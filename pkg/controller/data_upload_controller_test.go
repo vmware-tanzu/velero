@@ -24,11 +24,13 @@ import (
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/fake"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +41,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
@@ -60,10 +63,11 @@ const fakeSnapshotType velerov2alpha1api.SnapshotType = "fake-snapshot"
 
 type FakeClient struct {
 	kbclient.Client
-	getError    error
-	createError error
-	updateError error
-	patchError  error
+	getError       error
+	createError    error
+	updateError    error
+	patchError     error
+	updateConflict error
 }
 
 func (c *FakeClient) Get(ctx context.Context, key kbclient.ObjectKey, obj kbclient.Object) error {
@@ -87,6 +91,10 @@ func (c *FakeClient) Update(ctx context.Context, obj kbclient.Object, opts ...kb
 		return c.updateError
 	}
 
+	if c.updateConflict != nil {
+		return c.updateConflict
+	}
+
 	return c.Client.Update(ctx, obj, opts...)
 }
 
@@ -99,22 +107,18 @@ func (c *FakeClient) Patch(ctx context.Context, obj kbclient.Object, patch kbcli
 }
 
 func initDataUploaderReconciler(needError ...bool) (*DataUploadReconciler, error) {
-	var errs []error = make([]error, 4)
-	if len(needError) == 4 {
-		if needError[0] {
+	var errs []error = make([]error, 5)
+	for k, isError := range needError {
+		if k == 0 && isError {
 			errs[0] = fmt.Errorf("Get error")
-		}
-
-		if needError[1] {
+		} else if k == 1 && isError {
 			errs[1] = fmt.Errorf("Create error")
-		}
-
-		if needError[2] {
+		} else if k == 2 && isError {
 			errs[2] = fmt.Errorf("Update error")
-		}
-
-		if needError[3] {
+		} else if k == 3 && isError {
 			errs[3] = fmt.Errorf("Patch error")
+		} else if k == 4 && isError {
+			errs[4] = apierrors.NewConflict(velerov2alpha1api.Resource("datadownload"), dataDownloadName, errors.New("conflict"))
 		}
 	}
 
@@ -181,11 +185,18 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		Client: fake.NewClientBuilder().WithScheme(scheme).Build(),
 	}
 
-	if len(needError) == 4 {
-		fakeClient.getError = needError[0]
-		fakeClient.createError = needError[1]
-		fakeClient.updateError = needError[2]
-		fakeClient.patchError = needError[3]
+	for k := range needError {
+		if k == 0 {
+			fakeClient.getError = needError[0]
+		} else if k == 1 {
+			fakeClient.createError = needError[1]
+		} else if k == 2 {
+			fakeClient.updateError = needError[2]
+		} else if k == 3 {
+			fakeClient.patchError = needError[3]
+		} else if k == 4 {
+			fakeClient.updateConflict = needError[4]
+		}
 	}
 
 	fakeSnapshotClient := snapshotFake.NewSimpleClientset(vsObject, vscObj)
@@ -217,6 +228,7 @@ func dataUploadBuilder() *builder.DataUploadBuilder {
 		VolumeSnapshot: "fake-volume-snapshot",
 	}
 	return builder.ForDataUpload(velerov1api.DefaultNamespace, dataUploadName).
+		Labels(map[string]string{velerov1api.DataUploadLabel: dataUploadName}).
 		BackupStorageLocation("bsl-loc").
 		DataMover("velero").
 		SnapshotType("CSI").SourceNamespace("fake-ns").SourcePVC("test-pvc").CSISnapshot(csi)
@@ -298,6 +310,7 @@ func TestReconcile(t *testing.T) {
 		dataMgr             *datapath.Manager
 		expectedProcessed   bool
 		expected            *velerov2alpha1api.DataUpload
+		checkFunc           func(velerov2alpha1api.DataUpload) bool
 		expectedRequeue     ctrl.Result
 		expectedErrMsg      string
 		needErrs            []bool
@@ -380,6 +393,37 @@ func TestReconcile(t *testing.T) {
 			name:     "prepare timeout",
 			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).StartTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 5)}).Result(),
 			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
+		},
+		{
+			name: "Dataupload with enabled cancel",
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			du: func() *velerov2alpha1api.DataUpload {
+				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).Result()
+				controllerutil.AddFinalizer(du, dataUploadDownloadFinalizer)
+				du.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+				return du
+			}(),
+			expectedProcessed: false,
+			checkFunc: func(du velerov2alpha1api.DataUpload) bool {
+				return du.Spec.Cancel
+			},
+			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
+			expectedRequeue: ctrl.Result{},
+		},
+		{
+			name: "Dataupload with remove finalizer and should not be retrieved",
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			du: func() *velerov2alpha1api.DataUpload {
+				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).SnapshotType(fakeSnapshotType).Cancel(true).Result()
+				controllerutil.AddFinalizer(du, dataUploadDownloadFinalizer)
+				du.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+				return du
+			}(),
+			expectedProcessed: false,
+			checkFunc: func(du velerov2alpha1api.DataUpload) bool {
+				return !controllerutil.ContainsFinalizer(&du, dataUploadDownloadFinalizer)
+			},
+			expectedRequeue: ctrl.Result{},
 		},
 	}
 
@@ -465,6 +509,10 @@ func TestReconcile(t *testing.T) {
 
 			if !test.expectedProcessed {
 				assert.Equal(t, du.Status.CompletionTimestamp.IsZero(), true)
+			}
+
+			if test.checkFunc != nil {
+				assert.True(t, test.checkFunc(du))
 			}
 		})
 	}
@@ -751,5 +799,180 @@ func TestOnDuPrepareTimeout(t *testing.T) {
 		}, &du)
 
 		assert.Equal(t, test.expected.Status.Phase, du.Status.Phase)
+	}
+}
+
+func TestTryCancelDataUpload(t *testing.T) {
+	tests := []struct {
+		name        string
+		dd          *velerov2alpha1api.DataUpload
+		needErrs    []error
+		succeeded   bool
+		expectedErr string
+	}{
+		{
+			name:     "update fail",
+			dd:       dataUploadBuilder().Result(),
+			needErrs: []error{nil, nil, fmt.Errorf("fake-update-error"), nil},
+		},
+		{
+			name:     "cancel by others",
+			dd:       dataUploadBuilder().Result(),
+			needErrs: []error{nil, nil, &fakeAPIStatus{metav1.StatusReasonConflict}, nil},
+		},
+		{
+			name:      "succeed",
+			dd:        dataUploadBuilder().Result(),
+			needErrs:  []error{nil, nil, nil, nil},
+			succeeded: true,
+		},
+	}
+	for _, test := range tests {
+		ctx := context.Background()
+		r, err := initDataUploaderReconcilerWithError(test.needErrs...)
+		require.NoError(t, err)
+
+		err = r.client.Create(ctx, test.dd)
+		require.NoError(t, err)
+
+		r.TryCancelDataUpload(ctx, test.dd)
+
+		if test.expectedErr == "" {
+			assert.NoError(t, err)
+		} else {
+			assert.EqualError(t, err, test.expectedErr)
+		}
+	}
+}
+
+func TestUpdateDataUploadWithRetry(t *testing.T) {
+
+	namespacedName := types.NamespacedName{
+		Name:      dataUploadName,
+		Namespace: "velero",
+	}
+
+	// Define test cases
+	testCases := []struct {
+		Name      string
+		needErrs  []bool
+		ExpectErr bool
+	}{
+		{
+			Name:      "SuccessOnFirstAttempt",
+			needErrs:  []bool{false, false, false, false},
+			ExpectErr: false,
+		},
+		{
+			Name:      "Error get",
+			needErrs:  []bool{true, false, false, false, false},
+			ExpectErr: true,
+		},
+		{
+			Name:      "Error update",
+			needErrs:  []bool{false, false, true, false, false},
+			ExpectErr: true,
+		},
+		{
+			Name:      "Conflict with error timeout",
+			needErrs:  []bool{false, false, false, false, true},
+			ExpectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ctx, cancelFunc := context.WithTimeout(context.TODO(), time.Second*5)
+			defer cancelFunc()
+			r, err := initDataUploaderReconciler(tc.needErrs...)
+			require.NoError(t, err)
+			err = r.client.Create(ctx, dataUploadBuilder().Result())
+			require.NoError(t, err)
+			updateFunc := func(dataDownload *velerov2alpha1api.DataUpload) {
+				dataDownload.Spec.Cancel = true
+			}
+			err = UpdateDataUploadWithRetry(ctx, r.client, namespacedName, velerotest.NewLogger().WithField("name", tc.Name), updateFunc)
+			if tc.ExpectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestFindDataUploads(t *testing.T) {
+	tests := []struct {
+		name            string
+		pod             corev1.Pod
+		du              *velerov2alpha1api.DataUpload
+		expectedUploads []velerov2alpha1api.DataUpload
+		expectedError   bool
+	}{
+		// Test case 1: Pod with matching nodeName and DataUpload label
+		{
+			name: "MatchingPod",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "pod-1",
+					Labels: map[string]string{
+						velerov1api.DataUploadLabel: dataUploadName,
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node-1",
+				},
+			},
+			du: dataUploadBuilder().Result(),
+			expectedUploads: []velerov2alpha1api.DataUpload{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "velero",
+						Name:      dataUploadName,
+					},
+				},
+			},
+			expectedError: false,
+		},
+		// Test case 2: Pod with non-matching nodeName
+		{
+			name: "NonMatchingNodePod",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "pod-2",
+					Labels: map[string]string{
+						velerov1api.DataUploadLabel: dataUploadName,
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node-2",
+				},
+			},
+			du:              dataUploadBuilder().Result(),
+			expectedUploads: []velerov2alpha1api.DataUpload{},
+			expectedError:   false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r, err := initDataUploaderReconcilerWithError()
+			require.NoError(t, err)
+			r.nodeName = "node-1"
+			err = r.client.Create(ctx, test.du)
+			require.NoError(t, err)
+			err = r.client.Create(ctx, &test.pod)
+			require.NoError(t, err)
+			uploads, err := r.FindDataUploads(context.Background(), r.client, "velero")
+
+			if test.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, len(test.expectedUploads), len(uploads))
+			}
+		})
 	}
 }

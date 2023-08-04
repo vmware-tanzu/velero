@@ -36,6 +36,7 @@ import (
 	clientgofake "k8s.io/client-go/kubernetes/fake"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -68,25 +69,20 @@ func dataDownloadBuilder() *builder.DataDownloadBuilder {
 }
 
 func initDataDownloadReconciler(objects []runtime.Object, needError ...bool) (*DataDownloadReconciler, error) {
-	var errs []error = make([]error, 4)
-	if len(needError) == 4 {
-		if needError[0] {
+	var errs []error = make([]error, 5)
+	for k, isError := range needError {
+		if k == 0 && isError {
 			errs[0] = fmt.Errorf("Get error")
-		}
-
-		if needError[1] {
+		} else if k == 1 && isError {
 			errs[1] = fmt.Errorf("Create error")
-		}
-
-		if needError[2] {
+		} else if k == 2 && isError {
 			errs[2] = fmt.Errorf("Update error")
-		}
-
-		if needError[3] {
+		} else if k == 3 && isError {
 			errs[3] = fmt.Errorf("Patch error")
+		} else if k == 4 && isError {
+			errs[4] = apierrors.NewConflict(velerov2alpha1api.Resource("datadownload"), dataDownloadName, errors.New("conflict"))
 		}
 	}
-
 	return initDataDownloadReconcilerWithError(objects, errs...)
 }
 
@@ -109,12 +105,20 @@ func initDataDownloadReconcilerWithError(objects []runtime.Object, needError ...
 		Client: fake.NewClientBuilder().WithScheme(scheme).Build(),
 	}
 
-	if len(needError) == 4 {
-		fakeClient.getError = needError[0]
-		fakeClient.createError = needError[1]
-		fakeClient.updateError = needError[2]
-		fakeClient.patchError = needError[3]
+	for k := range needError {
+		if k == 0 {
+			fakeClient.getError = needError[0]
+		} else if k == 1 {
+			fakeClient.createError = needError[1]
+		} else if k == 2 {
+			fakeClient.updateError = needError[2]
+		} else if k == 3 {
+			fakeClient.patchError = needError[3]
+		} else if k == 4 {
+			fakeClient.updateConflict = needError[4]
+		}
 	}
+
 	var fakeKubeClient *clientgofake.Clientset
 	if len(objects) != 0 {
 		fakeKubeClient = clientgofake.NewSimpleClientset(objects...)
@@ -172,6 +176,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 		mockClose         bool
 		expected          *velerov2alpha1api.DataDownload
 		expectedStatusMsg string
+		checkFunc         func(du velerov2alpha1api.DataDownload) bool
 		expectedResult    *ctrl.Result
 	}{
 		{
@@ -290,6 +295,31 @@ func TestDataDownloadReconcile(t *testing.T) {
 			dd:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).StartTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 5)}).Result(),
 			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Result(),
 		},
+		{
+			name: "dataDownload with enabled cancel",
+			dd: func() *velerov2alpha1api.DataDownload {
+				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result()
+				controllerutil.AddFinalizer(dd, dataUploadDownloadFinalizer)
+				dd.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+				return dd
+			}(),
+			checkFunc: func(du velerov2alpha1api.DataDownload) bool {
+				return du.Spec.Cancel
+			},
+			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
+		},
+		{
+			name: "dataDownload with remove finalizer and should not be retrieved",
+			dd: func() *velerov2alpha1api.DataDownload {
+				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Cancel(true).Result()
+				controllerutil.AddFinalizer(dd, dataUploadDownloadFinalizer)
+				dd.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+				return dd
+			}(),
+			checkFunc: func(dd velerov2alpha1api.DataDownload) bool {
+				return !controllerutil.ContainsFinalizer(&dd, dataUploadDownloadFinalizer)
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -398,7 +428,11 @@ func TestDataDownloadReconcile(t *testing.T) {
 				assert.Contains(t, dd.Status.Message, test.expectedStatusMsg)
 			}
 			if test.dd.Namespace == velerov1api.DefaultNamespace {
-				require.Nil(t, err)
+				if controllerutil.ContainsFinalizer(test.dd, dataUploadDownloadFinalizer) {
+					assert.True(t, true, apierrors.IsNotFound(err))
+				} else {
+					require.Nil(t, err)
+				}
 			} else {
 				assert.True(t, true, apierrors.IsNotFound(err))
 			}
@@ -725,5 +759,180 @@ func TestOnDdPrepareTimeout(t *testing.T) {
 		}, &dd)
 
 		assert.Equal(t, test.expected.Status.Phase, dd.Status.Phase)
+	}
+}
+
+func TestTryCancelDataDownload(t *testing.T) {
+	tests := []struct {
+		name        string
+		dd          *velerov2alpha1api.DataDownload
+		needErrs    []error
+		succeeded   bool
+		expectedErr string
+	}{
+		{
+			name:     "update fail",
+			dd:       dataDownloadBuilder().Result(),
+			needErrs: []error{nil, nil, fmt.Errorf("fake-update-error"), nil},
+		},
+		{
+			name:     "cancel by others",
+			dd:       dataDownloadBuilder().Result(),
+			needErrs: []error{nil, nil, &fakeAPIStatus{metav1.StatusReasonConflict}, nil},
+		},
+		{
+			name:      "succeed",
+			dd:        dataDownloadBuilder().Result(),
+			needErrs:  []error{nil, nil, nil, nil},
+			succeeded: true,
+		},
+	}
+	for _, test := range tests {
+		ctx := context.Background()
+		r, err := initDataDownloadReconcilerWithError(nil, test.needErrs...)
+		require.NoError(t, err)
+
+		err = r.client.Create(ctx, test.dd)
+		require.NoError(t, err)
+
+		r.TryCancelDataDownload(ctx, test.dd)
+
+		if test.expectedErr == "" {
+			assert.NoError(t, err)
+		} else {
+			assert.EqualError(t, err, test.expectedErr)
+		}
+	}
+}
+
+func TestUpdateDataDownloadWithRetry(t *testing.T) {
+
+	namespacedName := types.NamespacedName{
+		Name:      dataDownloadName,
+		Namespace: "velero",
+	}
+
+	// Define test cases
+	testCases := []struct {
+		Name      string
+		needErrs  []bool
+		ExpectErr bool
+	}{
+		{
+			Name:      "SuccessOnFirstAttempt",
+			needErrs:  []bool{false, false, false, false},
+			ExpectErr: false,
+		},
+		{
+			Name:      "Error get",
+			needErrs:  []bool{true, false, false, false, false},
+			ExpectErr: true,
+		},
+		{
+			Name:      "Error update",
+			needErrs:  []bool{false, false, true, false, false},
+			ExpectErr: true,
+		},
+		{
+			Name:      "Conflict with error timeout",
+			needErrs:  []bool{false, false, false, false, true},
+			ExpectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			ctx, cancelFunc := context.WithTimeout(context.TODO(), time.Second*5)
+			defer cancelFunc()
+			r, err := initDataDownloadReconciler(nil, tc.needErrs...)
+			require.NoError(t, err)
+			err = r.client.Create(ctx, dataDownloadBuilder().Result())
+			require.NoError(t, err)
+			updateFunc := func(dataDownload *velerov2alpha1api.DataDownload) {
+				dataDownload.Spec.Cancel = true
+			}
+			err = UpdateDataDownloadWithRetry(ctx, r.client, namespacedName, velerotest.NewLogger().WithField("name", tc.Name), updateFunc)
+			if tc.ExpectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestFindDataDownloads(t *testing.T) {
+	tests := []struct {
+		name            string
+		pod             corev1.Pod
+		du              *velerov2alpha1api.DataDownload
+		expectedUploads []velerov2alpha1api.DataDownload
+		expectedError   bool
+	}{
+		// Test case 1: Pod with matching nodeName and DataDownload label
+		{
+			name: "MatchingPod",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "pod-1",
+					Labels: map[string]string{
+						velerov1api.DataDownloadLabel: dataDownloadName,
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node-1",
+				},
+			},
+			du: dataDownloadBuilder().Result(),
+			expectedUploads: []velerov2alpha1api.DataDownload{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "velero",
+						Name:      dataDownloadName,
+					},
+				},
+			},
+			expectedError: false,
+		},
+		// Test case 2: Pod with non-matching nodeName
+		{
+			name: "NonMatchingNodePod",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "pod-2",
+					Labels: map[string]string{
+						velerov1api.DataDownloadLabel: dataDownloadName,
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node-2",
+				},
+			},
+			du:              dataDownloadBuilder().Result(),
+			expectedUploads: []velerov2alpha1api.DataDownload{},
+			expectedError:   false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r, err := initDataDownloadReconcilerWithError(nil)
+			require.NoError(t, err)
+			r.nodeName = "node-1"
+			err = r.client.Create(ctx, test.du)
+			require.NoError(t, err)
+			err = r.client.Create(ctx, &test.pod)
+			require.NoError(t, err)
+			uploads, err := r.FindDataDownloads(context.Background(), r.client, "velero")
+
+			if test.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, len(test.expectedUploads), len(uploads))
+			}
+		})
 	}
 }

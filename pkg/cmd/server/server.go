@@ -40,6 +40,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -1107,10 +1108,13 @@ func markDataUploadsCancel(ctx context.Context, client ctrlclient.Client, backup
 		if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted ||
 			du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared ||
 			du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
-			updated := du.DeepCopy()
-			updated.Spec.Cancel = true
-			updated.Status.Message = fmt.Sprintf("found a dataupload with status %q during the velero server starting, mark it as cancel", du.Status.Phase)
-			if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&du)); err != nil {
+			err := controller.UpdateDataUploadWithRetry(ctx, client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, log.WithField("dataupload", du.Name),
+				func(dataUpload *velerov2alpha1api.DataUpload) {
+					dataUpload.Spec.Cancel = true
+					dataUpload.Status.Message = fmt.Sprintf("found a dataupload with status %q during the velero server starting, mark it as cancel", du.Status.Phase)
+				})
+
+			if err != nil {
 				log.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", du.GetName())
 				continue
 			}
@@ -1132,10 +1136,13 @@ func markDataDownloadsCancel(ctx context.Context, client ctrlclient.Client, rest
 		if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted ||
 			dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared ||
 			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
-			updated := dd.DeepCopy()
-			updated.Spec.Cancel = true
-			updated.Status.Message = fmt.Sprintf("found a datadownload with status %q during the velero server starting, mark it as cancel", dd.Status.Phase)
-			if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&dd)); err != nil {
+			err := controller.UpdateDataDownloadWithRetry(ctx, client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, log.WithField("datadownload", dd.Name),
+				func(dataDownload *velerov2alpha1api.DataDownload) {
+					dataDownload.Spec.Cancel = true
+					dataDownload.Status.Message = fmt.Sprintf("found a datadownload with status %q during the velero server starting, mark it as cancel", dd.Status.Phase)
+				})
+
+			if err != nil {
 				log.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", dd.GetName())
 				continue
 			}

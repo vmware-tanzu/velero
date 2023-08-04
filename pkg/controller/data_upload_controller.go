@@ -27,11 +27,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -54,8 +56,10 @@ import (
 )
 
 const (
-	dataUploadDownloadRequestor string        = "snapshot-data-upload-download"
-	preparingMonitorFrequency   time.Duration = time.Minute
+	dataUploadDownloadRequestor = "snapshot-data-upload-download"
+	acceptNodeLabelKey          = "velero.io/accepted-by"
+	dataUploadDownloadFinalizer = "velero.io/data-upload-download-finalizer"
+	preparingMonitorFrequency   = time.Minute
 )
 
 // DataUploadReconciler reconciles a DataUpload object
@@ -107,8 +111,8 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		"dataupload": req.NamespacedName,
 	})
 	log.Infof("Reconcile %s", req.Name)
-	var du velerov2alpha1api.DataUpload
-	if err := r.client.Get(ctx, req.NamespacedName, &du); err != nil {
+	du := &velerov2alpha1api.DataUpload{}
+	if err := r.client.Get(ctx, req.NamespacedName, du); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Debug("Unable to find DataUpload")
 			return ctrl.Result{}, nil
@@ -123,15 +127,42 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	ep, ok := r.snapshotExposerList[du.Spec.SnapshotType]
 	if !ok {
-		return r.errorOut(ctx, &du, errors.Errorf("%s type of snapshot exposer is not exist", du.Spec.SnapshotType), "not exist type of exposer", log)
+		return r.errorOut(ctx, du, errors.Errorf("%s type of snapshot exposer is not exist", du.Spec.SnapshotType), "not exist type of exposer", log)
+	}
+
+	// Logic for clear resources when dataupload been deleted
+	if du.DeletionTimestamp.IsZero() { // add finalizer for all cr at beginning
+		if !isDataUploadInFinalState(du) && !controllerutil.ContainsFinalizer(du, dataUploadDownloadFinalizer) {
+			succeeded, err := r.exclusiveUpdateDataUpload(ctx, du, func(du *velerov2alpha1api.DataUpload) {
+				controllerutil.AddFinalizer(du, dataUploadDownloadFinalizer)
+			})
+
+			if err != nil {
+				log.Errorf("failed to add finalizer with error %s for %s/%s", err.Error(), du.Namespace, du.Name)
+				return ctrl.Result{}, err
+			} else if !succeeded {
+				log.Warnf("failed to add finilizer for %s/%s and will requeue later", du.Namespace, du.Name)
+				return ctrl.Result{Requeue: true}, nil
+			}
+		}
+	} else if controllerutil.ContainsFinalizer(du, dataUploadDownloadFinalizer) && !du.Spec.Cancel && !isDataUploadInFinalState(du) {
+		// when delete cr we need to clear up internal resources created by Velero, here we use the cancel mechanism
+		// to help clear up resources instead of clear them directly in case of some conflict with Expose action
+		if err := UpdateDataUploadWithRetry(ctx, r.client, req.NamespacedName, log, func(dataUpload *velerov2alpha1api.DataUpload) {
+			dataUpload.Spec.Cancel = true
+			dataUpload.Status.Message = fmt.Sprintf("found a dataupload %s/%s is being deleted, mark it as cancel", du.Namespace, du.Name)
+		}); err != nil {
+			log.Errorf("failed to set cancel flag with error %s for %s/%s", err.Error(), du.Namespace, du.Name)
+			return ctrl.Result{}, err
+		}
 	}
 
 	if du.Status.Phase == "" || du.Status.Phase == velerov2alpha1api.DataUploadPhaseNew {
 		log.Info("Data upload starting")
 
-		accepted, err := r.acceptDataUpload(ctx, &du)
+		accepted, err := r.acceptDataUpload(ctx, du)
 		if err != nil {
-			return r.errorOut(ctx, &du, err, "error to accept the data upload", log)
+			return r.errorOut(ctx, du, err, "error to accept the data upload", log)
 		}
 
 		if !accepted {
@@ -146,22 +177,55 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, nil
 		}
 
-		exposeParam := r.setupExposeParam(&du)
+		exposeParam := r.setupExposeParam(du)
 
-		if err := ep.Expose(ctx, getOwnerObject(&du), exposeParam); err != nil {
-			return r.errorOut(ctx, &du, err, "error to expose snapshot", log)
-		}
-		log.Info("Snapshot is exposed")
 		// Expose() will trigger to create one pod whose volume is restored by a given volume snapshot,
 		// but the pod maybe is not in the same node of the current controller, so we need to return it here.
 		// And then only the controller who is in the same node could do the rest work.
+		if err := ep.Expose(ctx, getOwnerObject(du), exposeParam); err != nil {
+			if err := r.client.Get(ctx, req.NamespacedName, du); err != nil {
+				if !apierrors.IsNotFound(err) {
+					return ctrl.Result{}, errors.Wrap(err, "getting DataUpload")
+				}
+			}
+			if isDataUploadInFinalState(du) {
+				log.Warnf("expose snapshot with err %v but it may caused by clean up resources in cancel action", err)
+				r.cleanUp(ctx, du, log)
+				return ctrl.Result{}, nil
+			} else {
+				return r.errorOut(ctx, du, err, "error to expose snapshot", log)
+			}
+		}
+
+		log.Info("Snapshot is exposed")
+
+		// we need to get CR again for it may canceled by dataupload controller on other
+		// nodes when doing expose action, if detectd cancel action we need to clear up the internal
+		// resources created by velero during backup.
+		if err := r.client.Get(ctx, req.NamespacedName, du); err != nil {
+			if apierrors.IsNotFound(err) {
+				log.Debug("Unable to find DataUpload")
+				return ctrl.Result{}, nil
+			}
+			return ctrl.Result{}, errors.Wrap(err, "getting DataUpload")
+		}
+
+		// we need to clean up resources as resources created in Expose it may later than cancel action or prepare time
+		// and need to clean up resources again
+		if isDataUploadInFinalState(du) {
+			r.cleanUp(ctx, du, log)
+		}
+
 		return ctrl.Result{}, nil
 	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted {
 		if du.Spec.Cancel {
-			r.OnDataUploadCancelled(ctx, du.GetNamespace(), du.GetName())
+			// we don't want to update CR into cancel status forcely as it may conflict with CR update in Expose action
+			// we could retry when the CR requeue in periodcally
+			log.Debugf("Data upload is been canceled %s in Phase %s", du.GetName(), du.Status.Phase)
+			r.TryCancelDataUpload(ctx, du)
 		} else if du.Status.StartTimestamp != nil {
 			if time.Since(du.Status.StartTimestamp.Time) >= r.preparingTimeout {
-				r.onPrepareTimeout(ctx, &du)
+				r.onPrepareTimeout(ctx, du)
 			}
 		}
 
@@ -179,10 +243,10 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			log.Info("Cancellable data path is already started")
 			return ctrl.Result{}, nil
 		}
-		waitExposePara := r.setupWaitExposePara(&du)
-		res, err := ep.GetExposed(ctx, getOwnerObject(&du), du.Spec.OperationTimeout.Duration, waitExposePara)
+		waitExposePara := r.setupWaitExposePara(du)
+		res, err := ep.GetExposed(ctx, getOwnerObject(du), du.Spec.OperationTimeout.Duration, waitExposePara)
 		if err != nil {
-			return r.errorOut(ctx, &du, err, "exposed snapshot is not ready", log)
+			return r.errorOut(ctx, du, err, "exposed snapshot is not ready", log)
 		} else if res == nil {
 			log.Debug("Get empty exposer")
 			return ctrl.Result{}, nil
@@ -204,19 +268,19 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				log.Info("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Minute}, nil
 			} else {
-				return r.errorOut(ctx, &du, err, "error to create data path", log)
+				return r.errorOut(ctx, du, err, "error to create data path", log)
 			}
 		}
 
 		// Update status to InProgress
 		original := du.DeepCopy()
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseInProgress
-		if err := r.client.Patch(ctx, &du, client.MergeFrom(original)); err != nil {
-			return r.errorOut(ctx, &du, err, "error updating dataupload status", log)
+		if err := r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
+			return r.errorOut(ctx, du, err, "error updating dataupload status", log)
 		}
 
 		log.Info("Data upload is marked as in progress")
-		result, err := r.runCancelableDataUpload(ctx, fsBackup, &du, res, log)
+		result, err := r.runCancelableDataUpload(ctx, fsBackup, du, res, log)
 		if err != nil {
 			log.Errorf("Failed to run cancelable data path for %s with err %v", du.Name, err)
 			r.closeDataPath(ctx, du.Name)
@@ -234,7 +298,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			// Update status to Canceling.
 			original := du.DeepCopy()
 			du.Status.Phase = velerov2alpha1api.DataUploadPhaseCanceling
-			if err := r.client.Patch(ctx, &du, client.MergeFrom(original)); err != nil {
+			if err := r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
 				log.WithError(err).Error("error updating data upload into canceling status")
 				return ctrl.Result{}, err
 			}
@@ -243,7 +307,15 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 		return ctrl.Result{}, nil
 	} else {
-		log.Debugf("Data upload now is in %s phase and do nothing by current %s controller", du.Status.Phase, r.nodeName)
+		// put the finilizer remove action here for all cr will goes to the final status, we could check finalizer and do remove action in final status
+		// instead of intermediate state
+		if isDataUploadInFinalState(du) && !du.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(du, dataUploadDownloadFinalizer) {
+			original := du.DeepCopy()
+			controllerutil.RemoveFinalizer(du, dataUploadDownloadFinalizer)
+			if err := r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
+				log.WithError(err).Error("error to remove finalizer")
+			}
+		}
 		return ctrl.Result{}, nil
 	}
 }
@@ -341,33 +413,64 @@ func (r *DataUploadReconciler) OnDataUploadCancelled(ctx context.Context, namesp
 
 	log.Warn("Async fs backup data path canceled")
 
-	var du velerov2alpha1api.DataUpload
-	if getErr := r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, &du); getErr != nil {
+	du := &velerov2alpha1api.DataUpload{}
+	if getErr := r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, du); getErr != nil {
 		log.WithError(getErr).Warn("Failed to get dataupload on cancel")
 	} else {
 		// cleans up any objects generated during the snapshot expose
-		ep, ok := r.snapshotExposerList[du.Spec.SnapshotType]
-		if !ok {
-			log.WithError(fmt.Errorf("%v type of snapshot exposer is not exist", du.Spec.SnapshotType)).
-				Warn("Failed to clean up resources on canceled")
-		} else {
-			var volumeSnapshotName string
-			if du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI { // Other exposer should have another condition
-				volumeSnapshotName = du.Spec.CSISnapshot.VolumeSnapshot
-			}
-			ep.CleanUp(ctx, getOwnerObject(&du), volumeSnapshotName, du.Spec.SourceNamespace)
-		}
+		r.cleanUp(ctx, du, log)
 		original := du.DeepCopy()
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseCanceled
 		if du.Status.StartTimestamp.IsZero() {
 			du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		}
 		du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
-		if err := r.client.Patch(ctx, &du, client.MergeFrom(original)); err != nil {
+		if err := r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("error updating DataUpload status")
 		} else {
 			r.metrics.RegisterDataUploadCancel(r.nodeName)
 		}
+	}
+}
+
+// TryCancelDataUpload clear up resources only when update success
+func (r *DataUploadReconciler) TryCancelDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload) {
+	log := r.logger.WithField("dataupload", du.Name)
+	log.Warn("Async fs backup data path canceled")
+	succeeded, err := r.exclusiveUpdateDataUpload(ctx, du, func(dataUpload *velerov2alpha1api.DataUpload) {
+		dataUpload.Status.Phase = velerov2alpha1api.DataUploadPhaseCanceled
+		if dataUpload.Status.StartTimestamp.IsZero() {
+			dataUpload.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
+		}
+		dataUpload.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
+	})
+
+	if err != nil {
+		log.WithError(err).Error("error updating dataupload status")
+		return
+	} else if !succeeded {
+		log.Warn("conflict in updating dataupload status and will try it again later")
+		return
+	}
+
+	// success update
+	r.metrics.RegisterDataUploadCancel(r.nodeName)
+	// cleans up any objects generated during the snapshot expose
+	r.cleanUp(ctx, du, log)
+	r.closeDataPath(ctx, du.Name)
+}
+
+func (r *DataUploadReconciler) cleanUp(ctx context.Context, du *velerov2alpha1api.DataUpload, log *logrus.Entry) {
+	ep, ok := r.snapshotExposerList[du.Spec.SnapshotType]
+	if !ok {
+		log.WithError(fmt.Errorf("%v type of snapshot exposer is not exist", du.Spec.SnapshotType)).
+			Warn("Failed to clean up resources on canceled")
+	} else {
+		var volumeSnapshotName string
+		if du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI { // Other exposer should have another condition
+			volumeSnapshotName = du.Spec.CSISnapshot.VolumeSnapshot
+		}
+		ep.CleanUp(ctx, getOwnerObject(du), volumeSnapshotName, du.Spec.SourceNamespace)
 	}
 }
 
@@ -451,7 +554,6 @@ func (r *DataUploadReconciler) findDataUploadForPod(podObj client.Object) []reco
 	}
 
 	r.logger.WithField("Backup pod", pod.Name).Infof("Preparing dataupload %s", du.Name)
-
 	// we don't expect anyone else update the CR during the Prepare process
 	updated, err := r.exclusiveUpdateDataUpload(context.Background(), du, r.prepareDataUpload)
 	if err != nil || !updated {
@@ -511,6 +613,7 @@ func (r *DataUploadReconciler) errorOut(ctx context.Context, du *velerov2alpha1a
 	} else {
 		err = errors.Wrapf(err, "failed to clean up exposed snapshot with could not find %s snapshot exposer", du.Spec.SnapshotType)
 	}
+
 	return ctrl.Result{}, r.updateStatusToFailed(ctx, du, err, msg, log)
 }
 
@@ -537,16 +640,27 @@ func (r *DataUploadReconciler) acceptDataUpload(ctx context.Context, du *velerov
 
 	// For all data upload controller in each node-agent will try to update dataupload CR, and only one controller will success,
 	// and the success one could handle later logic
-	succeeded, err := r.exclusiveUpdateDataUpload(ctx, du, func(du *velerov2alpha1api.DataUpload) {
-		du.Status.Phase = velerov2alpha1api.DataUploadPhaseAccepted
-		du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
-	})
+	updated := du.DeepCopy()
+
+	updateFunc := func(dataUpload *velerov2alpha1api.DataUpload) {
+		dataUpload.Status.Phase = velerov2alpha1api.DataUploadPhaseAccepted
+		dataUpload.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
+		labels := dataUpload.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+		labels[acceptNodeLabelKey] = r.nodeName
+		dataUpload.SetLabels(labels)
+	}
+
+	succeeded, err := r.exclusiveUpdateDataUpload(ctx, updated, updateFunc)
 
 	if err != nil {
 		return false, err
 	}
 
 	if succeeded {
+		updateFunc(du) // If update success, it's need to update du values in memory
 		r.logger.WithField("Dataupload", du.Name).Infof("This datauplod has been accepted by %s", r.nodeName)
 		return true, nil
 	}
@@ -595,13 +709,15 @@ func (r *DataUploadReconciler) onPrepareTimeout(ctx context.Context, du *velerov
 
 func (r *DataUploadReconciler) exclusiveUpdateDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload,
 	updateFunc func(*velerov2alpha1api.DataUpload)) (bool, error) {
-	updated := du.DeepCopy()
-	updateFunc(updated)
+	updateFunc(du)
 
-	err := r.client.Update(ctx, updated)
+	err := r.client.Update(ctx, du)
 	if err == nil {
 		return true, nil
-	} else if apierrors.IsConflict(err) {
+	}
+
+	// warn we won't rollback du values in memory when error
+	if apierrors.IsConflict(err) {
 		return false, nil
 	} else {
 		return false, err
@@ -665,4 +781,31 @@ func findDataUploadByPod(client client.Client, pod corev1.Pod) (*velerov2alpha1a
 		return du, nil
 	}
 	return nil, nil
+}
+
+func isDataUploadInFinalState(du *velerov2alpha1api.DataUpload) bool {
+	return du.Status.Phase == velerov2alpha1api.DataUploadPhaseFailed ||
+		du.Status.Phase == velerov2alpha1api.DataUploadPhaseCanceled ||
+		du.Status.Phase == velerov2alpha1api.DataUploadPhaseCompleted
+}
+
+func UpdateDataUploadWithRetry(ctx context.Context, client client.Client, namespacedName types.NamespacedName, log *logrus.Entry, updateFunc func(dataUpload *velerov2alpha1api.DataUpload)) error {
+	return wait.PollUntilWithContext(ctx, time.Second, func(ctx context.Context) (done bool, err error) {
+		du := &velerov2alpha1api.DataUpload{}
+		if err := client.Get(ctx, namespacedName, du); err != nil {
+			return false, errors.Wrap(err, "getting DataUpload")
+		}
+
+		updateFunc(du)
+		updateErr := client.Update(ctx, du)
+		if updateErr != nil {
+			if apierrors.IsConflict(updateErr) {
+				log.Warnf("failed to update dataupload for %s/%s and will retry it", du.Namespace, du.Name)
+				return false, nil
+			}
+			log.Errorf("failed to update dataupload with error %s for %s/%s", updateErr.Error(), du.Namespace, du.Name)
+			return false, err
+		}
+		return true, nil
+	})
 }
