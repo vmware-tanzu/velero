@@ -48,7 +48,7 @@ func TestGetPodVolumeHostPath(t *testing.T) {
 			},
 			pod: builder.ForPod(velerov1api.DefaultNamespace, "fake-pod-1").Result(),
 			pvc: "fake-pvc-1",
-			err: "error getting volume directory name for pvc fake-pvc-1 in pod fake-pod-1: fake-error-1",
+			err: "error getting volume directory name for volume fake-pvc-1 in pod fake-pod-1: fake-error-1",
 		},
 		{
 			name: "single path match fail",
@@ -60,7 +60,7 @@ func TestGetPodVolumeHostPath(t *testing.T) {
 			},
 			pod: builder.ForPod(velerov1api.DefaultNamespace, "fake-pod-2").Result(),
 			pvc: "fake-pvc-1",
-			err: "error identifying unique volume path on host for pvc fake-pvc-1 in pod fake-pod-2: fake-error-2",
+			err: "error identifying unique volume path on host for volume fake-pvc-1 in pod fake-pod-2: fake-error-2",
 		},
 	}
 
