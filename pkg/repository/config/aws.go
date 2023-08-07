@@ -70,7 +70,7 @@ func GetS3Credentials(config map[string]string) (*credentials.Value, error) {
 		return nil, errors.New("missing credential file")
 	}
 
-	creds := credentials.NewSharedCredentials(credentialsFile, "")
+	creds := credentials.NewSharedCredentials(credentialsFile, config[awsProfileKey])
 	credValue, err := creds.Get()
 	if err != nil {
 		return nil, err
