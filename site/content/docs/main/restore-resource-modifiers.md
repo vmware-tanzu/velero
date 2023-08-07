@@ -25,22 +25,22 @@ Below is the two-step of using resource modifiers to modify the resources during
 **YAML template**
 
 - Yaml template:
-    ```yaml
-   version: v1
-   resourceModifierRules:
-   - conditions:
-      groupKind: persistentvolumeclaims
-      resourceNameRegex: "^mysql.*$"
-      namespaces:
-      - bar
-      - foo
-   patches:
-   - operation: replace
-      path: "/spec/storageClassName"
-      value: "premium"
-   - operation: remove
-      path: "/metadata/labels/test"
-    ```
+```yaml
+version: v1
+resourceModifierRules:
+- conditions:
+     groupKind: persistentvolumeclaims
+     resourceNameRegex: "^mysql.*$"
+     namespaces:
+     - bar
+     - foo
+  patches:
+  - operation: replace
+    path: "/spec/storageClassName"
+    value: "premium"
+  - operation: remove
+    path: "/metadata/labels/test"
+ ```
 
 - The above configmap will apply the JSON Patch to all the PVCs in the namespaces bar and foo with name starting with mysql. The JSON Patch will replace the storageClassName with "premium" and remove the label "test" from the PVCs.
 - You can specify multiple JSON Patches for a particular resource. The patches will be applied in the order specified in the configmap. A subsequent patch is applied in order and if multiple patches are specified for the same path, the last patch will override the previous patches.
