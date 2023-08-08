@@ -59,6 +59,13 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 				cmd.CheckError(err)
 			}
 
+			// Append "(Deleting)" to phase if deletionTimestamp is marked.
+			for i := range restores.Items {
+				if !restores.Items[i].DeletionTimestamp.IsZero() {
+					restores.Items[i].Status.Phase += " (Deleting)"
+				}
+			}
+
 			if printed, err := output.PrintWithFormat(c, restores); printed || err != nil {
 				cmd.CheckError(err)
 				return

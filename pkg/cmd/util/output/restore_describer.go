@@ -45,6 +45,12 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 			phase = velerov1api.RestorePhaseNew
 		}
 		phaseString := string(phase)
+
+		// Append "Deleting" to phaseString if deletionTimestamp is marked.
+		if !restore.DeletionTimestamp.IsZero() {
+			phaseString += " (Deleting)"
+		}
+
 		switch phase {
 		case velerov1api.RestorePhaseCompleted:
 			phaseString = color.GreenString(phaseString)
