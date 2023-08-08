@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"strconv"
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -117,7 +118,24 @@ func (r *ResourceModifierRule) PatchArrayToByteArray() ([]byte, error) {
 }
 
 func (p *JSONPatch) ToString() string {
-	if strings.Contains(p.Value, "\"") {
+	// if value is empty, then add empty quotes
+	if p.Value == "" {
+		return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": ""}`, p.Operation, p.From, p.Path)
+	}
+	// if value is null, then don't add quotes
+	if p.Value == "null" {
+		return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": %s}`, p.Operation, p.From, p.Path, p.Value)
+	}
+	// if value is a boolean, then don't add quotes
+	if _, err := strconv.ParseBool(p.Value); err == nil {
+		return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": %s}`, p.Operation, p.From, p.Path, p.Value)
+	}
+	// if value is a json object or array, then don't add quotes
+	if strings.Contains(p.Value, "\"") || strings.Contains(p.Value, "[") || strings.Contains(p.Value, "{") {
+		return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": %s}`, p.Operation, p.From, p.Path, p.Value)
+	}
+	// if value is a number, then don't add quotes
+	if _, err := strconv.ParseFloat(p.Value, 64); err == nil {
 		return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": %s}`, p.Operation, p.From, p.Path, p.Value)
 	}
 	return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": "%s"}`, p.Operation, p.From, p.Path, p.Value)

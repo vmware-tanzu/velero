@@ -185,7 +185,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				"namespace": "foo",
 			},
 			"spec": map[string]interface{}{
-				"replicas": "1",
+				"replicas": int64(1),
 				"template": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"labels": map[string]interface{}{
@@ -213,7 +213,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				"namespace": "foo",
 			},
 			"spec": map[string]interface{}{
-				"replicas": "2",
+				"replicas": int64(2),
 				"template": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"labels": map[string]interface{}{
@@ -241,7 +241,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				"namespace": "foo",
 			},
 			"spec": map[string]interface{}{
-				"replicas": "1",
+				"replicas": int64(1),
 				"template": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"labels": map[string]interface{}{
@@ -614,7 +614,7 @@ func TestJSONPatch_ToString(t *testing.T) {
 				Path:      "/spec/replicas",
 				Value:     "1",
 			},
-			want: `{"op": "test", "from": "", "path": "/spec/replicas", "value": "1"}`,
+			want: `{"op": "test", "from": "", "path": "/spec/replicas", "value": 1}`,
 		},
 		{
 			name: "replace",
@@ -623,7 +623,7 @@ func TestJSONPatch_ToString(t *testing.T) {
 				Path:      "/spec/replicas",
 				Value:     "2",
 			},
-			want: `{"op": "replace", "from": "", "path": "/spec/replicas", "value": "2"}`,
+			want: `{"op": "replace", "from": "", "path": "/spec/replicas", "value": 2}`,
 		},
 		{
 			name: "add complex interfaces",

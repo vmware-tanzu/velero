@@ -38,6 +38,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/pv-backup"
 	. "github.com/vmware-tanzu/velero/test/e2e/resource-filtering"
+	. "github.com/vmware-tanzu/velero/test/e2e/resourcemodifiers"
 	. "github.com/vmware-tanzu/velero/test/e2e/resourcepolicies"
 	. "github.com/vmware-tanzu/velero/test/e2e/scale"
 	. "github.com/vmware-tanzu/velero/test/e2e/schedule"
@@ -117,6 +118,8 @@ var _ = Describe("[ResourceFiltering][IncludeResources][Backup] Velero test on i
 var _ = Describe("[ResourceFiltering][IncludeResources][Restore] Velero test on include resources from the cluster restore", RestoreWithIncludeResources)
 var _ = Describe("[ResourceFiltering][LabelSelector] Velero test on backup include resources matching the label selector", BackupWithLabelSelector)
 var _ = Describe("[ResourceFiltering][ResourcePolicies] Velero test on skip backup of volume by resource policies", ResourcePoliciesTest)
+
+var _ = Describe("[ResourceModifier][Restore] Velero test on resource modifiers from the cluster restore", ResourceModifiersTest)
 
 var _ = Describe("[Backups][Deletion][Restic] Velero tests of Restic backup deletion", BackupDeletionWithRestic)
 var _ = Describe("[Backups][Deletion][Snapshot] Velero tests of snapshot backup deletion", BackupDeletionWithSnapshots)

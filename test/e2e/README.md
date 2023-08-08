@@ -126,7 +126,7 @@ For programming conventions, Take ResourcePoliciesCase case for example:
 ##### CreateResources
 - It's better to set a global timeout in CreateResources function which is the real beginning of one e2e test
 ##### Destroy
-- It's only clean up resources in currently test namespaces, if wantting to clean up all resources including resources created which is not in currently test namespaces, it's better to override base Destroy function
+- It's only clean up resources in currently test namespaces, if you wish to clean up all resources including resources created which are not in currently test namespaces, it's better to override base Destroy function
 ##### Clean
 - Clean function only clean resources in namespaces which has the prefix CaseBaseName. So the the names of test namespaces should start with prefix of CaseBaseName.
 - If wantting to clean up all resources including resources created which is not in currently test namespaces, it's better to override base Clean function
