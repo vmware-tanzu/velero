@@ -34,23 +34,23 @@ var getVolumeDirectory = kube.GetVolumeDirectory
 var singlePathMatch = kube.SinglePathMatch
 
 // GetPodVolumeHostPath returns a path that can be accessed from the host for a given volume of a pod
-func GetPodVolumeHostPath(ctx context.Context, pod *corev1.Pod, pvcName string,
+func GetPodVolumeHostPath(ctx context.Context, pod *corev1.Pod, volumeName string,
 	cli ctrlclient.Client, fs filesystem.Interface, log logrus.FieldLogger) (datapath.AccessPoint, error) {
-	logger := log.WithField("pod name", pod.Name).WithField("pod UID", pod.GetUID()).WithField("pvc", pvcName)
+	logger := log.WithField("pod name", pod.Name).WithField("pod UID", pod.GetUID()).WithField("volume", volumeName)
 
-	volDir, err := getVolumeDirectory(ctx, logger, pod, pvcName, cli)
+	volDir, err := getVolumeDirectory(ctx, logger, pod, volumeName, cli)
 	if err != nil {
-		return datapath.AccessPoint{}, errors.Wrapf(err, "error getting volume directory name for pvc %s in pod %s", pvcName, pod.Name)
+		return datapath.AccessPoint{}, errors.Wrapf(err, "error getting volume directory name for volume %s in pod %s", volumeName, pod.Name)
 	}
 
-	logger.WithField("volDir", volDir).Info("Got volume for backup PVC")
+	logger.WithField("volDir", volDir).Info("Got volume dir")
 
 	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(pod.GetUID()), volDir)
 	logger.WithField("pathGlob", pathGlob).Debug("Looking for path matching glob")
 
 	path, err := singlePathMatch(pathGlob, fs, logger)
 	if err != nil {
-		return datapath.AccessPoint{}, errors.Wrapf(err, "error identifying unique volume path on host for pvc %s in pod %s", pvcName, pod.Name)
+		return datapath.AccessPoint{}, errors.Wrapf(err, "error identifying unique volume path on host for volume %s in pod %s", volumeName, pod.Name)
 	}
 
 	logger.WithField("path", path).Info("Found path matching glob")

@@ -253,7 +253,7 @@ func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1.ObjectRe
 	if err != nil {
 		return nil, err
 	}
-	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, PVC: dataUploadName}}, nil
+	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, VolumeName: dataUploadName}}, nil
 }
 
 func (f *fakeSnapshotExposer) CleanUp(context.Context, corev1.ObjectReference, string, string) {

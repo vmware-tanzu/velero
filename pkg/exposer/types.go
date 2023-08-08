@@ -33,5 +33,5 @@ type ExposeResult struct {
 // ExposeByPod defines the result for the expose method that a hosting pod is created
 type ExposeByPod struct {
 	HostingPod *corev1.Pod
-	PVC        string
+	VolumeName string
 }
