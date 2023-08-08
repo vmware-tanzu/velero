@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/stringptr"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/typed/volumesnapshot/v1"
@@ -53,7 +54,15 @@ func WaitVolumeSnapshotReady(ctx context.Context, snapshotClient snapshotter.Sna
 			return false, errors.Wrapf(err, fmt.Sprintf("error to get volumesnapshot %s/%s", volumeSnapshotNS, volumeSnapshot))
 		}
 
-		if tmpVS.Status == nil || tmpVS.Status.BoundVolumeSnapshotContentName == nil || !boolptr.IsSetToTrue(tmpVS.Status.ReadyToUse) || tmpVS.Status.RestoreSize == nil {
+		if tmpVS.Status == nil {
+			return false, nil
+		}
+
+		if tmpVS.Status.Error != nil {
+			return false, errors.Errorf("volume snapshot creation error %s", stringptr.GetString(tmpVS.Status.Error.Message))
+		}
+
+		if !boolptr.IsSetToTrue(tmpVS.Status.ReadyToUse) {
 			return false, nil
 		}
 

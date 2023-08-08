@@ -31,6 +31,7 @@ import (
 	clientTesting "k8s.io/client-go/testing"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/stringptr"
 
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
@@ -54,6 +55,8 @@ func TestWaitVolumeSnapshotReady(t *testing.T) {
 			RestoreSize:                    &resource.Quantity{},
 		},
 	}
+
+	errMessage := "fake-snapshot-creation-error"
 
 	tests := []struct {
 		name      string
@@ -116,7 +119,7 @@ func TestWaitVolumeSnapshotReady(t *testing.T) {
 			err: "timed out waiting for the condition",
 		},
 		{
-			name:      "restore size is nil in status",
+			name:      "ready to use is false",
 			vsName:    "fake-vs",
 			namespace: "fake-ns",
 			clientObj: []runtime.Object{
@@ -127,11 +130,47 @@ func TestWaitVolumeSnapshotReady(t *testing.T) {
 					},
 					Status: &snapshotv1api.VolumeSnapshotStatus{
 						BoundVolumeSnapshotContentName: &vscName,
-						ReadyToUse:                     boolptr.True(),
+						ReadyToUse:                     boolptr.False(),
 					},
 				},
 			},
 			err: "timed out waiting for the condition",
+		},
+		{
+			name:      "snapshot creation error with message",
+			vsName:    "fake-vs",
+			namespace: "fake-ns",
+			clientObj: []runtime.Object{
+				&snapshotv1api.VolumeSnapshot{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "fake-vs",
+						Namespace: "fake-ns",
+					},
+					Status: &snapshotv1api.VolumeSnapshotStatus{
+						Error: &snapshotv1api.VolumeSnapshotError{
+							Message: &errMessage,
+						},
+					},
+				},
+			},
+			err: "volume snapshot creation error fake-snapshot-creation-error",
+		},
+		{
+			name:      "snapshot creation error without message",
+			vsName:    "fake-vs",
+			namespace: "fake-ns",
+			clientObj: []runtime.Object{
+				&snapshotv1api.VolumeSnapshot{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "fake-vs",
+						Namespace: "fake-ns",
+					},
+					Status: &snapshotv1api.VolumeSnapshotStatus{
+						Error: &snapshotv1api.VolumeSnapshotError{},
+					},
+				},
+			},
+			err: "volume snapshot creation error " + stringptr.NilString,
 		},
 		{
 			name:      "success",
