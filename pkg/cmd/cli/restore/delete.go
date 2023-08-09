@@ -123,7 +123,7 @@ func Run(o *cli.DeleteOptions) error {
 			errs = append(errs, errors.WithStack(err))
 			continue
 		}
-		fmt.Printf("Restore %q deleted\n", r.Name)
+		fmt.Printf("Request to delete restore %q submitted successfully.\nThe restore will be fully deleted after all associated data (restore files in object storage) are removed.\n", r.Name)
 	}
 	return kubeerrs.NewAggregate(errs)
 }
