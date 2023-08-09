@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -45,8 +46,9 @@ const (
 
 // WaitVolumeSnapshotReady waits a VS to become ready to use until the timeout reaches
 func WaitVolumeSnapshotReady(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface,
-	volumeSnapshot string, volumeSnapshotNS string, timeout time.Duration) (*snapshotv1api.VolumeSnapshot, error) {
+	volumeSnapshot string, volumeSnapshotNS string, timeout time.Duration, log logrus.FieldLogger) (*snapshotv1api.VolumeSnapshot, error) {
 	var updated *snapshotv1api.VolumeSnapshot
+	errMessage := sets.NewString()
 
 	err := wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
 		tmpVS, err := snapshotClient.VolumeSnapshots(volumeSnapshotNS).Get(ctx, volumeSnapshot, metav1.GetOptions{})
@@ -59,7 +61,7 @@ func WaitVolumeSnapshotReady(ctx context.Context, snapshotClient snapshotter.Sna
 		}
 
 		if tmpVS.Status.Error != nil {
-			return false, errors.Errorf("volume snapshot creation error %s", stringptr.GetString(tmpVS.Status.Error.Message))
+			errMessage.Insert(stringptr.GetString(tmpVS.Status.Error.Message))
 		}
 
 		if !boolptr.IsSetToTrue(tmpVS.Status.ReadyToUse) {
@@ -69,6 +71,14 @@ func WaitVolumeSnapshotReady(ctx context.Context, snapshotClient snapshotter.Sna
 		updated = tmpVS
 		return true, nil
 	})
+
+	if err == wait.ErrWaitTimeout {
+		err = errors.Errorf("volume snapshot is not ready until timeout, errors: %v", errMessage.List())
+	}
+
+	if errMessage.Len() > 0 {
+		log.Warnf("Some errors happened during waiting for ready snapshot, errors: %v", errMessage.List())
+	}
 
 	return updated, err
 }

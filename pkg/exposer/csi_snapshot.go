@@ -94,7 +94,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 
 	curLog.Info("Exposing CSI snapshot")
 
-	volumeSnapshot, err := csi.WaitVolumeSnapshotReady(ctx, e.csiSnapshotClient, csiExposeParam.SnapshotName, csiExposeParam.SourceNamespace, csiExposeParam.Timeout)
+	volumeSnapshot, err := csi.WaitVolumeSnapshotReady(ctx, e.csiSnapshotClient, csiExposeParam.SnapshotName, csiExposeParam.SourceNamespace, csiExposeParam.Timeout, curLog)
 	if err != nil {
 		return errors.Wrapf(err, "error wait volume snapshot ready")
 	}
