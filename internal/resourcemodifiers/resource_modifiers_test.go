@@ -617,7 +617,7 @@ func TestJSONPatch_ToString(t *testing.T) {
 			want: `{"op": "test", "from": "", "path": "/spec/replicas", "value": 1}`,
 		},
 		{
-			name: "replace",
+			name: "replace integer",
 			fields: fields{
 				Operation: "replace",
 				Path:      "/spec/replicas",
@@ -626,7 +626,25 @@ func TestJSONPatch_ToString(t *testing.T) {
 			want: `{"op": "replace", "from": "", "path": "/spec/replicas", "value": 2}`,
 		},
 		{
-			name: "add complex interfaces",
+			name: "replace array",
+			fields: fields{
+				Operation: "replace",
+				Path:      "/spec/template/spec/containers/0/ports",
+				Value:     `[{"containerPort": 80}]`,
+			},
+			want: `{"op": "replace", "from": "", "path": "/spec/template/spec/containers/0/ports", "value": [{"containerPort": 80}]}`,
+		},
+		{
+			name: "replace with null",
+			fields: fields{
+				Operation: "replace",
+				Path:      "/spec/template/spec/containers/0/ports",
+				Value:     `null`,
+			},
+			want: `{"op": "replace", "from": "", "path": "/spec/template/spec/containers/0/ports", "value": null}`,
+		},
+		{
+			name: "add json object",
 			fields: fields{
 				Operation: "add",
 				Path:      "/spec/template/spec/containers/0",

@@ -281,7 +281,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 	if o.ResourceModifierConfigMap != "" {
 		resModifiers = &corev1.TypedLocalObjectReference{
-			// Group version for core API is ""
+			// Group for core API is ""
 			APIGroup: &corev1.SchemeGroupVersion.Group,
 			Kind:     resourcemodifiers.ConfigmapRefType,
 			Name:     o.ResourceModifierConfigMap,
