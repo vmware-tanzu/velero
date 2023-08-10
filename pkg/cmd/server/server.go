@@ -531,6 +531,7 @@ High priorities:
   - Endpoints go before Services so no new Endpoints will be created
   - Services go before Clusters so they can be adopted by AKO-operator and no new Services will be created
     for the same clusters
+  - Ingresses go after Services to avoid ingress webhook failure caused by validation that if corresponding service exists
 
 Low priorities:
   - Tanzu ClusterBootstraps go last as it can reference any other kind of resources.
@@ -563,6 +564,8 @@ var defaultRestorePriorities = restore.Priorities{
 		"clusterclasses.cluster.x-k8s.io",
 		"endpoints",
 		"services",
+		"ingresses.extensions",
+		"ingresses.networking.k8s.io",
 	},
 	LowPriorities: []string{
 		"clusterbootstraps.run.tanzu.vmware.com",
