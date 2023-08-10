@@ -1,0 +1,1 @@
+Fix how the AWS credentials are obtained from configuration

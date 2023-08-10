@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -71,11 +72,26 @@ func TempCACertFile(caCert []byte, bsl string, fs filesystem.Interface) (string,
 	return name, nil
 }
 
+// environ is a slice of strings representing the environment, in the form "key=value".
+type environ []string
+
+// Unset a single environment variable.
+func (e *environ) Unset(key string) {
+	for i := range *e {
+		if strings.HasPrefix((*e)[i], key+"=") {
+			(*e)[i] = (*e)[len(*e)-1]
+			*e = (*e)[:len(*e)-1]
+			break
+		}
+	}
+}
+
 // CmdEnv returns a list of environment variables (in the format var=val) that
 // should be used when running a restic command for a particular backend provider.
 // This list is the current environment, plus any provider-specific variables restic needs.
 func CmdEnv(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error) {
-	env := os.Environ()
+	var env environ
+	env = os.Environ()
 	customEnv := map[string]string{}
 	var err error
 
@@ -113,6 +129,10 @@ func CmdEnv(backupLocation *velerov1api.BackupStorageLocation, credentialFileSto
 	}
 
 	for k, v := range customEnv {
+		env.Unset(k)
+		if v == "" {
+			continue
+		}
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
