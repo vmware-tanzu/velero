@@ -45,13 +45,11 @@ var veleroCfg VeleroConfig
 
 type apiGropuVersionsTest struct {
 	name       string
-	namespaces []string
 	srcCrdYaml string
 	srcCRs     map[string]string
 	tgtCrdYaml string
 	tgtVer     string
 	cm         *corev1api.ConfigMap
-	gvs        map[string][]string
 	want       map[string]map[string]string
 }
 
@@ -108,6 +106,8 @@ func APIGropuVersionsTest() {
 
 	Context("When EnableAPIGroupVersions flag is set", func() {
 		It("Should back up API group version and restore by version priority", func() {
+			ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
+			defer ctxCancel()
 			Expect(runEnableAPIGroupVersionsTests(
 				ctx,
 				*veleroCfg.ClientToInstallVelero,

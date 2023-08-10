@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
@@ -205,6 +206,8 @@ var _ = BeforeSuite(func() {
 var _ = AfterSuite(func() {
 	if VeleroCfg.InstallVelero && !VeleroCfg.Debug {
 		By("release test resources after testing")
-		Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
+		ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
+		defer ctxCancel()
+		Expect(VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
 	}
 })
