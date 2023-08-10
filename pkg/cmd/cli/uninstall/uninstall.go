@@ -73,6 +73,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 The '--namespace' flag can be used to specify the namespace where velero is installed (default: velero).
 Use '--force' to skip the prompt confirming if you want to uninstall Velero.
+
+If you need to preserve namespace, use velero install command with original install options and add '--uninstall' and '--preserve-uninstall-namespace' flags.
 		`,
 		Example: ` # velero uninstall --namespace staging`,
 		Run: func(c *cobra.Command, args []string) {
@@ -82,7 +84,7 @@ Use '--force' to skip the prompt confirming if you want to uninstall Velero.
 
 			// Confirm if not asked to force-skip confirmation
 			if !o.force {
-				fmt.Println("You are about to uninstall Velero.")
+				fmt.Printf("You are about to uninstall Velero from namespace %q. Namespace will be deleted\nTo uninstall from a different namespace, use --namespace flag.", f.Namespace())
 				if !cli.GetConfirmation() {
 					// Don't do anything unless we get confirmation
 					return
