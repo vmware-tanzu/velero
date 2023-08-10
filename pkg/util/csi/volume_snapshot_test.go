@@ -84,7 +84,7 @@ func TestWaitVolumeSnapshotReady(t *testing.T) {
 					},
 				},
 			},
-			err: "timed out waiting for the condition",
+			err: "volume snapshot is not ready until timeout, errors: []",
 		},
 		{
 			name:      "vsc is nil in status",
@@ -99,7 +99,7 @@ func TestWaitVolumeSnapshotReady(t *testing.T) {
 					Status: &snapshotv1api.VolumeSnapshotStatus{},
 				},
 			},
-			err: "timed out waiting for the condition",
+			err: "volume snapshot is not ready until timeout, errors: []",
 		},
 		{
 			name:      "ready to use is nil in status",
@@ -116,7 +116,7 @@ func TestWaitVolumeSnapshotReady(t *testing.T) {
 					},
 				},
 			},
-			err: "timed out waiting for the condition",
+			err: "volume snapshot is not ready until timeout, errors: []",
 		},
 		{
 			name:      "ready to use is false",
@@ -134,7 +134,7 @@ func TestWaitVolumeSnapshotReady(t *testing.T) {
 					},
 				},
 			},
-			err: "timed out waiting for the condition",
+			err: "volume snapshot is not ready until timeout, errors: []",
 		},
 		{
 			name:      "snapshot creation error with message",
@@ -153,7 +153,7 @@ func TestWaitVolumeSnapshotReady(t *testing.T) {
 					},
 				},
 			},
-			err: "volume snapshot creation error fake-snapshot-creation-error",
+			err: "volume snapshot is not ready until timeout, errors: [fake-snapshot-creation-error]",
 		},
 		{
 			name:      "snapshot creation error without message",
@@ -170,7 +170,7 @@ func TestWaitVolumeSnapshotReady(t *testing.T) {
 					},
 				},
 			},
-			err: "volume snapshot creation error " + stringptr.NilString,
+			err: "volume snapshot is not ready until timeout, errors: [" + stringptr.NilString + "]",
 		},
 		{
 			name:      "success",
@@ -187,7 +187,7 @@ func TestWaitVolumeSnapshotReady(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeSnapshotClient := snapshotFake.NewSimpleClientset(test.clientObj...)
 
-			vs, err := WaitVolumeSnapshotReady(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vsName, test.namespace, time.Millisecond)
+			vs, err := WaitVolumeSnapshotReady(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vsName, test.namespace, time.Millisecond, velerotest.NewLogger())
 			if err != nil {
 				assert.EqualError(t, err, test.err)
 			} else {
