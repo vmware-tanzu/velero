@@ -18,6 +18,7 @@ package discovery
 
 import (
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -170,7 +171,7 @@ func (h *helper) Refresh() error {
 	}
 
 	h.resources = discovery.FilteredBy(
-		discovery.ResourcePredicateFunc(filterByVerbs),
+		And(filterByVerbs, skipSubresource),
 		serverResources,
 	)
 
@@ -240,8 +241,32 @@ func refreshServerGroupsAndResources(discoveryClient serverResourcesInterface, l
 	return serverGroups, serverResources, err
 }
 
+// And returns a composite predicate that implements a logical AND of the predicates passed to it.
+func And(predicates ...discovery.ResourcePredicateFunc) discovery.ResourcePredicate {
+	return and{predicates}
+}
+
+type and struct {
+	predicates []discovery.ResourcePredicateFunc
+}
+
+func (a and) Match(groupVersion string, r *metav1.APIResource) bool {
+	for _, p := range a.predicates {
+		if !p(groupVersion, r) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func filterByVerbs(groupVersion string, r *metav1.APIResource) bool {
 	return discovery.SupportsAllVerbs{Verbs: []string{"list", "create", "get", "delete"}}.Match(groupVersion, r)
+}
+
+func skipSubresource(_ string, r *metav1.APIResource) bool {
+	// if we have a slash, then this is a subresource and we shouldn't include it.
+	return !strings.Contains(r.Name, "/")
 }
 
 // sortResources sources resources by moving extensions to the end of the slice. The order of all
