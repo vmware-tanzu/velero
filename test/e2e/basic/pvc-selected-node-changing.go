@@ -135,7 +135,7 @@ func (p *PVCSelectedNodeChanging) Restore() error {
 }
 func (p *PVCSelectedNodeChanging) Verify() error {
 	By(fmt.Sprintf("PVC selected node should be %s", p.newNodeName), func() {
-		pvcNameList, err := GetPvcByPodName(p.Ctx, p.mappedNS, p.pvcName)
+		pvcNameList, err := GetPvcByPVCName(p.Ctx, p.mappedNS, p.pvcName)
 		Expect(err).To(Succeed())
 		Expect(len(pvcNameList)).Should(Equal(1))
 		pvc, err := GetPVC(p.Ctx, p.Client, p.mappedNS, pvcNameList[0])

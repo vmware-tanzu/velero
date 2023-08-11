@@ -105,19 +105,19 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string, co
 	}
 }
 
-func (d *DeploymentBuilder) WithVolume(vols []*v1.Volume) *DeploymentBuilder {
+func (d *DeploymentBuilder) WithVolume(volumes []*v1.Volume) *DeploymentBuilder {
 	vmList := []v1.VolumeMount{}
-	for i, v := range vols {
+	for _, v := range volumes {
 		vmList = append(vmList, v1.VolumeMount{
 			Name:      v.Name,
 			MountPath: "/" + v.Name,
 		})
-		d.Spec.Template.Spec.Volumes = append(d.Spec.Template.Spec.Volumes, *vols[i])
+		d.Spec.Template.Spec.Volumes = append(d.Spec.Template.Spec.Volumes, *v)
+
 	}
 
 	// NOTE here just mount volumes to the first container
 	d.Spec.Template.Spec.Containers[0].VolumeMounts = vmList
-
 	return d
 }
 

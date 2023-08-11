@@ -160,12 +160,12 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			})
 
 			By("Get all 2 PVCs of Kibishii and label them seprately ", func() {
-				pvc, err := GetPvcByPodName(context.Background(), bslDeletionTestNs, podName_1)
+				pvc, err := GetPvcByPVCName(context.Background(), bslDeletionTestNs, podName_1)
 				Expect(err).To(Succeed())
 				fmt.Println(pvc)
 				Expect(len(pvc)).To(Equal(1))
 				pvc1 := pvc[0]
-				pvc, err = GetPvcByPodName(context.Background(), bslDeletionTestNs, podName_2)
+				pvc, err = GetPvcByPVCName(context.Background(), bslDeletionTestNs, podName_2)
 				Expect(err).To(Succeed())
 				fmt.Println(pvc)
 				Expect(len(pvc)).To(Equal(1))
