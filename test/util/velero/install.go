@@ -240,7 +240,7 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 		args = append(args, "--features", options.Features)
 		if strings.EqualFold(options.Features, "EnableCSI") && options.UseVolumeSnapshots {
 			if strings.EqualFold(cloudProvider, "azure") {
-				if err := KubectlApplyByFile(ctx, "util/csi/AzureVolumeSnapshotClass.yaml"); err != nil {
+				if err := KubectlApplyByFile(ctx, "../util/csi/AzureVolumeSnapshotClass.yaml"); err != nil {
 					return err
 				}
 			}

@@ -166,7 +166,7 @@ func (o *OrderedResources) Clean() error {
 	return nil
 }
 
-func (o *OrderedResources) DeleteBackups() error {
+func (o *OrderedResources) DeleteAllBackups() error {
 	backupList := new(velerov1api.BackupList)
 	if err := o.Client.Kubebuilder.List(o.Ctx, backupList, &kbclient.ListOptions{Namespace: o.VeleroCfg.VeleroNamespace}); err != nil {
 		return fmt.Errorf("failed to list backup object in %s namespace with err %v", o.VeleroCfg.VeleroNamespace, err)

@@ -50,8 +50,8 @@ func (s *StorageClasssChanging) Init() error {
 		Text: "Change the storage class of persistent volumes and persistent" +
 			" volume claims during restores",
 	}
-	s.srcStorageClass = "default"
-	s.desStorageClass = StorageClassName
+	s.srcStorageClass = StorageClassName
+	s.desStorageClass = StorageClassName2
 	s.labels = map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
 		"velero.io/plugin-config": ""}
 	s.data = map[string]string{s.srcStorageClass: s.desStorageClass}
@@ -75,10 +75,11 @@ func (s *StorageClasssChanging) CreateResources() error {
 		"app": "test",
 	}
 	s.Ctx, s.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
-	By(fmt.Sprintf("Create a storage class %s", s.desStorageClass), func() {
-		Expect(InstallStorageClass(s.Ctx, fmt.Sprintf("../testdata/storage-class/%s.yaml",
-			s.VeleroCfg.CloudProvider))).To(Succeed())
+
+	By(("Installing storage class..."), func() {
+		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", s.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
 	})
+
 	By(fmt.Sprintf("Create namespace %s", s.namespace), func() {
 		Expect(CreateNamespace(s.Ctx, s.Client, s.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", s.namespace))

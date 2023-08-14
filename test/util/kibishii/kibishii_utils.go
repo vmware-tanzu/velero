@@ -105,6 +105,7 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		RunDebug(context.Background(), veleroCLI, veleroNamespace, backupName, "")
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
+
 	fmt.Printf("VeleroBackupNamespace done %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if useVolumeSnapshots {
 		if providerName == "vsphere" {
@@ -291,15 +292,16 @@ func verifyData(ctx context.Context, namespace string, kibishiiData *KibishiiDat
 			return false, nil
 		}
 		if err != nil {
-			fmt.Printf("Kibishi verify stdout Timeout occurred: %s stderr: %s err: %s", stdout, stderr, err)
+			fmt.Printf("Kibishi verify stdout Timeout occurred: %s stderr: %s err: %s\n", stdout, stderr, err)
 			return false, nil
 		}
 		return true, nil
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Failed to wait generate data in namespace %s", namespace))
+		return errors.Wrapf(err, fmt.Sprintf("Failed to verify kibishii data in namespace %s\n", namespace))
 	}
+	fmt.Printf("Success to verify kibishii data in namespace %s\n", namespace)
 	return nil
 }
 

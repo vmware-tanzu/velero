@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 )
 
@@ -86,4 +87,26 @@ func CMDExecWithOutput(checkCMD *exec.Cmd) (*[]byte, error) {
 		return nil, err
 	}
 	return &jsonBuf, err
+}
+
+func WriteToFile(content, fileName string) error {
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		fmt.Println("fail to open file", err)
+		return err
+	}
+	defer file.Close()
+
+	write := bufio.NewWriter(file)
+	_, err = write.WriteString(content)
+	if err != nil {
+		fmt.Println("fail to WriteString file", err)
+		return err
+	}
+	err = write.Flush()
+	if err != nil {
+		fmt.Println("fail to Flush file", err)
+		return err
+	}
+	return nil
 }

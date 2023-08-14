@@ -69,7 +69,7 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 	AfterEach(func() {
 		if !veleroCfg.Debug {
 			By("Clean backups after test", func() {
-				DeleteBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
+				DeleteAllBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
 			})
 		}
 	})
