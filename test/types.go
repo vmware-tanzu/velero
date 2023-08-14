@@ -25,6 +25,7 @@ import (
 )
 
 const StorageClassName = "e2e-storage-class"
+const StorageClassName2 = "e2e-storage-class-2"
 
 var UUIDgen uuid.UUID
 
@@ -39,50 +40,53 @@ var ReportData *Report
 
 type VeleroConfig struct {
 	VeleroCfgInPerf
-	VeleroCLI                   string
-	VeleroImage                 string
-	VeleroVersion               string
-	CloudCredentialsFile        string
-	BSLConfig                   string
-	BSLBucket                   string
-	BSLPrefix                   string
-	VSLConfig                   string
-	CloudProvider               string
-	ObjectStoreProvider         string
-	VeleroNamespace             string
-	AdditionalBSLProvider       string
-	AdditionalBSLBucket         string
-	AdditionalBSLPrefix         string
-	AdditionalBSLConfig         string
-	AdditionalBSLCredentials    string
-	RegistryCredentialFile      string
-	RestoreHelperImage          string
-	UpgradeFromVeleroVersion    string
-	UpgradeFromVeleroCLI        string
-	MigrateFromVeleroVersion    string
-	MigrateFromVeleroCLI        string
-	Plugins                     string
-	AddBSLPlugins               string
-	InstallVelero               bool
-	KibishiiDirectory           string
-	Features                    string
-	Debug                       bool
-	GCFrequency                 string
-	DefaultCluster              string
-	StandbyCluster              string
-	ClientToInstallVelero       *TestClient
-	DefaultClient               *TestClient
-	StandbyClient               *TestClient
-	UploaderType                string
-	UseNodeAgent                bool
-	UseRestic                   bool
-	ProvideSnapshotsVolumeParam bool
-	DefaultVolumesToFsBackup    bool
-	UseVolumeSnapshots          bool
-	VeleroServerDebugMode       bool
-	SnapshotMoveData            bool
-	DataMoverPlugin             string
-	StandbyClusterCloudProvider string
+	VeleroCLI                         string
+	VeleroImage                       string
+	VeleroVersion                     string
+	CloudCredentialsFile              string
+	BSLConfig                         string
+	BSLBucket                         string
+	BSLPrefix                         string
+	VSLConfig                         string
+	CloudProvider                     string
+	ObjectStoreProvider               string
+	VeleroNamespace                   string
+	AdditionalBSLProvider             string
+	AdditionalBSLBucket               string
+	AdditionalBSLPrefix               string
+	AdditionalBSLConfig               string
+	AdditionalBSLCredentials          string
+	RegistryCredentialFile            string
+	RestoreHelperImage                string
+	UpgradeFromVeleroVersion          string
+	UpgradeFromVeleroCLI              string
+	MigrateFromVeleroVersion          string
+	MigrateFromVeleroCLI              string
+	Plugins                           string
+	AddBSLPlugins                     string
+	InstallVelero                     bool
+	KibishiiDirectory                 string
+	Features                          string
+	Debug                             bool
+	GCFrequency                       string
+	DefaultCluster                    string
+	StandbyCluster                    string
+	ClientToInstallVelero             *TestClient
+	DefaultClient                     *TestClient
+	StandbyClient                     *TestClient
+	UploaderType                      string
+	UseNodeAgent                      bool
+	UseRestic                         bool
+	ProvideSnapshotsVolumeParam       bool
+	DefaultVolumesToFsBackup          bool
+	UseVolumeSnapshots                bool
+	VeleroServerDebugMode             bool
+	SnapshotMoveData                  bool
+	DataMoverPlugin                   string
+	StandbyClusterCloudProvider       string
+	StandbyClusterPlugins             string
+	StandbyClusterOjbectStoreProvider string
+	DebugVeleroPodRestart             bool
 }
 
 type VeleroCfgInPerf struct {

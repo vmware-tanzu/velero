@@ -19,7 +19,6 @@ package filtering
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 const FileName = "test-data.txt"
@@ -110,7 +110,7 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 
 	By(("Installing storage class..."), func() {
-		Expect(r.installTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
+		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
 	})
 
 	By(fmt.Sprintf("Create configmap %s in namespaces %s for workload\n", r.cmName, r.VeleroCfg.VeleroNamespace), func() {
@@ -188,7 +188,7 @@ func (r *ResourcePoliciesCase) Verify() error {
 func (r *ResourcePoliciesCase) Clean() error {
 	// If created some resources which is not in current test namespace, we NEED to override the base Clean function
 	if !r.VeleroCfg.Debug {
-		if err := r.deleteTestStorageClassList([]string{"e2e-storage-class", "e2e-storage-class-2"}); err != nil {
+		if err := r.deleteTestStorageClassList([]string{StorageClassName, StorageClassName2}); err != nil {
 			return err
 		}
 
@@ -207,13 +207,13 @@ func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []
 		pvcName := fmt.Sprintf("pvc-%d", i)
 		By(fmt.Sprintf("Creating PVC %s in namespaces ...%s\n", pvcName, namespace))
 		if index%3 == 0 {
-			pvcBuilder := NewPVC(namespace, pvcName).WithStorageClass("e2e-storage-class") // Testing sc should not backup
+			pvcBuilder := NewPVC(namespace, pvcName).WithStorageClass(StorageClassName) // Testing sc should not backup
 			err = CreatePvc(r.Client, pvcBuilder)
 		} else if index%3 == 1 {
-			pvcBuilder := NewPVC(namespace, pvcName).WithStorageClass("e2e-storage-class-2") // Testing sc should backup
+			pvcBuilder := NewPVC(namespace, pvcName).WithStorageClass(StorageClassName2) // Testing sc should backup
 			err = CreatePvc(r.Client, pvcBuilder)
 		} else if index%3 == 2 {
-			pvcBuilder := NewPVC(namespace, pvcName).WithStorageClass("e2e-storage-class-2").WithResourceStorage(resource.MustParse("2Gi")) // Testing capacity should not backup
+			pvcBuilder := NewPVC(namespace, pvcName).WithStorageClass(StorageClassName2).WithResourceStorage(resource.MustParse("2Gi")) // Testing capacity should not backup
 			err = CreatePvc(r.Client, pvcBuilder)
 		}
 		if err != nil {
@@ -262,29 +262,4 @@ func (r *ResourcePoliciesCase) deleteTestStorageClassList(scList []string) error
 		}
 	}
 	return nil
-}
-
-func (r *ResourcePoliciesCase) installTestStorageClasses(path string) error {
-	err := InstallStorageClass(r.Ctx, path)
-	if err != nil {
-		return err
-	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get %s when install storage class", path)
-	}
-
-	// replace sc to new value
-	newContent := strings.ReplaceAll(string(content), "name: e2e-storage-class", "name: e2e-storage-class-2")
-
-	tmpFile, err := os.CreateTemp("", "sc-file")
-	if err != nil {
-		return errors.Wrapf(err, "failed to create temp file  when install storage class")
-	}
-
-	defer os.Remove(tmpFile.Name())
-	if _, err := tmpFile.WriteString(newContent); err != nil {
-		return errors.Wrapf(err, "failed to write content into temp file %s when install storage class", tmpFile.Name())
-	}
-	return InstallStorageClass(r.Ctx, tmpFile.Name())
 }

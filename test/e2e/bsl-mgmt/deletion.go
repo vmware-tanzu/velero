@@ -77,7 +77,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 	AfterEach(func() {
 		if !veleroCfg.Debug {
 			By("Clean backups after test", func() {
-				DeleteBackups(context.Background(), *veleroCfg.DefaultClient)
+				DeleteAllBackups(context.Background(), *veleroCfg.DefaultClient)
 			})
 			By(fmt.Sprintf("Delete sample workload namespace %s", bslDeletionTestNs), func() {
 				Expect(DeleteNamespace(context.Background(), *veleroCfg.ClientToInstallVelero, bslDeletionTestNs,
