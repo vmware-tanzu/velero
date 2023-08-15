@@ -119,3 +119,9 @@ func (d *DataUploadBuilder) StartTimestamp(startTime *metav1.Time) *DataUploadBu
 	d.object.Status.StartTimestamp = startTime
 	return d
 }
+
+// Labels sets the DataUpload's Labels.
+func (d *DataUploadBuilder) Labels(labels map[string]string) *DataUploadBuilder {
+	d.object.Labels = labels
+	return d
+}

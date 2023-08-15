@@ -368,11 +368,14 @@ func (s *nodeAgentServer) markDataUploadsCancel(r *controller.DataUploadReconcil
 			if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted ||
 				du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared ||
 				du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
-				updated := du.DeepCopy()
-				updated.Spec.Cancel = true
-				updated.Status.Message = fmt.Sprintf("found a dataupload with status %q during the node-agent starting, mark it as cancel", du.Status.Phase)
-				if err := client.Patch(s.ctx, updated, ctrlclient.MergeFrom(&du)); err != nil {
-					s.logger.WithError(errors.WithStack(err)).Errorf("failed to mark datadownload %q cancel", du.GetName())
+				err = controller.UpdateDataUploadWithRetry(s.ctx, client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, s.logger.WithField("dataupload", du.Name),
+					func(dataUpload *velerov2alpha1api.DataUpload) {
+						dataUpload.Spec.Cancel = true
+						dataUpload.Status.Message = fmt.Sprintf("found a dataupload with status %q during the node-agent starting, mark it as cancel", du.Status.Phase)
+					})
+
+				if err != nil {
+					s.logger.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", du.GetName())
 					continue
 				}
 				s.logger.WithField("dataupload", du.GetName()).Warn(du.Status.Message)
@@ -396,10 +399,13 @@ func (s *nodeAgentServer) markDataDownloadsCancel(r *controller.DataDownloadReco
 			if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted ||
 				dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared ||
 				dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
-				updated := dd.DeepCopy()
-				updated.Spec.Cancel = true
-				updated.Status.Message = fmt.Sprintf("found a datadownload with status %q during the node-agent starting, mark it as cancel", dd.Status.Phase)
-				if err := client.Patch(s.ctx, updated, ctrlclient.MergeFrom(dd)); err != nil {
+				err = controller.UpdateDataDownloadWithRetry(s.ctx, client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, s.logger.WithField("datadownload", dd.Name),
+					func(dataDownload *velerov2alpha1api.DataDownload) {
+						dataDownload.Spec.Cancel = true
+						dataDownload.Status.Message = fmt.Sprintf("found a datadownload with status %q during the node-agent starting, mark it as cancel", dd.Status.Phase)
+					})
+
+				if err != nil {
 					s.logger.WithError(errors.WithStack(err)).Errorf("failed to mark datadownload %q cancel", dd.GetName())
 					continue
 				}
