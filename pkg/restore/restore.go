@@ -1366,6 +1366,15 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 	}
 
+	// The object apiVersion might get modified by a RestorePlugin so we need to
+	// get a new client to reflect updated resource path.
+	newGR := schema.GroupResource{Group: obj.GroupVersionKind().Group, Resource: groupResource.Resource}
+	resourceClient, err = ctx.getResourceClient(newGR, obj, obj.GetNamespace())
+	if err != nil {
+		errs.AddVeleroError(fmt.Errorf("error getting updated resource client for namespace %q, resource %q: %v", namespace, &groupResource, err))
+		return warnings, errs, itemExists
+	}
+
 	ctx.log.Infof("Attempting to restore %s: %v", obj.GroupVersionKind().Kind, name)
 	createdObj, restoreErr := resourceClient.Create(obj)
 	if restoreErr == nil {

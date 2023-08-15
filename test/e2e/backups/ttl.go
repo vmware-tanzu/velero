@@ -80,11 +80,11 @@ func TTLTest() {
 			By("Clean backups after test", func() {
 				DeleteBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
 			})
-			if veleroCfg.InstallVelero {
-				Expect(VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
-			}
-			ctx, ctxCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer ctxCancel()
+			if veleroCfg.InstallVelero {
+				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
+			}
 			Expect(DeleteNamespace(ctx, client, test.testNS, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.testNS))
 		}
 	})

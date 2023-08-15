@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/client/mocks"
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	discovery_mocks "github.com/vmware-tanzu/velero/pkg/discovery/mocks"
@@ -64,24 +64,40 @@ func TestVeleroResourcesExist(t *testing.T) {
 	}
 	assert.Error(t, server.veleroResourcesExist())
 
-	// Velero API group doesn't contain any custom resources: should error
-	veleroAPIResourceList := &metav1.APIResourceList{
-		GroupVersion: v1.SchemeGroupVersion.String(),
+	// Velero v1 API group doesn't contain any custom resources: should error
+	veleroAPIResourceListVelerov1 := &metav1.APIResourceList{
+		GroupVersion: velerov1api.SchemeGroupVersion.String(),
 	}
 
-	fakeDiscoveryHelper.ResourceList = append(fakeDiscoveryHelper.ResourceList, veleroAPIResourceList)
+	fakeDiscoveryHelper.ResourceList = append(fakeDiscoveryHelper.ResourceList, veleroAPIResourceListVelerov1)
 	assert.Error(t, server.veleroResourcesExist())
 
-	// Velero API group contains all custom resources: should not error
-	for kind := range v1.CustomResources() {
-		veleroAPIResourceList.APIResources = append(veleroAPIResourceList.APIResources, metav1.APIResource{
+	// Velero v2alpha1 API group doesn't contain any custom resources: should error
+	veleroAPIResourceListVeleroV2alpha1 := &metav1.APIResourceList{
+		GroupVersion: velerov2alpha1api.SchemeGroupVersion.String(),
+	}
+
+	fakeDiscoveryHelper.ResourceList = append(fakeDiscoveryHelper.ResourceList, veleroAPIResourceListVeleroV2alpha1)
+	assert.Error(t, server.veleroResourcesExist())
+
+	// Velero v1 API group contains all custom resources, but v2alpha1 doesn't contain any custom resources: should error
+	for kind := range velerov1api.CustomResources() {
+		veleroAPIResourceListVelerov1.APIResources = append(veleroAPIResourceListVelerov1.APIResources, metav1.APIResource{
+			Kind: kind,
+		})
+	}
+	assert.Error(t, server.veleroResourcesExist())
+
+	// Velero v1 and v2alpha1 API group contain all custom resources: should not error
+	for kind := range velerov2alpha1api.CustomResources() {
+		veleroAPIResourceListVeleroV2alpha1.APIResources = append(veleroAPIResourceListVeleroV2alpha1.APIResources, metav1.APIResource{
 			Kind: kind,
 		})
 	}
 	assert.NoError(t, server.veleroResourcesExist())
 
 	// Velero API group contains some but not all custom resources: should error
-	veleroAPIResourceList.APIResources = veleroAPIResourceList.APIResources[:3]
+	veleroAPIResourceListVelerov1.APIResources = veleroAPIResourceListVelerov1.APIResources[:3]
 	assert.Error(t, server.veleroResourcesExist())
 }
 
@@ -268,6 +284,13 @@ func Test_veleroResourcesExist(t *testing.T) {
 				{Kind: "BackupStorageLocation"},
 				{Kind: "VolumeSnapshotLocation"},
 				{Kind: "ServerStatusRequest"},
+			},
+		},
+		{
+			GroupVersion: velerov2alpha1api.SchemeGroupVersion.String(),
+			APIResources: []metav1.APIResource{
+				{Kind: "DataUpload"},
+				{Kind: "DataDownload"},
 			},
 		},
 	})

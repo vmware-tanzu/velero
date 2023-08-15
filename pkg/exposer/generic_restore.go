@@ -143,7 +143,7 @@ func (e *genericRestoreExposer) GetExposed(ctx context.Context, ownerObject core
 
 	curLog.WithField("restore pvc", restorePVCName).Info("Restore PVC is bound")
 
-	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, PVC: restorePVCName}}, nil
+	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, VolumeName: pod.Spec.Volumes[0].Name}}, nil
 }
 
 func (e *genericRestoreExposer) CleanUp(ctx context.Context, ownerObject corev1.ObjectReference) {
@@ -251,6 +251,14 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
+	volumeName := string(ownerObject.UID)
+	containerName := string(ownerObject.UID)
+
+	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace)
+	if err != nil {
+		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
+	}
+
 	var gracePeriod int64 = 0
 
 	pod := &corev1.Pod{
@@ -271,19 +279,20 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name:            restorePodName,
-					Image:           "alpine:latest",
-					ImagePullPolicy: corev1.PullIfNotPresent,
-					Command:         []string{"sleep", "infinity"},
+					Name:            containerName,
+					Image:           podInfo.image,
+					ImagePullPolicy: corev1.PullNever,
+					Command:         []string{"/velero-helper", "pause"},
 					VolumeMounts: []corev1.VolumeMount{{
-						Name:      restorePVCName,
-						MountPath: "/" + restorePVCName,
+						Name:      volumeName,
+						MountPath: "/" + volumeName,
 					}},
 				},
 			},
+			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes: []corev1.Volume{{
-				Name: restorePVCName,
+				Name: volumeName,
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: restorePVCName,

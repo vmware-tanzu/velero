@@ -13,8 +13,8 @@ toc:
         url: /basic-install
       - page: Customize Installation
         url: /customize-installation
-      - page: Upgrade to 1.11
-        url: /upgrade-to-1.11
+      - page: Upgrade to 1.12
+        url: /upgrade-to-1.12
       - page: Supported providers
         url: /supported-providers
       - page: Evaluation install
@@ -43,6 +43,8 @@ toc:
         url: /restore-reference
       - page: Restore hooks
         url: /restore-hooks
+      - page: Restore Resource Modifiers
+        url: /restore-resource-modifiers
       - page: Run in any namespace
         url: /namespace
       - page: CSI Support

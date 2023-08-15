@@ -19,6 +19,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
@@ -68,7 +69,9 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 				DeleteBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
 			})
 			if veleroCfg.InstallVelero {
-				err = VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)
+				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
+				defer ctxCancel()
+				err = VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)
 				Expect(err).To(Succeed())
 			}
 		}

@@ -26,9 +26,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/stringptr"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/typed/volumesnapshot/v1"
@@ -44,8 +46,9 @@ const (
 
 // WaitVolumeSnapshotReady waits a VS to become ready to use until the timeout reaches
 func WaitVolumeSnapshotReady(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface,
-	volumeSnapshot string, volumeSnapshotNS string, timeout time.Duration) (*snapshotv1api.VolumeSnapshot, error) {
+	volumeSnapshot string, volumeSnapshotNS string, timeout time.Duration, log logrus.FieldLogger) (*snapshotv1api.VolumeSnapshot, error) {
 	var updated *snapshotv1api.VolumeSnapshot
+	errMessage := sets.NewString()
 
 	err := wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
 		tmpVS, err := snapshotClient.VolumeSnapshots(volumeSnapshotNS).Get(ctx, volumeSnapshot, metav1.GetOptions{})
@@ -53,13 +56,29 @@ func WaitVolumeSnapshotReady(ctx context.Context, snapshotClient snapshotter.Sna
 			return false, errors.Wrapf(err, fmt.Sprintf("error to get volumesnapshot %s/%s", volumeSnapshotNS, volumeSnapshot))
 		}
 
-		if tmpVS.Status == nil || tmpVS.Status.BoundVolumeSnapshotContentName == nil || !boolptr.IsSetToTrue(tmpVS.Status.ReadyToUse) || tmpVS.Status.RestoreSize == nil {
+		if tmpVS.Status == nil {
+			return false, nil
+		}
+
+		if tmpVS.Status.Error != nil {
+			errMessage.Insert(stringptr.GetString(tmpVS.Status.Error.Message))
+		}
+
+		if !boolptr.IsSetToTrue(tmpVS.Status.ReadyToUse) {
 			return false, nil
 		}
 
 		updated = tmpVS
 		return true, nil
 	})
+
+	if err == wait.ErrWaitTimeout {
+		err = errors.Errorf("volume snapshot is not ready until timeout, errors: %v", errMessage.List())
+	}
+
+	if errMessage.Len() > 0 {
+		log.Warnf("Some errors happened during waiting for ready snapshot, errors: %v", errMessage.List())
+	}
 
 	return updated, err
 }

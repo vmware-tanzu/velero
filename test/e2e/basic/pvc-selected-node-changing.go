@@ -91,7 +91,7 @@ func (p *PVCSelectedNodeChanging) CreateResources() error {
 	By("Prepare ConfigMap data", func() {
 		nodeNameList, err := GetWorkerNodes(p.Ctx)
 		Expect(err).To(Succeed())
-		Expect(len(nodeNameList) > 2).To(Equal(true))
+		Expect(len(nodeNameList) >= 2).To(Equal(true))
 		for _, nodeName := range nodeNameList {
 			if nodeName != p.oldNodeName {
 				p.newNodeName = nodeName

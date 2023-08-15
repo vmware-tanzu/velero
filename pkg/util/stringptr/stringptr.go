@@ -1,5 +1,5 @@
 /*
-Copyright The Velero Contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,24 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package exposer
+package stringptr
 
-import (
-	corev1 "k8s.io/api/core/v1"
-)
+const NilString = "<nil>"
 
-const (
-	AccessModeFileSystem = "by-file-system"
-)
-
-// ExposeResult defines the result of expose.
-// Varying from the type of the expose, the result may be different.
-type ExposeResult struct {
-	ByPod ExposeByPod
-}
-
-// ExposeByPod defines the result for the expose method that a hosting pod is created
-type ExposeByPod struct {
-	HostingPod *corev1.Pod
-	VolumeName string
+func GetString(str *string) string {
+	if str == nil {
+		return NilString
+	} else {
+		return *str
+	}
 }

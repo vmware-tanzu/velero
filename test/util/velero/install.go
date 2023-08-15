@@ -127,6 +127,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 		RestoreHelperImage:     veleroCfg.RestoreHelperImage,
 		VeleroServerDebugMode:  veleroCfg.VeleroServerDebugMode,
 	})
+
 	if err != nil {
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")

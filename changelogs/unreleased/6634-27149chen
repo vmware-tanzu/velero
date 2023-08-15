@@ -1,0 +1,1 @@
+Fixes #6498. Get resource client again after restore actions in case resource's gv is changed. This is an improvement of pr #6499, to support group changes. A group change usually happens in a restore plugin which is used for resource conversion: convert a resource from a not supported gv to a supported gv

@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -141,6 +142,18 @@ func initDataDownloadReconcilerWithError(objects []runtime.Object, needError ...
 }
 
 func TestDataDownloadReconcile(t *testing.T) {
+	daemonSet := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "velero",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+		Spec: appsv1.DaemonSetSpec{},
+	}
+
 	tests := []struct {
 		name              string
 		dd                *velerov2alpha1api.DataDownload
@@ -283,7 +296,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var objs []runtime.Object
 			if test.targetPVC != nil {
-				objs = []runtime.Object{test.targetPVC}
+				objs = []runtime.Object{test.targetPVC, daemonSet}
 			}
 			r, err := initDataDownloadReconciler(objs, test.needErrs...)
 			require.NoError(t, err)
@@ -330,7 +343,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 						} else if test.notNilExpose {
 							hostingPod := builder.ForPod("test-ns", "test-name").Volumes(&corev1.Volume{Name: "test-pvc"}).Result()
 							hostingPod.ObjectMeta.SetUID("test-uid")
-							ep.On("GetExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: hostingPod, PVC: "test-pvc"}}, nil)
+							ep.On("GetExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: hostingPod, VolumeName: "test-pvc"}}, nil)
 						} else if test.isGetExposeErr {
 							ep.On("GetExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("Error to get restore exposer"))
 						}

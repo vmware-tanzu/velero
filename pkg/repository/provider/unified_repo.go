@@ -67,7 +67,7 @@ const (
 	repoOpDescMaintain = "repo maintenance"
 	repoOpDescForget   = "forget"
 
-	repoConnectDesc = "unfied repo"
+	repoConnectDesc = "unified repo"
 )
 
 // NewUnifiedRepoProvider creates the service provider for Unified Repo
@@ -300,6 +300,11 @@ func (urp *unifiedRepoProvider) Forget(ctx context.Context, snapshotID string, p
 	err = bkRepo.DeleteManifest(ctx, udmrepo.ID(snapshotID))
 	if err != nil {
 		return errors.Wrap(err, "error to delete manifest")
+	}
+
+	err = bkRepo.Flush(ctx)
+	if err != nil {
+		return errors.Wrap(err, "error to flush repo")
 	}
 
 	log.Debug("Forget snapshot complete")

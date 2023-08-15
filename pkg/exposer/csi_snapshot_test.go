@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clientTesting "k8s.io/client-go/testing"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -80,6 +81,18 @@ func TestExpose(t *testing.T) {
 		Status: &snapshotv1api.VolumeSnapshotContentStatus{
 			RestoreSize: &restoreSize,
 		},
+	}
+
+	daemonSet := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "velero",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+		Spec: appsv1.DaemonSetSpec{},
 	}
 
 	tests := []struct {
@@ -256,6 +269,9 @@ func TestExpose(t *testing.T) {
 			snapshotClientObj: []runtime.Object{
 				vsObject,
 				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
 			},
 			kubeReactors: []reactor{
 				{

@@ -45,13 +45,11 @@ var veleroCfg VeleroConfig
 
 type apiGropuVersionsTest struct {
 	name       string
-	namespaces []string
 	srcCrdYaml string
 	srcCRs     map[string]string
 	tgtCrdYaml string
 	tgtVer     string
 	cm         *corev1api.ConfigMap
-	gvs        map[string][]string
 	want       map[string]map[string]string
 }
 
@@ -108,6 +106,8 @@ func APIGropuVersionsTest() {
 
 	Context("When EnableAPIGroupVersions flag is set", func() {
 		It("Should back up API group version and restore by version priority", func() {
+			ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
+			defer ctxCancel()
 			Expect(runEnableAPIGroupVersionsTests(
 				ctx,
 				*veleroCfg.ClientToInstallVelero,
@@ -121,12 +121,12 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, grou
 	tests := []apiGropuVersionsTest{
 		{
 			name:       "Target and source cluster preferred versions match; Preferred version v1 is restored (Priority 1, Case A).",
-			srcCrdYaml: "testdata/enable_api_group_versions/case-a-source.yaml",
+			srcCrdYaml: "../testdata/enable_api_group_versions/case-a-source.yaml",
 			srcCRs: map[string]string{
-				"v1":       "testdata/enable_api_group_versions/music_v1_rockband.yaml",
-				"v1alpha1": "testdata/enable_api_group_versions/music_v1alpha1_rockband.yaml",
+				"v1":       "../testdata/enable_api_group_versions/music_v1_rockband.yaml",
+				"v1alpha1": "../testdata/enable_api_group_versions/music_v1alpha1_rockband.yaml",
 			},
-			tgtCrdYaml: "testdata/enable_api_group_versions/case-a-target.yaml",
+			tgtCrdYaml: "../testdata/enable_api_group_versions/case-a-target.yaml",
 			tgtVer:     "v1",
 			cm:         nil,
 			want: map[string]map[string]string{
@@ -140,13 +140,13 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, grou
 		},
 		{
 			name:       "Latest common non-preferred supported version v2beta2 is restored (Priority 3, Case D).",
-			srcCrdYaml: "testdata/enable_api_group_versions/case-b-source-manually-added-mutations.yaml",
+			srcCrdYaml: "../testdata/enable_api_group_versions/case-b-source-manually-added-mutations.yaml",
 			srcCRs: map[string]string{
-				"v2beta2": "testdata/enable_api_group_versions/music_v2beta2_rockband.yaml",
-				"v2beta1": "testdata/enable_api_group_versions/music_v2beta1_rockband.yaml",
-				"v1":      "testdata/enable_api_group_versions/music_v1_rockband.yaml",
+				"v2beta2": "../testdata/enable_api_group_versions/music_v2beta2_rockband.yaml",
+				"v2beta1": "../testdata/enable_api_group_versions/music_v2beta1_rockband.yaml",
+				"v1":      "../testdata/enable_api_group_versions/music_v1_rockband.yaml",
 			},
-			tgtCrdYaml: "testdata/enable_api_group_versions/case-d-target-manually-added-mutations.yaml",
+			tgtCrdYaml: "../testdata/enable_api_group_versions/case-d-target-manually-added-mutations.yaml",
 			tgtVer:     "v2beta2",
 			cm:         nil,
 			want: map[string]map[string]string{
@@ -160,25 +160,25 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, grou
 		},
 		{
 			name:       "No common supported versions means no rockbands custom resource is restored.",
-			srcCrdYaml: "testdata/enable_api_group_versions/case-a-source.yaml",
+			srcCrdYaml: "../testdata/enable_api_group_versions/case-a-source.yaml",
 			srcCRs: map[string]string{
-				"v1":       "testdata/enable_api_group_versions/music_v1_rockband.yaml",
-				"v1alpha1": "testdata/enable_api_group_versions/music_v1alpha1_rockband.yaml",
+				"v1":       "../testdata/enable_api_group_versions/music_v1_rockband.yaml",
+				"v1alpha1": "../testdata/enable_api_group_versions/music_v1alpha1_rockband.yaml",
 			},
-			tgtCrdYaml: "testdata/enable_api_group_versions/case-b-target-manually-added-mutations.yaml",
+			tgtCrdYaml: "../testdata/enable_api_group_versions/case-b-target-manually-added-mutations.yaml",
 			tgtVer:     "",
 			cm:         nil,
 			want:       nil,
 		},
 		{
 			name:       "User config map overrides Priority 3, Case D and restores v2beta1",
-			srcCrdYaml: "testdata/enable_api_group_versions/case-b-source-manually-added-mutations.yaml",
+			srcCrdYaml: "../testdata/enable_api_group_versions/case-b-source-manually-added-mutations.yaml",
 			srcCRs: map[string]string{
-				"v2beta2": "testdata/enable_api_group_versions/music_v2beta2_rockband.yaml",
-				"v2beta1": "testdata/enable_api_group_versions/music_v2beta1_rockband.yaml",
-				"v1":      "testdata/enable_api_group_versions/music_v1_rockband.yaml",
+				"v2beta2": "../testdata/enable_api_group_versions/music_v2beta2_rockband.yaml",
+				"v2beta1": "../testdata/enable_api_group_versions/music_v2beta1_rockband.yaml",
+				"v1":      "../testdata/enable_api_group_versions/music_v1_rockband.yaml",
 			},
-			tgtCrdYaml: "testdata/enable_api_group_versions/case-d-target-manually-added-mutations.yaml",
+			tgtCrdYaml: "../testdata/enable_api_group_versions/case-d-target-manually-added-mutations.yaml",
 			tgtVer:     "v2beta1",
 			cm: builder.ForConfigMap(veleroCfg.VeleroNamespace, "enableapigroupversions").Data(
 				"restoreResourcesVersionPriority",
@@ -195,9 +195,9 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, grou
 		},
 		{
 			name:       "Restore successful when CRD doesn't (yet) exist in target",
-			srcCrdYaml: "testdata/enable_api_group_versions/case-a-source.yaml",
+			srcCrdYaml: "../testdata/enable_api_group_versions/case-a-source.yaml",
 			srcCRs: map[string]string{
-				"v1": "testdata/enable_api_group_versions/music_v1_rockband.yaml",
+				"v1": "../testdata/enable_api_group_versions/music_v1_rockband.yaml",
 			},
 			tgtCrdYaml: "",
 			tgtVer:     "v1",

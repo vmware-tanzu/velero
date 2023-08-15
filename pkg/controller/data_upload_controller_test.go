@@ -27,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -145,6 +146,18 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 			RestoreSize: &restoreSize,
 		},
 	}
+	daemonSet := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "velero",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
+		Spec: appsv1.DaemonSetSpec{},
+	}
+
 	now, err := time.Parse(time.RFC1123, time.RFC1123)
 	if err != nil {
 		return nil, err
@@ -176,7 +189,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 	}
 
 	fakeSnapshotClient := snapshotFake.NewSimpleClientset(vsObject, vscObj)
-	fakeKubeClient := clientgofake.NewSimpleClientset()
+	fakeKubeClient := clientgofake.NewSimpleClientset(daemonSet)
 	fakeFS := velerotest.NewFakeFileSystem()
 	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", "", dataUploadName)
 	_, err = fakeFS.Create(pathGlob)
@@ -240,7 +253,7 @@ func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1.ObjectRe
 	if err != nil {
 		return nil, err
 	}
-	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, PVC: dataUploadName}}, nil
+	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, VolumeName: dataUploadName}}, nil
 }
 
 func (f *fakeSnapshotExposer) CleanUp(context.Context, corev1.ObjectReference, string, string) {

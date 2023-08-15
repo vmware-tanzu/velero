@@ -322,8 +322,6 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td.backupStore.On("GetBackupVolumeSnapshots", input.Spec.BackupName).Return(snapshots, nil)
 		td.backupStore.On("GetBackupContents", input.Spec.BackupName).Return(io.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 		td.backupStore.On("DeleteBackup", input.Spec.BackupName).Return(nil)
-		td.backupStore.On("DeleteRestore", "restore-1").Return(nil)
-		td.backupStore.On("DeleteRestore", "restore-2").Return(nil)
 
 		_, err := td.controller.Reconcile(context.TODO(), td.req)
 		require.NoError(t, err)
@@ -363,8 +361,6 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.Nil(t, err)
 
 		td.backupStore.AssertCalled(t, "DeleteBackup", input.Spec.BackupName)
-		td.backupStore.AssertCalled(t, "DeleteRestore", "restore-1")
-		td.backupStore.AssertCalled(t, "DeleteRestore", "restore-2")
 
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())

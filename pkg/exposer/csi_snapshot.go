@@ -94,7 +94,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 
 	curLog.Info("Exposing CSI snapshot")
 
-	volumeSnapshot, err := csi.WaitVolumeSnapshotReady(ctx, e.csiSnapshotClient, csiExposeParam.SnapshotName, csiExposeParam.SourceNamespace, csiExposeParam.Timeout)
+	volumeSnapshot, err := csi.WaitVolumeSnapshotReady(ctx, e.csiSnapshotClient, csiExposeParam.SnapshotName, csiExposeParam.SourceNamespace, csiExposeParam.Timeout, curLog)
 	if err != nil {
 		return errors.Wrapf(err, "error wait volume snapshot ready")
 	}
@@ -218,7 +218,7 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.
 
 	curLog.WithField("backup pvc", backupPVCName).Info("Backup PVC is bound")
 
-	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, PVC: backupPVCName}}, nil
+	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, VolumeName: pod.Spec.Volumes[0].Name}}, nil
 }
 
 func (e *csiSnapshotExposer) CleanUp(ctx context.Context, ownerObject corev1.ObjectReference, vsName string, sourceNamespace string) {
@@ -345,6 +345,14 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject corev1.ObjectReference, backupPVC *corev1.PersistentVolumeClaim, label map[string]string) (*corev1.Pod, error) {
 	podName := ownerObject.Name
 
+	volumeName := string(ownerObject.UID)
+	containerName := string(ownerObject.UID)
+
+	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace)
+	if err != nil {
+		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
+	}
+
 	var gracePeriod int64 = 0
 
 	pod := &corev1.Pod{
@@ -365,19 +373,20 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name:            podName,
-					Image:           "alpine:latest",
-					ImagePullPolicy: corev1.PullIfNotPresent,
-					Command:         []string{"sleep", "infinity"},
+					Name:            containerName,
+					Image:           podInfo.image,
+					ImagePullPolicy: corev1.PullNever,
+					Command:         []string{"/velero-helper", "pause"},
 					VolumeMounts: []corev1.VolumeMount{{
-						Name:      backupPVC.Name,
-						MountPath: "/" + backupPVC.Name,
+						Name:      volumeName,
+						MountPath: "/" + volumeName,
 					}},
 				},
 			},
+			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes: []corev1.Volume{{
-				Name: backupPVC.Name,
+				Name: volumeName,
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: backupPVC.Name,
