@@ -4,6 +4,7 @@ ENV GOPATH=$APP_ROOT
 COPY . /go/src/github.com/vmware-tanzu/velero
 WORKDIR /go/src/github.com/vmware-tanzu/velero
 RUN CGO_ENABLED=0 GOOS=linux go build -a -mod=mod -ldflags '-extldflags "-static" -X github.com/vmware-tanzu/velero/pkg/buildinfo.Version=konveyor-dev' -o /go/src/velero github.com/vmware-tanzu/velero/cmd/velero
+RUN CGO_ENABLED=0 GOOS=linux go build -a -mod=mod -ldflags '-extldflags "-static"' -o /go/src/velero-helper github.com/vmware-tanzu/velero/cmd/velero-helper
 
 FROM quay.io/konveyor/builder:latest AS restic-builder
 ENV GOPATH=$APP_ROOT
@@ -16,6 +17,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -mod=mod -ldflags '-extldflags "-static
 FROM registry.access.redhat.com/ubi8-minimal
 RUN microdnf -y update && microdnf -y install nmap-ncat && microdnf clean all
 COPY --from=builder /go/src/velero velero
+COPY --from=builder /go/src/velero-helper velero-helper
 COPY --from=restic-builder /opt/app-root/src/restic /usr/bin/restic
 
 RUN mkdir -p /home/velero
