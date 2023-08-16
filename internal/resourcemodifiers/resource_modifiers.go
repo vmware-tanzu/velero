@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"strconv"
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -117,10 +118,10 @@ func (r *ResourceModifierRule) PatchArrayToByteArray() ([]byte, error) {
 }
 
 func (p *JSONPatch) ToString() string {
-	if strings.Contains(p.Value, "\"") {
-		return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": %s}`, p.Operation, p.From, p.Path, p.Value)
+	if addQuotes(p.Value) {
+		return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": "%s"}`, p.Operation, p.From, p.Path, p.Value)
 	}
-	return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": "%s"}`, p.Operation, p.From, p.Path, p.Value)
+	return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": %s}`, p.Operation, p.From, p.Path, p.Value)
 }
 
 func ApplyPatch(patch []byte, obj *unstructured.Unstructured, log logrus.FieldLogger) error {
@@ -161,4 +162,27 @@ func decodeStruct(r io.Reader, s interface{}) error {
 	dec := yaml.NewDecoder(r)
 	dec.KnownFields(true)
 	return dec.Decode(s)
+}
+
+func addQuotes(value string) bool {
+	if value == "" {
+		return true
+	}
+	// if value is null, then don't add quotes
+	if value == "null" {
+		return false
+	}
+	// if value is a boolean, then don't add quotes
+	if _, err := strconv.ParseBool(value); err == nil {
+		return false
+	}
+	// if value is a json object or array, then don't add quotes.
+	if strings.HasPrefix(value, "{") || strings.HasPrefix(value, "[") {
+		return false
+	}
+	// if value is a number, then don't add quotes
+	if _, err := strconv.ParseFloat(value, 64); err == nil {
+		return false
+	}
+	return true
 }
