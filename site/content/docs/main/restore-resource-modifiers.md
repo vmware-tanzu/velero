@@ -61,7 +61,7 @@ resourceModifierRules:
 version: v1
 resourceModifierRules:
 - conditions:
-    groupKind: persistentvolumeclaims.storage.k8s.io
+    groupKind: persistentvolumeclaims
     resourceNameRegex: ".*"
     namespaces:
     - bar
