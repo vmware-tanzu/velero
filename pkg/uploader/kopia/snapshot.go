@@ -88,10 +88,15 @@ func setupDefaultPolicy() *policy.Tree {
 
 // Backup backup specific sourcePath and update progress
 func Backup(ctx context.Context, fsUploader SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string,
-	forceFull bool, parentSnapshot string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+	forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 	if fsUploader == nil {
 		return nil, false, errors.New("get empty kopia uploader")
 	}
+
+	if volMode == uploader.PersistentVolumeBlock {
+		return nil, false, errors.New("unable to handle block storage")
+	}
+
 	dir, err := filepath.Abs(sourcePath)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "Invalid source path '%s'", sourcePath)

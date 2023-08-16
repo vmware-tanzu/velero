@@ -118,6 +118,7 @@ func (kp *kopiaProvider) RunBackup(
 	tags map[string]string,
 	forceFull bool,
 	parentSnapshot string,
+	volMode uploader.PersistentVolumeMode,
 	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {
 		return "", false, errors.New("Need to initial backup progress updater first")
@@ -125,6 +126,11 @@ func (kp *kopiaProvider) RunBackup(
 
 	if path == "" {
 		return "", false, errors.New("path is empty")
+	}
+
+	// For now, error on block mode
+	if volMode == uploader.PersistentVolumeBlock {
+		return "", false, errors.New("unable to currently support block mode")
 	}
 
 	log := kp.log.WithFields(logrus.Fields{
@@ -153,7 +159,7 @@ func (kp *kopiaProvider) RunBackup(
 	tags[uploader.SnapshotRequesterTag] = kp.requestorType
 	tags[uploader.SnapshotUploaderTag] = uploader.KopiaType
 
-	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, realSource, forceFull, parentSnapshot, tags, log)
+	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, realSource, forceFull, parentSnapshot, volMode, tags, log)
 	if err != nil {
 		if kpUploader.IsCanceled() {
 			log.Error("Kopia backup is canceled")
@@ -197,11 +203,17 @@ func (kp *kopiaProvider) RunRestore(
 	ctx context.Context,
 	snapshotID string,
 	volumePath string,
+	volMode uploader.PersistentVolumeMode,
 	updater uploader.ProgressUpdater) error {
 	log := kp.log.WithFields(logrus.Fields{
 		"snapshotID": snapshotID,
 		"volumePath": volumePath,
 	})
+
+	if volMode == uploader.PersistentVolumeBlock {
+		return errors.New("unable to currently support block mode")
+	}
+
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
 	progress := new(kopia.Progress)
 	progress.InitThrottle(restoreProgressCheckInterval)
