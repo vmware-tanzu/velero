@@ -359,5 +359,9 @@ gen-docs:
 test-e2e: local
 	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
 
+.PHONY: test-perf
+test-perf: local
+	$(MAKE) -e VERSION=$(VERSION) -C test/perf run
+
 go-generate:
 	go generate ./pkg/...

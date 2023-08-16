@@ -10,9 +10,9 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 
-	. "github.com/vmware-tanzu/velero/test/e2e"
+	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 type PVBackupFiltering struct {
@@ -67,7 +67,7 @@ func (p *PVBackupFiltering) Init() error {
 
 func (p *PVBackupFiltering) CreateResources() error {
 	p.Ctx, p.CtxCancel = context.WithTimeout(context.Background(), 30*time.Minute)
-	err := InstallStorageClass(p.Ctx, fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
+	err := InstallStorageClass(p.Ctx, fmt.Sprintf("../testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))
 	if err != nil {
 		return errors.Wrapf(err, "failed to install storage class for pv backup filtering test")
 	}

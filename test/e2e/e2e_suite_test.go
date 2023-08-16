@@ -28,7 +28,7 @@ import (
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 
-	. "github.com/vmware-tanzu/velero/test/e2e"
+	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/backup"
 	. "github.com/vmware-tanzu/velero/test/e2e/backups"
 	. "github.com/vmware-tanzu/velero/test/e2e/basic"
@@ -43,8 +43,8 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/scale"
 	. "github.com/vmware-tanzu/velero/test/e2e/schedule"
 	. "github.com/vmware-tanzu/velero/test/e2e/upgrade"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
-	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
+	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 func init() {
