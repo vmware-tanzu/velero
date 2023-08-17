@@ -37,6 +37,7 @@ import (
 const (
 	downloadRequestTimeout = 30 * time.Second
 	emptyDisplay           = "<none>"
+	defaultDataMover       = "velero"
 )
 
 // BindFlags defines a set of output-specific flags within the provided

@@ -42,7 +42,7 @@ Backup Template:
   
   Velero-Native Snapshot PVs:  auto
   Snapshot Move Data:          auto
-  Data Mover:                  <none>
+  Data Mover:                  velero
   
   TTL:  0s
   
@@ -86,7 +86,7 @@ Backup Template:
   
   Velero-Native Snapshot PVs:  auto
   Snapshot Move Data:          auto
-  Data Mover:                  <none>
+  Data Mover:                  velero
   
   TTL:  0s
   

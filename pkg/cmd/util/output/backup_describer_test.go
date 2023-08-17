@@ -212,7 +212,7 @@ Storage Location:  backup-location
 
 Velero-Native Snapshot PVs:  auto
 Snapshot Move Data:          auto
-Data Mover:                  <none>
+Data Mover:                  velero
 
 TTL:  0s
 
