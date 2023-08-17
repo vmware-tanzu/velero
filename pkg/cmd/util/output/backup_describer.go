@@ -206,7 +206,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("Velero-Native Snapshot PVs:\t%s\n", BoolPointerString(spec.SnapshotVolumes, "false", "true", "auto"))
 	d.Printf("Snapshot Move Data:\t%s\n", BoolPointerString(spec.SnapshotMoveData, "false", "true", "auto"))
 	if len(spec.DataMover) == 0 {
-		s = emptyDisplay
+		s = defaultDataMover
 	} else {
 		s = spec.DataMover
 	}
