@@ -1,1 +1,0 @@
-Velero Plugins no longer need kopia indirect dependency in their go.mod
