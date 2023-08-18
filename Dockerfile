@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Velero binary build section
-FROM --platform=$BUILDPLATFORM golang:1.20-bullseye as velero-builder
+FROM --platform=$BUILDPLATFORM golang:1.20.7-bullseye as velero-builder
 
 ARG GOPROXY
 ARG BIN
@@ -46,7 +46,7 @@ RUN mkdir -p /output/usr/bin && \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/velero-helper
 
 # Restic binary build section
-FROM --platform=$BUILDPLATFORM golang:1.20-bullseye as restic-builder
+FROM --platform=$BUILDPLATFORM golang:1.20.7-bullseye as restic-builder
 
 ARG BIN
 ARG TARGETOS
@@ -68,7 +68,7 @@ RUN mkdir -p /output/usr/bin && \
     /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh
 
 # Velero image packing section
-FROM gcr.io/distroless/base-nossl-debian11:nonroot
+FROM gcr.io/distroless/base-nossl-debian11@sha256:f10e1fbf558c630a4b74a987e6c754d45bf59f9ddcefce090f6b111925996767
 
 LABEL maintainer="Xun Jiang <jxun@vmware.com>"
 
