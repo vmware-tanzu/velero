@@ -129,7 +129,7 @@ func GetCsiSnapshotHandleV1(client TestClient, backupName string) ([]string, err
 	return snapshotHandleList, nil
 }
 func GetVolumeSnapshotContentNameByPod(client TestClient, podName, namespace, backupName string) (string, error) {
-	pvcList, err := GetPvcByPodName(context.Background(), namespace, podName)
+	pvcList, err := GetPvcByPVCName(context.Background(), namespace, podName)
 	if err != nil {
 		return "", err
 	}
