@@ -81,6 +81,7 @@ type Options struct {
 	DefaultVolumesToFsBackup        bool
 	UploaderType                    string
 	DefaultSnapshotMoveData         bool
+	DisableInformerCache            bool
 }
 
 // BindFlags adds command line values to the options struct.
@@ -122,6 +123,7 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", o.DefaultVolumesToFsBackup, "Bool flag to configure Velero server to use pod volume file system backup by default for all volumes on all backups. Optional.")
 	flags.StringVar(&o.UploaderType, "uploader-type", o.UploaderType, fmt.Sprintf("The type of uploader to transfer the data of pod volumes, the supported values are '%s', '%s'", uploader.ResticType, uploader.KopiaType))
 	flags.BoolVar(&o.DefaultSnapshotMoveData, "default-snapshot-move-data", o.DefaultSnapshotMoveData, "Bool flag to configure Velero server to move data by default for all snapshots supporting data movement. Optional.")
+	flags.BoolVar(&o.DisableInformerCache, "disable-informer-cache", o.DisableInformerCache, "Disable informer cache for Get calls on restore. With this enabled, it will speed up restore in cases where there are backup resources which already exist in the cluster, but for very large clusters this will increase velero memory usage. Default is false (don't disable). Optional.")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -149,6 +151,7 @@ func NewInstallOptions() *Options {
 		DefaultVolumesToFsBackup: false,
 		UploaderType:             uploader.KopiaType,
 		DefaultSnapshotMoveData:  false,
+		DisableInformerCache:     true,
 	}
 }
 
@@ -213,6 +216,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		DefaultVolumesToFsBackup:        o.DefaultVolumesToFsBackup,
 		UploaderType:                    o.UploaderType,
 		DefaultSnapshotMoveData:         o.DefaultSnapshotMoveData,
+		DisableInformerCache:            o.DisableInformerCache,
 	}, nil
 }
 

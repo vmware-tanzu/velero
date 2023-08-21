@@ -112,6 +112,7 @@ const (
 	defaultCredentialsDirectory = "/tmp/credentials"
 
 	defaultMaxConcurrentK8SConnections = 30
+	defaultDisableInformerCache        = false
 )
 
 type serverConfig struct {
@@ -136,6 +137,7 @@ type serverConfig struct {
 	uploaderType                                                            string
 	maxConcurrentK8SConnections                                             int
 	defaultSnapshotMoveData                                                 bool
+	disableInformerCache                                                    bool
 }
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -165,6 +167,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			uploaderType:                   uploader.ResticType,
 			maxConcurrentK8SConnections:    defaultMaxConcurrentK8SConnections,
 			defaultSnapshotMoveData:        false,
+			disableInformerCache:           defaultDisableInformerCache,
 		}
 	)
 
@@ -236,6 +239,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
 	command.Flags().IntVar(&config.maxConcurrentK8SConnections, "max-concurrent-k8s-connections", config.maxConcurrentK8SConnections, "Max concurrent connections number that Velero can create with kube-apiserver. Default is 30.")
 	command.Flags().BoolVar(&config.defaultSnapshotMoveData, "default-snapshot-move-data", config.defaultSnapshotMoveData, "Move data by default for all snapshots supporting data movement.")
+	command.Flags().BoolVar(&config.disableInformerCache, "disable-informer-cache", config.disableInformerCache, "Disable informer cache for Get calls on restore. WIth this enabled, it will speed up restore in cases where there are backup resources which already exist in the cluster, but for very large clusters this will increase velero memory usage. Default is false (don't disable).")
 
 	return command
 }
@@ -937,6 +941,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.metrics,
 			s.config.formatFlag.Parse(),
 			s.config.defaultItemOperationTimeout,
+			s.config.disableInformerCache,
 		)
 
 		if err = r.SetupWithManager(s.mgr); err != nil {
