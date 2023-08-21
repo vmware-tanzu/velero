@@ -1056,15 +1056,25 @@ func GetResticRepositories(ctx context.Context, veleroNamespace, targetNamespace
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
-func GetSnapshotCheckPoint(client TestClient, VeleroCfg VeleroConfig, expectCount int, namespaceBackedUp, backupName string, kibishiiPodNameList []string) (SnapshotCheckPoint, error) {
+func GetSnapshotCheckPoint(client TestClient, VeleroCfg VeleroConfig, expectCount int, namespaceBackedUp, backupName string, KibishiiPVCNameList []string) (SnapshotCheckPoint, error) {
 	var snapshotCheckPoint SnapshotCheckPoint
-	var err error
+
 	snapshotCheckPoint.ExpectCount = expectCount
 	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
-	snapshotCheckPoint.PodName = kibishiiPodNameList
+	snapshotCheckPoint.PodName = KibishiiPVCNameList
 	if VeleroCfg.CloudProvider == "azure" && strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
 		snapshotCheckPoint.EnableCSI = true
-		if snapshotCheckPoint.SnapshotIDList, err = util.CheckVolumeSnapshotCR(client, backupName, expectCount); err != nil {
+		resourceName := "snapshot.storage.k8s.io"
+
+		srcVersions, err := GetAPIVersions(VeleroCfg.DefaultClient, resourceName)
+
+		if err != nil {
+			return snapshotCheckPoint, err
+		}
+		if len(srcVersions) == 0 {
+			return snapshotCheckPoint, errors.New("Fail to get APIVersion")
+		}
+		if snapshotCheckPoint.SnapshotIDList, err = util.CheckVolumeSnapshotCR(client, backupName, expectCount, srcVersions[0]); err != nil {
 			return snapshotCheckPoint, errors.Wrapf(err, "Fail to get Azure CSI snapshot content")
 		}
 	}
@@ -1183,12 +1193,9 @@ func UpdateVeleroDeployment(ctx context.Context, veleroCfg VeleroConfig) ([]stri
 		Args: []string{"get", "deploy", "-n", veleroCfg.VeleroNamespace, "-ojson"},
 	}
 	cmds = append(cmds, cmd)
-	var args string
-	if veleroCfg.CloudProvider == "vsphere" {
-		args = fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"harbor-repo.vmware.com\\/velero_ci\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
-	} else {
-		args = fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"gcr.io\\/velero-gcp\\/nightly\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
-	}
+
+	args := fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"gcr.io\\/velero-gcp\\/nightly\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
+
 	cmd = &common.OsCommandLine{
 		Cmd:  "sed",
 		Args: []string{args},
@@ -1236,12 +1243,9 @@ func UpdateNodeAgent(ctx context.Context, veleroCfg VeleroConfig, dsjson string)
 		Args: []string{dsjson},
 	}
 	cmds = append(cmds, cmd)
-	var args string
-	if veleroCfg.CloudProvider == "vsphere" {
-		args = fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"harbor-repo.vmware.com\\/velero_ci\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
-	} else {
-		args = fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"gcr.io\\/velero-gcp\\/nightly\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
-	}
+
+	args := fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"gcr.io\\/velero-gcp\\/nightly\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
+
 	cmd = &common.OsCommandLine{
 		Cmd:  "sed",
 		Args: []string{args},

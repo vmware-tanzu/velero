@@ -26,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 const (
@@ -35,44 +37,88 @@ const (
 	PollTimeout  = 15 * time.Minute
 )
 
+// DeploymentBuilder builds Deployment objects.
+type DeploymentBuilder struct {
+	*apps.Deployment
+}
+
+func (d *DeploymentBuilder) Result() *apps.Deployment {
+	return d.Deployment
+}
+
 // newDeployment returns a RollingUpdate Deployment with a fake container image
-func NewDeployment(name, ns string, replicas int32, labels map[string]string, containers []v1.Container) *apps.Deployment {
+func NewDeployment(name, ns string, replicas int32, labels map[string]string, containers []v1.Container) *DeploymentBuilder {
 	if containers == nil {
 		containers = []v1.Container{
 			{
-				Name:    fmt.Sprintf("container-%s", "busybox"),
+				Name:    "container-busybox",
 				Image:   "gcr.io/velero-gcp/busybox:latest",
 				Command: []string{"sleep", "1000000"},
+				// Make pod obeys the restricted pod security standards.
+				SecurityContext: &v1.SecurityContext{
+					AllowPrivilegeEscalation: boolptr.False(),
+					Capabilities: &v1.Capabilities{
+						Drop: []v1.Capability{"ALL"},
+					},
+					RunAsNonRoot: boolptr.True(),
+					RunAsUser:    func(i int64) *int64 { return &i }(65534),
+					RunAsGroup:   func(i int64) *int64 { return &i }(65534),
+					SeccompProfile: &v1.SeccompProfile{
+						Type: v1.SeccompProfileTypeRuntimeDefault,
+					},
+				},
 			},
 		}
 	}
-	return &apps.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Deployment",
-			APIVersion: "apps/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-			Labels:    labels,
-		},
-		Spec: apps.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{MatchLabels: labels},
-			Strategy: apps.DeploymentStrategy{
-				Type:          apps.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: new(apps.RollingUpdateDeployment),
+	return &DeploymentBuilder{
+		&apps.Deployment{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
 			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+				Labels:    labels,
+			},
+			Spec: apps.DeploymentSpec{
+				Replicas: &replicas,
+				Selector: &metav1.LabelSelector{MatchLabels: labels},
+				Strategy: apps.DeploymentStrategy{
+					Type:          apps.RollingUpdateDeploymentStrategyType,
+					RollingUpdate: new(apps.RollingUpdateDeployment),
 				},
-				Spec: v1.PodSpec{
-					Containers: containers,
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: labels,
+					},
+					Spec: v1.PodSpec{
+						SecurityContext: &v1.PodSecurityContext{
+							FSGroup:             func(i int64) *int64 { return &i }(65534),
+							FSGroupChangePolicy: func(policy v1.PodFSGroupChangePolicy) *v1.PodFSGroupChangePolicy { return &policy }(v1.FSGroupChangeAlways),
+						},
+						Containers: containers,
+					},
 				},
 			},
 		},
 	}
+}
+
+func (d *DeploymentBuilder) WithVolume(volumes []*v1.Volume) *DeploymentBuilder {
+	vmList := []v1.VolumeMount{}
+	for _, v := range volumes {
+		vmList = append(vmList, v1.VolumeMount{
+			Name:      v.Name,
+			MountPath: "/" + v.Name,
+		})
+		d.Spec.Template.Spec.Volumes = append(d.Spec.Template.Spec.Volumes, *v)
+
+	}
+
+	// NOTE here just mount volumes to the first container
+	d.Spec.Template.Spec.Containers[0].VolumeMounts = vmList
+	return d
 }
 
 func CreateDeploy(c clientset.Interface, ns string, deployment *apps.Deployment) error {

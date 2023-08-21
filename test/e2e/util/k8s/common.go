@@ -33,7 +33,7 @@ import (
 	"github.com/vmware-tanzu/velero/test/e2e/util/common"
 )
 
-// ensureClusterExists returns whether or not a kubernetes cluster exists for tests to be run on.
+// ensureClusterExists returns whether or not a Kubernetes cluster exists for tests to be run on.
 func EnsureClusterExists(ctx context.Context) error {
 	return exec.CommandContext(ctx, "kubectl", "cluster-info").Run()
 }
@@ -81,7 +81,7 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 	return nil
 }
 
-func GetPvcByPodName(ctx context.Context, namespace, podName string) ([]string, error) {
+func GetPvcByPVCName(ctx context.Context, namespace, pvcName string) ([]string, error) {
 	// Example:
 	//    NAME                                  STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS             AGE
 	//    kibishii-data-kibishii-deployment-0   Bound    pvc-94b9fdf2-c30f-4a7b-87bf-06eadca0d5b6   1Gi        RWO            kibishii-storage-class   115s
@@ -94,7 +94,7 @@ func GetPvcByPodName(ctx context.Context, namespace, podName string) ([]string, 
 
 	cmd = &common.OsCommandLine{
 		Cmd:  "grep",
-		Args: []string{podName},
+		Args: []string{pvcName},
 	}
 	cmds = append(cmds, cmd)
 
@@ -200,6 +200,7 @@ func AddLabelToCRD(ctx context.Context, crd, label string) error {
 
 func KubectlApplyByFile(ctx context.Context, file string) error {
 	args := []string{"apply", "-f", file, "--force=true"}
+	fmt.Println(args)
 	return exec.CommandContext(ctx, "kubectl", args...).Run()
 }
 
@@ -213,39 +214,20 @@ func KubectlConfigUseContext(ctx context.Context, kubectlContext string) error {
 	return err
 }
 
-func GetAPIVersions(client *TestClient, name string) ([]string, error) {
-	var version []string
-	APIGroup, err := client.ClientGo.Discovery().ServerGroups()
-	if err != nil {
-		return nil, errors.Wrap(err, "Fail to get server API groups")
-	}
-	for _, group := range APIGroup.Groups {
-		fmt.Println(group.Name)
-		if group.Name == name {
-			for _, v := range group.Versions {
-				fmt.Println(v.Version)
-				version = append(version, v.Version)
-			}
-			return version, nil
-		}
-	}
-	return nil, errors.New("Server API groups is empty")
-}
-
-func GetPVByPodName(client TestClient, namespace, podName string) (string, error) {
-	pvcList, err := GetPvcByPodName(context.Background(), namespace, podName)
+func GetPVByPVCName(client TestClient, namespace, pvcName string) (string, error) {
+	pvcList, err := GetPvcByPVCName(context.Background(), namespace, pvcName)
 	if err != nil {
 		return "", err
 	}
 	if len(pvcList) != 1 {
-		return "", errors.New(fmt.Sprintf("Only 1 PVC of pod %s should be found under namespace %s", podName, namespace))
+		return "", errors.New(fmt.Sprintf("Only 1 PVC of pod %s should be found under namespace %s but got %v", pvcName, namespace, pvcList))
 	}
 	pvList, err := GetPvByPvc(context.Background(), namespace, pvcList[0])
 	if err != nil {
 		return "", err
 	}
 	if len(pvList) != 1 {
-		return "", errors.New(fmt.Sprintf("Only 1 PV of PVC %s pod %s should be found under namespace %s", pvcList[0], podName, namespace))
+		return "", errors.New(fmt.Sprintf("Only 1 PV of PVC %s pod %s should be found under namespace %s", pvcList[0], pvcName, namespace))
 	}
 	pv_value, err := GetPersistentVolume(context.Background(), client, "", pvList[0])
 	fmt.Println(pv_value.Annotations["pv.kubernetes.io/provisioned-by"])
@@ -255,15 +237,30 @@ func GetPVByPodName(client TestClient, namespace, podName string) (string, error
 	return pv_value.Name, nil
 }
 
-func CreateFileToPod(ctx context.Context, namespace, podName, volume, filename, content string) error {
-	arg := []string{"exec", "-n", namespace, "-c", podName, podName,
+func PrepareVolumeList(volumeNameList []string) (vols []*corev1.Volume) {
+	for i, volume := range volumeNameList {
+		vols = append(vols, &corev1.Volume{
+			Name: volume,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: fmt.Sprintf("pvc-%d", i),
+					ReadOnly:  false,
+				},
+			},
+		})
+	}
+	return
+}
+
+func CreateFileToPod(ctx context.Context, namespace, podName, containerName, volume, filename, content string) error {
+	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("echo ns-%s pod-%s volume-%s  > /%s/%s", namespace, podName, volume, volume, filename)}
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	return cmd.Run()
 }
-func ReadFileFromPodVolume(ctx context.Context, namespace, podName, volume, filename string) (string, error) {
-	arg := []string{"exec", "-n", namespace, "-c", podName, podName,
+func ReadFileFromPodVolume(ctx context.Context, namespace, podName, containerName, volume, filename string) (string, error) {
+	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", "cat", fmt.Sprintf("/%s/%s", volume, filename)}
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
@@ -330,4 +327,39 @@ func GetAllService(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return stdout, nil
+}
+
+func CreateVolumes(pvcName string, volumeNameList []string) (vols []*corev1.Volume) {
+	vols = []*corev1.Volume{}
+	for _, volume := range volumeNameList {
+		vols = append(vols, &corev1.Volume{
+			Name: volume,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+					ReadOnly:  false,
+				},
+			},
+		})
+	}
+	return
+}
+
+func GetAPIVersions(client *TestClient, name string) ([]string, error) {
+	var version []string
+	APIGroup, err := client.ClientGo.Discovery().ServerGroups()
+	if err != nil {
+		return nil, errors.Wrap(err, "Fail to get server API groups")
+	}
+	for _, group := range APIGroup.Groups {
+		fmt.Println(group.Name)
+		if group.Name == name {
+			for _, v := range group.Versions {
+				fmt.Println(v.Version)
+				version = append(version, v.Version)
+			}
+			return version, nil
+		}
+	}
+	return nil, errors.New("Server API groups is empty")
 }

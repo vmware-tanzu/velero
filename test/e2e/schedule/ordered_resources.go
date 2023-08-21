@@ -159,7 +159,7 @@ func (o *OrderedResources) CreateResources() error {
 	//Create deployment
 	deploymentName := fmt.Sprintf("deploy-%s", o.NSBaseName)
 	fmt.Printf("Creating deployment %s in %s namespaces ...\n", deploymentName, o.Namespace)
-	deployment := NewDeployment(deploymentName, o.Namespace, 1, label, nil)
+	deployment := NewDeployment(deploymentName, o.Namespace, 1, label, nil).Result()
 	deployment, err := CreateDeployment(o.Client.ClientGo, o.Namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create namespace %q with err %v", o.Namespace, err))

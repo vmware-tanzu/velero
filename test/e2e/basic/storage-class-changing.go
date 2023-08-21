@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -24,44 +25,44 @@ type StorageClasssChanging struct {
 	namespace       string
 	srcStorageClass string
 	desStorageClass string
+	pvcName         string
 	volume          string
 	podName         string
 	mappedNS        string
+	deploymentName  string
+	CaseBaseName    string
 }
 
 const SCCBaseName string = "scc-"
 
-var StorageClasssChangingTest func() = TestFunc(&StorageClasssChanging{
-	namespace: SCCBaseName + "1", TestCase: TestCase{NSBaseName: SCCBaseName}})
+var StorageClasssChangingTest func() = TestFunc(&StorageClasssChanging{})
 
 func (s *StorageClasssChanging) Init() error {
+	s.TestCase.Init()
+	UUIDgen, err := uuid.NewRandom()
+	Expect(err).To(Succeed())
+	s.CaseBaseName = SCCBaseName + UUIDgen.String()
+	s.namespace = SCCBaseName + UUIDgen.String()
+	s.BackupName = "backup-" + s.CaseBaseName
+	s.RestoreName = "restore-" + s.CaseBaseName
+	s.mappedNS = s.namespace + "-mapped"
 	s.VeleroCfg = VeleroCfg
 	s.Client = *s.VeleroCfg.ClientToInstallVelero
-	s.NSBaseName = SCCBaseName
-	s.namespace = s.NSBaseName + UUIDgen.String()
-	s.mappedNS = s.namespace + "-mapped"
 	s.TestMsg = &TestMSG{
 		Desc:      "Changing PV/PVC Storage Classes",
 		FailedMSG: "Failed to changing PV/PVC Storage Classes",
 		Text: "Change the storage class of persistent volumes and persistent" +
 			" volume claims during restores",
 	}
-	s.BackupName = "backup-sc-" + UUIDgen.String()
-	s.RestoreName = "restore-" + UUIDgen.String()
 	s.srcStorageClass = "default"
-	s.desStorageClass = "e2e-storage-class"
+	s.desStorageClass = StorageClassName
 	s.labels = map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
 		"velero.io/plugin-config": ""}
 	s.data = map[string]string{s.srcStorageClass: s.desStorageClass}
 	s.configmaptName = "change-storage-class-config"
 	s.volume = "volume-1"
+	s.pvcName = fmt.Sprintf("pvc-%s", s.volume)
 	s.podName = "pod-1"
-	return nil
-}
-
-func (s *StorageClasssChanging) StartRun() error {
-	s.BackupName = s.BackupName + "backup-" + UUIDgen.String()
-	s.RestoreName = s.RestoreName + "restore-" + UUIDgen.String()
 	s.BackupArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", s.BackupName,
 		"--include-namespaces", s.namespace,
@@ -74,9 +75,12 @@ func (s *StorageClasssChanging) StartRun() error {
 	return nil
 }
 func (s *StorageClasssChanging) CreateResources() error {
-	s.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+	label := map[string]string{
+		"app": "test",
+	}
+	s.Ctx, _ = context.WithTimeout(context.Background(), 10*time.Minute)
 	By(fmt.Sprintf("Create a storage class %s", s.desStorageClass), func() {
-		Expect(InstallStorageClass(context.Background(), fmt.Sprintf("testdata/storage-class/%s.yaml",
+		Expect(InstallStorageClass(s.Ctx, fmt.Sprintf("testdata/storage-class/%s.yaml",
 			s.VeleroCfg.CloudProvider))).To(Succeed())
 	})
 	By(fmt.Sprintf("Create namespace %s", s.namespace), func() {
@@ -84,10 +88,20 @@ func (s *StorageClasssChanging) CreateResources() error {
 			fmt.Sprintf("Failed to create namespace %s", s.namespace))
 	})
 
-	By(fmt.Sprintf("Create pod %s in namespace %s", s.podName, s.namespace), func() {
-		_, err := CreatePod(s.Client, s.namespace, s.podName, s.srcStorageClass, "", []string{s.volume}, nil, nil)
+	By(fmt.Sprintf("Create a deployment in namespace %s", s.VeleroCfg.VeleroNamespace), func() {
+
+		pvc, err := CreatePVC(s.Client, s.namespace, s.pvcName, s.srcStorageClass, nil)
+		Expect(err).To(Succeed())
+		vols := CreateVolumes(pvc.Name, []string{s.volume})
+
+		deployment := NewDeployment(s.CaseBaseName, s.namespace, 1, label, nil).WithVolume(vols).Result()
+		deployment, err = CreateDeployment(s.Client.ClientGo, s.namespace, deployment)
+		Expect(err).To(Succeed())
+		s.deploymentName = deployment.Name
+		err = WaitForReadyDeployment(s.Client.ClientGo, s.namespace, s.deploymentName)
 		Expect(err).To(Succeed())
 	})
+
 	By(fmt.Sprintf("Create ConfigMap %s in namespace %s", s.configmaptName, s.VeleroCfg.VeleroNamespace), func() {
 		_, err := CreateConfigMap(s.Client.ClientGo, s.VeleroCfg.VeleroNamespace, s.configmaptName, s.labels, s.data)
 		Expect(err).To(Succeed(), fmt.Sprintf("failed to create configmap in the namespace %q", s.VeleroCfg.VeleroNamespace))
@@ -97,19 +111,14 @@ func (s *StorageClasssChanging) CreateResources() error {
 
 func (s *StorageClasssChanging) Destroy() error {
 	By(fmt.Sprintf("Expect storage class of PV %s to be %s ", s.volume, s.srcStorageClass), func() {
-		pvName, err := GetPVByPodName(s.Client, s.namespace, s.volume)
-		Expect(err).To(Succeed(), fmt.Sprintf("Failed to get PV name by pod name %s", s.podName))
+		pvName, err := GetPVByPVCName(s.Client, s.namespace, s.pvcName)
+		Expect(err).To(Succeed(), fmt.Sprintf("Failed to get PV name by PVC name %s", s.pvcName))
 		pv, err := GetPersistentVolume(s.Ctx, s.Client, s.namespace, pvName)
-		Expect(err).To(Succeed(), fmt.Sprintf("Failed to get PV by pod name %s", s.podName))
-		fmt.Println(pv)
+		Expect(err).To(Succeed(), fmt.Sprintf("Failed to get PV by name %s", pvName))
 		Expect(pv.Spec.StorageClassName).To(Equal(s.srcStorageClass),
 			fmt.Sprintf("PV storage %s is not as expected %s", pv.Spec.StorageClassName, s.srcStorageClass))
 	})
 
-	By(fmt.Sprintf("Start to destroy namespace %s......", s.NSBaseName), func() {
-		Expect(CleanupNamespacesWithPoll(s.Ctx, s.Client, s.NSBaseName)).To(Succeed(),
-			fmt.Sprintf("Failed to delete namespace %s", s.NSBaseName))
-	})
 	return nil
 }
 
@@ -129,14 +138,26 @@ func (s *StorageClasssChanging) Restore() error {
 }
 func (s *StorageClasssChanging) Verify() error {
 	By(fmt.Sprintf("Expect storage class of PV %s to be %s ", s.volume, s.desStorageClass), func() {
-		time.Sleep(1 * time.Minute)
-		pvName, err := GetPVByPodName(s.Client, s.mappedNS, s.volume)
+		Expect(WaitForReadyDeployment(s.Client.ClientGo, s.mappedNS, s.deploymentName)).To(Succeed())
+		pvName, err := GetPVByPVCName(s.Client, s.mappedNS, s.pvcName)
 		Expect(err).To(Succeed(), fmt.Sprintf("Failed to get PV name by pod name %s", s.podName))
 		pv, err := GetPersistentVolume(s.Ctx, s.Client, s.mappedNS, pvName)
 		Expect(err).To(Succeed(), fmt.Sprintf("Failed to get PV by pod name %s", s.podName))
-		fmt.Println(pv)
 		Expect(pv.Spec.StorageClassName).To(Equal(s.desStorageClass),
 			fmt.Sprintf("PV storage %s is not as expected %s", pv.Spec.StorageClassName, s.desStorageClass))
 	})
+	return nil
+}
+
+func (s *StorageClasssChanging) Clean() error {
+	if !s.VeleroCfg.Debug {
+		By(fmt.Sprintf("Start to destroy namespace %s......", s.CaseBaseName), func() {
+			Expect(CleanupNamespacesWithPoll(s.Ctx, s.Client, s.CaseBaseName)).To(Succeed(),
+				fmt.Sprintf("Failed to delete namespace %s", s.CaseBaseName))
+		})
+		DeleteConfigmap(s.Client.ClientGo, s.VeleroCfg.VeleroNamespace, s.configmaptName)
+		DeleteStorageClass(s.Ctx, s.Client, s.desStorageClass)
+		s.TestCase.Clean()
+	}
 	return nil
 }

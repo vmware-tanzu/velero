@@ -124,7 +124,7 @@ func (p *PVBackupFiltering) CreateResources() error {
 				WaitForPods(p.Ctx, p.Client, ns, p.podsList[index])
 				for i, pod := range p.podsList[index] {
 					for j := range p.volumesList[i] {
-						Expect(CreateFileToPod(p.Ctx, ns, pod, p.volumesList[i][j],
+						Expect(CreateFileToPod(p.Ctx, ns, pod, pod, p.volumesList[i][j],
 							FILE_NAME, fileContent(ns, pod, p.volumesList[i][j]))).To(Succeed())
 					}
 				}
@@ -182,7 +182,7 @@ func fileContent(namespace, podName, volume string) string {
 }
 
 func fileExist(ctx context.Context, namespace, podName, volume string) error {
-	c, err := ReadFileFromPodVolume(ctx, namespace, podName, volume, FILE_NAME)
+	c, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s ",
 			FILE_NAME, volume, podName, namespace))
@@ -197,7 +197,7 @@ func fileExist(ctx context.Context, namespace, podName, volume string) error {
 	}
 }
 func fileNotExist(ctx context.Context, namespace, podName, volume string) error {
-	_, err := ReadFileFromPodVolume(ctx, namespace, podName, volume, FILE_NAME)
+	_, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME)
 	if err != nil {
 		return nil
 	} else {
