@@ -590,6 +590,10 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 		}
 	}
 
+	if len(errors) > 0 {
+		return nil, errors
+	}
+
 	return providerLocations, nil
 }
 
