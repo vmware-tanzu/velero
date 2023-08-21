@@ -64,4 +64,8 @@ func TestDeployment(t *testing.T) {
 
 	deploy = Deployment("velero", WithServiceAccountName("test-sa"))
 	assert.Equal(t, "test-sa", deploy.Spec.Template.Spec.ServiceAccountName)
+
+	deploy = Deployment("velero", WithDisableInformerCache())
+	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
+	assert.Equal(t, "--disable-informer-cache=true", deploy.Spec.Template.Spec.Containers[0].Args[1])
 }
