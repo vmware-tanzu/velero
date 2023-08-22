@@ -299,7 +299,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 			name: "dataDownload with enabled cancel",
 			dd: func() *velerov2alpha1api.DataDownload {
 				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result()
-				controllerutil.AddFinalizer(dd, dataUploadDownloadFinalizer)
+				controllerutil.AddFinalizer(dd, DataUploadDownloadFinalizer)
 				dd.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 				return dd
 			}(),
@@ -312,12 +312,12 @@ func TestDataDownloadReconcile(t *testing.T) {
 			name: "dataDownload with remove finalizer and should not be retrieved",
 			dd: func() *velerov2alpha1api.DataDownload {
 				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Cancel(true).Result()
-				controllerutil.AddFinalizer(dd, dataUploadDownloadFinalizer)
+				controllerutil.AddFinalizer(dd, DataUploadDownloadFinalizer)
 				dd.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 				return dd
 			}(),
 			checkFunc: func(dd velerov2alpha1api.DataDownload) bool {
-				return !controllerutil.ContainsFinalizer(&dd, dataUploadDownloadFinalizer)
+				return !controllerutil.ContainsFinalizer(&dd, DataUploadDownloadFinalizer)
 			},
 		},
 	}
@@ -428,7 +428,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 				assert.Contains(t, dd.Status.Message, test.expectedStatusMsg)
 			}
 			if test.dd.Namespace == velerov1api.DefaultNamespace {
-				if controllerutil.ContainsFinalizer(test.dd, dataUploadDownloadFinalizer) {
+				if controllerutil.ContainsFinalizer(test.dd, DataUploadDownloadFinalizer) {
 					assert.True(t, true, apierrors.IsNotFound(err))
 				} else {
 					require.Nil(t, err)

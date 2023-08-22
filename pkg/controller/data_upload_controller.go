@@ -58,7 +58,7 @@ import (
 const (
 	dataUploadDownloadRequestor = "snapshot-data-upload-download"
 	acceptNodeLabelKey          = "velero.io/accepted-by"
-	dataUploadDownloadFinalizer = "velero.io/data-upload-download-finalizer"
+	DataUploadDownloadFinalizer = "velero.io/data-upload-download-finalizer"
 	preparingMonitorFrequency   = time.Minute
 )
 
@@ -132,9 +132,9 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Logic for clear resources when dataupload been deleted
 	if du.DeletionTimestamp.IsZero() { // add finalizer for all cr at beginning
-		if !isDataUploadInFinalState(du) && !controllerutil.ContainsFinalizer(du, dataUploadDownloadFinalizer) {
+		if !isDataUploadInFinalState(du) && !controllerutil.ContainsFinalizer(du, DataUploadDownloadFinalizer) {
 			succeeded, err := r.exclusiveUpdateDataUpload(ctx, du, func(du *velerov2alpha1api.DataUpload) {
-				controllerutil.AddFinalizer(du, dataUploadDownloadFinalizer)
+				controllerutil.AddFinalizer(du, DataUploadDownloadFinalizer)
 			})
 
 			if err != nil {
@@ -145,7 +145,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				return ctrl.Result{Requeue: true}, nil
 			}
 		}
-	} else if controllerutil.ContainsFinalizer(du, dataUploadDownloadFinalizer) && !du.Spec.Cancel && !isDataUploadInFinalState(du) {
+	} else if controllerutil.ContainsFinalizer(du, DataUploadDownloadFinalizer) && !du.Spec.Cancel && !isDataUploadInFinalState(du) {
 		// when delete cr we need to clear up internal resources created by Velero, here we use the cancel mechanism
 		// to help clear up resources instead of clear them directly in case of some conflict with Expose action
 		if err := UpdateDataUploadWithRetry(ctx, r.client, req.NamespacedName, log, func(dataUpload *velerov2alpha1api.DataUpload) {
@@ -309,9 +309,9 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	} else {
 		// put the finilizer remove action here for all cr will goes to the final status, we could check finalizer and do remove action in final status
 		// instead of intermediate state
-		if isDataUploadInFinalState(du) && !du.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(du, dataUploadDownloadFinalizer) {
+		if isDataUploadInFinalState(du) && !du.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(du, DataUploadDownloadFinalizer) {
 			original := du.DeepCopy()
-			controllerutil.RemoveFinalizer(du, dataUploadDownloadFinalizer)
+			controllerutil.RemoveFinalizer(du, DataUploadDownloadFinalizer)
 			if err := r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
 				log.WithError(err).Error("error to remove finalizer")
 			}
