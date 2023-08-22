@@ -399,7 +399,7 @@ func TestReconcile(t *testing.T) {
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
 			du: func() *velerov2alpha1api.DataUpload {
 				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).Result()
-				controllerutil.AddFinalizer(du, dataUploadDownloadFinalizer)
+				controllerutil.AddFinalizer(du, DataUploadDownloadFinalizer)
 				du.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 				return du
 			}(),
@@ -415,13 +415,13 @@ func TestReconcile(t *testing.T) {
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
 			du: func() *velerov2alpha1api.DataUpload {
 				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).SnapshotType(fakeSnapshotType).Cancel(true).Result()
-				controllerutil.AddFinalizer(du, dataUploadDownloadFinalizer)
+				controllerutil.AddFinalizer(du, DataUploadDownloadFinalizer)
 				du.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 				return du
 			}(),
 			expectedProcessed: false,
 			checkFunc: func(du velerov2alpha1api.DataUpload) bool {
-				return !controllerutil.ContainsFinalizer(&du, dataUploadDownloadFinalizer)
+				return !controllerutil.ContainsFinalizer(&du, DataUploadDownloadFinalizer)
 			},
 			expectedRequeue: ctrl.Result{},
 		},
