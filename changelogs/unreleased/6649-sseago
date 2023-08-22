@@ -1,1 +1,1 @@
-Deal with PartiallyFailed orphaned backups as well as Completed ones
+Delete PartiallyFailed orphaned backups as well as Completed ones
