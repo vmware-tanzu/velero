@@ -35,13 +35,26 @@ type volumePolicy struct {
 type resourcePolicies struct {
 	Version        string         `yaml:"version"`
 	VolumePolicies []volumePolicy `yaml:"volumePolicies"`
+	ResticPolicies []resticPolicy `yaml:"resticPolicies"`
 	// we may support other resource policies in the future, and they could be added separately
 	// OtherResourcePolicies []OtherResourcePolicy
+}
+
+// ResticConfig is the restic configuration to apply when restic is used for volume backup.
+type ResticConfig struct {
+	Excludes []string `yaml:"excludes"`
+}
+
+// resticPolicy defines the restic configuration to use for volume resources matching the given conditions.
+type resticPolicy struct {
+	Conditions   map[string]interface{} `yaml:"conditions"`
+	ResticConfig ResticConfig           `yaml:"resticConfig"`
 }
 
 type Policies struct {
 	version        string
 	volumePolicies []volPolicy
+	resticPolicies []resticPolicy
 	// OtherPolicies
 }
 
@@ -74,6 +87,7 @@ func (p *Policies) buildPolicy(resPolicies *resourcePolicies) error {
 	}
 
 	// Other resource policies
+	p.resticPolicies = resPolicies.ResticPolicies
 
 	p.version = resPolicies.Version
 	return nil
@@ -125,6 +139,16 @@ func (p *Policies) Validate() error {
 		}
 	}
 	return nil
+}
+
+// GetResticConfig  returns the ResticConfig from the first resticPolicy where the resticPolicy.Conditions match
+// the given volume resource res.
+// FIXME Condition evaulation is not yet implemented. The ResticConfig from the first defined resticPolicy is returned.
+func (p *Policies) GetResticConfig(res interface{}) (*ResticConfig, error) {
+	for _, policy := range p.resticPolicies {
+		return &policy.ResticConfig, nil
+	}
+	return nil, nil
 }
 
 func GetResourcePoliciesFromConfig(cm *v1.ConfigMap) (*Policies, error) {

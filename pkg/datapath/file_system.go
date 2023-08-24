@@ -61,6 +61,10 @@ func newFileSystemBR(jobName string, requestorType string, client client.Client,
 	return fs
 }
 
+func (fs *fileSystemBR) GetUploadProvider() provider.Provider {
+	return fs.uploaderProv
+}
+
 func (fs *fileSystemBR) Init(ctx context.Context, bslName string, sourceNamespace string, uploaderType string, repositoryType string,
 	repoIdentifier string, repositoryEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter) error {
 	var err error

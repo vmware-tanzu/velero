@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
@@ -36,6 +37,10 @@ const restoreProgressCheckInterval = 10 * time.Second
 const backupProgressCheckInterval = 10 * time.Second
 
 var ErrorCanceled error = errors.New("uploader is canceled")
+
+type HasUploadProvider interface {
+	GetUploadProvider() Provider
+}
 
 // Provider which is designed for one pod volume to do the backup or restore
 type Provider interface {
@@ -60,6 +65,8 @@ type Provider interface {
 		updater uploader.ProgressUpdater) error
 	// Close which will close related repository
 	Close(ctx context.Context) error
+	// SetPolicy applies additional provider specific configuration from a resource policy (confimap)
+	SetPolicy(*resourcepolicies.Policies) error
 }
 
 // NewUploaderProvider initialize provider with specific uploaderType

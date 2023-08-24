@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	veleroapishared "github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
@@ -41,6 +43,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
@@ -161,6 +164,41 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err := fsBackup.Init(ctx, pvb.Spec.BackupStorageLocation, pvb.Spec.Pod.Namespace, pvb.Spec.UploaderType,
 		podvolume.GetPvbRepositoryType(&pvb), pvb.Spec.RepoIdentifier, r.repositoryEnsurer, r.credentialGetter); err != nil {
 		return r.errorOut(ctx, &pvb, err, "error to initialize data path", log)
+	}
+
+	if b, yes := fsBackup.(provider.HasUploadProvider); yes {
+		prov := b.GetUploadProvider()
+		if prov != nil {
+			// get resource policy name
+			backup := &velerov1api.Backup{}
+			for _, ref := range pvb.OwnerReferences {
+				if ref.Kind == "Backup" {
+					err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: req.Namespace, Name: ref.Name}, backup)
+					if err != nil {
+						log.Errorf("failed to get backup: %sw", err)
+					}
+					break
+				}
+			}
+			// load resource policy and pass it to the upload provider
+			if backup.Spec.ResourcePolicy != nil {
+				resPolicyName := backup.Spec.ResourcePolicy.Name
+				policiesConfigmap := &v1.ConfigMap{}
+				err = r.Client.Get(context.Background(), client.ObjectKey{Namespace: req.Namespace, Name: resPolicyName}, policiesConfigmap)
+				if err != nil {
+					log.Errorf("failed to get resource policies %s/%s configmap with err %v", req.Namespace, resPolicyName, err)
+				}
+				res, err := resourcepolicies.GetResourcePoliciesFromConfig(policiesConfigmap)
+				if err != nil {
+					log.Errorf("resource policies %s/%s: %s", req.Namespace, resPolicyName, err)
+				} else if err = res.Validate(); err != nil {
+					log.Errorf("resource policies %s/%s: %s", req.Namespace, resPolicyName, err)
+				} else {
+					prov.SetPolicy(res)
+				}
+			}
+
+		}
 	}
 
 	// If this is a PVC, look for the most recent completed pod volume backup for it and get

@@ -30,6 +30,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/uploader/kopia"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	repokeys "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
@@ -82,6 +83,11 @@ func NewKopiaUploaderProvider(
 		return nil, errors.Wrapf(err, "Failed to find kopia repository")
 	}
 	return kp, nil
+}
+
+func (kp *kopiaProvider) SetPolicy(*resourcepolicies.Policies) error {
+	// TODO implement
+	return nil
 }
 
 // CheckContext check context status check if context is timeout or cancel and backup restore once finished it will quit and return

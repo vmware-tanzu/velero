@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -27,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
@@ -50,6 +52,7 @@ type resticProvider struct {
 	extraFlags      []string
 	bsl             *velerov1api.BackupStorageLocation
 	log             logrus.FieldLogger
+	config          *resourcepolicies.ResticConfig
 }
 
 func NewResticUploaderProvider(
@@ -112,6 +115,12 @@ func (rp *resticProvider) Close(ctx context.Context) error {
 	return nil
 }
 
+// SetPolicy applies restic configuration from a resource policy (confimap)
+func (rp *resticProvider) SetPolicy(res *resourcepolicies.Policies) (err error) {
+	rp.config, err = res.GetResticConfig(nil)
+	return err
+}
+
 // RunBackup runs a `backup` command and watches the output to provide
 // progress updates to the caller and return snapshotID, isEmptySnapshot, error
 func (rp *resticProvider) RunBackup(
@@ -140,6 +149,7 @@ func (rp *resticProvider) RunBackup(
 	}
 
 	log := rp.log.WithFields(logrus.Fields{
+		"provider":       "restic",
 		"path":           path,
 		"parentSnapshot": parentSnapshot,
 	})
@@ -153,6 +163,22 @@ func (rp *resticProvider) RunBackup(
 
 	if parentSnapshot != "" {
 		backupCmd.ExtraFlags = append(backupCmd.ExtraFlags, fmt.Sprintf("--parent=%s", parentSnapshot))
+	}
+
+	// apply configuration from resource policy
+	if rp.config != nil {
+		log.Debugf("using resource policy config: %#v", rp.config)
+		// see also https://restic.readthedocs.io/en/latest/040_backup.html?highlight=--exclude#excluding-files
+		for _, exclude := range rp.config.Excludes {
+			backupCmd.ExtraFlags = append(backupCmd.ExtraFlags, "--exclude")
+			// FIXME resolve symlinks and relative paths to avoid escaping backupCmd.Dir.
+			if strings.HasPrefix(exclude, "/") {
+				// If the exclude is anchored to / we must replace it with working directory of the backup command.
+				backupCmd.ExtraFlags = append(backupCmd.ExtraFlags, filepath.Join(backupCmd.Dir, exclude))
+			} else {
+				backupCmd.ExtraFlags = append(backupCmd.ExtraFlags, exclude)
+			}
+		}
 	}
 
 	summary, stderrBuf, err := resticBackupFunc(backupCmd, log, updater)

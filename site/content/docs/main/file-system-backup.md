@@ -489,6 +489,8 @@ Velero integrate Restic binary directly, so the operations are done by calling R
 - Run `restic backup` commands to backup pod volume data
 - Run `restic restore` commands to restore pod volume data
 
+For restic customization see [resource filtering - restic configuration](resource-filtering.md#restic-configuration)
+
 ### How Velero integrates with Kopia
 Velero integrate Kopia modules into Velero's code, primarily two modules:
 - Kopia Uploader: Velero makes some wrap and isolation around it to create a generic file system uploader, 

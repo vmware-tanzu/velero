@@ -138,6 +138,8 @@ Exclude specific resources from the backup.
 
 Wildcard excludes are ignored.
 
+For restic file excludes see [restic file excludes](#restic-file-excludes)
+
 ### --exclude-namespaces
 
 Namespaces to exclude.
@@ -321,3 +323,20 @@ Velero supported conditions and format listed below:
 **Resource policies rules**
 - Velero already has lots of include or exclude filters. the resource policies are the final filters after others include or exclude filters in one backup processing workflow. So if use a defined similar filter like the opt-in approach to backup one pod volume but skip backup of the same pod volume in resource policies, as resource policies are the final filters that are applied, the volume will not be backed up.
 - If volume resource policies conflict with themselves the first matched policy will be respected when many policies are defined.
+
+### Restic configuration
+
+#### Restic file excludes
+
+See also https://restic.readthedocs.io/en/latest/040_backup.html#excluding-files
+
+```yaml
+version: v1
+resticPolicies:
+  - resticConfig:
+      excludes:
+        - /git/gitea-repositories/mirrors/**
+        - /indexers/**
+```
+
+NOTE: Currently only the first resticConfig is used and the excludes will apply to all persistent volumes.
