@@ -86,7 +86,6 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updater uploader.Prog
 
 	err := cmd.Start()
 	if err != nil {
-		exec.LogErrorAsExitCode(err, log)
 		return stdoutBuf.String(), stderrBuf.String(), err
 	}
 
@@ -120,7 +119,6 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updater uploader.Prog
 
 	err = cmd.Wait()
 	if err != nil {
-		exec.LogErrorAsExitCode(err, log)
 		return stdoutBuf.String(), stderrBuf.String(), err
 	}
 	quit <- struct{}{}
