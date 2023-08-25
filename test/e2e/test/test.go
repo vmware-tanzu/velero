@@ -34,6 +34,8 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
+const StorageClassName = "e2e-storage-class"
+
 /*
 The VeleroBackupRestoreTest interface is just could be suit for the cases that follow the test flow of
 create resources, backup, delete test resource, restore and verify.
@@ -83,7 +85,7 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 			flag.Parse()
 			veleroCfg := test.GetTestCase().VeleroCfg
 			// TODO: Skip nodeport test until issue https://github.com/kubernetes/kubernetes/issues/114384 fixed
-			if veleroCfg.CloudProvider == "azure" && strings.Contains(test.GetTestCase().NSBaseName, "nodeport") {
+			if (veleroCfg.CloudProvider == "azure" || veleroCfg.CloudProvider == "aws") && strings.Contains(test.GetTestCase().NSBaseName, "nodeport") {
 				Skip("Skip due to issue https://github.com/kubernetes/kubernetes/issues/114384 on AKS")
 			}
 			if veleroCfg.InstallVelero {

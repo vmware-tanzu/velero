@@ -120,6 +120,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				tmpCfgForOldVeleroInstall.RestoreHelperImage = ""
 				tmpCfgForOldVeleroInstall.Plugins = ""
 				tmpCfgForOldVeleroInstall.UploaderType = ""
+				tmpCfgForOldVeleroInstall.UseVolumeSnapshots = useVolumeSnapshots
 				if supportUploaderType {
 					tmpCfgForOldVeleroInstall.UseRestic = false
 					tmpCfgForOldVeleroInstall.UseNodeAgent = !useVolumeSnapshots

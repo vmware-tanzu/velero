@@ -98,7 +98,7 @@ func (p *PVCSelectedNodeChanging) CreateResources() error {
 	By("Prepare ConfigMap data", func() {
 		nodeNameList, err := GetWorkerNodes(context.Background())
 		Expect(err).To(Succeed())
-		Expect(len(nodeNameList) > 2).To(Equal(true))
+		Expect(len(nodeNameList) > 1).To(Equal(true))
 		for _, nodeName := range nodeNameList {
 			if nodeName != p.oldNodeName {
 				p.newNodeName = nodeName
@@ -142,7 +142,7 @@ func (p *PVCSelectedNodeChanging) Restore() error {
 }
 func (p *PVCSelectedNodeChanging) Verify() error {
 	By(fmt.Sprintf("PVC selected node should be %s", p.newNodeName), func() {
-		pvcNameList, err := GetPvcByPodName(context.Background(), p.mappedNS, p.pvcName)
+		pvcNameList, err := GetPvcByPVCName(context.Background(), p.mappedNS, p.pvcName)
 		Expect(err).To(Succeed())
 		Expect(len(pvcNameList)).Should(Equal(1))
 		pvc, err := GetPVC(context.Background(), p.Client, p.mappedNS, pvcNameList[0])
