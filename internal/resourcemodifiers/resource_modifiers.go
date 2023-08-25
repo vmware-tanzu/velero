@@ -2,7 +2,6 @@ package resourcemodifiers
 
 import (
 	"fmt"
-	"io"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,9 +9,11 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/yaml"
 
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
@@ -23,26 +24,27 @@ const (
 )
 
 type JSONPatch struct {
-	Operation string `yaml:"operation"`
-	From      string `yaml:"from,omitempty"`
-	Path      string `yaml:"path"`
-	Value     string `yaml:"value,omitempty"`
+	Operation string `json:"operation"`
+	From      string `json:"from,omitempty"`
+	Path      string `json:"path"`
+	Value     string `json:"value,omitempty"`
 }
 
 type Conditions struct {
-	Namespaces        []string `yaml:"namespaces,omitempty"`
-	GroupKind         string   `yaml:"groupKind"`
-	ResourceNameRegex string   `yaml:"resourceNameRegex"`
+	Namespaces        []string              `json:"namespaces,omitempty"`
+	GroupResource     string                `json:"groupResource"`
+	ResourceNameRegex string                `json:"resourceNameRegex,omitempty"`
+	LabelSelector     *metav1.LabelSelector `json:"labelSelector,omitempty"`
 }
 
 type ResourceModifierRule struct {
-	Conditions Conditions  `yaml:"conditions"`
-	Patches    []JSONPatch `yaml:"patches"`
+	Conditions Conditions  `json:"conditions"`
+	Patches    []JSONPatch `json:"patches"`
 }
 
 type ResourceModifiers struct {
-	Version               string                 `yaml:"version"`
-	ResourceModifierRules []ResourceModifierRule `yaml:"resourceModifierRules"`
+	Version               string                 `json:"version"`
+	ResourceModifierRules []ResourceModifierRule `json:"resourceModifierRules"`
 }
 
 func GetResourceModifiersFromConfig(cm *v1.ConfigMap) (*ResourceModifiers, error) {
@@ -58,7 +60,7 @@ func GetResourceModifiersFromConfig(cm *v1.ConfigMap) (*ResourceModifiers, error
 		yamlData = v
 	}
 
-	resModifiers, err := unmarshalResourceModifiers(&yamlData)
+	resModifiers, err := unmarshalResourceModifiers([]byte(yamlData))
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -83,9 +85,11 @@ func (r *ResourceModifierRule) Apply(obj *unstructured.Unstructured, groupResour
 	if !namespaceInclusion.ShouldInclude(obj.GetNamespace()) {
 		return nil
 	}
-	if !strings.EqualFold(groupResource, r.Conditions.GroupKind) {
+
+	if !strings.EqualFold(groupResource, r.Conditions.GroupResource) {
 		return nil
 	}
+
 	if r.Conditions.ResourceNameRegex != "" {
 		match, err := regexp.MatchString(r.Conditions.ResourceNameRegex, obj.GetName())
 		if err != nil {
@@ -95,6 +99,17 @@ func (r *ResourceModifierRule) Apply(obj *unstructured.Unstructured, groupResour
 			return nil
 		}
 	}
+
+	if r.Conditions.LabelSelector != nil {
+		selector, err := metav1.LabelSelectorAsSelector(r.Conditions.LabelSelector)
+		if err != nil {
+			return errors.Errorf("error in creating label selector %s", err.Error())
+		}
+		if !selector.Matches(labels.Set(obj.GetLabels())) {
+			return nil
+		}
+	}
+
 	patches, err := r.PatchArrayToByteArray()
 	if err != nil {
 		return err
@@ -107,7 +122,7 @@ func (r *ResourceModifierRule) Apply(obj *unstructured.Unstructured, groupResour
 	return nil
 }
 
-// convert all JsonPatch to string array with the format of jsonpatch.Patch and then convert it to byte array
+// PatchArrayToByteArray converts all JsonPatch to string array with the format of jsonpatch.Patch and then convert it to byte array
 func (r *ResourceModifierRule) PatchArrayToByteArray() ([]byte, error) {
 	var patches []string
 	for _, patch := range r.Patches {
@@ -148,20 +163,13 @@ func ApplyPatch(patch []byte, obj *unstructured.Unstructured, log logrus.FieldLo
 	return nil
 }
 
-func unmarshalResourceModifiers(yamlData *string) (*ResourceModifiers, error) {
+func unmarshalResourceModifiers(yamlData []byte) (*ResourceModifiers, error) {
 	resModifiers := &ResourceModifiers{}
-	err := decodeStruct(strings.NewReader(*yamlData), resModifiers)
+	err := yaml.UnmarshalStrict(yamlData, resModifiers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode yaml data into resource modifiers  %v", err)
 	}
 	return resModifiers, nil
-}
-
-// decodeStruct restrict validate the keys in decoded mappings to exist as fields in the struct being decoded into
-func decodeStruct(r io.Reader, s interface{}) error {
-	dec := yaml.NewDecoder(r)
-	dec.KnownFields(true)
-	return dec.Decode(s)
 }
 
 func addQuotes(value string) bool {

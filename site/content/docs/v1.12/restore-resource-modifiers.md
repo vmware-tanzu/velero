@@ -29,7 +29,7 @@ Below is the two-step of using resource modifiers to modify the resources during
 version: v1
 resourceModifierRules:
 - conditions:
-     groupKind: persistentvolumeclaims
+     groupResource: persistentvolumeclaims
      resourceNameRegex: "^mysql.*$"
      namespaces:
      - bar
@@ -61,7 +61,7 @@ resourceModifierRules:
 version: v1
 resourceModifierRules:
 - conditions:
-    groupKind: persistentvolumeclaims
+    groupResource: persistentvolumeclaims
     resourceNameRegex: ".*"
     namespaces:
     - bar
@@ -80,7 +80,7 @@ resourceModifierRules:
 version: v1
 resourceModifierRules:
 - conditions:
-    groupKind: deployments.apps
+    groupResource: deployments.apps
     resourceNameRegex: "^test-.*$"
     namespaces:
     - bar

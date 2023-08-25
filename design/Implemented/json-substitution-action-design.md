@@ -26,7 +26,7 @@ Currently velero supports substituting certain values in the K8s resources durin
 <!-- ## Background -->
 
 ## Goals
-- Allow the user to specify a GroupKind, Name(optional), JSON patch for modification.
+- Allow the user to specify a GroupResource, Name(optional), JSON patch for modification.
 - Allow the user to specify multiple JSON patch.
 
 ## Non Goals
@@ -74,7 +74,7 @@ velero restore create --from-backup backup-1 --resource-modifier-configmap resou
 
 ### Resource Modifier ConfigMap Structure
 - User first needs to provide details on which resources the JSON Substitutions need to be applied. 
-    - For this the user will provide 4 inputs - Namespaces(for NS Scoped resources), GroupKind (kind.group format similar to includeResources field in velero) and Name Regex(optional).
+    - For this the user will provide 4 inputs - Namespaces(for NS Scoped resources), GroupResource (resource.group format similar to includeResources field in velero) and Name Regex(optional).
     - If the user does not provide the Name, the JSON Substitutions will be applied to all the resources of the given Group and Kind under the given namespaces.
 
 - Further the use will specify the JSON Patch using the structure of kubectl's "JSON Patch" based inputs.
@@ -83,7 +83,7 @@ velero restore create --from-backup backup-1 --resource-modifier-configmap resou
 version: v1
 resourceModifierRules:
 - conditions:
-    groupKind: persistentvolumeclaims
+    groupResource: persistentvolumeclaims
     resourceNameRegex: "mysql.*"
     namespaces:
     - bar
@@ -119,7 +119,7 @@ kubectl create cm <configmap-name> --from-file <yaml-file> -n velero
 version: v1
 resourceModifierRules:
 - conditions:
-    groupKind: persistentvolumeclaims.storage.k8s.io
+    groupResource: persistentvolumeclaims.storage.k8s.io
     resourceNameRegex: ".*"
     namespaces:
     - bar
