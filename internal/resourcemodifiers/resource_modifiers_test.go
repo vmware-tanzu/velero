@@ -183,6 +183,9 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			"metadata": map[string]interface{}{
 				"name":      "test-deployment",
 				"namespace": "foo",
+				"labels": map[string]interface{}{
+					"app": "nginx",
+				},
 			},
 			"spec": map[string]interface{}{
 				"replicas": int64(1),
@@ -211,6 +214,9 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			"metadata": map[string]interface{}{
 				"name":      "test-deployment",
 				"namespace": "foo",
+				"labels": map[string]interface{}{
+					"app": "nginx",
+				},
 			},
 			"spec": map[string]interface{}{
 				"replicas": int64(2),
@@ -239,6 +245,9 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			"metadata": map[string]interface{}{
 				"name":      "test-deployment",
 				"namespace": "foo",
+				"labels": map[string]interface{}{
+					"app": "nginx",
+				},
 			},
 			"spec": map[string]interface{}{
 				"replicas": int64(1),
@@ -578,6 +587,80 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			},
 			wantErr: false,
 			wantObj: deployNginxMysql.DeepCopy(),
+		},
+		{
+			name: "nginx deployment: match label selector",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupResource: "deployments.apps",
+							Namespaces:    []string{"foo"},
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": "nginx",
+								},
+							},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "test",
+								Path:      "/spec/replicas",
+								Value:     "1",
+							},
+							{
+								Operation: "replace",
+								Path:      "/spec/replicas",
+								Value:     "2",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           deployNginxOneReplica.DeepCopy(),
+				groupResource: "deployments.apps",
+			},
+			wantErr: false,
+			wantObj: deployNginxTwoReplica.DeepCopy(),
+		},
+		{
+			name: "nginx deployment: mismatch label selector",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupResource: "deployments.apps",
+							Namespaces:    []string{"foo"},
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": "nginx-mismatch",
+								},
+							},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "test",
+								Path:      "/spec/replicas",
+								Value:     "1",
+							},
+							{
+								Operation: "replace",
+								Path:      "/spec/replicas",
+								Value:     "2",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           deployNginxOneReplica.DeepCopy(),
+				groupResource: "deployments.apps",
+			},
+			wantErr: false,
+			wantObj: deployNginxOneReplica.DeepCopy(),
 		},
 	}
 

@@ -86,7 +86,7 @@ func (r *ResourceModifierRule) Apply(obj *unstructured.Unstructured, groupResour
 		return nil
 	}
 
-	if !strings.EqualFold(groupResource, r.Conditions.GroupResource) {
+	if r.Conditions.GroupResource != groupResource {
 		return nil
 	}
 
