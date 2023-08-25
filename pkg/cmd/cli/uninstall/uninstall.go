@@ -19,6 +19,8 @@ package uninstall
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -40,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
@@ -49,6 +52,12 @@ import (
 )
 
 var gracefulDeletionMaximumDuration = 1 * time.Minute
+
+var resToDelete = []kbclient.ObjectList{
+	&velerov1api.RestoreList{},
+	&velerov2alpha1api.DataUploadList{},
+	&velerov2alpha1api.DataDownloadList{},
+}
 
 // uninstallOptions collects all the options for uninstalling Velero from a Kubernetes cluster.
 type uninstallOptions struct {
@@ -167,11 +176,7 @@ func Run(ctx context.Context, kbClient kbclient.Client, namespace string) error 
 }
 
 func deleteNamespace(ctx context.Context, kbClient kbclient.Client, namespace string) error {
-	// Deal with resources with attached finalizers to ensure proper handling of those finalizers.
-	if err := deleteResourcesWithFinalizer(ctx, kbClient, namespace); err != nil {
-		return errors.Wrap(err, "Fail to remove finalizer from restores")
-	}
-
+	// First check if it's already been deleted
 	ns := &corev1.Namespace{}
 	key := kbclient.ObjectKey{Name: namespace}
 	if err := kbClient.Get(ctx, key, ns); err != nil {
@@ -180,6 +185,11 @@ func deleteNamespace(ctx context.Context, kbClient kbclient.Client, namespace st
 			return nil
 		}
 		return err
+	}
+
+	// Deal with resources with attached finalizers to ensure proper handling of those finalizers.
+	if err := deleteResourcesWithFinalizer(ctx, kbClient, namespace); err != nil {
+		return errors.Wrap(err, "Fail to remove finalizer from restores")
 	}
 
 	if err := kbClient.Delete(ctx, ns); err != nil {
@@ -223,34 +233,46 @@ func deleteNamespace(ctx context.Context, kbClient kbclient.Client, namespace st
 // 2. The controller may encounter errors while handling the finalizer, in such case, the controller will keep trying until it succeeds.
 // So it is important to set a timeout, once the process exceed the timeout, we will forcedly delete the resources by removing the finalizer from them,
 // otherwise the deletion process may get stuck indefinitely.
-// 3. There is only restore finalizer supported as of v1.12. If any new finalizers are added in the future, the corresponding deletion logic can be
+// 3. There is only resources finalizer supported as of v1.12. If any new finalizers are added in the future, the corresponding deletion logic can be
 // incorporated into this function.
 func deleteResourcesWithFinalizer(ctx context.Context, kbClient kbclient.Client, namespace string) error {
 	fmt.Println("Waiting for resource with attached finalizer to be deleted")
-	return deleteRestore(ctx, kbClient, namespace)
+	return deleteResources(ctx, kbClient, namespace)
 }
 
-func deleteRestore(ctx context.Context, kbClient kbclient.Client, namespace string) error {
-	// Check if restore crd exists, if it does not exist, return immediately.
+func checkResources(ctx context.Context, kbClient kbclient.Client) error {
+	checkCRDs := []string{"restores.velero.io", "datauploads.velero.io", "datadownloads.velero.io"}
 	var err error
 	v1crd := &apiextv1.CustomResourceDefinition{}
-	key := kbclient.ObjectKey{Name: "restores.velero.io"}
-	if err = kbClient.Get(ctx, key, v1crd); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		} else {
-			return errors.Wrap(err, "Error getting restore crd")
+	for _, crd := range checkCRDs {
+		key := kbclient.ObjectKey{Name: crd}
+		if err = kbClient.Get(ctx, key, v1crd); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			} else {
+				return errors.Wrapf(err, "Error getting %s crd", crd)
+			}
 		}
 	}
+	return nil
+}
 
-	// First attempt to gracefully delete all the restore within a specified time frame, If the process exceeds the timeout limit,
-	// it is likely that there may be errors during the finalization of restores. In such cases, we should proceed with forcefully deleting the restores.
-	err = gracefullyDeleteRestore(ctx, kbClient, namespace)
-	if err != nil && err != wait.ErrWaitTimeout {
-		return errors.Wrap(err, "Error deleting restores")
+func deleteResources(ctx context.Context, kbClient kbclient.Client, namespace string) error {
+	// Check if resources crd exists, if it does not exist, return immediately.
+	err := checkResources(ctx, kbClient)
+	if err != nil {
+		return err
 	}
+
+	// First attempt to gracefully delete all the resources within a specified time frame, If the process exceeds the timeout limit,
+	// it is likely that there may be errors during the finalization of restores. In such cases, we should proceed with forcefully deleting the restores.
+	err = gracefullyDeleteResources(ctx, kbClient, namespace)
+	if err != nil && err != wait.ErrWaitTimeout {
+		return errors.Wrap(err, "Error deleting resources")
+	}
+
 	if err == wait.ErrWaitTimeout {
-		err = forcedlyDeleteRestore(ctx, kbClient, namespace)
+		err = forcedlyDeleteResources(ctx, kbClient, namespace)
 		if err != nil {
 			return errors.Wrap(err, "Error deleting restores")
 		}
@@ -259,30 +281,89 @@ func deleteRestore(ctx context.Context, kbClient kbclient.Client, namespace stri
 	return nil
 }
 
-func gracefullyDeleteRestore(ctx context.Context, kbClient kbclient.Client, namespace string) error {
-	var err error
-	restoreList := &velerov1api.RestoreList{}
-	if err = kbClient.List(ctx, restoreList, &kbclient.ListOptions{Namespace: namespace}); err != nil {
-		return errors.Wrap(err, "Error getting restores during graceful deletion")
+func gracefullyDeleteResources(ctx context.Context, kbClient kbclient.Client, namespace string) error {
+	errorChan := make(chan error)
+
+	var wg sync.WaitGroup
+	wg.Add(len(resToDelete))
+
+	for i := range resToDelete {
+		go func(index int) {
+			defer wg.Done()
+			errorChan <- gracefullyDeleteResource(ctx, kbClient, namespace, resToDelete[index])
+		}(i)
 	}
 
-	for i := range restoreList.Items {
-		if err = kbClient.Delete(ctx, &restoreList.Items[i]); err != nil {
-			if apierrors.IsNotFound(err) {
-				continue
-			}
-			return errors.Wrap(err, "Error deleting restores during graceful deletion")
+	go func() {
+		wg.Wait()
+		close(errorChan)
+	}()
+
+	for err := range errorChan {
+		if err != nil {
+			return err
 		}
 	}
 
+	return waitDeletingResources(ctx, kbClient, namespace)
+}
+
+func gracefullyDeleteResource(ctx context.Context, kbClient kbclient.Client, namespace string, list kbclient.ObjectList) error {
+	var err error
+
+	if err = kbClient.List(ctx, list, &kbclient.ListOptions{Namespace: namespace}); err != nil {
+		return errors.Wrap(err, "Error getting resources during graceful deletion")
+	}
+
+	var objectsToDelete []kbclient.Object
+	items := reflect.ValueOf(list).Elem().FieldByName("Items")
+
+	for i := 0; i < items.Len(); i++ {
+		item := items.Index(i).Addr().Interface()
+		// Type assertion to cast item to the appropriate type
+		switch typedItem := item.(type) {
+		case *velerov1api.Restore:
+			objectsToDelete = append(objectsToDelete, typedItem)
+		case *velerov2alpha1api.DataUpload:
+			objectsToDelete = append(objectsToDelete, typedItem)
+		case *velerov2alpha1api.DataDownload:
+			objectsToDelete = append(objectsToDelete, typedItem)
+		default:
+			return errors.New("Unsupported resource type")
+		}
+	}
+
+	// Delete collected resources in a batch
+	for _, resource := range objectsToDelete {
+		if err = kbClient.Delete(ctx, resource); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return errors.Wrap(err, "Error deleting resources during graceful deletion")
+		}
+	}
+	return err
+}
+
+func waitDeletingResources(ctx context.Context, kbClient kbclient.Client, namespace string) error {
 	// Wait for the deletion of all the restores within a specified time frame
-	err = wait.PollImmediate(time.Second, gracefulDeletionMaximumDuration, func() (bool, error) {
+	err := wait.PollImmediate(time.Second, gracefulDeletionMaximumDuration, func() (bool, error) {
 		restoreList := &velerov1api.RestoreList{}
 		if errList := kbClient.List(ctx, restoreList, &kbclient.ListOptions{Namespace: namespace}); errList != nil {
 			return false, errList
 		}
 
-		if len(restoreList.Items) > 0 {
+		dataUploadList := &velerov2alpha1api.DataUploadList{}
+		if errList := kbClient.List(ctx, dataUploadList, &kbclient.ListOptions{Namespace: namespace}); errList != nil {
+			return false, errList
+		}
+
+		dataDownloadList := &velerov2alpha1api.DataDownloadList{}
+		if errList := kbClient.List(ctx, dataDownloadList, &kbclient.ListOptions{Namespace: namespace}); errList != nil {
+			return false, errList
+		}
+
+		if len(restoreList.Items)+len(dataUploadList.Items)+len(dataDownloadList.Items) > 0 {
 			fmt.Print(".")
 			return false, nil
 		} else {
@@ -293,10 +374,10 @@ func gracefullyDeleteRestore(ctx context.Context, kbClient kbclient.Client, name
 	return err
 }
 
-func forcedlyDeleteRestore(ctx context.Context, kbClient kbclient.Client, namespace string) error {
+func forcedlyDeleteResources(ctx context.Context, kbClient kbclient.Client, namespace string) error {
 	// Delete velero deployment first in case:
-	// 1. finalizers will be added back by restore controller after they are removed at next step;
-	// 2. new restores attached with finalizer will be created by restore controller after we remove all the restores' finalizer at next step;
+	// 1. finalizers will be added back by resources related controller after they are removed at next step;
+	// 2. new resources attached with finalizer will be created by controller after we remove all the resources' finalizer at next step;
 	deploy := &appsv1api.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "velero",
@@ -330,23 +411,56 @@ func forcedlyDeleteRestore(ctx context.Context, kbClient kbclient.Client, namesp
 	if err != nil {
 		return errors.Wrap(err, "Error deleting velero deployment during force deletion")
 	}
+	return removeResourcesFinalizer(ctx, kbClient, namespace)
+}
 
-	// Remove all the restores' finalizer so they can be deleted during the deletion of velero namespace.
-	restoreList := &velerov1api.RestoreList{}
-	if err := kbClient.List(ctx, restoreList, &kbclient.ListOptions{Namespace: namespace}); err != nil {
-		return errors.Wrap(err, "Error getting restores during force deletion")
+func removeResourcesFinalizer(ctx context.Context, kbClient kbclient.Client, namespace string) error {
+	for i := range resToDelete {
+		if err := removeResourceFinalizer(ctx, kbClient, namespace, resToDelete[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func removeResourceFinalizer(ctx context.Context, kbClient kbclient.Client, namespace string, resourceList kbclient.ObjectList) error {
+	listOptions := &kbclient.ListOptions{Namespace: namespace}
+	if err := kbClient.List(ctx, resourceList, listOptions); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("Error getting resources of type %T during force deletion", resourceList))
 	}
 
-	for i := range restoreList.Items {
-		if controllerutil.ContainsFinalizer(&restoreList.Items[i], controller.ExternalResourcesFinalizer) {
-			update := &restoreList.Items[i]
-			original := update.DeepCopy()
-			controllerutil.RemoveFinalizer(update, controller.ExternalResourcesFinalizer)
-			if err := kubeutil.PatchResource(original, update, kbClient); err != nil {
-				return errors.Wrap(err, "Error removing restore finalizer during force deletion")
-			}
+	items := reflect.ValueOf(resourceList).Elem().FieldByName("Items")
+	var err error
+	for i := 0; i < items.Len(); i++ {
+		item := items.Index(i).Addr().Interface()
+		// Type assertion to cast item to the appropriate type
+		switch typedItem := item.(type) {
+		case *velerov1api.Restore:
+			err = removeFinalizerForObject(typedItem, controller.ExternalResourcesFinalizer, kbClient)
+		case *velerov2alpha1api.DataUpload:
+			err = removeFinalizerForObject(typedItem, controller.DataUploadDownloadFinalizer, kbClient)
+		case *velerov2alpha1api.DataDownload:
+			err = removeFinalizerForObject(typedItem, controller.DataUploadDownloadFinalizer, kbClient)
+		default:
+			err = errors.Errorf("Unsupported resource type %T", typedItem)
+		}
+		if err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func removeFinalizerForObject(obj kbclient.Object, finalizer string, kbClient kbclient.Client) error {
+	if controllerutil.ContainsFinalizer(obj, finalizer) {
+		update := obj.DeepCopyObject().(kbclient.Object)
+		original := obj.DeepCopyObject().(kbclient.Object)
+
+		controllerutil.RemoveFinalizer(update, finalizer)
+		if err := kubeutil.PatchResource(original, update, kbClient); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("Error removing finalizer %q during force deletion", finalizer))
+		}
+	}
 	return nil
 }
