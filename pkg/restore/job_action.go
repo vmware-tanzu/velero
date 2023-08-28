@@ -17,15 +17,12 @@ limitations under the License.
 package restore
 
 import (
-	"strconv"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	batchv1api "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
@@ -54,35 +51,12 @@ func (a *JobAction) Execute(input *velero.RestoreItemActionExecuteInput) (*veler
 		return nil, errors.WithStack(err)
 	}
 
-	// get kube version
-	serverVersion, err := discovery.ServerVersion(a.logger)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	// if kube version < 1.27, use legacy controller-uid label
-	majorVersion, err := strconv.Atoi(serverVersion.Major)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	minorVersion, err := strconv.Atoi(serverVersion.Minor)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	deleteLegacyControllerUIDLabel := false
-	if majorVersion < 1 || (majorVersion == 1 && minorVersion <= 27) {
-		deleteLegacyControllerUIDLabel = true
-	}
-
 	if job.Spec.Selector != nil {
 		delete(job.Spec.Selector.MatchLabels, controllerUIDLabel)
-		if deleteLegacyControllerUIDLabel {
-			delete(job.Spec.Selector.MatchLabels, legacyControllerUIDLabel)
-		}
+		delete(job.Spec.Selector.MatchLabels, legacyControllerUIDLabel)
 	}
 	delete(job.Spec.Template.ObjectMeta.Labels, controllerUIDLabel)
-	if deleteLegacyControllerUIDLabel {
-		delete(job.Spec.Template.ObjectMeta.Labels, legacyControllerUIDLabel)
-	}
+	delete(job.Spec.Template.ObjectMeta.Labels, legacyControllerUIDLabel)
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(job)
 	if err != nil {

@@ -312,11 +312,3 @@ func (h *helper) ServerVersion() *version.Info {
 	defer h.lock.RUnlock()
 	return h.serverVersion
 }
-
-func ServerVersion(logger logrus.FieldLogger) (*version.Info, error) {
-	discoveryHelper, err := NewHelper(&discovery.DiscoveryClient{}, logger)
-	if err != nil {
-		return nil, err
-	}
-	return discoveryHelper.ServerVersion(), nil
-}
