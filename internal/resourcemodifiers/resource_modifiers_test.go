@@ -90,6 +90,32 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
+	cm4 := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupResource: deployments.apps\n    labelSelector:\n      matchLabels:\n        a: b\n",
+		},
+	}
+
+	rules4 := &ResourceModifiers{
+		Version: "v1",
+		ResourceModifierRules: []ResourceModifierRule{
+			{
+				Conditions: Conditions{
+					GroupResource: "deployments.apps",
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"a": "b",
+						},
+					},
+				},
+			},
+		},
+	}
+
 	type args struct {
 		cm *v1.ConfigMap
 	}
@@ -122,6 +148,14 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			},
 			want:    nil,
 			wantErr: true,
+		},
+		{
+			name: "match labels",
+			args: args{
+				cm: cm4,
+			},
+			want:    rules4,
+			wantErr: false,
 		},
 		{
 			name: "nil configmap",
