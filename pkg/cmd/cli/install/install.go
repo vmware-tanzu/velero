@@ -79,6 +79,7 @@ type Options struct {
 	Features                        string
 	DefaultVolumesToFsBackup        bool
 	UploaderType                    string
+	DefaultSnapshotMoveData         bool
 }
 
 // BindFlags adds command line values to the options struct.
@@ -118,6 +119,7 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Features, "features", o.Features, "Comma separated list of Velero feature flags to be set on the Velero deployment and the node-agent daemonset, if node-agent is enabled")
 	flags.BoolVar(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", o.DefaultVolumesToFsBackup, "Bool flag to configure Velero server to use pod volume file system backup by default for all volumes on all backups. Optional.")
 	flags.StringVar(&o.UploaderType, "uploader-type", o.UploaderType, fmt.Sprintf("The type of uploader to transfer the data of pod volumes, the supported values are '%s', '%s'", uploader.ResticType, uploader.KopiaType))
+	flags.BoolVar(&o.DefaultSnapshotMoveData, "default-snapshot-move-data", o.DefaultSnapshotMoveData, "Bool flag to configure Velero server to move data by default for all snapshots supporting data movement. Optional.")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -144,6 +146,7 @@ func NewInstallOptions() *Options {
 		CRDsOnly:                 false,
 		DefaultVolumesToFsBackup: false,
 		UploaderType:             uploader.KopiaType,
+		DefaultSnapshotMoveData:  false,
 	}
 }
 
@@ -206,6 +209,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		Features:                        strings.Split(o.Features, ","),
 		DefaultVolumesToFsBackup:        o.DefaultVolumesToFsBackup,
 		UploaderType:                    o.UploaderType,
+		DefaultSnapshotMoveData:         o.DefaultSnapshotMoveData,
 	}, nil
 }
 

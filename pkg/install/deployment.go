@@ -46,6 +46,7 @@ type podTemplateConfig struct {
 	defaultVolumesToFsBackup        bool
 	serviceAccountName              string
 	uploaderType                    string
+	defaultSnapshotMoveData         bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -136,6 +137,12 @@ func WithDefaultVolumesToFsBackup() podTemplateOption {
 	}
 }
 
+func WithDefaultSnapshotMoveData() podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.defaultSnapshotMoveData = true
+	}
+}
+
 func WithServiceAccountName(sa string) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.serviceAccountName = sa
@@ -165,6 +172,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 
 	if c.defaultVolumesToFsBackup {
 		args = append(args, "--default-volumes-to-fs-backup=true")
+	}
+
+	if c.defaultSnapshotMoveData {
+		args = append(args, "--default-snapshot-move-data=true")
 	}
 
 	if len(c.uploaderType) > 0 {
