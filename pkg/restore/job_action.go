@@ -17,13 +17,21 @@ limitations under the License.
 package restore
 
 import (
+	"strconv"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	batchv1api "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+)
+
+const (
+	legacyControllerUIDLabel = "controller-uid"                     // <=1.27 This still exists in 1.27 for backward compatibility, maybe remove in 1.28?
+	controllerUIDLabel       = "batch.kubernetes.io/controller-uid" // >=1.27 https://github.com/kubernetes/kubernetes/pull/114930#issuecomment-1384667494
 )
 
 type JobAction struct {
@@ -46,10 +54,35 @@ func (a *JobAction) Execute(input *velero.RestoreItemActionExecuteInput) (*veler
 		return nil, errors.WithStack(err)
 	}
 
-	if job.Spec.Selector != nil {
-		delete(job.Spec.Selector.MatchLabels, "controller-uid")
+	// get kube version
+	serverVersion, err := discovery.ServerVersion(a.logger)
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
-	delete(job.Spec.Template.ObjectMeta.Labels, "controller-uid")
+	// if kube version < 1.27, use legacy controller-uid label
+	majorVersion, err := strconv.Atoi(serverVersion.Major)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	minorVersion, err := strconv.Atoi(serverVersion.Minor)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	deleteLegacyControllerUIDLabel := false
+	if majorVersion < 1 || (majorVersion == 1 && minorVersion <= 27) {
+		deleteLegacyControllerUIDLabel = true
+	}
+
+	if job.Spec.Selector != nil {
+		delete(job.Spec.Selector.MatchLabels, controllerUIDLabel)
+		if deleteLegacyControllerUIDLabel {
+			delete(job.Spec.Selector.MatchLabels, legacyControllerUIDLabel)
+		}
+	}
+	delete(job.Spec.Template.ObjectMeta.Labels, controllerUIDLabel)
+	if deleteLegacyControllerUIDLabel {
+		delete(job.Spec.Template.ObjectMeta.Labels, legacyControllerUIDLabel)
+	}
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(job)
 	if err != nil {
