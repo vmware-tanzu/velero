@@ -1,0 +1,1 @@
+Kubernetes 1.27 new job label batch.kubernetes.io/controller-uid are deleted during restore per https://github.com/kubernetes/kubernetes/pull/114930
