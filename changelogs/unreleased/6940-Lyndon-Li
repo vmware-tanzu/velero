@@ -1,0 +1,1 @@
+Fix issue #6647, add the --default-snapshot-move-data parameter to Velero install, so that users don't need to specify --snapshot-move-data per backup when they want to move snapshot data for all backups
