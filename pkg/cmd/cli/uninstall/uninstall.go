@@ -53,11 +53,7 @@ import (
 
 var gracefulDeletionMaximumDuration = 1 * time.Minute
 
-var resToDelete = []kbclient.ObjectList{
-	&velerov1api.RestoreList{},
-	&velerov2alpha1api.DataUploadList{},
-	&velerov2alpha1api.DataDownloadList{},
-}
+var resToDelete = []kbclient.ObjectList{}
 
 // uninstallOptions collects all the options for uninstalling Velero from a Kubernetes cluster.
 type uninstallOptions struct {
@@ -247,10 +243,20 @@ func checkResources(ctx context.Context, kbClient kbclient.Client) error {
 	for _, crd := range checkCRDs {
 		key := kbclient.ObjectKey{Name: crd}
 		if err = kbClient.Get(ctx, key, v1crd); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			} else {
+			if !apierrors.IsNotFound(err) {
 				return errors.Wrapf(err, "Error getting %s crd", crd)
+			}
+		} else {
+			// no error with found CRD that we should delete
+			switch crd {
+			case "restores.velero.io":
+				resToDelete = append(resToDelete, &velerov1api.RestoreList{})
+			case "datauploads.velero.io":
+				resToDelete = append(resToDelete, &velerov2alpha1api.DataUploadList{})
+			case "datadownloads.velero.io":
+				resToDelete = append(resToDelete, &velerov2alpha1api.DataDownloadList{})
+			default:
+				fmt.Printf("Unsupported type %s to be cleared\n", crd)
 			}
 		}
 	}
@@ -348,27 +354,19 @@ func gracefullyDeleteResource(ctx context.Context, kbClient kbclient.Client, nam
 func waitDeletingResources(ctx context.Context, kbClient kbclient.Client, namespace string) error {
 	// Wait for the deletion of all the restores within a specified time frame
 	err := wait.PollImmediate(time.Second, gracefulDeletionMaximumDuration, func() (bool, error) {
-		restoreList := &velerov1api.RestoreList{}
-		if errList := kbClient.List(ctx, restoreList, &kbclient.ListOptions{Namespace: namespace}); errList != nil {
-			return false, errList
+		itemsCount := 0
+		for i := range resToDelete {
+			if errList := kbClient.List(ctx, resToDelete[i], &kbclient.ListOptions{Namespace: namespace}); errList != nil {
+				return false, errList
+			}
+			itemsCount += reflect.ValueOf(resToDelete[i]).Elem().FieldByName("Items").Len()
+			if itemsCount > 0 {
+				fmt.Print(".")
+				return false, nil
+			}
 		}
 
-		dataUploadList := &velerov2alpha1api.DataUploadList{}
-		if errList := kbClient.List(ctx, dataUploadList, &kbclient.ListOptions{Namespace: namespace}); errList != nil {
-			return false, errList
-		}
-
-		dataDownloadList := &velerov2alpha1api.DataDownloadList{}
-		if errList := kbClient.List(ctx, dataDownloadList, &kbclient.ListOptions{Namespace: namespace}); errList != nil {
-			return false, errList
-		}
-
-		if len(restoreList.Items)+len(dataUploadList.Items)+len(dataDownloadList.Items) > 0 {
-			fmt.Print(".")
-			return false, nil
-		} else {
-			return true, nil
-		}
+		return true, nil
 	})
 
 	return err
