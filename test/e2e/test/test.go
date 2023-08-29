@@ -192,7 +192,7 @@ func (t *TestCase) Clean() error {
 			CleanupNamespaces(t.Ctx, t.Client, t.CaseBaseName)
 		})
 		By("Clean backups after test", func() {
-			DeleteBackups(t.Ctx, t.Client)
+			DeleteAllBackups(t.Ctx, t.Client)
 		})
 	}
 	return nil
