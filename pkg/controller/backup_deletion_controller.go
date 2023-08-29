@@ -27,7 +27,6 @@ import (
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -570,27 +569,10 @@ func (r *backupDeletionReconciler) patchDeleteBackupRequest(ctx context.Context,
 }
 
 func (r *backupDeletionReconciler) patchBackup(ctx context.Context, backup *velerov1api.Backup, mutate func(*velerov1api.Backup)) (*velerov1api.Backup, error) {
-	//TODO: The patchHelper can't be used here because the `backup/xxx/status` does not exist, until the bakcup resource is refactored
-
-	// Record original json
-	oldData, err := json.Marshal(backup)
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling original Backup")
-	}
-
-	newBackup := backup.DeepCopy()
-	mutate(newBackup)
-	newData, err := json.Marshal(newBackup)
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling updated Backup")
-	}
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating json merge patch for Backup")
-	}
-
-	if err := r.Client.Patch(ctx, backup, client.RawPatch(types.MergePatchType, patchBytes)); err != nil {
-		return nil, errors.Wrap(err, "error patching Backup")
+	original := backup.DeepCopy()
+	mutate(backup)
+	if err := r.Patch(ctx, backup, client.MergeFrom(original)); err != nil {
+		return nil, errors.Wrap(err, "error patching the backup")
 	}
 	return backup, nil
 }
