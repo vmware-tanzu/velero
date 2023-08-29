@@ -59,6 +59,11 @@ Velero supports the following kinds of plugins:
 - **Restore Item Action** - executes arbitrary logic for individual items prior to restoring them into a cluster
 - **Delete Item Action** - executes arbitrary logic based on individual items within a backup prior to deleting the backup
 
+Plugin binaries are discovered by recursively reading a directory in no particular order. Hence no guarantee is provided for the
+order in which item action plugins are invoked. However, if a single binary implements multiple item action plugins,
+they may be invoked in the order in which they are registered but it is best to not depend on this
+implementation. This is not guaranteed officially and the implementation can change at any time.
+
 ## Plugin Logging
 
 Velero provides a [logger][2] that can be used by plugins to log structured information to the main Velero server log or
