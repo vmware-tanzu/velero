@@ -217,8 +217,14 @@ func checkBackupPhase(ctx context.Context, veleroCLI string, veleroNamespace str
 		return err
 	}
 	if backup.Status.Phase != expectedPhase {
+		if VeleroCfg.DebugVeleroPodRestart {
+			pods, err := GetVeleroPodName(ctx)
+			fmt.Println(err)
+			CollectClusterEvents(backupName, pods)
+		}
 		return errors.Errorf("Unexpected backup phase got %s, expecting %s", backup.Status.Phase, expectedPhase)
 	}
+
 	return nil
 }
 
@@ -239,6 +245,11 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 		return err
 	}
 	if restore.Status.Phase != expectedPhase {
+		if VeleroCfg.DebugVeleroPodRestart {
+			pods, err := GetVeleroPodName(ctx)
+			fmt.Println(err)
+			CollectClusterEvents(restoreName, pods)
+		}
 		return errors.Errorf("Unexpected restore phase got %s, expecting %s", restore.Status.Phase, expectedPhase)
 	}
 	return nil
@@ -442,7 +453,6 @@ func VeleroRestoreExec(ctx context.Context, veleroCLI, veleroNamespace, restoreN
 	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
 		return err
 	}
-
 	return checkRestorePhase(ctx, veleroCLI, veleroNamespace, restoreName, phaseExpect)
 }
 
@@ -1241,7 +1251,7 @@ func GetVersionList(veleroCli, veleroVersion string) []VeleroCLI2Version {
 	}
 	return veleroCLI2VersionList
 }
-func DeleteBackups(ctx context.Context, client TestClient) error {
+func DeleteAllBackups(ctx context.Context, client TestClient) error {
 	backupList := new(velerov1api.BackupList)
 	if err := client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: VeleroCfg.VeleroNamespace}); err != nil {
 		return fmt.Errorf("failed to list backup object in %s namespace with err %v", VeleroCfg.VeleroNamespace, err)
@@ -1250,6 +1260,24 @@ func DeleteBackups(ctx context.Context, client TestClient) error {
 		fmt.Printf("Backup %s is going to be deleted...\n", backup.Name)
 		if err := VeleroBackupDelete(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup.Name); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func DeleteBackups(ctx context.Context, client TestClient, backupNames []string) error {
+	backupList := new(velerov1api.BackupList)
+	if err := client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: VeleroCfg.VeleroNamespace}); err != nil {
+		return fmt.Errorf("failed to list backup object in %s namespace with err %v", VeleroCfg.VeleroNamespace, err)
+	}
+	for _, backup := range backupList.Items {
+		for _, bn := range backupNames {
+			if backup.Name == bn {
+				fmt.Printf("Backup %s is going to be deleted...\n", backup.Name)
+				if err := VeleroBackupDelete(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup.Name); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil
@@ -1481,4 +1509,57 @@ func IsSupportUploaderType(version string) (bool, error) {
 	} else {
 		return false, nil
 	}
+}
+
+func GetVeleroPodName(ctx context.Context) ([]string, error) {
+	// Example:
+	//    NAME                                  STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS             AGE
+	//    kibishii-data-kibishii-deployment-0   Bound    pvc-94b9fdf2-c30f-4a7b-87bf-06eadca0d5b6   1Gi        RWO            kibishii-storage-class   115s
+	cmds := []*common.OsCommandLine{}
+	cmd := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"get", "pod", "-n", "velero"},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "grep",
+		Args: []string{"velero"},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+	cmds = append(cmds, cmd)
+
+	return common.GetListByCmdPipes(ctx, cmds)
+}
+
+func InstallTestStorageClasses(path string) error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer ctxCancel()
+	err := InstallStorageClass(ctx, path)
+	if err != nil {
+		return err
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get %s when install storage class", path)
+	}
+
+	// replace sc to new value
+	newContent := strings.ReplaceAll(string(content), fmt.Sprintf("name: %s", StorageClassName), fmt.Sprintf("name: %s", StorageClassName2))
+
+	tmpFile, err := os.CreateTemp("", "sc-file")
+	if err != nil {
+		return errors.Wrapf(err, "failed to create temp file  when install storage class")
+	}
+
+	defer os.Remove(tmpFile.Name())
+	if _, err := tmpFile.WriteString(newContent); err != nil {
+		return errors.Wrapf(err, "failed to write content into temp file %s when install storage class", tmpFile.Name())
+	}
+	return InstallStorageClass(ctx, tmpFile.Name())
 }

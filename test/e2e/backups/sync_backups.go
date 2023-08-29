@@ -66,7 +66,7 @@ func BackupsSyncTest() {
 	AfterEach(func() {
 		if !VeleroCfg.Debug {
 			By("Clean backups after test", func() {
-				DeleteBackups(context.Background(), *VeleroCfg.ClientToInstallVelero)
+				DeleteAllBackups(context.Background(), *VeleroCfg.ClientToInstallVelero)
 			})
 			if VeleroCfg.InstallVelero {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)

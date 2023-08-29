@@ -82,22 +82,26 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 	})
 	AfterEach(func() {
 		if !veleroCfg.Debug {
-			// TODO: delete backup created by case self, not all
-			// By("Clean backups after test", func() {
-			// 	DeleteBackups(context.Background(), *veleroCfg.DefaultClient)
-			// })
-			if veleroCfg.InstallVelero {
-				By(fmt.Sprintf("Uninstall Velero and delete sample workload namespace %s", migrationNamespace), func() {
-					ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
-					defer ctxCancel()
-					Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultCluster)).To(Succeed())
-					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
-						veleroCfg.VeleroNamespace)).To(Succeed())
-					DeleteNamespace(context.Background(), *veleroCfg.DefaultClient, migrationNamespace, true)
+			By(fmt.Sprintf("Uninstall Velero on cluster %s", veleroCfg.DefaultCluster), func() {
+				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
+				defer ctxCancel()
+				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultCluster)).To(Succeed())
+				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
+					veleroCfg.VeleroNamespace)).To(Succeed())
+				DeleteNamespace(context.Background(), *veleroCfg.DefaultClient, migrationNamespace, true)
+			})
 
-					Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyCluster)).To(Succeed())
-					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
-						veleroCfg.VeleroNamespace)).To(Succeed())
+			By(fmt.Sprintf("Uninstall Velero on cluster %s", veleroCfg.StandbyCluster), func() {
+				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
+				defer ctxCancel()
+				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyCluster)).To(Succeed())
+				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
+					veleroCfg.VeleroNamespace)).To(Succeed())
+				DeleteNamespace(context.Background(), *veleroCfg.StandbyClient, migrationNamespace, true)
+			})
+
+			if veleroCfg.InstallVelero {
+				By(fmt.Sprintf("Delete sample workload namespace %s", migrationNamespace), func() {
 					DeleteNamespace(context.Background(), *veleroCfg.StandbyClient, migrationNamespace, true)
 				})
 			}
@@ -110,7 +114,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 	})
 	When("kibishii is the sample workload", func() {
 		It("should be successfully backed up and restored to the default BackupStorageLocation", func() {
-
+			var backupNames []string
 			if veleroCfg.SnapshotMoveData {
 				if !useVolumeSnapshots {
 					Skip("FSB migration test is not needed in data mover scenario")
@@ -185,7 +189,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			KibishiiData := *DefaultKibishiiData
 			By("Deploy sample workload of Kibishii", func() {
 				if OriginVeleroCfg.SnapshotMoveData {
-					KibishiiData.ExpectedNodes = 6
+					KibishiiData.ExpectedNodes = 3
 				}
 
 				Expect(KibishiiPrepareBeforeBackup(oneHourTimeout, *veleroCfg.DefaultClient, veleroCfg.CloudProvider,
@@ -206,6 +210,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, BackupStorageClassCfg.BackupName, "")
 					return "Fail to backup workload"
 				})
+				backupNames = append(backupNames, BackupStorageClassCfg.BackupName)
 
 				var BackupCfg BackupConfig
 				BackupCfg.BackupName = backupName
@@ -223,6 +228,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					RunDebug(context.Background(), OriginVeleroCfg.VeleroCLI, OriginVeleroCfg.VeleroNamespace, BackupCfg.BackupName, "")
 					return "Fail to backup workload"
 				})
+				backupNames = append(backupNames, BackupCfg.BackupName)
 			})
 
 			if useVolumeSnapshots {
@@ -283,7 +289,12 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				veleroCfg.UseRestic = false
 				if veleroCfg.SnapshotMoveData {
 					veleroCfg.UseNodeAgent = true
+					// For SnapshotMoveData pipelines, we should use standby clustr setting for Velero installation
+					// In nightly CI, StandbyClusterPlugins is set properly if pipeline is for SnapshotMoveData.
+					veleroCfg.Plugins = veleroCfg.StandbyClusterPlugins
+					veleroCfg.ObjectStoreProvider = veleroCfg.StandbyClusterOjbectStoreProvider
 				}
+
 				Expect(VeleroInstall(context.Background(), &veleroCfg, true)).To(Succeed())
 			})
 
@@ -325,6 +336,11 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			By(fmt.Sprintf("Verify workload %s after restore ", migrationNamespace), func() {
 				Expect(KibishiiVerifyAfterRestore(*veleroCfg.StandbyClient, migrationNamespace,
 					oneHourTimeout, &KibishiiData)).To(Succeed(), "Fail to verify workload after restore")
+			})
+
+			// TODO: delete backup created by case self, not all
+			By("Clean backups after test", func() {
+				DeleteBackups(context.Background(), *veleroCfg.DefaultClient, backupNames)
 			})
 		})
 	})

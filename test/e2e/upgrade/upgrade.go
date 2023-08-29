@@ -87,7 +87,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 	AfterEach(func() {
 		if !veleroCfg.Debug {
 			By("Clean backups after test", func() {
-				DeleteBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
+				DeleteAllBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
 			})
 			By(fmt.Sprintf("Delete sample workload namespace %s", upgradeNamespace), func() {
 				DeleteNamespace(context.Background(), *veleroCfg.ClientToInstallVelero, upgradeNamespace, true)
@@ -136,6 +136,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				version, err := GetVeleroVersion(oneHourTimeout, tmpCfgForOldVeleroInstall.VeleroCLI, true)
 				Expect(err).To(Succeed(), "Fail to get Velero version")
 				tmpCfgForOldVeleroInstall.VeleroVersion = version
+				tmpCfgForOldVeleroInstall.UseVolumeSnapshots = useVolumeSnapshots
 
 				if supportUploaderType {
 					tmpCfgForOldVeleroInstall.UseRestic = false

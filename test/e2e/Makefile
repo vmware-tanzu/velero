@@ -51,7 +51,6 @@ SKIP_STR := $(foreach var, $(subst ., ,$(GINKGO_SKIP)),-skip "$(var)")
 FOCUS_STR := $(foreach var, $(subst ., ,$(GINKGO_FOCUS)),-focus "$(var)")
 VELERO_CLI ?=$$(pwd)/../../_output/bin/$(GOOS)/$(GOARCH)/velero
 VELERO_IMAGE ?= velero/velero:main
-VELERO_VERSION ?= $(VERSION)
 PLUGINS ?=
 RESTORE_HELPER_IMAGE ?=
 #Released version only
@@ -74,6 +73,8 @@ BSL_CONFIG ?=
 VSL_CONFIG ?=
 CLOUD_PROVIDER ?=
 STANDBY_CLUSTER_CLOUD_PROVIDER ?=
+STANDBY_CLUSTER_PLUGINS ?=
+STANDBY_CLUSTER_OBJECT_STORE_PROVIDER ?=
 OBJECT_STORE_PROVIDER ?=
 INSTALL_VELERO ?= true
 REGISTRY_CREDENTIAL_FILE ?=
@@ -90,6 +91,7 @@ ADDITIONAL_BSL_CONFIG ?=
 
 FEATURES ?=
 DEBUG_E2E_TEST ?= false
+DEBUG_VELERO_POD_RESTART ?= false
 VELERO_SERVER_DEBUG_MODE ?= false
 
 # Parameters to run migration tests along with all other E2E tests, and both of them should
@@ -119,7 +121,7 @@ run: ginkgo
 	@$(GINKGO) -v $(FOCUS_STR) $(SKIP_STR) . -- -velerocli=$(VELERO_CLI) \
 		-velero-image=$(VELERO_IMAGE) \
 		-plugins=$(PLUGINS) \
-		-velero-version=$(VELERO_VERSION) \
+		-velero-version=$(VERSION) \
 		-restore-helper-image=$(RESTORE_HELPER_IMAGE) \
 		-upgrade-from-velero-cli=$(UPGRADE_FROM_VELERO_CLI) \
 		-upgrade-from-velero-version=$(UPGRADE_FROM_VELERO_VERSION) \
@@ -150,7 +152,10 @@ run: ginkgo
 		-uploader-type=$(UPLOADER_TYPE) \
 		-snapshot-move-data=$(SNAPSHOT_MOVE_DATA) \
 		-data-mover-plugin=$(DATA_MOVER_plugin) \
-		-standby-cluster-cloud-provider=$(STANDBY_CLUSTER_CLOUD_PROVIDER)
+		-standby-cluster-cloud-provider=$(STANDBY_CLUSTER_CLOUD_PROVIDER) \
+		-standby-cluster-plugins=$(STANDBY_CLUSTER_PLUGINS) \
+		-standby-cluster-object-store-provider=$(STANDBY_CLUSTER_OBJECT_STORE_PROVIDER) \
+		-debug-velero-pod-restart=$(DEBUG_VELERO_POD_RESTART)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

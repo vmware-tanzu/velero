@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -30,7 +31,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	"github.com/vmware-tanzu/velero/test/util/common"
+	common "github.com/vmware-tanzu/velero/test/util/common"
 )
 
 // ensureClusterExists returns whether or not a Kubernetes cluster exists for tests to be run on.
@@ -289,15 +290,15 @@ func ReadFileFromPodVolume(ctx context.Context, namespace, podName, containerNam
 	return stdout, err
 }
 
-func KubectlGetInfo(cmdName string, arg []string) {
+func RunCommand(cmdName string, arg []string) string {
 	cmd := exec.CommandContext(context.Background(), cmdName, arg...)
-	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
+	fmt.Printf("Run cmd =%v\n", cmd)
 	stdout, stderr, err := veleroexec.RunCommand(cmd)
-	fmt.Println(stdout)
 	if err != nil {
 		fmt.Println(stderr)
 		fmt.Println(err)
 	}
+	return stdout
 }
 
 func KubectlGetDsJson(veleroNamespace string) (string, error) {
@@ -362,4 +363,27 @@ func CreateVolumes(pvcName string, volumeNameList []string) (vols []*corev1.Volu
 		})
 	}
 	return
+}
+
+func CollectClusterEvents(key string, pods []string) {
+	prefix := "pod"
+	date := RunCommand("date", []string{"-u"})
+	logs := []string{}
+	logs = append(logs, date)
+	logs = append(logs, RunCommand("kubectl", []string{"get", "events", "-o", "custom-columns=FirstSeen:.firstTimestamp,Count:.count,From:.source.component,Type:.type,Reason:.reason,Message:.message", "--all-namespaces"}))
+	logs = append(logs, RunCommand("kubectl", []string{"get", "events", "-o", "yaml", "--all-namespaces"}))
+	for _, pod := range pods {
+		logs = append(logs, RunCommand("kubectl", []string{"logs", "-n", "velero", pod, "--previous"}))
+		prefix = fmt.Sprintf("%s-%s", prefix, pod)
+	}
+	logs = append(logs, RunCommand("date", []string{"-u"}))
+	log := strings.Join(logs, "\n")
+
+	fileName := fmt.Sprintf("%s-%s", prefix, key)
+	fmt.Printf("Cluster event log file %s: %s", fileName, log)
+
+	err := common.WriteToFile(log, fileName)
+	if err != nil {
+		fmt.Printf("Fail to log cluster event: %v", err)
+	}
 }
