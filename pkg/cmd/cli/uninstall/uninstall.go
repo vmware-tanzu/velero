@@ -280,7 +280,7 @@ func deleteResources(ctx context.Context, kbClient kbclient.Client, namespace st
 	if err == wait.ErrWaitTimeout {
 		err = forcedlyDeleteResources(ctx, kbClient, namespace)
 		if err != nil {
-			return errors.Wrap(err, "Error deleting restores")
+			return errors.Wrap(err, "Error deleting resources forcedly")
 		}
 	}
 
@@ -315,9 +315,7 @@ func gracefullyDeleteResources(ctx context.Context, kbClient kbclient.Client, na
 }
 
 func gracefullyDeleteResource(ctx context.Context, kbClient kbclient.Client, namespace string, list kbclient.ObjectList) error {
-	var err error
-
-	if err = kbClient.List(ctx, list, &kbclient.ListOptions{Namespace: namespace}); err != nil {
+	if err := kbClient.List(ctx, list, &kbclient.ListOptions{Namespace: namespace}); err != nil {
 		return errors.Wrap(err, "Error getting resources during graceful deletion")
 	}
 
@@ -341,14 +339,14 @@ func gracefullyDeleteResource(ctx context.Context, kbClient kbclient.Client, nam
 
 	// Delete collected resources in a batch
 	for _, resource := range objectsToDelete {
-		if err = kbClient.Delete(ctx, resource); err != nil {
+		if err := kbClient.Delete(ctx, resource); err != nil {
 			if apierrors.IsNotFound(err) {
 				continue
 			}
 			return errors.Wrap(err, "Error deleting resources during graceful deletion")
 		}
 	}
-	return err
+	return nil
 }
 
 func waitDeletingResources(ctx context.Context, kbClient kbclient.Client, namespace string) error {
