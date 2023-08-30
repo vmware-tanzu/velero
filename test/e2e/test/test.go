@@ -34,8 +34,6 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/util/velero"
 )
 
-const StorageClassName = "e2e-storage-class"
-
 /*
 The VeleroBackupRestoreTest interface is just could be suit for the cases that follow the test flow of
 create resources, backup, delete test resource, restore and verify.

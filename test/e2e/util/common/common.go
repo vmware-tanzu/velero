@@ -10,6 +10,9 @@ import (
 	"os/exec"
 )
 
+const StorageClassName = "e2e-storage-class"
+const StorageClassName2 = "e2e-storage-class-2"
+
 type OsCommandLine struct {
 	Cmd  string
 	Args []string
