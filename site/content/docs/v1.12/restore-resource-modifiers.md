@@ -29,11 +29,14 @@ Below is the two-step of using resource modifiers to modify the resources during
 version: v1
 resourceModifierRules:
 - conditions:
-     groupKind: persistentvolumeclaims
-     resourceNameRegex: "^mysql.*$"
-     namespaces:
-     - bar
-     - foo
+    groupResource: persistentvolumeclaims
+    resourceNameRegex: "^mysql.*$"
+    namespaces:
+    - bar
+    - foo
+    labelSelector:
+      matchLabels:
+        foo: bar
   patches:
   - operation: replace
     path: "/spec/storageClassName"
@@ -42,9 +45,9 @@ resourceModifierRules:
     path: "/metadata/labels/test"
  ```
 
-- The above configmap will apply the JSON Patch to all the PVCs in the namespaces bar and foo with name starting with mysql. The JSON Patch will replace the storageClassName with "premium" and remove the label "test" from the PVCs.
+- The above configmap will apply the JSON Patch to all the PVCs in the namespaces bar and foo with name starting with mysql and match label `foo: bar`. The JSON Patch will replace the storageClassName with "premium" and remove the label "test" from the PVCs.
 - You can specify multiple JSON Patches for a particular resource. The patches will be applied in the order specified in the configmap. A subsequent patch is applied in order and if multiple patches are specified for the same path, the last patch will override the previous patches.
-- You can can specify multiple resourceModifierRules in the configmap. The rules will be applied in the order specified in the configmap. 
+- You can specify multiple resourceModifierRules in the configmap. The rules will be applied in the order specified in the configmap. 
 
 ### Operations supported by the JSON Patch RFC: 
 - add
@@ -61,7 +64,7 @@ resourceModifierRules:
 version: v1
 resourceModifierRules:
 - conditions:
-    groupKind: persistentvolumeclaims
+    groupResource: persistentvolumeclaims
     resourceNameRegex: ".*"
     namespaces:
     - bar
@@ -80,7 +83,7 @@ resourceModifierRules:
 version: v1
 resourceModifierRules:
 - conditions:
-    groupKind: deployments.apps
+    groupResource: deployments.apps
     resourceNameRegex: "^test-.*$"
     namespaces:
     - bar

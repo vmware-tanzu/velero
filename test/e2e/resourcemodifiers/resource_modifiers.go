@@ -36,7 +36,7 @@ var yamlData = `
 version: v1
 resourceModifierRules:
 - conditions:
-    groupKind: deployments.apps
+    groupResource: deployments.apps
     resourceNameRegex: "resource-modifiers-.*"
   patches:
   - operation: add

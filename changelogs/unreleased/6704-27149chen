@@ -1,0 +1,3 @@
+This pr made some improvements in Resource Modifiers:
+1. add label selector
+2. change the field name from groupKind to groupResource
