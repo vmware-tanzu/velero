@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -32,6 +33,9 @@ import (
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	"github.com/vmware-tanzu/velero/test/e2e/util/common"
 )
+
+const StorageClassName = "e2e-storage-class"
+const StorageClassName2 = "e2e-storage-class-2"
 
 // ensureClusterExists returns whether or not a Kubernetes cluster exists for tests to be run on.
 func EnsureClusterExists(ctx context.Context) error {
@@ -362,4 +366,31 @@ func GetAPIVersions(client *TestClient, name string) ([]string, error) {
 		}
 	}
 	return nil, errors.New("Server API groups is empty")
+}
+
+func InstallTestStorageClasses(path string) error {
+	ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer ctxCancel()
+	err := InstallStorageClass(ctx, path)
+	if err != nil {
+		return err
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get %s when install storage class", path)
+	}
+
+	// replace sc to new value
+	newContent := strings.ReplaceAll(string(content), fmt.Sprintf("name: %s", StorageClassName), fmt.Sprintf("name: %s", StorageClassName2))
+
+	tmpFile, err := os.CreateTemp("", "sc-file")
+	if err != nil {
+		return errors.Wrapf(err, "failed to create temp file  when install storage class")
+	}
+
+	defer os.Remove(tmpFile.Name())
+	if _, err := tmpFile.WriteString(newContent); err != nil {
+		return errors.Wrapf(err, "failed to write content into temp file %s when install storage class", tmpFile.Name())
+	}
+	return InstallStorageClass(ctx, tmpFile.Name())
 }

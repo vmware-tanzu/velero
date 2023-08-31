@@ -75,6 +75,15 @@ func (p *PVCSelectedNodeChanging) StartRun() error {
 }
 func (p *PVCSelectedNodeChanging) CreateResources() error {
 	p.Ctx, _ = context.WithTimeout(context.Background(), 60*time.Minute)
+
+	By(fmt.Sprintf("Create a storage class %s.", StorageClassName), func() {
+		Expect(InstallStorageClass(context.Background(), fmt.Sprintf("testdata/storage-class/%s.yaml", p.VeleroCfg.CloudProvider))).To(Succeed())
+	})
+
+	By(fmt.Sprintf("Create a storage class %s.", StorageClassName), func() {
+		Expect(InstallTestStorageClasses(fmt.Sprintf("testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
+	})
+
 	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
 		Expect(CreateNamespace(context.Background(), p.Client, p.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", p.namespace))
@@ -87,7 +96,7 @@ func (p *PVCSelectedNodeChanging) CreateResources() error {
 			p.oldNodeName = nodeName
 			fmt.Printf("Create PVC on node %s\n", p.oldNodeName)
 			pvcAnn := map[string]string{p.ann: nodeName}
-			_, err := CreatePod(p.Client, p.namespace, p.podName, "default", p.pvcName, []string{p.volume}, pvcAnn, nil)
+			_, err := CreatePod(p.Client, p.namespace, p.podName, StorageClassName, p.pvcName, []string{p.volume}, pvcAnn, nil)
 			Expect(err).To(Succeed())
 			err = WaitForPods(context.Background(), p.Client, p.namespace, []string{p.podName})
 			Expect(err).To(Succeed())
