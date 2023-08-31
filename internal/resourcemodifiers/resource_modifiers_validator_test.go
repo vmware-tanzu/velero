@@ -21,7 +21,7 @@ func TestResourceModifiers_Validate(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "persistentvolumeclaims",
+							GroupResource:     "persistentvolumeclaims",
 							ResourceNameRegex: ".*",
 							Namespaces:        []string{"bar", "foo"},
 						},
@@ -44,7 +44,7 @@ func TestResourceModifiers_Validate(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "persistentvolumeclaims",
+							GroupResource:     "persistentvolumeclaims",
 							ResourceNameRegex: ".*",
 							Namespaces:        []string{"bar", "foo"},
 						},
@@ -75,7 +75,7 @@ func TestResourceModifiers_Validate(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "persistentvolumeclaims",
+							GroupResource:     "persistentvolumeclaims",
 							ResourceNameRegex: ".*",
 							Namespaces:        []string{"bar", "foo"},
 						},
@@ -92,13 +92,13 @@ func TestResourceModifiers_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Condition has empty GroupKind",
+			name: "Condition has empty GroupResource",
 			fields: fields{
 				Version: "v1",
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "",
+							GroupResource:     "",
 							ResourceNameRegex: ".*",
 							Namespaces:        []string{"bar", "foo"},
 						},

@@ -1,9 +1,8 @@
 package resourcemodifiers
 
 import (
-	"strings"
-
 	"fmt"
+	"strings"
 )
 
 func (r *ResourceModifierRule) Validate() error {
@@ -48,8 +47,8 @@ func (p *JSONPatch) Validate() error {
 }
 
 func (c *Conditions) Validate() error {
-	if c.GroupKind == "" {
-		return fmt.Errorf("groupkind cannot be empty")
+	if c.GroupResource == "" {
+		return fmt.Errorf("groupkResource cannot be empty")
 	}
 	return nil
 }

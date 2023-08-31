@@ -18,7 +18,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			Namespace: "test-namespace",
 		},
 		Data: map[string]string{
-			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupKind: persistentvolumeclaims\n    resourceNameRegex: \".*\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: replace\n    path: \"/spec/storageClassName\"\n    value: \"premium\"\n  - operation: remove\n    path: \"/metadata/labels/test\"\n\n\n",
+			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupResource: persistentvolumeclaims\n    resourceNameRegex: \".*\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: replace\n    path: \"/spec/storageClassName\"\n    value: \"premium\"\n  - operation: remove\n    path: \"/metadata/labels/test\"\n\n\n",
 		},
 	}
 
@@ -27,7 +27,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		ResourceModifierRules: []ResourceModifierRule{
 			{
 				Conditions: Conditions{
-					GroupKind:         "persistentvolumeclaims",
+					GroupResource:     "persistentvolumeclaims",
 					ResourceNameRegex: ".*",
 					Namespaces:        []string{"bar", "foo"},
 				},
@@ -51,7 +51,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			Namespace: "test-namespace",
 		},
 		Data: map[string]string{
-			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupKind: deployments.apps\n    resourceNameRegex: \"^test-.*$\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: add\n    path: \"/spec/template/spec/containers/0\"\n    value: \"{\\\"name\\\": \\\"nginx\\\", \\\"image\\\": \\\"nginx:1.14.2\\\", \\\"ports\\\": [{\\\"containerPort\\\": 80}]}\"\n  - operation: copy\n    from: \"/spec/template/spec/containers/0\"\n    path: \"/spec/template/spec/containers/1\"\n\n\n",
+			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupResource: deployments.apps\n    resourceNameRegex: \"^test-.*$\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: add\n    path: \"/spec/template/spec/containers/0\"\n    value: \"{\\\"name\\\": \\\"nginx\\\", \\\"image\\\": \\\"nginx:1.14.2\\\", \\\"ports\\\": [{\\\"containerPort\\\": 80}]}\"\n  - operation: copy\n    from: \"/spec/template/spec/containers/0\"\n    path: \"/spec/template/spec/containers/1\"\n\n\n",
 		},
 	}
 
@@ -60,7 +60,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		ResourceModifierRules: []ResourceModifierRule{
 			{
 				Conditions: Conditions{
-					GroupKind:         "deployments.apps",
+					GroupResource:     "deployments.apps",
 					ResourceNameRegex: "^test-.*$",
 					Namespaces:        []string{"bar", "foo"},
 				},
@@ -86,7 +86,33 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			Namespace: "test-namespace",
 		},
 		Data: map[string]string{
-			"sub.yml": "version1: v1\nresourceModifierRules:\n- conditions:\n    groupKind: deployments.apps\n    resourceNameRegex: \"^test-.*$\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: add\n    path: \"/spec/template/spec/containers/0\"\n    value: \"{\\\"name\\\": \\\"nginx\\\", \\\"image\\\": \\\"nginx:1.14.2\\\", \\\"ports\\\": [{\\\"containerPort\\\": 80}]}\"\n  - operation: copy\n    from: \"/spec/template/spec/containers/0\"\n    path: \"/spec/template/spec/containers/1\"\n\n\n",
+			"sub.yml": "version1: v1\nresourceModifierRules:\n- conditions:\n    groupResource: deployments.apps\n    resourceNameRegex: \"^test-.*$\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: add\n    path: \"/spec/template/spec/containers/0\"\n    value: \"{\\\"name\\\": \\\"nginx\\\", \\\"image\\\": \\\"nginx:1.14.2\\\", \\\"ports\\\": [{\\\"containerPort\\\": 80}]}\"\n  - operation: copy\n    from: \"/spec/template/spec/containers/0\"\n    path: \"/spec/template/spec/containers/1\"\n\n\n",
+		},
+	}
+
+	cm4 := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupResource: deployments.apps\n    labelSelector:\n      matchLabels:\n        a: b\n",
+		},
+	}
+
+	rules4 := &ResourceModifiers{
+		Version: "v1",
+		ResourceModifierRules: []ResourceModifierRule{
+			{
+				Conditions: Conditions{
+					GroupResource: "deployments.apps",
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"a": "b",
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -122,6 +148,14 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			},
 			want:    nil,
 			wantErr: true,
+		},
+		{
+			name: "match labels",
+			args: args{
+				cm: cm4,
+			},
+			want:    rules4,
+			wantErr: false,
 		},
 		{
 			name: "nil configmap",
@@ -183,6 +217,9 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			"metadata": map[string]interface{}{
 				"name":      "test-deployment",
 				"namespace": "foo",
+				"labels": map[string]interface{}{
+					"app": "nginx",
+				},
 			},
 			"spec": map[string]interface{}{
 				"replicas": int64(1),
@@ -211,6 +248,9 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			"metadata": map[string]interface{}{
 				"name":      "test-deployment",
 				"namespace": "foo",
+				"labels": map[string]interface{}{
+					"app": "nginx",
+				},
 			},
 			"spec": map[string]interface{}{
 				"replicas": int64(2),
@@ -239,6 +279,9 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			"metadata": map[string]interface{}{
 				"name":      "test-deployment",
 				"namespace": "foo",
+				"labels": map[string]interface{}{
+					"app": "nginx",
+				},
 			},
 			"spec": map[string]interface{}{
 				"replicas": int64(1),
@@ -287,7 +330,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "persistentvolumeclaims",
+							GroupResource:     "persistentvolumeclaims",
 							ResourceNameRegex: "[a-z",
 							Namespaces:        []string{"foo"},
 						},
@@ -320,7 +363,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "persistentvolumeclaims",
+							GroupResource:     "persistentvolumeclaims",
 							ResourceNameRegex: ".*",
 							Namespaces:        []string{"foo"},
 						},
@@ -353,7 +396,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "deployments.apps",
+							GroupResource:     "deployments.apps",
 							ResourceNameRegex: "^test-.*$",
 							Namespaces:        []string{"foo"},
 						},
@@ -386,7 +429,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "deployments.apps",
+							GroupResource:     "deployments.apps",
 							ResourceNameRegex: "^test-.*$",
 							Namespaces:        []string{"foo"},
 						},
@@ -419,8 +462,8 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:  "deployments.apps",
-							Namespaces: []string{"foo"},
+							GroupResource: "deployments.apps",
+							Namespaces:    []string{"foo"},
 						},
 						Patches: []JSONPatch{
 							{
@@ -451,7 +494,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind: "deployments.apps",
+							GroupResource: "deployments.apps",
 						},
 						Patches: []JSONPatch{
 							{
@@ -482,7 +525,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "deployments.apps",
+							GroupResource:     "deployments.apps",
 							ResourceNameRegex: ".*",
 							Namespaces:        []string{"bar"},
 						},
@@ -515,7 +558,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "deployments.apps",
+							GroupResource:     "deployments.apps",
 							ResourceNameRegex: "^test-.*$",
 							Namespaces:        []string{"foo"},
 						},
@@ -543,7 +586,7 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 				ResourceModifierRules: []ResourceModifierRule{
 					{
 						Conditions: Conditions{
-							GroupKind:         "deployments.apps",
+							GroupResource:     "deployments.apps",
 							ResourceNameRegex: "^test-.*$",
 							Namespaces:        []string{"foo"},
 						},
@@ -578,6 +621,80 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			},
 			wantErr: false,
 			wantObj: deployNginxMysql.DeepCopy(),
+		},
+		{
+			name: "nginx deployment: match label selector",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupResource: "deployments.apps",
+							Namespaces:    []string{"foo"},
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": "nginx",
+								},
+							},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "test",
+								Path:      "/spec/replicas",
+								Value:     "1",
+							},
+							{
+								Operation: "replace",
+								Path:      "/spec/replicas",
+								Value:     "2",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           deployNginxOneReplica.DeepCopy(),
+				groupResource: "deployments.apps",
+			},
+			wantErr: false,
+			wantObj: deployNginxTwoReplica.DeepCopy(),
+		},
+		{
+			name: "nginx deployment: mismatch label selector",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupResource: "deployments.apps",
+							Namespaces:    []string{"foo"},
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"app": "nginx-mismatch",
+								},
+							},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "test",
+								Path:      "/spec/replicas",
+								Value:     "1",
+							},
+							{
+								Operation: "replace",
+								Path:      "/spec/replicas",
+								Value:     "2",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           deployNginxOneReplica.DeepCopy(),
+				groupResource: "deployments.apps",
+			},
+			wantErr: false,
+			wantObj: deployNginxOneReplica.DeepCopy(),
 		},
 	}
 
