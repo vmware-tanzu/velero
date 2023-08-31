@@ -29,14 +29,14 @@ Below is the two-step of using resource modifiers to modify the resources during
 version: v1
 resourceModifierRules:
 - conditions:
-     groupResource: persistentvolumeclaims
-     resourceNameRegex: "^mysql.*$"
-     namespaces:
-     - bar
-     - foo
-     labelSelector:
-       matchLabels:
-          foo: bar
+    groupResource: persistentvolumeclaims
+    resourceNameRegex: "^mysql.*$"
+    namespaces:
+    - bar
+    - foo
+    labelSelector:
+      matchLabels:
+        foo: bar
   patches:
   - operation: replace
     path: "/spec/storageClassName"
