@@ -760,7 +760,7 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 		},
 		Data: map[string]string{
-			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupKind: persistentvolumeclaims\n    resourceNameRegex: \".*\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: replace\n    path: \"/spec/storageClassName\"\n    value: \"premium\"\n  - operation: remove\n    path: \"/metadata/labels/test\"\n\n\n",
+			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupResource: persistentvolumeclaims\n    resourceNameRegex: \".*\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: replace\n    path: \"/spec/storageClassName\"\n    value: \"premium\"\n  - operation: remove\n    path: \"/metadata/labels/test\"\n\n\n",
 		},
 	}
 	require.NoError(t, r.kbClient.Create(context.Background(), cm1))
@@ -788,7 +788,7 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 		},
 		Data: map[string]string{
-			"sub.yml": "version1: v1\nresourceModifierRules:\n- conditions:\n    groupKind: persistentvolumeclaims\n    resourceNameRegex: \".*\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: replace\n    path: \"/spec/storageClassName\"\n    value: \"premium\"\n  - operation: remove\n    path: \"/metadata/labels/test\"\n\n\n",
+			"sub.yml": "version1: v1\nresourceModifierRules:\n- conditions:\n    groupResource: persistentvolumeclaims\n    resourceNameRegex: \".*\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: replace\n    path: \"/spec/storageClassName\"\n    value: \"premium\"\n  - operation: remove\n    path: \"/metadata/labels/test\"\n\n\n",
 		},
 	}
 	require.NoError(t, r.kbClient.Create(context.Background(), invalidVersionCm))
@@ -816,7 +816,7 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 		},
 		Data: map[string]string{
-			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupKind: persistentvolumeclaims\n    resourceNameRegex: \".*\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: invalid\n    path: \"/spec/storageClassName\"\n    value: \"premium\"\n  - operation: remove\n    path: \"/metadata/labels/test\"\n\n\n",
+			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupResource: persistentvolumeclaims\n    resourceNameRegex: \".*\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: invalid\n    path: \"/spec/storageClassName\"\n    value: \"premium\"\n  - operation: remove\n    path: \"/metadata/labels/test\"\n\n\n",
 		},
 	}
 	require.NoError(t, r.kbClient.Create(context.Background(), invalidOperatorCm))
