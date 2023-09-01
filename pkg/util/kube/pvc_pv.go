@@ -155,14 +155,19 @@ func RebindPVC(ctx context.Context, pvcGetter corev1client.CoreV1Interface,
 }
 
 // ResetPVBinding resets the binding info of a PV and adds the required labels so as to make it ready for binding
-func ResetPVBinding(ctx context.Context, pvGetter corev1client.CoreV1Interface, pv *corev1api.PersistentVolume, labels map[string]string) (*corev1api.PersistentVolume, error) {
+func ResetPVBinding(ctx context.Context, pvGetter corev1client.CoreV1Interface, pv *corev1api.PersistentVolume,
+	labels map[string]string, pvc *corev1api.PersistentVolumeClaim) (*corev1api.PersistentVolume, error) {
 	origBytes, err := json.Marshal(pv)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling original PV")
 	}
 
 	updated := pv.DeepCopy()
-	updated.Spec.ClaimRef = nil
+	updated.Spec.ClaimRef = &corev1api.ObjectReference{
+		Kind:      pvc.Kind,
+		Namespace: pvc.Namespace,
+		Name:      pvc.Name,
+	}
 	delete(updated.Annotations, KubeAnnBoundByController)
 
 	if labels != nil {
@@ -280,6 +285,10 @@ func WaitPVBound(ctx context.Context, pvGetter corev1client.CoreV1Interface, pvN
 		}
 
 		if tmpPV.Spec.ClaimRef == nil {
+			return false, nil
+		}
+
+		if tmpPV.Status.Phase != corev1api.VolumeBound {
 			return false, nil
 		}
 

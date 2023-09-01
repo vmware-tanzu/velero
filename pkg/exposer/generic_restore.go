@@ -221,7 +221,7 @@ func (e *genericRestoreExposer) RebindVolume(ctx context.Context, ownerObject co
 	}
 
 	restorePVName := restorePV.Name
-	restorePV, err = kube.ResetPVBinding(ctx, e.kubeClient.CoreV1(), restorePV, matchLabel)
+	restorePV, err = kube.ResetPVBinding(ctx, e.kubeClient.CoreV1(), restorePV, matchLabel, targetPVC)
 	if err != nil {
 		return errors.Wrapf(err, "error to reset binding info for restore PV %s", restorePVName)
 	}
