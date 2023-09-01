@@ -4,16 +4,17 @@
 
 ## Maintainers
 
-| Maintainer          | GitHub ID                                                     | Affiliation                               |
-|---------------------|---------------------------------------------------------------|-------------------------------------------|
-| Dave Smith-Uchida   | [dsu-igeek](https://github.com/dsu-igeek)                     | [Kasten](https://github.com/kastenhq/)    |
-| Scott Seago         | [sseago](https://github.com/sseago)                           | [OpenShift](https://github.com/openshift) |
-| Daniel Jiang        | [reasonerjt](https://github.com/reasonerjt)                   | [VMware](https://www.github.com/vmware/)  |
-| Wenkai Yin          | [ywk253100](https://github.com/ywk253100)                     | [VMware](https://www.github.com/vmware/)  |
-| Xun Jiang           | [blackpiglet](https://github.com/blackpiglet)                 | [VMware](https://www.github.com/vmware/)  |
-| Ming Qiu            | [qiuming-best](https://github.com/qiuming-best)               | [VMware](https://www.github.com/vmware/)  |
-| Shubham Pampattiwar | [shubham-pampattiwar](https://github.com/shubham-pampattiwar) | [OpenShift](https://github.com/openshift) |
-| Yonghui Li          | [Lyndon-Li](https://github.com/Lyndon-Li)                     | [VMware](https://www.github.com/vmware/)  |
+| Maintainer          | GitHub ID                                                     | Affiliation                                      |
+|---------------------|---------------------------------------------------------------|--------------------------------------------------|
+| Dave Smith-Uchida   | [dsu-igeek](https://github.com/dsu-igeek)                     | [Kasten](https://github.com/kastenhq/)           |
+| Scott Seago         | [sseago](https://github.com/sseago)                           | [OpenShift](https://github.com/openshift)        |
+| Daniel Jiang        | [reasonerjt](https://github.com/reasonerjt)                   | [VMware](https://www.github.com/vmware/)         |
+| Wenkai Yin          | [ywk253100](https://github.com/ywk253100)                     | [VMware](https://www.github.com/vmware/)         |
+| Xun Jiang           | [blackpiglet](https://github.com/blackpiglet)                 | [VMware](https://www.github.com/vmware/)         |
+| Ming Qiu            | [qiuming-best](https://github.com/qiuming-best)               | [VMware](https://www.github.com/vmware/)         |
+| Shubham Pampattiwar | [shubham-pampattiwar](https://github.com/shubham-pampattiwar) | [OpenShift](https://github.com/openshift)        |
+| Yonghui Li          | [Lyndon-Li](https://github.com/Lyndon-Li)                     | [VMware](https://www.github.com/vmware/)         |
+| Anshul Ahuja        | [anshulahuja98](https://github.com/anshulahuja98)             | [Microsoft Azure](https://www.github.com/azure/) |
 
 ## Emeritus Maintainers
 * Adnan Abdulhussein ([prydonius](https://github.com/prydonius))
