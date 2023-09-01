@@ -568,10 +568,25 @@ func TestResetPVBinding(t *testing.T) {
 		},
 	}
 
+	pvcObject := &corev1api.PersistentVolumeClaim{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "fake-kind-1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns-1",
+			Name:      "fake-pvc-1",
+			Annotations: map[string]string{
+				KubeAnnBindCompleted:     "true",
+				KubeAnnBoundByController: "true",
+			},
+		},
+	}
+
 	tests := []struct {
 		name      string
 		clientObj []runtime.Object
 		pv        *corev1api.PersistentVolume
+		pvc       *corev1api.PersistentVolumeClaim
 		labels    map[string]string
 		reactors  []reactor
 		result    *corev1api.PersistentVolume
@@ -580,6 +595,7 @@ func TestResetPVBinding(t *testing.T) {
 		{
 			name:      "path fail",
 			pv:        pvObject,
+			pvc:       pvcObject,
 			clientObj: []runtime.Object{pvObject},
 			reactors: []reactor{
 				{
@@ -595,6 +611,7 @@ func TestResetPVBinding(t *testing.T) {
 		{
 			name: "succeed",
 			pv:   pvObject,
+			pvc:  pvcObject,
 			labels: map[string]string{
 				"fake-label-1": "fake-value-1",
 				"fake-label-2": "fake-value-2",
@@ -606,6 +623,13 @@ func TestResetPVBinding(t *testing.T) {
 					Labels: map[string]string{
 						"fake-label-1": "fake-value-1",
 						"fake-label-2": "fake-value-2",
+					},
+				},
+				Spec: corev1api.PersistentVolumeSpec{
+					ClaimRef: &corev1api.ObjectReference{
+						Kind:      "fake-kind-1",
+						Namespace: "fake-ns-1",
+						Name:      "fake-pvc-1",
 					},
 				},
 			},
@@ -622,7 +646,7 @@ func TestResetPVBinding(t *testing.T) {
 
 			var kubeClient kubernetes.Interface = fakeKubeClient
 
-			result, err := ResetPVBinding(context.Background(), kubeClient.CoreV1(), test.pv, test.labels)
+			result, err := ResetPVBinding(context.Background(), kubeClient.CoreV1(), test.pv, test.labels, test.pvc)
 			if err != nil {
 				assert.EqualError(t, err, test.err)
 			} else {
@@ -741,6 +765,18 @@ func TestWaitPVBound(t *testing.T) {
 			err: "error to wait for bound of PV: timed out waiting for the condition",
 		},
 		{
+			name:   "pvc status not bound",
+			pvName: "fake-pv",
+			kubeClientObj: []runtime.Object{
+				&corev1api.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "fake-pv",
+					},
+				},
+			},
+			err: "error to wait for bound of PV: timed out waiting for the condition",
+		},
+		{
 			name:         "pvc claimRef pvc name mismatch",
 			pvName:       "fake-pv",
 			pvcName:      "fake-pvc",
@@ -756,6 +792,9 @@ func TestWaitPVBound(t *testing.T) {
 							Namespace: "fake-ns",
 							Name:      "fake-pvc-1",
 						},
+					},
+					Status: corev1api.PersistentVolumeStatus{
+						Phase: "Bound",
 					},
 				},
 			},
@@ -778,6 +817,9 @@ func TestWaitPVBound(t *testing.T) {
 							Name:      "fake-pvc",
 						},
 					},
+					Status: corev1api.PersistentVolumeStatus{
+						Phase: "Bound",
+					},
 				},
 			},
 			err: "error to wait for bound of PV: pv has been bound by unexpected pvc fake-ns-1/fake-pvc",
@@ -799,6 +841,9 @@ func TestWaitPVBound(t *testing.T) {
 							Namespace: "fake-ns",
 						},
 					},
+					Status: corev1api.PersistentVolumeStatus{
+						Phase: "Bound",
+					},
 				},
 			},
 			expectedPV: &corev1api.PersistentVolume{
@@ -811,6 +856,9 @@ func TestWaitPVBound(t *testing.T) {
 						Name:      "fake-pvc",
 						Namespace: "fake-ns",
 					},
+				},
+				Status: corev1api.PersistentVolumeStatus{
+					Phase: "Bound",
 				},
 			},
 		},
