@@ -71,6 +71,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
+var resourceMustHave = []string{
+	"datauploads.velero.io",
+}
+
 type VolumeSnapshotterGetter interface {
 	GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error)
 }
@@ -276,6 +280,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		resourceIncludesExcludes:       resourceIncludesExcludes,
 		resourceStatusIncludesExcludes: restoreStatusIncludesExcludes,
 		namespaceIncludesExcludes:      namespaceIncludesExcludes,
+		resourceMustHave:               sets.NewString(resourceMustHave...),
 		chosenGrpVersToRestore:         make(map[string]ChosenGroupVersion),
 		selector:                       selector,
 		OrSelectors:                    OrSelectors,
@@ -320,6 +325,7 @@ type restoreContext struct {
 	resourceIncludesExcludes       *collections.IncludesExcludes
 	resourceStatusIncludesExcludes *collections.IncludesExcludes
 	namespaceIncludesExcludes      *collections.IncludesExcludes
+	resourceMustHave               sets.String
 	chosenGrpVersToRestore         map[string]ChosenGroupVersion
 	selector                       labels.Selector
 	OrSelectors                    []labels.Selector
@@ -989,7 +995,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// via obj.GetNamespace()) instead of the namespace parameter, because we want
 	// to check the *original* namespace, not the remapped one if it's been remapped.
 	if namespace != "" {
-		if !ctx.namespaceIncludesExcludes.ShouldInclude(obj.GetNamespace()) {
+		if !ctx.namespaceIncludesExcludes.ShouldInclude(obj.GetNamespace()) && !ctx.resourceMustHave.Has(groupResource.String()) {
 			ctx.log.WithFields(logrus.Fields{
 				"namespace":     obj.GetNamespace(),
 				"name":          obj.GetName(),
@@ -2016,7 +2022,7 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 		// Iterate through each namespace that contains instances of the
 		// resource and append to the list of to-be restored resources.
 		for namespace, items := range resourceList.ItemsByNamespace {
-			if namespace != "" && !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
+			if namespace != "" && !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) && !ctx.resourceMustHave.Has(groupResource.String()) {
 				ctx.log.Infof("Skipping namespace %s", namespace)
 				continue
 			}
