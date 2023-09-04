@@ -700,7 +700,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	bslr := controller.NewBackupStorageLocationReconciler(
 		s.ctx,
 		s.mgr.GetClient(),
-		s.mgr.GetScheme(),
 		storage.DefaultBackupLocationInfo{
 			StorageLocation:           s.config.defaultBackupLocation,
 			ServerValidationFrequency: s.config.storeValidationFrequency,

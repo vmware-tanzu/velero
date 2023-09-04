@@ -24,7 +24,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,7 +46,6 @@ const (
 type backupStorageLocationReconciler struct {
 	ctx                       context.Context
 	client                    client.Client
-	scheme                    *runtime.Scheme
 	defaultBackupLocationInfo storage.DefaultBackupLocationInfo
 	// use variables to refer to these functions so they can be
 	// replaced with fakes for testing.
@@ -61,7 +59,6 @@ type backupStorageLocationReconciler struct {
 func NewBackupStorageLocationReconciler(
 	ctx context.Context,
 	client client.Client,
-	scheme *runtime.Scheme,
 	defaultBackupLocationInfo storage.DefaultBackupLocationInfo,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
@@ -69,7 +66,6 @@ func NewBackupStorageLocationReconciler(
 	return &backupStorageLocationReconciler{
 		ctx:                       ctx,
 		client:                    client,
-		scheme:                    scheme,
 		defaultBackupLocationInfo: defaultBackupLocationInfo,
 		newPluginManager:          newPluginManager,
 		backupStoreGetter:         backupStoreGetter,
