@@ -210,7 +210,25 @@ func (sr *shimRepository) DeleteManifest(ctx context.Context, id manifest.ID) er
 }
 
 func (sr *shimRepository) ReplaceManifests(ctx context.Context, labels map[string]string, payload interface{}) (manifest.ID, error) {
-	return manifest.ID(""), errors.New("ReplaceManifests is not supported")
+	const minReplaceManifestTimeDelta = 100 * time.Millisecond
+
+	md, err := sr.FindManifests(ctx, labels)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to load manifests")
+	}
+
+	for _, em := range md {
+		age := sr.Time().Sub(em.ModTime)
+		if age < minReplaceManifestTimeDelta {
+			time.Sleep(minReplaceManifestTimeDelta)
+		}
+
+		if err := sr.DeleteManifest(ctx, em.ID); err != nil {
+			return "", errors.Wrapf(err, "unable to delete previous manifest %v", em.ID)
+		}
+	}
+
+	return sr.PutManifest(ctx, labels, payload)
 }
 
 // Flush all the unifited repository data
