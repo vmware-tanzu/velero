@@ -196,9 +196,8 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 	log.Info("Getting items for resource")
 
 	var (
-		gvr           = gv.WithResource(resource.Name)
-		gr            = gvr.GroupResource()
-		clusterScoped = !resource.Namespaced
+		gvr = gv.WithResource(resource.Name)
+		gr  = gvr.GroupResource()
 	)
 
 	orders := getOrderedResourcesForType(r.backupRequest.Backup.Spec.OrderedResources, resource.Name)
@@ -272,8 +271,6 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 		}
 	}
 
-	namespacesToList := getNamespacesToList(r.backupRequest.NamespaceIncludesExcludes)
-
 	// Handle namespace resource here.
 	// Namespace are only filtered by namespace include/exclude filters.
 	// Label selectors are not checked.
@@ -289,10 +286,12 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 			return nil, errors.WithStack(err)
 		}
 
-		items := r.backupNamespaces(unstructuredList, namespacesToList, gr, preferredGVR, log)
+		items := r.backupNamespaces(unstructuredList, r.backupRequest.NamespaceIncludesExcludes, gr, preferredGVR, log)
 
 		return items, nil
 	}
+	clusterScoped := !resource.Namespaced
+	namespacesToList := getNamespacesToList(r.backupRequest.NamespaceIncludesExcludes)
 
 	// If we get here, we're backing up something other than namespaces
 	if clusterScoped {
@@ -533,31 +532,13 @@ func (r *itemCollector) listItemsForLabel(unstructuredItems []unstructured.Unstr
 
 // backupNamespaces process namespace resource according to namespace filters.
 func (r *itemCollector) backupNamespaces(unstructuredList *unstructured.UnstructuredList,
-	namespacesToList []string, gr schema.GroupResource, preferredGVR schema.GroupVersionResource,
+	ie *collections.IncludesExcludes, gr schema.GroupResource, preferredGVR schema.GroupVersionResource,
 	log logrus.FieldLogger) []*kubernetesResource {
 	var items []*kubernetesResource
 	for index, unstructured := range unstructuredList.Items {
-		found := false
-		if len(namespacesToList) == 0 {
-			// No namespace found. By far, this condition cannot be triggered. Either way,
-			// namespacesToList is not empty.
-			log.Debug("Skip namespace resource, because no item found by namespace filters.")
-			break
-		} else if len(namespacesToList) == 1 && namespacesToList[0] == "" {
-			// All namespaces are included.
-			log.Debugf("Backup namespace %s due to full cluster backup.", unstructured.GetName())
-			found = true
-		} else {
-			for _, ns := range namespacesToList {
-				if unstructured.GetName() == ns {
-					log.Debugf("Backup namespace %s due to namespace filters setting.", unstructured.GetName())
-					found = true
-					break
-				}
-			}
-		}
+		if ie.ShouldInclude(unstructured.GetName()) {
+			log.Debugf("Backup namespace %s due to namespace filters setting.", unstructured.GetName())
 
-		if found {
 			path, err := r.writeToFile(&unstructuredList.Items[index])
 			if err != nil {
 				log.WithError(err).Error("Error writing item to file")
