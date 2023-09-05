@@ -34,6 +34,14 @@ import (
 
 const defaultServiceAccountName = "velero"
 
+// PSA labels
+const PSAEnforceLabel = "pod-security.kubernetes.io/enforce"
+const PSAEnforceVersionLabel = "pod-security.kubernetes.io/enforce-version"
+const PSAAuditLabel = "pod-security.kubernetes.io/audit"
+const PSAAuditVersionLabel = "pod-security.kubernetes.io/audit-version"
+const PSAWarnLabel = "pod-security.kubernetes.io/warn"
+const PSAWarnVersionLabel = "pod-security.kubernetes.io/warn-version"
+
 var (
 	DefaultVeleroPodCPURequest    = "500m"
 	DefaultVeleroPodMemRequest    = "128Mi"
@@ -148,8 +156,12 @@ func Namespace(namespace string) *corev1.Namespace {
 		},
 	}
 
-	ns.Labels["pod-security.kubernetes.io/enforce"] = "privileged"
-	ns.Labels["pod-security.kubernetes.io/enforce-version"] = "latest"
+	ns.Labels[PSAEnforceLabel] = "privileged"
+	ns.Labels[PSAEnforceVersionLabel] = "latest"
+	ns.Labels[PSAAuditLabel] = "privileged"
+	ns.Labels[PSAAuditVersionLabel] = "latest"
+	ns.Labels[PSAWarnLabel] = "privileged"
+	ns.Labels[PSAWarnVersionLabel] = "latest"
 
 	return ns
 }
