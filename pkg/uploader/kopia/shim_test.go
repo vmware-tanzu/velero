@@ -49,7 +49,6 @@ func TestShimRepo(t *testing.T) {
 	shim.PrefetchObjects(ctx, []object.ID{}, "hint")
 	shim.UpdateDescription("desc")
 	shim.NewWriter(ctx, repo.WriteSessionOptions{})
-	shim.ReplaceManifests(ctx, map[string]string{}, nil)
 	shim.OnSuccessfulFlush(func(ctx context.Context, w repo.RepositoryWriter) error { return nil })
 
 	backupRepo.On("Close", mock.Anything).Return(nil)
@@ -201,4 +200,93 @@ func TestShimObjWriter(t *testing.T) {
 
 	objWriter.On("Close").Return(nil)
 	writer.Close()
+}
+
+func TestReplaceManifests(t *testing.T) {
+	meta1 := udmrepo.ManifestEntryMetadata{
+		ID: "mani-1",
+	}
+
+	meta2 := udmrepo.ManifestEntryMetadata{
+		ID: "mani-2",
+	}
+
+	tests := []struct {
+		name               string
+		backupRepo         *mocks.BackupRepo
+		isGetManifestError bool
+		expectedError      string
+		expectedID         manifest.ID
+	}{
+		{
+			name:               "Failed to find manifest",
+			isGetManifestError: true,
+			backupRepo: func() *mocks.BackupRepo {
+				backupRepo := &mocks.BackupRepo{}
+				backupRepo.On("FindManifests", mock.Anything, mock.Anything).Return([]*udmrepo.ManifestEntryMetadata{},
+					errors.New("fake-find-error"))
+				return backupRepo
+			}(),
+			expectedError: "unable to load manifests: failed to get manifests with labels map[]: fake-find-error",
+		},
+		{
+			name:               "Failed to delete manifest",
+			isGetManifestError: true,
+			backupRepo: func() *mocks.BackupRepo {
+				backupRepo := &mocks.BackupRepo{}
+				backupRepo.On("FindManifests", mock.Anything, mock.Anything).Return([]*udmrepo.ManifestEntryMetadata{
+					&meta1,
+					&meta2,
+				}, nil)
+				backupRepo.On("Time").Return(time.Now())
+				backupRepo.On("DeleteManifest", mock.Anything, mock.Anything).Return(errors.New("fake-delete-error"))
+				return backupRepo
+			}(),
+			expectedError: "unable to delete previous manifest mani-1: fake-delete-error",
+		},
+		{
+			name: "Failed to put manifest",
+			backupRepo: func() *mocks.BackupRepo {
+				backupRepo := &mocks.BackupRepo{}
+				backupRepo.On("FindManifests", mock.Anything, mock.Anything).Return([]*udmrepo.ManifestEntryMetadata{
+					&meta1,
+					&meta2,
+				}, nil)
+				backupRepo.On("Time").Return(time.Now())
+				backupRepo.On("DeleteManifest", mock.Anything, mock.Anything).Return(nil)
+				backupRepo.On("PutManifest", mock.Anything, mock.Anything).Return(udmrepo.ID(""), errors.New("fake-put-error"))
+				return backupRepo
+			}(),
+			expectedError: "fake-put-error",
+		},
+		{
+			name: "Success",
+			backupRepo: func() *mocks.BackupRepo {
+				backupRepo := &mocks.BackupRepo{}
+				backupRepo.On("FindManifests", mock.Anything, mock.Anything).Return([]*udmrepo.ManifestEntryMetadata{
+					&meta1,
+					&meta2,
+				}, nil)
+				backupRepo.On("Time").Return(time.Now())
+				backupRepo.On("DeleteManifest", mock.Anything, mock.Anything).Return(nil)
+				backupRepo.On("PutManifest", mock.Anything, mock.Anything).Return(udmrepo.ID("fake-id"), nil)
+				return backupRepo
+			}(),
+			expectedID: manifest.ID("fake-id"),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			id, err := NewShimRepo(tc.backupRepo).ReplaceManifests(ctx, map[string]string{}, nil)
+
+			if tc.expectedError != "" {
+				assert.EqualError(t, err, tc.expectedError)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, tc.expectedID, id)
+		})
+	}
 }

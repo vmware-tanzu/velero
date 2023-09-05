@@ -26,6 +26,7 @@ import (
 	"github.com/kopia/kopia/repo"
 	"github.com/kopia/kopia/repo/manifest"
 	"github.com/kopia/kopia/snapshot"
+	"github.com/kopia/kopia/snapshot/policy"
 	"github.com/kopia/kopia/snapshot/restore"
 	"github.com/kopia/kopia/snapshot/snapshotfs"
 	"github.com/pkg/errors"
@@ -58,7 +59,8 @@ func injectSnapshotFuncs() *snapshotMockes {
 		repoWriterMock: &repomocks.RepositoryWriter{},
 	}
 
-	applyRetentionPolicyFunc = s.policyMock.ApplyRetentionPolicy
+	setPolicyFunc = s.policyMock.SetPolicy
+	treeForSourceFunc = s.policyMock.TreeForSource
 	loadSnapshotFunc = s.snapshotMock.LoadSnapshot
 	saveSnapshotFunc = s.snapshotMock.SaveSnapshot
 	return s
@@ -135,13 +137,13 @@ func TestSnapshotSource(t *testing.T) {
 			notError: false,
 		},
 		{
-			name: "failed to apply policy",
+			name: "failed to set policy",
 			args: []mockArgs{
 				{methodName: "LoadSnapshot", returns: []interface{}{manifest, nil}},
 				{methodName: "SaveSnapshot", returns: []interface{}{manifest.ID, nil}},
 				{methodName: "TreeForSource", returns: []interface{}{nil, nil}},
-				{methodName: "ApplyRetentionPolicy", returns: []interface{}{nil, errors.New("failed to save snapshot")}},
-				{methodName: "SetPolicy", returns: []interface{}{nil}},
+				{methodName: "ApplyRetentionPolicy", returns: []interface{}{nil, nil}},
+				{methodName: "SetPolicy", returns: []interface{}{errors.New("failed to set policy")}},
 				{methodName: "Upload", returns: []interface{}{manifest, nil}},
 				{methodName: "Flush", returns: []interface{}{nil}},
 			},
@@ -232,7 +234,7 @@ func TestReportSnapshotStatus(t *testing.T) {
 			},
 		}
 
-		result, size, err := reportSnapshotStatus(manifest, setupDefaultPolicy())
+		result, size, err := reportSnapshotStatus(manifest, policy.BuildTree(nil, getDefaultPolicy()))
 
 		switch {
 		case tc.shouldError && err == nil:
