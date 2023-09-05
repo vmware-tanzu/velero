@@ -31,6 +31,7 @@ import (
 	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
 	veleroflag "github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
@@ -73,7 +74,7 @@ func TestNewSetCommand(t *testing.T) {
 	// verify all options are set as expected
 	assert.Equal(t, backupName, o.Name)
 	assert.Equal(t, cacert, o.CACertFile)
-	assert.Equal(t, defaultBackupStorageLocation, o.DefaultBackupStorageLocation)
+	assert.Equal(t, defaultBackupStorageLocation, boolptr.IsSetToTrue(o.DefaultBackupStorageLocation.Value))
 	assert.Equal(t, true, reflect.DeepEqual(credential, o.Credential))
 
 	assert.Contains(t, e.Error(), fmt.Sprintf("%s: no such file or directory", cacert))
@@ -102,7 +103,7 @@ func TestSetCommand_Execute(t *testing.T) {
 	_, stderr, err := veleroexec.RunCommand(cmd)
 
 	if err != nil {
-		assert.Contains(t, stderr, fmt.Sprintf("backupstoragelocations.velero.io \"%s\" not found", bsl))
+		assert.Contains(t, stderr, "backupstoragelocations.velero.io \"bsl-1\" not found")
 		return
 	}
 	t.Fatalf("process ran with err %v, want backup delete successfully", err)

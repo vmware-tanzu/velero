@@ -28,11 +28,13 @@ import (
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 func NewSetCommand(f client.Factory, use string) *cobra.Command {
@@ -58,7 +60,7 @@ type SetOptions struct {
 	Name                         string
 	CACertFile                   string
 	Credential                   flag.Map
-	DefaultBackupStorageLocation bool
+	DefaultBackupStorageLocation flag.OptionalBool
 }
 
 func NewSetOptions() *SetOptions {
@@ -70,7 +72,8 @@ func NewSetOptions() *SetOptions {
 func (o *SetOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
 	flags.Var(&o.Credential, "credential", "Sets the credential to be used by this location as a key-value pair, where the key is the Kubernetes Secret name, and the value is the data key name within the Secret. Optional, one value only.")
-	flags.BoolVar(&o.DefaultBackupStorageLocation, "default", o.DefaultBackupStorageLocation, "Sets this new location to be the new default backup storage location. Optional.")
+	f := flags.VarPF(&o.DefaultBackupStorageLocation, "default", "", "Sets this new location to be the new default backup storage location. Optional.")
+	f.NoOptDefVal = cmd.TRUE
 }
 
 func (o *SetOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
@@ -113,30 +116,25 @@ func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
 		return errors.WithStack(err)
 	}
 
-	if o.DefaultBackupStorageLocation {
-		// There is one and only one default backup storage location.
-		// Disable the origin default backup storage location.
-		locations := new(velerov1api.BackupStorageLocationList)
-		if err := kbClient.List(context.Background(), locations, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
-			return errors.WithStack(err)
-		}
-		for i, location := range locations.Items {
-			if !location.Spec.Default {
-				continue
-			}
-			if location.Name == o.Name {
-				// Do not update if the origin default BSL is the current one.
-				break
-			}
-			location.Spec.Default = false
-			if err := kbClient.Update(context.Background(), &locations.Items[i], &kbclient.UpdateOptions{}); err != nil {
+	defaultOpt := o.DefaultBackupStorageLocation.Value
+	if defaultOpt != nil {
+		if *defaultOpt { // set default backup storage location
+			// need first check if there is already a default backup storage location
+			defalutBSLs, err := storage.GetDefaultBackupStorageLocations(context.Background(), kbClient, f.Namespace())
+			if err != nil {
 				return errors.WithStack(err)
 			}
-			break
+			if len(defalutBSLs.Items) > 0 {
+				return errors.New("there is already a default backup storage location")
+			}
 		}
+	} else {
+		// user do not specify default option
+		// we should keep the original default option
+		o.DefaultBackupStorageLocation = flag.OptionalBool{Value: &location.Spec.Default}
 	}
 
-	location.Spec.Default = o.DefaultBackupStorageLocation
+	location.Spec.Default = boolptr.IsSetToTrue(o.DefaultBackupStorageLocation.Value)
 	location.Spec.StorageType.ObjectStorage.CACert = caCertData
 
 	for name, key := range o.Credential.Data() {
