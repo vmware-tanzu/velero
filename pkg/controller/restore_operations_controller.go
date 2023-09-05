@@ -138,17 +138,6 @@ func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, errors.Wrap(err, "error getting backup info")
 	}
 
-	if info.location.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
-		log.Infof("Cannot check progress on Restore operations because backup storage location %s is currently in read-only mode; marking restore PartiallyFailed", info.location.Name)
-		restore.Status.Phase = velerov1api.RestorePhasePartiallyFailed
-
-		err := r.updateRestoreAndOperationsJSON(ctx, original, restore, nil, &itemoperationmap.OperationsForRestore{ErrsSinceUpdate: []string{"BSL is read-only"}}, false, false)
-		if err != nil {
-			log.WithError(err).Error("error updating Restore")
-		}
-		return ctrl.Result{}, nil
-	}
-
 	pluginManager := r.newPluginManager(r.logger)
 	defer pluginManager.CleanupClients()
 	backupStore, err := r.backupStoreGetter.Get(info.location, pluginManager, r.logger)
