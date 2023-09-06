@@ -65,7 +65,11 @@ There may be additional installation steps depending on the cloud provider plugi
 [plugin specific documentation](supported-providers.md) for the must up to date information.  
 
 **Note:** Currently, Velero creates a secret named `velero-repo-credentials` in the velero install namespace, containing a default backup repository password.
-You can update the secret with your own password encoded as base64 prior to the first backup (i.e., FS Backup, data mover) targeting to the backup repository. The value of the key to update is `Data[repository-password]`.
+You can update the secret with your own password encoded as base64 prior to the first backup (i.e., FS Backup, data mover) targeting to the backup repository. The value of the key to update is
+```
+data:
+  repository-password: <custom-password>
+```
 Backup repository is created during the first execution of backup targeting to it after installing Velero with node agent. If you update the secret password after the first
 backup which created the backup repository, then Velero will not be able to connect with the older backups.
 
