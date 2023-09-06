@@ -498,10 +498,6 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 		result[udmrepo.StoreOptionS3Endpoint] = strings.Trim(s3URL, "/")
 		result[udmrepo.StoreOptionS3DisableTLSVerify] = config["insecureSkipTLSVerify"]
 		result[udmrepo.StoreOptionS3DisableTLS] = strconv.FormatBool(disableTLS)
-
-		if backupLocation.Spec.ObjectStorage != nil && backupLocation.Spec.ObjectStorage.CACert != nil {
-			result[udmrepo.StoreOptionS3CustomCA] = base64.StdEncoding.EncodeToString(backupLocation.Spec.ObjectStorage.CACert)
-		}
 	} else if backendType == repoconfig.AzureBackend {
 		for k, v := range config {
 			result[k] = v
@@ -510,6 +506,9 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 
 	result[udmrepo.StoreOptionOssBucket] = bucket
 	result[udmrepo.StoreOptionPrefix] = prefix
+	if backupLocation.Spec.ObjectStorage != nil && backupLocation.Spec.ObjectStorage.CACert != nil {
+		result[udmrepo.StoreOptionCACert] = base64.StdEncoding.EncodeToString(backupLocation.Spec.ObjectStorage.CACert)
+	}
 	result[udmrepo.StoreOptionOssRegion] = strings.Trim(region, "/")
 	result[udmrepo.StoreOptionFsPath] = config["fspath"]
 

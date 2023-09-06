@@ -95,8 +95,8 @@ func TestS3Setup(t *testing.T) {
 		{
 			name: "with wrong ca",
 			flags: map[string]string{
-				udmrepo.StoreOptionOssBucket:  "fake-bucket",
-				udmrepo.StoreOptionS3CustomCA: "fake-base-64",
+				udmrepo.StoreOptionOssBucket: "fake-bucket",
+				udmrepo.StoreOptionCACert:    "fake-base-64",
 			},
 			expectedOptions: s3.Options{
 				BucketName: "fake-bucket",
@@ -105,8 +105,8 @@ func TestS3Setup(t *testing.T) {
 		{
 			name: "with correct ca",
 			flags: map[string]string{
-				udmrepo.StoreOptionOssBucket:  "fake-bucket",
-				udmrepo.StoreOptionS3CustomCA: "ZmFrZS1jYQ==",
+				udmrepo.StoreOptionOssBucket: "fake-bucket",
+				udmrepo.StoreOptionCACert:    "ZmFrZS1jYQ==",
 			},
 			expectedOptions: s3.Options{
 				BucketName: "fake-bucket",

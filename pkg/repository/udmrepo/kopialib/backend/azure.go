@@ -21,6 +21,7 @@ import (
 
 	"github.com/kopia/kopia/repo/blob"
 
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/azure"
 )
 
@@ -29,6 +30,9 @@ type AzureBackend struct {
 }
 
 func (c *AzureBackend) Setup(ctx context.Context, flags map[string]string) error {
+	if flags[udmrepo.StoreOptionCACert] != "" {
+		flags["caCertEncoded"] = "true"
+	}
 	c.option = azure.Option{
 		Config: flags,
 		Limits: setupLimits(ctx, flags),

@@ -17,9 +17,15 @@ limitations under the License.
 package azure
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
@@ -66,13 +72,57 @@ func LoadCredentials(config map[string]string) (map[string]string, error) {
 
 // GetClientOptions returns the client options based on the BSL/VSL config and credentials
 func GetClientOptions(locationCfg, creds map[string]string) (policy.ClientOptions, error) {
+	options := policy.ClientOptions{}
+
 	cloudCfg, err := getCloudConfiguration(locationCfg, creds)
 	if err != nil {
-		return policy.ClientOptions{}, err
+		return options, err
 	}
-	return policy.ClientOptions{
-		Cloud: cloudCfg,
-	}, nil
+	options.Cloud = cloudCfg
+
+	if locationCfg["caCert"] != "" {
+		certPool, _ := x509.SystemCertPool()
+		if certPool == nil {
+			certPool = x509.NewCertPool()
+		}
+		var caCert []byte
+		// As this function is used in both repository and plugin, the caCert isn't encoded
+		// when passing to the plugin while is encoded when works with repository, use one
+		// config item to distinguish these two cases
+		if locationCfg["caCertEncoded"] != "" {
+			caCert, err = base64.StdEncoding.DecodeString(locationCfg["caCert"])
+			if err != nil {
+				return options, err
+			}
+		} else {
+			caCert = []byte(locationCfg["caCert"])
+		}
+
+		certPool.AppendCertsFromPEM(caCert)
+
+		// https://github.com/Azure/azure-sdk-for-go/blob/sdk/azcore/v1.6.1/sdk/azcore/runtime/transport_default_http_client.go#L19
+		transport := &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+				RootCAs:    certPool,
+			},
+		}
+		options.Transport = &http.Client{
+			Transport: transport,
+		}
+	}
+
+	return options, nil
 }
 
 // getCloudConfiguration based on the BSL/VSL config and credentials

@@ -44,7 +44,7 @@ func (c *S3Backend) Setup(ctx context.Context, flags map[string]string) error {
 	c.options.DoNotUseTLS = optionalHaveBool(ctx, udmrepo.StoreOptionS3DisableTLS, flags)
 	c.options.DoNotVerifyTLS = optionalHaveBool(ctx, udmrepo.StoreOptionS3DisableTLSVerify, flags)
 	c.options.SessionToken = optionalHaveString(udmrepo.StoreOptionS3Token, flags)
-	c.options.RootCA = optionalHaveBase64(ctx, udmrepo.StoreOptionS3CustomCA, flags)
+	c.options.RootCA = optionalHaveBase64(ctx, udmrepo.StoreOptionCACert, flags)
 
 	c.options.Limits = setupLimits(ctx, flags)
 

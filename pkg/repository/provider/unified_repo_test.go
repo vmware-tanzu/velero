@@ -384,7 +384,7 @@ func TestGetStorageVariables(t *testing.T) {
 				"endpoint":      "fake-url",
 				"doNotUseTLS":   "false",
 				"skipTLSVerify": "false",
-				"customCA":      base64.StdEncoding.EncodeToString([]byte{0x01, 0x02, 0x03, 0x04, 0x05}),
+				"caCert":        base64.StdEncoding.EncodeToString([]byte{0x01, 0x02, 0x03, 0x04, 0x05}),
 			},
 		},
 		{
