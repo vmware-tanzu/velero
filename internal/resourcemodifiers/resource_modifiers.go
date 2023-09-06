@@ -52,7 +52,7 @@ func GetResourceModifiersFromConfig(cm *v1.ConfigMap) (*ResourceModifiers, error
 		return nil, fmt.Errorf("could not parse config from nil configmap")
 	}
 	if len(cm.Data) != 1 {
-		return nil, fmt.Errorf("illegal resource modifiers %s/%s configmap", cm.Name, cm.Namespace)
+		return nil, fmt.Errorf("illegal resource modifiers %s/%s configmap", cm.Namespace, cm.Name)
 	}
 
 	var yamlData string

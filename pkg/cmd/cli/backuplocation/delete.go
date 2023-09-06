@@ -33,8 +33,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
 )
 
-const bslLabelKey = "velero.io/storage-location"
-
 // NewDeleteCommand creates and returns a new cobra command for deleting backup-locations.
 func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	o := cli.NewDeleteOptions("backup-location")
@@ -146,7 +144,7 @@ func findAssociatedBackups(client kbclient.Client, bslName, ns string) (velerov1
 	var backups velerov1api.BackupList
 	err := client.List(context.Background(), &backups, &kbclient.ListOptions{
 		Namespace: ns,
-		Raw:       &metav1.ListOptions{LabelSelector: bslLabelKey + "=" + bslName},
+		Raw:       &metav1.ListOptions{LabelSelector: velerov1api.StorageLocationLabel + "=" + bslName},
 	})
 	return backups, err
 }
@@ -155,7 +153,7 @@ func findAssociatedBackupRepos(client kbclient.Client, bslName, ns string) (vele
 	var repos velerov1api.BackupRepositoryList
 	err := client.List(context.Background(), &repos, &kbclient.ListOptions{
 		Namespace: ns,
-		Raw:       &metav1.ListOptions{LabelSelector: bslLabelKey + "=" + bslName},
+		Raw:       &metav1.ListOptions{LabelSelector: velerov1api.StorageLocationLabel + "=" + bslName},
 	})
 	return repos, err
 }
