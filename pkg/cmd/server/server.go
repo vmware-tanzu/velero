@@ -135,6 +135,7 @@ type serverConfig struct {
 	defaultVolumesToFsBackup                                                bool
 	uploaderType                                                            string
 	maxConcurrentK8SConnections                                             int
+	defaultSnapshotMoveData                                                 bool
 }
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -163,6 +164,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			defaultVolumesToFsBackup:       podvolume.DefaultVolumesToFsBackup,
 			uploaderType:                   uploader.ResticType,
 			maxConcurrentK8SConnections:    defaultMaxConcurrentK8SConnections,
+			defaultSnapshotMoveData:        false,
 		}
 	)
 
@@ -233,6 +235,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.defaultItemOperationTimeout, "default-item-operation-timeout", config.defaultItemOperationTimeout, "How long to wait on asynchronous BackupItemActions and RestoreItemActions to complete before timing out. Default is 4 hours")
 	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
 	command.Flags().IntVar(&config.maxConcurrentK8SConnections, "max-concurrent-k8s-connections", config.maxConcurrentK8SConnections, "Max concurrent connections number that Velero can create with kube-apiserver. Default is 30.")
+	command.Flags().BoolVar(&config.defaultSnapshotMoveData, "default-snapshot-move-data", config.defaultSnapshotMoveData, "Move data by default for all snapshots supporting data movement.")
 
 	return command
 }
@@ -756,6 +759,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.csiSnapshotClient,
 			s.credentialFileStore,
 			s.config.maxConcurrentK8SConnections,
+			s.config.defaultSnapshotMoveData,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.Backup)
 		}
