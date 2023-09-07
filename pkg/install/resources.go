@@ -30,7 +30,11 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
-const defaultServiceAccountName = "velero"
+const (
+	defaultServiceAccountName = "velero"
+	podSecurityLevel          = "privileged"
+	podSecurityVersion        = "latest"
+)
 
 var (
 	DefaultVeleroPodCPURequest    = "500m"
@@ -146,8 +150,12 @@ func Namespace(namespace string) *corev1.Namespace {
 		},
 	}
 
-	ns.Labels["pod-security.kubernetes.io/enforce"] = "privileged"
-	ns.Labels["pod-security.kubernetes.io/enforce-version"] = "latest"
+	ns.Labels["pod-security.kubernetes.io/enforce"] = podSecurityLevel
+	ns.Labels["pod-security.kubernetes.io/enforce-version"] = podSecurityVersion
+	ns.Labels["pod-security.kubernetes.io/audit"] = podSecurityLevel
+	ns.Labels["pod-security.kubernetes.io/audit-version"] = podSecurityVersion
+	ns.Labels["pod-security.kubernetes.io/warn"] = podSecurityLevel
+	ns.Labels["pod-security.kubernetes.io/warn-version"] = podSecurityVersion
 
 	return ns
 }
