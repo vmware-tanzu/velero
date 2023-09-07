@@ -114,6 +114,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 	command.Flags().Var(formatFlag, "log-format", fmt.Sprintf("The format for log output. Valid values are %s.", strings.Join(formatFlag.AllowedValues(), ", ")))
 	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
 	command.Flags().DurationVar(&config.dataMoverPrepareTimeout, "data-mover-prepare-timeout", config.dataMoverPrepareTimeout, "How long to wait for preparing a DataUpload/DataDownload. Default is 30 minutes.")
+	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "The address to expose prometheus metrics")
 
 	return command
 }
@@ -193,14 +194,15 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 	}
 
 	s := &nodeAgentServer{
-		logger:     logger,
-		ctx:        ctx,
-		cancelFunc: cancelFunc,
-		fileSystem: filesystem.NewFileSystem(),
-		mgr:        mgr,
-		config:     config,
-		namespace:  factory.Namespace(),
-		nodeName:   nodeName,
+		logger:         logger,
+		ctx:            ctx,
+		cancelFunc:     cancelFunc,
+		fileSystem:     filesystem.NewFileSystem(),
+		mgr:            mgr,
+		config:         config,
+		namespace:      factory.Namespace(),
+		nodeName:       nodeName,
+		metricsAddress: config.metricsAddress,
 	}
 
 	// the cache isn't initialized yet when "validatePodVolumesHostPath" is called, the client returned by the manager cannot
