@@ -255,6 +255,7 @@ func SnapshotSource(
 	manifest.Tags = snapshotTags
 
 	manifest.Description = description
+	manifest.Pins = []string{"velero-pin"}
 
 	if _, err = saveSnapshotFunc(ctx, rep, manifest); err != nil {
 		return "", 0, errors.Wrapf(err, "Failed to save kopia manifest %v", manifest.ID)
