@@ -361,7 +361,7 @@ func (s *nodeAgentServer) markDataUploadsCancel(r *controller.DataUploadReconcil
 		return
 	}
 	if dataUploads, err := r.FindDataUploads(s.ctx, client, s.namespace); err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to find data downloads")
+		s.logger.WithError(errors.WithStack(err)).Error("failed to find data uploads")
 	} else {
 		for i := range dataUploads {
 			du := dataUploads[i]
@@ -463,7 +463,7 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 			continue
 		}
 		if pod.Spec.NodeName != s.nodeName {
-			s.logger.Debugf("the node of pod referenced by podvolumebackup %q is %q, not %q, skip", pvr.GetName(), pod.Spec.NodeName, s.nodeName)
+			s.logger.Debugf("the node of pod referenced by podvolumerestore %q is %q, not %q, skip", pvr.GetName(), pod.Spec.NodeName, s.nodeName)
 			continue
 		}
 
