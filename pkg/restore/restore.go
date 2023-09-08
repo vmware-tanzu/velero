@@ -1352,6 +1352,14 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 	}
 
+	if ctx.resourceModifiers != nil {
+		if errList := ctx.resourceModifiers.ApplyResourceModifierRules(obj, groupResource.String(), ctx.log); errList != nil {
+			for _, err := range errList {
+				errs.Add(namespace, err)
+			}
+		}
+	}
+
 	// Necessary because we may have remapped the namespace if the namespace is
 	// blank, don't create the key.
 	originalNamespace := obj.GetNamespace()
@@ -1363,14 +1371,6 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// for easy identification of all cluster resources created by this restore
 	// and which backup they came from.
 	addRestoreLabels(obj, ctx.restore.Name, ctx.restore.Spec.BackupName)
-
-	if ctx.resourceModifiers != nil {
-		if errList := ctx.resourceModifiers.ApplyResourceModifierRules(obj, groupResource.String(), ctx.log); errList != nil {
-			for _, err := range errList {
-				errs.Add(namespace, err)
-			}
-		}
-	}
 
 	// The object apiVersion might get modified by a RestorePlugin so we need to
 	// get a new client to reflect updated resource path.
