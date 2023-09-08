@@ -46,7 +46,7 @@ resourceModifierRules:
  ```
 
 - The above configmap will apply the JSON Patch to all the PVCs in the namespaces bar and foo with name starting with mysql and match label `foo: bar`. The JSON Patch will replace the storageClassName with "premium" and remove the label "test" from the PVCs.
-- Note that the Namespace here is the origin namespace of the resource, not the new namespace where the resource is going to be restored.
+- Note that the Namespace here is the original namespace of the backed up resource, not the new namespace where the resource is going to be restored.
 - You can specify multiple JSON Patches for a particular resource. The patches will be applied in the order specified in the configmap. A subsequent patch is applied in order and if multiple patches are specified for the same path, the last patch will override the previous patches.
 - You can specify multiple resourceModifierRules in the configmap. The rules will be applied in the order specified in the configmap. 
 
