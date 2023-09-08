@@ -58,10 +58,22 @@ func TestExpose(t *testing.T) {
 			UID:       "fake-uid",
 		},
 	}
+
+	snapshotClass := "fake-snapshot-class"
 	vsObject := &snapshotv1api.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "fake-vs",
 			Namespace: "fake-ns",
+			Annotations: map[string]string{
+				"fake-key-1": "fake-value-1",
+				"fake-key-2": "fake-value-2",
+			},
+		},
+		Spec: snapshotv1api.VolumeSnapshotSpec{
+			Source: snapshotv1api.VolumeSnapshotSource{
+				VolumeSnapshotContentName: &vscName,
+			},
+			VolumeSnapshotClassName: &snapshotClass,
 		},
 		Status: &snapshotv1api.VolumeSnapshotStatus{
 			BoundVolumeSnapshotContentName: &vscName,
@@ -71,15 +83,23 @@ func TestExpose(t *testing.T) {
 	}
 
 	var restoreSize int64
+	snapshotHandle := "fake-handle"
 	vscObj := &snapshotv1api.VolumeSnapshotContent{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "fake-vsc",
+			Name: vscName,
+			Annotations: map[string]string{
+				"fake-key-3": "fake-value-3",
+				"fake-key-4": "fake-value-4",
+			},
 		},
 		Spec: snapshotv1api.VolumeSnapshotContentSpec{
-			DeletionPolicy: snapshotv1api.VolumeSnapshotContentDelete,
+			DeletionPolicy:          snapshotv1api.VolumeSnapshotContentDelete,
+			Driver:                  "fake-driver",
+			VolumeSnapshotClassName: &snapshotClass,
 		},
 		Status: &snapshotv1api.VolumeSnapshotContentStatus{
-			RestoreSize: &restoreSize,
+			RestoreSize:    &restoreSize,
+			SnapshotHandle: &snapshotHandle,
 		},
 	}
 
@@ -284,6 +304,23 @@ func TestExpose(t *testing.T) {
 			},
 			err: "error to create backup pod: fake-create-error",
 		},
+		{
+			name:        "success",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:    "fake-vs",
+				SourceNamespace: "fake-ns",
+				AccessMode:      AccessModeFileSystem,
+				Timeout:         time.Millisecond,
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -317,7 +354,33 @@ func TestExpose(t *testing.T) {
 			}
 
 			err := exposer.Expose(context.Background(), ownerObject, &test.exposeParam)
-			assert.EqualError(t, err, test.err)
+			if err == nil {
+				assert.NoError(t, err)
+
+				_, err = exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
+				assert.NoError(t, err)
+
+				_, err = exposer.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
+				assert.NoError(t, err)
+
+				expectedVS, err := exposer.csiSnapshotClient.VolumeSnapshots(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
+				assert.NoError(t, err)
+
+				expectedVSC, err := exposer.csiSnapshotClient.VolumeSnapshotContents().Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
+				assert.NoError(t, err)
+
+				assert.Equal(t, expectedVS.Annotations, vsObject.Annotations)
+				assert.Equal(t, *expectedVS.Spec.VolumeSnapshotClassName, *vsObject.Spec.VolumeSnapshotClassName)
+				assert.Equal(t, *expectedVS.Spec.Source.VolumeSnapshotContentName, expectedVSC.Name)
+
+				assert.Equal(t, expectedVSC.Annotations, vscObj.Annotations)
+				assert.Equal(t, expectedVSC.Spec.DeletionPolicy, vscObj.Spec.DeletionPolicy)
+				assert.Equal(t, expectedVSC.Spec.Driver, vscObj.Spec.Driver)
+				assert.Equal(t, *expectedVSC.Spec.VolumeSnapshotClassName, *vscObj.Spec.VolumeSnapshotClassName)
+			} else {
+				assert.EqualError(t, err, test.err)
+			}
+
 		})
 	}
 }
