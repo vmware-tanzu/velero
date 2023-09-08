@@ -159,6 +159,10 @@ func (kp *kopiaProvider) RunBackup(
 	tags[uploader.SnapshotRequesterTag] = kp.requestorType
 	tags[uploader.SnapshotUploaderTag] = uploader.KopiaType
 
+	if realSource != "" {
+		realSource = fmt.Sprintf("%s/%s/%s", kp.requestorType, uploader.KopiaType, realSource)
+	}
+
 	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, realSource, forceFull, parentSnapshot, volMode, tags, log)
 	if err != nil {
 		if kpUploader.IsCanceled() {
