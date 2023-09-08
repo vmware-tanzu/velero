@@ -246,8 +246,9 @@ func (e *csiSnapshotExposer) createBackupVS(ctx context.Context, ownerObject cor
 
 	vs := &snapshotv1api.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      backupVSName,
-			Namespace: ownerObject.Namespace,
+			Name:        backupVSName,
+			Namespace:   ownerObject.Namespace,
+			Annotations: snapshotVS.Annotations,
 			// Don't add ownerReference to SnapshotBackup.
 			// The backupPVC should be deleted before backupVS, otherwise, the deletion of backupVS will fail since
 			// backupPVC has its dataSource referring to it
@@ -268,7 +269,8 @@ func (e *csiSnapshotExposer) createBackupVSC(ctx context.Context, ownerObject co
 
 	vsc := &snapshotv1api.VolumeSnapshotContent{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: backupVSCName,
+			Name:        backupVSCName,
+			Annotations: snapshotVSC.Annotations,
 		},
 		Spec: snapshotv1api.VolumeSnapshotContentSpec{
 			VolumeSnapshotRef: corev1.ObjectReference{
