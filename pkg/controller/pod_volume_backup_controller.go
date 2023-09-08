@@ -101,8 +101,6 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		)
 	}
 
-	log.Info("PodVolumeBackup starting")
-
 	// Only process items for this node.
 	if pvb.Spec.Node != r.nodeName {
 		return ctrl.Result{}, nil
@@ -115,6 +113,8 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		log.Debug("PodVolumeBackup is not new, not processing")
 		return ctrl.Result{}, nil
 	}
+
+	log.Info("PodVolumeBackup starting")
 
 	callbacks := datapath.Callbacks{
 		OnCompleted: r.OnDataPathCompleted,

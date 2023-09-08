@@ -57,6 +57,14 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			kbClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
+			var csiClient *snapshotv1client.Clientset
+			if features.IsEnabled(velerov1api.CSIFeatureFlag) {
+				clientConfig, err := f.ClientConfig()
+				cmd.CheckError(err)
+				csiClient, err = snapshotv1client.NewForConfig(clientConfig)
+				cmd.CheckError(err)
+			}
+
 			if outputFormat != "plaintext" && outputFormat != "json" {
 				cmd.CheckError(fmt.Errorf("invalid output format '%s'. valid value are 'plaintext, json'", outputFormat))
 			}
@@ -96,16 +104,9 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeBackups for backup %s: %v\n", backup.Name, err)
 				}
 
-				var csiClient *snapshotv1client.Clientset
 				// declare vscList up here since it may be empty and we'll pass the empty Items field into DescribeBackup
 				vscList := new(snapshotv1api.VolumeSnapshotContentList)
 				if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-					clientConfig, err := f.ClientConfig()
-					cmd.CheckError(err)
-
-					csiClient, err = snapshotv1client.NewForConfig(clientConfig)
-					cmd.CheckError(err)
-
 					opts := label.NewListOptionsForBackup(backup.Name)
 					vscList, err = csiClient.SnapshotV1().VolumeSnapshotContents().List(context.TODO(), opts)
 					if err != nil {
