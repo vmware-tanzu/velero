@@ -120,6 +120,10 @@ spec:
   ttl: 24h0m0s
   # whether pod volume file system backup should be used for all volumes by default.
   defaultVolumesToFsBackup: true
+  # Whether snapshot data should be moved. If set, data movement is launched after the snapshot is created.
+  snapshotMoveData: true
+  # The data mover to be used by the backup. If the value is "" or "velero", the built-in data mover will be used.
+  datamover: velero
   # Actions to perform at different times during a backup. The only hook supported is
   # executing a command in a container in a pod using the pod exec API. Optional.
   hooks:

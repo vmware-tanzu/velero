@@ -118,6 +118,10 @@ spec:
     defaultVolumesToFsBackup: true
     # The labels you want on backup objects, created from this schedule (instead of copying the labels you have on schedule object itself).
     # When this field is set, the labels from the Schedule resource are not copied to the Backup resource.
+    # Whether snapshot data should be moved. If set, data movement is launched after the snapshot is created.
+    snapshotMoveData: true
+    # The data mover to be used by the backup. If the value is "" or "velero", the built-in data mover will be used.
+    datamover: velero
     metadata:
       labels:
         labelname: somelabelvalue
