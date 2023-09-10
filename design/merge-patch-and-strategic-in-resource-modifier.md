@@ -11,6 +11,7 @@
         - [How to choose the right patch type](#how-to-choose-the-right-patch-type)
         - [New Field MergePatches](#new-field-mergepatches)
         - [New Field StrategicPatches](#new-field-strategicpatches)
+        - [Conditional Patches in ALL Patch Types](#conditional-patches-in-all-patch-types)
         - [Wildcard Support for GroupResource](#wildcard-support-for-groupresource)
         - [Helper Command to Generate Merge Patch and Strategic Merge Patch](#helper-command-to-generate-merge-patch-and-strategic-merge-patch)
     - [Security Considerations](#security-considerations)
@@ -106,6 +107,31 @@ resourceModifierRules:
 - The above configmap will apply the Strategic Merge Patch to the pod with name my-pod in namespace ns1 and update the image of container nginx to `repo2/nginx`.
 - Both json and yaml format are supported for the patchData.
 
+### Conditional Patches in ALL Patch Types
+Since JSON Merge Patch and Strategic Merge Patch do not support conditional patches, we will use the `test` operation of JSON Patch to support conditional patches in all patch types by adding it to `Conditions` struct in `ResourceModifierRule`.
+
+Example of test in conditions
+```yaml
+version: v1
+resourceModifierRules:
+- conditions:
+    groupResource: persistentvolumeclaims.storage.k8s.io
+    matches:
+    - path: "/spec/storageClassName"
+      value: "premium"
+  mergePatches:
+  - patchData: |
+      {
+        "metadata": {
+          "annotations": {
+            "foo": null
+          }
+        }
+      }
+```
+- The above configmap will apply the Merge Patch to all the PVCs in all namespaces with storageClassName premium and remove the annotation `foo` from the PVCs.
+- You can specify multiple rules in the `matches` list. The patch will be applied only if all the matches are satisfied.
+
 ### Wildcard Support for GroupResource
 The user can specify a wildcard for groupResource in the conditions' struct. This will allow the user to apply the patches for all the resources of a particular group or all resources in all groups. For example, `*.apps` will apply to all the resources in the `apps` group, `*` will apply to all the resources in all groups.
 
@@ -120,8 +146,10 @@ No security impact.
 Compatible with current Resource Modifiers.
 
 ## Implementation
-- Add New fields `MergePatches` and `StrategicPatches` to the `ResourceModifierRule` struct
+- Use "github.com/evanphx/json-patch" to support JSON Merge Patch.
+- Use "k8s.io/apimachinery/pkg/util/strategicpatch" to support Strategic Merge Patch.
 - Use glob to support wildcard for `groupResource` in `conditions` struct.
+- Use `test` operation of JSON Patch to calculate the `matches` in `conditions` struct.
 
 ## Future enhancements
 - add jq support for more complex conditions or patches, to meet the situations that the current conditions or patches can not handle. like [this issue](      https://github.com/vmware-tanzu/velero/issues/6344)
