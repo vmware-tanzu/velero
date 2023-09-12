@@ -1,0 +1,1 @@
+Use old(origin) namespace in resource modifier conditions in case namespace may change during restore
