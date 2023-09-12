@@ -309,7 +309,9 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	} else {
 		// put the finilizer remove action here for all cr will goes to the final status, we could check finalizer and do remove action in final status
 		// instead of intermediate state
-		if isDataDownloadInFinalState(dd) && !dd.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(dd, DataUploadDownloadFinalizer) {
+		// remove finalizer no matter whether the cr is being deleted or not for it is no longer needed when internal resources are all cleaned up
+		// also in final status cr won't block the direct delete of the velero namespace
+		if isDataDownloadInFinalState(dd) && controllerutil.ContainsFinalizer(dd, DataUploadDownloadFinalizer) {
 			original := dd.DeepCopy()
 			controllerutil.RemoveFinalizer(dd, DataUploadDownloadFinalizer)
 			if err := r.client.Patch(ctx, dd, client.MergeFrom(original)); err != nil {
