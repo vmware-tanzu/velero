@@ -41,6 +41,35 @@ This section documents some of the choices made during implementation of the Vel
     ```yaml
       velero.io/csi-volumesnapshot-class: "true"
     ```
+  
+    The above is the default behaviour, there are more granular control on which snapshot class to use for snapshots at backup level,  pvc level. This can be achieved through annotations:
+    1. **VolumeSnapshotClass selection at backup/schedule level**
+      You can annotate the backup/ schedule with driver and VolumeSnapshotClass name. The CSI plugin will use the VolumeSnapshotClass specified in the annotation. If the annotation is not present, the CSI plugin will use the default VolumeSnapshotClass for the driver.
+      
+          *example annotation on backup/schedule:*
+          ```yaml
+          apiVersion: velero.io/v1
+          kind: Backup
+          metadata:
+          name: backup-1
+          annotations:
+              velero.io/csi-volumesnapshot-class_csi.cloud.disk.driver: csi-diskdriver-snapclass
+              velero.io/csi-volumesnapshot-class_csi.cloud.file.driver: csi-filedriver-snapclass
+              velero.io/csi-volumesnapshot-class_<driver name>: csi-snapclass
+          ```
+    1. **VolumeSnapshotClass selection at PVC level**
+      You can annotate the PVCs with driver and VolumeSnapshotClass name. The CSI plugin will use the VolumeSnapshotClass specified in the annotation. If the annotation is not present, the CSI plugin will use the default VolumeSnapshotClass for the driver. If the VolumeSnapshotClass provided is of a different driver, the CSI plugin will use the default VolumeSnapshotClass for the driver.
+
+        *example annotation on PVC:*
+        ```yaml
+        apiVersion: v1
+        kind: PersistentVolumeClaim
+        metadata:
+        name: pvc-1
+        annotations:
+            velero.io/csi-volumesnapshot-class: csi-diskdriver-snapclass
+            
+        ```
  1. The VolumeSnapshot objects will be removed from the cluster after the backup is uploaded to the object storage, so that the namespace that is backed up can be deleted without removing the snapshot in the storage provider if the `DeletionPolicy` is `Delete.  
 
 ## How it Works - Overview

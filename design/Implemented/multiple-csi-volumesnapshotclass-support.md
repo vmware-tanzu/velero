@@ -67,12 +67,12 @@ The Velero CSI plugin chooses the VolumeSnapshotClass in the cluster that has th
         metadata:
         name: backup-1
         annotations:
-            velero.io/csi-volumesnapshot-class/csi.cloud.disk.driver: csi-diskdriver-snapclass
-            velero.io/csi-volumesnapshot-class/csi.cloud.file.driver: csi-filedriver-snapclass
-            velero.io/csi-volumesnapshot-class/<driver name>: csi-snapclass
+            velero.io/csi-volumesnapshot-class_csi.cloud.disk.driver: csi-diskdriver-snapclass
+            velero.io/csi-volumesnapshot-class_csi.cloud.file.driver: csi-filedriver-snapclass
+            velero.io/csi-volumesnapshot-class_<driver name>: csi-snapclass
         ```
 
-         To query the annotations on a backup: "velero.io/csi-volumesnapshot-class/'driver name'" - where driver names comes from the PVC's driver.
+         To query the annotations on a backup: "velero.io/csi-volumesnapshot-class_'driver name'" - where driver names comes from the PVC's driver.
 
     2. **Support VolumeSnapshotClass selection at PVC level**
     The user can annotate the PVCs with driver and VolumeSnapshotClass name. The CSI plugin will use the VolumeSnapshotClass specified in the annotation. If the annotation is not present, the CSI plugin will use the default VolumeSnapshotClass for the driver. If the VolumeSnapshotClass provided is of a different driver, the CSI plugin will use the default VolumeSnapshotClass for the driver.
