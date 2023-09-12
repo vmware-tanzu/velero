@@ -42,5 +42,5 @@ func GetGCPCredentials(config map[string]string) string {
 	if credentialsFile, ok := config[CredentialsFileKey]; ok {
 		return credentialsFile
 	}
-	return os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	return os.Getenv(gcpCredentialsFileEnvVar)
 }

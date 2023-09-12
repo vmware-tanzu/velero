@@ -81,7 +81,7 @@ func GetS3Credentials(config map[string]string) (*credentials.Value, error) {
 	opts := session.Options{}
 	credentialsFile := config[CredentialsFileKey]
 	if credentialsFile == "" {
-		credentialsFile = os.Getenv("AWS_SHARED_CREDENTIALS_FILE")
+		credentialsFile = os.Getenv(awsCredentialsFileEnvVar)
 	}
 	if credentialsFile != "" {
 		opts.SharedConfigFiles = append(opts.SharedConfigFiles, credentialsFile)
