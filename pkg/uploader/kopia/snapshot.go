@@ -44,7 +44,8 @@ import (
 )
 
 // All function mainly used to make testing more convenient
-var applyRetentionPolicyFunc = policy.ApplyRetentionPolicy
+var treeForSourceFunc = policy.TreeForSource
+var setPolicyFunc = policy.SetPolicy
 var saveSnapshotFunc = snapshot.SaveSnapshot
 var loadSnapshotFunc = snapshot.LoadSnapshot
 var listSnapshotsFunc = snapshot.ListSnapshots
@@ -72,18 +73,46 @@ func newOptionalBool(b bool) *policy.OptionalBool {
 	return &ob
 }
 
-// setupDefaultPolicy set default policy for kopia
-func setupDefaultPolicy() *policy.Tree {
-	defaultPolicy := *policy.DefaultPolicy
+func getDefaultPolicy() *policy.Policy {
+	return &policy.Policy{
+		RetentionPolicy: policy.RetentionPolicy{
+			KeepLatest:  newOptionalInt(math.MaxInt32),
+			KeepAnnual:  newOptionalInt(math.MaxInt32),
+			KeepDaily:   newOptionalInt(math.MaxInt32),
+			KeepHourly:  newOptionalInt(math.MaxInt32),
+			KeepMonthly: newOptionalInt(math.MaxInt32),
+			KeepWeekly:  newOptionalInt(math.MaxInt32),
+		},
+		CompressionPolicy: policy.CompressionPolicy{
+			CompressorName: "none",
+		},
+		UploadPolicy: policy.UploadPolicy{
+			MaxParallelFileReads:    newOptionalInt(runtime.NumCPU()),
+			ParallelUploadAboveSize: nil,
+		},
+		SchedulingPolicy: policy.SchedulingPolicy{
+			Manual: true,
+		},
+		ErrorHandlingPolicy: policy.ErrorHandlingPolicy{
+			IgnoreUnknownTypes: newOptionalBool(true),
+		},
+	}
+}
 
-	defaultPolicy.RetentionPolicy.KeepLatest = newOptionalInt(math.MaxInt32)
-	defaultPolicy.CompressionPolicy.CompressorName = "none"
-	defaultPolicy.UploadPolicy.MaxParallelFileReads = newOptionalInt(runtime.NumCPU())
-	defaultPolicy.UploadPolicy.ParallelUploadAboveSize = nil
-	defaultPolicy.SchedulingPolicy.Manual = true
-	defaultPolicy.ErrorHandlingPolicy.IgnoreUnknownTypes = newOptionalBool(true)
+func setupDefaultPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snapshot.SourceInfo) (*policy.Tree, error) {
+	// some internal operations from Kopia code retrieves policies from repo directly, so we need to persist the policy to repo
+	err := setPolicyFunc(ctx, rep, sourceInfo, getDefaultPolicy())
+	if err != nil {
+		return nil, errors.Wrap(err, "error to set policy")
+	}
 
-	return policy.BuildTree(nil, &defaultPolicy)
+	// retrieve policy from repo
+	policyTree, err := treeForSourceFunc(ctx, rep, sourceInfo)
+	if err != nil {
+		return nil, errors.Wrap(err, "error to retrieve policy")
+	}
+
+	return policyTree, nil
 }
 
 // Backup backup specific sourcePath and update progress
@@ -117,7 +146,7 @@ func Backup(ctx context.Context, fsUploader SnapshotUploader, repoWriter repo.Re
 		Host:     udmrepo.GetRepoDomain(),
 		Path:     filepath.Clean(realSource),
 	}
-	if sourceInfo.Path == "" {
+	if realSource == "" {
 		sourceInfo.Path = dir
 	}
 
@@ -213,7 +242,10 @@ func SnapshotSource(
 		log.Infof("Using parent snapshot %s, start time %v, end time %v, description %s", previous[i].ID, previous[i].StartTime.ToTime(), previous[i].EndTime.ToTime(), previous[i].Description)
 	}
 
-	policyTree := setupDefaultPolicy()
+	policyTree, err := setupDefaultPolicy(ctx, rep, sourceInfo)
+	if err != nil {
+		return "", 0, errors.Wrapf(err, "unable to set policy for si %v", sourceInfo)
+	}
 
 	manifest, err := u.Upload(ctx, rootDir, policyTree, sourceInfo, previous...)
 	if err != nil {
@@ -223,14 +255,12 @@ func SnapshotSource(
 	manifest.Tags = snapshotTags
 
 	manifest.Description = description
+	manifest.Pins = []string{"velero-pin"}
 
 	if _, err = saveSnapshotFunc(ctx, rep, manifest); err != nil {
 		return "", 0, errors.Wrapf(err, "Failed to save kopia manifest %v", manifest.ID)
 	}
-	_, err = applyRetentionPolicyFunc(ctx, rep, sourceInfo, true)
-	if err != nil {
-		return "", 0, errors.Wrapf(err, "Failed to apply kopia retention policy for si %v", sourceInfo)
-	}
+
 	if err = rep.Flush(ctx); err != nil {
 		return "", 0, errors.Wrapf(err, "Failed to flush kopia repository")
 	}

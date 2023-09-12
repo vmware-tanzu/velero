@@ -671,12 +671,11 @@ func (r *restoreReconciler) deleteExternalResources(restore *api.Restore) error 
 
 	backupInfo, err := r.fetchBackupInfo(restore.Spec.BackupName)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			r.logger.Errorf("got not found error: %v, skip deleting the restore files in object storage", err)
+			return nil
+		}
 		return errors.Wrap(err, fmt.Sprintf("can't get backup info, backup: %s", restore.Spec.BackupName))
-	}
-
-	// if storage locations is read-only, skip deletion
-	if backupInfo.location.Spec.AccessMode == api.BackupStorageLocationAccessModeReadOnly {
-		return nil
 	}
 
 	// delete restore files in object storage
