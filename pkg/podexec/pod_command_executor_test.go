@@ -262,6 +262,37 @@ func TestEnsureContainerExists(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestPodCompeted(t *testing.T) {
+	pod := &corev1api.Pod{
+		Spec: corev1api.PodSpec{
+			Containers: []corev1api.Container{
+				{
+					Name: "foo",
+				},
+			},
+		},
+		Status: corev1api.PodStatus{
+			Phase: corev1api.PodSucceeded,
+		},
+	}
+
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
+	require.NoError(t, err)
+
+	clientConfig := &rest.Config{}
+	poster := &mockPoster{}
+	defer poster.AssertExpectations(t)
+	podCommandExecutor := NewPodCommandExecutor(clientConfig, poster).(*defaultPodCommandExecutor)
+
+	hook := v1.ExecHook{
+		Container: "foo",
+		Command:   []string{"some", "command"},
+	}
+
+	err = podCommandExecutor.ExecutePodCommand(velerotest.NewLogger(), obj, "namespace", "name", "hookName", &hook)
+	require.NoError(t, err)
+}
+
 type mockStreamExecutorFactory struct {
 	mock.Mock
 }
