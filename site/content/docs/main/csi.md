@@ -59,12 +59,12 @@ This section documents some of the choices made during implementation of the Vel
         metadata:
           name: test-backup
           annotations:
-            velero.io/csi-volumesnapshot-class/disk.csi.cloud.com: "test-snapclass"
+            velero.io/csi-volumesnapshot-class_disk.csi.cloud.com: "test-snapclass"
         spec:
             includedNamespaces:
             - default
         ```
-        Note: Please ensure all your annotations are in lowercase. And follow the following format: `velero.io/csi-volumesnapshot-class/<driver name> = <VolumeSnapshotClass Name>`
+        Note: Please ensure all your annotations are in lowercase. And follow the following format: `velero.io/csi-volumesnapshot-class_<driver name> = <VolumeSnapshotClass Name>`
 
     3. **Choosing VolumeSnapshotClass for a particular PVC:**
     If you want to use a particular VolumeSnapshotClass for a particular PVC, you can add a annotation to the PVC to indicate which VolumeSnapshotClass to use. This overrides any annotation added to backup or schedule. For example, if you want to use the VolumeSnapshotClass `test-snapclass` for a particular PVC, you can create a PVC like this:
