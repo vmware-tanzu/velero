@@ -13,6 +13,8 @@ the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Az
 It also provides a plugin model that enables anyone to implement additional object and block storage backends, outside the
 main Velero repository.  
 
+If your storage supports CSI (Container Storage Interface) snapshots, Velero also allows you to take snapshots through CSI and then optionally move the snapshot data to a different storage location.  
+
 Velero's File System Backup is an addition to the aforementioned snapshot approaches. Its pros and cons are listed below:  
 Pros:  
 - It is capable of backing up and restoring almost any type of Kubernetes volume. Therefore, if you need a volume snapshot 
@@ -22,9 +24,8 @@ have a native snapshot concept, FSB might be for you.
 the one backing Kubernetes volumes, for example, a durable storage.
 
 Cons:
-- It backs up data from the live file system, so the backup data is less consistent than the snapshot approaches.
-- It access the file system from the mounted hostpath directory, so the pods need to run as root user and even under 
-privileged mode in some environments.  
+- It backs up data from the live file system, in which way the data is not captured at the same point in time, so is less consistent than the snapshot approaches.
+- It access the file system from the mounted hostpath directory, so Velero Node Agent pods need to run as root user and even under privileged mode in some environments.  
 
 **NOTE:** hostPath volumes are not supported, but the [local volume type][5] is supported.  
 
@@ -64,6 +65,15 @@ for namespace2 would be `https://s3-us-west-2.amazonaws.com/bucket/kopia/ns2`.
 There may be additional installation steps depending on the cloud provider plugin you are using. You should refer to the 
 [plugin specific documentation](supported-providers.md) for the must up to date information.  
 
+**Note:** Currently, Velero creates a secret named `velero-repo-credentials` in the velero install namespace, containing a default backup repository password.
+You can update the secret with your own password encoded as base64 prior to the first backup (i.e., FS Backup, data mover) targeting to the backup repository. The value of the key to update is
+```
+data:
+  repository-password: <custom-password>
+```
+Backup repository is created during the first execution of backup targeting to it after installing Velero with node agent. If you update the secret password after the first
+backup which created the backup repository, then Velero will not be able to connect with the older backups.
+
 ### Configure Node Agent DaemonSet spec
 
 After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the node-agent DaemonSet spec. 
@@ -98,7 +108,7 @@ To mount the correct hostpath to pods volumes, run the node-agent pod in `privil
 1. Add the `velero` ServiceAccount to the `privileged` SCC:
 
     ```
-    $ oc adm policy add-scc-to-user privileged -z velero -n velero
+    oc adm policy add-scc-to-user privileged -z velero -n velero
     ```
 
 2. Modify the DaemonSet yaml to request a privileged mode:
@@ -155,20 +165,6 @@ The hostPath should be changed from `/var/lib/kubelet/pods` to `/var/vcap/data/k
 ```yaml
 hostPath:
   path: /var/vcap/data/kubelet/pods
-```
-
-
-**Microsoft Azure**
-
-If you are using [Azure Files][8], you need to add `nouser_xattr` to your storage class's `mountOptions`. 
-See [this restic issue][9] for more details.  
-
-You can use the following command to patch the storage class:
-
-```bash
-kubectl patch storageclass/<YOUR_AZURE_FILE_STORAGE_CLASS_NAME> \
-  --type json \
-  --patch '[{"op":"add","path":"/mountOptions/-","value":"nouser_xattr"}]'
 ```
 
 ## To back up
@@ -354,6 +350,7 @@ to make sure backups complete successfully for massive small files or large back
 For this reason, FSB can only backup volumes that are mounted by a pod and not directly from the PVC. For orphan PVC/PV pairs 
 (without running pods), some Velero users overcame this limitation running a staging pod (i.e. a busybox or alpine container 
 with an infinite sleep) to mount these PVC/PV pairs prior taking a Velero backup.  
+- Velero File System Backup expects volumes to be mounted under `<hostPath>/<pod UID>` (`hostPath` is configurable as mentioned in [Configure Node Agent DaemonSet spec](#configure-node-agent-daemonset-spec)). Some Kubernetes systems (i.e., [vCluster][11]) don't mount volumes under the `<pod UID>` sub-dir, Velero File System Backup is not working with them.  
 
 ## Customize Restore Helper Container
 
@@ -595,3 +592,4 @@ To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watch
 [8]: https://docs.microsoft.com/en-us/azure/aks/azure-files-dynamic-pv
 [9]: https://github.com/restic/restic/issues/1800
 [10]: customize-installation.md#default-pod-volume-backup-to-file-system-backup
+[11]: https://www.vcluster.com/
