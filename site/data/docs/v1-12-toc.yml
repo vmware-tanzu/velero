@@ -49,6 +49,8 @@ toc:
         url: /namespace
       - page: CSI Support
         url: /csi
+      - page: CSI Snapshot Data Movement
+        url: /csi-snapshot-data-movement 
       - page: Verifying Self-signed Certificates
         url: /self-signed-certificates
       - page: Changing RBAC permissions
