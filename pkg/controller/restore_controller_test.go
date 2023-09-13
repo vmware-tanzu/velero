@@ -776,7 +776,8 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		Spec: velerov1api.RestoreSpec{
 			BackupName: "backup-1",
 			ResourceModifier: &corev1.TypedLocalObjectReference{
-				Kind: resourcemodifiers.ConfigmapRefType,
+				// intentional to ensure case insensitivity works as expected
+				Kind: "confIGMaP",
 				Name: "test-configmap-invalid",
 			},
 		},
