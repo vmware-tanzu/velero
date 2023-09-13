@@ -31,6 +31,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
@@ -302,7 +303,11 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 
 		volumeBackup := newPodVolumeBackup(backup, pod, volume, repoIdentifier, b.uploaderType, pvc)
-		if _, err = b.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{}); err != nil {
+		// TODO: once backupper is refactored to use controller-runtime, just pass client instead of anonymous func
+		if err := veleroclient.CreateRetryGenerateNameWithFunc(volumeBackup, func() error {
+			_, err := b.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{})
+			return err
+		}); err != nil {
 			errs = append(errs, err)
 			continue
 		}

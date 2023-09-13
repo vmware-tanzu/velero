@@ -26,6 +26,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
 )
 
 type Getter interface {
@@ -40,7 +41,7 @@ type DefaultServerStatusGetter struct {
 func (g *DefaultServerStatusGetter) GetServerStatus(kbClient kbclient.Client) (*velerov1api.ServerStatusRequest, error) {
 	created := builder.ForServerStatusRequest(g.Namespace, "", "0").ObjectMeta(builder.WithGenerateName("velero-cli-")).Result()
 
-	if err := kbClient.Create(context.Background(), created, &kbclient.CreateOptions{}); err != nil {
+	if err := veleroclient.CreateRetryGenerateName(kbClient, context.Background(), created); err != nil {
 		return nil, errors.WithStack(err)
 	}
 

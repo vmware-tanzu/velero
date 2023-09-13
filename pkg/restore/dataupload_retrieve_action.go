@@ -30,6 +30,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
@@ -104,7 +105,7 @@ func (d *DataUploadRetrieveAction) Execute(input *velero.RestoreItemActionExecut
 		},
 	}
 
-	err = d.client.Create(context.Background(), &cm, &client.CreateOptions{})
+	err = veleroclient.CreateRetryGenerateName(d.client, context.Background(), &cm)
 	if err != nil {
 		d.logger.Errorf("fail to create DataUploadResult ConfigMap %s/%s: %s", cm.Namespace, cm.Name, err.Error())
 		return nil, errors.Wrap(err, "fail to create DataUploadResult ConfigMap")
