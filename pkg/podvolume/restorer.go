@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
@@ -172,7 +173,10 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 
 		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, repo.Spec.ResticIdentifier, backupInfo.uploaderType, data.SourceNamespace, pvc)
 
-		if err := errorOnly(r.veleroClient.VeleroV1().PodVolumeRestores(volumeRestore.Namespace).Create(context.TODO(), volumeRestore, metav1.CreateOptions{})); err != nil {
+		// TODO: once restorer is refactored to use controller-runtime, just pass client instead of anonymous func
+		if err := veleroclient.CreateRetryGenerateNameWithFunc(volumeRestore, func() error {
+			return errorOnly(r.veleroClient.VeleroV1().PodVolumeRestores(volumeRestore.Namespace).Create(context.TODO(), volumeRestore, metav1.CreateOptions{}))
+		}); err != nil {
 			errs = append(errs, errors.WithStack(err))
 			continue
 		}
