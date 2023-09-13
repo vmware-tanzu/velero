@@ -558,6 +558,14 @@ func TestRetainVSC(t *testing.T) {
 					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
 				},
 			},
+			updated: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-vsc",
+				},
+				Spec: snapshotv1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
+				},
+			},
 		},
 		{
 			name: "path vsc fail",
