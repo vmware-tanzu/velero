@@ -101,7 +101,7 @@ func GetVolumeSnapshotContentForVolumeSnapshot(volSnap *snapshotv1api.VolumeSnap
 func RetainVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface,
 	vsc *snapshotv1api.VolumeSnapshotContent) (*snapshotv1api.VolumeSnapshotContent, error) {
 	if vsc.Spec.DeletionPolicy == snapshotv1api.VolumeSnapshotContentRetain {
-		return nil, nil
+		return vsc, nil
 	}
 	origBytes, err := json.Marshal(vsc)
 	if err != nil {
