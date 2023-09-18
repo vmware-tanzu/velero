@@ -235,7 +235,7 @@ The '--namespace' flag can be used to specify a different namespace to install i
 
 Use '--wait' to wait for the Velero Deployment to be ready before proceeding.
 
-Use '-o yaml' or '-o json'  with '--dry-run' to output all generated resources as text instead of sending the resources to the server.
+Use '-o yaml' or '-o json' with '--dry-run' to output all generated resources as text instead of sending the resources to the server.
 This is useful as a starting point for more customized installations.
 		`,
 		Example: `  # velero install --provider gcp --plugins velero/velero-plugin-for-gcp:v1.0.0 --bucket mybucket --secret-file ./gcp-service-account.json
