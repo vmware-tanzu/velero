@@ -1,1 +1,0 @@
-Fix issue #6753, remove the check for read-only BSL in restore async operation controller since Velero cannot fully support read-only mode BSL in restore at present

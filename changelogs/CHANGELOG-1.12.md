@@ -51,6 +51,7 @@ To fix CVEs and keep pace with Golang, Velero made changes as follows:
 * Prior to v1.12, the parameter `uploader-type` for Velero installation had a default value of "restic". However, starting from this version, the default value has been changed to "kopia". This means that Velero will now use Kopia as the default path for file system backup.
 * The ways of setting CSI snapshot time have changed in v1.12. First, the sync waiting time for creating a snapshot handle in the CSI plugin is changed from the fixed 10 minutes into backup.Spec.CSISnapshotTimeout. The second, the async waiting time for VolumeSnapshot and VolumeSnapshotContent's status turning into `ReadyToUse` in operation uses the operation's timeout. The default value is 4 hours.
 * As from [Velero helm chart v4.0.0](https://github.com/vmware-tanzu/helm-charts/releases/tag/velero-4.0.0), it supports multiple BSL and VSL, and the BSL and VSL have changed from the map into a slice, and[ this breaking change](https://github.com/vmware-tanzu/helm-charts/pull/413) is not backward compatible. So it would be best to change the BSL and VSL configuration into slices before the Upgrade.
+* Prior to v1.12, deleting the Velero namespace would easily remove all the resources within it. However, with the introduction of finalizers attached to the Velero CR including `restore`, `dataupload`, and `datadownload` in this version, directly deleting Velero namespace may get stuck indefinitely because the pods responsible for handling the finalizers might be deleted before the resources attached to the finalizers. To avoid this issue, please use the command `velero uninstall` to delete all the Velero resources or ensure that you handle the finalizer appropriately before deleting the Velero namespace.
 
 
 ### Limitations/Known issues
@@ -132,3 +133,10 @@ prior PVC restores with CSI (#6111, @eemcmullan)
 * Make GetPluginConfig accessible from other packages. (#6151, @tkaovila)
 * Ignore not found error during patching managedFields (#6136, @ywk253100)
 * Fix the goreleaser issues and add a new goreleaser action (#6109, @blackpiglet)
+* Add CSI snapshot data movement doc (#6793, @Lyndon-Li)
+* Use old(origin) namespace in resource modifier conditions in case namespace may change during restore (#6724, @27149chen)
+* Fix #6752: add namespace exclude check. (#6762, @blackpiglet)
+* Update restore controller logic for restore deletion (#6761, @ywk253100)
+* Fix issue #6753, remove the check for read-only BSL in restore async operation controller since Velero cannot fully support read-only mode BSL in restore at present (#6758, @Lyndon-Li)
+* Fixes #6636, skip subresource in resource discovery (#6688, @27149chen)
+* This pr made some improvements in Resource Modifiers:1. add label selector 2. change the field name from groupKind to groupResource (#6704, @27149chen)
