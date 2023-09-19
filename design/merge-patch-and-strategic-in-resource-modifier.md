@@ -47,6 +47,7 @@ This proposal is to add support for JSON Merge Patch and Strategic Merge Patch i
 ## Detailed Design
 - The design and approach is inspired by kubectl patch command and [this doc](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/).
 - New fields `MergePatches` and `StrategicPatches` will be added to the `ResourceModifierRule` struct to support all three patch types.
+- Only one of the three patch types can be specified in a single `ResourceModifierRule`.
 - Add wildcard support for `groupResource` in `conditions` struct.
 - The workflow to create Resource Modifier ConfigMap and reference it in RestoreSpec will remain the same as described in document [Resource Modifiers](https://github.com/vmware-tanzu/velero/blob/main/site/content/docs/main/restore-resource-modifiers.md).
 
