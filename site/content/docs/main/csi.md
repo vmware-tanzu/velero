@@ -37,11 +37,53 @@ This section documents some of the choices made during implementation of the Vel
 
  1. VolumeSnapshots created by the Velero CSI plugins are retained only for the lifetime of the backup even if the `DeletionPolicy` on the VolumeSnapshotClass is set to `Retain`. To accomplish this, during deletion of the backup the prior to deleting the VolumeSnapshot, VolumeSnapshotContent object is patched to set its `DeletionPolicy` to `Delete`. Deleting the VolumeSnapshot object will result in cascade delete of the VolumeSnapshotContent and the snapshot in the storage provider.
  1. VolumeSnapshotContent objects created during a `velero backup` that are dangling, unbound to a VolumeSnapshot object, will be discovered, using labels, and deleted on backup deletion.
- 1. The Velero CSI plugins, to backup CSI backed PVCs, will choose the VolumeSnapshotClass in the cluster that has the same driver name and also has the `velero.io/csi-volumesnapshot-class` label set on it, like
-    ```yaml
-      velero.io/csi-volumesnapshot-class: "true"
-    ```
- 1. The VolumeSnapshot objects will be removed from the cluster after the backup is uploaded to the object storage, so that the namespace that is backed up can be deleted without removing the snapshot in the storage provider if the `DeletionPolicy` is `Delete.  
+ 1. The Velero CSI plugins, to backup CSI backed PVCs, will choose the VolumeSnapshotClass in the cluster based on the following logic:
+    1. **Default Behavior:**
+    You can simply create a VolumeSnapshotClass for a particular driver and put a label on it to indicate that it is the default VolumeSnapshotClass for that driver.  For example, if you want to create a VolumeSnapshotClass for the CSI driver `disk.csi.cloud.com` for taking snapshots of disks created with `disk.csi.cloud.com` based storage classes, you can create a VolumeSnapshotClass like this:
+        ```yaml
+        apiVersion: snapshot.storage.k8s.io/v1
+        kind: VolumeSnapshotClass
+        metadata:
+          name: test-snapclass
+          labels:
+            velero.io/csi-volumesnapshot-class: "true"
+        driver: disk.csi.cloud.com
+        ```
+        Note: For each driver type, there should only be 1 VolumeSnapshotClass with the label `velero.io/csi-volumesnapshot-class: "true"`.
+
+    2. **Choose VolumeSnapshotClass for a particular Backup Or Schedule:**
+    If you want to use a particular VolumeSnapshotClass for a particular backup or schedule, you can add a annotation to the backup or schedule to indicate which VolumeSnapshotClass to use.  For example, if you want to use the VolumeSnapshotClass `test-snapclass` for a particular backup for snapshotting PVCs of `disk.csi.cloud.com`, you can create a backup like this:
+        ```yaml
+        apiVersion: velero.io/v1
+        kind: Backup
+        metadata:
+          name: test-backup
+          annotations:
+            velero.io/csi-volumesnapshot-class_disk.csi.cloud.com: "test-snapclass"
+        spec:
+            includedNamespaces:
+            - default
+        ```
+        Note: Please ensure all your annotations are in lowercase. And follow the following format: `velero.io/csi-volumesnapshot-class_<driver name> = <VolumeSnapshotClass Name>`
+
+    3. **Choosing VolumeSnapshotClass for a particular PVC:**
+    If you want to use a particular VolumeSnapshotClass for a particular PVC, you can add a annotation to the PVC to indicate which VolumeSnapshotClass to use. This overrides any annotation added to backup or schedule. For example, if you want to use the VolumeSnapshotClass `test-snapclass` for a particular PVC, you can create a PVC like this:
+        ```yaml
+        apiVersion: v1
+        kind: PersistentVolumeClaim
+        metadata:
+          name: test-pvc
+          annotations:
+            velero.io/csi-volumesnapshot-class: "test-snapclass"
+        spec:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+                requests:
+                storage: 1Gi
+            storageClassName: disk.csi.cloud.com
+        ```
+ 1. The VolumeSnapshot objects will be removed from the cluster after the backup is uploaded to the object storage, so that the namespace that is backed up can be deleted without removing the snapshot in the storage provider if the `DeletionPolicy` is `Delete`.  
 
 ## How it Works - Overview
 
