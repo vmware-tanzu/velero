@@ -39,16 +39,15 @@ import (
 
 func TestGetStorageCredentials(t *testing.T) {
 	testCases := []struct {
-		name                string
-		backupLocation      velerov1api.BackupStorageLocation
-		credFileStore       *credmock.FileStore
-		credStoreError      error
-		credStorePath       string
-		getAzureCredentials func(map[string]string) (string, string, error)
-		getS3Credentials    func(map[string]string) (*awscredentials.Value, error)
-		getGCPCredentials   func(map[string]string) string
-		expected            map[string]string
-		expectedErr         string
+		name              string
+		backupLocation    velerov1api.BackupStorageLocation
+		credFileStore     *credmock.FileStore
+		credStoreError    error
+		credStorePath     string
+		getS3Credentials  func(map[string]string) (*awscredentials.Value, error)
+		getGCPCredentials func(map[string]string) string
+		expected          map[string]string
+		expectedErr       string
 	}{
 		{
 			name:        "invalid credentials file store interface",
@@ -160,43 +159,15 @@ func TestGetStorageCredentials(t *testing.T) {
 			expected:      map[string]string{},
 		},
 		{
-			name: "azure, Credential section exists in BSL",
+			name: "azure",
 			backupLocation: velerov1api.BackupStorageLocation{
 				Spec: velerov1api.BackupStorageLocationSpec{
-					Provider: "velero.io/azure",
-					Config: map[string]string{
-						"credentialsFile": "credentials-from-config-map",
-					},
+					Provider:   "velero.io/azure",
 					Credential: &corev1api.SecretKeySelector{},
 				},
 			},
 			credFileStore: new(credmock.FileStore),
-			credStorePath: "credentials-from-credential-key",
-			getAzureCredentials: func(config map[string]string) (string, string, error) {
-				return "storage account from: " + config["credentialsFile"], "", nil
-			},
-
-			expected: map[string]string{
-				"storageAccount": "storage account from: credentials-from-credential-key",
-				"storageKey":     "",
-			},
-		},
-		{
-			name: "azure, get azure credentials fails",
-			backupLocation: velerov1api.BackupStorageLocation{
-				Spec: velerov1api.BackupStorageLocationSpec{
-					Provider: "velero.io/azure",
-					Config: map[string]string{
-						"credentialsFile": "credentials-from-config-map",
-					},
-				},
-			},
-			getAzureCredentials: func(config map[string]string) (string, string, error) {
-				return "", "", errors.New("fake error")
-			},
-			credFileStore: new(credmock.FileStore),
-			expected:      map[string]string{},
-			expectedErr:   "error get azure credentials: fake error",
+			expected:      nil,
 		},
 		{
 			name: "gcp, Credential section not exists in BSL",
@@ -220,7 +191,6 @@ func TestGetStorageCredentials(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			getAzureCredentials = tc.getAzureCredentials
 			getS3Credentials = tc.getS3Credentials
 			getGCPCredentials = tc.getGCPCredentials
 
@@ -245,14 +215,14 @@ func TestGetStorageCredentials(t *testing.T) {
 
 func TestGetStorageVariables(t *testing.T) {
 	testCases := []struct {
-		name                  string
-		backupLocation        velerov1api.BackupStorageLocation
-		repoName              string
-		repoBackend           string
-		getS3BucketRegion     func(string) (string, error)
-		getAzureStorageDomain func(map[string]string) (string, error)
-		expected              map[string]string
-		expectedErr           string
+		name              string
+		backupLocation    velerov1api.BackupStorageLocation
+		credFileStore     *credmock.FileStore
+		repoName          string
+		repoBackend       string
+		getS3BucketRegion func(string) (string, error)
+		expected          map[string]string
+		expectedErr       string
 	}{
 		{
 			name: "invalid provider",
@@ -414,11 +384,11 @@ func TestGetStorageVariables(t *testing.T) {
 				"endpoint":      "fake-url",
 				"doNotUseTLS":   "false",
 				"skipTLSVerify": "false",
-				"customCA":      base64.StdEncoding.EncodeToString([]byte{0x01, 0x02, 0x03, 0x04, 0x05}),
+				"caCert":        base64.StdEncoding.EncodeToString([]byte{0x01, 0x02, 0x03, 0x04, 0x05}),
 			},
 		},
 		{
-			name: "azure, getAzureStorageDomain fail",
+			name: "azure",
 			backupLocation: velerov1api.BackupStorageLocation{
 				Spec: velerov1api.BackupStorageLocationSpec{
 					Provider: "velero.io/azure",
@@ -436,68 +406,13 @@ func TestGetStorageVariables(t *testing.T) {
 					},
 				},
 			},
-			getAzureStorageDomain: func(config map[string]string) (string, error) {
-				return "", errors.New("fake error")
-			},
-			repoBackend: "fake-repo-type",
-			expected:    map[string]string{},
-			expectedErr: "error to get azure storage domain: fake error",
-		},
-		{
-			name: "azure, ObjectStorage section exists in BSL",
-			backupLocation: velerov1api.BackupStorageLocation{
-				Spec: velerov1api.BackupStorageLocationSpec{
-					Provider: "velero.io/azure",
-					Config: map[string]string{
-						"bucket": "fake-bucket-config",
-						"prefix": "fake-prefix-config",
-						"region": "fake-region",
-						"fspath": "",
-					},
-					StorageType: velerov1api.StorageType{
-						ObjectStorage: &velerov1api.ObjectStorageLocation{
-							Bucket: "fake-bucket-object-store",
-							Prefix: "fake-prefix-object-store",
-						},
-					},
-				},
-			},
-			getAzureStorageDomain: func(config map[string]string) (string, error) {
-				return "fake-domain", nil
-			},
-			repoBackend: "fake-repo-type",
+			credFileStore: new(credmock.FileStore),
+			repoBackend:   "fake-repo-type",
 			expected: map[string]string{
-				"bucket":        "fake-bucket-object-store",
-				"prefix":        "fake-prefix-object-store/fake-repo-type/",
-				"region":        "fake-region",
-				"fspath":        "",
-				"storageDomain": "fake-domain",
-			},
-		},
-		{
-			name: "azure, ObjectStorage section not exists in BSL, repo name exists",
-			backupLocation: velerov1api.BackupStorageLocation{
-				Spec: velerov1api.BackupStorageLocationSpec{
-					Provider: "velero.io/azure",
-					Config: map[string]string{
-						"bucket": "fake-bucket",
-						"prefix": "fake-prefix",
-						"region": "fake-region",
-						"fspath": "",
-					},
-				},
-			},
-			repoName:    "//fake-name//",
-			repoBackend: "fake-repo-type",
-			getAzureStorageDomain: func(config map[string]string) (string, error) {
-				return "fake-domain", nil
-			},
-			expected: map[string]string{
-				"bucket":        "fake-bucket",
-				"prefix":        "fake-prefix/fake-repo-type/fake-name/",
-				"region":        "fake-region",
-				"fspath":        "",
-				"storageDomain": "fake-domain",
+				"bucket": "fake-bucket-object-store",
+				"prefix": "fake-prefix-object-store/fake-repo-type/",
+				"region": "fake-region",
+				"fspath": "",
 			},
 		},
 		{
@@ -524,7 +439,6 @@ func TestGetStorageVariables(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			getS3BucketRegion = tc.getS3BucketRegion
-			getAzureStorageDomain = tc.getAzureStorageDomain
 
 			actual, err := getStorageVariables(&tc.backupLocation, tc.repoBackend, tc.repoName)
 

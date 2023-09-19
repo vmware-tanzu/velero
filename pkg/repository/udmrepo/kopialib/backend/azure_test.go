@@ -20,83 +20,28 @@ import (
 	"context"
 	"testing"
 
+	"github.com/kopia/kopia/repo/blob/throttling"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-
-	"github.com/kopia/kopia/repo/blob/azure"
-	"github.com/kopia/kopia/repo/blob/throttling"
 )
 
 func TestAzureSetup(t *testing.T) {
-	testCases := []struct {
-		name        string
-		flags       map[string]string
-		expected    azure.Options
-		expectedErr string
-	}{
-		{
-			name:        "must have bucket name",
-			flags:       map[string]string{},
-			expectedErr: "key " + udmrepo.StoreOptionOssBucket + " not found",
-		},
-		{
-			name: "must have storage account",
-			flags: map[string]string{
-				udmrepo.StoreOptionOssBucket: "fake-bucket",
-			},
-			expected: azure.Options{
-				Container: "fake-bucket",
-			},
-			expectedErr: "key " + udmrepo.StoreOptionAzureStorageAccount + " not found",
-		},
-		{
-			name: "must have secret key",
-			flags: map[string]string{
-				udmrepo.StoreOptionOssBucket:           "fake-bucket",
-				udmrepo.StoreOptionAzureStorageAccount: "fake-account",
-			},
-			expected: azure.Options{
-				Container:      "fake-bucket",
-				StorageAccount: "fake-account",
-			},
-			expectedErr: "key " + udmrepo.StoreOptionAzureKey + " not found",
-		},
-		{
-			name: "with limits",
-			flags: map[string]string{
-				udmrepo.StoreOptionOssBucket:           "fake-bucket",
-				udmrepo.StoreOptionAzureStorageAccount: "fake-account",
-				udmrepo.StoreOptionAzureKey:            "fake-key",
-				udmrepo.ThrottleOptionReadOps:          "100",
-				udmrepo.ThrottleOptionUploadBytes:      "200",
-			},
-			expected: azure.Options{
-				Container:      "fake-bucket",
-				StorageAccount: "fake-account",
-				StorageKey:     "fake-key",
-				Limits: throttling.Limits{
-					ReadsPerSecond:       100,
-					UploadBytesPerSecond: 200,
-				},
-			},
-		},
+	backend := AzureBackend{}
+
+	flags := map[string]string{
+		"key":                             "value",
+		udmrepo.ThrottleOptionReadOps:     "100",
+		udmrepo.ThrottleOptionUploadBytes: "200",
+	}
+	limits := throttling.Limits{
+		ReadsPerSecond:       100,
+		UploadBytesPerSecond: 200,
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			azFlags := AzureBackend{}
-
-			err := azFlags.Setup(context.Background(), tc.flags)
-
-			require.Equal(t, tc.expected, azFlags.options)
-
-			if tc.expectedErr == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.EqualError(t, err, tc.expectedErr)
-			}
-		})
-	}
+	err := backend.Setup(context.Background(), flags)
+	require.Nil(t, err)
+	assert.Equal(t, flags, backend.option.Config)
+	assert.Equal(t, limits, backend.option.Limits)
 }

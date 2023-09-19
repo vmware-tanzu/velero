@@ -47,11 +47,9 @@ type unifiedRepoProvider struct {
 
 // this func is assigned to a package-level variable so it can be
 // replaced when unit-testing
-var getAzureCredentials = repoconfig.GetAzureCredentials
 var getS3Credentials = repoconfig.GetS3Credentials
 var getGCPCredentials = repoconfig.GetGCPCredentials
 var getS3BucketRegion = repoconfig.GetAWSBucketRegion
-var getAzureStorageDomain = repoconfig.GetAzureStorageDomain
 
 type localFuncTable struct {
 	getStorageVariables   func(*velerov1api.BackupStorageLocation, string, string) (map[string]string, error)
@@ -190,6 +188,7 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 		log.Debug("Repo has already been initialized remotely")
 		return nil
 	}
+	log.Infof("failed to connect to the repo: %v, will try to create it", err)
 
 	err = urp.repoService.Init(ctx, *repoOption, true)
 	if err != nil {
@@ -436,13 +435,8 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 			result[udmrepo.StoreOptionS3Token] = credValue.SessionToken
 		}
 	case repoconfig.AzureBackend:
-		storageAccount, accountKey, err := getAzureCredentials(config)
-		if err != nil {
-			return map[string]string{}, errors.Wrap(err, "error get azure credentials")
-		}
-		result[udmrepo.StoreOptionAzureStorageAccount] = storageAccount
-		result[udmrepo.StoreOptionAzureKey] = accountKey
-
+		// do nothing here, will retrieve the credential in Azure Storage
+		return nil, nil
 	case repoconfig.GCPBackend:
 		result[udmrepo.StoreOptionCredentialFile] = getGCPCredentials(config)
 	}
@@ -504,21 +498,17 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 		result[udmrepo.StoreOptionS3Endpoint] = strings.Trim(s3URL, "/")
 		result[udmrepo.StoreOptionS3DisableTLSVerify] = config["insecureSkipTLSVerify"]
 		result[udmrepo.StoreOptionS3DisableTLS] = strconv.FormatBool(disableTLS)
-
-		if backupLocation.Spec.ObjectStorage != nil && backupLocation.Spec.ObjectStorage.CACert != nil {
-			result[udmrepo.StoreOptionS3CustomCA] = base64.StdEncoding.EncodeToString(backupLocation.Spec.ObjectStorage.CACert)
-		}
 	} else if backendType == repoconfig.AzureBackend {
-		domain, err := getAzureStorageDomain(config)
-		if err != nil {
-			return map[string]string{}, errors.Wrapf(err, "error to get azure storage domain")
+		for k, v := range config {
+			result[k] = v
 		}
-
-		result[udmrepo.StoreOptionAzureDomain] = domain
 	}
 
 	result[udmrepo.StoreOptionOssBucket] = bucket
 	result[udmrepo.StoreOptionPrefix] = prefix
+	if backupLocation.Spec.ObjectStorage != nil && backupLocation.Spec.ObjectStorage.CACert != nil {
+		result[udmrepo.StoreOptionCACert] = base64.StdEncoding.EncodeToString(backupLocation.Spec.ObjectStorage.CACert)
+	}
 	result[udmrepo.StoreOptionOssRegion] = strings.Trim(region, "/")
 	result[udmrepo.StoreOptionFsPath] = config["fspath"]
 

@@ -42,12 +42,6 @@ const (
 	StoreOptionS3Endpoint         = "endpoint"
 	StoreOptionS3DisableTLS       = "doNotUseTLS"
 	StoreOptionS3DisableTLSVerify = "skipTLSVerify"
-	StoreOptionS3CustomCA         = "customCA"
-
-	StoreOptionAzureKey            = "storageKey"
-	StoreOptionAzureDomain         = "storageDomain"
-	StoreOptionAzureStorageAccount = "storageAccount"
-	StoreOptionAzureToken          = "sasToken"
 
 	StoreOptionFsPath = "fspath"
 
@@ -55,6 +49,7 @@ const (
 
 	StoreOptionOssBucket = "bucket"
 	StoreOptionOssRegion = "region"
+	StoreOptionCACert    = "caCert"
 
 	StoreOptionCredentialFile = "credFile"
 	StoreOptionPrefix         = "prefix"

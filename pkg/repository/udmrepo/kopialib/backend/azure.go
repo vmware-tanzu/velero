@@ -20,41 +20,26 @@ import (
 	"context"
 
 	"github.com/kopia/kopia/repo/blob"
-	"github.com/kopia/kopia/repo/blob/azure"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/azure"
 )
 
 type AzureBackend struct {
-	options azure.Options
+	option azure.Option
 }
 
 func (c *AzureBackend) Setup(ctx context.Context, flags map[string]string) error {
-	var err error
-	c.options.Container, err = mustHaveString(udmrepo.StoreOptionOssBucket, flags)
-	if err != nil {
-		return err
+	if flags[udmrepo.StoreOptionCACert] != "" {
+		flags["caCertEncoded"] = "true"
 	}
-
-	c.options.StorageAccount, err = mustHaveString(udmrepo.StoreOptionAzureStorageAccount, flags)
-	if err != nil {
-		return err
+	c.option = azure.Option{
+		Config: flags,
+		Limits: setupLimits(ctx, flags),
 	}
-
-	c.options.StorageKey, err = mustHaveString(udmrepo.StoreOptionAzureKey, flags)
-	if err != nil {
-		return err
-	}
-
-	c.options.Prefix = optionalHaveString(udmrepo.StoreOptionPrefix, flags)
-	c.options.SASToken = optionalHaveString(udmrepo.StoreOptionAzureToken, flags)
-	c.options.StorageDomain = optionalHaveString(udmrepo.StoreOptionAzureDomain, flags)
-
-	c.options.Limits = setupLimits(ctx, flags)
-
 	return nil
 }
 
 func (c *AzureBackend) Connect(ctx context.Context, isCreate bool) (blob.Storage, error) {
-	return azure.New(ctx, &c.options, false)
+	return azure.NewStorage(ctx, &c.option, false)
 }
