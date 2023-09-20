@@ -1181,6 +1181,17 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			// want to dynamically re-provision it.
 			return warnings, errs, itemExists
 
+		case hasRestorePVAnnotation(obj, ctx):
+			ctx.log.Infof("Restoring persistent volume as-is because it has a restore annotation.")
+
+			updatedObj, err := updatePVObject(ctx, obj, resourceID)
+			if err != nil {
+				errs.Add(namespace, err)
+				return warnings, errs, itemExists
+			}
+
+			obj = updatedObj
+
 		case hasDeleteReclaimPolicy(obj.Object):
 			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
 			ctx.pvsToProvision.Insert(name)
@@ -1192,20 +1203,12 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		default:
 			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
 
-			// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
-			_, err = remapClaimRefNS(ctx, obj)
+			updatedObj, err := updatePVObject(ctx, obj, resourceID)
 			if err != nil {
 				errs.Add(namespace, err)
 				return warnings, errs, itemExists
 			}
-			obj = resetVolumeBindingInfo(obj)
-			// We call the pvRestorer here to clear out the PV's claimRef.UID,
-			// so it can be re-claimed when its PVC is restored and gets a new UID.
-			updatedObj, err := ctx.pvRestorer.executePVAction(obj)
-			if err != nil {
-				errs.Add(namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
-				return warnings, errs, itemExists
-			}
+
 			obj = updatedObj
 		}
 	}
@@ -1826,9 +1829,43 @@ func hasPodVolumeBackup(unstructuredPV *unstructured.Unstructured, ctx *restoreC
 	return found
 }
 
+func hasRestorePVAnnotation(unstructuredPV *unstructured.Unstructured, ctx *restoreContext) bool {
+	annotation, ok := ctx.restore.GetAnnotations()["velero.io/restore-pvs"]
+	if !ok {
+		return false
+	}
+
+	pvsToBeRestored := strings.Split(annotation, ",")
+	pvName := unstructuredPV.GetName()
+	for _, pvToBeRestored := range pvsToBeRestored {
+		if pvToBeRestored == pvName {
+			return true
+		}
+	}
+	return false
+}
+
 func hasDeleteReclaimPolicy(obj map[string]interface{}) bool {
 	policy, _, _ := unstructured.NestedString(obj, "spec", "persistentVolumeReclaimPolicy")
 	return policy == string(v1.PersistentVolumeReclaimDelete)
+}
+
+func updatePVObject(ctx *restoreContext, obj *unstructured.Unstructured, resourceID string) (*unstructured.Unstructured, error) {
+	// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
+	_, err := remapClaimRefNS(ctx, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	obj = resetVolumeBindingInfo(obj)
+	// We call the pvRestorer here to clear out the PV's claimRef.UID,
+	// so it can be re-claimed when its PVC is restored and gets a new UID.
+	updatedObj, err := ctx.pvRestorer.executePVAction(obj)
+	if err != nil {
+		return nil, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err)
+	}
+
+	return updatedObj, nil
 }
 
 // resetVolumeBindingInfo clears any necessary metadata out of a PersistentVolume
