@@ -54,7 +54,7 @@ This proposal is to add support for JSON Merge Patch and Strategic Merge Patch i
 ### How to choose the right patch type
 - [JSON Merge Patch](https://datatracker.ietf.org/doc/html/rfc7386) is a naively simple format, with limited usability. Probably it is a good choice if you are building something small, with very simple JSON Schema.
 - [JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902) is a more complex format, but it is applicable to any JSON documents. For a comparison of JSON patch and JSON merge patch, see [JSON Patch and JSON Merge Patch](https://erosb.github.io/post/json-patch-vs-merge-patch/).
-- Strategic Merge Patch is a Kubernetes defined patch type, mainly used to process resources of type list. You can replace/merge a list, add/remove items from a list by key, change the order of items in a list, etc. For more details, see [this doc](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/).
+- Strategic Merge Patch is a Kubernetes defined patch type, mainly used to process resources of type list. You can replace/merge a list, add/remove items from a list by key, change the order of items in a list, etc. Strategic merge patch is not supported for custom resources. For more details, see [this doc](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/).
 
 ### New Field MergePatches
 MergePatches is a list to specify the merge patches to be applied on the resource. The merge patches will be applied in the order specified in the configmap. A subsequent patch is applied in order and if multiple patches are specified for the same path, the last patch will override the previous patches.
@@ -139,6 +139,39 @@ The user can specify a wildcard for groupResource in the conditions' struct. Thi
 ### Helper Command to Generate Merge Patch and Strategic Merge Patch
 The patchData of Strategic Merge Patch is sometimes a bit complex for user to write. We can provide a helper command to generate the patchData for Strategic Merge Patch. The command will take the original resource and the modified resource as input and generate the patchData.
 It can also be used in Merge Patch.
+
+Here is a sample code snippet to achieve this:
+```go
+package main
+
+import (
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+func main() {
+	pod := &corev1.Pod{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "web",
+					Image: "nginx",
+				},
+			},
+		},
+	}
+	newPod := pod.DeepCopy()
+	patch := client.StrategicMergeFrom(pod)
+	newPod.Spec.Containers[0].Image = "nginx1"
+
+	data, _ := patch.Data(newPod)
+	fmt.Println(string(data))
+	// Output:
+	// {"spec":{"$setElementOrder/containers":[{"name":"web"}],"containers":[{"image":"nginx1","name":"web"}]}}
+}
+```
 
 ## Security Considerations
 No security impact.
