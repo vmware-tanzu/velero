@@ -70,6 +70,7 @@ func (p *Policies) buildPolicy(resPolicies *resourcePolicies) error {
 		volP.conditions = append(volP.conditions, &storageClassCondition{storageClass: con.StorageClass})
 		volP.conditions = append(volP.conditions, &nfsCondition{nfs: con.NFS})
 		volP.conditions = append(volP.conditions, &csiCondition{csi: con.CSI})
+		volP.conditions = append(volP.conditions, &volumeTypeCondition{volumeTypes: con.VolumeTypes})
 		p.volumePolicies = append(p.volumePolicies, volP)
 	}
 

@@ -355,6 +355,51 @@ volumePolicies:
 			},
 			skip: false,
 		},
+		{
+			name: "match volume by types",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+    volumeTypes:
+      - local
+      - hostPath
+  action:
+    type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						HostPath: &v1.HostPathVolumeSource{Path: "/mnt/data"},
+					},
+				},
+			},
+			skip: true,
+		},
+		{
+			name: "dismatch volume by types",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+    volumeTypes:
+      - local
+  action:
+    type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						HostPath: &v1.HostPathVolumeSource{Path: "/mnt/data"},
+					},
+				},
+			},
+			skip: false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
