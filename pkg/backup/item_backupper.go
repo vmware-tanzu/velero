@@ -22,8 +22,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 	"sync"
+	"time"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/pkg/errors"
@@ -408,7 +409,19 @@ func (ib *itemBackupper) executeActions(
 			itemOperList := ib.backupRequest.GetItemOperationsList()
 			*itemOperList = append(*itemOperList, &newOperation)
 		}
-		
+		// ## Approach 1
+		// Extract all PVCs from the Additional Items
+		// Create a label such as <podname>:<>
+		// Apply label to all these PVCs
+		// Create VolumeSnapshotGroup CR with label selector
+		// Invoke VolumeSnapshotGroup Action with the the CR
+		// Poll for VSG in CSI VSG Plugin's Execute()
+		// Return Additional Items and continue backup
+
+		// ## Approach 2
+		// Async call the current CSI Plugin's Execute()
+		// Wait for all snapshots to complete.
+		// Max parallelism can be controlled by further tweaking the WaitGroup.
 		additionalItemFilesChannel := make(chan []FileForArchive)
 		errChannel := make(chan error)
 		var wg sync.WaitGroup
@@ -438,7 +451,7 @@ func (ib *itemBackupper) executeActions(
 			}
 			if additionalItem.GroupResource == kuberesource.PersistentVolumeClaims {
 				wg.Add(1)
-				go func(additionalItem *velero.ResourceIdentifier) {
+				go func() {
 					defer wg.Done()
 					_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
 					if err != nil {
@@ -446,7 +459,7 @@ func (ib *itemBackupper) executeActions(
 						return
 					}
 					additionalItemFilesChannel <- additionalItemFiles
-				}(&additionalItem)
+				}()
 			} else {
 				_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
 				if err != nil {
@@ -464,7 +477,6 @@ func (ib *itemBackupper) executeActions(
 		for err := range errChannel {
 			return nil, itemFiles, err
 		}
-
 	}
 	return obj, itemFiles, nil
 }
