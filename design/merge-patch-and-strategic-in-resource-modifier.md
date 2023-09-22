@@ -138,7 +138,7 @@ The user can specify a wildcard for groupResource in the conditions' struct. Thi
 
 ### Helper Command to Generate Merge Patch and Strategic Merge Patch
 The patchData of Strategic Merge Patch is sometimes a bit complex for user to write. We can provide a helper command to generate the patchData for Strategic Merge Patch. The command will take the original resource and the modified resource as input and generate the patchData.
-It can also be used in Merge Patch.
+It can also be used in JSON Merge Patch.
 
 Here is a sample code snippet to achieve this:
 ```go
@@ -186,7 +186,8 @@ Compatible with current Resource Modifiers.
 - Use `test` operation of JSON Patch to calculate the `matches` in `conditions` struct.
 
 ## Future enhancements
-- add jq support for more complex conditions or patches, to meet the situations that the current conditions or patches can not handle. like [this issue](      https://github.com/vmware-tanzu/velero/issues/6344)
+- add a Velero subcommand to generate/validate the patchData for Strategic Merge Patch and JSON Merge Patch.
+- add jq support for more complex conditions or patches, to meet the situations that the current conditions or patches can not handle. like [this issue](https://github.com/vmware-tanzu/velero/issues/6344)
 
 ## Open Issues
 N/A
