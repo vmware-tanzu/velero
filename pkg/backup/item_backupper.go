@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
+	"sync"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/pkg/errors"
@@ -408,7 +408,10 @@ func (ib *itemBackupper) executeActions(
 			itemOperList := ib.backupRequest.GetItemOperationsList()
 			*itemOperList = append(*itemOperList, &newOperation)
 		}
-
+		
+		additionalItemFilesChannel := make(chan []FileForArchive)
+		errChannel := make(chan error)
+		var wg sync.WaitGroup
 		for _, additionalItem := range additionalItemIdentifiers {
 			gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
 			if err != nil {
@@ -433,13 +436,35 @@ func (ib *itemBackupper) executeActions(
 			if err != nil {
 				return nil, itemFiles, errors.WithStack(err)
 			}
-
-			_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
-			if err != nil {
-				return nil, itemFiles, err
+			if additionalItem.GroupResource == kuberesource.PersistentVolumeClaims {
+				wg.Add(1)
+				go func(additionalItem *velero.ResourceIdentifier) {
+					defer wg.Done()
+					_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
+					if err != nil {
+						errChannel <- err
+						return
+					}
+					additionalItemFilesChannel <- additionalItemFiles
+				}(&additionalItem)
+			} else {
+				_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
+				if err != nil {
+					return nil, itemFiles, err
+				}
+				itemFiles = append(itemFiles, additionalItemFiles...)
 			}
-			itemFiles = append(itemFiles, additionalItemFiles...)
 		}
+		wg.Wait()
+		close(additionalItemFilesChannel)
+		close(errChannel)
+		for itemFilesFromChannel := range additionalItemFilesChannel {
+			itemFiles = append(itemFiles, itemFilesFromChannel...)
+		}
+		for err := range errChannel {
+			return nil, itemFiles, err
+		}
+
 	}
 	return obj, itemFiles, nil
 }
