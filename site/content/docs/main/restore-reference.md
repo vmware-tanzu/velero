@@ -269,7 +269,9 @@ are `none` (default) and `update`. If you choose to update existing resources du
 
 You can also configure the existing resource policy in a [Restore](api-types/restore.md) object.
 
-**NOTE:** Update of a resource only applies to the Kubernetes resource data such as its spec. It may not work as expected for certain resource types such as PVCs and Pods. In case of PVCs for example, data in the PV is not restored or overwritten in any way. 
+**NOTE:** 
+* Update of a resource only applies to the Kubernetes resource data such as its spec. It may not work as expected for certain resource types such as PVCs and Pods. In case of PVCs for example, data in the PV is not restored or overwritten in any way.
+* `update` existing resource policy works in a best-effort way, which means when restore's `--existing-resource-policy` is set to `update`, Velero will try to update the resource if the resource already exists, if the update fails, Velero will fall back to the default non-destructive way in the restore, and just logs a warning without failing the restore.
 
 ## Removing a Restore object
 
