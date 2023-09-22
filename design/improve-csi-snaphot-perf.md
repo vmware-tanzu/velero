@@ -48,7 +48,15 @@ No security impact.
 ## Compatibility
 
 ## Implementation
+## For Approach 2
+- Current code flow `backupItem` in backup.go is invoked for each resource -> this further invokes `itembackupper.backupItem` -> `backupItemInternal`
+- Now for a Pod -> First Pre Hooks are run -> Then `executeActions` -> iterate over all BIA applicable on Pod -> which will invoke the `PodAction`
+- After all actions are run, `executeActions` gets the additionalItems to backup(PVCs)
+- For all these PVCs  and other additional items we iterate and call `itembackupper.backupItem`.
+- After all additional items are backed up -> control returns to `backupItemInternal` -> Post Hooks are run -> and then `backupItem` returns.
+- Here the change we will do is that when backup for additionalItems is done, for PVCs, we will run `itembackupper.backupItem` in an async way.
 
+Overall this will batch all PVCs of 1 pod together. This can even be extended to VolumeSnapshotGroup approach in future.
 
 ## Future enhancement
 
