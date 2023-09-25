@@ -1353,7 +1353,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	if ctx.resourceModifiers != nil {
-		if errList := ctx.resourceModifiers.ApplyResourceModifierRules(obj, groupResource.String(), ctx.log); errList != nil {
+		if errList := ctx.resourceModifiers.ApplyResourceModifierRules(obj, groupResource.String(), ctx.kbClient.Scheme(), ctx.log); errList != nil {
 			for _, err := range errList {
 				errs.Add(namespace, err)
 			}
