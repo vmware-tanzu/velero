@@ -94,6 +94,7 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if err := c.Get(ctx, req.NamespacedName, schedule); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.WithError(err).Error("schedule not found")
+			c.metrics.RemoveSchedule(req.Name)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, errors.Wrapf(err, "error getting schedule %s", req.String())
