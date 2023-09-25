@@ -1830,7 +1830,7 @@ func hasPodVolumeBackup(unstructuredPV *unstructured.Unstructured, ctx *restoreC
 }
 
 func hasRestorePVAnnotation(unstructuredPV *unstructured.Unstructured, ctx *restoreContext) bool {
-	annotation, ok := ctx.restore.GetAnnotations()["velero.io/restore-pvs"]
+	annotation, ok := ctx.restore.GetAnnotations()[velerov1api.RestorePVsAnnotation]
 	if !ok {
 		return false
 	}
