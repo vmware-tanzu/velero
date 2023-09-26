@@ -1,0 +1,1 @@
+Fix #6861. Only Restic path requires repoIdentifier, so for non-restic path, set the repoIdentifier fields as empty in PVB and PVR and also remove the RepoIdentifier column in the get output of PVBs and PVRs

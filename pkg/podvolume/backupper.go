@@ -235,6 +235,11 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 	}
 
+	repoIdentifier := ""
+	if repositoryType == velerov1api.BackupRepositoryTypeRestic {
+		repoIdentifier = repo.Spec.ResticIdentifier
+	}
+
 	var numVolumeSnapshots int
 	for _, volumeName := range volumesToBackup {
 		volume, ok := podVolumes[volumeName]
@@ -283,7 +288,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			}
 		}
 
-		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, b.uploaderType, pvc)
+		volumeBackup := newPodVolumeBackup(backup, pod, volume, repoIdentifier, b.uploaderType, pvc)
 		if _, err = b.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{}); err != nil {
 			errs = append(errs, err)
 			continue
