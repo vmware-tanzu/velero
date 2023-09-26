@@ -89,6 +89,9 @@ const (
 
 	// ResourceUsageLabel is the label key to explain the Velero resource usage.
 	ResourceUsageLabel = "velero.io/resource-usage"
+
+	// RestorePVsAnnotation is the annotation key used to indicate whether PVs should be restored. If a PV name appears in this annotation, restore it regardless of the reclaim policy.
+	RestorePVsAnnotation = "velero.io/restore-pvs"
 )
 
 type AsyncOperationIDPrefix string
