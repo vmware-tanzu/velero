@@ -38,6 +38,8 @@ Backup Template:
   
   Label selector:  <none>
   
+  Or label selector:  <none>
+  
   Storage Location:  
   
   Velero-Native Snapshot PVs:  auto
@@ -81,6 +83,8 @@ Backup Template:
     Cluster-scoped:  auto
   
   Label selector:  <none>
+  
+  Or label selector:  <none>
   
   Storage Location:  
   
