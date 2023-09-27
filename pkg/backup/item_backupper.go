@@ -52,6 +52,7 @@ import (
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	pdvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
@@ -200,7 +201,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 			// Get the list of volumes to back up using pod volume backup from the pod's annotations. Remove from this list
 			// any volumes that use a PVC that we've already backed up (this would be in a read-write-many scenario,
 			// where it's been backed up from another pod), since we don't need >1 backup per PVC.
-			includedVolumes, optedOutVolumes := podvolume.GetVolumesByPod(pod, boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToFsBackup))
+			includedVolumes, optedOutVolumes := pdvolumeutil.GetVolumesByPod(pod, boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToFsBackup))
 			for _, volume := range includedVolumes {
 				// track the volumes that are PVCs using the PVC snapshot tracker, so that when we backup PVCs/PVs
 				// via an item action in the next step, we don't snapshot PVs that will have their data backed up
