@@ -70,7 +70,7 @@ RUN mkdir -p /output/usr/bin && \
     go clean -modcache -cache
 
 # Velero image packing section
-FROM gcr.io/distroless/base-nossl-debian11@sha256:f10e1fbf558c630a4b74a987e6c754d45bf59f9ddcefce090f6b111925996767
+FROM paketobuildpacks/run-jammy-tiny:0.2.5
 
 LABEL maintainer="Xun Jiang <jxun@vmware.com>"
 
@@ -78,5 +78,5 @@ COPY --from=velero-builder /output /
 
 COPY --from=restic-builder /output /
 
-USER nonroot:nonroot
+USER cnb:cnb
 
