@@ -35,10 +35,6 @@ spec:
       jsonPath: .spec.volume
       name: Volume
       type: string
-    - description: Backup repository identifier for this backup
-      jsonPath: .spec.repoIdentifier
-      name: Repository ID
-      type: string
     - description: The type of the uploader to handle data transfer
       jsonPath: .spec.uploaderType
       name: Uploader Type
