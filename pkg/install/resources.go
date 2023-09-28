@@ -240,6 +240,7 @@ type VeleroOptions struct {
 	SecretData                      []byte
 	RestoreOnly                     bool
 	UseNodeAgent                    bool
+	PrivilegedNodeAgent             bool
 	UseVolumeSnapshots              bool
 	BSLConfig                       map[string]string
 	VSLConfig                       map[string]string
@@ -373,6 +374,9 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		}
 		if len(o.Features) > 0 {
 			dsOpts = append(dsOpts, WithFeatures(o.Features))
+		}
+		if o.PrivilegedNodeAgent {
+			dsOpts = append(dsOpts, WithPrivilegedNodeAgent())
 		}
 		ds := DaemonSet(o.Namespace, dsOpts...)
 		if err := appendUnstructured(resources, ds); err != nil {

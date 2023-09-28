@@ -200,10 +200,11 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	b.resultsLock.Unlock()
 
 	var (
-		errs              []error
-		podVolumeBackups  []*velerov1api.PodVolumeBackup
-		podVolumes        = make(map[string]corev1api.Volume)
-		mountedPodVolumes = sets.String{}
+		errs               []error
+		podVolumeBackups   []*velerov1api.PodVolumeBackup
+		podVolumes         = make(map[string]corev1api.Volume)
+		mountedPodVolumes  = sets.String{}
+		attachedPodDevices = sets.String{}
 	)
 	pvcSummary := NewPVCBackupSummary()
 
@@ -232,6 +233,9 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	for _, container := range pod.Spec.Containers {
 		for _, volumeMount := range container.VolumeMounts {
 			mountedPodVolumes.Insert(volumeMount.Name)
+		}
+		for _, volumeDevice := range container.VolumeDevices {
+			attachedPodDevices.Insert(volumeDevice.Name)
 		}
 	}
 
@@ -265,6 +269,15 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 		if isHostPath {
 			log.Warnf("Volume %s in pod %s/%s is a hostPath volume which is not supported for pod volume backup, skipping", volumeName, pod.Namespace, pod.Name)
+			continue
+		}
+
+		// check if volume is a block volume
+		if attachedPodDevices.Has(volumeName) {
+			msg := fmt.Sprintf("volume %s declared in pod %s/%s is a block volume. Block volumes are not supported for fs backup, skipping",
+				volumeName, pod.Namespace, pod.Name)
+			log.Warn(msg)
+			pvcSummary.addSkipped(volumeName, msg)
 			continue
 		}
 

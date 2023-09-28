@@ -128,11 +128,6 @@ func (kp *kopiaProvider) RunBackup(
 		return "", false, errors.New("path is empty")
 	}
 
-	// For now, error on block mode
-	if volMode == uploader.PersistentVolumeBlock {
-		return "", false, errors.New("unable to currently support block mode")
-	}
-
 	log := kp.log.WithFields(logrus.Fields{
 		"path":           path,
 		"realSource":     realSource,
@@ -214,10 +209,6 @@ func (kp *kopiaProvider) RunRestore(
 		"volumePath": volumePath,
 	})
 
-	if volMode == uploader.PersistentVolumeBlock {
-		return errors.New("unable to currently support block mode")
-	}
-
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
 	progress := new(kopia.Progress)
 	progress.InitThrottle(restoreProgressCheckInterval)
@@ -235,7 +226,7 @@ func (kp *kopiaProvider) RunRestore(
 	// We use the cancel channel to control the restore cancel, so don't pass a context with cancel to Kopia restore.
 	// Otherwise, Kopia restore will not response to the cancel control but return an arbitrary error.
 	// Kopia restore cancel is not designed as well as Kopia backup which uses the context to control backup cancel all the way.
-	size, fileCount, err := RestoreFunc(context.Background(), repoWriter, progress, snapshotID, volumePath, log, restoreCancel)
+	size, fileCount, err := RestoreFunc(context.Background(), repoWriter, progress, snapshotID, volumePath, volMode, log, restoreCancel)
 
 	if err != nil {
 		return errors.Wrapf(err, "Failed to run kopia restore")

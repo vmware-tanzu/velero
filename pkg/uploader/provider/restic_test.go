@@ -212,6 +212,9 @@ func TestResticRunRestore(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.volMode == "" {
+				tc.volMode = uploader.PersistentVolumeFilesystem
+			}
 			resticRestoreCMDFunc = tc.hookResticRestoreFunc
 			if tc.volMode == "" {
 				tc.volMode = uploader.PersistentVolumeFilesystem

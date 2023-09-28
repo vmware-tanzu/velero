@@ -38,6 +38,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
 func TestNamespaceAndName(t *testing.T) {
@@ -165,6 +166,13 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 			want: "a-pv/mount",
 		},
 		{
+			name: "Block CSI volume with a PVC/PV does not append '/mount' to the volume name",
+			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").PersistentVolumeClaimSource("my-pvc").Result()).Result(),
+			pvc:  builder.ForPersistentVolumeClaim("ns-1", "my-pvc").VolumeName("a-pv").Result(),
+			pv:   builder.ForPersistentVolume("a-pv").CSI("csi.test.com", "provider-volume-id").VolumeMode(corev1.PersistentVolumeBlock).Result(),
+			want: "a-pv",
+		},
+		{
 			name: "CSI volume mounted without a PVC appends '/mount' to the volume name",
 			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").CSISource("csi.test.com").Result()).Result(),
 			want: "my-vol/mount",
@@ -208,6 +216,54 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, tc.want, dir)
+	}
+}
+
+// TestGetVolumeModeSuccess tests the GetVolumeMode function
+func TestGetVolumeModeSuccess(t *testing.T) {
+	tests := []struct {
+		name string
+		pod  *corev1.Pod
+		pvc  *corev1.PersistentVolumeClaim
+		pv   *corev1.PersistentVolume
+		want uploader.PersistentVolumeMode
+	}{
+		{
+			name: "Filesystem PVC volume",
+			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").PersistentVolumeClaimSource("my-pvc").Result()).Result(),
+			pvc:  builder.ForPersistentVolumeClaim("ns-1", "my-pvc").VolumeName("a-pv").Result(),
+			pv:   builder.ForPersistentVolume("a-pv").VolumeMode(corev1.PersistentVolumeFilesystem).Result(),
+			want: uploader.PersistentVolumeFilesystem,
+		},
+		{
+			name: "Block PVC volume",
+			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").PersistentVolumeClaimSource("my-pvc").Result()).Result(),
+			pvc:  builder.ForPersistentVolumeClaim("ns-1", "my-pvc").VolumeName("a-pv").Result(),
+			pv:   builder.ForPersistentVolume("a-pv").VolumeMode(corev1.PersistentVolumeBlock).Result(),
+			want: uploader.PersistentVolumeBlock,
+		},
+		{
+			name: "Pod volume without a PVC",
+			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").Result()).Result(),
+			want: uploader.PersistentVolumeFilesystem,
+		},
+	}
+
+	for _, tc := range tests {
+		clientBuilder := fake.NewClientBuilder()
+
+		if tc.pvc != nil {
+			clientBuilder = clientBuilder.WithObjects(tc.pvc)
+		}
+		if tc.pv != nil {
+			clientBuilder = clientBuilder.WithObjects(tc.pv)
+		}
+
+		// Function under test
+		mode, err := GetVolumeMode(context.Background(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, clientBuilder.Build())
+
+		require.NoError(t, err)
+		assert.Equal(t, tc.want, mode)
 	}
 }
 
