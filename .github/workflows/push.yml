@@ -48,7 +48,10 @@ jobs:
         version: latest
 
     - name: Build
-      run: make local
+      run: |
+        make local
+        # Clean go cache to ease the build environment storage pressure.
+        go clean -modcache -cache
 
     - name: Test
       run: make test
