@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kopia/kopia/repo"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -188,11 +189,13 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 		log.Debug("Repo has already been initialized remotely")
 		return nil
 	}
-	log.Infof("failed to connect to the repo: %v, will try to create it", err)
+	if !errors.Is(err, repo.ErrRepositoryNotInitialized) {
+		return errors.Wrap(err, "error to connect to backup repo")
+	}
 
 	err = urp.repoService.Init(ctx, *repoOption, true)
 	if err != nil {
-		return errors.Wrap(err, "error to init backup repo")
+		return errors.Wrap(err, "error to create backup repo")
 	}
 
 	log.Debug("Prepare repo complete")
