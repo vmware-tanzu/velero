@@ -46,7 +46,7 @@ kubectl edit deployment/velero -n velero
 ...
 ```
 
-**Note:** Velero plugins run as binaries, i.e. after they are executed, either successful or not, they exit. So, if you see **received EOF, stopping recv loop** messages in debug logs, that does not mean an error occurred.
+**Note:** Velero plugins run as binaries, i.e. after they are executed, either successful or not, they exit. So, if you see **received EOF, stopping recv loop** messages in debug logs, that does not mean an error occurred, just that a plugin finished executing.
 
 ## Known issue with restoring LoadBalancer Service
 
