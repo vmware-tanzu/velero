@@ -23,17 +23,17 @@ CSI Snapshot Data Movement is useful in below scenarios:
 * For on-premises users, the storage usually doesn't support durable snapshots, so it is impossible/less efficient/cost ineffective to keep volume snapshots by the storage This feature helps to move the snapshot data to a storage with lower cost and larger scale for long time preservation.
 * For public cloud users, this feature helps users to fulfill the multiple cloud strategy. It allows users to back up volume snapshots from one cloud provider and preserve or restore the data to another cloud provider. Then users will be free to flow their business data across cloud providers based on Velero backup and restore
 
-CSI Snapshot Data Movement is built according to the Volume Snapshot Data Movement design ([Volume Snapshot Data Movement](https://github.com/vmware-tanzu/velero/blob/main/design/Implemented/unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md)). More details can be found in the design.
+CSI Snapshot Data Movement is built according to the Volume Snapshot Data Movement design ([Volume Snapshot Data Movement design](https://github.com/vmware-tanzu/velero/blob/main/design/volume-snapshot-data-movement/volume-snapshot-data-movement.md)). Additionally, guidance on how to use the feature can be found in the Volume Snapshot Data Movement doc([Volume Snapshot Data Movement doc](https://velero.io/docs/v1.12/csi-snapshot-data-movement)).
 
 #### Resource Modifiers
 In many use cases, customers often need to substitute specific values in Kubernetes resources during the restoration process like changing the namespace, changing the storage class, etc. 
 
-To address this need, Resource Modifiers (also known as JSON Substitutions) offer a generic solution in the restore workflow. It allows the user to define filters for specific resources and then specify a JSON patch (operator, path, value) to apply to the resource. This feature simplifies the process of making substitutions without requiring the implementation of a new RestoreItemAction plugin. More details can be found in Volume Snapshot Resource Modifiers design ([Resource Modifiers](https://github.com/vmware-tanzu/velero/blob/main/design/Implemented/json-substitution-action-design.md)).
+To address this need, Resource Modifiers (also known as JSON Substitutions) offer a generic solution in the restore workflow. It allows the user to define filters for specific resources and then specify a JSON patch (operator, path, value) to apply to the resource. This feature simplifies the process of making substitutions without requiring the implementation of a new RestoreItemAction plugin. More design details can be found in Resource Modifiers design ([Resource Modifiers design](https://github.com/vmware-tanzu/velero/blob/main/design/Implemented/json-substitution-action-design.md)). For instructions on how to use the feature, please refer to Resource Modifiers doc([Resource Modifiers doc](https://velero.io/docs/v1.12/restore-resource-modifiers)). 
 
 #### Multiple VolumeSnapshotClasses
 Prior to version 1.12, the Velero CSI plugin would choose the VolumeSnapshotClass in the cluster based on matching driver names and the presence of the "velero.io/csi-volumesnapshot-class" label. However,  this approach proved inadequate for many user scenarios.
 
-With the introduction of version 1.12, Velero now offers support for multiple VolumeSnapshotClasses in the CSI Plugin, enabling users to select a specific class for a particular backup. More details can be found in Multiple VolumeSnapshotClasses design ([Multiple VolumeSnapshotClasses](https://github.com/vmware-tanzu/velero/blob/main/design/Implemented/multiple-csi-volumesnapshotclass-support.md)).
+With the introduction of version 1.12, Velero now offers support for multiple VolumeSnapshotClasses in the CSI Plugin, enabling users to select a specific class for a particular backup. More design details can be found in Multiple VolumeSnapshotClasses design ([Multiple VolumeSnapshotClasses design](https://github.com/vmware-tanzu/velero/blob/main/design/Implemented/multiple-csi-volumesnapshotclass-support.md)). For instructions on how to use the feature, please refer to Multiple VolumeSnapshotClasses doc ([Multiple VolumeSnapshotClasses doc](https://velero.io/docs/v1.12/csi/#implementation-choices)). 
 
 #### Restore Finalizer
 Before v1.12, the restore controller would only delete restore resources but wouldn’t delete restore data from the backup storage location when the command `velero restore delete` was executed. The only chance Velero deletes restores data from the backup storage location is when the associated backup is deleted.
@@ -56,6 +56,7 @@ To fix CVEs and keep pace with Golang, Velero made changes as follows:
 
 ### Limitations/Known issues
 * The Azure plugin supports Azure AD Workload identity way, but it only works for Velero native snapshots. It cannot support filesystem backup and snapshot data mover scenarios. 
+* File System backup under Kopia path and CSI Snapshot Data Movement backup fail to back up files that are large the 2GiB due to issue https://github.com/vmware-tanzu/velero/issues/6668.
 
 
 ### All Changes
