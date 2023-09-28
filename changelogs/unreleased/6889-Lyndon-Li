@@ -1,0 +1,1 @@
+Flush repo after policy is set so that policy is retrieved correctly by TreeForSource
