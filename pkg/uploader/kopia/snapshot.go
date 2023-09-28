@@ -199,6 +199,10 @@ func SnapshotSource(
 		return "", 0, errors.Wrapf(err, "unable to set policy for si %v", sourceInfo)
 	}
 
+	if err := rep.Flush(ctx); err != nil {
+		return "", 0, errors.Wrap(err, "error to flush policy repo")
+	}
+
 	policyTree, err := treeForSourceFunc(ctx, rep, sourceInfo)
 	if err != nil {
 		return "", 0, errors.Wrapf(err, "unable to create policy getter for si %v", sourceInfo)
@@ -232,7 +236,7 @@ func reportSnapshotStatus(manifest *snapshot.Manifest, policyTree *policy.Tree) 
 	var errs []string
 	if ds := manifest.RootEntry.DirSummary; ds != nil {
 		for _, ent := range ds.FailedEntries {
-			policy := policyTree.DefinedPolicy()
+			policy := policyTree.EffectivePolicy()
 			if !(policy != nil && *policy.ErrorHandlingPolicy.IgnoreUnknownTypes == true && strings.Contains(ent.Error, fs.ErrUnknown.Error())) {
 				errs = append(errs, fmt.Sprintf("Error when processing %v: %v", ent.EntryPath, ent.Error))
 			}
