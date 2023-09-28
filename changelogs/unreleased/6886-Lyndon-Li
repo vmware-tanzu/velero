@@ -1,0 +1,1 @@
+Set ParallelUploadAboveSize as MaxInt64 and flush repo after setting up policy so that policy is retrieved correctly by TreeForSource
