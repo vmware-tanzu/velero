@@ -46,6 +46,7 @@ type podTemplateConfig struct {
 	defaultVolumesToFsBackup        bool
 	serviceAccountName              string
 	uploaderType                    string
+	privilegedNodeAgent             bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -139,6 +140,12 @@ func WithDefaultVolumesToFsBackup() podTemplateOption {
 func WithServiceAccountName(sa string) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.serviceAccountName = sa
+	}
+}
+
+func WithPrivilegedNodeAgent() podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.privilegedNodeAgent = true
 	}
 }
 

@@ -22,6 +22,7 @@ import (
 
 const (
 	AccessModeFileSystem = "by-file-system"
+	AccessModeBlock      = "by-block-device"
 )
 
 // ExposeResult defines the result of expose.

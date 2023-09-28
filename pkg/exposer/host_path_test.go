@@ -29,17 +29,19 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
 func TestGetPodVolumeHostPath(t *testing.T) {
 	tests := []struct {
-		name             string
-		getVolumeDirFunc func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (string, error)
-		pathMatchFunc    func(string, filesystem.Interface, logrus.FieldLogger) (string, error)
-		pod              *corev1.Pod
-		pvc              string
-		err              string
+		name              string
+		getVolumeDirFunc  func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (string, error)
+		getVolumeModeFunc func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (uploader.PersistentVolumeMode, error)
+		pathMatchFunc     func(string, filesystem.Interface, logrus.FieldLogger) (string, error)
+		pod               *corev1.Pod
+		pvc               string
+		err               string
 	}{
 		{
 			name: "get volume dir fail",
@@ -55,12 +57,27 @@ func TestGetPodVolumeHostPath(t *testing.T) {
 			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (string, error) {
 				return "", nil
 			},
+			getVolumeModeFunc: func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (uploader.PersistentVolumeMode, error) {
+				return uploader.PersistentVolumeFilesystem, nil
+			},
 			pathMatchFunc: func(string, filesystem.Interface, logrus.FieldLogger) (string, error) {
 				return "", errors.New("fake-error-2")
 			},
 			pod: builder.ForPod(velerov1api.DefaultNamespace, "fake-pod-2").Result(),
 			pvc: "fake-pvc-1",
 			err: "error identifying unique volume path on host for volume fake-pvc-1 in pod fake-pod-2: fake-error-2",
+		},
+		{
+			name: "get block volume dir success",
+			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (
+				string, error) {
+				return "fake-pvc-1", nil
+			},
+			pathMatchFunc: func(string, filesystem.Interface, logrus.FieldLogger) (string, error) {
+				return "/host_pods/fake-pod-1-id/volumeDevices/kubernetes.io~csi/fake-pvc-1-id", nil
+			},
+			pod: builder.ForPod(velerov1api.DefaultNamespace, "fake-pod-1").Result(),
+			pvc: "fake-pvc-1",
 		},
 	}
 
@@ -70,12 +87,18 @@ func TestGetPodVolumeHostPath(t *testing.T) {
 				getVolumeDirectory = test.getVolumeDirFunc
 			}
 
+			if test.getVolumeModeFunc != nil {
+				getVolumeMode = test.getVolumeModeFunc
+			}
+
 			if test.pathMatchFunc != nil {
 				singlePathMatch = test.pathMatchFunc
 			}
 
 			_, err := GetPodVolumeHostPath(context.Background(), test.pod, test.pvc, nil, nil, velerotest.NewLogger())
-			assert.EqualError(t, err, test.err)
+			if test.err != "" || err != nil {
+				assert.EqualError(t, err, test.err)
+			}
 		})
 	}
 }

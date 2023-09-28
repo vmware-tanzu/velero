@@ -26,11 +26,13 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/datapath"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 var getVolumeDirectory = kube.GetVolumeDirectory
+var getVolumeMode = kube.GetVolumeMode
 var singlePathMatch = kube.SinglePathMatch
 
 // GetPodVolumeHostPath returns a path that can be accessed from the host for a given volume of a pod
@@ -45,7 +47,17 @@ func GetPodVolumeHostPath(ctx context.Context, pod *corev1.Pod, volumeName strin
 
 	logger.WithField("volDir", volDir).Info("Got volume dir")
 
-	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(pod.GetUID()), volDir)
+	volMode, err := getVolumeMode(ctx, logger, pod, volumeName, cli)
+	if err != nil {
+		return datapath.AccessPoint{}, errors.Wrapf(err, "error getting volume mode for volume %s in pod %s", volumeName, pod.Name)
+	}
+
+	volSubDir := "volumes"
+	if volMode == uploader.PersistentVolumeBlock {
+		volSubDir = "volumeDevices"
+	}
+
+	pathGlob := fmt.Sprintf("/host_pods/%s/%s/*/%s", string(pod.GetUID()), volSubDir, volDir)
 	logger.WithField("pathGlob", pathGlob).Debug("Looking for path matching glob")
 
 	path, err := singlePathMatch(pathGlob, fs, logger)
@@ -56,6 +68,7 @@ func GetPodVolumeHostPath(ctx context.Context, pod *corev1.Pod, volumeName strin
 	logger.WithField("path", path).Info("Found path matching glob")
 
 	return datapath.AccessPoint{
-		ByPath: path,
+		ByPath:  path,
+		VolMode: volMode,
 	}, nil
 }
