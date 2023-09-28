@@ -68,6 +68,11 @@ func newOptionalInt(b int) *policy.OptionalInt {
 	return &ob
 }
 
+func newOptionalInt64(b int64) *policy.OptionalInt64 {
+	ob := policy.OptionalInt64(b)
+	return &ob
+}
+
 func newOptionalBool(b bool) *policy.OptionalBool {
 	ob := policy.OptionalBool(b)
 	return &ob
@@ -88,7 +93,7 @@ func getDefaultPolicy() *policy.Policy {
 		},
 		UploadPolicy: policy.UploadPolicy{
 			MaxParallelFileReads:    newOptionalInt(runtime.NumCPU()),
-			ParallelUploadAboveSize: nil,
+			ParallelUploadAboveSize: newOptionalInt64(math.MaxInt64),
 		},
 		SchedulingPolicy: policy.SchedulingPolicy{
 			Manual: true,
@@ -104,6 +109,11 @@ func setupDefaultPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceIn
 	err := setPolicyFunc(ctx, rep, sourceInfo, getDefaultPolicy())
 	if err != nil {
 		return nil, errors.Wrap(err, "error to set policy")
+	}
+
+	err = rep.Flush(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "error to flush repo")
 	}
 
 	// retrieve policy from repo
