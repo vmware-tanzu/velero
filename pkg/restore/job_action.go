@@ -26,6 +26,11 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
+const (
+	legacyControllerUIDLabel = "controller-uid"                     // <=1.27 This still exists in 1.27 for backward compatibility, maybe remove in 1.28?
+	controllerUIDLabel       = "batch.kubernetes.io/controller-uid" // >=1.27 https://github.com/kubernetes/kubernetes/pull/114930#issuecomment-1384667494
+)
+
 type JobAction struct {
 	logger logrus.FieldLogger
 }
@@ -47,9 +52,11 @@ func (a *JobAction) Execute(input *velero.RestoreItemActionExecuteInput) (*veler
 	}
 
 	if job.Spec.Selector != nil {
-		delete(job.Spec.Selector.MatchLabels, "controller-uid")
+		delete(job.Spec.Selector.MatchLabels, controllerUIDLabel)
+		delete(job.Spec.Selector.MatchLabels, legacyControllerUIDLabel)
 	}
-	delete(job.Spec.Template.ObjectMeta.Labels, "controller-uid")
+	delete(job.Spec.Template.ObjectMeta.Labels, controllerUIDLabel)
+	delete(job.Spec.Template.ObjectMeta.Labels, legacyControllerUIDLabel)
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(job)
 	if err != nil {
