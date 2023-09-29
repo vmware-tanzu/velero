@@ -174,11 +174,6 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return fmt.Errorf("either a 'selector' or an 'or-selector' can be specified, but not both")
 	}
 
-	client, err := f.KubebuilderWatchClient()
-	if err != nil {
-		return err
-	}
-
 	// Ensure that unless FromSchedule is set, args contains a backup name
 	if o.FromSchedule == "" && len(args) != 1 {
 		return fmt.Errorf("a backup name is required, unless you are creating based on a schedule")
@@ -197,7 +192,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	if o.StorageLocation != "" {
 		location := &velerov1api.BackupStorageLocation{}
-		if err := client.Get(context.Background(), kbclient.ObjectKey{
+		if err := o.client.Get(context.Background(), kbclient.ObjectKey{
 			Namespace: f.Namespace(),
 			Name:      o.StorageLocation,
 		}, location); err != nil {
@@ -207,7 +202,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	for _, loc := range o.SnapshotLocations {
 		snapshotLocation := new(velerov1api.VolumeSnapshotLocation)
-		if err := o.client.Get(context.TODO(), kbclient.ObjectKey{Namespace: f.Namespace(), Name: loc}, snapshotLocation); err != nil {
+		if err := o.client.Get(context.Background(), kbclient.ObjectKey{Namespace: f.Namespace(), Name: loc}, snapshotLocation); err != nil {
 			return err
 		}
 	}
