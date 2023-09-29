@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/kopia/kopia/fs"
+	"github.com/kopia/kopia/fs/virtualfs"
 	"github.com/kopia/kopia/repo"
 	"github.com/kopia/kopia/repo/manifest"
 	"github.com/kopia/kopia/snapshot"
@@ -594,11 +595,11 @@ func TestBackup(t *testing.T) {
 			expectedError: errors.New("Unable to read dir"),
 		},
 		{
-			name:          "Unable to handle block mode",
+			name:          "Source path is not a block device",
 			sourcePath:    "/",
 			tags:          nil,
 			volMode:       uploader.PersistentVolumeBlock,
-			expectedError: errors.New("unable to handle block storage"),
+			expectedError: errors.New("source path / is not a block device"),
 		},
 	}
 
@@ -660,6 +661,7 @@ func TestRestore(t *testing.T) {
 		expectedBytes       int64
 		expectedCount       int32
 		expectedError       error
+		volMode             uploader.PersistentVolumeMode
 	}
 
 	// Define test cases
@@ -697,6 +699,46 @@ func TestRestore(t *testing.T) {
 			snapshotID:    "snapshot-123",
 			expectedError: nil,
 		},
+		{
+			name: "Expect block volume successful",
+			filesystemEntryFunc: func(ctx context.Context, rep repo.Repository, rootID string, consistentAttributes bool) (fs.Entry, error) {
+				return snapshotfs.EntryFromDirEntry(rep, &snapshot.DirEntry{Type: snapshot.EntryTypeFile}), nil
+			},
+			restoreEntryFunc: func(ctx context.Context, rep repo.Repository, output restore.Output, rootEntry fs.Entry, options restore.Options) (restore.Stats, error) {
+				return restore.Stats{}, nil
+			},
+			snapshotID:    "snapshot-123",
+			expectedError: nil,
+			volMode:       uploader.PersistentVolumeBlock,
+		},
+		{
+			name: "Unable to evaluate symlinks for block volume",
+			filesystemEntryFunc: func(ctx context.Context, rep repo.Repository, rootID string, consistentAttributes bool) (fs.Entry, error) {
+				return snapshotfs.EntryFromDirEntry(rep, &snapshot.DirEntry{Type: snapshot.EntryTypeFile}), nil
+			},
+			restoreEntryFunc: func(ctx context.Context, rep repo.Repository, output restore.Output, rootEntry fs.Entry, options restore.Options) (restore.Stats, error) {
+				err := output.BeginDirectory(ctx, "fake-dir", virtualfs.NewStaticDirectory("fake-dir", nil))
+				return restore.Stats{}, err
+			},
+			snapshotID:    "snapshot-123",
+			expectedError: errors.New("unable to evaluate symlinks for"),
+			volMode:       uploader.PersistentVolumeBlock,
+			dest:          "/wrong-dest",
+		},
+		{
+			name: "Target file is not a block device",
+			filesystemEntryFunc: func(ctx context.Context, rep repo.Repository, rootID string, consistentAttributes bool) (fs.Entry, error) {
+				return snapshotfs.EntryFromDirEntry(rep, &snapshot.DirEntry{Type: snapshot.EntryTypeFile}), nil
+			},
+			restoreEntryFunc: func(ctx context.Context, rep repo.Repository, output restore.Output, rootEntry fs.Entry, options restore.Options) (restore.Stats, error) {
+				err := output.BeginDirectory(ctx, "fake-dir", virtualfs.NewStaticDirectory("fake-dir", nil))
+				return restore.Stats{}, err
+			},
+			snapshotID:    "snapshot-123",
+			expectedError: errors.New("target file /tmp is not a block device"),
+			volMode:       uploader.PersistentVolumeBlock,
+			dest:          "/tmp",
+		},
 	}
 
 	em := &manifest.EntryMetadata{
@@ -706,6 +748,10 @@ func TestRestore(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.volMode == "" {
+				tc.volMode = uploader.PersistentVolumeFilesystem
+			}
+
 			if tc.invalidManifestType {
 				em.Labels[manifest.TypeLabelKey] = ""
 			} else {
@@ -725,7 +771,7 @@ func TestRestore(t *testing.T) {
 			repoWriterMock.On("OpenObject", mock.Anything, mock.Anything).Return(em, nil)
 
 			progress := new(Progress)
-			bytesRestored, fileCount, err := Restore(context.Background(), repoWriterMock, progress, tc.snapshotID, tc.dest, logrus.New(), nil)
+			bytesRestored, fileCount, err := Restore(context.Background(), repoWriterMock, progress, tc.snapshotID, tc.dest, tc.volMode, logrus.New(), nil)
 
 			// Check if the returned error matches the expected error
 			if tc.expectedError != nil {
