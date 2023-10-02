@@ -397,7 +397,7 @@ Target volume information includes PVC and PV that represents the volume and the
 The data mover information and backup repository information are the same with DataUpload CRD.
 DataDownload CRD defines the same status as DataUpload CRD with nearly the same meanings.  
 
-Below is the full spec of DataUpload CRD:
+Below is the full spec of DataDownload CRD:
 ```
 apiVersion: apiextensions.k8s.io/v1alpha1
 kind: CustomResourceDefinition
