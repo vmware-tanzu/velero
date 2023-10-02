@@ -82,7 +82,7 @@ Signed-off-by: Joe Beda <joe@heptio.com>
 
 This can easily be done with the `--signoff` option to `git commit`.
 
-By doing this you state that you can certify the following (from https://developercertificate.org/):
+By doing this you state that you can certify the following (from [https://developercertificate.org/](https://developercertificate.org/)):
 
 ```
 Developer Certificate of Origin
