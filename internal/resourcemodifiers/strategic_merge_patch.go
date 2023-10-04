@@ -33,10 +33,6 @@ func (p *StrategicMergePatcher) Patch(u *unstructured.Unstructured, _ logrus.Fie
 		return nil, err
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("error in unmarshaling object %s", err.Error())
-	}
-
 	origin := u.DeepCopy()
 	updated := u.DeepCopy()
 	for _, patch := range p.patches {
@@ -47,7 +43,7 @@ func (p *StrategicMergePatcher) Patch(u *unstructured.Unstructured, _ logrus.Fie
 
 		err = strategicPatchObject(origin, patchBytes, updated, schemaReferenceObj, metav1.FieldValidationStrict)
 		if err != nil {
-			return nil, fmt.Errorf("error in applying JSON Patch %s", err.Error())
+			return nil, fmt.Errorf("error in applying Strategic Patch %s", err.Error())
 		}
 
 		origin = updated.DeepCopy()

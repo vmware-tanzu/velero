@@ -23,21 +23,20 @@ func (p *JSONMergePatcher) Patch(u *unstructured.Unstructured, _ logrus.FieldLog
 		return nil, fmt.Errorf("error in marshaling object %s", err)
 	}
 
-	var modifiedObjBytes []byte
 	for _, patch := range p.patches {
 		patchBytes, err := yaml.YAMLToJSON(patch.PatchBytes)
 		if err != nil {
 			return nil, fmt.Errorf("error in converting YAML to JSON %s", err)
 		}
 
-		modifiedObjBytes, err = jsonpatch.MergePatch(objBytes, patchBytes)
+		objBytes, err = jsonpatch.MergePatch(objBytes, patchBytes)
 		if err != nil {
 			return nil, fmt.Errorf("error in applying JSON Patch %s", err.Error())
 		}
 	}
 
 	updated := &unstructured.Unstructured{}
-	err = updated.UnmarshalJSON(modifiedObjBytes)
+	err = updated.UnmarshalJSON(objBytes)
 	if err != nil {
 		return nil, fmt.Errorf("error in unmarshalling modified object %s", err.Error())
 	}
