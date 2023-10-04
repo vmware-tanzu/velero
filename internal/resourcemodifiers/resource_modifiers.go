@@ -129,7 +129,7 @@ func (r *ResourceModifierRule) apply(obj *unstructured.Unstructured, groupResour
 	return nil
 }
 
-func matchConditions(u *unstructured.Unstructured, patches []JSONPatch, logger logrus.FieldLogger) (bool, error) {
+func matchConditions(u *unstructured.Unstructured, patches []JSONPatch, _ logrus.FieldLogger) (bool, error) {
 	if len(patches) == 0 {
 		return true, nil
 	}
