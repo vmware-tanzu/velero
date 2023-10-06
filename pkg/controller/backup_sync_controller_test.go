@@ -557,7 +557,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 				k8sBackups: []*velerov1api.Backup{
 					baseBuilder("backupA").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backupB").Phase(velerov1api.BackupPhaseCompleted).Result(),
-					baseBuilder("backupC").Phase(velerov1api.BackupPhaseCompleted).Result(),
+					baseBuilder("backupC").Phase(velerov1api.BackupPhasePartiallyFailed).Result(),
 				},
 				expectedDeletes: sets.NewString("backupA", "backupB", "backupC"),
 			},
@@ -568,9 +568,10 @@ var _ = Describe("Backup Sync Reconciler", func() {
 				k8sBackups: []*velerov1api.Backup{
 					baseBuilder("backup-1").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backup-2").Phase(velerov1api.BackupPhaseCompleted).Result(),
-					baseBuilder("backup-C").Phase(velerov1api.BackupPhaseCompleted).Result(),
+					baseBuilder("backup-B").Phase(velerov1api.BackupPhaseCompleted).Result(),
+					baseBuilder("backup-C").Phase(velerov1api.BackupPhasePartiallyFailed).Result(),
 				},
-				expectedDeletes: sets.NewString("backup-C"),
+				expectedDeletes: sets.NewString("backup-B", "backup-C"),
 			},
 			{
 				name:         "all overlapping backups",
@@ -579,7 +580,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 				k8sBackups: []*velerov1api.Backup{
 					baseBuilder("backup-1").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backup-2").Phase(velerov1api.BackupPhaseCompleted).Result(),
-					baseBuilder("backup-3").Phase(velerov1api.BackupPhaseCompleted).Result(),
+					baseBuilder("backup-3").Phase(velerov1api.BackupPhasePartiallyFailed).Result(),
 				},
 				expectedDeletes: sets.NewString(),
 			},
@@ -589,13 +590,14 @@ var _ = Describe("Backup Sync Reconciler", func() {
 				cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
 				k8sBackups: []*velerov1api.Backup{
 					baseBuilder("backupA").Phase(velerov1api.BackupPhaseCompleted).Result(),
+					baseBuilder("backupB").Phase(velerov1api.BackupPhasePartiallyFailed).Result(),
 					baseBuilder("Deleting").Phase(velerov1api.BackupPhaseDeleting).Result(),
 					baseBuilder("Failed").Phase(velerov1api.BackupPhaseFailed).Result(),
 					baseBuilder("FailedValidation").Phase(velerov1api.BackupPhaseFailedValidation).Result(),
 					baseBuilder("InProgress").Phase(velerov1api.BackupPhaseInProgress).Result(),
 					baseBuilder("New").Phase(velerov1api.BackupPhaseNew).Result(),
 				},
-				expectedDeletes: sets.NewString("backupA"),
+				expectedDeletes: sets.NewString("backupA", "backupB"),
 			},
 			{
 				name:         "all overlapping backups and all backups that are not complete",
@@ -616,12 +618,13 @@ var _ = Describe("Backup Sync Reconciler", func() {
 					baseBuilder("backup-1").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backup-2").Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backup-C").Phase(velerov1api.BackupPhaseCompleted).Result(),
+					baseBuilder("backup-D").Phase(velerov1api.BackupPhasePartiallyFailed).Result(),
 
 					baseBuilder("backup-4").ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "alternate")).Phase(velerov1api.BackupPhaseCompleted).Result(),
 					baseBuilder("backup-5").ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "alternate")).Phase(velerov1api.BackupPhaseCompleted).Result(),
-					baseBuilder("backup-6").ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "alternate")).Phase(velerov1api.BackupPhaseCompleted).Result(),
+					baseBuilder("backup-6").ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "alternate")).Phase(velerov1api.BackupPhasePartiallyFailed).Result(),
 				},
-				expectedDeletes: sets.NewString("backup-C"),
+				expectedDeletes: sets.NewString("backup-C", "backup-D"),
 			},
 			{
 				name:         "some overlapping backups",
@@ -646,8 +649,14 @@ var _ = Describe("Backup Sync Reconciler", func() {
 						).
 						Phase(velerov1api.BackupPhaseCompleted).
 						Result(),
+					builder.ForBackup("ns-1", "backup-D").
+						ObjectMeta(
+							builder.WithLabels(velerov1api.StorageLocationLabel, "the-really-long-location-name-that-is-much-more-than-63-c69e779"),
+						).
+						Phase(velerov1api.BackupPhasePartiallyFailed).
+						Result(),
 				},
-				expectedDeletes: sets.NewString("backup-C"),
+				expectedDeletes: sets.NewString("backup-C", "backup-D"),
 				useLongBSLName:  true,
 			},
 		}
