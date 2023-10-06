@@ -339,7 +339,7 @@ Velero backs up resources for CSI snapshot data movement backup in the same way 
 - CSI plugin checks if a data movement is required, if so it creates a `DataUpload` CR and then returns to Velero backup.  
 - Velero now is able to back up other resources, including other PVC objects.  
 - Velero backup controller periodically queries the data movement status from CSI plugin, the period is configurable through the Velero server parameter `--item-operation-sync-frequency`, by default it is 10s. On the call, CSI plugin turns to check the phase of the `DataUpload` CRs.  
-- When all the `DataUpload` CRs come to a terminal state (i.e., `Completed`, `Failed` or `Cancelled`), Velero backup perists all the necessary information and finish the backup.  
+- When all the `DataUpload` CRs come to a terminal state (i.e., `Completed`, `Failed` or `Cancelled`), Velero backup persists all the necessary information and finish the backup.  
 
 - CSI plugin expects a data mover to handle the `DataUpload` CR. If no data mover is configured for the backup, Velero built-in data mover will handle it.  
 - If the `DataUpload` CR does not reach to the terminal state with in the given time, the `DataUpload` CR will be cancelled. You can set the timeout value per backup through the `--item-operation-timeout` parameter, the default value is `4 hours`.  
