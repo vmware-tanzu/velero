@@ -39,8 +39,3 @@ You can also override the default list of linters by  running the command
 
 To run unit tests, use `make test`.
 
-## Vendor dependencies
-
-If you need to add or update the vendored dependencies, see [Vendoring dependencies][11].
-
-[11]: vendoring-dependencies.md
