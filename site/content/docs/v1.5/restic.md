@@ -10,7 +10,7 @@ the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Az
 It also provides a plugin model that enables anyone to implement additional object and block storage backends, outside the
 main Velero repository.
 
-The restic intergation was added to give you an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume. This integration is an addition to Velero's capabilities, not a replacement for existing functionality. If you're running on AWS, and taking EBS snapshots as part of your regular Velero backups, there's no need to switch to using restic. However, if you need a volume snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir,
+The restic integration was added to give you an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume. This integration is an addition to Velero's capabilities, not a replacement for existing functionality. If you're running on AWS, and taking EBS snapshots as part of your regular Velero backups, there's no need to switch to using restic. However, if you need a volume snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir,
 local, or any other volume type that doesn't have a native snapshot concept, restic might be for you.
 
 Restic is not tied to a specific storage platform, which means that this integration also paves the way for future work to enable

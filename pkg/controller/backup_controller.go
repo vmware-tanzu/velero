@@ -540,8 +540,8 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 	if len(errors) > 0 {
 		return nil, errors
 	}
-	allLocations := &velerov1api.VolumeSnapshotLocationList{}
-	err := b.kbClient.List(context.Background(), allLocations, &kbclient.ListOptions{Namespace: backup.Namespace, LabelSelector: labels.Everything()})
+	vsls := &velerov1api.VolumeSnapshotLocationList{}
+	err := b.kbClient.List(context.Background(), vsls, &kbclient.ListOptions{Namespace: backup.Namespace, LabelSelector: labels.Everything()})
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("error listing volume snapshot locations: %v", err))
 		return nil, errors
@@ -549,8 +549,8 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 
 	// build a map of provider->list of all locations for the provider
 	allProviderLocations := make(map[string][]*velerov1api.VolumeSnapshotLocation)
-	for i := range allLocations.Items {
-		loc := allLocations.Items[i]
+	for i := range vsls.Items {
+		loc := vsls.Items[i]
 		allProviderLocations[loc.Spec.Provider] = append(allProviderLocations[loc.Spec.Provider], &loc)
 	}
 

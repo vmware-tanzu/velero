@@ -361,6 +361,12 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 	var gracePeriod int64 = 0
 	volumeMounts, volumeDevices := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode)
 
+	if label == nil {
+		label = make(map[string]string)
+	}
+
+	label[podGroupLabel] = podGroupSnapshot
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -377,6 +383,18 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 			Labels: label,
 		},
 		Spec: corev1.PodSpec{
+			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "kubernetes.io/hostname",
+					WhenUnsatisfiable: corev1.ScheduleAnyway,
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							podGroupLabel: podGroupSnapshot,
+						},
+					},
+				},
+			},
 			Containers: []corev1.Container{
 				{
 					Name:            containerName,

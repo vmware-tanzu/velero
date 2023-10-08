@@ -570,7 +570,7 @@ func (r *backupDeletionReconciler) patchDeleteBackupRequest(ctx context.Context,
 }
 
 func (r *backupDeletionReconciler) patchBackup(ctx context.Context, backup *velerov1api.Backup, mutate func(*velerov1api.Backup)) (*velerov1api.Backup, error) {
-	//TODO: The patchHelper can't be used here because the `backup/xxx/status` does not exist, until the bakcup resource is refactored
+	//TODO: The patchHelper can't be used here because the `backup/xxx/status` does not exist, until the backup resource is refactored
 
 	// Record original json
 	oldData, err := json.Marshal(backup)

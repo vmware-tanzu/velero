@@ -61,7 +61,7 @@ in progress for 1.9.
 * Add rbac and annotation test cases (#4455, @mqiu)
 * remove --crds-version in velero install command. (#4446, @jxun)
 * Upgrade e2e test vsphere plugin (#4440, @mqiu)
-* Fix e2e test failures for the inappropriate optimaze of velero install (#4438, @mqiu)
+* Fix e2e test failures for the inappropriate optimize of velero install (#4438, @mqiu)
 * Limit backup namespaces on test resource filtering cases (#4437, @mqiu)
 * Bump up Go to 1.17 (#4431, @reasonerjt)
 * Added `<backup name>`-itemsnapshots.json.gz to the backup format.  This file exists
