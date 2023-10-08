@@ -100,7 +100,7 @@ To fix CVEs and keep pace with Golang, Velero made changes as follows:
 * Enable staticcheck linter. (#5788, @blackpiglet)
 * Set Kopia IgnoreUnknownTypes in ErrorHandlingPolicy to True for ignoring backup unknown file type (#5786, @qiuming-best)
 * Bump up Restic version to 0.15.0  (#5784, @qiuming-best)
-* Add File system backup related matrics to Grafana dashboard
+* Add File system backup related metrics to Grafana dashboard
   - Add metrics backup_warning_total for record of total warnings
   - Add metrics backup_last_status for record of last status of the backup  (#5779, @allenxu404)
 * Design for Handling backup of volumes by resources filters (#5773, @qiuming-best)
