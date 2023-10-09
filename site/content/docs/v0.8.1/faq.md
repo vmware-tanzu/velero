@@ -6,7 +6,7 @@ layout: docs
 ## When is it appropriate to use Ark instead of etcd's built in backup/restore?
 
 Etcd's backup/restore tooling is good for recovering from data loss in a single etcd cluster. For
-example, it is a good idea to take a backup of etcd prior to upgrading etcd istelf. For more
+example, it is a good idea to take a backup of etcd prior to upgrading etcd itself. For more
 sophisticated management of your Kubernetes cluster backups and restores, we feel that Ark is
 generally a better approach. It gives you the ability to throw away an unstable cluster and restore
 your Kubernetes resources and data into a new cluster, which you can't do easily just by backing up
