@@ -43,7 +43,8 @@ RUN mkdir -p /output/usr/bin && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN} && \
     go build -o /output/velero-helper \
-    -ldflags "${LDFLAGS}" ${PKG}/cmd/velero-helper
+    -ldflags "${LDFLAGS}" ${PKG}/cmd/velero-helper && \
+    go clean -modcache -cache
 
 # Restic binary build section
 FROM --platform=$BUILDPLATFORM golang:1.20-bullseye as restic-builder
@@ -65,10 +66,11 @@ COPY . /go/src/github.com/vmware-tanzu/velero
 
 RUN mkdir -p /output/usr/bin && \
     export GOARM=$(echo "${GOARM}" | cut -c2-) && \
-    /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh
+    /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh && \
+    go clean -modcache -cache
 
 # Velero image packing section
-FROM gcr.io/distroless/base-nossl-debian11:nonroot
+FROM paketobuildpacks/run-jammy-tiny:latest
 
 LABEL maintainer="Xun Jiang <jxun@vmware.com>"
 
@@ -76,5 +78,5 @@ COPY --from=velero-builder /output /
 
 COPY --from=restic-builder /output /
 
-USER nonroot:nonroot
+USER cnb:cnb
 

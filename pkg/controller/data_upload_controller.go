@@ -177,7 +177,10 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, nil
 		}
 
-		exposeParam := r.setupExposeParam(du)
+		exposeParam, err := r.setupExposeParam(du)
+		if err != nil {
+			return r.errorOut(ctx, du, err, "failed to set exposer parameters", log)
+		}
 
 		// Expose() will trigger to create one pod whose volume is restored by a given volume snapshot,
 		// but the pod maybe is not in the same node of the current controller, so we need to return it here.
@@ -735,18 +738,33 @@ func (r *DataUploadReconciler) closeDataPath(ctx context.Context, duName string)
 	r.dataPathMgr.RemoveAsyncBR(duName)
 }
 
-func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload) interface{} {
+func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload) (interface{}, error) {
 	if du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
+		pvc := &corev1.PersistentVolumeClaim{}
+		err := r.client.Get(context.Background(), types.NamespacedName{
+			Namespace: du.Spec.SourceNamespace,
+			Name:      du.Spec.SourcePVC,
+		}, pvc)
+
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get PVC %s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC)
+		}
+
+		accessMode := exposer.AccessModeFileSystem
+		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == corev1.PersistentVolumeBlock {
+			accessMode = exposer.AccessModeBlock
+		}
+
 		return &exposer.CSISnapshotExposeParam{
 			SnapshotName:     du.Spec.CSISnapshot.VolumeSnapshot,
 			SourceNamespace:  du.Spec.SourceNamespace,
 			StorageClass:     du.Spec.CSISnapshot.StorageClass,
 			HostingPodLabels: map[string]string{velerov1api.DataUploadLabel: du.Name},
-			AccessMode:       exposer.AccessModeFileSystem,
+			AccessMode:       accessMode,
 			Timeout:          du.Spec.OperationTimeout.Duration,
-		}
+		}, nil
 	}
-	return nil
+	return nil, nil
 }
 
 func (r *DataUploadReconciler) setupWaitExposePara(du *velerov2alpha1api.DataUpload) interface{} {

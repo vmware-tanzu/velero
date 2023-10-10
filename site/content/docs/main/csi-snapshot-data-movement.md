@@ -41,7 +41,7 @@ velero install --use-node-agent
 ### Configure Node Agent DaemonSet spec
 
 After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the node-agent DaemonSet spec. 
-The steps in this section are only needed if you are installing on RancherOS, OpenShift, VMware Tanzu Kubernetes Grid 
+The steps in this section are only needed if you are installing on RancherOS, Nutanix, OpenShift, VMware Tanzu Kubernetes Grid 
 Integrated Edition (formerly VMware Enterprise PKS), or Microsoft Azure.  
 
 
@@ -63,6 +63,22 @@ hostPath:
   path: /opt/rke/var/lib/kubelet/pods
 ```
 
+**Nutanix**
+
+Update the host path for volumes in the node-agent DaemonSet in the Velero namespace from `/var/lib/kubelet/pods` to
+`/var/nutanix/var/lib/kubelet`.
+
+```yaml
+hostPath:
+  path: /var/lib/kubelet/pods
+```
+
+to
+
+```yaml
+hostPath:
+  path: /var/nutanix/var/lib/kubelet
+```
 
 **OpenShift**
 
@@ -75,24 +91,10 @@ To mount the correct hostpath to pods volumes, run the node-agent pod in `privil
     oc adm policy add-scc-to-user privileged -z velero -n velero
     ```
 
-2. Modify the DaemonSet yaml to request a privileged mode:
-
-    ```diff
-    @@ -67,3 +67,5 @@ spec:
-                  value: /credentials/cloud
-                - name: VELERO_SCRATCH_DIR
-                  value: /scratch
-    +          securityContext:
-    +            privileged: true
+2. Install Velero with the '--privileged-node-agent' option to request a privileged mode:
+  
     ```
-
-    or
-
-    ```shell
-    oc patch ds/node-agent \
-      --namespace velero \
-      --type json \
-      -p '[{"op":"add","path":"/spec/template/spec/containers/0/securityContext","value": { "privileged": true}}]'
+    velero install --use-node-agent --privileged-node-agent
     ```
 
 If node-agent is not running in a privileged mode, it will not be able to access snapshot volumes within the mounted 
@@ -324,7 +326,7 @@ Velero backs up resources for CSI snapshot data movement backup in the same way 
 - CSI plugin checks if a data movement is required, if so it creates a `DataUpload` CR and then returns to Velero backup.  
 - Velero now is able to back up other resources, including other PVC objects.  
 - Velero backup controller periodically queries the data movement status from CSI plugin, the period is configurable through the Velero server parameter `--item-operation-sync-frequency`, by default it is 10s. On the call, CSI plugin turns to check the phase of the `DataUpload` CRs.  
-- When all the `DataUpload` CRs come to a terminal state (i.e., `Completed`, `Failed` or `Cancelled`), Velero backup perists all the necessary information and finish the backup.  
+- When all the `DataUpload` CRs come to a terminal state (i.e., `Completed`, `Failed` or `Cancelled`), Velero backup persists all the necessary information and finish the backup.  
 
 - CSI plugin expects a data mover to handle the `DataUpload` CR. If no data mover is configured for the backup, Velero built-in data mover will handle it.  
 - If the `DataUpload` CR does not reach to the terminal state with in the given time, the `DataUpload` CR will be cancelled. You can set the timeout value per backup through the `--item-operation-timeout` parameter, the default value is `4 hours`.  

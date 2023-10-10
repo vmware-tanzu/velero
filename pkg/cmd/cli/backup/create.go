@@ -95,6 +95,7 @@ type CreateOptions struct {
 	ExcludeNamespaceScopedResources flag.StringArray
 	Labels                          flag.Map
 	Selector                        flag.LabelSelector
+	OrSelector                      flag.OrLabelSelector
 	IncludeClusterResources         flag.OptionalBool
 	Wait                            bool
 	StorageLocation                 string
@@ -130,6 +131,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.StorageLocation, "storage-location", "", "Location in which to store the backup.")
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "List of locations (at most one per provider) where volume snapshots should be stored.")
 	flags.VarP(&o.Selector, "selector", "l", "Only back up resources matching this label selector.")
+	flags.Var(&o.OrSelector, "or-selector", "Backup resources matching at least one of the label selector from the list. Label selectors should be separated by ' or '. For example, foo=bar or app=nginx")
 	flags.StringVar(&o.OrderedResources, "ordered-resources", "", "Mapping Kinds to an ordered list of specific resources of that Kind.  Resource names are separated by commas and their names are in format 'namespace/resourcename'. For cluster scope resource, simply use resource name. Key-value pairs in the mapping are separated by semi-colon.  Example: 'pods=ns1/pod1,ns1/pod2;persistentvolumeclaims=ns1/pvc4,ns1/pvc8'.  Optional.")
 	flags.DurationVar(&o.CSISnapshotTimeout, "csi-snapshot-timeout", o.CSISnapshotTimeout, "How long to wait for CSI snapshot creation before timeout.")
 	flags.DurationVar(&o.ItemOperationTimeout, "item-operation-timeout", o.ItemOperationTimeout, "How long to wait for async plugin operations before timeout.")
@@ -168,9 +170,8 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return err
 	}
 
-	client, err := f.KubebuilderWatchClient()
-	if err != nil {
-		return err
+	if o.Selector.LabelSelector != nil && o.OrSelector.OrLabelSelectors != nil {
+		return fmt.Errorf("either a 'selector' or an 'or-selector' can be specified, but not both")
 	}
 
 	// Ensure that unless FromSchedule is set, args contains a backup name
@@ -191,7 +192,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	if o.StorageLocation != "" {
 		location := &velerov1api.BackupStorageLocation{}
-		if err := client.Get(context.Background(), kbclient.ObjectKey{
+		if err := o.client.Get(context.Background(), kbclient.ObjectKey{
 			Namespace: f.Namespace(),
 			Name:      o.StorageLocation,
 		}, location); err != nil {
@@ -201,7 +202,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	for _, loc := range o.SnapshotLocations {
 		snapshotLocation := new(velerov1api.VolumeSnapshotLocation)
-		if err := o.client.Get(context.TODO(), kbclient.ObjectKey{Namespace: f.Namespace(), Name: loc}, snapshotLocation); err != nil {
+		if err := o.client.Get(context.Background(), kbclient.ObjectKey{Namespace: f.Namespace(), Name: loc}, snapshotLocation); err != nil {
 			return err
 		}
 	}
@@ -365,6 +366,7 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			IncludedNamespaceScopedResources(o.IncludeNamespaceScopedResources...).
 			ExcludedNamespaceScopedResources(o.ExcludeNamespaceScopedResources...).
 			LabelSelector(o.Selector.LabelSelector).
+			OrLabelSelector(o.OrSelector.OrLabelSelectors).
 			TTL(o.TTL).
 			StorageLocation(o.StorageLocation).
 			VolumeSnapshotLocations(o.SnapshotLocations...).

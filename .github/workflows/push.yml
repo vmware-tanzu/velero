@@ -48,7 +48,10 @@ jobs:
         version: latest
 
     - name: Build
-      run: make local
+      run: |
+        make local
+        # Clean go cache to ease the build environment storage pressure.
+        go clean -modcache -cache
 
     - name: Test
       run: make test
@@ -73,7 +76,7 @@ jobs:
       run: |
         sudo swapoff -a
         sudo rm -f /mnt/swapfile
-        docker image prune -a --force
+        docker system prune -a --force
               
         # Build and push Velero image to docker registry
         docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}

@@ -157,6 +157,12 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 	for _, podVolume := range data.Pod.Spec.Volumes {
 		podVolumes[podVolume.Name] = podVolume
 	}
+
+	repoIdentifier := ""
+	if repositoryType == velerov1api.BackupRepositoryTypeRestic {
+		repoIdentifier = repo.Spec.ResticIdentifier
+	}
+
 	for volume, backupInfo := range volumesToRestore {
 		volumeObj, ok := podVolumes[volume]
 		var pvc *corev1api.PersistentVolumeClaim
@@ -170,7 +176,7 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 			}
 		}
 
-		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, repo.Spec.ResticIdentifier, backupInfo.uploaderType, data.SourceNamespace, pvc)
+		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, repoIdentifier, backupInfo.uploaderType, data.SourceNamespace, pvc)
 
 		if err := errorOnly(r.veleroClient.VeleroV1().PodVolumeRestores(volumeRestore.Namespace).Create(context.TODO(), volumeRestore, metav1.CreateOptions{})); err != nil {
 			errs = append(errs, errors.WithStack(err))

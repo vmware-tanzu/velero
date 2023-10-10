@@ -397,7 +397,7 @@ Target volume information includes PVC and PV that represents the volume and the
 The data mover information and backup repository information are the same with DataUpload CRD.
 DataDownload CRD defines the same status as DataUpload CRD with nearly the same meanings.  
 
-Below is the full spec of DataUpload CRD:
+Below is the full spec of DataDownload CRD:
 ```
 apiVersion: apiextensions.k8s.io/v1alpha1
 kind: CustomResourceDefinition
@@ -703,33 +703,38 @@ type Provider interface {
 In this case, we will extend the default kopia uploader to add the ability, when a given volume is for a block mode and is mapped as a device, we will use the [StreamingFile](https://pkg.go.dev/github.com/kopia/kopia@v0.13.0/fs#StreamingFile) to stream the device and backup to the kopia repository. 
 
 ```go
-func getLocalBlockEntry(kopiaEntry fs.Entry, log logrus.FieldLogger) (fs.Entry, error) {
-	path := kopiaEntry.LocalFilesystemPath()
-
-	fileInfo, err := os.Lstat(path)
+func getLocalBlockEntry(sourcePath string) (fs.Entry, error) {
+	source, err := resolveSymlink(sourcePath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Unable to get the source device information %s", path)
+		return nil, errors.Wrap(err, "resolveSymlink")
+	}
+
+	fileInfo, err := os.Lstat(source)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to get the source device information %s", source)
 	}
 
 	if (fileInfo.Sys().(*syscall.Stat_t).Mode & syscall.S_IFMT) != syscall.S_IFBLK {
-		return nil, errors.Errorf("Source path %s is not a block device", path)
+		return nil, errors.Errorf("source path %s is not a block device", source)
 	}
-  	device, err := os.Open(path)
+
+	device, err := os.Open(source)
 	if err != nil {
 		if os.IsPermission(err) || err.Error() == ErrNotPermitted {
-			return nil, errors.Wrapf(err, "No permission to open the source device %s, make sure that node agent is running in privileged mode", path)
+			return nil, errors.Wrapf(err, "no permission to open the source device %s, make sure that node agent is running in privileged mode", source)
 		}
-		return nil, errors.Wrapf(err, "Unable to open the source device %s", path)
+		return nil, errors.Wrapf(err, "unable to open the source device %s", source)
 	}
-	return virtualfs.StreamingFileFromReader(kopiaEntry.Name(), device), nil
 
+	sf := virtualfs.StreamingFileFromReader(source, device)
+	return virtualfs.NewStaticDirectory(source, []fs.Entry{sf}), nil
 }
 ```
 
 In the `pkg/uploader/kopia/snapshot.go` this is used in the Backup call like
 
 ```go
-	if volMode == PersistentVolumeFilesystem {
+	if volMode == uploader.PersistentVolumeFilesystem {
 		// to be consistent with restic when backup empty dir returns one error for upper logic handle
 		dirs, err := os.ReadDir(source)
 		if err != nil {
@@ -742,15 +747,17 @@ In the `pkg/uploader/kopia/snapshot.go` this is used in the Backup call like
   source = filepath.Clean(source)
   ...
 
-  sourceEntry, err := getLocalFSEntry(source)
-	if err != nil {
-		return nil, false, errors.Wrap(err, "Unable to get local filesystem entry")
-	}
+	var sourceEntry fs.Entry
 
-  if volMode == PersistentVolumeBlock {
-		sourceEntry, err = getLocalBlockEntry(sourceEntry, log)
+	if volMode == uploader.PersistentVolumeBlock {
+		sourceEntry, err = getLocalBlockEntry(source)
 		if err != nil {
-			return nil, false, errors.Wrap(err, "Unable to get local block device entry")
+			return nil, false, errors.Wrap(err, "unable to get local block device entry")
+		}
+	} else {
+		sourceEntry, err = getLocalFSEntry(source)
+		if err != nil {
+			return nil, false, errors.Wrap(err, "unable to get local filesystem entry")
 		}
 	}
 
@@ -766,6 +773,8 @@ We only need to extend two functions the rest will be passed through.
 ```go
 type BlockOutput struct {
 	*restore.FilesystemOutput
+
+	targetFileName string
 }
 
 var _ restore.Output = &BlockOutput{}
@@ -773,30 +782,15 @@ var _ restore.Output = &BlockOutput{}
 const bufferSize = 128 * 1024
 
 func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remoteFile fs.File) error {
-
-	targetFileName, err := filepath.EvalSymlinks(o.TargetPath)
-	if err != nil {
-		return errors.Wrapf(err, "Unable to evaluate symlinks for %s", targetFileName)
-	}
-
-	fileInfo, err := os.Lstat(targetFileName)
-	if err != nil {
-		return errors.Wrapf(err, "Unable to get the target device information for %s", targetFileName)
-	}
-
-	if (fileInfo.Sys().(*syscall.Stat_t).Mode & syscall.S_IFMT) != syscall.S_IFBLK {
-		return errors.Errorf("Target file %s is not a block device", targetFileName)
-	}
-
 	remoteReader, err := remoteFile.Open(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to open remote file %s", remoteFile.Name())
+		return errors.Wrapf(err, "failed to open remote file %s", remoteFile.Name())
 	}
 	defer remoteReader.Close()
 
-	targetFile, err := os.Create(targetFileName)
+	targetFile, err := os.Create(o.targetFileName)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to open file %s", targetFileName)
+		return errors.Wrapf(err, "failed to open file %s", o.targetFileName)
 	}
 	defer targetFile.Close()
 
@@ -807,7 +801,7 @@ func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remote
 		bytesToWrite, err := remoteReader.Read(buffer)
 		if err != nil {
 			if err != io.EOF {
-				return errors.Wrapf(err, "Failed to read data from remote file %s", targetFileName)
+				return errors.Wrapf(err, "failed to read data from remote file %s", o.targetFileName)
 			}
 			readData = false
 		}
@@ -819,7 +813,7 @@ func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remote
 					bytesToWrite -= bytesWritten
 					offset += bytesWritten
 				} else {
-					return errors.Wrapf(err, "Failed to write data to file %s", targetFileName)
+					return errors.Wrapf(err, "failed to write data to file %s", o.targetFileName)
 				}
 			}
 		}
@@ -829,42 +823,43 @@ func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remote
 }
 
 func (o *BlockOutput) BeginDirectory(ctx context.Context, relativePath string, e fs.Directory) error {
-	targetFileName, err := filepath.EvalSymlinks(o.TargetPath)
+	var err error
+	o.targetFileName, err = filepath.EvalSymlinks(o.TargetPath)
 	if err != nil {
-		return errors.Wrapf(err, "Unable to evaluate symlinks for %s", targetFileName)
+		return errors.Wrapf(err, "unable to evaluate symlinks for %s", o.targetFileName)
 	}
 
-	fileInfo, err := os.Lstat(targetFileName)
+	fileInfo, err := os.Lstat(o.targetFileName)
 	if err != nil {
-		return errors.Wrapf(err, "Unable to get the target device information for %s", o.TargetPath)
+		return errors.Wrapf(err, "unable to get the target device information for %s", o.TargetPath)
 	}
 
 	if (fileInfo.Sys().(*syscall.Stat_t).Mode & syscall.S_IFMT) != syscall.S_IFBLK {
-		return errors.Errorf("Target file %s is not a block device", o.TargetPath)
+		return errors.Errorf("target file %s is not a block device", o.TargetPath)
 	}
 
 	return nil
 }
 ```
 
-Of note, we do need to add root access to the daemon set node agent to access the new mount. 
+Additional mount is required in the node-agent specification to resolve symlinks to the block devices from /host_pods/POD_ID/volumeDevices/kubernetes.io~csi directory.
 
 ```yaml
-...
             - mountPath: /var/lib/kubelet/plugins
               mountPropagation: HostToContainer
               name: host-plugins
-
 ....
         - hostPath:
             path: /var/lib/kubelet/plugins
           name: host-plugins
+```
 
-...
+Privileged mode is required to access the block devices in /var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/publish directory as confirmed by testing on EKS and Minikube.
+
+```yaml
 							SecurityContext: &corev1.SecurityContext{
-								Privileged: &c.privilegedAgent,
+								Privileged: &c.privilegedNodeAgent,
 							},
-
 ```
 
 ## Plugin Data Movers

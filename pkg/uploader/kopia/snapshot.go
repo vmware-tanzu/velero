@@ -68,6 +68,11 @@ func newOptionalInt(b int) *policy.OptionalInt {
 	return &ob
 }
 
+func newOptionalInt64(b int64) *policy.OptionalInt64 {
+	ob := policy.OptionalInt64(b)
+	return &ob
+}
+
 func newOptionalBool(b bool) *policy.OptionalBool {
 	ob := policy.OptionalBool(b)
 	return &ob
@@ -88,7 +93,7 @@ func getDefaultPolicy() *policy.Policy {
 		},
 		UploadPolicy: policy.UploadPolicy{
 			MaxParallelFileReads:    newOptionalInt(runtime.NumCPU()),
-			ParallelUploadAboveSize: nil,
+			ParallelUploadAboveSize: newOptionalInt64(math.MaxInt64),
 		},
 		SchedulingPolicy: policy.SchedulingPolicy{
 			Manual: true,
@@ -106,6 +111,11 @@ func setupDefaultPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceIn
 		return nil, errors.Wrap(err, "error to set policy")
 	}
 
+	err = rep.Flush(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "error to flush repo")
+	}
+
 	// retrieve policy from repo
 	policyTree, err := treeForSourceFunc(ctx, rep, sourceInfo)
 	if err != nil {
@@ -121,25 +131,22 @@ func Backup(ctx context.Context, fsUploader SnapshotUploader, repoWriter repo.Re
 	if fsUploader == nil {
 		return nil, false, errors.New("get empty kopia uploader")
 	}
-
-	if volMode == uploader.PersistentVolumeBlock {
-		return nil, false, errors.New("unable to handle block storage")
-	}
-
-	dir, err := filepath.Abs(sourcePath)
+	source, err := filepath.Abs(sourcePath)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "Invalid source path '%s'", sourcePath)
 	}
 
-	// to be consistent with restic when backup empty dir returns one error for upper logic handle
-	dirs, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, false, errors.Wrapf(err, "Unable to read dir in path %s", dir)
-	} else if len(dirs) == 0 {
-		return nil, true, nil
+	if volMode == uploader.PersistentVolumeFilesystem {
+		// to be consistent with restic when backup empty dir returns one error for upper logic handle
+		dirs, err := os.ReadDir(source)
+		if err != nil {
+			return nil, false, errors.Wrapf(err, "Unable to read dir in path %s", source)
+		} else if len(dirs) == 0 {
+			return nil, true, nil
+		}
 	}
 
-	dir = filepath.Clean(dir)
+	source = filepath.Clean(source)
 
 	sourceInfo := snapshot.SourceInfo{
 		UserName: udmrepo.GetRepoUser(),
@@ -147,16 +154,25 @@ func Backup(ctx context.Context, fsUploader SnapshotUploader, repoWriter repo.Re
 		Path:     filepath.Clean(realSource),
 	}
 	if realSource == "" {
-		sourceInfo.Path = dir
+		sourceInfo.Path = source
 	}
 
-	rootDir, err := getLocalFSEntry(dir)
-	if err != nil {
-		return nil, false, errors.Wrap(err, "Unable to get local filesystem entry")
+	var sourceEntry fs.Entry
+
+	if volMode == uploader.PersistentVolumeBlock {
+		sourceEntry, err = getLocalBlockEntry(source)
+		if err != nil {
+			return nil, false, errors.Wrap(err, "unable to get local block device entry")
+		}
+	} else {
+		sourceEntry, err = getLocalFSEntry(source)
+		if err != nil {
+			return nil, false, errors.Wrap(err, "unable to get local filesystem entry")
+		}
 	}
 
 	kopiaCtx := kopia.SetupKopiaLog(ctx, log)
-	snapID, snapshotSize, err := SnapshotSource(kopiaCtx, repoWriter, fsUploader, sourceInfo, rootDir, forceFull, parentSnapshot, tags, log, "Kopia Uploader")
+	snapID, snapshotSize, err := SnapshotSource(kopiaCtx, repoWriter, fsUploader, sourceInfo, sourceEntry, forceFull, parentSnapshot, tags, log, "Kopia Uploader")
 	if err != nil {
 		return nil, false, err
 	}
@@ -338,7 +354,8 @@ func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sour
 }
 
 // Restore restore specific sourcePath with given snapshotID and update progress
-func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress, snapshotID, dest string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
+func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode,
+	log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
 	log.Info("Start to restore...")
 
 	kopiaCtx := kopia.SetupKopiaLog(ctx, log)
@@ -360,7 +377,7 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 		return 0, 0, errors.Wrapf(err, "Unable to resolve path %v", dest)
 	}
 
-	output := &restore.FilesystemOutput{
+	fsOutput := &restore.FilesystemOutput{
 		TargetPath:             path,
 		OverwriteDirectories:   true,
 		OverwriteFiles:         true,
@@ -368,9 +385,16 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 		IgnorePermissionErrors: true,
 	}
 
-	err = output.Init(ctx)
+	err = fsOutput.Init(ctx)
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "error to init output")
+	}
+
+	var output restore.Output = fsOutput
+	if volMode == uploader.PersistentVolumeBlock {
+		output = &BlockOutput{
+			FilesystemOutput: fsOutput,
+		}
 	}
 
 	stat, err := restoreEntryFunc(kopiaCtx, rep, output, rootEntry, restore.Options{

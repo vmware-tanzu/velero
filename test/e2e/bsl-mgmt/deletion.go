@@ -159,7 +159,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 				Expect(AddLabelToPod(context.Background(), "kibishii-deployment-1", bslDeletionTestNs, label_2)).To(Succeed())
 			})
 
-			By("Get all 2 PVCs of Kibishii and label them seprately ", func() {
+			By("Get all 2 PVCs of Kibishii and label them separately ", func() {
 				pvc, err := GetPvcByPVCName(context.Background(), bslDeletionTestNs, podName_1)
 				Expect(err).To(Succeed())
 				fmt.Println(pvc)

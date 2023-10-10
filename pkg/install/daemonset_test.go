@@ -35,7 +35,7 @@ func TestDaemonSet(t *testing.T) {
 
 	ds = DaemonSet("velero", WithSecret(true))
 	assert.Equal(t, 7, len(ds.Spec.Template.Spec.Containers[0].Env))
-	assert.Equal(t, 3, len(ds.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 4, len(ds.Spec.Template.Spec.Volumes))
 
 	ds = DaemonSet("velero", WithFeatures([]string{"foo,bar,baz"}))
 	assert.Len(t, ds.Spec.Template.Spec.Containers[0].Args, 3)

@@ -6,7 +6,6 @@
 
 | Maintainer          | GitHub ID                                                     | Affiliation                                      |
 |---------------------|---------------------------------------------------------------|--------------------------------------------------|
-| Dave Smith-Uchida   | [dsu-igeek](https://github.com/dsu-igeek)                     | [Kasten](https://github.com/kastenhq/)           |
 | Scott Seago         | [sseago](https://github.com/sseago)                           | [OpenShift](https://github.com/openshift)        |
 | Daniel Jiang        | [reasonerjt](https://github.com/reasonerjt)                   | [VMware](https://www.github.com/vmware/)         |
 | Wenkai Yin          | [ywk253100](https://github.com/ywk253100)                     | [VMware](https://www.github.com/vmware/)         |
@@ -26,12 +25,12 @@
 * Carlisia Thompson ([carlisia](https://github.com/carlisia))
 * Bridget McErlean ([zubron](https://github.com/zubron))
 * JenTing Hsiao ([jenting](https://github.com/jenting))
-
+* Dave Smith-Uchida ([dsu-igeek](https://github.com/dsu-igeek))
+  
 ## Velero Contributors & Stakeholders
 
 | Feature Area           |                                         Lead                                         |
 |------------------------|:------------------------------------------------------------------------------------:|
-| Architect              |             Dave Smith-Uchida [dsu-igeek](https://github.com/dsu-igeek)              |
 | Technical Lead         |               Daniel Jiang [reasonerjt](https://github.com/reasonerjt)               |
 | Kubernetes CSI Liaison |                                                                                      |
 | Deployment             |                                                                                      |

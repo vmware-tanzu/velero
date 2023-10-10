@@ -144,7 +144,7 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 					log.WithError(err).Error("fail to get restore for DownloadRequest")
 					return ctrl.Result{}, nil
 				}
-				log.Warnf("Fail to get restore for DownloadRequest %s. Retry later.", err.Error())
+				log.Warnf("fail to get restore for DownloadRequest %s. Retry later.", err.Error())
 				return ctrl.Result{}, errors.WithStack(err)
 			}
 			backupName = restore.Spec.BackupName
@@ -172,7 +172,7 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				log.Errorf("BSL for DownloadRequest cannot be found")
 				return ctrl.Result{}, nil
 			}
-			log.Warnf("Fail to get BSL for DownloadRequest: %s", err.Error())
+			log.Warnf("fail to get BSL for DownloadRequest: %s", err.Error())
 			return ctrl.Result{}, errors.WithStack(err)
 		}
 

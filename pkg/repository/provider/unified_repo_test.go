@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	awscredentials "github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/kopia/kopia/repo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -648,7 +649,28 @@ func TestPrepareRepo(t *testing.T) {
 				}
 				return errors.New("fake-error-2")
 			},
-			expectedErr: "error to init backup repo: fake-error-2",
+			expectedErr: "error to connect to backup repo: fake-error-1",
+		},
+		{
+			name:            "not initialize",
+			getter:          new(credmock.SecretStore),
+			credStoreReturn: "fake-password",
+			funcTable: localFuncTable{
+				getStorageVariables: func(*velerov1api.BackupStorageLocation, string, string) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+				getStorageCredentials: func(*velerov1api.BackupStorageLocation, velerocredentials.FileStore) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+			},
+			repoService: new(reposervicenmocks.BackupRepoService),
+			retFuncInit: func(ctx context.Context, repoOption udmrepo.RepoOptions, createNew bool) error {
+				if !createNew {
+					return repo.ErrRepositoryNotInitialized
+				}
+				return errors.New("fake-error-2")
+			},
+			expectedErr: "error to create backup repo: fake-error-2",
 		},
 	}
 

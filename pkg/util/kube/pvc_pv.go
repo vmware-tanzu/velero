@@ -316,3 +316,23 @@ func WaitPVBound(ctx context.Context, pvGetter corev1client.CoreV1Interface, pvN
 func IsPVCBound(pvc *corev1api.PersistentVolumeClaim) bool {
 	return pvc.Spec.VolumeName != ""
 }
+
+// MakePodPVCAttachment returns the volume mounts and devices for a pod needed to attach a PVC
+func MakePodPVCAttachment(volumeName string, volumeMode *corev1api.PersistentVolumeMode) ([]corev1api.VolumeMount, []corev1api.VolumeDevice) {
+	var volumeMounts []corev1api.VolumeMount = nil
+	var volumeDevices []corev1api.VolumeDevice = nil
+
+	if volumeMode != nil && *volumeMode == corev1api.PersistentVolumeBlock {
+		volumeDevices = []corev1api.VolumeDevice{{
+			Name:       volumeName,
+			DevicePath: "/" + volumeName,
+		}}
+	} else {
+		volumeMounts = []corev1api.VolumeMount{{
+			Name:      volumeName,
+			MountPath: "/" + volumeName,
+		}}
+	}
+
+	return volumeMounts, volumeDevices
+}

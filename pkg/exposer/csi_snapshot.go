@@ -233,9 +233,12 @@ func (e *csiSnapshotExposer) CleanUp(ctx context.Context, ownerObject corev1.Obj
 }
 
 func getVolumeModeByAccessMode(accessMode string) (corev1.PersistentVolumeMode, error) {
-	if accessMode == AccessModeFileSystem {
+	switch accessMode {
+	case AccessModeFileSystem:
 		return corev1.PersistentVolumeFilesystem, nil
-	} else {
+	case AccessModeBlock:
+		return corev1.PersistentVolumeBlock, nil
+	default:
 		return "", errors.Errorf("unsupported access mode %s", accessMode)
 	}
 }
@@ -356,6 +359,13 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 	}
 
 	var gracePeriod int64 = 0
+	volumeMounts, volumeDevices := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode)
+
+	if label == nil {
+		label = make(map[string]string)
+	}
+
+	label[podGroupLabel] = podGroupSnapshot
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -373,16 +383,26 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 			Labels: label,
 		},
 		Spec: corev1.PodSpec{
+			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "kubernetes.io/hostname",
+					WhenUnsatisfiable: corev1.ScheduleAnyway,
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							podGroupLabel: podGroupSnapshot,
+						},
+					},
+				},
+			},
 			Containers: []corev1.Container{
 				{
 					Name:            containerName,
 					Image:           podInfo.image,
 					ImagePullPolicy: corev1.PullNever,
 					Command:         []string{"/velero-helper", "pause"},
-					VolumeMounts: []corev1.VolumeMount{{
-						Name:      volumeName,
-						MountPath: "/" + volumeName,
-					}},
+					VolumeMounts:    volumeMounts,
+					VolumeDevices:   volumeDevices,
 				},
 			},
 			ServiceAccountName:            podInfo.serviceAccount,

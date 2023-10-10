@@ -77,7 +77,7 @@ backup which created the backup repository, then Velero will not be able to conn
 ### Configure Node Agent DaemonSet spec
 
 After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the node-agent DaemonSet spec. 
-The steps in this section are only needed if you are installing on RancherOS, OpenShift, VMware Tanzu Kubernetes Grid 
+The steps in this section are only needed if you are installing on RancherOS, Nutanix, OpenShift, VMware Tanzu Kubernetes Grid 
 Integrated Edition (formerly VMware Enterprise PKS), or Microsoft Azure.  
 
 
@@ -99,6 +99,23 @@ hostPath:
   path: /opt/rke/var/lib/kubelet/pods
 ```
 
+**Nutanix**
+
+
+Update the host path for volumes in the node-agent DaemonSet in the Velero namespace from `/var/lib/kubelet/pods` to
+`/var/nutanix/var/lib/kubelet`.
+
+```yaml
+hostPath:
+  path: /var/lib/kubelet/pods
+```
+
+to
+
+```yaml
+hostPath:
+  path: /var/nutanix/var/lib/kubelet
+```
 
 **OpenShift**
 
@@ -111,24 +128,10 @@ To mount the correct hostpath to pods volumes, run the node-agent pod in `privil
     oc adm policy add-scc-to-user privileged -z velero -n velero
     ```
 
-2. Modify the DaemonSet yaml to request a privileged mode:
-
-    ```diff
-    @@ -67,3 +67,5 @@ spec:
-                  value: /credentials/cloud
-                - name: VELERO_SCRATCH_DIR
-                  value: /scratch
-    +          securityContext:
-    +            privileged: true
+2. Install Velero with the '--privileged-node-agent' option to request a privileged mode:
+  
     ```
-
-    or
-
-    ```shell
-    oc patch ds/node-agent \
-      --namespace velero \
-      --type json \
-      -p '[{"op":"add","path":"/spec/template/spec/containers/0/securityContext","value": { "privileged": true}}]'
+    velero install --use-node-agent --privileged-node-agent
     ```
 
 

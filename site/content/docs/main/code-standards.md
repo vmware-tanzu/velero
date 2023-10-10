@@ -8,6 +8,24 @@ toc: "true"
 
 When opening a pull request, please fill out the checklist supplied the template. This will help others properly categorize and review your pull request.
 
+### PR title
+
+Make sure that the pull request title summarizes the change made (and not just "fixes issue #xxxx"):
+
+Example PR titles:
+
+ - "Check for nil when validating foo"
+ - "Issue #1234: Check for nil when validating foo"
+
+### Cherry-pick PRs
+
+When a PR to main needs to be cherry-picked to a release branch, please wait until the main PR is merged first before creating the CP PR. If the CP PR is made before the main PR is merged, there is a risk that PR modifications in response to review comments will not make it into the CP PR.
+
+The Cherry-pick PR title should reference the branch it's cherry-picked to and the fact that it's a CP of a commit to main:
+
+ - "[release-1.13 CP] Issue #1234: Check for nil when validating foo"
+
+
 ## Adding a changelog
 
 Authors are expected to include a changelog file with their pull requests. The changelog file
@@ -108,7 +126,7 @@ Signed-off-by: Joe Beda <joe@heptio.com>
 
 This can easily be done with the `--signoff` option to `git commit`.
 
-By doing this you state that you can certify the following (from https://developercertificate.org/):
+By doing this you state that you can certify the following (from [https://developercertificate.org/](https://developercertificate.org/)):
 
 ```
 Developer Certificate of Origin

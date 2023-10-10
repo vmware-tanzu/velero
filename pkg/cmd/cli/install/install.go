@@ -66,6 +66,7 @@ type Options struct {
 	BackupStorageConfig       flag.Map
 	VolumeSnapshotConfig      flag.Map
 	UseNodeAgent              bool
+	PrivilegedNodeAgent       bool
 	//TODO remove UseRestic when migration test out of using it
 	UseRestic                       bool
 	Wait                            bool
@@ -110,6 +111,7 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "Run the server in restore-only mode. Optional.")
 	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "Generate resources, but don't send them to the cluster. Use with -o. Optional.")
 	flags.BoolVar(&o.UseNodeAgent, "use-node-agent", o.UseNodeAgent, "Create Velero node-agent daemonset. Optional. Velero node-agent hosts Velero modules that need to run in one or more nodes(i.e. Restic, Kopia).")
+	flags.BoolVar(&o.PrivilegedNodeAgent, "privileged-node-agent", o.PrivilegedNodeAgent, "Use privileged mode for the node agent. Optional. Required to backup block devices.")
 	flags.BoolVar(&o.Wait, "wait", o.Wait, "Wait for Velero deployment to be ready. Optional.")
 	flags.DurationVar(&o.DefaultRepoMaintenanceFrequency, "default-repo-maintain-frequency", o.DefaultRepoMaintenanceFrequency, "How often 'maintain' is run for backup repositories by default. Optional.")
 	flags.DurationVar(&o.GarbageCollectionFrequency, "garbage-collection-frequency", o.GarbageCollectionFrequency, "How often the garbage collection runs for expired backups.(default 1h)")
@@ -198,6 +200,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		SecretData:                      secretData,
 		RestoreOnly:                     o.RestoreOnly,
 		UseNodeAgent:                    o.UseNodeAgent,
+		PrivilegedNodeAgent:             o.PrivilegedNodeAgent,
 		UseVolumeSnapshots:              o.UseVolumeSnapshots,
 		BSLConfig:                       o.BackupStorageConfig.Data(),
 		VSLConfig:                       o.VolumeSnapshotConfig.Data(),

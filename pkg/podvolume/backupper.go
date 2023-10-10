@@ -200,10 +200,11 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	b.resultsLock.Unlock()
 
 	var (
-		errs              []error
-		podVolumeBackups  []*velerov1api.PodVolumeBackup
-		podVolumes        = make(map[string]corev1api.Volume)
-		mountedPodVolumes = sets.String{}
+		errs               []error
+		podVolumeBackups   []*velerov1api.PodVolumeBackup
+		podVolumes         = make(map[string]corev1api.Volume)
+		mountedPodVolumes  = sets.String{}
+		attachedPodDevices = sets.String{}
 	)
 	pvcSummary := NewPVCBackupSummary()
 
@@ -233,6 +234,14 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		for _, volumeMount := range container.VolumeMounts {
 			mountedPodVolumes.Insert(volumeMount.Name)
 		}
+		for _, volumeDevice := range container.VolumeDevices {
+			attachedPodDevices.Insert(volumeDevice.Name)
+		}
+	}
+
+	repoIdentifier := ""
+	if repositoryType == velerov1api.BackupRepositoryTypeRestic {
+		repoIdentifier = repo.Spec.ResticIdentifier
 	}
 
 	var numVolumeSnapshots int
@@ -263,6 +272,15 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			continue
 		}
 
+		// check if volume is a block volume
+		if attachedPodDevices.Has(volumeName) {
+			msg := fmt.Sprintf("volume %s declared in pod %s/%s is a block volume. Block volumes are not supported for fs backup, skipping",
+				volumeName, pod.Namespace, pod.Name)
+			log.Warn(msg)
+			pvcSummary.addSkipped(volumeName, msg)
+			continue
+		}
+
 		// volumes that are not mounted by any container should not be backed up, because
 		// its directory is not created
 		if !mountedPodVolumes.Has(volumeName) {
@@ -283,7 +301,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			}
 		}
 
-		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, b.uploaderType, pvc)
+		volumeBackup := newPodVolumeBackup(backup, pod, volume, repoIdentifier, b.uploaderType, pvc)
 		if _, err = b.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(context.TODO(), volumeBackup, metav1.CreateOptions{}); err != nil {
 			errs = append(errs, err)
 			continue
