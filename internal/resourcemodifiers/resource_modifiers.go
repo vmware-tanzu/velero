@@ -163,7 +163,7 @@ func unmarshalResourceModifiers(yamlData []byte) (*ResourceModifiers, error) {
 	resModifiers := &ResourceModifiers{}
 	err := yaml.UnmarshalStrict(yamlData, resModifiers)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode yaml data into resource modifiers  %v", err)
+		return nil, fmt.Errorf("failed to decode yaml data into resource modifiers, err: %s", err)
 	}
 	return resModifiers, nil
 }

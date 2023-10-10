@@ -120,6 +120,64 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
+	cm5 := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupResource: pods\n    namespaces:\n    - ns1\n  mergePatches:\n  - patchData:\n      metadata:\n        annotations:\n          foo: null",
+		},
+	}
+
+	rules5 := &ResourceModifiers{
+		Version: "v1",
+		ResourceModifierRules: []ResourceModifierRule{
+			{
+				Conditions: Conditions{
+					GroupResource: "pods",
+					Namespaces: []string{
+						"ns1",
+					},
+				},
+				MergePatches: []JSONMergePatch{
+					{
+						PatchData: []byte(`{"metadata":{"annotations":{"foo":null}}}`),
+					},
+				},
+			},
+		},
+	}
+
+	cm6 := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupResource: pods\n    namespaces:\n    - ns1\n  strategicPatches:\n  - patchData:\n      spec:\n        containers:\n        - name: nginx\n          image: repo2/nginx",
+		},
+	}
+
+	rules6 := &ResourceModifiers{
+		Version: "v1",
+		ResourceModifierRules: []ResourceModifierRule{
+			{
+				Conditions: Conditions{
+					GroupResource: "pods",
+					Namespaces: []string{
+						"ns1",
+					},
+				},
+				StrategicPatches: []StrategicMergePatch{
+					{
+						PatchData: []byte(`{"spec":{"containers":[{"image":"repo2/nginx","name":"nginx"}]}}`),
+					},
+				},
+			},
+		},
+	}
+
 	type args struct {
 		cm *v1.ConfigMap
 	}
@@ -169,6 +227,22 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "complex payload with json merge patch",
+			args: args{
+				cm: cm5,
+			},
+			want:    rules5,
+			wantErr: false,
+		},
+		{
+			name: "complex payload with strategic merge patch",
+			args: args{
+				cm: cm6,
+			},
+			want:    rules6,
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -178,7 +252,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetResourceModifiersFromConfig() = %v, want %v", got, tt.want)
+				t.Errorf("GetResourceModifiersFromConfig() = %#v, want %#v", got, tt.want)
 			}
 		})
 	}
@@ -910,7 +984,7 @@ func TestResourceModifiers_ApplyResourceModifierRules_StrategicMergePatch(t *tes
 						},
 						StrategicPatches: []StrategicMergePatch{
 							{
-								PatchBytes: []byte(`{"spec":{"containers":[{"name":"nginx","image":"nginx1"}]}}`),
+								PatchData: []byte(`{"spec":{"containers":[{"name":"nginx","image":"nginx1"}]}}`),
 							},
 						},
 					},
@@ -933,7 +1007,7 @@ func TestResourceModifiers_ApplyResourceModifierRules_StrategicMergePatch(t *tes
 						},
 						StrategicPatches: []StrategicMergePatch{
 							{
-								PatchBytes: []byte(`spec:
+								PatchData: []byte(`spec:
   containers:
   - name: nginx
     image: nginx1`),
@@ -959,7 +1033,7 @@ func TestResourceModifiers_ApplyResourceModifierRules_StrategicMergePatch(t *tes
 						},
 						StrategicPatches: []StrategicMergePatch{
 							{
-								PatchBytes: []byte(`{"spec":{"volumes":[{"nfs":null,"name":"vol1","persistentVolumeClaim":{"claimName":"pvc1"}}]}}`),
+								PatchData: []byte(`{"spec":{"volumes":[{"nfs":null,"name":"vol1","persistentVolumeClaim":{"claimName":"pvc1"}}]}}`),
 							},
 						},
 					},
@@ -982,7 +1056,7 @@ func TestResourceModifiers_ApplyResourceModifierRules_StrategicMergePatch(t *tes
 						},
 						StrategicPatches: []StrategicMergePatch{
 							{
-								PatchBytes: []byte(`{"spec":{"volumes":[{"$retainKeys":["name","persistentVolumeClaim"],"name":"vol1","persistentVolumeClaim":{"claimName":"pvc1"}}]}}`),
+								PatchData: []byte(`{"spec":{"volumes":[{"$retainKeys":["name","persistentVolumeClaim"],"name":"vol1","persistentVolumeClaim":{"claimName":"pvc1"}}]}}`),
 							},
 						},
 					},
@@ -1005,7 +1079,7 @@ func TestResourceModifiers_ApplyResourceModifierRules_StrategicMergePatch(t *tes
 						},
 						StrategicPatches: []StrategicMergePatch{
 							{
-								PatchBytes: []byte(`{"spec":{"$setElementOrder/ports":[{"port":8001},{"port":9000},{"port":8002}],"ports":[{"name":"fake","port":9000,"protocol":"TCP","targetPort":9000},{"$patch":"delete","port":8000}]}}`),
+								PatchData: []byte(`{"spec":{"$setElementOrder/ports":[{"port":8001},{"port":9000},{"port":8002}],"ports":[{"name":"fake","port":9000,"protocol":"TCP","targetPort":9000},{"$patch":"delete","port":8000}]}}`),
 							},
 						},
 					},
@@ -1062,7 +1136,7 @@ func TestResourceModifiers_ApplyResourceModifierRules_JSONMergePatch(t *testing.
 						},
 						MergePatches: []JSONMergePatch{
 							{
-								PatchBytes: []byte(`{"metadata":{"labels":{"a":"c"}}}`),
+								PatchData: []byte(`{"metadata":{"labels":{"a":"c"}}}`),
 							},
 						},
 					},
@@ -1085,7 +1159,7 @@ func TestResourceModifiers_ApplyResourceModifierRules_JSONMergePatch(t *testing.
 						},
 						MergePatches: []JSONMergePatch{
 							{
-								PatchBytes: []byte(`metadata:
+								PatchData: []byte(`metadata:
   labels:
     a: c`),
 							},
@@ -1110,7 +1184,7 @@ func TestResourceModifiers_ApplyResourceModifierRules_JSONMergePatch(t *testing.
 						},
 						MergePatches: []JSONMergePatch{
 							{
-								PatchBytes: []byte(`{"metadata":{"labels":{"a":null}}}`),
+								PatchData: []byte(`{"metadata":{"labels":{"a":null}}}`),
 							},
 						},
 					},
@@ -1133,7 +1207,7 @@ func TestResourceModifiers_ApplyResourceModifierRules_JSONMergePatch(t *testing.
 						},
 						MergePatches: []JSONMergePatch{
 							{
-								PatchBytes: []byte(`{"metadata":{"labels":{"a":"b"}}}`),
+								PatchData: []byte(`{"metadata":{"labels":{"a":"b"}}}`),
 							},
 						},
 					},
@@ -1156,7 +1230,7 @@ func TestResourceModifiers_ApplyResourceModifierRules_JSONMergePatch(t *testing.
 						},
 						MergePatches: []JSONMergePatch{
 							{
-								PatchBytes: []byte(`{"metadata":{"labels":{"a":null}}}`),
+								PatchData: []byte(`{"metadata":{"labels":{"a":null}}}`),
 							},
 						},
 					},
@@ -1209,7 +1283,7 @@ func TestResourceModifiers_wildcard_in_GroupResource(t *testing.T) {
 						},
 						MergePatches: []JSONMergePatch{
 							{
-								PatchBytes: []byte(`{"metadata":{"labels":{"a":"c"}}}`),
+								PatchData: []byte(`{"metadata":{"labels":{"a":"c"}}}`),
 							},
 						},
 					},
@@ -1232,7 +1306,7 @@ func TestResourceModifiers_wildcard_in_GroupResource(t *testing.T) {
 						},
 						MergePatches: []JSONMergePatch{
 							{
-								PatchBytes: []byte(`{"metadata":{"labels":{"a":"c"}}}`),
+								PatchData: []byte(`{"metadata":{"labels":{"a":"c"}}}`),
 							},
 						},
 					},
@@ -1291,7 +1365,7 @@ func TestResourceModifiers_conditional_patches(t *testing.T) {
 						},
 						MergePatches: []JSONMergePatch{
 							{
-								PatchBytes: []byte(`{"metadata":{"labels":{"a":"c"}}}`),
+								PatchData: []byte(`{"metadata":{"labels":{"a":"c"}}}`),
 							},
 						},
 					},
@@ -1320,7 +1394,7 @@ func TestResourceModifiers_conditional_patches(t *testing.T) {
 						},
 						MergePatches: []JSONMergePatch{
 							{
-								PatchBytes: []byte(`{"metadata":{"labels":{"a":"c"}}}`),
+								PatchData: []byte(`{"metadata":{"labels":{"a":"c"}}}`),
 							},
 						},
 					},

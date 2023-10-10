@@ -1,6 +1,7 @@
 package resourcemodifiers
 
 import (
+	"encoding/json"
 	"fmt"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -10,7 +11,7 @@ import (
 )
 
 type JSONMergePatch struct {
-	PatchBytes []byte `json:"patchBytes,omitempty"`
+	PatchData json.RawMessage `json:"patchData,omitempty"`
 }
 
 type JSONMergePatcher struct {
@@ -24,14 +25,14 @@ func (p *JSONMergePatcher) Patch(u *unstructured.Unstructured, _ logrus.FieldLog
 	}
 
 	for _, patch := range p.patches {
-		patchBytes, err := yaml.YAMLToJSON(patch.PatchBytes)
+		patchBytes, err := yaml.YAMLToJSON(patch.PatchData)
 		if err != nil {
 			return nil, fmt.Errorf("error in converting YAML to JSON %s", err)
 		}
 
 		objBytes, err = jsonpatch.MergePatch(objBytes, patchBytes)
 		if err != nil {
-			return nil, fmt.Errorf("error in applying JSON Patch %s", err.Error())
+			return nil, fmt.Errorf("error in applying JSON Patch: %s", err.Error())
 		}
 	}
 

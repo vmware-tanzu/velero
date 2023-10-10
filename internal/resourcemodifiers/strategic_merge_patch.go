@@ -1,6 +1,7 @@
 package resourcemodifiers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -13,12 +14,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/json"
+	kubejson "sigs.k8s.io/json"
 	"sigs.k8s.io/yaml"
 )
 
 type StrategicMergePatch struct {
-	PatchBytes []byte `json:"patchBytes,omitempty"`
+	PatchData json.RawMessage `json:"patchData,omitempty"`
 }
 
 type StrategicMergePatcher struct {
@@ -36,7 +37,7 @@ func (p *StrategicMergePatcher) Patch(u *unstructured.Unstructured, _ logrus.Fie
 	origin := u.DeepCopy()
 	updated := u.DeepCopy()
 	for _, patch := range p.patches {
-		patchBytes, err := yaml.YAMLToJSON(patch.PatchBytes)
+		patchBytes, err := yaml.YAMLToJSON(patch.PatchData)
 		if err != nil {
 			return nil, fmt.Errorf("error in converting YAML to JSON %s", err)
 		}
@@ -72,12 +73,12 @@ func strategicPatchObject(
 	patchMap := make(map[string]interface{})
 	var strictErrs []error
 	if validationDirective == metav1.FieldValidationWarn || validationDirective == metav1.FieldValidationStrict {
-		strictErrs, err = json.UnmarshalStrict(patchBytes, &patchMap)
+		strictErrs, err = kubejson.UnmarshalStrict(patchBytes, &patchMap)
 		if err != nil {
 			return apierrors.NewBadRequest(err.Error())
 		}
 	} else {
-		if err = json.UnmarshalCaseSensitivePreserveInts(patchBytes, &patchMap); err != nil {
+		if err = kubejson.UnmarshalCaseSensitivePreserveInts(patchBytes, &patchMap); err != nil {
 			return apierrors.NewBadRequest(err.Error())
 		}
 	}
