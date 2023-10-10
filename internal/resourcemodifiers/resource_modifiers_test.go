@@ -1282,7 +1282,7 @@ func TestResourceModifiers_conditional_patches(t *testing.T) {
 						Conditions: Conditions{
 							GroupResource: "*",
 							Namespaces:    []string{"fake"},
-							Matches: []JSONPatch{
+							Matches: []MatchRule{
 								{
 									Path:  "/metadata/labels/a",
 									Value: "b",
@@ -1311,7 +1311,7 @@ func TestResourceModifiers_conditional_patches(t *testing.T) {
 						Conditions: Conditions{
 							GroupResource: "*",
 							Namespaces:    []string{"fake"},
-							Matches: []JSONPatch{
+							Matches: []MatchRule{
 								{
 									Path:  "/metadata/labels/a",
 									Value: "c",

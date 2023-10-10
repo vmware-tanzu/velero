@@ -23,17 +23,21 @@ const (
 	ResourceModifierSupportedVersionV1 = "v1"
 )
 
+type MatchRule struct {
+	Path  string `json:"path,omitempty"`
+	Value string `json:"value,omitempty"`
+}
+
 type Conditions struct {
 	Namespaces        []string              `json:"namespaces,omitempty"`
 	GroupResource     string                `json:"groupResource"`
 	ResourceNameRegex string                `json:"resourceNameRegex,omitempty"`
 	LabelSelector     *metav1.LabelSelector `json:"labelSelector,omitempty"`
-	Matches           []JSONPatch           `json:"matches,omitempty"`
+	Matches           []MatchRule           `json:"matches,omitempty"`
 }
 
 type ResourceModifierRule struct {
 	Conditions       Conditions            `json:"conditions"`
-	PatchData        string                `json:"patchData,omitempty"`
 	Patches          []JSONPatch           `json:"patches,omitempty"`
 	MergePatches     []JSONMergePatch      `json:"mergePatches,omitempty"`
 	StrategicPatches []StrategicMergePatch `json:"strategicPatches,omitempty"`
@@ -85,7 +89,7 @@ func (r *ResourceModifierRule) apply(obj *unstructured.Unstructured, groupResour
 
 	g, err := glob.Compile(r.Conditions.GroupResource)
 	if err != nil {
-		log.Errorf("bad glob pattern %s, err: %s", r.Conditions.GroupResource, err)
+		log.Errorf("Bad glob pattern of groupResource in condition, groupResource: %s, err: %s", r.Conditions.GroupResource, err)
 		return err
 	}
 
@@ -129,16 +133,18 @@ func (r *ResourceModifierRule) apply(obj *unstructured.Unstructured, groupResour
 	return nil
 }
 
-func matchConditions(u *unstructured.Unstructured, patches []JSONPatch, _ logrus.FieldLogger) (bool, error) {
+func matchConditions(u *unstructured.Unstructured, patches []MatchRule, _ logrus.FieldLogger) (bool, error) {
 	if len(patches) == 0 {
 		return true, nil
 	}
 
 	var fixed []JSONPatch
 	for _, patch := range patches {
-		patch.From = ""
-		patch.Operation = "test"
-		fixed = append(fixed, patch)
+		fixed = append(fixed, JSONPatch{
+			Operation: "test",
+			Path:      patch.Path,
+			Value:     patch.Value,
+		})
 	}
 
 	p := &JSONPatcher{patches: fixed}

@@ -114,6 +114,32 @@ func TestResourceModifiers_Validate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "More than one patch type in a rule",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupResource: "*",
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "test",
+								Path:      "/spec/storageClassName",
+								Value:     "premium",
+							},
+						},
+						MergePatches: []JSONMergePatch{
+							{
+								PatchBytes: []byte(`{"metadata":{"labels":{"a":null}}}`),
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
