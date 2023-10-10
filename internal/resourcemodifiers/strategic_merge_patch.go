@@ -7,7 +7,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -42,7 +41,7 @@ func (p *StrategicMergePatcher) Patch(u *unstructured.Unstructured, _ logrus.Fie
 			return nil, fmt.Errorf("error in converting YAML to JSON %s", err)
 		}
 
-		err = strategicPatchObject(origin, patchBytes, updated, schemaReferenceObj, metav1.FieldValidationStrict)
+		err = strategicPatchObject(origin, patchBytes, updated, schemaReferenceObj)
 		if err != nil {
 			return nil, fmt.Errorf("error in applying Strategic Patch %s", err.Error())
 		}
@@ -63,7 +62,6 @@ func strategicPatchObject(
 	patchBytes []byte,
 	objToUpdate runtime.Object,
 	schemaReferenceObj runtime.Object,
-	validationDirective string,
 ) error {
 	originalObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(originalObject)
 	if err != nil {
@@ -72,18 +70,12 @@ func strategicPatchObject(
 
 	patchMap := make(map[string]interface{})
 	var strictErrs []error
-	if validationDirective == metav1.FieldValidationWarn || validationDirective == metav1.FieldValidationStrict {
-		strictErrs, err = kubejson.UnmarshalStrict(patchBytes, &patchMap)
-		if err != nil {
-			return apierrors.NewBadRequest(err.Error())
-		}
-	} else {
-		if err = kubejson.UnmarshalCaseSensitivePreserveInts(patchBytes, &patchMap); err != nil {
-			return apierrors.NewBadRequest(err.Error())
-		}
+	strictErrs, err = kubejson.UnmarshalStrict(patchBytes, &patchMap)
+	if err != nil {
+		return apierrors.NewBadRequest(err.Error())
 	}
 
-	if err := applyPatchToObject(originalObjMap, patchMap, objToUpdate, schemaReferenceObj, strictErrs, validationDirective); err != nil {
+	if err := applyPatchToObject(originalObjMap, patchMap, objToUpdate, schemaReferenceObj, strictErrs); err != nil {
 		return err
 	}
 	return nil
@@ -98,7 +90,6 @@ func applyPatchToObject(
 	objToUpdate runtime.Object,
 	schemaReferenceObj runtime.Object,
 	strictErrs []error,
-	validationDirective string,
 ) error {
 	patchedObjMap, err := strategicpatch.StrategicMergeMapPatch(originalMap, patchMap, schemaReferenceObj)
 	if err != nil {
@@ -107,8 +98,7 @@ func applyPatchToObject(
 
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
 	converter := runtime.DefaultUnstructuredConverter
-	returnUnknownFields := validationDirective == metav1.FieldValidationWarn || validationDirective == metav1.FieldValidationStrict
-	if err := converter.FromUnstructuredWithValidation(patchedObjMap, objToUpdate, returnUnknownFields); err != nil {
+	if err := converter.FromUnstructuredWithValidation(patchedObjMap, objToUpdate, true); err != nil {
 		strictError, isStrictError := runtime.AsStrictDecodingError(err)
 		switch {
 		case !isStrictError:
@@ -119,8 +109,8 @@ func applyPatchToObject(
 			return apierrors.NewInvalid(schema.GroupKind{}, "", field.ErrorList{
 				field.Invalid(field.NewPath("patch"), fmt.Sprintf("%+v", patchMap), err.Error()),
 			})
-		case validationDirective == metav1.FieldValidationWarn:
-			//addStrictDecodingWarnings(requestContext, append(strictErrs, strictError.Errors()...))
+		//case validationDirective == metav1.FieldValidationWarn:
+		//	addStrictDecodingWarnings(requestContext, append(strictErrs, strictError.Errors()...))
 		default:
 			strictDecodingError := runtime.NewStrictDecodingError(append(strictErrs, strictError.Errors()...))
 			return apierrors.NewInvalid(schema.GroupKind{}, "", field.ErrorList{
@@ -129,8 +119,8 @@ func applyPatchToObject(
 		}
 	} else if len(strictErrs) > 0 {
 		switch {
-		case validationDirective == metav1.FieldValidationWarn:
-			//addStrictDecodingWarnings(requestContext, strictErrs)
+		//case validationDirective == metav1.FieldValidationWarn:
+		//	addStrictDecodingWarnings(requestContext, strictErrs)
 		default:
 			return apierrors.NewInvalid(schema.GroupKind{}, "", field.ErrorList{
 				field.Invalid(field.NewPath("patch"), fmt.Sprintf("%+v", patchMap), runtime.NewStrictDecodingError(strictErrs).Error()),
