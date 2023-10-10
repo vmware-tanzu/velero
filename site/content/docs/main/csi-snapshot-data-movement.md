@@ -194,7 +194,7 @@ Or if you want to use a customized data mover:
 velero backup create NAME --snapshot-move-data --data-mover DATA-MOVER-NAME OPTIONS...
 ```
 
-When the backup starts, you will see the `VolumeSnapshot` and `VolumeSnapshotContent` objects created, but after the backup finishes, the objects will disppear.  
+When the backup starts, you will see the `VolumeSnapshot` and `VolumeSnapshotContent` objects created, but after the backup finishes, the objects will disappear.  
 After snapshots are created, you will see one or more `DataUpload` CRs created.  
 You may also see some intermediate objects (i.e., pods, PVCs, PVs) created in Velero namespace or the cluster scope, they are to help data movers to move data. And they will be removed after the backup completes.  
 The phase of a `DataUpload` CR changes several times during the backup process and finally goes to one of the terminal status, `Completed`, `Failed` or `Cancelled`. You can see the phase changes as well as the data upload progress by watching the `DataUpload` CRs:  
