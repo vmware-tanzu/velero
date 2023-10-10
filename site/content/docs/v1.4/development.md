@@ -25,9 +25,3 @@ You can run `make verify` to ensure that all generated files (clientset, listers
 ## Test
 
 To run unit tests, use `make test`.
-
-## Vendor dependencies
-
-If you need to add or update the vendored dependencies, see [Vendoring dependencies][11].
-
-[11]: vendoring-dependencies.md
