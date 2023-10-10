@@ -131,7 +131,7 @@ These are the steps to update the Velero Homebrew version.
 - If you don't already have one, create a [GitHub access token for Homebrew](https://github.com/settings/tokens/new?scopes=gist,public_repo&description=Homebrew)
 - Run `export HOMEBREW_GITHUB_API_TOKEN=your_token_here` on your command line to make sure that `brew` can work on GitHub on your behalf.
 - Run `hack/release-tools/brew-update.sh`. This script will download the necessary files, do the checks, and invoke the brew helper to submit the PR, which will open in your browser.
-- Update Windows Chocolatey version. From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/main/README.md)
+- Update Windows Chocolatey version. From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/main/README.md). Please update the `tools\chocolateyinstall.ps1` file content according to [the existing Velero chocolatey package install script file](https://community.chocolatey.org/packages/velero#files). The current Velero chocolatey package maintainer is [Adam Rush](https://github.com/adamrushuk). It's possible others don't have permission to upload the new version. If so, please contact [Adam Rush](https://github.com/adamrushuk) for help.
 
 ## Plugins
 
