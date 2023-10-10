@@ -17,7 +17,9 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -26,10 +28,15 @@ import (
 
 func TestNewCredential(t *testing.T) {
 	options := policy.ClientOptions{}
-
 	// no credentials
 	creds := map[string]string{}
-	_, err := NewCredential(creds, options)
+	tokenCredential, _ := NewCredential(creds, options)
+
+	var scopes []string
+	scopes = append(scopes, "https://management.core.windows.net//.default")
+
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*2)
+	_, err := tokenCredential.GetToken(ctx, policy.TokenRequestOptions{Scopes: scopes})
 	require.NotNil(t, err)
 
 	// config credential
@@ -40,6 +47,7 @@ func TestNewCredential(t *testing.T) {
 	}
 	_, err = NewCredential(creds, options)
 	require.Nil(t, err)
+
 }
 
 func Test_newConfigCredential(t *testing.T) {
