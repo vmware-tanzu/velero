@@ -68,17 +68,12 @@ resourceModifierRules:
     namespaces:
     - ns1
   mergePatches:
-  - patchData: |
-      {
-        "metadata": {
-          "annotations": {
-            "foo": null
-          }
-        }
-      }
+  - patchData:
+      metadata:
+        annotations:
+          foo: null
 ```
 - The above configmap will apply the Merge Patch to all the pods in namespace ns1 and remove the annotation `foo` from the pods.
-- Both json and yaml format are supported for the patchData.
 
 ### New Field StrategicPatches
 StrategicPatches is a list to specify the strategic merge patches to be applied on the resource. The strategic merge patches will be applied in the order specified in the configmap. A subsequent patch is applied in order and if multiple patches are specified for the same path, the last patch will override the previous patches.
@@ -88,25 +83,18 @@ Example of StrategicPatches in ResourceModifierRule
 version: v1
 resourceModifierRules:
 - conditions:
-  groupResource: pods
-  resourceNameRegex: "^my-pod$"
-  namespaces:
-  - ns1
+    groupResource: pods
+    resourceNameRegex: "^my-pod$"
+    namespaces:
+    - ns1
   strategicPatches:
-  - patchData: |
-      {
-        "spec": {
-          "containers": [
-            {
-              "name": "nginx",
-              "image": "repo2/nginx"
-            }
-          ]
-        }
-      }
+  - patchData:
+      spec:
+        containers:
+        - name: nginx
+          image: repo2/nginx
 ```
 - The above configmap will apply the Strategic Merge Patch to the pod with name my-pod in namespace ns1 and update the image of container nginx to `repo2/nginx`.
-- Both json and yaml format are supported for the patchData.
 
 ### Conditional Patches in ALL Patch Types
 Since JSON Merge Patch and Strategic Merge Patch do not support conditional patches, we will use the `test` operation of JSON Patch to support conditional patches in all patch types by adding it to `Conditions` struct in `ResourceModifierRule`.
