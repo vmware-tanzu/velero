@@ -1,0 +1,1 @@
+Partially fix #6734, guide Kubernetes' scheduler to spread backup pods evenly across nodes as much as possible, so that data mover backup could achieve better parallelism
