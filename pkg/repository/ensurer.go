@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
 )
 
 // Ensurer ensures that backup repositories are created and ready.
@@ -107,7 +108,7 @@ func (r *Ensurer) repoLock(key BackupRepositoryKey) *sync.Mutex {
 
 func (r *Ensurer) createBackupRepositoryAndWait(ctx context.Context, namespace string, backupRepoKey BackupRepositoryKey) (*velerov1api.BackupRepository, error) {
 	toCreate := NewBackupRepository(namespace, backupRepoKey)
-	if err := r.repoClient.Create(ctx, toCreate, &client.CreateOptions{}); err != nil {
+	if err := veleroclient.CreateRetryGenerateName(r.repoClient, ctx, toCreate); err != nil {
 		return nil, errors.Wrap(err, "unable to create backup repository resource")
 	}
 
