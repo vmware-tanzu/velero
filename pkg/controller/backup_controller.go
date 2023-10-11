@@ -88,6 +88,7 @@ type backupReconciler struct {
 	volumeSnapshotClient        snapshotterClientSet.Interface
 	credentialFileStore         credentials.FileStore
 	maxConcurrentK8SConnections int
+	defaultSnapshotMoveData     bool
 }
 
 func NewBackupReconciler(
@@ -113,6 +114,7 @@ func NewBackupReconciler(
 	volumeSnapshotClient snapshotterClientSet.Interface,
 	credentialStore credentials.FileStore,
 	maxConcurrentK8SConnections int,
+	defaultSnapshotMoveData bool,
 ) *backupReconciler {
 	b := &backupReconciler{
 		ctx:                         ctx,
@@ -138,6 +140,7 @@ func NewBackupReconciler(
 		volumeSnapshotClient:        volumeSnapshotClient,
 		credentialFileStore:         credentialStore,
 		maxConcurrentK8SConnections: maxConcurrentK8SConnections,
+		defaultSnapshotMoveData:     defaultSnapshotMoveData,
 	}
 	b.updateTotalBackupMetric()
 	return b
@@ -351,6 +354,10 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 
 	if request.Spec.DefaultVolumesToFsBackup == nil {
 		request.Spec.DefaultVolumesToFsBackup = &b.defaultVolumesToFsBackup
+	}
+
+	if request.Spec.SnapshotMoveData == nil {
+		request.Spec.SnapshotMoveData = &b.defaultSnapshotMoveData
 	}
 
 	// find which storage location to use
