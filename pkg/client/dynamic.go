@@ -102,6 +102,8 @@ type StatusUpdater interface {
 	UpdateStatus(obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error)
 }
 
+//go:generate mockery --name Dynamic
+
 // Dynamic contains client methods that Velero needs for backing up and restoring resources.
 type Dynamic interface {
 	Creator
