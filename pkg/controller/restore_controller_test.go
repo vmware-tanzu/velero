@@ -114,6 +114,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				metrics.NewServerMetrics(),
 				formatFlag,
 				60*time.Minute,
+				false,
 			)
 
 			if test.backupStoreError == nil {
@@ -191,6 +192,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 				metrics.NewServerMetrics(),
 				formatFlag,
 				60*time.Minute,
+				false,
 			)
 
 			_, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{
@@ -445,6 +447,7 @@ func TestRestoreReconcile(t *testing.T) {
 				metrics.NewServerMetrics(),
 				formatFlag,
 				60*time.Minute,
+				false,
 			)
 
 			r.clock = clocktesting.NewFakeClock(now)
@@ -616,6 +619,7 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		metrics.NewServerMetrics(),
 		formatFlag,
 		60*time.Minute,
+		false,
 	)
 
 	restore := &velerov1api.Restore{
@@ -708,6 +712,7 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		metrics.NewServerMetrics(),
 		formatFlag,
 		60*time.Minute,
+		false,
 	)
 
 	restore := &velerov1api.Restore{

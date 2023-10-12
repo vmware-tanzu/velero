@@ -253,6 +253,7 @@ type VeleroOptions struct {
 	DefaultVolumesToFsBackup        bool
 	UploaderType                    string
 	DefaultSnapshotMoveData         bool
+	DisableInformerCache            bool
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -355,6 +356,10 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 
 	if o.DefaultSnapshotMoveData {
 		deployOpts = append(deployOpts, WithDefaultSnapshotMoveData())
+	}
+
+	if o.DisableInformerCache {
+		deployOpts = append(deployOpts, WithDisableInformerCache())
 	}
 
 	deploy := Deployment(o.Namespace, deployOpts...)
