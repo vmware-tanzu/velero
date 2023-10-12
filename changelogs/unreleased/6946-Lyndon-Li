@@ -1,0 +1,1 @@
+Fix #6668, add a limitation for file system restore parallelism with other types of restores (CSI snapshot restore, CSI snapshot movement restore)
