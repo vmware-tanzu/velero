@@ -18,6 +18,7 @@ package nodeagent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -33,12 +34,24 @@ import (
 
 const (
 	// daemonSet is the name of the Velero node agent daemonset.
-	daemonSet = "node-agent"
+	daemonSet             = "node-agent"
+	configName            = "node-agent-configs"
+	dataPathConConfigName = "data-path-concurrency"
 )
 
 var (
 	ErrDaemonSetNotFound = errors.New("daemonset not found")
 )
+
+type DataPathConcurrency struct {
+	// ConfigRules specifies the concurrency number to nodes matched by rules
+	ConfigRules map[string]int `json:"configRules"`
+}
+
+type Configs struct {
+	// DataPathConcurrency is the config for data path concurrency per node.
+	DataPathConcurrency *DataPathConcurrency
+}
 
 // IsRunning checks if the node agent daemonset is running properly. If not, return the error found
 func IsRunning(ctx context.Context, kubeClient kubernetes.Interface, namespace string) error {
@@ -82,4 +95,32 @@ func GetPodSpec(ctx context.Context, kubeClient kubernetes.Interface, namespace 
 	}
 
 	return &ds.Spec.Template.Spec, nil
+}
+
+func GetConfigs(ctx context.Context, namespace string, cmClient corev1client.ConfigMapsGetter) (*Configs, error) {
+	cm, err := cmClient.ConfigMaps(namespace).Get(ctx, configName, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		} else {
+			return nil, errors.Wrapf(err, "error to get node agent configs %s", configName)
+		}
+	}
+
+	if cm.Data == nil {
+		return nil, errors.Errorf("data is not available in config map %s", configName)
+	}
+
+	jsonBytes, exist := cm.Data[dataPathConConfigName]
+	if !exist {
+		return nil, nil
+	}
+
+	concurrencyConfigs := DataPathConcurrency{}
+	err = json.Unmarshal([]byte(jsonBytes), &concurrencyConfigs)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error to unmarshall data path concurrency configs from %s", configName)
+	}
+
+	return &Configs{DataPathConcurrency: &concurrencyConfigs}, nil
 }
