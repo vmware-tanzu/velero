@@ -76,6 +76,32 @@ Please do notice there is also side effect that may not be expected. Because sch
 
 If there is possibility the schedule will be disable to not create backup anymore, and the created backups are still useful. Please do not enable this option. For detail, please reference to [Backups created by a schedule with useOwnerReferenceInBackup set do not get synced properly](https://github.com/vmware-tanzu/velero/issues/4093).
 
+Some GitOps tools have configurations to avoid pruning the day 2 backups generated from the schedule.
+For example, the ArgoCD has two ways to do that:
+* Add annotations to schedule. This method makes ArgoCD ignore the schedule from syncing, so the generated backups are ignored too, but it has a side effect. When deleting the schedule from the GitOps manifest, the schedule can not be deleted. User needs to do it manually.
+``` yaml
+    annotations:
+      argocd.argoproj.io/compare-options: IgnoreExtraneous
+      argocd.argoproj.io/sync-options: Delete=false,Prune=false
+```
+* If ArgoCD is deployed by ArgoCD-Operator, there is another option: [resourceExclusions](https://argocd-operator.readthedocs.io/en/latest/reference/argocd/#resource-exclusions-example). This is an example, which means ArgoCD operator should ignore `Backup` and `Restore` in `velero.io` group in the `velero` namespace for all managed k8s cluster.
+``` yaml
+apiVersion: argoproj.io/v1alpha1
+kind: ArgoCD
+metadata:
+  name: velero-argocd
+  namespace: velero
+spec:
+  resourceExclusions: |
+    - apiGroups:
+      - velero.io
+      kinds:
+      - Backup
+      - Restore
+      clusters:
+      - "*"
+```
+
 #### Cannot support backup data immutability
 Starting from 1.11, Velero's backups may not work as expected when the target object storage has some kind of an "immutability" option configured. These options are known by different names (see links below for some examples). The main reason is that Velero first saves the state of a backup as Finalizing and then checks whether there are any async operations in progress. If there are, it needs to wait for all of them to be finished before moving the backup state to Complete. If there are no async operations, the state is moved to Complete right away. In either case, Velero needs to modify the metadata in object storage and that will not be possible if some kind of immutability is configured on the object storage.
 
