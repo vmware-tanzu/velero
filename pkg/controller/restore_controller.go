@@ -101,6 +101,7 @@ type restoreReconciler struct {
 	logFormat                   logging.Format
 	clock                       clock.WithTickerAndDelayedExecution
 	defaultItemOperationTimeout time.Duration
+	disableInformerCache        bool
 
 	newPluginManager  func(logger logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
@@ -123,6 +124,7 @@ func NewRestoreReconciler(
 	metrics *metrics.ServerMetrics,
 	logFormat logging.Format,
 	defaultItemOperationTimeout time.Duration,
+	disableInformerCache bool,
 ) *restoreReconciler {
 	r := &restoreReconciler{
 		ctx:                         ctx,
@@ -135,6 +137,7 @@ func NewRestoreReconciler(
 		logFormat:                   logFormat,
 		clock:                       &clock.RealClock{},
 		defaultItemOperationTimeout: defaultItemOperationTimeout,
+		disableInformerCache:        disableInformerCache,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -519,13 +522,14 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 	}
 
 	restoreReq := &pkgrestore.Request{
-		Log:               restoreLog,
-		Restore:           restore,
-		Backup:            info.backup,
-		PodVolumeBackups:  podVolumeBackups,
-		VolumeSnapshots:   volumeSnapshots,
-		BackupReader:      backupFile,
-		ResourceModifiers: resourceModifiers,
+		Log:                  restoreLog,
+		Restore:              restore,
+		Backup:               info.backup,
+		PodVolumeBackups:     podVolumeBackups,
+		VolumeSnapshots:      volumeSnapshots,
+		BackupReader:         backupFile,
+		ResourceModifiers:    resourceModifiers,
+		DisableInformerCache: r.disableInformerCache,
 	}
 	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, pluginManager)
 
