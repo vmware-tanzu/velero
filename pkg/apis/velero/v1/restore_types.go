@@ -214,6 +214,11 @@ type ExecRestoreHook struct {
 	// before attempting to run the command.
 	// +optional
 	WaitTimeout metav1.Duration `json:"waitTimeout,omitempty"`
+
+	// WaitForReady ensures command will be launched when container is Ready instead of Running.
+	// +optional
+	// +nullable
+	WaitForReady *bool `json:"waitForReady,omitempty"`
 }
 
 // InitRestoreHook is a hook that adds an init container to a PodSpec to run commands before the

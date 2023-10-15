@@ -181,6 +181,8 @@ Below are the annotations that can be added to a pod to specify exec restore hoo
     * How long to wait once execution begins. Defaults is 30 seconds. Optional.
 * `post.hook.restore.velero.io/wait-timeout`
     * How long to wait for a container to become ready. This should be long enough for the container to start plus any preceding hooks in the same container to complete. The wait timeout begins when the container is restored and may require time for the image to pull and volumes to mount. If not set the restore will wait indefinitely. Optional.
+* `post.hook.restore.velero.io/wait-for-ready`
+    * String representation of a boolean that ensure command will be launched when underlying container is fully [Ready](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes). Use with caution because if only one restore hook for a pod consists of `WaitForReady` flag as "true", all the other hook executions for that pod, whatever their origin (`Backup` or `Restore` CRD), will wait for `Ready` state too. Any value except "true" will be considered as "false". Defaults is false. Optional.
 
 #### Exec Restore Hooks As Pod Annotation Example
 

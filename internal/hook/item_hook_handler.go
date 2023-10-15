@@ -19,6 +19,7 @@ package hook
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +38,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restorehelper"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -61,6 +63,7 @@ const (
 	podRestoreHookOnErrorAnnotationKey              = "post.hook.restore.velero.io/on-error"
 	podRestoreHookTimeoutAnnotationKey              = "post.hook.restore.velero.io/exec-timeout"
 	podRestoreHookWaitTimeoutAnnotationKey          = "post.hook.restore.velero.io/wait-timeout"
+	podRestoreHookWaitForReadyAnnotationKey         = "post.hook.restore.velero.io/wait-for-ready"
 	podRestoreHookInitContainerImageAnnotationKey   = "init.hook.restore.velero.io/container-image"
 	podRestoreHookInitContainerNameAnnotationKey    = "init.hook.restore.velero.io/container-name"
 	podRestoreHookInitContainerCommandAnnotationKey = "init.hook.restore.velero.io/command"
@@ -477,12 +480,23 @@ func getPodExecRestoreHookFromAnnotations(annotations map[string]string, log log
 		}
 	}
 
+	waitForReadyString := annotations[podRestoreHookWaitForReadyAnnotationKey]
+	waitForReady := boolptr.False()
+	if waitForReadyString != "" {
+		var err error
+		*waitForReady, err = strconv.ParseBool(waitForReadyString)
+		if err != nil {
+			log.Warn(errors.Wrapf(err, "Unable to parse wait for ready %s, ignoring", waitForReadyString))
+		}
+	}
+
 	return &velerov1api.ExecRestoreHook{
-		Container:   container,
-		Command:     parseStringToCommand(commandValue),
-		OnError:     onError,
-		ExecTimeout: metav1.Duration{Duration: execTimeout},
-		WaitTimeout: metav1.Duration{Duration: waitTimeout},
+		Container:    container,
+		Command:      parseStringToCommand(commandValue),
+		OnError:      onError,
+		ExecTimeout:  metav1.Duration{Duration: execTimeout},
+		WaitTimeout:  metav1.Duration{Duration: waitTimeout},
+		WaitForReady: waitForReady,
 	}
 }
 
@@ -541,6 +555,10 @@ func GroupRestoreExecHooks(
 				HookName:   rrh.Name,
 				Hook:       *rh.Exec,
 				HookSource: "backupSpec",
+			}
+			// default to false if attr WaitForReady not set
+			if named.Hook.WaitForReady == nil {
+				named.Hook.WaitForReady = boolptr.False()
 			}
 			// default to first container in pod if unset, without mutating resource restore hook
 			if named.Hook.Container == "" {

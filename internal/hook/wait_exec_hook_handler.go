@@ -29,6 +29,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
@@ -126,8 +127,8 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 		}
 
 		for containerName, hooks := range byContainer {
-			if !isContainerRunning(newPod, containerName) {
-				podLog.Infof("Container %s is not running: post-restore hooks will not yet be executed", containerName)
+			if !isContainerUp(newPod, containerName, hooks) {
+				podLog.Infof("Container %s is not up: post-restore hooks will not yet be executed", containerName)
 				continue
 			}
 			podMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newPod)
@@ -243,13 +244,23 @@ func podHasContainer(pod *v1.Pod, containerName string) bool {
 	return false
 }
 
-func isContainerRunning(pod *v1.Pod, containerName string) bool {
+func isContainerUp(pod *v1.Pod, containerName string, hooks []PodExecRestoreHook) bool {
 	if pod == nil {
 		return false
+	}
+	var waitForReady bool
+	for _, hook := range hooks {
+		if boolptr.IsSetToTrue(hook.Hook.WaitForReady) {
+			waitForReady = true
+			break
+		}
 	}
 	for _, cs := range pod.Status.ContainerStatuses {
 		if cs.Name != containerName {
 			continue
+		}
+		if waitForReady {
+			return cs.Ready
 		}
 		return cs.State.Running != nil
 	}

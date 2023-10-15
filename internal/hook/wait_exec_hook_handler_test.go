@@ -35,6 +35,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 type fakeListWatchFactory struct {
@@ -790,12 +791,13 @@ func TestPodHasContainer(t *testing.T) {
 	}
 }
 
-func TestIsContainerRunning(t *testing.T) {
+func TestIsContainerUp(t *testing.T) {
 	tests := []struct {
 		name      string
 		pod       *v1.Pod
 		container string
 		expect    bool
+		hooks     []PodExecRestoreHook
 	}{
 		{
 			name:      "should return true when running",
@@ -809,6 +811,49 @@ func TestIsContainerRunning(t *testing.T) {
 					},
 				}).
 				Result(),
+			hooks: []PodExecRestoreHook{},
+		},
+		{
+			name:      "should return false when running but not ready",
+			container: "container1",
+			expect:    false,
+			pod: builder.ForPod("default", "my-pod").
+				ContainerStatuses(&v1.ContainerStatus{
+					Name: "container1",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+					Ready: false,
+				}).
+				Result(),
+			hooks: []PodExecRestoreHook{
+				{
+					Hook: velerov1api.ExecRestoreHook{
+						WaitForReady: boolptr.True(),
+					},
+				},
+			},
+		},
+		{
+			name:      "should return true when running and ready",
+			container: "container1",
+			expect:    true,
+			pod: builder.ForPod("default", "my-pod").
+				ContainerStatuses(&v1.ContainerStatus{
+					Name: "container1",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+					Ready: true,
+				}).
+				Result(),
+			hooks: []PodExecRestoreHook{
+				{
+					Hook: velerov1api.ExecRestoreHook{
+						WaitForReady: boolptr.True(),
+					},
+				},
+			},
 		},
 		{
 			name:      "should return false when no state is set",
@@ -820,6 +865,7 @@ func TestIsContainerRunning(t *testing.T) {
 					State: v1.ContainerState{},
 				}).
 				Result(),
+			hooks: []PodExecRestoreHook{},
 		},
 		{
 			name:      "should return false when waiting",
@@ -833,6 +879,7 @@ func TestIsContainerRunning(t *testing.T) {
 					},
 				}).
 				Result(),
+			hooks: []PodExecRestoreHook{},
 		},
 		{
 			name:      "should return true when running and first container is terminated",
@@ -852,11 +899,12 @@ func TestIsContainerRunning(t *testing.T) {
 						},
 					}).
 				Result(),
+			hooks: []PodExecRestoreHook{},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := isContainerRunning(test.pod, test.container)
+			actual := isContainerUp(test.pod, test.container, test.hooks)
 			assert.Equal(t, actual, test.expect)
 		})
 	}
