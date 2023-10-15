@@ -419,7 +419,7 @@ func (s *nodeAgentServer) markDataDownloadsCancel(r *controller.DataDownloadReco
 
 func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 	pvbs := &velerov1api.PodVolumeBackupList{}
-	if err := client.List(s.ctx, pvbs, &ctrlclient.MatchingFields{"metadata.namespace": s.namespace}); err != nil {
+	if err := client.List(s.ctx, pvbs, &ctrlclient.ListOptions{Namespace: s.namespace}); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("failed to list podvolumebackups")
 		return
 	}
@@ -445,7 +445,7 @@ func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 
 func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 	pvrs := &velerov1api.PodVolumeRestoreList{}
-	if err := client.List(s.ctx, pvrs, &ctrlclient.MatchingFields{"metadata.namespace": s.namespace}); err != nil {
+	if err := client.List(s.ctx, pvrs, &ctrlclient.ListOptions{Namespace: s.namespace}); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("failed to list podvolumerestores")
 		return
 	}
