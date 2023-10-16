@@ -449,24 +449,16 @@ func (ib *itemBackupper) executeActions(
 			if err != nil {
 				return nil, itemFiles, errors.WithStack(err)
 			}
-			if additionalItem.GroupResource == kuberesource.PersistentVolumeClaims {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
-					if err != nil {
-						errChannel <- err
-						return
-					}
-					additionalItemFilesChannel <- additionalItemFiles
-				}()
-			} else {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
 				_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
 				if err != nil {
-					return nil, itemFiles, err
+					errChannel <- err
+					return
 				}
-				itemFiles = append(itemFiles, additionalItemFiles...)
-			}
+				additionalItemFilesChannel <- additionalItemFiles
+			}()
 		}
 		wg.Wait()
 		close(additionalItemFilesChannel)
