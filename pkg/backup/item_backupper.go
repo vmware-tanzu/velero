@@ -422,7 +422,7 @@ func (ib *itemBackupper) executeActions(
 		// Async call the current CSI Plugin's Execute()
 		// Wait for all snapshots to complete.
 		// Max parallelism can be controlled by further tweaking the WaitGroup.
-		additionalItemFilesChannel := make(chan []FileForArchive)
+		additionalItemFilesChannel := make(chan FileForArchive)
 		errChannel := make(chan error)
 		var wg sync.WaitGroup
 		for _, additionalItem := range additionalItemIdentifiers {
@@ -451,25 +451,27 @@ func (ib *itemBackupper) executeActions(
 			}
 			wg.Add(1)
 			go func(additionalItem velero.ResourceIdentifier, log logrus.FieldLogger, item runtime.Unstructured, gvr schema.GroupVersionResource, mustInclude, finalize bool) {
+				defer wg.Done()
 				log.WithFields(logrus.Fields{
 					"groupResource": additionalItem.GroupResource,
 					"namespace":     additionalItem.Namespace,
 					"name":          additionalItem.Name,
 				}).Infof("Triggering async backupitem for additional item")
-				defer wg.Done()
 				_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
 				if err != nil {
 					errChannel <- err
 					return
 				}
-				additionalItemFilesChannel <- additionalItemFiles
+				for _, file := range additionalItemFiles {
+					additionalItemFilesChannel <- file
+				}
 			}(additionalItem, log, item.DeepCopy(), gvr, mustInclude, finalize)
 		}
 		wg.Wait()
 		close(additionalItemFilesChannel)
 		close(errChannel)
 		for itemFilesFromChannel := range additionalItemFilesChannel {
-			itemFiles = append(itemFiles, itemFilesFromChannel...)
+			itemFiles = append(itemFiles, itemFilesFromChannel)
 		}
 		for err := range errChannel {
 			return nil, itemFiles, err
