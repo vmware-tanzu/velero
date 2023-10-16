@@ -262,8 +262,8 @@ Velero only support volume resource policies currently, other kinds of resource 
           driver: aws.ebs.csi.driver
         # pv matches one of the storage class list
         storageClass:
-        - gp2
-        - standard
+          - gp2
+          - standard
       action:
         type: skip
     - conditions:
@@ -287,6 +287,14 @@ Velero only support volume resource policies currently, other kinds of resource 
     - conditions:
         # csi could be empty which matches any csi volume source
         csi: {}
+      action:
+        type: skip
+    - conditions:
+        volumeTypes:
+          - emptyDir
+          - downwardAPI
+          - configmap
+          - cinder
       action:
         type: skip
     ```
@@ -335,6 +343,19 @@ Velero supported conditions and format listed below:
       path: /mnt/nfs
     ```
     For volume provisioned by [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes) support all above attributes, but for pod [Volume](https://kubernetes.io/docs/concepts/storage/volumes) only support filtered by volume source.
+
+- volume types
+
+  Support filter volumes by types
+  ```yaml
+  volumeTypes: 
+    # matches volumes listed below
+    - emptyDir
+    - downwardAPI
+    - configmap
+    - cinder
+  ```
+   Volume types could be found in [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes) and pod [Volume](https://kubernetes.io/docs/concepts/storage/volumes)
 
 **Resource policies rules**
 - Velero already has lots of include or exclude filters. the resource policies are the final filters after others include or exclude filters in one backup processing workflow. So if use a defined similar filter like the opt-in approach to backup one pod volume but skip backup of the same pod volume in resource policies, as resource policies are the final filters that are applied, the volume will not be backed up.

@@ -47,6 +47,7 @@ type structuredVolume struct {
 	storageClass string
 	nfs          *nFSVolumeSource
 	csi          *csiVolumeSource
+	volumeType   SupportedVolume
 }
 
 func (s *structuredVolume) parsePV(pv *corev1api.PersistentVolume) {
@@ -61,6 +62,8 @@ func (s *structuredVolume) parsePV(pv *corev1api.PersistentVolume) {
 	if csi != nil {
 		s.csi = &csiVolumeSource{Driver: csi.Driver}
 	}
+
+	s.volumeType = getVolumeTypeFromPV(pv)
 }
 
 func (s *structuredVolume) parsePodVolume(vol *corev1api.Volume) {
@@ -73,6 +76,8 @@ func (s *structuredVolume) parsePodVolume(vol *corev1api.Volume) {
 	if csi != nil {
 		s.csi = &csiVolumeSource{Driver: csi.Driver}
 	}
+
+	s.volumeType = getVolumeTypeFromVolume(vol)
 }
 
 type capacityCondition struct {

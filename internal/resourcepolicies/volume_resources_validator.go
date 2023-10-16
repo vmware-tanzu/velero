@@ -38,10 +38,11 @@ type nFSVolumeSource struct {
 
 // volumeConditions defined the current format of conditions we parsed
 type volumeConditions struct {
-	Capacity     string           `yaml:"capacity,omitempty"`
-	StorageClass []string         `yaml:"storageClass,omitempty"`
-	NFS          *nFSVolumeSource `yaml:"nfs,omitempty"`
-	CSI          *csiVolumeSource `yaml:"csi,omitempty"`
+	Capacity     string            `yaml:"capacity,omitempty"`
+	StorageClass []string          `yaml:"storageClass,omitempty"`
+	NFS          *nFSVolumeSource  `yaml:"nfs,omitempty"`
+	CSI          *csiVolumeSource  `yaml:"csi,omitempty"`
+	VolumeTypes  []SupportedVolume `yaml:"volumeTypes,omitempty"`
 }
 
 func (c *capacityCondition) validate() error {
