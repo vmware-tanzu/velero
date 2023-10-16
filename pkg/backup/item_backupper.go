@@ -450,7 +450,12 @@ func (ib *itemBackupper) executeActions(
 				return nil, itemFiles, errors.WithStack(err)
 			}
 			wg.Add(1)
-			go func() {
+			go func(additionalItem velero.ResourceIdentifier, log logrus.FieldLogger, item runtime.Unstructured, gvr schema.GroupVersionResource, mustInclude, finalize bool) {
+				log.WithFields(logrus.Fields{
+					"groupResource": additionalItem.GroupResource,
+					"namespace":     additionalItem.Namespace,
+					"name":          additionalItem.Name,
+				}).Infof("Triggering async backupitem for additional item")
 				defer wg.Done()
 				_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
 				if err != nil {
@@ -458,7 +463,7 @@ func (ib *itemBackupper) executeActions(
 					return
 				}
 				additionalItemFilesChannel <- additionalItemFiles
-			}()
+			}(additionalItem, log, item.DeepCopy(), gvr, mustInclude, finalize)
 		}
 		wg.Wait()
 		close(additionalItemFilesChannel)
