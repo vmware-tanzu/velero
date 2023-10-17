@@ -52,6 +52,7 @@ import (
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	csiutil "github.com/vmware-tanzu/velero/pkg/util/csi"
 	pdvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -361,6 +362,14 @@ func (ib *itemBackupper) executeActions(
 			ib.trackSkippedPV(obj, groupResource, "", "skipped due to resource policy ", log)
 			continue
 		}
+
+		// If the EnableCSI feature is not enabled, but the executing action is from CSI plugin, skip the action.
+		if csiutil.ShouldSkipAction(actionName) {
+			log.Infof("Skip action %s for resource %s:%s/%s, because the CSI feature is not enabled. Feature setting is %s.",
+				actionName, groupResource.String(), metadata.GetNamespace(), metadata.GetName(), features.Serialize())
+			continue
+		}
+
 		updatedItem, additionalItemIdentifiers, operationID, postOperationItems, err := action.Execute(obj, ib.backupRequest.Backup)
 		if err != nil {
 			return nil, itemFiles, errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
@@ -652,6 +661,7 @@ func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource 
 		}
 		return ib.backupRequest.ResPolicies.GetMatchAction(pv)
 	}
+
 	return nil, nil
 }
 

@@ -68,6 +68,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	csiutil "github.com/vmware-tanzu/velero/pkg/util/csi"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
@@ -1334,6 +1335,13 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	for _, action := range ctx.getApplicableActions(groupResource, namespace) {
 		if !action.Selector.Matches(labels.Set(obj.GetLabels())) {
+			continue
+		}
+
+		// If the EnableCSI feature is not enabled, but the executing action is from CSI plugin, skip the action.
+		if csiutil.ShouldSkipAction(action.Name()) {
+			ctx.log.Infof("Skip action %s for resource %s:%s/%s, because the CSI feature is not enabled. Feature setting is %s.",
+				action.Name(), groupResource.String(), obj.GetNamespace(), obj.GetName(), features.Serialize())
 			continue
 		}
 

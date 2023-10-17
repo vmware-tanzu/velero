@@ -46,6 +46,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -1379,6 +1380,12 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 			expectNotSkippedPVs: []string{"pv-1"},
 		},
 	}
+	// Enable CSI feature before running the test, because Velero will check whether
+	// CSI feature is enabled before executing CSI plugin actions.
+	features.NewFeatureFlagSet("EnableCSI")
+	defer func() {
+		features.NewFeatureFlagSet("")
+	}()
 	for _, tc := range tests {
 		t.Run(tc.name, func(tt *testing.T) {
 			var (

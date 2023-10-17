@@ -73,6 +73,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/repository"
@@ -307,6 +308,13 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	pluginRegistry := process.NewRegistry(config.pluginDir, logger, logger.Level)
 	if err := pluginRegistry.DiscoverPlugins(); err != nil {
 		return nil, err
+	}
+
+	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
+		_, err = pluginRegistry.Get(common.PluginKindBackupItemActionV2, "velero.io/csi-pvc-backupper")
+		if err == nil {
+			logger.Warn("CSI plugins are registered, but the EnableCSI feature is not enabled.")
+		}
 	}
 
 	// cancelFunc is not deferred here because if it was, then ctx would immediately
