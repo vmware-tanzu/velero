@@ -21,6 +21,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/storage/names"
 )
 
 // ScheduleSpec defines the specification for a Velero schedule
@@ -124,5 +125,5 @@ type ScheduleList struct {
 
 // TimestampedName returns the default backup name format based on the schedule
 func (s *Schedule) TimestampedName(timestamp time.Time) string {
-	return fmt.Sprintf("%s-%s", s.Name, timestamp.Format("20060102150405"))
+	return names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-%s-", s.Name, timestamp.Format("20060102150405")))
 }
