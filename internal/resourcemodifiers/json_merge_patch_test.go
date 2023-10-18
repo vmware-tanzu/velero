@@ -13,15 +13,15 @@ import (
 func TestJsonMergePatchFailure(t *testing.T) {
 	tests := []struct {
 		name string
-		data []byte
+		data string
 	}{
 		{
 			name: "patch with bad yaml",
-			data: []byte("a: b:"),
+			data: "a: b:",
 		},
 		{
 			name: "patch with bad json",
-			data: []byte(`{"a"::1}`),
+			data: `{"a"::1}`,
 		},
 	}
 	for _, tt := range tests {

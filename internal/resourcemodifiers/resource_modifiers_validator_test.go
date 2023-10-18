@@ -147,7 +147,7 @@ func TestResourceModifiers_Validate(t *testing.T) {
 						},
 						MergePatches: []JSONMergePatch{
 							{
-								PatchData: []byte(`{"metadata":{"labels":{"a":null}}}`),
+								PatchData: `{"metadata":{"labels":{"a":null}}}`,
 							},
 						},
 					},

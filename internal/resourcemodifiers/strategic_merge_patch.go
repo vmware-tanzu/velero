@@ -1,7 +1,6 @@
 package resourcemodifiers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -18,7 +17,7 @@ import (
 )
 
 type StrategicMergePatch struct {
-	PatchData json.RawMessage `json:"patchData,omitempty"`
+	PatchData string `json:"patchData,omitempty"`
 }
 
 type StrategicMergePatcher struct {
@@ -36,7 +35,7 @@ func (p *StrategicMergePatcher) Patch(u *unstructured.Unstructured, _ logrus.Fie
 	origin := u.DeepCopy()
 	updated := u.DeepCopy()
 	for _, patch := range p.patches {
-		patchBytes, err := yaml.YAMLToJSON(patch.PatchData)
+		patchBytes, err := yaml.YAMLToJSON([]byte(patch.PatchData))
 		if err != nil {
 			return nil, fmt.Errorf("error in converting YAML to JSON %s", err)
 		}
