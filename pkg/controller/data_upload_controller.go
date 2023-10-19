@@ -762,6 +762,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			HostingPodLabels: map[string]string{velerov1api.DataUploadLabel: du.Name},
 			AccessMode:       accessMode,
 			Timeout:          du.Spec.OperationTimeout.Duration,
+			VolumeSize:       pvc.Spec.Resources.Requests[corev1.ResourceStorage],
 		}, nil
 	}
 	return nil, nil
