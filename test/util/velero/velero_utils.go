@@ -35,11 +35,9 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
-	"k8s.io/apimachinery/pkg/util/wait"
-
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
-
 	ver "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
@@ -1176,7 +1174,7 @@ func GetResticRepositories(ctx context.Context, veleroNamespace, targetNamespace
 	cmds := []*common.OsCommandLine{}
 	cmd := &common.OsCommandLine{
 		Cmd:  "kubectl",
-		Args: []string{"get", "-n", veleroNamespace, "BackupRepositories"},
+		Args: []string{"get", "-n", veleroNamespace, "backuprepositories"},
 	}
 	cmds = append(cmds, cmd)
 

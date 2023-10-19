@@ -30,7 +30,6 @@ import (
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/kibishii"
-
 	. "github.com/vmware-tanzu/velero/test/util/providers"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -246,6 +245,11 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 				})
 			} else { // For Restics
 				By(fmt.Sprintf("Resticrepositories for BSL %s should be created in Velero namespace", backupLocation_1), func() {
+					err = BackupRepositoriesCountShouldBe(context.Background(),
+						veleroCfg.VeleroNamespace, bslDeletionTestNs+"-"+backupLocation_1, 1)
+					if err != nil {
+						time.Sleep(500 * time.Hour)
+					}
 					Expect(BackupRepositoriesCountShouldBe(context.Background(),
 						veleroCfg.VeleroNamespace, bslDeletionTestNs+"-"+backupLocation_1, 1)).To(Succeed())
 				})
