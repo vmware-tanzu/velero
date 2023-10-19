@@ -61,6 +61,9 @@ type CSISnapshotExposeParam struct {
 
 	// Timeout specifies the time wait for resources operations in Expose
 	Timeout time.Duration
+
+	// VolumeSize specifies the size of the source volume
+	VolumeSize resource.Quantity
 }
 
 // CSISnapshotExposeWaitParam define the input param for WaitExposed of CSI snapshots
@@ -156,7 +159,15 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 
 	curLog.WithField("vsc name", backupVSC.Name).Infof("Backup VSC is created from %s", vsc.Name)
 
-	backupPVC, err := e.createBackupPVC(ctx, ownerObject, backupVS.Name, csiExposeParam.StorageClass, csiExposeParam.AccessMode, *volumeSnapshot.Status.RestoreSize)
+	var volumeSize resource.Quantity
+	if volumeSnapshot.Status.RestoreSize != nil && !volumeSnapshot.Status.RestoreSize.IsZero() {
+		volumeSize = *volumeSnapshot.Status.RestoreSize
+	} else {
+		volumeSize = csiExposeParam.VolumeSize
+		curLog.WithField("vs name", volumeSnapshot.Name).Warnf("The snapshot doesn't contain a valid restore size, use source volume's size %v", volumeSize)
+	}
+
+	backupPVC, err := e.createBackupPVC(ctx, ownerObject, backupVS.Name, csiExposeParam.StorageClass, csiExposeParam.AccessMode, volumeSize)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pvc")
 	}
