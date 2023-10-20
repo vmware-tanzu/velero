@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -540,25 +539,35 @@ func GetScopeResourceIncludesExcludes(helper discovery.Helper, logger logrus.Fie
 	return ret
 }
 
+type BackupOrRestoreIncludeExcludeSpec interface{
+	GetIncludeClusterResources() *bool
+	GetIncludedResources() []string
+	GetExcludedResources() []string
+	GetIncludedClusterScopedResources() []string
+	GetExcludedClusterScopedResources() []string
+	GetIncludedNamespaceScopedResources() []string
+	GetExcludedNamespaceScopedResources() []string
+}
+
 // UseOldResourceFilters checks whether to use old resource filters (IncludeClusterResources,
 // IncludedResources and ExcludedResources), depending the backup's filters setting.
 // New filters are IncludedClusterScopedResources, ExcludedClusterScopedResources,
 // IncludedNamespaceScopedResources and ExcludedNamespaceScopedResources.
-func UseOldResourceFilters(backupSpec velerov1api.BackupSpec) bool {
+func UseOldResourceFilters(brSpec BackupOrRestoreIncludeExcludeSpec) bool {
 	// If all resource filters are none, it is treated as using old parameter filters.
-	if backupSpec.IncludeClusterResources == nil &&
-		len(backupSpec.IncludedResources) == 0 &&
-		len(backupSpec.ExcludedResources) == 0 &&
-		len(backupSpec.IncludedClusterScopedResources) == 0 &&
-		len(backupSpec.ExcludedClusterScopedResources) == 0 &&
-		len(backupSpec.IncludedNamespaceScopedResources) == 0 &&
-		len(backupSpec.ExcludedNamespaceScopedResources) == 0 {
+	if brSpec.GetIncludeClusterResources() == nil &&
+		len(brSpec.GetIncludedResources()) == 0 &&
+		len(brSpec.GetExcludedResources()) == 0 &&
+		len(brSpec.GetIncludedClusterScopedResources()) == 0 &&
+		len(brSpec.GetExcludedClusterScopedResources()) == 0 &&
+		len(brSpec.GetIncludedNamespaceScopedResources()) == 0 &&
+		len(brSpec.GetExcludedNamespaceScopedResources()) == 0 {
 		return true
 	}
 
-	if backupSpec.IncludeClusterResources != nil ||
-		len(backupSpec.IncludedResources) > 0 ||
-		len(backupSpec.ExcludedResources) > 0 {
+	if brSpec.GetIncludeClusterResources() != nil ||
+		len(brSpec.GetIncludedResources()) > 0 ||
+		len(brSpec.GetExcludedResources()) > 0 {
 		return true
 	}
 
