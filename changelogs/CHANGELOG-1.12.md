@@ -1,3 +1,32 @@
+## v1.12.1
+### 2023-10-20
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.12.1
+
+### Container Image
+`velero/velero:v1.12.1`
+
+### Documentation
+https://velero.io/docs/v1.12/
+
+### Upgrading
+https://velero.io/docs/v1.12/upgrade-to-1.12/
+
+### All changes
+* Import auth provider plugins (#6970, @0x113)
+* Perf improvements for existing resource restore (#6948, @sseago)
+* Retry failed create when using generateName (#6943, @sseago)
+* Fix issue #6647, add the --default-snapshot-move-data parameter to Velero install, so that users don't need to specify --snapshot-move-data per backup when they want to move snapshot data for all backups (#6940, @Lyndon-Li)
+* Partially fix #6734, guide Kubernetes' scheduler to spread backup pods evenly across nodes as much as possible, so that data mover backup could achieve better parallelism (#6935, @Lyndon-Li)
+* Replace the base image with paketobuildpacks image (#6934, @ywk253100)
+* Add support for block volumes with Kopia (#6897, @dzaninovic)
+* Set ParallelUploadAboveSize as MaxInt64 and flush repo after setting up policy so that policy is retrieved correctly by TreeForSource (#6886, @Lyndon-Li)
+* Kubernetes 1.27 new job label batch.kubernetes.io/controller-uid are deleted during restore per https://github.com/kubernetes/kubernetes/pull/114930 (#6713, @kaovilai)
+* Add `orLabelSelectors` for backup, restore commands (#6881, @nilesh-akhade)
+* Fix issue #6859, move plugin depending podvolume functions to util pkg, so as to remove the dependencies to unnecessary repository packages like kopia, azure, etc. (#6877, @Lyndon-Li)
+* Fix issue #6786, always delete VSC regardless of the deletion policy (#6873, @Lyndon-Li)
+
 ## v1.12
 ### 2023-08-18
 
