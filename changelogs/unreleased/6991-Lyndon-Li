@@ -1,0 +1,1 @@
+Fix #6988, always get region from BSL if it is not empty
