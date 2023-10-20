@@ -13,6 +13,20 @@ https://velero.io/docs/v1.12/
 ### Upgrading
 https://velero.io/docs/v1.12/upgrade-to-1.12/
 
+### Highlights
+
+#### Data Mover Adds Support for Block Mode Volumes
+For PersistentVolumes with volumeMode set as Block, the volumes are mounted as raw block devices in pods, in 1.12.1, Velero CSI snapshot data movement supports to backup and restore this kind of volumes under linux based Kubernetes clusters.
+
+#### New Parameter in Installation to Enable Data Mover
+The `velero install` sub-command now includes a new parameter,`--default-snapshot-move-data`, which configures Velero server to move data by default for all snapshots supporting data movement. This feature is useful for users who will always want to use VBDM for backups instead of plain CSI , as they no longer need to specify the `--snapshot-move-data` flag for each individual backup. 
+
+#### Velero Base Image change
+The base image previously used by Velero was `distroless`,  which contains several CVEs cannot be addressed quickly. As a result, Velero will now use `paketobuildpacks` image starting from this new version.
+
+### Limitations/Known issues
+* The data mover's support for block mode volumes is currently only applicable to Linux environments.
+
 ### All changes
 * Import auth provider plugins (#6970, @0x113)
 * Perf improvements for existing resource restore (#6948, @sseago)
@@ -26,6 +40,8 @@ https://velero.io/docs/v1.12/upgrade-to-1.12/
 * Add `orLabelSelectors` for backup, restore commands (#6881, @nilesh-akhade)
 * Fix issue #6859, move plugin depending podvolume functions to util pkg, so as to remove the dependencies to unnecessary repository packages like kopia, azure, etc. (#6877, @Lyndon-Li)
 * Fix issue #6786, always delete VSC regardless of the deletion policy (#6873, @Lyndon-Li)
+* Fix #6988, always get region from BSL if it is not empty (#6991, @Lyndon-Li)
+* Add both non-Windows version and Windows version code for PVC block mode logic. (#6986, @blackpiglet)
 
 ## v1.12
 ### 2023-08-18
