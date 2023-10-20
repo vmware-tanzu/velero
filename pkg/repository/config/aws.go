@@ -64,7 +64,7 @@ func GetS3ResticEnvVars(config map[string]string) (map[string]string, error) {
 		result[awsSecretKeyEnvVar] = creds.SecretAccessKey
 		result[awsSessTokenEnvVar] = creds.SessionToken
 		result[awsCredentialsFileEnvVar] = ""
-		result[awsProfileEnvVar] = ""
+		result[awsProfileEnvVar] = "" // profile is not needed since we have the credentials from profile via GetS3Credentials
 		result[awsConfigFileEnvVar] = ""
 	}
 
@@ -87,6 +87,7 @@ func GetS3Credentials(config map[string]string) (*credentials.Value, error) {
 		opts.SharedConfigFiles = append(opts.SharedConfigFiles, credentialsFile)
 		opts.SharedConfigState = session.SharedConfigEnable
 	}
+	opts.Profile = config[awsProfileKey]
 
 	sess, err := session.NewSessionWithOptions(opts)
 	if err != nil {
