@@ -167,7 +167,7 @@ func TTLTest() {
 			Expect(t).To(Equal(test.ttl))
 		})
 
-		By(fmt.Sprintf("Waiting %s minutes for removing backup ralated resources by GC", test.ttl.String()), func() {
+		By(fmt.Sprintf("Waiting %s minutes for removing backup related resources by GC", test.ttl.String()), func() {
 			time.Sleep(test.ttl)
 		})
 
