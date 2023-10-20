@@ -62,7 +62,7 @@ func GetS3ResticEnvVars(config map[string]string) (map[string]string, error) {
 		result[awsSecretKeyEnvVar] = creds.SecretAccessKey
 		result[awsSessTokenEnvVar] = creds.SessionToken
 		result[awsCredentialsFileEnvVar] = ""
-		result[awsProfileEnvVar] = ""
+		result[awsProfileEnvVar] = "" // profile is not needed since we have the credentials from profile via GetS3Credentials
 		result[awsConfigFileEnvVar] = ""
 	}
 
@@ -87,6 +87,7 @@ func GetS3Credentials(config map[string]string) (*aws.Credentials, error) {
 			// as credentials of a BSL
 			awsconfig.WithSharedConfigFiles([]string{credentialsFile}))
 	}
+	opts = append(opts, awsconfig.WithSharedConfigProfile(config[awsProfileKey]))
 
 	cfg, err := awsconfig.LoadDefaultConfig(context.Background(), opts...)
 	if err != nil {
