@@ -477,9 +477,11 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 
 		var err error
 		if s3URL == "" {
-			region, err = getS3BucketRegion(bucket)
-			if err != nil {
-				return map[string]string{}, errors.Wrap(err, "error get s3 bucket region")
+			if region == "" {
+				region, err = getS3BucketRegion(bucket)
+				if err != nil {
+					return map[string]string{}, errors.Wrap(err, "error get s3 bucket region")
+				}
 			}
 
 			s3URL = fmt.Sprintf("s3-%s.amazonaws.com", region)
