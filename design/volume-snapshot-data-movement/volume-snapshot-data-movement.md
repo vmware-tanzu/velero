@@ -28,12 +28,14 @@ Moreover, we would like to create a general workflow to variations during the da
 - Support different snapshot types, i.e., CSI snapshot, volume snapshot API from storage vendors
 - Support different snapshot accesses, i.e., through PV generated from snapshots, and through direct access API from storage vendors
 - Reuse the existing Velero generic data path as creatd in [Unified Repository design][1]
+- Allow users to retain configurable number of native snapshots after data movement completes
 
 ## Non-Goals
 
 - The current support for block level access is through file system uploader, so it is not aimed to deliver features of an ultimate block level backup. Block level backup will be included in a future design
 - Most of the components are generic, but the Exposer is snapshot type specific or snapshot access specific. The current design covers the implementation details for exposing CSI snapshot to host path access only, for other types or accesses, we may need a separate design
 - The current workflow focuses on snapshot-based data movements. For some application/SaaS level data sources, snapshots may not be taken explicitly. We don’t take them into consideration, though we believe that some workflows or components may still be reusable.
+- It is possible that native snapshot creation succeeds but data movement fails technically, in this case, we don't support to retain the native snapshot. The backup will be set to ParitiallyFailed and no data will be restored for the volume of the failed data movement. We don't foresee cases that snapshot creation succeeds but data movement always fail, so we will leave this for further design on future requirements.  
 
 ## Architecture of Volume Snapshot Data Movement
 
@@ -269,6 +271,10 @@ spec:
                 description: OperationTimeout specifies the time used to wait internal 
                   operations, e.g., wait the CSI snapshot to become readyToUse.
                 type: string
+              retainSnapshot:
+                description: RetainSnapshot specifies whether to retain the snapshot
+                  after backup completes.
+                type: boolean                
               snapshotType:
                 description: SnapshotType is the type of the snapshot to be backed
                   up.
@@ -335,6 +341,10 @@ spec:
                     format: int64
                     type: integer
                 type: object
+              retainedSnapshot:
+                description: RetainedSnapshot is name of the snapshot that has been
+                  retained.
+                type: string                
               snapshotID:
                 description: SnapshotID is the identifier for the snapshot in the
                   backup repository.
@@ -637,9 +647,45 @@ In DUCR/DDCR’s status, we have fields like ```totalBytes``` and ```doneBytes``
 - Call ```kubectl get dataupload -n velero xxx or kubectl get datadownload -n velero xxx```.
 - Call ```velero backup describe –details```. This is implemented as part of BIA/RIA V2, the above values are transferred to async operation and this command retrieve them from the async operation instead of DUCR/DDCR. See [general progress monitoring design][2] for details
 
+## Retain Native Snapshots
+Users are allowed to specify a global limit number of native snapshots to be retained for each volume, then:
+- If the number is not specified, or if it is not a positive value, it means no native snapshot is to be retained
+- Otherwise, the value defines the max snapshots to be retained for each volume, a.k.a, the limit. If the limit is exceeded, the oldest retained snapshot will be removed
+
+There may be snapshot number limit from storage side, different storages may/may not have this limit and may define different numbers as a trade off of resource consumption, performance, data redundancy, etc. This means users should be aware of the limit from their storage and always configure a Velero retained snapshot number that is no larger than their storage limit, otherwise, the snapshot creation and the data movement for the volume may fail.  
+For the same reason, if a DMP supports snapshot from more than one kinds of storages, it may need to set different snapshot limits for volumes from different storages, based on different criteria (E.g., CSI plugin may needs to set different numbers by CSI driver types). In this case, the DMP could overwrite the global limit number based on its own configurations. The configurations are private to the DMP itself since the storage information is only known by the specific DMP, and how the configurations are structured and interpreted is also private to the specific DMP.  
+
+The global limit number is set as an annotation of a backup CR, the annotation is called ```backup.velero.io/data-mover-snapshot-to-retain```. In this way, DMPs are able to query the number from the backup CR.  
+
+DMP is responsible to maintain the native snapshots. Specifically, it is able to list/count the retained snapshots for each volume, and remove the old ones once the limit is exceeded.  
+Practically, DMP creates a snapshot associated object(SAO) for each retained snapshot, then it could list/count the retained snapshots by listing/counting the SAOs through Kubernetes API any time after the backup. For some DMPs, some Kubernetes objects are created as part of the snapshot creation, then they could choose any of the objects as SAOs. For others, if no Kubernetes objects are created necessarily during the snapshot creation, they can create some Kubernetes objects (i.e. configMaps) purposefully as SAOs. For Velero CSI plugin, the VolumeSnapshotContent objects will act as SAOs.  
+To assist on the listing/counting, several labels are applied to SAOs:
+- ```velero.io/snapshot-alias-name```: The DMP gives an alias to each SAO. As mentioned above, Velero/DMP should not expect DMs to keep the snapshots and their associated objects unchanged, e.g., a DM may delete the VS/VSC created by CSI plugin and create new ones from them (so the new ones also represent the same snapshots). By giving an alias, DMPs are guaranteed to find the SAOs by the alias label even though they have no idea to know where the DMs have cloned the SAOs. This also means that DMs should inherit all the labels from the original SAOs
+- ```velero.io/snapshot-volume-name```: This label stores the volume's identity for which a snapshot is created. Its value could be anything that could uniquely identify a volume, for example, for a PVC, the value could be its namespaced name or UID. In this way, the DMP is able to tell all the retained snapshots for a specific volume  
+
+DMPs then return the SAOs as ```itemToUpdate``` with their aliases to Velero backup, in this way, when the DM execution finishes, Velero gets the latest SAOs by their aliases and persist them to the backup storage.  
+Velero, specifically the backup sync controller, is responsible to sync the SAOs to the target cluster for restore if they are not there. In this way, it is guaranteed that all the SAOs are available as long as their associated backups are there, or for every restore, DMPs always see the full list of SAOs for all the volumes to be restored.  
+ 
+After the retained snapshots are counted against the limit and if limit is exceeded, DMP needs to make sure the old snapshots are first removed before creating the new snapshot, otherwise, the snapshot creation may fail as some storage has a hard limit of the snapshot numbers.  
+Since the retained snapshot from an old backup has been deleted before the completion of the new backup, it is possible that the new backup fails and the retained snapshot from the old backup is deleted unnecessarily. In this case, restore from the old backup has to go through data movement since the retained snapshot has been deleted, which may lead longer time. However, the data should still be restored appropriately.  
+
+DMPs also need to tell DMs to retain a snasphot, it is done through the ```retainSnapshot``` field in the DUCR's spec. This is a boolean value and if it is true, DMs will not delete the snapshots after its execution finishes.  
+After data movement completes, the retained snapshot name is recorded in DUCR's ```retainedSnapshot``` field, the names are different varying from snapshot types. For CSI snapshots, they are the VSC names for the retained snapshots.  
+
+During restore, DMPs checks the existence of the SAO for a volume of a backup, if it exists, it restore the data from the native snapshot; otherwise, it submits DDCRs to do a data movement.  
+
+For Velero CSI plugin, the existing logics are reused for restoring retained native snapshots, with some adjustment in the workflow.  
+Below diagram shows how snapshot retained backup happens for Velero and Velero CSI plugin:  
+![backup-sequence-retained-snapshot.png](backup-sequence-retained-snapshot.png)  
+Below diagram shows how snapshot retained restore happens for Velero and Velero CSI plugin when native snapshot is not available:  
+![restore-sequence-retained-snapshot-not-avai.png](restore-sequence-retained-snapshot-not-avai.png)  
+Below diagram shows how snapshot retained restore happens for Velero and Velero CSI plugin when native snapshot is available:  
+![restore-sequence-retained-snapshot-avai.png](restore-sequence-retained-snapshot-avai.png)  
 
 ## Backup Sync
 DUCR contains the information that is required during restore but as mentioned above, it will not be synced because during restore its information is retrieved dynamically. Therefore, we have no change to Backup Sync.  
+For snapshot retained, as mentioned above, the backup sync controller finds the SAOs for a backup by the ```velero.io/snapshot-alias-name``` in the backup storage and sync them to the target cluster during backup sync. For CSI snapshot, Velero has existing logics to sync VolumeSnapshotContents, this logic will be reused.  
+
 
 ## Backup Deletion
 Once a backup is deleted, the data in the backup repository should be deleted as well. On the other hand, the data is created by the specific DM, Velero doesn't know how to delete the data. Therefore, Velero relies on the DM to delete the backup data.  
@@ -654,6 +700,9 @@ As the current workflow, when ```velero backup delete``` CLI is called, a ```del
 - Finally, when all the items in the list are processed successfully, the DM removes the ```velero.io/dm-delete-backup``` finalizer
 - Otherwise, if any error happens during the processing, the ```deletebackuprequests``` CR will be left there with the ```velero.io/dm-delete-backup``` finalizer, as well as the failed DUCRs
 - DMs may use a periodical manner to retry the failed delete requests  
+
+Once the backup is deleted, the native snapshots retained should also be deleted. Velero has the ability to delete the SAOs as they are part of the backup, if any particular operations is required for deleting the snapshots, the DMP who creates the snapshots needs to implement DIA (DeleteItemAction) on the SAOs.  
+For CSI snapshot, CSI plugin implements DIA on VolumeSnapshotContent objects, so that the snapshots could be removed appropriately.  
 
 ## Restarts
 If Velero restarts during a data movement activity, the backup/restore will be marked as failed when Velero server comes back, by this time, Velero will request a cancellation to the ongoing data movement.  
@@ -890,11 +939,12 @@ Conclusively, below are the steps plugin DMs need to do in order to integrate to
 - Set PV's ```claimRef``` to the provided PVC and set ```velero.io/dynamic-pv-restore``` label
 
 ## Working Mode
-It doesn’t mean that once the data movement feature is enabled users must move every snapshot. We will support below two working modes:
+It doesn’t mean that once the data movement feature is enabled users must move every snapshot. We will support below three working modes:
 - Don’t move snapshots. This is same with the existing CSI snapshot feature, that is, native snapshots are taken and kept
 - Move snapshot data and delete native snapshots. This means that once the data movement completes, the native snapshots will be deleted.
+- Move snapshot data and keep X native snapshots for each volume. This means snapshot data is moved first and also several native snapshots will be kept according to users' configuration.  
 
-For this purpose, we need to add a new option in the backup command as well as the Backup CRD.  
+For this purpose, we need to add new options in the backup command, the Backup CRD and Velero server parameters.  
 The same option for restore will be retrieved from the specified backup, so that the working mode is consistent.  
 
 ## Backup and Restore CRD Changes
@@ -911,9 +961,12 @@ We add below new fields in the Backup CRD:
 	DataMover string `json:"datamover,omitempty"`
 ```	
 SnapshotMoveData will be used to decide the Working Mode.  
-DataMover will be used to decide the data mover to handle the DUCR. DUCR's DataMover value is derived from this value.    
+DataMover will be used to decide the data mover to handle the DUCR. DUCR's DataMover value is derived from this value.  
 
 As mentioned in the Plugin Data Movers section, the data movement information for a restore should be the same with the backup. Therefore, the working mode for restore should be decided by checking the corresponding Backup CR; when creating a DDCR, the DataMover value should be retrieved from the corresponding Backup Result.  
+
+## Velero Server parameter Changes
+We add a new flag to Velero server parameter ```data-mover-snapshot-to-retain``` as a global configuration for users to specify how many native snapshots should be retained for each volume, the default value is 0, which means snapshots are not retained. For more information of how native snapshot retain works, check the Retain Native Snapshots section.  
 
 ## Logging
 The logs during the data movement are categorized as below:
