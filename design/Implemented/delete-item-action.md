@@ -175,7 +175,7 @@ If there are one or more, download the backup tarball from backup storage, untar
 
 ## Alternatives Considered
 
-Another proposal for higher level `DeleteItemActions` was initially included, which would require implementors to individually download the backup tarball themselves.
+Another proposal for higher level `DeleteItemActions` was initially included, which would require implementers to individually download the backup tarball themselves.
 While this may be useful long term, it is not a good fit for the current goals as each plugin would be re-implementing a lot of boilerplate.
 See the deletion-plugins.md file for this alternative proposal in more detail.
 
