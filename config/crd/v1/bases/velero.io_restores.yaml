@@ -186,6 +186,12 @@ spec:
                                     - Continue
                                     - Fail
                                     type: string
+                                  waitForReady:
+                                    description: WaitForReady ensures command will
+                                      be launched when container is Ready instead
+                                      of Running.
+                                    nullable: true
+                                    type: boolean
                                   waitTimeout:
                                     description: WaitTimeout defines the maximum amount
                                       of time Velero should wait for the container

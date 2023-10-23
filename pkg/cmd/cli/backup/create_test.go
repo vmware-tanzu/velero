@@ -185,7 +185,7 @@ func TestCreateCommand(t *testing.T) {
 		defaultVolumesToFsBackup := "true"
 		resPoliciesConfigmap := "cm-name-2"
 		dataMover := "velero"
-
+		parallelFilesUpload := 10
 		flags := new(flag.FlagSet)
 		o := NewCreateOptions()
 		o.BindFlags(flags)
@@ -213,6 +213,7 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--default-volumes-to-fs-backup", defaultVolumesToFsBackup})
 		flags.Parse([]string{"--resource-policies-configmap", resPoliciesConfigmap})
 		flags.Parse([]string{"--data-mover", dataMover})
+		flags.Parse([]string{"--parallel-files-upload", fmt.Sprintf("%d", parallelFilesUpload)})
 		//flags.Parse([]string{"--wait"})
 
 		client := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
@@ -261,6 +262,7 @@ func TestCreateCommand(t *testing.T) {
 		require.Equal(t, defaultVolumesToFsBackup, o.DefaultVolumesToFsBackup.String())
 		require.Equal(t, resPoliciesConfigmap, o.ResPoliciesConfigmap)
 		require.Equal(t, dataMover, o.DataMover)
+		require.Equal(t, parallelFilesUpload, o.ParallelFilesUpload)
 		//assert.Equal(t, true, o.Wait)
 
 		// verify oldAndNewFilterParametersUsedTogether

@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
@@ -129,14 +130,14 @@ func (fs *fileSystemBR) Close(ctx context.Context) {
 	fs.log.WithField("user", fs.jobName).Info("FileSystemBR is closed")
 }
 
-func (fs *fileSystemBR) StartBackup(source AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string) error {
+func (fs *fileSystemBR) StartBackup(source AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, uploaderConfigs shared.UploaderConfig) error {
 	if !fs.initialized {
 		return errors.New("file system data path is not initialized")
 	}
 
 	go func() {
 		snapshotID, emptySnapshot, err := fs.uploaderProv.RunBackup(fs.ctx, source.ByPath, realSource, tags, forceFull,
-			parentSnapshot, source.VolMode, fs)
+			parentSnapshot, source.VolMode, uploaderConfigs, fs)
 
 		if err == provider.ErrorCanceled {
 			fs.callbacks.OnCancelled(context.Background(), fs.namespace, fs.jobName)

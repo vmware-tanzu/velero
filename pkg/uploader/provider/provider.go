@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
@@ -49,6 +50,7 @@ type Provider interface {
 		forceFull bool,
 		parentSnapshot string,
 		volMode uploader.PersistentVolumeMode,
+		uploaderCfg shared.UploaderConfig,
 		updater uploader.ProgressUpdater) (string, bool, error)
 	// RunRestore which will do restore for one specific volume with given snapshot id and return error
 	// updater is used for updating backup progress which implement by third-party

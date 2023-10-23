@@ -123,6 +123,14 @@ spec:
                 description: SourcePVC is the name of the PVC which the snapshot is
                   taken for.
                 type: string
+              uploaderConfig:
+                description: UploaderConfig specifies the configuration for the uploader.
+                properties:
+                  parallelFilesUpload:
+                    description: ParallelFilesUpload is the number of files parallel
+                      uploads to perform when using the uploader.
+                    type: integer
+                type: object
             required:
             - backupStorageLocation
             - operationTimeout

@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
 	providerMock "github.com/vmware-tanzu/velero/pkg/uploader/provider/mocks"
@@ -95,12 +96,12 @@ func TestAsyncBackup(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fs := newFileSystemBR("job-1", "test", nil, "velero", Callbacks{}, velerotest.NewLogger()).(*fileSystemBR)
 			mockProvider := providerMock.NewProvider(t)
-			mockProvider.On("RunBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.result.Backup.SnapshotID, test.result.Backup.EmptySnapshot, test.err)
+			mockProvider.On("RunBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.result.Backup.SnapshotID, test.result.Backup.EmptySnapshot, test.err)
 			fs.uploaderProv = mockProvider
 			fs.initialized = true
 			fs.callbacks = test.callbacks
 
-			err := fs.StartBackup(AccessPoint{ByPath: test.path}, "", "", false, nil)
+			err := fs.StartBackup(AccessPoint{ByPath: test.path}, "", "", false, nil, shared.UploaderConfig{})
 			require.Equal(t, nil, err)
 
 			<-finish

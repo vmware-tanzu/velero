@@ -401,6 +401,7 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume c
 			BackupStorageLocation: backup.Spec.StorageLocation,
 			RepoIdentifier:        repoIdentifier,
 			UploaderType:          uploaderType,
+			UploaderConfig:        backup.Spec.UploaderConfig,
 		},
 	}
 

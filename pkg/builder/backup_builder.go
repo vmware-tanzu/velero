@@ -299,3 +299,9 @@ func (b *BackupBuilder) DataMover(name string) *BackupBuilder {
 	b.object.Spec.DataMover = name
 	return b
 }
+
+// ParallelFilesUpload sets the Backup's uploader parallel uploads
+func (b *BackupBuilder) ParallelFilesUpload(parallel int) *BackupBuilder {
+	b.object.Spec.UploaderConfig.ParallelFilesUpload = parallel
+	return b
+}

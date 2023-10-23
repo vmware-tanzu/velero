@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
@@ -122,6 +123,7 @@ func (rp *resticProvider) RunBackup(
 	forceFull bool,
 	parentSnapshot string,
 	volMode uploader.PersistentVolumeMode,
+	uploaderCfg shared.UploaderConfig,
 	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {
 		return "", false, errors.New("Need to initial backup progress updater first")
@@ -143,6 +145,10 @@ func (rp *resticProvider) RunBackup(
 		"path":           path,
 		"parentSnapshot": parentSnapshot,
 	})
+
+	if uploaderCfg.ParallelFilesUpload > 0 {
+		log.Warnf("ParallelFilesUpload is set to %d, but restic does not support parallel file uploads. Ignoring.", uploaderCfg.ParallelFilesUpload)
+	}
 
 	backupCmd := resticBackupCMDFunc(rp.repoIdentifier, rp.credentialsFile, path, tags)
 	backupCmd.Env = rp.cmdEnv
