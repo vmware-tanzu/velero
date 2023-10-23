@@ -27,6 +27,7 @@ import (
 
 	"github.com/kopia/kopia/repo"
 	"github.com/kopia/kopia/repo/content"
+	"github.com/kopia/kopia/repo/content/index"
 	"github.com/kopia/kopia/repo/manifest"
 	"github.com/kopia/kopia/repo/object"
 )
@@ -140,7 +141,7 @@ func (sr *shimRepository) Refresh(ctx context.Context) error {
 
 // ContentInfo not supported
 func (sr *shimRepository) ContentInfo(ctx context.Context, contentID content.ID) (content.Info, error) {
-	return nil, errors.New("ContentInfo is not supported")
+	return index.Info{}, errors.New("ContentInfo is not supported")
 }
 
 // PrefetchContents is not supported by unified repo
