@@ -97,9 +97,12 @@ func (p *ResourceModifiers) ApplyResourceModifierRules(obj *unstructured.Unstruc
 }
 
 func (r *ResourceModifierRule) apply(obj *unstructured.Unstructured, groupResource string, scheme *runtime.Scheme, log logrus.FieldLogger) error {
-	namespaceInclusion := collections.NewIncludesExcludes().Includes(r.Conditions.Namespaces...)
-	if !namespaceInclusion.ShouldInclude(obj.GetNamespace()) {
-		return nil
+	ns := obj.GetNamespace()
+	if ns != "" {
+		namespaceInclusion := collections.NewIncludesExcludes().Includes(r.Conditions.Namespaces...)
+		if !namespaceInclusion.ShouldInclude(ns) {
+			return nil
+		}
 	}
 
 	g, err := glob.Compile(r.Conditions.GroupResource)
@@ -148,17 +151,21 @@ func (r *ResourceModifierRule) apply(obj *unstructured.Unstructured, groupResour
 	return nil
 }
 
-func matchConditions(u *unstructured.Unstructured, patches []MatchRule, _ logrus.FieldLogger) (bool, error) {
-	if len(patches) == 0 {
+func matchConditions(u *unstructured.Unstructured, rules []MatchRule, _ logrus.FieldLogger) (bool, error) {
+	if len(rules) == 0 {
 		return true, nil
 	}
 
 	var fixed []JSONPatch
-	for _, patch := range patches {
+	for _, rule := range rules {
+		if rule.Path == "" {
+			return false, fmt.Errorf("path is required for match rule")
+		}
+
 		fixed = append(fixed, JSONPatch{
 			Operation: "test",
-			Path:      patch.Path,
-			Value:     patch.Value,
+			Path:      rule.Path,
+			Value:     rule.Value,
 		})
 	}
 

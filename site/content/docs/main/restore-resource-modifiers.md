@@ -105,3 +105,81 @@ resourceModifierRules:
 -  Update a container's image using a json patch with positional arrays
 kubectl patch pod valid-pod -type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'
 - Before creating the resource modifier yaml, you can try it out using kubectl patch command. The same commands should work as it is.
+
+### New features introduced in 1.13
+
+#### JSON Merge Patch
+you can modify a resource using JSON Merge Patch
+```yaml
+version: v1
+resourceModifierRules:
+- conditions:
+    groupResource: pods
+    namespaces:
+    - ns1
+  mergePatches:
+  - patchData: |
+      {
+        "metadata": {
+          "annotations": {
+            "foo": null
+          }
+        }
+      }
+```
+- The above configmap will apply the Merge Patch to all the pods in namespace ns1 and remove the annotation `foo` from the pods.
+- Both json and yaml format are supported for the patchData.
+
+#### Strategic Merge Patch
+you can modify a resource using Strategic Merge Patch
+```yaml
+version: v1
+resourceModifierRules:
+- conditions:
+    groupResource: pods
+    resourceNameRegex: "^my-pod$"
+    namespaces:
+    - ns1
+  strategicPatches:
+  - patchData: |
+      {
+        "spec": {
+          "containers": [
+            {
+              "name": "nginx",
+              "image": "repo2/nginx"
+            }
+          ]
+        }
+      }
+```
+- The above configmap will apply the Strategic Merge Patch to the pod with name my-pod in namespace ns1 and update the image of container nginx to `repo2/nginx`.
+- Both json and yaml format are supported for the patchData.
+
+### Conditional Patches in ALL Patch Types
+Since JSON Merge Patch and Strategic Merge Patch do not support conditional patches, we use the `test` operation of JSON Patch to support conditional patches in all patch types by adding it to `Conditions` struct in `ResourceModifierRule`.
+
+Example of test in conditions
+```yaml
+version: v1
+resourceModifierRules:
+- conditions:
+    groupResource: persistentvolumeclaims.storage.k8s.io
+    matches:
+    - path: "/spec/storageClassName"
+      value: "premium"
+  mergePatches:
+  - patchData: |
+      {
+        "metadata": {
+          "annotations": {
+            "foo": null
+          }
+        }
+      }
+```
+- The above configmap will apply the Merge Patch to all the PVCs in all namespaces with storageClassName premium and remove the annotation `foo` from the PVCs.
+- You can specify multiple rules in the `matches` list. The patch will be applied only if all the matches are satisfied.
+
+### Wildcard Support for GroupResource
+The user can specify a wildcard for groupResource in the conditions' struct. This will allow the user to apply the patches for all the resources of a particular group or all resources in all groups. For example, `*.apps` will apply to all the resources in the `apps` group, `*` will apply to all the resources in all groups.

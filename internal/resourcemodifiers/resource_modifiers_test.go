@@ -141,7 +141,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			Namespace: "test-namespace",
 		},
 		Data: map[string]string{
-			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupResource: pods\n    namespaces:\n    - ns1\n  mergePatches:\n  - patchData: |\n      metadata:\n        annotations:\n          foo: null",
+			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupResource: pods\n    namespaces:\n    - ns1\n    matches:\n    - path: /metadata/annotations/foo\n      value: bar\n  mergePatches:\n  - patchData: |\n      metadata:\n        annotations:\n          foo: null",
 		},
 	}
 
@@ -153,6 +153,12 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 					GroupResource: "pods",
 					Namespaces: []string{
 						"ns1",
+					},
+					Matches: []MatchRule{
+						{
+							Path:  "/metadata/annotations/foo",
+							Value: "bar",
+						},
 					},
 				},
 				MergePatches: []JSONMergePatch{
@@ -341,7 +347,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetResourceModifiersFromConfig() = %#v, want %#v", got, tt.want)
+				t.Errorf("GetResourceModifiersFromConfig() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -621,6 +627,38 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			},
 			wantErr: false,
 			wantObj: deployNginxOneReplica.DeepCopy(),
+		},
+		{
+			name: "nginx deployment: Empty Resource Regex",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupResource: "deployments.apps",
+							Namespaces:    []string{"foo"},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "test",
+								Path:      "/spec/replicas",
+								Value:     "1",
+							},
+							{
+								Operation: "replace",
+								Path:      "/spec/replicas",
+								Value:     "2",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           deployNginxOneReplica.DeepCopy(),
+				groupResource: "deployments.apps",
+			},
+			wantErr: false,
+			wantObj: deployNginxTwoReplica.DeepCopy(),
 		},
 		{
 			name: "nginx deployment: Empty Resource Regex",
