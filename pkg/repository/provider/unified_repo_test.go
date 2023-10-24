@@ -22,7 +22,7 @@ import (
 	"errors"
 	"testing"
 
-	awscredentials "github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/kopia/kopia/repo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -45,7 +45,7 @@ func TestGetStorageCredentials(t *testing.T) {
 		credFileStore     *credmock.FileStore
 		credStoreError    error
 		credStorePath     string
-		getS3Credentials  func(map[string]string) (*awscredentials.Value, error)
+		getS3Credentials  func(map[string]string) (*aws.Credentials, error)
 		getGCPCredentials func(map[string]string) string
 		expected          map[string]string
 		expectedErr       string
@@ -89,8 +89,8 @@ func TestGetStorageCredentials(t *testing.T) {
 					},
 				},
 			},
-			getS3Credentials: func(config map[string]string) (*awscredentials.Value, error) {
-				return &awscredentials.Value{
+			getS3Credentials: func(config map[string]string) (*aws.Credentials, error) {
+				return &aws.Credentials{
 					AccessKeyID: "from: " + config["credentialsFile"],
 				}, nil
 			},
@@ -115,8 +115,8 @@ func TestGetStorageCredentials(t *testing.T) {
 			},
 			credFileStore: new(credmock.FileStore),
 			credStorePath: "credentials-from-credential-key",
-			getS3Credentials: func(config map[string]string) (*awscredentials.Value, error) {
-				return &awscredentials.Value{
+			getS3Credentials: func(config map[string]string) (*aws.Credentials, error) {
+				return &aws.Credentials{
 					AccessKeyID: "from: " + config["credentialsFile"],
 				}, nil
 			},
@@ -138,7 +138,7 @@ func TestGetStorageCredentials(t *testing.T) {
 					},
 				},
 			},
-			getS3Credentials: func(config map[string]string) (*awscredentials.Value, error) {
+			getS3Credentials: func(config map[string]string) (*aws.Credentials, error) {
 				return nil, errors.New("fake error")
 			},
 			credFileStore: new(credmock.FileStore),
@@ -153,7 +153,7 @@ func TestGetStorageCredentials(t *testing.T) {
 					Config:   map[string]string{},
 				},
 			},
-			getS3Credentials: func(config map[string]string) (*awscredentials.Value, error) {
+			getS3Credentials: func(config map[string]string) (*aws.Credentials, error) {
 				return nil, nil
 			},
 			credFileStore: new(credmock.FileStore),

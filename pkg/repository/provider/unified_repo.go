@@ -433,7 +433,7 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 
 		if credValue != nil {
 			result[udmrepo.StoreOptionS3KeyID] = credValue.AccessKeyID
-			result[udmrepo.StoreOptionS3Provider] = credValue.ProviderName
+			result[udmrepo.StoreOptionS3Provider] = credValue.Source
 			result[udmrepo.StoreOptionS3SecretKey] = credValue.SecretAccessKey
 			result[udmrepo.StoreOptionS3Token] = credValue.SessionToken
 		}
