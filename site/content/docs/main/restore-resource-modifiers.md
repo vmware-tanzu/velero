@@ -106,10 +106,8 @@ resourceModifierRules:
 kubectl patch pod valid-pod -type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'
 - Before creating the resource modifier yaml, you can try it out using kubectl patch command. The same commands should work as it is.
 
-### New features introduced in 1.13
-
 #### JSON Merge Patch
-you can modify a resource using JSON Merge Patch
+You can modify a resource using JSON Merge Patch
 ```yaml
 version: v1
 resourceModifierRules:
@@ -129,9 +127,10 @@ resourceModifierRules:
 ```
 - The above configmap will apply the Merge Patch to all the pods in namespace ns1 and remove the annotation `foo` from the pods.
 - Both json and yaml format are supported for the patchData.
+- For more details, please refer to [this doc](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/)
 
 #### Strategic Merge Patch
-you can modify a resource using Strategic Merge Patch
+You can modify a resource using Strategic Merge Patch
 ```yaml
 version: v1
 resourceModifierRules:
@@ -155,11 +154,13 @@ resourceModifierRules:
 ```
 - The above configmap will apply the Strategic Merge Patch to the pod with name my-pod in namespace ns1 and update the image of container nginx to `repo2/nginx`.
 - Both json and yaml format are supported for the patchData.
+- For more details, please refer to [this doc](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/)
+
 
 ### Conditional Patches in ALL Patch Types
-Since JSON Merge Patch and Strategic Merge Patch do not support conditional patches, we use the `test` operation of JSON Patch to support conditional patches in all patch types by adding it to `Conditions` struct in `ResourceModifierRule`.
+A new field `matches` is added in conditions to support conditional patches.
 
-Example of test in conditions
+Example of matches in conditions
 ```yaml
 version: v1
 resourceModifierRules:
