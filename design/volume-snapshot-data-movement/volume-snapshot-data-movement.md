@@ -666,6 +666,9 @@ At present, VBDM doesn't support recovery, so it will follow the second rule.
 ## Kopia For Block Device
 To work with block devices, VGDP will be updated. Today, when Kopia attempts to create a snapshot of the block device, it will error because kopia does not support this file type. Kopia does have a nice set of interfaces that are able to be extended though.
 
+**Notice**
+The Kopia block mode uploader only supports non-Windows platforms, because the block mode code invokes some system calls that are not present in the Windows platform.
+
 To achieve the necessary information to determine the type of volume that is being used, we will need to pass in the volume mode in provider interface.
 
 ```go

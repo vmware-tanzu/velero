@@ -1,1 +1,1 @@
-Add both non-Windows version and Windows version code for PVC block mode logic.
+Limit PVC block mode logic to non-Windows platform.

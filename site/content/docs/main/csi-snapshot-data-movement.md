@@ -248,6 +248,7 @@ that anyone who has access to your backup storage can decrypt your backup data**
 to the backup storage appropriately. 
 - [Velero built-in data mover] Even though the backup data could be incrementally preserved, for a single file data, Velero built-in data mover leverages on deduplication to find the difference to be saved. This means that large files (such as ones storing a database) will take a long time to scan for data  deduplication, even if the actual difference is small.
 - [Velero built-in data mover] You may need to [customize the resource limits][11] to make sure backups complete successfully for massive small files or large backup size cases, for more details refer to [Velero file system level backup performance guide][12]. 
+- The block mode is supported by the Kopia uploader, but it only supports non-Windows platforms, because the block mode code invokes some system calls that are not present in the Windows platform.
 
 ## Troubleshooting
 
