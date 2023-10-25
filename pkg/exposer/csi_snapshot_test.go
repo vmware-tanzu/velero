@@ -152,8 +152,9 @@ func TestExpose(t *testing.T) {
 			name:        "wait vs ready fail",
 			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
-				SnapshotName: "fake-vs",
-				Timeout:      time.Millisecond,
+				SnapshotName:     "fake-vs",
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
 			},
 			err: "error wait volume snapshot ready: error to get volumesnapshot /fake-vs: volumesnapshots.snapshot.storage.k8s.io \"fake-vs\" not found",
 		},
@@ -161,9 +162,10 @@ func TestExpose(t *testing.T) {
 			name:        "get vsc fail",
 			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
-				SnapshotName:    "fake-vs",
-				SourceNamespace: "fake-ns",
-				Timeout:         time.Millisecond,
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -174,9 +176,10 @@ func TestExpose(t *testing.T) {
 			name:        "delete vs fail",
 			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
-				SnapshotName:    "fake-vs",
-				SourceNamespace: "fake-ns",
-				Timeout:         time.Millisecond,
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -197,9 +200,10 @@ func TestExpose(t *testing.T) {
 			name:        "delete vsc fail",
 			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
-				SnapshotName:    "fake-vs",
-				SourceNamespace: "fake-ns",
-				Timeout:         time.Millisecond,
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -220,9 +224,10 @@ func TestExpose(t *testing.T) {
 			name:        "create backup vs fail",
 			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
-				SnapshotName:    "fake-vs",
-				SourceNamespace: "fake-ns",
-				Timeout:         time.Millisecond,
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -243,9 +248,10 @@ func TestExpose(t *testing.T) {
 			name:        "create backup vsc fail",
 			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
-				SnapshotName:    "fake-vs",
-				SourceNamespace: "fake-ns",
-				Timeout:         time.Millisecond,
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -280,10 +286,11 @@ func TestExpose(t *testing.T) {
 			name:        "create backup pvc fail",
 			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
-				SnapshotName:    "fake-vs",
-				SourceNamespace: "fake-ns",
-				Timeout:         time.Millisecond,
-				AccessMode:      AccessModeFileSystem,
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				AccessMode:       AccessModeFileSystem,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -304,10 +311,11 @@ func TestExpose(t *testing.T) {
 			name:        "create backup pod fail",
 			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
-				SnapshotName:    "fake-vs",
-				SourceNamespace: "fake-ns",
-				AccessMode:      AccessModeFileSystem,
-				Timeout:         time.Millisecond,
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -331,10 +339,11 @@ func TestExpose(t *testing.T) {
 			name:        "success",
 			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
-				SnapshotName:    "fake-vs",
-				SourceNamespace: "fake-ns",
-				AccessMode:      AccessModeFileSystem,
-				Timeout:         time.Millisecond,
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
@@ -348,11 +357,12 @@ func TestExpose(t *testing.T) {
 			name:        "restore size from exposeParam",
 			ownerBackup: backup,
 			exposeParam: CSISnapshotExposeParam{
-				SnapshotName:    "fake-vs",
-				SourceNamespace: "fake-ns",
-				AccessMode:      AccessModeFileSystem,
-				Timeout:         time.Millisecond,
-				VolumeSize:      *resource.NewQuantity(567890, ""),
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				VolumeSize:       *resource.NewQuantity(567890, ""),
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObjectWithoutRestoreSize,
