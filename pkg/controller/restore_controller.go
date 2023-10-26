@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -376,7 +377,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 	}
 
 	var resourceModifiers *resourcemodifiers.ResourceModifiers = nil
-	if restore.Spec.ResourceModifier != nil && restore.Spec.ResourceModifier.Kind == resourcemodifiers.ConfigmapRefType {
+	if restore.Spec.ResourceModifier != nil && strings.EqualFold(restore.Spec.ResourceModifier.Kind, resourcemodifiers.ConfigmapRefType) {
 		ResourceModifierConfigMap := &corev1api.ConfigMap{}
 		err := r.kbClient.Get(context.Background(), client.ObjectKey{Namespace: restore.Namespace, Name: restore.Spec.ResourceModifier.Name}, ResourceModifierConfigMap)
 		if err != nil {
