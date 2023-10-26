@@ -292,13 +292,15 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
 		log.Info("Data upload is in progress")
 		if du.Spec.Cancel {
-			fsBackup := r.dataPathMgr.GetAsyncBR(du.Name)
-			if fsBackup == nil {
-				return ctrl.Result{}, nil
-			}
 			log.Info("Data upload is being canceled")
 
-			// Update status to Canceling.
+			fsBackup := r.dataPathMgr.GetAsyncBR(du.Name)
+			if fsBackup == nil {
+				r.OnDataUploadCancelled(ctx, du.GetNamespace(), du.GetName())
+				return ctrl.Result{}, nil
+			}
+
+			// Update status to Canceling
 			original := du.DeepCopy()
 			du.Status.Phase = velerov2alpha1api.DataUploadPhaseCanceling
 			if err := r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
