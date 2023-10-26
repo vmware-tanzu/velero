@@ -209,10 +209,10 @@ func TestWaitExecHandleHooks(t *testing.T) {
 						Result(),
 				},
 			},
-			expectedErrors: []error{errors.New("pod hook error")},
+			expectedErrors: []error{errors.New("hook <from-annotation> in container container1 failed to execute, err: pod hook error")},
 		},
 		{
-			name: "should return no error when hook from annotation fails with on error mode continue",
+			name: "should return error when hook from annotation fails with on error mode continue",
 			initialPod: builder.ForPod("default", "my-pod").
 				ObjectMeta(builder.WithAnnotations(
 					podRestoreHookCommandAnnotationKey, "/usr/bin/foo",
@@ -278,7 +278,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 						Result(),
 				},
 			},
-			expectedErrors: nil,
+			expectedErrors: []error{errors.New("hook <from-annotation> in container container1 failed to execute, err: pod hook error")},
 		},
 		{
 			name: "should return no error when hook from annotation executes after 10ms wait for container to start",
@@ -422,7 +422,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			},
 		},
 		{
-			name:          "should return no error when spec hook with wait timeout expires with OnError mode Continue",
+			name:          "should return error when spec hook with wait timeout expires with OnError mode Continue",
 			groupResource: "pods",
 			initialPod: builder.ForPod("default", "my-pod").
 				Containers(&v1.Container{
@@ -435,7 +435,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 					},
 				}).
 				Result(),
-			expectedErrors: nil,
+			expectedErrors: []error{errors.New("hook my-hook-1 in container container1 in pod default/my-pod not executed: context deadline exceeded")},
 			byContainer: map[string][]PodExecRestoreHook{
 				"container1": {
 					{
@@ -515,8 +515,8 @@ func TestWaitExecHandleHooks(t *testing.T) {
 			sharedHooksContextTimeout: time.Millisecond,
 		},
 		{
-			name:           "should return no error when shared hooks context is canceled before spec hook with OnError mode Continue executes",
-			expectedErrors: nil,
+			name:           "should return error when shared hooks context is canceled before spec hook with OnError mode Continue executes",
+			expectedErrors: []error{errors.New("hook my-hook-1 in container container1 in pod default/my-pod not executed: context deadline exceeded")},
 			groupResource:  "pods",
 			initialPod: builder.ForPod("default", "my-pod").
 				Containers(&v1.Container{
