@@ -861,6 +861,7 @@ func TestRestoreItems(t *testing.T) {
 		tarball              io.Reader
 		want                 []*test.APIResource
 		expectedRestoreItems map[itemKey]restoredItemStatus
+		disableInformer      bool
 	}{
 		{
 			name:    "metadata uid/resourceVersion/etc. gets removed",
@@ -1017,6 +1018,26 @@ func TestRestoreItems(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.Secrets(builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"foo": []byte("bar")}).Result()),
 			},
+			disableInformer: true,
+			want: []*test.APIResource{
+				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
+			},
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:  {action: "created", itemExists: true},
+				{resource: "v1/Secret", namespace: "ns-1", name: "sa-1"}: {action: "updated", itemExists: true},
+			},
+		},
+		{
+			name:    "update secret data and labels when secret exists in cluster and is not identical to the backed up one, existing resource policy is update, using informer cache",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("secrets", builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"key-1": []byte("value-1")}).Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Secrets(builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"foo": []byte("bar")}).Result()),
+			},
+			disableInformer: false,
 			want: []*test.APIResource{
 				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
 			},
@@ -1175,13 +1196,14 @@ func TestRestoreItems(t *testing.T) {
 			}
 
 			data := &Request{
-				Log:              h.log,
-				Restore:          tc.restore,
-				Backup:           tc.backup,
-				PodVolumeBackups: nil,
-				VolumeSnapshots:  nil,
-				BackupReader:     tc.tarball,
-				RestoredItems:    map[itemKey]restoredItemStatus{},
+				Log:                  h.log,
+				Restore:              tc.restore,
+				Backup:               tc.backup,
+				PodVolumeBackups:     nil,
+				VolumeSnapshots:      nil,
+				BackupReader:         tc.tarball,
+				RestoredItems:        map[itemKey]restoredItemStatus{},
+				DisableInformerCache: tc.disableInformer,
 			}
 			warnings, errs := h.restorer.Restore(
 				data,

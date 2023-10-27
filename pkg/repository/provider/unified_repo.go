@@ -433,7 +433,7 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 
 		if credValue != nil {
 			result[udmrepo.StoreOptionS3KeyID] = credValue.AccessKeyID
-			result[udmrepo.StoreOptionS3Provider] = credValue.ProviderName
+			result[udmrepo.StoreOptionS3Provider] = credValue.Source
 			result[udmrepo.StoreOptionS3SecretKey] = credValue.SecretAccessKey
 			result[udmrepo.StoreOptionS3Token] = credValue.SessionToken
 		}
@@ -477,9 +477,11 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 
 		var err error
 		if s3URL == "" {
-			region, err = getS3BucketRegion(bucket)
-			if err != nil {
-				return map[string]string{}, errors.Wrap(err, "error get s3 bucket region")
+			if region == "" {
+				region, err = getS3BucketRegion(bucket)
+				if err != nil {
+					return map[string]string{}, errors.Wrap(err, "error get s3 bucket region")
+				}
 			}
 
 			s3URL = fmt.Sprintf("s3-%s.amazonaws.com", region)

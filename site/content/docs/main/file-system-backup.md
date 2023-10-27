@@ -354,6 +354,7 @@ For this reason, FSB can only backup volumes that are mounted by a pod and not d
 (without running pods), some Velero users overcame this limitation running a staging pod (i.e. a busybox or alpine container 
 with an infinite sleep) to mount these PVC/PV pairs prior taking a Velero backup.  
 - Velero File System Backup expects volumes to be mounted under `<hostPath>/<pod UID>` (`hostPath` is configurable as mentioned in [Configure Node Agent DaemonSet spec](#configure-node-agent-daemonset-spec)). Some Kubernetes systems (i.e., [vCluster][11]) don't mount volumes under the `<pod UID>` sub-dir, Velero File System Backup is not working with them.  
+- File system restores of the same pod won't start until all the volumes of the pod get bound, even though some of the volumes have been bound and ready for restore. An a result, if a pod has multiple volumes, while only part of the volumes are restored by file system restore, these file system restores won't start until the other volumes are restored completely by other restore types (i.e., [CSI Snapshot Restore][12], [CSI Snapshot Data Movement][13]), the file system restores won't happen concurrently with those other types of restores.  
 
 ## Customize Restore Helper Container
 
@@ -596,3 +597,5 @@ To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watch
 [9]: https://github.com/restic/restic/issues/1800
 [10]: customize-installation.md#default-pod-volume-backup-to-file-system-backup
 [11]: https://www.vcluster.com/
+[12]: csi.md
+[13]: csi-snapshot-data-movement.md

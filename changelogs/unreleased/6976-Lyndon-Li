@@ -1,0 +1,1 @@
+It is a valid case that the Status.RestoreSize field in VolumeSnapshot is not set, if so, get the volume size from the source PVC to create the backup PVC

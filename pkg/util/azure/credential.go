@@ -26,7 +26,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// NewCredential chains the config credential and workload identity credential
+// NewCredential chains the config credential , workload identity credential , managed identity credential
 func NewCredential(creds map[string]string, options policy.ClientOptions) (azcore.TokenCredential, error) {
 	var (
 		credential []azcore.TokenCredential
@@ -56,6 +56,15 @@ func NewCredential(creds map[string]string, options policy.ClientOptions) (azcor
 	})
 	if err == nil {
 		credential = append(credential, wic)
+	} else {
+		errMsgs = append(errMsgs, err.Error())
+	}
+
+	//managed identity credential
+	o := &azidentity.ManagedIdentityCredentialOptions{ClientOptions: options, ID: azidentity.ClientID(creds[CredentialKeyClientID])}
+	msi, err := azidentity.NewManagedIdentityCredential(o)
+	if err == nil {
+		credential = append(credential, msi)
 	} else {
 		errMsgs = append(errMsgs, err.Error())
 	}

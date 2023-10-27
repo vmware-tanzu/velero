@@ -35,11 +35,9 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
-	"k8s.io/apimachinery/pkg/util/wait"
-
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
-
 	ver "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
@@ -1161,7 +1159,7 @@ func SnapshotCRsCountShouldBe(ctx context.Context, namespace, backupName string,
 }
 
 func BackupRepositoriesCountShouldBe(ctx context.Context, veleroNamespace, targetNamespace string, expectedCount int) error {
-	resticArr, err := GetResticRepositories(ctx, veleroNamespace, targetNamespace)
+	resticArr, err := GetRepositories(ctx, veleroNamespace, targetNamespace)
 	if err != nil {
 		return errors.Wrapf(err, "Fail to get BackupRepositories")
 	}
@@ -1172,11 +1170,11 @@ func BackupRepositoriesCountShouldBe(ctx context.Context, veleroNamespace, targe
 	}
 }
 
-func GetResticRepositories(ctx context.Context, veleroNamespace, targetNamespace string) ([]string, error) {
+func GetRepositories(ctx context.Context, veleroNamespace, targetNamespace string) ([]string, error) {
 	cmds := []*common.OsCommandLine{}
 	cmd := &common.OsCommandLine{
 		Cmd:  "kubectl",
-		Args: []string{"get", "-n", veleroNamespace, "BackupRepositories"},
+		Args: []string{"get", "-n", veleroNamespace, "backuprepositories.velero.io"},
 	}
 	cmds = append(cmds, cmd)
 

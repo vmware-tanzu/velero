@@ -105,6 +105,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 						{
 							Name:            "node-agent",
 							Image:           c.image,
+							Ports:           containerPorts(),
 							ImagePullPolicy: pullPolicy,
 							Command: []string{
 								"/velero",

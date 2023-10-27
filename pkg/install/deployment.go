@@ -48,6 +48,7 @@ type podTemplateConfig struct {
 	uploaderType                    string
 	defaultSnapshotMoveData         bool
 	privilegedNodeAgent             bool
+	disableInformerCache            bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -144,6 +145,12 @@ func WithDefaultSnapshotMoveData() podTemplateOption {
 	}
 }
 
+func WithDisableInformerCache() podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.disableInformerCache = true
+	}
+}
+
 func WithServiceAccountName(sa string) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.serviceAccountName = sa
@@ -183,6 +190,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 
 	if c.defaultSnapshotMoveData {
 		args = append(args, "--default-snapshot-move-data=true")
+	}
+
+	if c.disableInformerCache {
+		args = append(args, "--disable-informer-cache=true")
 	}
 
 	if len(c.uploaderType) > 0 {

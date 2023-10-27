@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -101,6 +102,7 @@ type restoreReconciler struct {
 	logFormat                   logging.Format
 	clock                       clock.WithTickerAndDelayedExecution
 	defaultItemOperationTimeout time.Duration
+	disableInformerCache        bool
 
 	newPluginManager  func(logger logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
@@ -123,6 +125,7 @@ func NewRestoreReconciler(
 	metrics *metrics.ServerMetrics,
 	logFormat logging.Format,
 	defaultItemOperationTimeout time.Duration,
+	disableInformerCache bool,
 ) *restoreReconciler {
 	r := &restoreReconciler{
 		ctx:                         ctx,
@@ -135,6 +138,7 @@ func NewRestoreReconciler(
 		logFormat:                   logFormat,
 		clock:                       &clock.RealClock{},
 		defaultItemOperationTimeout: defaultItemOperationTimeout,
+		disableInformerCache:        disableInformerCache,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -373,7 +377,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 	}
 
 	var resourceModifiers *resourcemodifiers.ResourceModifiers = nil
-	if restore.Spec.ResourceModifier != nil && restore.Spec.ResourceModifier.Kind == resourcemodifiers.ConfigmapRefType {
+	if restore.Spec.ResourceModifier != nil && strings.EqualFold(restore.Spec.ResourceModifier.Kind, resourcemodifiers.ConfigmapRefType) {
 		ResourceModifierConfigMap := &corev1api.ConfigMap{}
 		err := r.kbClient.Get(context.Background(), client.ObjectKey{Namespace: restore.Namespace, Name: restore.Spec.ResourceModifier.Name}, ResourceModifierConfigMap)
 		if err != nil {
@@ -519,13 +523,14 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 	}
 
 	restoreReq := &pkgrestore.Request{
-		Log:               restoreLog,
-		Restore:           restore,
-		Backup:            info.backup,
-		PodVolumeBackups:  podVolumeBackups,
-		VolumeSnapshots:   volumeSnapshots,
-		BackupReader:      backupFile,
-		ResourceModifiers: resourceModifiers,
+		Log:                  restoreLog,
+		Restore:              restore,
+		Backup:               info.backup,
+		PodVolumeBackups:     podVolumeBackups,
+		VolumeSnapshots:      volumeSnapshots,
+		BackupReader:         backupFile,
+		ResourceModifiers:    resourceModifiers,
+		DisableInformerCache: r.disableInformerCache,
 	}
 	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, pluginManager)
 
