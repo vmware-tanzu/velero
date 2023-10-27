@@ -131,6 +131,7 @@ type DataDownloadStatus struct {
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Time duration since this DataDownload was created"
 // +kubebuilder:printcolumn:name="Node",type="string",JSONPath=".status.node",description="Name of the node where the DataDownload is processed"
 
+// DataDownload acts as the protocol between data mover plugins and data mover controller for the datamover restore operation
 type DataDownload struct {
 	metav1.TypeMeta `json:",inline"`
 

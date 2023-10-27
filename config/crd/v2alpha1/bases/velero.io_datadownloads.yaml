@@ -48,6 +48,8 @@ spec:
     name: v2alpha1
     schema:
       openAPIV3Schema:
+        description: DataDownload acts as the protocol between data mover plugins
+          and data mover controller for the datamover restore operation
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
