@@ -36,7 +36,8 @@ import (
 func svcJSON(ports ...corev1api.ServicePort) string {
 	svc := corev1api.Service{
 		Spec: corev1api.ServiceSpec{
-			Ports: ports,
+			HealthCheckNodePort: 8080,
+			Ports:               ports,
 		},
 	}
 
@@ -483,6 +484,164 @@ func TestServiceActionExecute(t *testing.T) {
 							Protocol: "TCP",
 						},
 					},
+				},
+			},
+		},
+		{
+			name: "If PreserveNodePorts is True in restore spec then HealthCheckNodePort always preserved.",
+			obj: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+				},
+				Spec: corev1api.ServiceSpec{
+					HealthCheckNodePort:   8080,
+					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeLocal,
+					Type:                  corev1api.ServiceTypeLoadBalancer,
+					Ports: []corev1api.ServicePort{
+						{
+							Name:     "http",
+							Port:     80,
+							NodePort: 8080,
+						},
+						{
+							Name:     "hepsiburada",
+							NodePort: 9025,
+						},
+					},
+				},
+			},
+			restore: builder.ForRestore(api.DefaultNamespace, "").PreserveNodePorts(true).Result(),
+			expectedRes: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+				},
+				Spec: corev1api.ServiceSpec{
+					HealthCheckNodePort:   8080,
+					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeLocal,
+					Type:                  corev1api.ServiceTypeLoadBalancer,
+					Ports: []corev1api.ServicePort{
+						{
+							Name:     "http",
+							Port:     80,
+							NodePort: 8080,
+						},
+						{
+							Name:     "hepsiburada",
+							NodePort: 9025,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "If PreserveNodePorts is False in restore spec then HealthCheckNodePort should be cleaned.",
+			obj: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+				},
+				Spec: corev1api.ServiceSpec{
+					HealthCheckNodePort:   8080,
+					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeLocal,
+					Type:                  corev1api.ServiceTypeLoadBalancer,
+				},
+			},
+			restore: builder.ForRestore(api.DefaultNamespace, "").PreserveNodePorts(false).Result(),
+			expectedRes: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+				},
+				Spec: corev1api.ServiceSpec{
+					HealthCheckNodePort:   0,
+					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeLocal,
+					Type:                  corev1api.ServiceTypeLoadBalancer,
+				},
+			},
+		},
+		{
+			name: "If PreserveNodePorts is false in restore spec, but service is not expected, then HealthCheckNodePort should be kept.",
+			obj: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+				},
+				Spec: corev1api.ServiceSpec{
+					HealthCheckNodePort:   8080,
+					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeCluster,
+					Type:                  corev1api.ServiceTypeLoadBalancer,
+				},
+			},
+			restore: builder.ForRestore(api.DefaultNamespace, "").PreserveNodePorts(false).Result(),
+			expectedRes: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+				},
+				Spec: corev1api.ServiceSpec{
+					HealthCheckNodePort:   8080,
+					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeCluster,
+					Type:                  corev1api.ServiceTypeLoadBalancer,
+				},
+			},
+		},
+		{
+			name: "If PreserveNodePorts is false in restore spec, but HealthCheckNodePort can be found in Annotation, then it should be kept.",
+			obj: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "svc-1",
+					Annotations: map[string]string{annotationLastAppliedConfig: svcJSON()},
+				},
+				Spec: corev1api.ServiceSpec{
+					HealthCheckNodePort:   8080,
+					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeLocal,
+					Type:                  corev1api.ServiceTypeLoadBalancer,
+				},
+			},
+			restore: builder.ForRestore(api.DefaultNamespace, "").PreserveNodePorts(false).Result(),
+			expectedRes: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "svc-1",
+					Annotations: map[string]string{annotationLastAppliedConfig: svcJSON()},
+				},
+				Spec: corev1api.ServiceSpec{
+					HealthCheckNodePort:   8080,
+					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeLocal,
+					Type:                  corev1api.ServiceTypeLoadBalancer,
+				},
+			},
+		},
+		{
+			name: "If PreserveNodePorts is false in restore spec, but HealthCheckNodePort can be found in ManagedFields, then it should be kept.",
+			obj: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							FieldsV1: &metav1.FieldsV1{
+								Raw: []byte(`{"f:spec":{"f:healthCheckNodePort":{}}}`),
+							},
+						},
+					},
+				},
+				Spec: corev1api.ServiceSpec{
+					HealthCheckNodePort:   8080,
+					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeLocal,
+					Type:                  corev1api.ServiceTypeLoadBalancer,
+				},
+			},
+			restore: builder.ForRestore(api.DefaultNamespace, "").PreserveNodePorts(false).Result(),
+			expectedRes: corev1api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "svc-1",
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							FieldsV1: &metav1.FieldsV1{
+								Raw: []byte(`{"f:spec":{"f:healthCheckNodePort":{}}}`),
+							},
+						},
+					},
+				},
+				Spec: corev1api.ServiceSpec{
+					HealthCheckNodePort:   8080,
+					ExternalTrafficPolicy: corev1api.ServiceExternalTrafficPolicyTypeLocal,
+					Type:                  corev1api.ServiceTypeLoadBalancer,
 				},
 			},
 		},
