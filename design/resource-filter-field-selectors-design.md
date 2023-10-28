@@ -42,10 +42,11 @@ fieldSelectorPolicies:
 - groupResource: 
     group: apiextensions.k8s.io
     resource: customresourcedefinitions
-  metadata.name: virtualservers.k8s.nginx.org
-  metadata.name: virtualserverroutes.k8s.nginx.org
-  metadata.name: transportservers.k8s.nginx.org
-  metadata.name: policies.k8s.nginx.org
+  fieldSelectors:
+    metadata.name: virtualservers.k8s.nginx.org
+    metadata.name: virtualserverroutes.k8s.nginx.org
+    metadata.name: transportservers.k8s.nginx.org
+    metadata.name: policies.k8s.nginx.org
 EOF
 ```
 
@@ -136,6 +137,10 @@ N/A.
 ## Compatibility
 
 The field selector mechanism only works with the new `ResourcePolicies` API.
+
+Similar to volume resource policy, resource filters like `IncludedResources`, `ExcludedResources` etc. has higher precedence than the field selector policy.
+For example, if during a backup, the `ExcludedResources` filter is used to exclude CRD resources, then providing a CRD field selector policy will have no effects.
+Unlike volume resource policies, the field selector policy doesn't support the `action` API.
 
 ## Implementation
 
