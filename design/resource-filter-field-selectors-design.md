@@ -8,7 +8,7 @@ The proposed field selection design complements the existing [filtering API][2],
 ## Background
 
 The current mechanism to include cluster-scoped resources in backups via the `IncludeResources`, `IncludeClusterResources` and `IncludeClusterScopedResources` API filters the resources by their [`ResourceGroup`][3].
-This is insufficent for operator backup use cases, where specific Custom Resource Definition (CRD) must be included in order for the restored operator to work.
+This is insufficient for operator backup use cases, where specific Custom Resource Definition (CRD) must be included in order for the restored operator to work.
 See issue [#4876][4].
 
 The existing [label selection][5] mechanism doesn't scale on large Kubernetes clusters, due to constraints beyond the users' control like:
