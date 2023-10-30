@@ -17,8 +17,11 @@ limitations under the License.
 package config
 
 import (
+	"os"
+	"reflect"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/stretchr/testify/require"
 )
 
@@ -60,6 +63,84 @@ func TestGetS3ResticEnvVars(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestGetS3CredentialsCorrectlyUseProfile(t *testing.T) {
+	type args struct {
+		config             map[string]string
+		secretFileContents string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *aws.Credentials
+		wantErr bool
+	}{
+		{
+			name: "Test GetS3Credentials use profile correctly",
+			args: args{
+				config: map[string]string{
+					"profile": "some-profile",
+				},
+				secretFileContents: `[default]
+	aws_access_key_id = default-access-key-id
+	aws_secret_access_key = default-secret-access-key
+	[profile some-profile]
+	aws_access_key_id = some-profile-access-key-id
+	aws_secret_access_key = some-profile-secret-access-key
+	`,
+			},
+			want: &aws.Credentials{
+				AccessKeyID:     "some-profile-access-key-id",
+				SecretAccessKey: "some-profile-secret-access-key",
+			},
+		},
+		{
+			name: "Test GetS3Credentials default to default profile",
+			args: args{
+				config: map[string]string{},
+				secretFileContents: `[default]
+	aws_access_key_id = default-access-key-id
+	aws_secret_access_key = default-secret-access-key
+	[profile some-profile]
+	aws_access_key_id = some-profile-access-key-id
+	aws_secret_access_key = some-profile-secret-access-key
+	`,
+			},
+			want: &aws.Credentials{
+				AccessKeyID:     "default-access-key-id",
+				SecretAccessKey: "default-secret-access-key",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpFile, err := os.CreateTemp("", "velero-test-aws-credentials")
+			defer os.Remove(tmpFile.Name())
+			if err != nil {
+				t.Errorf("GetS3Credentials() error = %v", err)
+				return
+			}
+			// write the contents of the secret file to the temp file
+			_, err = tmpFile.WriteString(tt.args.secretFileContents)
+			if err != nil {
+				t.Errorf("GetS3Credentials() error = %v", err)
+				return
+			}
+			tt.args.config["credentialsFile"] = tmpFile.Name()
+			got, err := GetS3Credentials(tt.args.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetS3Credentials() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got.AccessKeyID, tt.want.AccessKeyID) {
+				t.Errorf("GetS3Credentials() got = %v, want %v", got.AccessKeyID, tt.want.AccessKeyID)
+			}
+			if !reflect.DeepEqual(got.SecretAccessKey, tt.want.SecretAccessKey) {
+				t.Errorf("GetS3Credentials() got = %v, want %v", got.SecretAccessKey, tt.want.SecretAccessKey)
+			}
 		})
 	}
 }
