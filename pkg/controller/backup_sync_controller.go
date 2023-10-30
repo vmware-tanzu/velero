@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 
@@ -170,6 +171,27 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			backup.Labels = make(map[string]string)
 		}
 		backup.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(backup.Spec.StorageLocation)
+
+		//check for the backup schedule. If it does not exist, remove it.
+		listedReferences := backup.ObjectMeta.OwnerReferences
+		foundReferences := make([]metav1.OwnerReference, 0)
+		for _, v := range listedReferences {
+			schedule := new(velerov1api.Schedule)
+			err := b.client.Get(ctx, types.NamespacedName{
+				Name:      v.Name,
+				Namespace: backup.Namespace,
+			}, schedule)
+			switch {
+			case err != nil && apierrors.IsNotFound(err):
+				log.Debug("Removing missing schedule ownership reference from backup")
+			case err != nil && !apierrors.IsNotFound(err):
+				log.WithError(errors.WithStack(err)).Error("Error finding ownership reference schedule")
+				fallthrough
+			default:
+				foundReferences = append(foundReferences, v)
+			}
+		}
+		backup.ObjectMeta.OwnerReferences = foundReferences
 
 		// attempt to create backup custom resource via API
 		err = b.client.Create(ctx, backup, &client.CreateOptions{})
