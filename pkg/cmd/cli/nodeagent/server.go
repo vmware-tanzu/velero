@@ -84,7 +84,6 @@ type nodeAgentServerConfig struct {
 	metricsAddress          string
 	resourceTimeout         time.Duration
 	dataMoverPrepareTimeout time.Duration
-	dataPathConcurrentNum   int
 }
 
 func NewServerCommand(f client.Factory) *cobra.Command {
@@ -94,7 +93,6 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 		metricsAddress:          defaultMetricsAddress,
 		resourceTimeout:         defaultResourceTimeout,
 		dataMoverPrepareTimeout: defaultDataMoverPrepareTimeout,
-		dataPathConcurrentNum:   defaultDataPathConcurrentNum,
 	}
 
 	command := &cobra.Command{
@@ -122,7 +120,6 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
 	command.Flags().DurationVar(&config.dataMoverPrepareTimeout, "data-mover-prepare-timeout", config.dataMoverPrepareTimeout, "How long to wait for preparing a DataUpload/DataDownload. Default is 30 minutes.")
 	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "The address to expose prometheus metrics")
-	command.Flags().IntVar(&config.dataPathConcurrentNum, "data-path-concurrent-num", config.dataPathConcurrentNum, "The concurrent number of data path in the current node. Default is 1.")
 
 	return command
 }
@@ -229,13 +226,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		return nil, err
 	}
 
-	dataPathConcurrentNum := config.dataPathConcurrentNum
-	if dataPathConcurrentNum <= 0 {
-		dataPathConcurrentNum = defaultDataPathConcurrentNum
-		s.logger.Warnf("Data path concurrency number %v is invalid, use the default value %v", config.dataPathConcurrentNum, defaultDataPathConcurrentNum)
-	}
-
-	dataPathConcurrentNum = s.getDataPathConcurrentNum(dataPathConcurrentNum, s.logger)
+	dataPathConcurrentNum := s.getDataPathConcurrentNum(defaultDataPathConcurrentNum, s.logger)
 	s.dataPathMgr = datapath.NewManager(dataPathConcurrentNum)
 
 	return s, nil
@@ -498,15 +489,23 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 	}
 }
 
-func (s *nodeAgentServer) getDataPathConcurrentNum(globalNum int, logger logrus.FieldLogger) int {
+func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int, logger logrus.FieldLogger) int {
 	configs, err := nodeagent.GetConfigs(s.ctx, s.namespace, s.kubeClient.CoreV1())
 	if err != nil {
 		logger.WithError(err).Warn("Failed to get node agent configs")
+		return defaultNum
 	}
 
 	if configs == nil || configs.DataPathConcurrency == nil {
-		logger.Infof("Node agent configs are not found, use the global number %v", globalNum)
-		return globalNum
+		logger.Infof("Node agent configs are not found, use the default number %v", defaultNum)
+		return defaultNum
+	}
+
+	globalNum := configs.DataPathConcurrency.GlobalConfig
+
+	if globalNum <= 0 {
+		logger.Warnf("Global number %v is invalid, use the default value %v", globalNum, defaultNum)
+		globalNum = defaultNum
 	}
 
 	curNode, err := s.kubeClient.CoreV1().Nodes().Get(s.ctx, s.nodeName, metav1.GetOptions{})
@@ -515,27 +514,23 @@ func (s *nodeAgentServer) getDataPathConcurrentNum(globalNum int, logger logrus.
 		return globalNum
 	}
 
-	selectors := map[labels.Selector]int{}
-	for rule, number := range configs.DataPathConcurrency.ConfigRules {
-		selector, err := labels.Parse(rule)
-		if err != nil {
-			logger.WithError(err).Warnf("Failed to parse rule with label selector %s, skip it", rule)
-			continue
-		}
-
-		if number <= 0 {
-			logger.Warnf("Rule with label selector %s is with an invalid number %v, skip it", rule, number)
-			continue
-		}
-
-		selectors[selector] = number
-	}
-
 	concurrentNum := math.MaxInt32
-	for selector, number := range selectors {
+
+	for _, rule := range configs.DataPathConcurrency.PerNodeConfig {
+		selector, err := metav1.LabelSelectorAsSelector(&rule.NodeSelector)
+		if err != nil {
+			logger.WithError(err).Warnf("Failed to parse rule with label selector %s, skip it", rule.NodeSelector.String())
+			continue
+		}
+
+		if rule.Number <= 0 {
+			logger.Warnf("Rule with label selector %s is with an invalid number %v, skip it", rule.NodeSelector.String(), rule.Number)
+			continue
+		}
+
 		if selector.Matches(labels.Set(curNode.GetLabels())) {
-			if concurrentNum > number {
-				concurrentNum = number
+			if concurrentNum > rule.Number {
+				concurrentNum = rule.Number
 			}
 		}
 	}

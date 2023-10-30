@@ -44,8 +44,19 @@ var (
 )
 
 type DataPathConcurrency struct {
-	// ConfigRules specifies the concurrency number to nodes matched by rules
-	ConfigRules map[string]int `json:"configRules"`
+	// GlobalConfig specifies the concurrency number to all nodes for which per-node config is not specified
+	GlobalConfig int `json:"globalConfig,omitempty"`
+
+	// PerNodeConfig specifies the concurrency number to nodes matched by rules
+	PerNodeConfig []RuledConfigs `json:"perNodeConfig,omitempty"`
+}
+
+type RuledConfigs struct {
+	// NodeSelector specifies the label selector to match nodes
+	NodeSelector metav1.LabelSelector `json:"nodeSelector"`
+
+	// Number specifies the number value associated to the matched nodes
+	Number int `json:"number"`
 }
 
 type Configs struct {
@@ -111,16 +122,16 @@ func GetConfigs(ctx context.Context, namespace string, cmClient corev1client.Con
 		return nil, errors.Errorf("data is not available in config map %s", configName)
 	}
 
-	jsonBytes, exist := cm.Data[dataPathConConfigName]
+	jsonString, exist := cm.Data[dataPathConConfigName]
 	if !exist {
 		return nil, nil
 	}
 
-	concurrencyConfigs := DataPathConcurrency{}
-	err = json.Unmarshal([]byte(jsonBytes), &concurrencyConfigs)
+	concurrencyConfigs := &DataPathConcurrency{}
+	err = json.Unmarshal([]byte(jsonString), concurrencyConfigs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error to unmarshall data path concurrency configs from %s", configName)
 	}
 
-	return &Configs{DataPathConcurrency: &concurrencyConfigs}, nil
+	return &Configs{DataPathConcurrency: concurrencyConfigs}, nil
 }
