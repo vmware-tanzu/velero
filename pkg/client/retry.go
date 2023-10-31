@@ -25,20 +25,14 @@ import (
 )
 
 func CreateRetryGenerateName(client kbclient.Client, ctx context.Context, obj kbclient.Object) error {
-	return CreateRetryGenerateNameWithFunc(obj, func() error {
-		return client.Create(ctx, obj, &kbclient.CreateOptions{})
-	})
-}
-
-func CreateRetryGenerateNameWithFunc(obj kbclient.Object, createFn func() error) error {
 	retryCreateFn := func() error {
 		// needed to ensure that the name from the failed create isn't left on the object between retries
 		obj.SetName("")
-		return createFn()
+		return client.Create(ctx, obj, &kbclient.CreateOptions{})
 	}
 	if obj.GetGenerateName() != "" && obj.GetName() == "" {
 		return retry.OnError(retry.DefaultRetry, apierrors.IsAlreadyExists, retryCreateFn)
 	} else {
-		return createFn()
+		return client.Create(ctx, obj, &kbclient.CreateOptions{})
 	}
 }

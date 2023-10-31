@@ -22,13 +22,13 @@ import (
 
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
-
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/kubernetes"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
@@ -52,12 +52,18 @@ func IsRunning(ctx context.Context, kubeClient kubernetes.Interface, namespace s
 }
 
 // IsRunningInNode checks if the node agent pod is running properly in a specified node. If not, return the error found
-func IsRunningInNode(ctx context.Context, namespace string, nodeName string, podClient corev1client.PodsGetter) error {
+func IsRunningInNode(ctx context.Context, namespace string, nodeName string, crClient ctrlclient.Client) error {
 	if nodeName == "" {
 		return errors.New("node name is empty")
 	}
 
-	pods, err := podClient.Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("name=%s", daemonSet)})
+	pods := new(v1.PodList)
+	parsedSelector, err := labels.Parse(fmt.Sprintf("name=%s", daemonSet))
+	if err != nil {
+		return errors.Wrap(err, "fail to parse selector")
+	}
+
+	err = crClient.List(ctx, pods, &ctrlclient.ListOptions{LabelSelector: parsedSelector})
 	if err != nil {
 		return errors.Wrap(err, "failed to list daemonset pods")
 	}

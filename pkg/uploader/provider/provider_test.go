@@ -28,7 +28,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/credentials/mocks"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
+	"github.com/vmware-tanzu/velero/pkg/util"
 )
 
 type NewUploaderProviderTestCase struct {
@@ -42,7 +42,7 @@ type NewUploaderProviderTestCase struct {
 func TestNewUploaderProvider(t *testing.T) {
 	// Mock objects or dependencies
 	ctx := context.Background()
-	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+	client := fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()
 	repoIdentifier := "repoIdentifier"
 	bsl := &velerov1api.BackupStorageLocation{}
 	backupRepo := &velerov1api.BackupRepository{}
