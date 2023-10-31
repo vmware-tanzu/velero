@@ -63,7 +63,7 @@ repository on AWS S3, the full backup repo path for namespace1 would be `https:/
 for namespace2 would be `https://s3-us-west-2.amazonaws.com/bucket/kopia/ns2`.  
 
 There may be additional installation steps depending on the cloud provider plugin you are using. You should refer to the 
-[plugin specific documentation](supported-providers.md) for the must up to date information.  
+[plugin specific documentation](supported-providers.md) for the most up to date information.  
 
 **Note:** Currently, Velero creates a secret named `velero-repo-credentials` in the velero install namespace, containing a default backup repository password.
 You can update the secret with your own password encoded as base64 prior to the first backup (i.e., FS Backup, data mover) targeting to the backup repository. The value of the key to update is
