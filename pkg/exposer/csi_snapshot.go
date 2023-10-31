@@ -204,6 +204,7 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.
 
 	backupPodName := ownerObject.Name
 	backupPVCName := ownerObject.Name
+	volumeName := string(ownerObject.UID)
 
 	curLog := e.log.WithFields(logrus.Fields{
 		"owner": ownerObject.Name,
@@ -232,7 +233,20 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.
 
 	curLog.WithField("backup pvc", backupPVCName).Info("Backup PVC is bound")
 
-	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, VolumeName: pod.Spec.Volumes[0].Name}}, nil
+	i := 0
+	for i = 0; i < len(pod.Spec.Volumes); i++ {
+		if pod.Spec.Volumes[i].Name == volumeName {
+			break
+		}
+	}
+
+	if i == len(pod.Spec.Volumes) {
+		return nil, errors.Errorf("backup pod %s doesn't have the expected backup volume", pod.Name)
+	}
+
+	curLog.WithField("pod", pod.Name).Infof("Backup volume is found in pod at index %v", i)
+
+	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, VolumeName: volumeName}}, nil
 }
 
 func (e *csiSnapshotExposer) CleanUp(ctx context.Context, ownerObject corev1.ObjectReference, vsName string, sourceNamespace string) {
