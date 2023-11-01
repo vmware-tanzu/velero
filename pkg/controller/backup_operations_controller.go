@@ -275,6 +275,8 @@ func (c *backupOperationsReconciler) updateBackupAndOperationsJSON(
 	return nil
 }
 
+// check progress of backupItemOperations
+// return: inProgressOperations, changes, completedCount, failedCount, errs
 func getBackupItemOperationProgress(
 	backup *velerov1api.Backup,
 	pluginManager clientmgmt.Manager,
