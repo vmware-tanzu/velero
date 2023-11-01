@@ -3114,6 +3114,9 @@ func TestBackupWithPodVolume(t *testing.T) {
 						Volumes(builder.ForVolume("bar").PersistentVolumeClaimSource("pvc-1").Result()).
 						Result(),
 				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Result(),
+				),
 			},
 			want: []*velerov1.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-foo").Volume("foo").Result(),
@@ -3134,6 +3137,9 @@ func TestBackupWithPodVolume(t *testing.T) {
 						ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "bar")).
 						Volumes(builder.ForVolume("bar").PersistentVolumeClaimSource("pvc-1").Result()).
 						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Result(),
 				),
 			},
 			want: []*velerov1.PodVolumeBackup{

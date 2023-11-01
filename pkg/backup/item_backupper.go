@@ -203,7 +203,24 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 			// any volumes that use a PVC that we've already backed up (this would be in a read-write-many scenario,
 			// where it's been backed up from another pod), since we don't need >1 backup per PVC.
 			includedVolumes, optedOutVolumes := pdvolumeutil.GetVolumesByPod(pod, boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToFsBackup))
+		includedVolumesLoop:
 			for _, volume := range includedVolumes {
+				// Check if the PVC resource is not included in the backup
+				if !ib.backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()) {
+					// Search for the matched volume in the Pod
+					for _, podVolume := range pod.Spec.Volumes {
+						if podVolume.Name != volume {
+							continue
+						}
+						// Check if the volume is a PVC type
+						if podVolume.PersistentVolumeClaim != nil {
+							// Skip the volume and prevent PVB creation
+							log.Infof("Skipping volume %s because it's a %s type and this resource excluded in the backup.", volume, kuberesource.PersistentVolumeClaims.String())
+							continue includedVolumesLoop
+						}
+					}
+				}
+
 				// track the volumes that are PVCs using the PVC snapshot tracker, so that when we backup PVCs/PVs
 				// via an item action in the next step, we don't snapshot PVs that will have their data backed up
 				// with pod volume backup.
