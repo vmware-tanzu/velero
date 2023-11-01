@@ -1,4 +1,4 @@
-# Copyright 2020 The Kubernetes Authors.
+# Copyright the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ help:  ## Display this help
 TOOLS_DIR := $(REPO_ROOT)/hack/tools
 BIN_DIR := bin
 TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
-GINKGO := $(GOPATH)/bin/ginkgo
+GINKGO := $(shell go env GOPATH)/bin/ginkgo
 KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
 OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 GINKGO_FOCUS ?=
@@ -151,7 +151,7 @@ run: ginkgo
 		-standby-cluster=$(STANDBY_CLUSTER) \
 		-uploader-type=$(UPLOADER_TYPE) \
 		-snapshot-move-data=$(SNAPSHOT_MOVE_DATA) \
-		-data-mover-plugin=$(DATA_MOVER_plugin) \
+		-data-mover-plugin=$(DATA_MOVER_PLUGIN) \
 		-standby-cluster-cloud-provider=$(STANDBY_CLUSTER_CLOUD_PROVIDER) \
 		-standby-cluster-plugins=$(STANDBY_CLUSTER_PLUGINS) \
 		-standby-cluster-object-store-provider=$(STANDBY_CLUSTER_OBJECT_STORE_PROVIDER) \
