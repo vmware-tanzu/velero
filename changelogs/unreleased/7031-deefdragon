@@ -1,1 +1,0 @@
-Fix #7031. Added check for Owner References when synchronizing backups, removing references that are not found.
