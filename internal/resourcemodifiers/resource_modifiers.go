@@ -105,7 +105,7 @@ func (r *ResourceModifierRule) apply(obj *unstructured.Unstructured, groupResour
 		}
 	}
 
-	g, err := glob.Compile(r.Conditions.GroupResource)
+	g, err := glob.Compile(r.Conditions.GroupResource, '.')
 	if err != nil {
 		log.Errorf("Bad glob pattern of groupResource in condition, groupResource: %s, err: %s", r.Conditions.GroupResource, err)
 		return err

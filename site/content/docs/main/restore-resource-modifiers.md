@@ -183,4 +183,5 @@ resourceModifierRules:
 - You can specify multiple rules in the `matches` list. The patch will be applied only if all the matches are satisfied.
 
 ### Wildcard Support for GroupResource
-The user can specify a wildcard for groupResource in the conditions' struct. This will allow the user to apply the patches for all the resources of a particular group or all resources in all groups. For example, `*.apps` will apply to all the resources in the `apps` group, `*` will apply to all the resources in all groups.
+The user can specify a wildcard for groupResource in the conditions' struct. This will allow the user to apply the patches for all the resources of a particular group or all resources in all groups. For example, `*.apps` will apply to all the resources in the `apps` group, `*` will apply to all the resources in core group, `*.*` will apply to all the resources in all groups.
+- If both `*.groupName` and `namespaces` are specified, the patches will be applied to all the namespaced resources in this group in the specified namespaces and all the cluster resources in this group.
