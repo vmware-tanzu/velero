@@ -1,0 +1,2 @@
+FS backup create PodVolumeBackup when the backup excluded PVC, 
+so I added logic to skip PVC volume type when PVC is not included in the backup resources to be backed up.

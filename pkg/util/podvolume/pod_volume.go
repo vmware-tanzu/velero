@@ -26,7 +26,7 @@ import (
 )
 
 // GetVolumesByPod returns a list of volume names to backup for the provided pod.
-func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup bool) ([]string, []string) {
+func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup, backupExcludePVC bool) ([]string, []string) {
 	// tracks the volumes that have been explicitly opted out of backup via the annotation in the pod
 	optedOutVolumes := make([]string, 0)
 
@@ -56,6 +56,9 @@ func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup bool) ([]strin
 		}
 		// don't backup DownwardAPI volumes, all data in those come from kube state.
 		if pv.DownwardAPI != nil {
+			continue
+		}
+		if pv.PersistentVolumeClaim != nil && backupExcludePVC {
 			continue
 		}
 		// don't backup volumes that are included in the exclude list.
