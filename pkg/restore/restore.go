@@ -1532,18 +1532,17 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	if restoreErr != nil {
-		// check for the existence of the object in cluster, if no error then it implies that object exists
-		// and if err then we want to judge whether there is an existing error in the previous creation.
-		// if so, we will return the 'get' error.
-		// otherwise, we will return the original creation error.
+		// check for the existence of the object that failed creation due to alreadyExist in cluster, if no error then it implies that object exists.
+		// and if err then itemExists remains false as we were not able to confirm the existence of the object via Get call or creation call.
+		// We return the get error as a warning to notify the user that the object could exist in cluster and we were not able to confirm it.
 		if !ctx.disableInformerCache {
 			fromCluster, err = ctx.getResource(groupResource, obj, namespace, name)
 		} else {
 			fromCluster, err = resourceClient.Get(name, metav1.GetOptions{})
 		}
 		if err != nil && isAlreadyExistsError {
-			ctx.log.Errorf("Error retrieving in-cluster version of %s: %v", kube.NamespaceAndName(obj), err)
-			errs.Add(namespace, err)
+			ctx.log.Warnf("Unable to retrieve in-cluster version of %s: %v, object won't be restored by velero or have restore labels, and existing resource policy is not applied", kube.NamespaceAndName(obj), err)
+			warnings.Add(namespace, err)
 			return warnings, errs, itemExists
 		}
 	}
