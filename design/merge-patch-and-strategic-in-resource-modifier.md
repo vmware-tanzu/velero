@@ -88,10 +88,10 @@ Example of StrategicPatches in ResourceModifierRule
 version: v1
 resourceModifierRules:
 - conditions:
-  groupResource: pods
-  resourceNameRegex: "^my-pod$"
-  namespaces:
-  - ns1
+    groupResource: pods
+    resourceNameRegex: "^my-pod$"
+    namespaces:
+    - ns1
   strategicPatches:
   - patchData: |
       {

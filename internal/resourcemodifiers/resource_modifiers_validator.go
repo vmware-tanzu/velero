@@ -24,6 +24,21 @@ func (r *ResourceModifierRule) Validate() error {
 	if err := r.Conditions.Validate(); err != nil {
 		return err
 	}
+
+	count := 0
+	for _, size := range []int{
+		len(r.Patches),
+		len(r.MergePatches),
+		len(r.StrategicPatches),
+	} {
+		if size != 0 {
+			count++
+		}
+		if count >= 2 {
+			return fmt.Errorf("only one of patches, mergePatches, strategicPatches can be specified")
+		}
+	}
+
 	for _, patch := range r.Patches {
 		if err := patch.Validate(); err != nil {
 			return err
