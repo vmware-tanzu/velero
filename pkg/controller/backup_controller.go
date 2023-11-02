@@ -34,7 +34,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -112,7 +111,6 @@ func NewBackupReconciler(
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	formatFlag logging.Format,
 	volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister,
-	volumeSnapshotClient snapshotterClientSet.Interface,
 	credentialStore credentials.FileStore,
 	maxConcurrentK8SConnections int,
 	defaultSnapshotMoveData bool,
@@ -138,7 +136,6 @@ func NewBackupReconciler(
 		backupStoreGetter:           backupStoreGetter,
 		formatFlag:                  formatFlag,
 		volumeSnapshotLister:        volumeSnapshotLister,
-		volumeSnapshotClient:        volumeSnapshotClient,
 		credentialFileStore:         credentialStore,
 		maxConcurrentK8SConnections: maxConcurrentK8SConnections,
 		defaultSnapshotMoveData:     defaultSnapshotMoveData,
@@ -660,65 +657,15 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 		fatalErrs = append(fatalErrs, err)
 	}
 
-	// Empty slices here so that they can be passed in to the persistBackup call later, regardless of whether or not CSI's enabled.
-	// This way, we only make the Lister call if the feature flag's on.
-	var volumeSnapshots []snapshotv1api.VolumeSnapshot
-	var volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent
-	var volumeSnapshotClasses []snapshotv1api.VolumeSnapshotClass
-	if boolptr.IsSetToTrue(backup.Spec.SnapshotMoveData) {
-		backupLog.Info("backup SnapshotMoveData is set to true, skip VolumeSnapshot resource persistence.")
-	} else if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		selector := label.NewSelectorForBackup(backup.Name)
-		vscList := &snapshotv1api.VolumeSnapshotContentList{}
-
-		if b.volumeSnapshotLister != nil {
-			tmpVSs, err := b.volumeSnapshotLister.List(label.NewSelectorForBackup(backup.Name))
-			if err != nil {
-				backupLog.Error(err)
-			}
-			for _, vs := range tmpVSs {
-				volumeSnapshots = append(volumeSnapshots, *vs)
-			}
-		}
-
-		backup.CSISnapshots = volumeSnapshots
-
-		err = b.kbClient.List(context.Background(), vscList, &kbclient.ListOptions{LabelSelector: selector})
-		if err != nil {
-			backupLog.Error(err)
-		}
-		if len(vscList.Items) >= 0 {
-			volumeSnapshotContents = vscList.Items
-		}
-
-		vsClassSet := sets.NewString()
-		for index := range volumeSnapshotContents {
-			// persist the volumesnapshotclasses referenced by vsc
-			if volumeSnapshotContents[index].Spec.VolumeSnapshotClassName != nil && !vsClassSet.Has(*volumeSnapshotContents[index].Spec.VolumeSnapshotClassName) {
-				vsClass := &snapshotv1api.VolumeSnapshotClass{}
-				if err := b.kbClient.Get(context.TODO(), kbclient.ObjectKey{Name: *volumeSnapshotContents[index].Spec.VolumeSnapshotClassName}, vsClass); err != nil {
-					backupLog.Error(err)
-				} else {
-					vsClassSet.Insert(*volumeSnapshotContents[index].Spec.VolumeSnapshotClassName)
-					volumeSnapshotClasses = append(volumeSnapshotClasses, *vsClass)
-				}
-			}
-		}
-	}
-
+	// native snapshots phase will either be failed or completed right away
+	// https://github.com/vmware-tanzu/velero/blob/de3ea52f0cc478e99efa7b9524c7f353514261a4/pkg/backup/item_backupper.go#L632-L639
 	backup.Status.VolumeSnapshotsAttempted = len(backup.VolumeSnapshots)
 	for _, snap := range backup.VolumeSnapshots {
 		if snap.Status.Phase == volume.SnapshotPhaseCompleted {
 			backup.Status.VolumeSnapshotsCompleted++
 		}
 	}
-
-	backup.Status.CSIVolumeSnapshotsAttempted = len(backup.CSISnapshots)
-	for _, vs := range backup.CSISnapshots {
-		if vs.Status != nil && boolptr.IsSetToTrue(vs.Status.ReadyToUse) {
-			backup.Status.CSIVolumeSnapshotsCompleted++
-		}
-	}
+	volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses := pkgbackup.UpdateBackupCSISnapshotsStatus(b.kbClient, b.volumeSnapshotLister, backup.Backup, backupLog)
 
 	// Iterate over backup item operations and update progress.
 	// Any errors on operations at this point should be added to backup errors.

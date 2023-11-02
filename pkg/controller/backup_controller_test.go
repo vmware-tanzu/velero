@@ -43,7 +43,6 @@ import (
 	"k8s.io/utils/clock"
 	testclocks "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -1059,7 +1058,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					FormatVersion:               "1.1.0",
 					StartTimestamp:              &timestamp,
 					Expiration:                  &timestamp,
-					CSIVolumeSnapshotsAttempted: 0,
+					CSIVolumeSnapshotsAttempted: 1,
 					CSIVolumeSnapshotsCompleted: 0,
 				},
 			},
@@ -1181,7 +1180,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					FormatVersion:               "1.1.0",
 					StartTimestamp:              &timestamp,
 					Expiration:                  &timestamp,
-					CSIVolumeSnapshotsAttempted: 0,
+					CSIVolumeSnapshotsAttempted: 1,
 					CSIVolumeSnapshotsCompleted: 0,
 				},
 			},
@@ -1263,7 +1262,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					FormatVersion:               "1.1.0",
 					StartTimestamp:              &timestamp,
 					Expiration:                  &timestamp,
-					CSIVolumeSnapshotsAttempted: 0,
+					CSIVolumeSnapshotsAttempted: 1,
 					CSIVolumeSnapshotsCompleted: 0,
 				},
 			},
@@ -1710,7 +1709,7 @@ func TestPatchResourceWorksWithStatus(t *testing.T) {
 				},
 			}
 			// check original exists
-			if err := fakeClient.Get(context.Background(), client.ObjectKeyFromObject(tt.args.updated), fromCluster); err != nil {
+			if err := fakeClient.Get(context.Background(), kbclient.ObjectKeyFromObject(tt.args.updated), fromCluster); err != nil {
 				t.Errorf("PatchResource() error = %v", err)
 			}
 			// ignore resourceVersion
@@ -1720,7 +1719,7 @@ func TestPatchResourceWorksWithStatus(t *testing.T) {
 				t.Errorf("PatchResource() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			// check updated exists
-			if err := fakeClient.Get(context.Background(), client.ObjectKeyFromObject(tt.args.updated), fromCluster); err != nil {
+			if err := fakeClient.Get(context.Background(), kbclient.ObjectKeyFromObject(tt.args.updated), fromCluster); err != nil {
 				t.Errorf("PatchResource() error = %v", err)
 			}
 

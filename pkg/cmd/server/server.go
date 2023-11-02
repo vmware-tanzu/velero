@@ -768,7 +768,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupStoreGetter,
 			s.config.formatFlag.Parse(),
 			s.csiSnapshotLister,
-			s.csiSnapshotClient,
 			s.credentialFileStore,
 			s.config.maxConcurrentK8SConnections,
 			s.config.defaultSnapshotMoveData,
@@ -832,6 +831,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		cmd.CheckError(err)
 		r := controller.NewBackupFinalizerReconciler(
 			s.mgr.GetClient(),
+			s.csiSnapshotLister,
 			clock.RealClock{},
 			backupper,
 			newPluginManager,
