@@ -25,7 +25,6 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/retry"
 	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -191,16 +190,8 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 	recordBackupMetrics(log, backup, outBackupFile, r.metrics, true)
-	CSISnapshotsNotReady := errors.New("CSI snapshots not ready")
-	retry.OnError(retry.DefaultBackoff, func(err error) bool {
-		return err == CSISnapshotsNotReady
-	}, func() error {
-		pkgbackup.UpdateBackupCSISnapshotsStatus(r.client, r.volumeSnapshotLister, backup, log)
-		if backup.Status.CSIVolumeSnapshotsCompleted < backup.Status.CSIVolumeSnapshotsAttempted {
-			return CSISnapshotsNotReady
-		}
-		return nil
-	})
+	
+	pkgbackup.UpdateBackupCSISnapshotsStatus(r.client, r.volumeSnapshotLister, backup, log)
 	// update backup metadata in object store
 	backupJSON := new(bytes.Buffer)
 	if err := encode.To(backup, "json", backupJSON); err != nil {
