@@ -10,6 +10,7 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
@@ -19,7 +20,7 @@ import (
 func UpdateBackupCSISnapshotsStatus(client kbclient.Client, volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister, backup *velerov1api.Backup, backupLog logrus.FieldLogger) (volumeSnapshots []snapshotv1api.VolumeSnapshot, volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent, volumeSnapshotClasses []snapshotv1api.VolumeSnapshotClass) {
 	if boolptr.IsSetToTrue(backup.Spec.SnapshotMoveData) {
 		backupLog.Info("backup SnapshotMoveData is set to true, skip VolumeSnapshot resource persistence.")
-	} else {
+	} else if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		selector := label.NewSelectorForBackup(backup.Name)
 		vscList := &snapshotv1api.VolumeSnapshotContentList{}
 	
