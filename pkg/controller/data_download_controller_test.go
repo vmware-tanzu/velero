@@ -632,7 +632,7 @@ func TestFindDataDownloadForPod(t *testing.T) {
 		{
 			name: "find dataDownload for pod",
 			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: dataDownloadName}).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: dataDownloadName}).Status(corev1.PodStatus{Phase: corev1.PodRunning}).Result(),
 			checkFunc: func(du *velerov2alpha1api.DataDownload, requests []reconcile.Request) {
 				// Assert that the function returns a single request
 				assert.Len(t, requests, 1)

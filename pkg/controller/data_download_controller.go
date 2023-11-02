@@ -485,10 +485,6 @@ func (r *DataDownloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						return false
 					}
 
-					if newObj.Status.Phase != v1.PodRunning {
-						return false
-					}
-
 					if newObj.Spec.NodeName == "" {
 						return false
 					}
@@ -510,43 +506,55 @@ func (r *DataDownloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *DataDownloadReconciler) findSnapshotRestoreForPod(podObj client.Object) []reconcile.Request {
 	pod := podObj.(*v1.Pod)
-
 	dd, err := findDataDownloadByPod(r.client, *pod)
+
+	log := r.logger.WithField("pod", pod.Name)
 	if err != nil {
-		r.logger.WithField("Restore pod", pod.Name).WithError(err).Error("unable to get DataDownload")
+		log.WithError(err).Error("unable to get DataDownload")
 		return []reconcile.Request{}
 	} else if dd == nil {
-		r.logger.WithField("Restore pod", pod.Name).Error("get empty DataDownload")
+		log.Error("get empty DataDownload")
 		return []reconcile.Request{}
 	}
+	log = log.WithFields(logrus.Fields{
+		"Dataddownload": dd.Name,
+	})
 
 	if dd.Status.Phase != velerov2alpha1api.DataDownloadPhaseAccepted {
 		return []reconcile.Request{}
 	}
 
-	requests := make([]reconcile.Request, 1)
+	if pod.Status.Phase == v1.PodRunning {
+		log.Info("Preparing data download")
+		// we don't expect anyone else update the CR during the Prepare process
+		updated, err := r.exclusiveUpdateDataDownload(context.Background(), dd, r.prepareDataDownload)
+		if err != nil || !updated {
+			log.WithField("updated", updated).WithError(err).Warn("failed to update datadownload, prepare will halt for this datadownload")
+			return []reconcile.Request{}
+		}
+	} else if unrecoverable, reason := kube.IsPodUnrecoverable(pod, log); unrecoverable {
+		err := UpdateDataDownloadWithRetry(context.Background(), r.client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, r.logger.WithField("datadownlad", dd.Name),
+			func(dataDownload *velerov2alpha1api.DataDownload) {
+				dataDownload.Spec.Cancel = true
+				dataDownload.Status.Message = fmt.Sprintf("datadownload mark as cancel to failed early for exposing pod %s/%s is in abnormal status for %s", pod.Namespace, pod.Name, reason)
+			})
 
-	r.logger.WithField("Restore pod", pod.Name).Infof("Preparing data download %s", dd.Name)
-
-	// we don't expect anyone else update the CR during the Prepare process
-	updated, err := r.exclusiveUpdateDataDownload(context.Background(), dd, r.prepareDataDownload)
-	if err != nil || !updated {
-		r.logger.WithFields(logrus.Fields{
-			"Datadownload": dd.Name,
-			"Restore pod":  pod.Name,
-			"updated":      updated,
-		}).WithError(err).Warn("failed to patch datadownload, prepare will halt for this datadownload")
+		if err != nil {
+			log.WithError(err).Warn("failed to cancel datadownload, and it will wait for prepare timeout")
+			return []reconcile.Request{}
+		}
+		log.Info("Exposed pod is in abnormal status, and datadownload is marked as cancel")
+	} else {
 		return []reconcile.Request{}
 	}
 
-	requests[0] = reconcile.Request{
+	request := reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: dd.Namespace,
 			Name:      dd.Name,
 		},
 	}
-
-	return requests
+	return []reconcile.Request{request}
 }
 
 func (r *DataDownloadReconciler) FindDataDownloads(ctx context.Context, cli client.Client, ns string) ([]*velerov2alpha1api.DataDownload, error) {
