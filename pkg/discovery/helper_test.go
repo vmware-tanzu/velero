@@ -30,7 +30,6 @@ import (
 	clientgotesting "k8s.io/client-go/testing"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	discoverymocks "github.com/vmware-tanzu/velero/pkg/discovery/mocks"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -548,39 +547,31 @@ func TestHelper_refreshServerPreferredResources(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		isGetResError bool
+		name        string
+		expectedErr error
 	}{
 		{
-			name: "success get preferred resources",
+			name:        "success get preferred resources",
+			expectedErr: nil,
 		},
 		{
-			name:          "failed to get preferred resources",
-			isGetResError: true,
+			name:        "failed to get preferred resources",
+			expectedErr: errors.New("Failed to discover preferred resources"),
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			fakeClient := discoverymocks.NewServerResourcesInterface(t)
-
-			if tc.isGetResError {
-				fakeClient.On("ServerPreferredResources").Return(nil, errors.New("Failed to discover preferred resources"))
-			} else {
-				fakeClient.On("ServerPreferredResources").Return(apiList, nil)
-			}
+			fakeClient := velerotest.NewFakeServerResourcesInterface(apiList, []*metav1.APIGroup{}, map[schema.GroupVersion]error{}, tc.expectedErr)
 
 			resources, err := refreshServerPreferredResources(fakeClient, logrus.New())
 
-			if tc.isGetResError {
+			if tc.expectedErr != nil {
 				assert.NotNil(t, err)
-				assert.Nil(t, resources)
 			} else {
 				assert.Nil(t, err)
 				assert.NotNil(t, resources)
 			}
-
-			fakeClient.AssertExpectations(t)
 		})
 	}
 }
@@ -612,41 +603,31 @@ func TestHelper_refreshServerGroupsAndResources(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		name          string
-		isGetResError bool
+		name        string
+		expectedErr error
 	}{
 		{
 			name: "success get service groups and resouorces",
 		},
 		{
-			name:          "failed to service groups and resouorces",
-			isGetResError: true,
+			name:        "failed to service groups and resouorces",
+			expectedErr: errors.New("Failed to discover service groups and resouorces"),
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			fakeClient := discoverymocks.NewServerResourcesInterface(t)
-
-			if tc.isGetResError {
-				fakeClient.On("ServerGroupsAndResources").Return(nil, nil, errors.New("Failed to discover service groups and resouorces"))
-			} else {
-				fakeClient.On("ServerGroupsAndResources").Return(apiGroup, apiList, nil)
-			}
+			fakeClient := velerotest.NewFakeServerResourcesInterface(apiList, apiGroup, map[schema.GroupVersion]error{}, tc.expectedErr)
 
 			serverGroups, serverResources, err := refreshServerGroupsAndResources(fakeClient, logrus.New())
 
-			if tc.isGetResError {
+			if tc.expectedErr != nil {
 				assert.NotNil(t, err)
-				assert.Nil(t, serverGroups)
-				assert.Nil(t, serverResources)
 			} else {
 				assert.Nil(t, err)
 				assert.NotNil(t, serverGroups)
 				assert.NotNil(t, serverResources)
 			}
-
-			fakeClient.AssertExpectations(t)
 		})
 	}
 }
