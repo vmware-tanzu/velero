@@ -23,7 +23,7 @@ func UpdateBackupCSISnapshotsStatus(client kbclient.Client, volumeSnapshotLister
 	} else if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		selector := label.NewSelectorForBackup(backup.Name)
 		vscList := &snapshotv1api.VolumeSnapshotContentList{}
-	
+
 		if volumeSnapshotLister != nil {
 			tmpVSs, err := volumeSnapshotLister.List(label.NewSelectorForBackup(backup.Name))
 			if err != nil {
@@ -33,7 +33,7 @@ func UpdateBackupCSISnapshotsStatus(client kbclient.Client, volumeSnapshotLister
 				volumeSnapshots = append(volumeSnapshots, *vs)
 			}
 		}
-	
+
 		err := client.List(context.Background(), vscList, &kbclient.ListOptions{LabelSelector: selector})
 		if err != nil {
 			backupLog.Error(err)
@@ -41,7 +41,7 @@ func UpdateBackupCSISnapshotsStatus(client kbclient.Client, volumeSnapshotLister
 		if len(vscList.Items) >= 0 {
 			volumeSnapshotContents = vscList.Items
 		}
-	
+
 		vsClassSet := sets.NewString()
 		for index := range volumeSnapshotContents {
 			// persist the volumesnapshotclasses referenced by vsc
