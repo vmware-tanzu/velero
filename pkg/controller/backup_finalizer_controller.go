@@ -25,9 +25,12 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
@@ -40,19 +43,21 @@ import (
 
 // backupFinalizerReconciler reconciles a Backup object
 type backupFinalizerReconciler struct {
-	client            kbclient.Client
-	clock             clocks.WithTickerAndDelayedExecution
-	backupper         pkgbackup.Backupper
-	newPluginManager  func(logrus.FieldLogger) clientmgmt.Manager
-	backupTracker     BackupTracker
-	metrics           *metrics.ServerMetrics
-	backupStoreGetter persistence.ObjectBackupStoreGetter
-	log               logrus.FieldLogger
+	client               kbclient.Client
+	volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister
+	clock                clocks.WithTickerAndDelayedExecution
+	backupper            pkgbackup.Backupper
+	newPluginManager     func(logrus.FieldLogger) clientmgmt.Manager
+	backupTracker        BackupTracker
+	metrics              *metrics.ServerMetrics
+	backupStoreGetter    persistence.ObjectBackupStoreGetter
+	log                  logrus.FieldLogger
 }
 
 // NewBackupFinalizerReconciler initializes and returns backupFinalizerReconciler struct.
 func NewBackupFinalizerReconciler(
 	client kbclient.Client,
+	volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister,
 	clock clocks.WithTickerAndDelayedExecution,
 	backupper pkgbackup.Backupper,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
@@ -186,7 +191,16 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 	recordBackupMetrics(log, backup, outBackupFile, r.metrics, true)
-
+	CSISnapshotsNotReady := errors.New("CSI snapshots not ready")
+	retry.OnError(retry.DefaultBackoff, func(err error) bool {
+		return err == CSISnapshotsNotReady
+	}, func() error {
+		pkgbackup.UpdateBackupCSISnapshotsStatus(r.client, r.volumeSnapshotLister, backup, log)
+		if backup.Status.CSIVolumeSnapshotsCompleted < backup.Status.CSIVolumeSnapshotsAttempted {
+			return CSISnapshotsNotReady
+		}
+		return nil
+	})
 	// update backup metadata in object store
 	backupJSON := new(bytes.Buffer)
 	if err := encode.To(backup, "json", backupJSON); err != nil {
