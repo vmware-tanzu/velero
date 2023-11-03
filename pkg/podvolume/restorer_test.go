@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appv1 "k8s.io/api/apps/v1"
@@ -31,15 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	kubefake "k8s.io/client-go/kubernetes/fake"
-	clientTesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	ctrlfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	velerofake "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 func TestGetVolumesRepositoryType(t *testing.T) {
@@ -162,6 +160,7 @@ type expectError struct {
 func TestRestorePodVolumes(t *testing.T) {
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	ctxWithCancel, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -261,42 +260,6 @@ func TestRestorePodVolumes(t *testing.T) {
 				},
 				{
 					err: "error getting persistent volume claim for volume: persistentvolumeclaims \"fake-pvc-2\" not found",
-				},
-			},
-		},
-		{
-			name: "create pvb fail",
-			pvbs: []*velerov1api.PodVolumeBackup{
-				createPVBObj(true, true, 1, "kopia"),
-				createPVBObj(true, true, 2, "kopia"),
-			},
-			kubeClientObj: []runtime.Object{
-				createNodeAgentDaemonset(),
-				createPVCObj(1),
-				createPVCObj(2),
-			},
-			ctlClientObj: []runtime.Object{
-				createBackupRepoObj(),
-			},
-			veleroReactors: []reactor{
-				{
-					verb:     "create",
-					resource: "podvolumerestores",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.New("fake-create-error")
-					},
-				},
-			},
-			restoredPod:     createPodObj(true, true, true, 2),
-			sourceNamespace: "fake-ns",
-			bsl:             "fake-bsl",
-			runtimeScheme:   scheme,
-			errs: []expectError{
-				{
-					err: "fake-create-error",
-				},
-				{
-					err: "fake-create-error",
 				},
 			},
 		},
@@ -407,22 +370,32 @@ func TestRestorePodVolumes(t *testing.T) {
 				fakeClientBuilder = fakeClientBuilder.WithScheme(test.runtimeScheme)
 			}
 
-			fakeCtlClient := fakeClientBuilder.WithRuntimeObjects(test.ctlClientObj...).Build()
+			objClient := append(test.ctlClientObj, test.kubeClientObj...)
+			objClient = append(objClient, test.veleroClientObj...)
+
+			fakeCRClient := velerotest.NewFakeControllerRuntimeClient(t, objClient...)
 
 			fakeKubeClient := kubefake.NewSimpleClientset(test.kubeClientObj...)
 			var kubeClient kubernetes.Interface = fakeKubeClient
 
-			fakeVeleroClient := velerofake.NewSimpleClientset(test.veleroClientObj...)
-			for _, reactor := range test.veleroReactors {
-				fakeVeleroClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			fakeCRWatchClient := velerotest.NewFakeControllerRuntimeWatchClient(t, test.kubeClientObj...)
+			lw := kube.InternalLW{
+				Client:     fakeCRWatchClient,
+				Namespace:  velerov1api.DefaultNamespace,
+				ObjectList: new(velerov1api.PodVolumeRestoreList),
 			}
-			var veleroClient versioned.Interface = fakeVeleroClient
 
-			ensurer := repository.NewEnsurer(fakeCtlClient, velerotest.NewLogger(), time.Millisecond)
+			pvrInformer := cache.NewSharedIndexInformer(&lw, &velerov1api.PodVolumeBackup{}, 0, cache.Indexers{})
+
+			go pvrInformer.Run(ctx.Done())
+			require.True(t, cache.WaitForCacheSync(ctx.Done(), pvrInformer.HasSynced))
+
+			ensurer := repository.NewEnsurer(fakeCRClient, velerotest.NewLogger(), time.Millisecond)
 
 			restoreObj := builder.ForRestore(velerov1api.DefaultNamespace, "fake-restore").Result()
 
-			factory := NewRestorerFactory(repository.NewRepoLocker(), ensurer, veleroClient, kubeClient.CoreV1(), kubeClient.CoreV1(), kubeClient, velerotest.NewLogger())
+			factory := NewRestorerFactory(repository.NewRepoLocker(), ensurer, kubeClient,
+				fakeCRClient, pvrInformer, velerotest.NewLogger())
 			rs, err := factory.NewRestorer(ctx, restoreObj)
 
 			require.NoError(t, err)

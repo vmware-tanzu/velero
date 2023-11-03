@@ -25,9 +25,10 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
+	"github.com/vmware-tanzu/velero/pkg/util"
 )
 
 // Encode converts the provided object to the specified format
@@ -56,8 +57,11 @@ func To(obj runtime.Object, format string, w io.Writer) error {
 // Only objects registered in the velero scheme, or objects with their TypeMeta set will have valid encoders.
 func EncoderFor(format string, obj runtime.Object) (runtime.Encoder, error) {
 	var encoder runtime.Encoder
+
+	codecFactory := serializer.NewCodecFactory(util.VeleroScheme)
+
 	desiredMediaType := fmt.Sprintf("application/%s", format)
-	serializerInfo, found := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), desiredMediaType)
+	serializerInfo, found := runtime.SerializerInfoForMediaType(codecFactory.SupportedMediaTypes(), desiredMediaType)
 	if !found {
 		return nil, errors.Errorf("unable to locate an encoder for %q", desiredMediaType)
 	}
@@ -69,7 +73,7 @@ func EncoderFor(format string, obj runtime.Object) (runtime.Encoder, error) {
 	if !obj.GetObjectKind().GroupVersionKind().Empty() {
 		return encoder, nil
 	}
-	encoder = scheme.Codecs.EncoderForVersion(encoder, v1.SchemeGroupVersion)
+	encoder = codecFactory.EncoderForVersion(encoder, v1.SchemeGroupVersion)
 	return encoder, nil
 }
 

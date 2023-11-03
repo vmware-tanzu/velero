@@ -66,7 +66,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
-	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/itemoperationmap"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
@@ -250,12 +249,12 @@ type server struct {
 	metricsAddress        string
 	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
-	veleroClient          clientset.Interface
 	discoveryClient       discovery.DiscoveryInterface
 	discoveryHelper       velerodiscovery.Helper
 	dynamicClient         dynamic.Interface
 	csiSnapshotClient     *snapshotv1client.Clientset
 	csiSnapshotLister     snapshotv1listers.VolumeSnapshotLister
+	crClient              ctrlclient.Client
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
 	logger                logrus.FieldLogger
@@ -301,6 +300,11 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+
+	crClient, err := f.KubebuilderClient()
 	if err != nil {
 		return nil, err
 	}
@@ -380,9 +384,9 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		metricsAddress:        config.metricsAddress,
 		kubeClientConfig:      clientConfig,
 		kubeClient:            kubeClient,
-		veleroClient:          veleroClient,
 		discoveryClient:       veleroClient.Discovery(),
 		dynamicClient:         dynamicClient,
+		crClient:              crClient,
 		ctx:                   ctx,
 		cancelFunc:            cancelFunc,
 		logger:                logger,
@@ -727,6 +731,11 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupStorageLocation)
 	}
 
+	pvbInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov1api.PodVolumeBackup{})
+	if err != nil {
+		s.logger.Fatal(err, "fail to get controller-runtime informer from manager for PVB")
+	}
+
 	if _, ok := enabledRuntimeControllers[controller.Backup]; ok {
 		backupper, err := backup.NewKubernetesBackupper(
 			s.mgr.GetClient(),
@@ -736,10 +745,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			podvolume.NewBackupperFactory(
 				s.repoLocker,
 				s.repoEnsurer,
-				s.veleroClient,
-				s.kubeClient.CoreV1(),
-				s.kubeClient.CoreV1(),
-				s.kubeClient.CoreV1(),
+				s.crClient,
+				pvbInformer,
 				s.logger,
 			),
 			s.config.podVolumeOperationTimeout,
@@ -818,10 +825,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			podvolume.NewBackupperFactory(
 				s.repoLocker,
 				s.repoEnsurer,
-				s.veleroClient,
-				s.kubeClient.CoreV1(),
-				s.kubeClient.CoreV1(),
-				s.kubeClient.CoreV1(),
+				s.crClient,
+				pvbInformer,
 				s.logger,
 			),
 			s.config.podVolumeOperationTimeout,
@@ -909,6 +914,11 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
+	pvrInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov1api.PodVolumeRestore{})
+	if err != nil {
+		s.logger.Fatal(err, "fail to get controller-runtime informer from manager for PVR")
+	}
+
 	if _, ok := enabledRuntimeControllers[controller.Restore]; ok {
 		restorer, err := restore.NewKubernetesRestorer(
 			s.discoveryHelper,
@@ -918,10 +928,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			podvolume.NewRestorerFactory(
 				s.repoLocker,
 				s.repoEnsurer,
-				s.veleroClient,
-				s.kubeClient.CoreV1(),
-				s.kubeClient.CoreV1(),
 				s.kubeClient,
+				s.crClient,
+				pvrInformer,
 				s.logger,
 			),
 			s.config.podVolumeOperationTimeout,
