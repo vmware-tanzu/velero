@@ -17,7 +17,7 @@ You can deploy Velero on Tencent [TKE](https://cloud.tencent.com/document/produc
 
 Create an object bucket for Velero to store backups in the Tencent Cloud COS console. For how to create, please refer to Tencent Cloud COS [Create a bucket](https://cloud.tencent.com/document/product/436/13309) usage instructions.
 
-Set access to the bucket through the object storage console, the bucket needs to be **read** and **written**, so the account is granted data reading, data writing permissions. For how to configure, see the [permission access settings](https://cloud.tencent.com/document/product/436/13315.E5.8D.95.E4.B8.AA.E6.8E.88.E6.9D.83) Tencent user instructions.
+Set access to the bucket through the object storage console, the bucket needs to be **read** and **written**, so the account is granted data reading, data writing permissions. For how to configure, see the [permission access settings](https://cloud.tencent.com/document/product/436/13315) Tencent user instructions.
 
 ## Get bucket access credentials
 

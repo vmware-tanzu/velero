@@ -28,8 +28,6 @@ import (
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks/volumesnapshotter/v1"
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -116,11 +114,6 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			var (
-				client                   = fake.NewSimpleClientset()
-				snapshotLocationInformer = informers.NewSharedInformerFactory(client, 0).Velero().V1().VolumeSnapshotLocations()
-			)
-
 			r := &pvRestorer{
 				logger:     velerotest.NewLogger(),
 				restorePVs: tc.restore.Spec.RestorePVs,
@@ -132,7 +125,7 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			}
 
 			for _, loc := range tc.locations {
-				require.NoError(t, snapshotLocationInformer.Informer().GetStore().Add(loc))
+				require.NoError(t, r.kbclient.Create(context.TODO(), loc))
 			}
 
 			res, err := r.executePVAction(tc.obj)

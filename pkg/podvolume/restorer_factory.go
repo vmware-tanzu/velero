@@ -18,18 +18,15 @@ package podvolume
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 )
 
@@ -41,47 +38,33 @@ type RestorerFactory interface {
 
 func NewRestorerFactory(repoLocker *repository.RepoLocker,
 	repoEnsurer *repository.Ensurer,
-	veleroClient clientset.Interface,
-	pvcClient corev1client.PersistentVolumeClaimsGetter,
-	podClient corev1client.PodsGetter,
 	kubeClient kubernetes.Interface,
+	crClient ctrlclient.Client,
+	pvrInformer ctrlcache.Informer,
 	log logrus.FieldLogger) RestorerFactory {
 	return &restorerFactory{
-		repoLocker:   repoLocker,
-		repoEnsurer:  repoEnsurer,
-		veleroClient: veleroClient,
-		pvcClient:    pvcClient,
-		podClient:    podClient,
-		kubeClient:   kubeClient,
-		log:          log,
+		repoLocker:  repoLocker,
+		repoEnsurer: repoEnsurer,
+		kubeClient:  kubeClient,
+		crClient:    crClient,
+		pvrInformer: pvrInformer,
+		log:         log,
 	}
 }
 
 type restorerFactory struct {
-	repoLocker   *repository.RepoLocker
-	repoEnsurer  *repository.Ensurer
-	veleroClient clientset.Interface
-	pvcClient    corev1client.PersistentVolumeClaimsGetter
-	podClient    corev1client.PodsGetter
-	kubeClient   kubernetes.Interface
-	log          logrus.FieldLogger
+	repoLocker  *repository.RepoLocker
+	repoEnsurer *repository.Ensurer
+	kubeClient  kubernetes.Interface
+	crClient    ctrlclient.Client
+	pvrInformer ctrlcache.Informer
+	log         logrus.FieldLogger
 }
 
 func (rf *restorerFactory) NewRestorer(ctx context.Context, restore *velerov1api.Restore) (Restorer, error) {
-	informer := velerov1informers.NewFilteredPodVolumeRestoreInformer(
-		rf.veleroClient,
-		restore.Namespace,
-		0,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-		func(opts *metav1.ListOptions) {
-			opts.LabelSelector = fmt.Sprintf("%s=%s", velerov1api.RestoreUIDLabel, restore.UID)
-		},
-	)
+	r := newRestorer(ctx, rf.repoLocker, rf.repoEnsurer, rf.pvrInformer, rf.kubeClient, rf.crClient, restore, rf.log)
 
-	r := newRestorer(ctx, rf.repoLocker, rf.repoEnsurer, informer, rf.veleroClient, rf.pvcClient, rf.podClient, rf.kubeClient, rf.log)
-
-	go informer.Run(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), rf.pvrInformer.HasSynced) {
 		return nil, errors.New("timed out waiting for cache to sync")
 	}
 

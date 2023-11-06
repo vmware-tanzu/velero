@@ -261,12 +261,12 @@ type ExecHook struct {
 type HookErrorMode string
 
 const (
-	// HookErrorModeContinue means that an error from a hook is acceptable, and the backup can
-	// proceed.
+	// HookErrorModeContinue means that an error from a hook is acceptable and the backup/restore can
+	// proceed with the rest of hooks' execution. This backup/restore should be in `PartiallyFailed` status.
 	HookErrorModeContinue HookErrorMode = "Continue"
 
-	// HookErrorModeFail means that an error from a hook is problematic, and the backup should be in
-	// error.
+	// HookErrorModeFail means that an error from a hook is problematic and Velero should stop executing following hooks.
+	// This backup/restore should be in `PartiallyFailed` status.
 	HookErrorModeFail HookErrorMode = "Fail"
 )
 

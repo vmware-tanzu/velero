@@ -311,7 +311,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		discoveryHelper:                kr.discoveryHelper,
 		resourcePriorities:             kr.resourcePriorities,
 		resourceRestoreHooks:           resourceRestoreHooks,
-		hooksErrs:                      make(chan error),
+		hooksErrs:                      make(chan hook.HookErrInfo),
 		waitExecHookHandler:            waitExecHookHandler,
 		hooksContext:                   hooksCtx,
 		hooksCancelFunc:                hooksCancelFunc,
@@ -360,7 +360,7 @@ type restoreContext struct {
 	discoveryHelper                discovery.Helper
 	resourcePriorities             Priorities
 	hooksWaitGroup                 sync.WaitGroup
-	hooksErrs                      chan error
+	hooksErrs                      chan hook.HookErrInfo
 	resourceRestoreHooks           []hook.ResourceRestoreHook
 	waitExecHookHandler            hook.WaitExecHookHandler
 	hooksContext                   go_context.Context
@@ -655,8 +655,8 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 		ctx.hooksWaitGroup.Wait()
 		close(ctx.hooksErrs)
 	}()
-	for err := range ctx.hooksErrs {
-		errs.Velero = append(errs.Velero, err.Error())
+	for errInfo := range ctx.hooksErrs {
+		errs.Add(errInfo.Namespace, errInfo.Err)
 	}
 	ctx.log.Info("Done waiting for all post-restore exec hooks to complete")
 
@@ -1474,7 +1474,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	if ctx.resourceModifiers != nil {
-		if errList := ctx.resourceModifiers.ApplyResourceModifierRules(obj, groupResource.String(), ctx.log); errList != nil {
+		if errList := ctx.resourceModifiers.ApplyResourceModifierRules(obj, groupResource.String(), ctx.kbClient.Scheme(), ctx.log); errList != nil {
 			for _, err := range errList {
 				errs.Add(namespace, err)
 			}
@@ -1532,18 +1532,17 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	if restoreErr != nil {
-		// check for the existence of the object in cluster, if no error then it implies that object exists
-		// and if err then we want to judge whether there is an existing error in the previous creation.
-		// if so, we will return the 'get' error.
-		// otherwise, we will return the original creation error.
+		// check for the existence of the object that failed creation due to alreadyExist in cluster, if no error then it implies that object exists.
+		// and if err then itemExists remains false as we were not able to confirm the existence of the object via Get call or creation call.
+		// We return the get error as a warning to notify the user that the object could exist in cluster and we were not able to confirm it.
 		if !ctx.disableInformerCache {
 			fromCluster, err = ctx.getResource(groupResource, obj, namespace, name)
 		} else {
 			fromCluster, err = resourceClient.Get(name, metav1.GetOptions{})
 		}
 		if err != nil && isAlreadyExistsError {
-			ctx.log.Errorf("Error retrieving in-cluster version of %s: %v", kube.NamespaceAndName(obj), err)
-			errs.Add(namespace, err)
+			ctx.log.Warnf("Unable to retrieve in-cluster version of %s: %v, object won't be restored by velero or have restore labels, and existing resource policy is not applied", kube.NamespaceAndName(obj), err)
+			warnings.Add(namespace, err)
 			return warnings, errs, itemExists
 		}
 	}
@@ -1899,10 +1898,11 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 		// on the ctx.podVolumeErrs channel.
 		defer ctx.hooksWaitGroup.Done()
 
+		podNs := createdObj.GetNamespace()
 		pod := new(v1.Pod)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(createdObj.UnstructuredContent(), &pod); err != nil {
 			ctx.log.WithError(err).Error("error converting unstructured pod")
-			ctx.hooksErrs <- err
+			ctx.hooksErrs <- hook.HookErrInfo{Namespace: podNs, Err: err}
 			return
 		}
 		execHooksByContainer, err := hook.GroupRestoreExecHooks(
@@ -1912,7 +1912,7 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 		)
 		if err != nil {
 			ctx.log.WithError(err).Errorf("error getting exec hooks for pod %s/%s", pod.Namespace, pod.Name)
-			ctx.hooksErrs <- err
+			ctx.hooksErrs <- hook.HookErrInfo{Namespace: podNs, Err: err}
 			return
 		}
 
@@ -1922,7 +1922,7 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 
 			for _, err := range errs {
 				// Errors are already logged in the HandleHooks method.
-				ctx.hooksErrs <- err
+				ctx.hooksErrs <- hook.HookErrInfo{Namespace: podNs, Err: err}
 			}
 		}
 	}()

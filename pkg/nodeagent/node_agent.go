@@ -23,13 +23,13 @@ import (
 
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
-
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/kubernetes"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
@@ -76,12 +76,18 @@ func IsRunning(ctx context.Context, kubeClient kubernetes.Interface, namespace s
 }
 
 // IsRunningInNode checks if the node agent pod is running properly in a specified node. If not, return the error found
-func IsRunningInNode(ctx context.Context, namespace string, nodeName string, podClient corev1client.PodsGetter) error {
+func IsRunningInNode(ctx context.Context, namespace string, nodeName string, crClient ctrlclient.Client) error {
 	if nodeName == "" {
 		return errors.New("node name is empty")
 	}
 
-	pods, err := podClient.Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("name=%s", daemonSet)})
+	pods := new(v1.PodList)
+	parsedSelector, err := labels.Parse(fmt.Sprintf("name=%s", daemonSet))
+	if err != nil {
+		return errors.Wrap(err, "fail to parse selector")
+	}
+
+	err = crClient.List(ctx, pods, &ctrlclient.ListOptions{LabelSelector: parsedSelector})
 	if err != nil {
 		return errors.Wrap(err, "failed to list daemonset pods")
 	}
@@ -108,8 +114,8 @@ func GetPodSpec(ctx context.Context, kubeClient kubernetes.Interface, namespace 
 	return &ds.Spec.Template.Spec, nil
 }
 
-func GetConfigs(ctx context.Context, namespace string, cmClient corev1client.ConfigMapsGetter) (*Configs, error) {
-	cm, err := cmClient.ConfigMaps(namespace).Get(ctx, configName, metav1.GetOptions{})
+func GetConfigs(ctx context.Context, namespace string, kubeClient kubernetes.Interface) (*Configs, error) {
+	cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, configName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -63,7 +64,7 @@ func NewPauseCommand(f client.Factory, use string) *cobra.Command {
 }
 
 func runPause(f client.Factory, o *cli.SelectOptions, paused bool) error {
-	client, err := f.Client()
+	crClient, err := f.KubebuilderClient()
 	if err != nil {
 		return err
 	}
@@ -75,7 +76,8 @@ func runPause(f client.Factory, o *cli.SelectOptions, paused bool) error {
 	switch {
 	case len(o.Names) > 0:
 		for _, name := range o.Names {
-			schedule, err := client.VeleroV1().Schedules(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
+			schedule := new(velerov1api.Schedule)
+			err := crClient.Get(context.TODO(), ctrlclient.ObjectKey{Name: name, Namespace: f.Namespace()}, schedule)
 			if err != nil {
 				errs = append(errs, errors.WithStack(err))
 				continue
@@ -83,11 +85,16 @@ func runPause(f client.Factory, o *cli.SelectOptions, paused bool) error {
 			schedules = append(schedules, schedule)
 		}
 	default:
-		selector := labels.Everything().String()
+		selector := labels.Everything()
 		if o.Selector.LabelSelector != nil {
-			selector = o.Selector.String()
+			convertedSelector, err := metav1.LabelSelectorAsSelector(o.Selector.LabelSelector)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			selector = convertedSelector
 		}
-		res, err := client.VeleroV1().Schedules(f.Namespace()).List(context.TODO(), metav1.ListOptions{
+		res := new(velerov1api.ScheduleList)
+		err := crClient.List(context.TODO(), res, &ctrlclient.ListOptions{
 			LabelSelector: selector,
 		})
 		if err != nil {
@@ -113,7 +120,7 @@ func runPause(f client.Factory, o *cli.SelectOptions, paused bool) error {
 			continue
 		}
 		schedule.Spec.Paused = paused
-		if _, err := client.VeleroV1().Schedules(schedule.Namespace).Update(context.TODO(), schedule, metav1.UpdateOptions{}); err != nil {
+		if err := crClient.Update(context.TODO(), schedule); err != nil {
 			return errors.Wrapf(err, "failed to update schedule %s", schedule.Name)
 		}
 		fmt.Printf("Schedule %s %s successfully\n", schedule.Name, msg)

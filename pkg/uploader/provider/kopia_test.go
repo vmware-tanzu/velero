@@ -35,12 +35,12 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/credentials/mocks"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	udmrepo "github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	udmrepomocks "github.com/vmware-tanzu/velero/pkg/repository/udmrepo/mocks"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/uploader/kopia"
+	"github.com/vmware-tanzu/velero/pkg/util"
 )
 
 type FakeBackupProgressUpdater struct {
@@ -64,7 +64,7 @@ func (f *FakeRestoreProgressUpdater) UpdateProgress(p *uploader.Progress) {}
 func TestRunBackup(t *testing.T) {
 	var kp kopiaProvider
 	kp.log = logrus.New()
-	updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()}
+	updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
 
 	testCases := []struct {
 		name           string
@@ -121,7 +121,7 @@ func TestRunBackup(t *testing.T) {
 func TestRunRestore(t *testing.T) {
 	var kp kopiaProvider
 	kp.log = logrus.New()
-	updater := FakeRestoreProgressUpdater{PodVolumeRestore: &velerov1api.PodVolumeRestore{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()}
+	updater := FakeRestoreProgressUpdater{PodVolumeRestore: &velerov1api.PodVolumeRestore{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
 
 	testCases := []struct {
 		name            string

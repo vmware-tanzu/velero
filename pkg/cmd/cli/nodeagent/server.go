@@ -490,7 +490,7 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 }
 
 func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int, logger logrus.FieldLogger) int {
-	configs, err := nodeagent.GetConfigs(s.ctx, s.namespace, s.kubeClient.CoreV1())
+	configs, err := nodeagent.GetConfigs(s.ctx, s.namespace, s.kubeClient)
 	if err != nil {
 		logger.WithError(err).Warn("Failed to get node agent configs")
 		return defaultNum

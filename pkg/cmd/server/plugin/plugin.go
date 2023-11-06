@@ -152,12 +152,12 @@ func newPodVolumeRestoreItemAction(f client.Factory) plugincommon.HandlerInitial
 			return nil, err
 		}
 
-		veleroClient, err := f.Client()
+		crClient, err := f.KubebuilderClient()
 		if err != nil {
 			return nil, err
 		}
 
-		return restore.NewPodVolumeRestoreAction(logger, client.CoreV1().ConfigMaps(f.Namespace()), veleroClient.VeleroV1().PodVolumeBackups(f.Namespace())), nil
+		return restore.NewPodVolumeRestoreAction(logger, client.CoreV1().ConfigMaps(f.Namespace()), crClient), nil
 	}
 }
 

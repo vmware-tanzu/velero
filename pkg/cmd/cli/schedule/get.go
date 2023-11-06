@@ -21,6 +21,8 @@ import (
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -38,19 +40,25 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
 
-			veleroClient, err := f.Client()
+			crClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
 			var schedules *api.ScheduleList
 			if len(args) > 0 {
 				schedules = new(api.ScheduleList)
 				for _, name := range args {
-					schedule, err := veleroClient.VeleroV1().Schedules(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
+					schedule := new(api.Schedule)
+					err := crClient.Get(context.TODO(), ctrlclient.ObjectKey{Name: name, Namespace: f.Namespace()}, schedule)
 					cmd.CheckError(err)
 					schedules.Items = append(schedules.Items, *schedule)
 				}
 			} else {
-				schedules, err = veleroClient.VeleroV1().Schedules(f.Namespace()).List(context.TODO(), listOptions)
+				selector := labels.NewSelector()
+				if listOptions.LabelSelector != "" {
+					selector, err = labels.Parse(listOptions.LabelSelector)
+					cmd.CheckError(err)
+				}
+				err := crClient.List(context.TODO(), schedules, &ctrlclient.ListOptions{LabelSelector: selector})
 				cmd.CheckError(err)
 			}
 

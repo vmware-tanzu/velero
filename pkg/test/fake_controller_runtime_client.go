@@ -21,6 +21,7 @@ import (
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/require"
+	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,6 +39,8 @@ func NewFakeControllerRuntimeClientBuilder(t *testing.T) *k8sfake.ClientBuilder 
 	require.NoError(t, err)
 	err = corev1api.AddToScheme(scheme)
 	require.NoError(t, err)
+	err = appsv1api.AddToScheme(scheme)
+	require.NoError(t, err)
 	err = snapshotv1api.AddToScheme(scheme)
 	require.NoError(t, err)
 	return k8sfake.NewClientBuilder().WithScheme(scheme)
@@ -51,7 +54,13 @@ func NewFakeControllerRuntimeClient(t *testing.T, initObjs ...runtime.Object) cl
 	require.NoError(t, err)
 	err = corev1api.AddToScheme(scheme)
 	require.NoError(t, err)
+	err = appsv1api.AddToScheme(scheme)
+	require.NoError(t, err)
 	err = snapshotv1api.AddToScheme(scheme)
 	require.NoError(t, err)
 	return k8sfake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(initObjs...).Build()
+}
+
+func NewFakeControllerRuntimeWatchClient(t *testing.T, initObjs ...runtime.Object) client.WithWatch {
+	return NewFakeControllerRuntimeClientBuilder(t).WithRuntimeObjects(initObjs...).Build()
 }
