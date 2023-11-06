@@ -226,7 +226,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		return nil, err
 	}
 
-	dataPathConcurrentNum := s.getDataPathConcurrentNum(defaultDataPathConcurrentNum, s.logger)
+	dataPathConcurrentNum := s.getDataPathConcurrentNum(defaultDataPathConcurrentNum)
 	s.dataPathMgr = datapath.NewManager(dataPathConcurrentNum)
 
 	return s, nil
@@ -489,28 +489,34 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 	}
 }
 
-func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int, logger logrus.FieldLogger) int {
-	configs, err := nodeagent.GetConfigs(s.ctx, s.namespace, s.kubeClient)
+var getConfigsFunc = nodeagent.GetConfigs
+
+func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
+	configs, err := getConfigsFunc(s.ctx, s.namespace, s.kubeClient)
 	if err != nil {
-		logger.WithError(err).Warn("Failed to get node agent configs")
+		s.logger.WithError(err).Warn("Failed to get node agent configs")
 		return defaultNum
 	}
 
 	if configs == nil || configs.DataPathConcurrency == nil {
-		logger.Infof("Node agent configs are not found, use the default number %v", defaultNum)
+		s.logger.Infof("Node agent configs are not found, use the default number %v", defaultNum)
 		return defaultNum
 	}
 
 	globalNum := configs.DataPathConcurrency.GlobalConfig
 
 	if globalNum <= 0 {
-		logger.Warnf("Global number %v is invalid, use the default value %v", globalNum, defaultNum)
+		s.logger.Warnf("Global number %v is invalid, use the default value %v", globalNum, defaultNum)
 		globalNum = defaultNum
+	}
+
+	if len(configs.DataPathConcurrency.PerNodeConfig) == 0 {
+		return globalNum
 	}
 
 	curNode, err := s.kubeClient.CoreV1().Nodes().Get(s.ctx, s.nodeName, metav1.GetOptions{})
 	if err != nil {
-		logger.WithError(err).Warnf("Failed to get node info for %s, use the global number %v", s.nodeName, globalNum)
+		s.logger.WithError(err).Warnf("Failed to get node info for %s, use the global number %v", s.nodeName, globalNum)
 		return globalNum
 	}
 
@@ -519,12 +525,12 @@ func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int, logger logrus
 	for _, rule := range configs.DataPathConcurrency.PerNodeConfig {
 		selector, err := metav1.LabelSelectorAsSelector(&rule.NodeSelector)
 		if err != nil {
-			logger.WithError(err).Warnf("Failed to parse rule with label selector %s, skip it", rule.NodeSelector.String())
+			s.logger.WithError(err).Warnf("Failed to parse rule with label selector %s, skip it", rule.NodeSelector.String())
 			continue
 		}
 
 		if rule.Number <= 0 {
-			logger.Warnf("Rule with label selector %s is with an invalid number %v, skip it", rule.NodeSelector.String(), rule.Number)
+			s.logger.Warnf("Rule with label selector %s is with an invalid number %v, skip it", rule.NodeSelector.String(), rule.Number)
 			continue
 		}
 
@@ -536,10 +542,10 @@ func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int, logger logrus
 	}
 
 	if concurrentNum == math.MaxInt32 {
-		logger.Infof("Per node number for node %s is not found, use the global number %v", s.nodeName, globalNum)
+		s.logger.Infof("Per node number for node %s is not found, use the global number %v", s.nodeName, globalNum)
 		concurrentNum = globalNum
 	} else {
-		logger.Infof("Use the per node number %v over global number %v for node %s", concurrentNum, globalNum, s.nodeName)
+		s.logger.Infof("Use the per node number %v over global number %v for node %s", concurrentNum, globalNum, s.nodeName)
 	}
 
 	return concurrentNum
