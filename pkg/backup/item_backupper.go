@@ -167,7 +167,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		namespace: namespace,
 		name:      name,
 	}
-
+	// mutex on BackedUpItems needed.
 	if _, exists := ib.backupRequest.BackedUpItems[key]; exists {
 		log.Info("Skipping item because it's already been backed up.")
 		// returning true since this item *is* in the backup, even though we're not backing it up here
@@ -694,6 +694,7 @@ func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource 
 // this function will be called throughout the process of backup, it needs to handle any object
 func (ib *itemBackupper) trackSkippedPV(obj runtime.Unstructured, groupResource schema.GroupResource, approach string, reason string, log logrus.FieldLogger) {
 	if name, err := getPVName(obj, groupResource); len(name) > 0 && err == nil {
+		// Skip PV Tracker already has Mutex lock.
 		ib.backupRequest.SkippedPVTracker.Track(name, approach, reason)
 	} else if err != nil {
 		log.WithError(err).Warnf("unable to get PV name, skip tracking.")
