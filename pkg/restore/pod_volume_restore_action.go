@@ -27,11 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	veleroimage "github.com/vmware-tanzu/velero/internal/velero"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -47,16 +47,16 @@ const (
 )
 
 type PodVolumeRestoreAction struct {
-	logger                logrus.FieldLogger
-	client                corev1client.ConfigMapInterface
-	podVolumeBackupClient velerov1client.PodVolumeBackupInterface
+	logger   logrus.FieldLogger
+	client   corev1client.ConfigMapInterface
+	crClient ctrlclient.Client
 }
 
-func NewPodVolumeRestoreAction(logger logrus.FieldLogger, client corev1client.ConfigMapInterface, podVolumeBackupClient velerov1client.PodVolumeBackupInterface) *PodVolumeRestoreAction {
+func NewPodVolumeRestoreAction(logger logrus.FieldLogger, client corev1client.ConfigMapInterface, crClient ctrlclient.Client) *PodVolumeRestoreAction {
 	return &PodVolumeRestoreAction{
-		logger:                logger,
-		client:                client,
-		podVolumeBackupClient: podVolumeBackupClient,
+		logger:   logger,
+		client:   client,
+		crClient: crClient,
 	}
 }
 
@@ -86,9 +86,11 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 
 	log := a.logger.WithField("pod", kube.NamespaceAndName(&pod))
 
-	opts := label.NewListOptionsForBackup(input.Restore.Spec.BackupName)
-	podVolumeBackupList, err := a.podVolumeBackupClient.List(context.TODO(), opts)
-	if err != nil {
+	opts := &ctrlclient.ListOptions{
+		LabelSelector: label.NewSelectorForBackup(input.Restore.Spec.BackupName),
+	}
+	podVolumeBackupList := new(velerov1api.PodVolumeBackupList)
+	if err := a.crClient.List(context.TODO(), podVolumeBackupList, opts); err != nil {
 		return nil, errors.WithStack(err)
 	}
 

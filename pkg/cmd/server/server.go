@@ -294,11 +294,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
-	veleroClient, err := f.Client()
-	if err != nil {
-		return nil, err
-	}
-
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return nil, err
@@ -379,12 +374,18 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
+	var discoveryClient *discovery.DiscoveryClient
+	if discoveryClient, err = discovery.NewDiscoveryClientForConfig(clientConfig); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+
 	s := &server{
 		namespace:             f.Namespace(),
 		metricsAddress:        config.metricsAddress,
 		kubeClientConfig:      clientConfig,
 		kubeClient:            kubeClient,
-		discoveryClient:       veleroClient.Discovery(),
+		discoveryClient:       discoveryClient,
 		dynamicClient:         dynamicClient,
 		crClient:              crClient,
 		ctx:                   ctx,
