@@ -311,7 +311,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		discoveryHelper:                kr.discoveryHelper,
 		resourcePriorities:             kr.resourcePriorities,
 		resourceRestoreHooks:           resourceRestoreHooks,
-		hooksErrs:                      make(chan error),
+		hooksErrs:                      make(chan hook.HookErrInfo),
 		waitExecHookHandler:            waitExecHookHandler,
 		hooksContext:                   hooksCtx,
 		hooksCancelFunc:                hooksCancelFunc,
@@ -360,7 +360,7 @@ type restoreContext struct {
 	discoveryHelper                discovery.Helper
 	resourcePriorities             Priorities
 	hooksWaitGroup                 sync.WaitGroup
-	hooksErrs                      chan error
+	hooksErrs                      chan hook.HookErrInfo
 	resourceRestoreHooks           []hook.ResourceRestoreHook
 	waitExecHookHandler            hook.WaitExecHookHandler
 	hooksContext                   go_context.Context
@@ -655,8 +655,8 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 		ctx.hooksWaitGroup.Wait()
 		close(ctx.hooksErrs)
 	}()
-	for err := range ctx.hooksErrs {
-		errs.Velero = append(errs.Velero, err.Error())
+	for errInfo := range ctx.hooksErrs {
+		errs.Add(errInfo.Namespace, errInfo.Err)
 	}
 	ctx.log.Info("Done waiting for all post-restore exec hooks to complete")
 
@@ -1898,10 +1898,11 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 		// on the ctx.podVolumeErrs channel.
 		defer ctx.hooksWaitGroup.Done()
 
+		podNs := createdObj.GetNamespace()
 		pod := new(v1.Pod)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(createdObj.UnstructuredContent(), &pod); err != nil {
 			ctx.log.WithError(err).Error("error converting unstructured pod")
-			ctx.hooksErrs <- err
+			ctx.hooksErrs <- hook.HookErrInfo{Namespace: podNs, Err: err}
 			return
 		}
 		execHooksByContainer, err := hook.GroupRestoreExecHooks(
@@ -1911,7 +1912,7 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 		)
 		if err != nil {
 			ctx.log.WithError(err).Errorf("error getting exec hooks for pod %s/%s", pod.Namespace, pod.Name)
-			ctx.hooksErrs <- err
+			ctx.hooksErrs <- hook.HookErrInfo{Namespace: podNs, Err: err}
 			return
 		}
 
@@ -1921,7 +1922,7 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 
 			for _, err := range errs {
 				// Errors are already logged in the HandleHooks method.
-				ctx.hooksErrs <- err
+				ctx.hooksErrs <- hook.HookErrInfo{Namespace: podNs, Err: err}
 			}
 		}
 	}()
