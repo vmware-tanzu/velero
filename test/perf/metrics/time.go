@@ -16,40 +16,53 @@ limitations under the License.
 
 package metrics
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 const TimeCaseDesc = "Time cost"
 
+type TimeSpan struct {
+	Start time.Time
+	End   time.Time
+}
+
 type TimeMetrics struct {
 	Name     string
-	TimeInfo map[string]time.Time // metric name : start timestamp
-	Metrics  map[string]float64   // metric name : time duration
+	TimeInfo map[string]TimeSpan // metric name : start timestamp
 }
 
 func (t *TimeMetrics) GetMetrics() map[string]string {
 	tmpMetrics := make(map[string]string)
-	for k, v := range t.Metrics {
-		duration := time.Duration(v) * time.Second
-		tmpMetrics[k] = duration.String()
+	for k, v := range t.TimeInfo {
+		duration := v.End.Sub(v.Start)
+		if duration < time.Second {
+			// For those too shoter time difference we should ignored
+			// as it may not really execute the logic
+			continue
+		}
+		tmpMetrics[k] = duration.String() + fmt.Sprintf(" (%s - %s)", v.Start.Format(time.RFC3339), v.End.Format(time.RFC3339))
 	}
 	return tmpMetrics
 }
 
 func (t *TimeMetrics) Start(name string) {
-	t.TimeInfo[name] = time.Now()
-}
-
-func (t *TimeMetrics) End(name string) {
-	t.Metrics[name] = time.Now().Sub(t.TimeInfo[name]).Seconds()
-	if t.Metrics[name] < 1 {
-		// For those too shoter time difference we should ignored
-		// as it may not really execute the logic
-		delete(t.Metrics, name)
+	t.TimeInfo[name] = TimeSpan{
+		Start: time.Now(),
 	}
 }
 
+func (t *TimeMetrics) End(name string) {
+	if _, ok := t.TimeInfo[name]; !ok {
+		return
+	}
+	timeSpan := t.TimeInfo[name]
+	timeSpan.End = time.Now()
+	t.TimeInfo[name] = timeSpan
+}
+
 func (t *TimeMetrics) Update() error {
-	t.Metrics[t.Name] = time.Now().Sub(t.TimeInfo[t.Name]).Seconds()
 	return nil
 }
 
