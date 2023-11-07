@@ -227,6 +227,7 @@ func TestPutBackup(t *testing.T) {
 		snapshots            io.Reader
 		backupItemOperations io.Reader
 		resourceList         io.Reader
+		backupVolumeInfo     io.Reader
 		expectedErr          string
 		expectedKeys         []string
 	}{
@@ -239,6 +240,7 @@ func TestPutBackup(t *testing.T) {
 			snapshots:            newStringReadSeeker("snapshots"),
 			backupItemOperations: newStringReadSeeker("backupItemOperations"),
 			resourceList:         newStringReadSeeker("resourceList"),
+			backupVolumeInfo:     newStringReadSeeker("backupVolumeInfo"),
 			expectedErr:          "",
 			expectedKeys: []string{
 				"backups/backup-1/velero-backup.json",
@@ -248,6 +250,7 @@ func TestPutBackup(t *testing.T) {
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"backups/backup-1/backup-1-itemoperations.json.gz",
 				"backups/backup-1/backup-1-resource-list.json.gz",
+				"backups/backup-1/backup-1-volumeinfos.json.gz",
 			},
 		},
 		{
@@ -260,6 +263,7 @@ func TestPutBackup(t *testing.T) {
 			snapshots:            newStringReadSeeker("snapshots"),
 			backupItemOperations: newStringReadSeeker("backupItemOperations"),
 			resourceList:         newStringReadSeeker("resourceList"),
+			backupVolumeInfo:     newStringReadSeeker("backupVolumeInfo"),
 			expectedErr:          "",
 			expectedKeys: []string{
 				"prefix-1/backups/backup-1/velero-backup.json",
@@ -269,6 +273,7 @@ func TestPutBackup(t *testing.T) {
 				"prefix-1/backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"prefix-1/backups/backup-1/backup-1-itemoperations.json.gz",
 				"prefix-1/backups/backup-1/backup-1-resource-list.json.gz",
+				"prefix-1/backups/backup-1/backup-1-volumeinfos.json.gz",
 			},
 		},
 		{
@@ -280,6 +285,7 @@ func TestPutBackup(t *testing.T) {
 			snapshots:            newStringReadSeeker("snapshots"),
 			backupItemOperations: newStringReadSeeker("backupItemOperations"),
 			resourceList:         newStringReadSeeker("resourceList"),
+			backupVolumeInfo:     newStringReadSeeker("backupVolumeInfo"),
 			expectedErr:          "error readers return errors",
 			expectedKeys:         []string{"backups/backup-1/backup-1-logs.gz"},
 		},
@@ -291,6 +297,7 @@ func TestPutBackup(t *testing.T) {
 			snapshots:            newStringReadSeeker("snapshots"),
 			backupItemOperations: newStringReadSeeker("backupItemOperations"),
 			resourceList:         newStringReadSeeker("resourceList"),
+			backupVolumeInfo:     newStringReadSeeker("backupVolumeInfo"),
 			expectedErr:          "error readers return errors",
 			expectedKeys:         []string{"backups/backup-1/backup-1-logs.gz"},
 		},
@@ -303,6 +310,7 @@ func TestPutBackup(t *testing.T) {
 			snapshots:            newStringReadSeeker("snapshots"),
 			backupItemOperations: newStringReadSeeker("backupItemOperations"),
 			resourceList:         newStringReadSeeker("resourceList"),
+			backupVolumeInfo:     newStringReadSeeker("backupVolumeInfo"),
 			expectedErr:          "",
 			expectedKeys: []string{
 				"backups/backup-1/velero-backup.json",
@@ -311,23 +319,26 @@ func TestPutBackup(t *testing.T) {
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"backups/backup-1/backup-1-itemoperations.json.gz",
 				"backups/backup-1/backup-1-resource-list.json.gz",
+				"backups/backup-1/backup-1-volumeinfos.json.gz",
 			},
 		},
 		{
-			name:            "data should be uploaded even when metadata is nil",
-			metadata:        nil,
-			contents:        newStringReadSeeker("contents"),
-			log:             newStringReadSeeker("log"),
-			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
-			snapshots:       newStringReadSeeker("snapshots"),
-			resourceList:    newStringReadSeeker("resourceList"),
-			expectedErr:     "",
+			name:             "data should be uploaded even when metadata is nil",
+			metadata:         nil,
+			contents:         newStringReadSeeker("contents"),
+			log:              newStringReadSeeker("log"),
+			podVolumeBackup:  newStringReadSeeker("podVolumeBackup"),
+			snapshots:        newStringReadSeeker("snapshots"),
+			resourceList:     newStringReadSeeker("resourceList"),
+			backupVolumeInfo: newStringReadSeeker("backupVolumeInfo"),
+			expectedErr:      "",
 			expectedKeys: []string{
 				"backups/backup-1/backup-1.tar.gz",
 				"backups/backup-1/backup-1-logs.gz",
 				"backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"backups/backup-1/backup-1-resource-list.json.gz",
+				"backups/backup-1/backup-1-volumeinfos.json.gz",
 			},
 		},
 	}
@@ -345,6 +356,7 @@ func TestPutBackup(t *testing.T) {
 				VolumeSnapshots:      tc.snapshots,
 				BackupItemOperations: tc.backupItemOperations,
 				BackupResourceList:   tc.resourceList,
+				BackupVolumeInfo:     tc.backupVolumeInfo,
 			}
 			err := harness.PutBackup(backupInfo)
 
@@ -1041,6 +1053,90 @@ func TestNewObjectBackupStoreGetterConfig(t *testing.T) {
 			_, err := tc.getter.Get(tc.location, objStoreGetter, velerotest.NewLogger())
 			require.NoError(t, err)
 			require.Equal(t, tc.wantConfig, objStore.Config)
+		})
+	}
+}
+
+func TestGetBackupVolumeInfos(t *testing.T) {
+	tests := []struct {
+		name           string
+		volumeInfo     *volume.VolumeInfos
+		volumeInfoStr  string
+		expectedErr    string
+		expectedResult []volume.VolumeInfo
+	}{
+		{
+			name: "No VolumeInfos, expect no error.",
+		},
+		{
+			name: "Valid VolumeInfo, should pass.",
+			volumeInfo: &volume.VolumeInfos{
+				VolumeInfos: []volume.VolumeInfo{
+					{
+						PVCName:           "pvcName",
+						PVName:            "pvName",
+						Skipped:           true,
+						SnapshotDataMoved: false,
+					},
+				},
+			},
+			expectedResult: []volume.VolumeInfo{
+				{
+					PVCName:           "pvcName",
+					PVName:            "pvName",
+					Skipped:           true,
+					SnapshotDataMoved: false,
+				},
+			},
+		},
+		{
+			name:          "Invalid VolumeInfo string, should also pass.",
+			volumeInfoStr: `{"volumeInfos": [{"abc": "123", "def": "456", "pvcName": "pvcName"}]}`,
+			expectedResult: []volume.VolumeInfo{
+				{
+					PVCName: "pvcName",
+				},
+			},
+		},
+	}
+
+	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.volumeInfo != nil {
+				obj := new(bytes.Buffer)
+				gzw := gzip.NewWriter(obj)
+
+				require.NoError(t, json.NewEncoder(gzw).Encode(tc.volumeInfo))
+				require.NoError(t, gzw.Close())
+				harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-volumeinfos.json.gz", obj)
+			}
+
+			if tc.volumeInfoStr != "" {
+				obj := new(bytes.Buffer)
+				gzw := gzip.NewWriter(obj)
+				_, err := gzw.Write([]byte(tc.volumeInfoStr))
+				require.NoError(t, err)
+
+				require.NoError(t, gzw.Close())
+				harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-volumeinfos.json.gz", obj)
+			}
+
+			result, err := harness.GetBackupVolumeInfos("test-backup")
+			if tc.expectedErr != "" {
+				require.Equal(t, tc.expectedErr, err.Error())
+			} else {
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+				require.NoError(t, err)
+			}
+
+			if len(tc.expectedResult) > 0 {
+				require.Equal(t, tc.expectedResult, result.VolumeInfos)
+			}
+
 		})
 	}
 }

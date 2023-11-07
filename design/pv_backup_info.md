@@ -35,44 +35,50 @@ The `restoreItem` function can decode the _backup-name_-volumes-info.json file t
 ## Detailed Design
 
 ### The VolumeInfo structure
-_backup-name_-volumes-info.json file is a structure that contains an array of structure `VolumeInfo` and a VolumeInfo version parameter. The version is used to support multiple VolumeInfo version, and make the backward-compatible support possible. The current version is `1`.
+_backup-name_-volumes-info.json file is a structure that contains an array of structure `VolumeInfo`.
 
-The 1 version of `VolumeInfo` definition is:
 ``` golang
-type VolumeInfoV1 struct {
-    PVCName        string    // The PVC's name. The format should be <namespace-name>/<PVC-name>
+type VolumeInfo struct {
+    PVCName        string    // The PVC's name.
+    PVCNamespace   string    // The PVC's namespace.
     PVName         string    // The PV name.
-    BackupMethod   string    // The way the volume data is backed up. The valid value includes `VeleroNativeSnapshot`, `PodVolumeBackup`, `CSISnapshot` and `Skipped`.
-    SnapshotDataMovement bool // Whether the volume's snapshot data is moved to specified storage.
+    BackupMethod   string    // The way the volume data is backed up. The valid value includes `VeleroNativeSnapshot`, `PodVolumeBackup` and `CSISnapshot`.
+    SnapshotDataMoved bool   // Whether the volume's snapshot data is moved to specified storage.
 
+    Skipped         boolean   // Whether the Volume is skipped in this backup.
     SkippedReason   string    // The reason for the volume is skipped in the backup.
     StartTimestamp  *metav1.Time // Snapshot starts timestamp.
 
+    OperationID     string   // The Async Operation's ID.
+
     CSISnapshotInfo          CSISnapshotInfo
-    SnapshotDataMoveInfo     SnapshotDataMoveInfo
+    SnapshotDataMovementInfo SnapshotDataMovementInfo
     NativeSnapshotInfo       VeleroNativeSnapshotInfo
     PVBInfo                  PodVolumeBackupInfo
+    PVInfo                   PVInfo
 }
 
 // CSISnapshotInfo is used for displaying the CSI snapshot status
 type CSISnapshotInfo struct {
-    SnapshotHandle  string       // The actual snapshot ID. It can be the cloud provider's snapshot ID or the file-system uploader's snapshot.
+    SnapshotHandle  string       // It's the storage provider's snapshot ID for CSI.
     Size            int64        // The snapshot corresponding volume size. Some of the volume backup methods cannot retrieve the data by current design, for example, the Velero native snapshot.
 
     Driver          string  // The name of the CSI driver.
     VSCName         string // The name of the VolumeSnapshotContent. 
 }
 
-// SnapshotDataMoveInfo is used for displaying the snapshot data mover status.
-type SnapshotDataMoveInfo struct {
+// SnapshotDataMovementInfo is used for displaying the snapshot data mover status.
+type SnapshotDataMovementInfo struct {
     DataMover        string    // The data mover used by the backup. The valid values are `velero` and ``(equals to `velero`).
     UploaderType     string    // The type of the uploader that uploads the snapshot data. The valid values are `kopia` and `restic`. It's useful for file-system backup and snapshot data mover.
-    RetainedSnapshot string    // The name or ID of the snapshot associated object(SAO).
+    RetainedSnapshot string    // The name or ID of the snapshot associated object(SAO). SAO is used to support local snapshots for the snapshot data mover, e.g. it could be a VolumeSnapshot for CSI snapshot data moign/pv_backup_info.
+    SnapshotHandle string  	   // It's the filesystem repository's snapshot ID.
+	
 }
 
 // VeleroNativeSnapshotInfo is used for displaying the Velero native snapshot status.
 type VeleroNativeSnapshotInfo struct {
-    SnapshotHandle      string       // The actual snapshot ID. It can be the cloud provider's snapshot ID or the file-system uploader's snapshot.
+    SnapshotHandle      string       // It's the storage provider's snapshot ID for the Velero-native snapshot.
     Size                int64        // The snapshot corresponding volume size. Some of the volume backup methods cannot retrieve the data by current design, for example, the Velero native snapshot.
 
     VolumeType string    // The cloud provider snapshot volume type.
@@ -82,33 +88,20 @@ type VeleroNativeSnapshotInfo struct {
 
 // PodVolumeBackupInfo is used for displaying the PodVolumeBackup snapshot status.
 type PodVolumeBackupInfo struct {
-    SnapshotHandle      string       // The actual snapshot ID. It can be the cloud provider's snapshot ID or the file-system uploader's snapshot.
+    SnapshotHandle      string       // It's the file-system uploader's snapshot ID for PodVolumeBackup.
     Size                int64        // The snapshot corresponding volume size. Some of the volume backup methods cannot retrieve the data by current design, for example, the Velero native snapshot.
 
     UploaderType  string    // The type of the uploader that uploads the data. The valid values are `kopia` and `restic`. It's useful for file-system backup and snapshot data mover.
-    VolumeName    string // The PVC's corresponding volume name used by Pod
-    PodName       string // The Pod name mounting this PVC. The format should be <namespace-name>/<pod-name>.
-}
-```
-
-To make Velero support multiple versions of VolumeInfo, Velero needs to create a structure to include the version and the versioned volume information together. The information is persisted in the metadata file during backup creation. When reading the VolumeInfo metadata file, Velero reads the version information first by un-marshalling the metadata file by structure `VolumeInfoVersion`, then decide to use which version of the VolumeInfos according to the version value.
-
-If there is need to introduce a non compatible change to the VolumeInfo, a new version of `VolumeInfos` and `VolumeInfo` are needed. For example, version 2 is created, then `VolumeInfosV2` and `VolumeInfoV2` structures are needed.
-
-Only when there a non-backward-compatible change introduced in the `VolumeInfo` structure, the `version`'s version will be incremented.
-
-``` golang
-type VolumeInfoVersion struct {
-    Version string 
+    VolumeName    string   // The PVC's corresponding volume name used by Pod: https://github.com/kubernetes/kubernetes/blob/e4b74dd12fa8cb63c174091d5536a10b8ec19d34/pkg/apis/core/types.go#L48
+    PodName       string   // The Pod name mounting this PVC. The format should be <namespace-name>/<pod-name>.
+    NodeName      string   // The PVB-taken k8s node's name.
 }
 
-type VolumeInfosV2 struct {
-    Infos   []VolumeInfoV2
-    Version string // VolumeInfo structure's version information.
-}
-
-type VolumeInfoV2 struct {
-    ...
+// PVInfo is used to store some PV information modified after creation.
+// Those information are lost after PV recreation.
+type PVInfo struct {
+    ReclaimPolicy string            // ReclaimPolicy of PV. It could be different from the referenced StorageClass.
+    Labels        map[string]string // The PV's labels should be kept after recreation.
 }
 ```
 
@@ -164,11 +157,12 @@ After introducing the VolumeInfo array, the following logic will be added.
             ...
         case CSISnapshot:
             ...
-        case Skipped:
-            // Check whether the Velero server should restore the PV depending on the DeletionPolicy setting.
         default:
             // Need to check whether the volume is backed up by the SnapshotDataMover.
             if volumeInfo.SnapshotDataMovement:
+
+            // Check whether the Velero server should restore the PV depending on the DeletionPolicy setting.
+            if volumeInfo.Skipped:
 ```
 
 ### How the VolumeInfo metadata file is deleted

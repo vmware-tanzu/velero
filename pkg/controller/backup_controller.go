@@ -849,6 +849,7 @@ func persistBackup(backup *pkgbackup.Request,
 ) []error {
 	persistErrs := []error{}
 	backupJSON := new(bytes.Buffer)
+	volumeInfos := make([]volume.VolumeInfo, 0)
 
 	if err := encode.To(backup.Backup, "json", backupJSON); err != nil {
 		persistErrs = append(persistErrs, errors.Wrap(err, "error encoding backup"))
@@ -895,6 +896,11 @@ func persistBackup(backup *pkgbackup.Request,
 		persistErrs = append(persistErrs, errs...)
 	}
 
+	volumeInfoJSON, errs := encode.ToJSONGzip(volumeInfos, "backup volumes information")
+	if errs != nil {
+		persistErrs = append(persistErrs, errs...)
+	}
+
 	if len(persistErrs) > 0 {
 		// Don't upload the JSON files or backup tarball if encoding to json fails.
 		backupJSON = nil
@@ -906,6 +912,7 @@ func persistBackup(backup *pkgbackup.Request,
 		csiSnapshotContentsJSON = nil
 		csiSnapshotClassesJSON = nil
 		backupResult = nil
+		volumeInfoJSON = nil
 	}
 
 	backupInfo := persistence.BackupInfo{
@@ -921,6 +928,7 @@ func persistBackup(backup *pkgbackup.Request,
 		CSIVolumeSnapshots:        csiSnapshotJSON,
 		CSIVolumeSnapshotContents: csiSnapshotContentsJSON,
 		CSIVolumeSnapshotClasses:  csiSnapshotClassesJSON,
+		BackupVolumeInfo:          volumeInfoJSON,
 	}
 	if err := backupStore.PutBackup(backupInfo); err != nil {
 		persistErrs = append(persistErrs, err)

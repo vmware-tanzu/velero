@@ -50,7 +50,8 @@ type BackupInfo struct {
 	BackupResourceList,
 	CSIVolumeSnapshots,
 	CSIVolumeSnapshotContents,
-	CSIVolumeSnapshotClasses io.Reader
+	CSIVolumeSnapshotClasses,
+	BackupVolumeInfo io.Reader
 }
 
 // BackupStore defines operations for creating, retrieving, and deleting
@@ -270,6 +271,7 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 		s.layout.getCSIVolumeSnapshotContentsKey(info.Name): info.CSIVolumeSnapshotContents,
 		s.layout.getCSIVolumeSnapshotClassesKey(info.Name):  info.CSIVolumeSnapshotClasses,
 		s.layout.getBackupResultsKey(info.Name):             info.BackupResults,
+		s.layout.getBackupVolumeInfoKey(info.Name):          info.BackupVolumeInfo,
 	}
 
 	for key, reader := range backupObjs {
@@ -489,6 +491,25 @@ func (s *objectBackupStore) GetPodVolumeBackups(name string) ([]*velerov1api.Pod
 	}
 
 	return podVolumeBackups, nil
+}
+
+func (s *objectBackupStore) GetBackupVolumeInfos(name string) (*volume.VolumeInfos, error) {
+	var volumeInfos *volume.VolumeInfos
+
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getBackupVolumeInfoKey(name))
+	if err != nil {
+		return volumeInfos, err
+	}
+	if res == nil {
+		return volumeInfos, nil
+	}
+	defer res.Close()
+
+	if err := decode(res, &volumeInfos); err != nil {
+		return volumeInfos, err
+	}
+
+	return volumeInfos, nil
 }
 
 func (s *objectBackupStore) GetBackupContents(name string) (io.ReadCloser, error) {
