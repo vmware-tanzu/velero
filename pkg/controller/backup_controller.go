@@ -792,7 +792,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 		}
 	}
 
-	b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Backup completed")
+	b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Infof("Initial backup processing complete, moving to %s", backup.Status.Phase)
 
 	// if we return a non-nil error, the calling function will update
 	// the backup's phase to Failed.
