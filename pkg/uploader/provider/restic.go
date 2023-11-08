@@ -30,6 +30,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/util/exec"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
@@ -161,6 +162,7 @@ func (rp *resticProvider) RunBackup(
 			log.Debugf("Restic backup got empty dir with %s path", path)
 			return "", true, nil
 		}
+		exec.LogErrorAsExitCode(err, log)
 		return "", false, errors.WithStack(fmt.Errorf("error running restic backup command %s with error: %v stderr: %v", backupCmd.String(), err, stderrBuf))
 	}
 	// GetSnapshotID
