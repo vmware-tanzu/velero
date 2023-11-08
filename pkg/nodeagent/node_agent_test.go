@@ -242,16 +242,16 @@ func TestGetPodSpec(t *testing.T) {
 
 func TestGetConfigs(t *testing.T) {
 	cm := builder.ForConfigMap("fake-ns", "node-agent-configs").Result()
-	cmWithInvalidData := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("fake-key", "fake-value").Result()
-	cmWithInvalidDataFormat := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("data-path-concurrency", "wrong").Result()
-	cmWithValidData := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("data-path-concurrency", "{\"globalConfig\": 5}").Result()
+	cmWithInvalidDataFormat := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("fake-key", "wrong").Result()
+	cmWithoutCocurrentData := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("fake-key", "{\"someothers\":{\"someother\": 10}}").Result()
+	cmWithValidData := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("fake-key", "{\"dataPathConcurrency\":{\"globalConfig\": 5}}").Result()
 
 	tests := []struct {
 		name          string
 		kubeClientObj []runtime.Object
 		namespace     string
 		kubeReactors  []reactor
-		expectResult  *DataPathConcurrency
+		expectResult  *Configs
 		expectErr     string
 	}{
 		{
@@ -281,19 +281,20 @@ func TestGetConfigs(t *testing.T) {
 			expectErr: "data is not available in config map node-agent-configs",
 		},
 		{
-			name:      "cm's data is not found",
-			namespace: "fake-ns",
-			kubeClientObj: []runtime.Object{
-				cmWithInvalidData,
-			},
-		},
-		{
 			name:      "cm's data is with invalid format",
 			namespace: "fake-ns",
 			kubeClientObj: []runtime.Object{
 				cmWithInvalidDataFormat,
 			},
-			expectErr: "error to unmarshall data path concurrency configs from node-agent-configs: invalid character 'w' looking for beginning of value",
+			expectErr: "error to unmarshall configs from node-agent-configs: invalid character 'w' looking for beginning of value",
+		},
+		{
+			name:      "concurrency configs are not found",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				cmWithoutCocurrentData,
+			},
+			expectResult: &Configs{nil},
 		},
 		{
 			name:      "success",
@@ -301,8 +302,10 @@ func TestGetConfigs(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				cmWithValidData,
 			},
-			expectResult: &DataPathConcurrency{
-				GlobalConfig: 5,
+			expectResult: &Configs{
+				DataPathConcurrency: &DataPathConcurrency{
+					GlobalConfig: 5,
+				},
 			},
 		},
 	}
@@ -321,8 +324,10 @@ func TestGetConfigs(t *testing.T) {
 
 				if test.expectResult == nil {
 					assert.Nil(t, result)
+				} else if test.expectResult.DataPathConcurrency == nil {
+					assert.Nil(t, result.DataPathConcurrency)
 				} else {
-					assert.Equal(t, *test.expectResult, *result.DataPathConcurrency)
+					assert.Equal(t, *test.expectResult.DataPathConcurrency, *result.DataPathConcurrency)
 				}
 			} else {
 				assert.EqualError(t, err, test.expectErr)

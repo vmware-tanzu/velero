@@ -161,7 +161,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
 				return nil, nil
 			},
-			expectLog: fmt.Sprintf("Node agent configs are not found, use the default number %v", defaultNum),
+			expectLog: fmt.Sprintf("Concurrency configs are not found, use the default number %v", defaultNum),
 			expectNum: defaultNum,
 		},
 		{
@@ -169,7 +169,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
 				return &nodeagent.Configs{}, nil
 			},
-			expectLog: fmt.Sprintf("Node agent configs are not found, use the default number %v", defaultNum),
+			expectLog: fmt.Sprintf("Concurrency configs are not found, use the default number %v", defaultNum),
 			expectNum: defaultNum,
 		},
 		{

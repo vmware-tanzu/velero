@@ -499,7 +499,7 @@ func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
 	}
 
 	if configs == nil || configs.DataPathConcurrency == nil {
-		s.logger.Infof("Node agent configs are not found, use the default number %v", defaultNum)
+		s.logger.Infof("Concurrency configs are not found, use the default number %v", defaultNum)
 		return defaultNum
 	}
 

@@ -61,7 +61,7 @@ type RuledConfigs struct {
 
 type Configs struct {
 	// DataPathConcurrency is the config for data path concurrency per node.
-	DataPathConcurrency *DataPathConcurrency
+	DataPathConcurrency *DataPathConcurrency `json:"dataPathConcurrency,omitempty"`
 }
 
 // IsRunning checks if the node agent daemonset is running properly. If not, return the error found
@@ -128,16 +128,16 @@ func GetConfigs(ctx context.Context, namespace string, kubeClient kubernetes.Int
 		return nil, errors.Errorf("data is not available in config map %s", configName)
 	}
 
-	jsonString, exist := cm.Data[dataPathConConfigName]
-	if !exist {
-		return nil, nil
+	jsonString := ""
+	for _, v := range cm.Data {
+		jsonString = v
 	}
 
-	concurrencyConfigs := &DataPathConcurrency{}
-	err = json.Unmarshal([]byte(jsonString), concurrencyConfigs)
+	configs := &Configs{}
+	err = json.Unmarshal([]byte(jsonString), configs)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error to unmarshall data path concurrency configs from %s", configName)
+		return nil, errors.Wrapf(err, "error to unmarshall configs from %s", configName)
 	}
 
-	return &Configs{DataPathConcurrency: concurrencyConfigs}, nil
+	return configs, nil
 }
