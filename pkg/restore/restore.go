@@ -114,6 +114,7 @@ type kubernetesRestorer struct {
 	podGetter                  cache.Getter
 	credentialFileStore        credentials.FileStore
 	kbClient                   crclient.Client
+	featureVerifier            *features.Verifier
 }
 
 // NewKubernetesRestorer creates a new kubernetesRestorer.
@@ -131,6 +132,7 @@ func NewKubernetesRestorer(
 	podGetter cache.Getter,
 	credentialStore credentials.FileStore,
 	kbClient crclient.Client,
+	featureVerifier *features.Verifier,
 ) (Restorer, error) {
 	return &kubernetesRestorer{
 		discoveryHelper:            discoveryHelper,
@@ -155,6 +157,7 @@ func NewKubernetesRestorer(
 		podGetter:           podGetter,
 		credentialFileStore: credentialStore,
 		kbClient:            kbClient,
+		featureVerifier:     featureVerifier,
 	}, nil
 }
 
@@ -319,6 +322,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		itemOperationsList:             req.GetItemOperationsList(),
 		resourceModifiers:              req.ResourceModifiers,
 		disableInformerCache:           req.DisableInformerCache,
+		featureVerifier:                kr.featureVerifier,
 	}
 
 	return restoreCtx.execute()
@@ -369,6 +373,7 @@ type restoreContext struct {
 	itemOperationsList             *[]*itemoperation.RestoreOperation
 	resourceModifiers              *resourcemodifiers.ResourceModifiers
 	disableInformerCache           bool
+	featureVerifier                *features.Verifier
 }
 
 type resourceClientKey struct {
@@ -1295,6 +1300,14 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			// want to dynamically re-provision it.
 			return warnings, errs, itemExists
 
+		case hasCSIVolumeSnapshot(ctx, obj):
+		case hasSnapshotDataUpload(ctx, obj):
+			if ready, err := ctx.featureVerifier.Verify(velerov1api.CSIFeatureFlag); !ready {
+				ctx.log.Errorf("Failed to verify CSI modules, ready %v, err %v", ready, err)
+				errs.Add(namespace, fmt.Errorf("CSI modules are not ready for restore. Check CSI feature is enabled and CSI plugin is installed"))
+				return warnings, errs, itemExists
+			}
+
 		case hasDeleteReclaimPolicy(obj.Object):
 			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
 			ctx.pvsToProvision.Insert(name)
@@ -1936,6 +1949,43 @@ func hasSnapshot(pvName string, snapshots []*volume.Snapshot) bool {
 	}
 
 	return false
+}
+
+func hasCSIVolumeSnapshot(ctx *restoreContext, unstructuredPV *unstructured.Unstructured) bool {
+	return false
+}
+
+func hasSnapshotDataUpload(ctx *restoreContext, unstructuredPV *unstructured.Unstructured) bool {
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.Object, pv); err != nil {
+		ctx.log.WithError(err).Warnf("Unable to convert PV from unstructured to structured")
+		return false
+	}
+
+	if pv.Spec.ClaimRef == nil {
+		return false
+	}
+
+	dataUploadResultList := new(v1.ConfigMapList)
+	err := ctx.kbClient.List(go_context.TODO(), dataUploadResultList, &crclient.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			velerov1api.RestoreUIDLabel:       label.GetValidName(string(ctx.restore.GetUID())),
+			velerov1api.PVCNamespaceNameLabel: label.GetValidName(pv.Spec.ClaimRef.Namespace + "." + pv.Spec.ClaimRef.Name),
+			velerov1api.ResourceUsageLabel:    label.GetValidName(string(velerov1api.VeleroResourceUsageDataUploadResult)),
+		}),
+	})
+	if err != nil {
+		ctx.log.WithError(err).Warnf("Fail to list DataUpload result CM.")
+		return false
+	}
+
+	if len(dataUploadResultList.Items) != 1 {
+		ctx.log.WithError(fmt.Errorf("dataupload result number is not expected")).
+			Warnf("Got %d DataUpload result. Expect one.", len(dataUploadResultList.Items))
+		return false
+	}
+
+	return true
 }
 
 func hasPodVolumeBackup(unstructuredPV *unstructured.Unstructured, ctx *restoreContext) bool {

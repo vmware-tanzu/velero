@@ -72,7 +72,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/repository"
@@ -268,6 +267,7 @@ type server struct {
 	mgr                   manager.Manager
 	credentialFileStore   credentials.FileStore
 	credentialSecretStore credentials.SecretStore
+	featureVerifier       *features.Verifier
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
@@ -309,11 +309,10 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
-	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		_, err = pluginRegistry.Get(common.PluginKindBackupItemActionV2, "velero.io/csi-pvc-backupper")
-		if err == nil {
-			logger.Warn("CSI plugins are registered, but the EnableCSI feature is not enabled.")
-		}
+	featureVerifier := features.NewVerifier(pluginRegistry)
+
+	if _, err := featureVerifier.Verify(velerov1api.CSIFeatureFlag); err != nil {
+		logger.WithError(err).Warn("CSI feature verification failed, the feature may not be ready.")
 	}
 
 	// cancelFunc is not deferred here because if it was, then ctx would immediately
@@ -397,6 +396,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		mgr:                   mgr,
 		credentialFileStore:   credentialFileStore,
 		credentialSecretStore: credentialSecretStore,
+		featureVerifier:       featureVerifier,
 	}
 
 	// Setup CSI snapshot client and lister
@@ -942,6 +942,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.kubeClient.CoreV1().RESTClient(),
 			s.credentialFileStore,
 			s.mgr.GetClient(),
+			s.featureVerifier,
 		)
 
 		cmd.CheckError(err)
