@@ -40,7 +40,7 @@ type singleLogRecorder struct {
 }
 
 func (s *singleLogRecorder) Write(p []byte) (n int, err error) {
-	*s.buffer = string(p[:])
+	*s.buffer = *s.buffer + string(p[:])
 	return len(p), nil
 }
 

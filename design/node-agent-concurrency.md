@@ -28,10 +28,15 @@ Therefore, in order to gain the optimized performance with the limited resources
 
 We introduce a configMap named ```node-agent-configs``` for users to specify the node-agent related configurations. This configMap is not created by Velero, users should create it manually on demand. The configMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one configMap in each namespace which applies to node-agent in that namespace only.  
 Node-agent server checks these configurations at startup time and use it to initiate the related VGDP modules. Therefore, users could edit this configMap any time, but in order to make the changes effective, node-agent server needs to be restarted.  
-The ```node-agent-configs``` configMap may be used for other purpose of configuring node-agent in future, at present, there is only one kind of configuration as the data in the configMap, the name is ```data-path-concurrency```.  
+The ```node-agent-configs``` configMap may be used for other purpose of configuring node-agent in future, at present, there is only one kind of configuration as the data in the configMap, the name is ```dataPathConcurrency```.  
 
-The data structure for ```data-path-concurrency``` is as below:
+The data structure for ```node-agent-configs``` is as below:
 ```go
+type Configs struct {
+	// DataPathConcurrency is the config for data path concurrency per node.
+	DataPathConcurrency *DataPathConcurrency `json:"dataPathConcurrency,omitempty"`
+}
+
 type DataPathConcurrency struct {
     // GlobalConfig specifies the concurrency number to all nodes for which per-node config is not specified
     GlobalConfig int `json:"globalConfig,omitempty"`
@@ -50,7 +55,7 @@ type RuledConfigs struct {
 ```
 
 ### Global concurrent number
-We allow users to specify a concurrent number that will be applied to all nodes if the per-node number is not specified. This number is set through ```globalConfig``` field in ```data-path-concurrency```.  
+We allow users to specify a concurrent number that will be applied to all nodes if the per-node number is not specified. This number is set through ```globalConfig``` field in ```dataPathConcurrency```.  
 The number starts from 1 which means there is no concurrency, only one instance of VGDP is allowed. There is no roof limit.    
 If this number is not specified or not valid, a hard-coded default value will be used, the value is set to 1. 
 
@@ -62,7 +67,7 @@ We allow users to specify different concurrent number per node, for example, use
 The range of Per-node concurrent number is the same with Global concurrent number.  
 Per-node concurrent number is preferable to Global concurrent number, so it will overwrite the Global concurrent number for that node.  
 
-Per-node concurrent number is implemented through ```perNodeConfig``` field in ```data-path-concurrency```.  
+Per-node concurrent number is implemented through ```perNodeConfig``` field in ```dataPathConcurrency```.  
 
 ```perNodeConfig``` is a list of ```RuledConfigs``` each item of which matches one or more nodes by label selectors and specify the concurrent number for the matched nodes. This means, the nodes are identified by labels.  
 
@@ -80,30 +85,32 @@ If one node falls into more than one rules, e.g., if node1 also has the label ``
 A sample of the ```node-agent-configs``` configMap is as below:
 ```json
 {
-    "globalConfig": 2,
-    "perNodeConfig": [
-        {
-            "nodeSelector": {
-                "matchLabels": {
-                    "kubernetes.io/hostname": "node1"
-                }
+    "dataPathConcurrency": {
+        "globalConfig": 2,
+        "perNodeConfig": [
+            {
+                "nodeSelector": {
+                    "matchLabels": {
+                        "kubernetes.io/hostname": "node1"
+                    }
+                },
+                "number": 3
             },
-            "number": 3
-        },    
-        {
-            "nodeSelector": {
-                "matchLabels": {
-                    "beta.kubernetes.io/instance-type": "Standard_B4ms"
-                }
-            },
-            "number": 5
-        }
-    ]
+            {
+                "nodeSelector": {
+                    "matchLabels": {
+                        "beta.kubernetes.io/instance-type": "Standard_B4ms"
+                    }
+                },
+                "number": 5
+            }
+        ]
+    }
 }
 ```
 To create the configMap, users need to save something like the above sample to a json file and then run below command:
 ```
-kubectl create cm node-agent-configs -n velero --from-file=data-path-concurrency=<json file name>
+kubectl create cm node-agent-configs -n velero --from-file=<json file name>
 ```
 
 ### Global data path manager

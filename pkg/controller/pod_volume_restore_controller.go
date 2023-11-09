@@ -50,7 +50,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
-func NewPodVolumeRestoreReconciler(client client.Client, ensurer *repository.Ensurer,
+func NewPodVolumeRestoreReconciler(client client.Client, dataPathMgr *datapath.Manager, ensurer *repository.Ensurer,
 	credentialGetter *credentials.CredentialGetter, logger logrus.FieldLogger) *PodVolumeRestoreReconciler {
 	return &PodVolumeRestoreReconciler{
 		Client:            client,
@@ -59,7 +59,7 @@ func NewPodVolumeRestoreReconciler(client client.Client, ensurer *repository.Ens
 		credentialGetter:  credentialGetter,
 		fileSystem:        filesystem.NewFileSystem(),
 		clock:             &clocks.RealClock{},
-		dataPathMgr:       datapath.NewManager(1),
+		dataPathMgr:       dataPathMgr,
 	}
 }
 

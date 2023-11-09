@@ -19,6 +19,7 @@ package nodeagent
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -32,6 +33,7 @@ import (
 	storagev1api "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -53,7 +55,9 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
 	"github.com/vmware-tanzu/velero/pkg/controller"
+	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -73,6 +77,7 @@ const (
 
 	defaultResourceTimeout         = 10 * time.Minute
 	defaultDataMoverPrepareTimeout = 30 * time.Minute
+	defaultDataPathConcurrentNum   = 1
 )
 
 type nodeAgentServerConfig struct {
@@ -132,6 +137,7 @@ type nodeAgentServer struct {
 	config            nodeAgentServerConfig
 	kubeClient        kubernetes.Interface
 	csiSnapshotClient *snapshotv1client.Clientset
+	dataPathMgr       *datapath.Manager
 }
 
 func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, config nodeAgentServerConfig) (*nodeAgentServer, error) {
@@ -219,6 +225,10 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 	if err != nil {
 		return nil, err
 	}
+
+	dataPathConcurrentNum := s.getDataPathConcurrentNum(defaultDataPathConcurrentNum)
+	s.dataPathMgr = datapath.NewManager(dataPathConcurrentNum)
+
 	return s, nil
 }
 
@@ -263,24 +273,24 @@ func (s *nodeAgentServer) run() {
 
 	credentialGetter := &credentials.CredentialGetter{FromFile: credentialFileStore, FromSecret: credSecretStore}
 	repoEnsurer := repository.NewEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
-	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), repoEnsurer,
+	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.dataPathMgr, repoEnsurer,
 		credentialGetter, s.nodeName, s.mgr.GetScheme(), s.metrics, s.logger)
 
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", controller.PodVolumeBackup)
 	}
 
-	if err = controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), repoEnsurer, credentialGetter, s.logger).SetupWithManager(s.mgr); err != nil {
+	if err = controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.dataPathMgr, repoEnsurer, credentialGetter, s.logger).SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
 
-	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.kubeClient, s.csiSnapshotClient.SnapshotV1(), repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	s.markDataUploadsCancel(dataUploadReconciler)
 	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.kubeClient, repoEnsurer, credentialGetter, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.kubeClient, s.dataPathMgr, repoEnsurer, credentialGetter, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	s.markDataDownloadsCancel(dataDownloadReconciler)
 	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
@@ -477,4 +487,66 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 		}
 		s.logger.WithField("podvolumerestore", pvr.GetName()).Warn(pvr.Status.Message)
 	}
+}
+
+var getConfigsFunc = nodeagent.GetConfigs
+
+func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
+	configs, err := getConfigsFunc(s.ctx, s.namespace, s.kubeClient)
+	if err != nil {
+		s.logger.WithError(err).Warn("Failed to get node agent configs")
+		return defaultNum
+	}
+
+	if configs == nil || configs.DataPathConcurrency == nil {
+		s.logger.Infof("Concurrency configs are not found, use the default number %v", defaultNum)
+		return defaultNum
+	}
+
+	globalNum := configs.DataPathConcurrency.GlobalConfig
+
+	if globalNum <= 0 {
+		s.logger.Warnf("Global number %v is invalid, use the default value %v", globalNum, defaultNum)
+		globalNum = defaultNum
+	}
+
+	if len(configs.DataPathConcurrency.PerNodeConfig) == 0 {
+		return globalNum
+	}
+
+	curNode, err := s.kubeClient.CoreV1().Nodes().Get(s.ctx, s.nodeName, metav1.GetOptions{})
+	if err != nil {
+		s.logger.WithError(err).Warnf("Failed to get node info for %s, use the global number %v", s.nodeName, globalNum)
+		return globalNum
+	}
+
+	concurrentNum := math.MaxInt32
+
+	for _, rule := range configs.DataPathConcurrency.PerNodeConfig {
+		selector, err := metav1.LabelSelectorAsSelector(&rule.NodeSelector)
+		if err != nil {
+			s.logger.WithError(err).Warnf("Failed to parse rule with label selector %s, skip it", rule.NodeSelector.String())
+			continue
+		}
+
+		if rule.Number <= 0 {
+			s.logger.Warnf("Rule with label selector %s is with an invalid number %v, skip it", rule.NodeSelector.String(), rule.Number)
+			continue
+		}
+
+		if selector.Matches(labels.Set(curNode.GetLabels())) {
+			if concurrentNum > rule.Number {
+				concurrentNum = rule.Number
+			}
+		}
+	}
+
+	if concurrentNum == math.MaxInt32 {
+		s.logger.Infof("Per node number for node %s is not found, use the global number %v", s.nodeName, globalNum)
+		concurrentNum = globalNum
+	} else {
+		s.logger.Infof("Use the per node number %v over global number %v for node %s", concurrentNum, globalNum, s.nodeName)
+	}
+
+	return concurrentNum
 }
