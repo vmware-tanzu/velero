@@ -41,6 +41,11 @@ spec:
     # CSI VolumeSnapshot status turns to ReadyToUse during creation, before
     # returning error as timeout. The default value is 10 minute.
     csiSnapshotTimeout: 10m
+    # resourcePolicy specifies the referenced resource policies that backup should follow
+    # optional
+    resourcePolicy:
+      kind: configmap
+      name: resource-policy-configmap
     # Array of namespaces to include in the scheduled backup. If unspecified, all namespaces are included.
     # Optional.
     includedNamespaces:
