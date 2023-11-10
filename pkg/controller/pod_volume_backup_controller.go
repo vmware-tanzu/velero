@@ -47,7 +47,7 @@ import (
 const pVBRRequestor string = "pod-volume-backup-restore"
 
 // NewPodVolumeBackupReconciler creates the PodVolumeBackupReconciler instance
-func NewPodVolumeBackupReconciler(client client.Client, ensurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter,
+func NewPodVolumeBackupReconciler(client client.Client, dataPathMgr *datapath.Manager, ensurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter,
 	nodeName string, scheme *runtime.Scheme, metrics *metrics.ServerMetrics, logger logrus.FieldLogger) *PodVolumeBackupReconciler {
 	return &PodVolumeBackupReconciler{
 		Client:            client,
@@ -59,7 +59,7 @@ func NewPodVolumeBackupReconciler(client client.Client, ensurer *repository.Ensu
 		clock:             &clocks.RealClock{},
 		scheme:            scheme,
 		metrics:           metrics,
-		dataPathMgr:       datapath.NewManager(1),
+		dataPathMgr:       dataPathMgr,
 	}
 }
 

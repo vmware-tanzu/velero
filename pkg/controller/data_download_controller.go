@@ -69,7 +69,7 @@ type DataDownloadReconciler struct {
 	metrics           *metrics.ServerMetrics
 }
 
-func NewDataDownloadReconciler(client client.Client, kubeClient kubernetes.Interface,
+func NewDataDownloadReconciler(client client.Client, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
 	repoEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter, nodeName string, preparingTimeout time.Duration, logger logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:            client,
@@ -81,7 +81,7 @@ func NewDataDownloadReconciler(client client.Client, kubeClient kubernetes.Inter
 		nodeName:          nodeName,
 		repositoryEnsurer: repoEnsurer,
 		restoreExposer:    exposer.NewGenericRestoreExposer(kubeClient, logger),
-		dataPathMgr:       datapath.NewManager(1),
+		dataPathMgr:       dataPathMgr,
 		preparingTimeout:  preparingTimeout,
 		metrics:           metrics,
 	}

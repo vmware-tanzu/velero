@@ -41,6 +41,11 @@ func ForNode(name string) *NodeBuilder {
 	}
 }
 
+func (b *NodeBuilder) Labels(labels map[string]string) *NodeBuilder {
+	b.object.Labels = labels
+	return b
+}
+
 // Result returns the built Node.
 func (b *NodeBuilder) Result() *corev1api.Node {
 	return b.object

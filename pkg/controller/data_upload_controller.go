@@ -79,8 +79,8 @@ type DataUploadReconciler struct {
 	metrics             *metrics.ServerMetrics
 }
 
-func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interface,
-	csiSnapshotClient snapshotter.SnapshotV1Interface, repoEnsurer *repository.Ensurer, clock clocks.WithTickerAndDelayedExecution,
+func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interface, csiSnapshotClient snapshotter.SnapshotV1Interface,
+	dataPathMgr *datapath.Manager, repoEnsurer *repository.Ensurer, clock clocks.WithTickerAndDelayedExecution,
 	cred *credentials.CredentialGetter, nodeName string, fs filesystem.Interface, preparingTimeout time.Duration, log logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:              client,
@@ -93,7 +93,7 @@ func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interfa
 		logger:              log,
 		repoEnsurer:         repoEnsurer,
 		snapshotExposerList: map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(kubeClient, csiSnapshotClient, log)},
-		dataPathMgr:         datapath.NewManager(1),
+		dataPathMgr:         dataPathMgr,
 		preparingTimeout:    preparingTimeout,
 		metrics:             metrics,
 	}

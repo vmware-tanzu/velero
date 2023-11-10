@@ -101,3 +101,8 @@ func (b *PodBuilder) ContainerStatuses(containerStatuses ...*corev1api.Container
 	}
 	return b
 }
+
+func (b *PodBuilder) Phase(phase corev1api.PodPhase) *PodBuilder {
+	b.object.Status.Phase = phase
+	return b
+}
