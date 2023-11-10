@@ -27,17 +27,21 @@ type PluginFinder interface {
 	Find(kind common.PluginKind, name string) bool
 }
 
-type Verifier struct {
+type Verifier interface {
+	Verify(name string) (bool, error)
+}
+
+type verifier struct {
 	finder PluginFinder
 }
 
-func NewVerifier(finder PluginFinder) *Verifier {
-	return &Verifier{
+func NewVerifier(finder PluginFinder) Verifier {
+	return &verifier{
 		finder: finder,
 	}
 }
 
-func (v *Verifier) Verify(name string) (bool, error) {
+func (v *verifier) Verify(name string) (bool, error) {
 	enabled := IsEnabled(name)
 
 	switch name {

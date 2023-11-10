@@ -115,7 +115,7 @@ type kubernetesRestorer struct {
 	podGetter                  cache.Getter
 	credentialFileStore        credentials.FileStore
 	kbClient                   crclient.Client
-	featureVerifier            *features.Verifier
+	featureVerifier            features.Verifier
 }
 
 // NewKubernetesRestorer creates a new kubernetesRestorer.
@@ -133,7 +133,7 @@ func NewKubernetesRestorer(
 	podGetter cache.Getter,
 	credentialStore credentials.FileStore,
 	kbClient crclient.Client,
-	featureVerifier *features.Verifier,
+	featureVerifier features.Verifier,
 ) (Restorer, error) {
 	return &kubernetesRestorer{
 		discoveryHelper:            discoveryHelper,
@@ -376,7 +376,7 @@ type restoreContext struct {
 	itemOperationsList             *[]*itemoperation.RestoreOperation
 	resourceModifiers              *resourcemodifiers.ResourceModifiers
 	disableInformerCache           bool
-	featureVerifier                *features.Verifier
+	featureVerifier                features.Verifier
 }
 
 type resourceClientKey struct {

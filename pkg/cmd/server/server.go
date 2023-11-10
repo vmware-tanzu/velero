@@ -267,7 +267,7 @@ type server struct {
 	mgr                   manager.Manager
 	credentialFileStore   credentials.FileStore
 	credentialSecretStore credentials.SecretStore
-	featureVerifier       *features.Verifier
+	featureVerifier       features.Verifier
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
