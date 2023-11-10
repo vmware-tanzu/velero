@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -299,6 +300,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		pvsToProvision:                 sets.NewString(),
 		pvRestorer:                     pvRestorer,
 		volumeSnapshots:                req.VolumeSnapshots,
+		csiVolumeSnapshots:             req.CSIVolumeSnapshots,
 		podVolumeBackups:               req.PodVolumeBackups,
 		resourceTerminatingTimeout:     kr.resourceTerminatingTimeout,
 		resourceTimeout:                kr.resourceTimeout,
@@ -348,6 +350,7 @@ type restoreContext struct {
 	pvsToProvision                 sets.String
 	pvRestorer                     PVRestorer
 	volumeSnapshots                []*volume.Snapshot
+	csiVolumeSnapshots             []*snapshotv1api.VolumeSnapshot
 	podVolumeBackups               []*velerov1api.PodVolumeBackup
 	resourceTerminatingTimeout     time.Duration
 	resourceTimeout                time.Duration
@@ -1288,7 +1291,35 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			}
 
 		case hasPodVolumeBackup(obj, ctx):
-			ctx.log.Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
+			ctx.log.WithFields(logrus.Fields{
+				"namespace":     obj.GetNamespace(),
+				"name":          obj.GetName(),
+				"groupResource": groupResource.String(),
+			}).Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
+			ctx.pvsToProvision.Insert(name)
+
+			// Return early because we don't want to restore the PV itself, we
+			// want to dynamically re-provision it.
+			return warnings, errs, itemExists
+
+		case hasCSIVolumeSnapshot(ctx, obj):
+			ctx.log.WithFields(logrus.Fields{
+				"namespace":     obj.GetNamespace(),
+				"name":          obj.GetName(),
+				"groupResource": groupResource.String(),
+			}).Infof("Dynamically re-provisioning persistent volume because it has a related CSI VolumeSnapshot.")
+			ctx.pvsToProvision.Insert(name)
+
+			// Return early because we don't want to restore the PV itself, we
+			// want to dynamically re-provision it.
+			return warnings, errs, itemExists
+
+		case hasSnapshotDataUpload(ctx, obj):
+			ctx.log.WithFields(logrus.Fields{
+				"namespace":     obj.GetNamespace(),
+				"name":          obj.GetName(),
+				"groupResource": groupResource.String(),
+			}).Infof("Dynamically re-provisioning persistent volume because it has a related snapshot DataUpload.")
 			ctx.pvsToProvision.Insert(name)
 
 			// Return early because we don't want to restore the PV itself, we
@@ -1296,7 +1327,11 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs, itemExists
 
 		case hasDeleteReclaimPolicy(obj.Object):
-			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
+			ctx.log.WithFields(logrus.Fields{
+				"namespace":     obj.GetNamespace(),
+				"name":          obj.GetName(),
+				"groupResource": groupResource.String(),
+			}).Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
 			ctx.pvsToProvision.Insert(name)
 
 			// Return early because we don't want to restore the PV itself, we
@@ -1304,7 +1339,11 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs, itemExists
 
 		default:
-			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
+			ctx.log.WithFields(logrus.Fields{
+				"namespace":     obj.GetNamespace(),
+				"name":          obj.GetName(),
+				"groupResource": groupResource.String(),
+			}).Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
 
 			// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
 			_, err = remapClaimRefNS(ctx, obj)
@@ -1936,6 +1975,55 @@ func hasSnapshot(pvName string, snapshots []*volume.Snapshot) bool {
 	}
 
 	return false
+}
+
+func hasCSIVolumeSnapshot(ctx *restoreContext, unstructuredPV *unstructured.Unstructured) bool {
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.Object, pv); err != nil {
+		ctx.log.WithError(err).Warnf("Unable to convert PV from unstructured to structured")
+		return false
+	}
+
+	for _, vs := range ctx.csiVolumeSnapshots {
+		if pv.Spec.ClaimRef.Name == *vs.Spec.Source.PersistentVolumeClaimName &&
+			pv.Spec.ClaimRef.Namespace == vs.Namespace {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSnapshotDataUpload(ctx *restoreContext, unstructuredPV *unstructured.Unstructured) bool {
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.Object, pv); err != nil {
+		ctx.log.WithError(err).Warnf("Unable to convert PV from unstructured to structured")
+		return false
+	}
+
+	if pv.Spec.ClaimRef == nil {
+		return false
+	}
+
+	dataUploadResultList := new(v1.ConfigMapList)
+	err := ctx.kbClient.List(go_context.TODO(), dataUploadResultList, &crclient.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			velerov1api.RestoreUIDLabel:       label.GetValidName(string(ctx.restore.GetUID())),
+			velerov1api.PVCNamespaceNameLabel: label.GetValidName(pv.Spec.ClaimRef.Namespace + "." + pv.Spec.ClaimRef.Name),
+			velerov1api.ResourceUsageLabel:    label.GetValidName(string(velerov1api.VeleroResourceUsageDataUploadResult)),
+		}),
+	})
+	if err != nil {
+		ctx.log.WithError(err).Warnf("Fail to list DataUpload result CM.")
+		return false
+	}
+
+	if len(dataUploadResultList.Items) != 1 {
+		ctx.log.WithError(fmt.Errorf("dataupload result number is not expected")).
+			Warnf("Got %d DataUpload result. Expect one.", len(dataUploadResultList.Items))
+		return false
+	}
+
+	return true
 }
 
 func hasPodVolumeBackup(unstructuredPV *unstructured.Unstructured, ctx *restoreContext) bool {
