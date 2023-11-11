@@ -10,6 +10,14 @@ type SkippedPV struct {
 	Reasons []PVSkipReason `json:"reasons"`
 }
 
+func (s *SkippedPV) SerializeSkipReasons() string {
+	ret := ""
+	for _, reason := range s.Reasons {
+		ret = ret + reason.Approach + ": " + reason.Reason + ";"
+	}
+	return ret
+}
+
 type PVSkipReason struct {
 	Approach string `json:"approach"`
 	Reason   string `json:"reason"`
