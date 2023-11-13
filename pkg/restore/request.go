@@ -21,6 +21,7 @@ import (
 	"io"
 	"sort"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -60,6 +61,7 @@ type Request struct {
 	itemOperationsList   *[]*itemoperation.RestoreOperation
 	ResourceModifiers    *resourcemodifiers.ResourceModifiers
 	DisableInformerCache bool
+	CSIVolumeSnapshots   []*snapshotv1api.VolumeSnapshot
 }
 
 type restoredItemStatus struct {
