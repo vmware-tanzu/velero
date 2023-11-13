@@ -119,6 +119,8 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		return errors.Wrap(err, "error to retain volume snapshot content")
 	}
 
+	vsc = retained
+
 	curLog.WithField("vsc name", vsc.Name).WithField("retained", (retained != nil)).Info("Finished to retain VSC")
 
 	defer func() {
@@ -134,7 +136,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 
 	curLog.WithField("vs name", volumeSnapshot.Name).Infof("VS is deleted in namespace %s", volumeSnapshot.Namespace)
 
-	err = csi.EnsureDeleteVSC(ctx, e.csiSnapshotClient, vsc.Name, csiExposeParam.OperationTimeout)
+	err = csi.EnsureDeleteVSC(ctx, e.csiSnapshotClient, vsc, csiExposeParam.OperationTimeout)
 	if err != nil {
 		return errors.Wrap(err, "error to delete volume snapshot content")
 	}
