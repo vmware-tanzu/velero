@@ -104,7 +104,6 @@ func GetPvcByPVCName(ctx context.Context, namespace, pvcName string) ([]string, 
 		Args: []string{"{print $1}"},
 	}
 	cmds = append(cmds, cmd)
-
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
@@ -279,15 +278,30 @@ func CreateFileToPod(ctx context.Context, namespace, podName, containerName, vol
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	return cmd.Run()
 }
-func ReadFileFromPodVolume(ctx context.Context, namespace, podName, containerName, volume, filename string) (string, error) {
+func FileExistInPV(ctx context.Context, namespace, podName, containerName, volume, filename string) (bool, error) {
+	stdout, stderr, err := ReadFileFromPodVolume(ctx, namespace, podName, containerName, volume, filename)
+
+	output := fmt.Sprintf("%s:%s", stdout, stderr)
+	if strings.Contains(output, fmt.Sprintf("/%s/%s: No such file or directory", volume, filename)) {
+		return false, nil
+	} else {
+		if err == nil {
+			return true, nil
+		} else {
+			return false, errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s",
+				filename, volume, podName, namespace))
+		}
+	}
+}
+func ReadFileFromPodVolume(ctx context.Context, namespace, podName, containerName, volume, filename string) (string, string, error) {
 	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", "cat", fmt.Sprintf("/%s/%s", volume, filename)}
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	stdout, stderr, err := veleroexec.RunCommand(cmd)
-	fmt.Print(stdout)
-	fmt.Print(stderr)
-	return stdout, err
+	fmt.Printf("stdout: %s\n", stdout)
+	fmt.Printf("stderr: %s\n", stderr)
+	return stdout, stderr, err
 }
 
 func RunCommand(cmdName string, arg []string) string {

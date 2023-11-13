@@ -180,7 +180,7 @@ func fileContent(namespace, podName, volume string) string {
 }
 
 func fileExist(ctx context.Context, namespace, podName, volume string) error {
-	c, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME)
+	c, _, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s ",
 			FILE_NAME, volume, podName, namespace))
@@ -195,7 +195,7 @@ func fileExist(ctx context.Context, namespace, podName, volume string) error {
 	}
 }
 func fileNotExist(ctx context.Context, namespace, podName, volume string) error {
-	_, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME)
+	_, _, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME)
 	if err != nil {
 		return nil
 	} else {

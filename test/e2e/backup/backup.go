@@ -31,15 +31,33 @@ import (
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
+type BackupRestoreTestConfig struct {
+	useVolumeSnapshots  bool
+	kibishiiPatchSubDir string
+	isRetainPVTest      bool
+}
+
 func BackupRestoreWithSnapshots() {
-	BackupRestoreTest(true)
+	config := BackupRestoreTestConfig{true, "", false}
+	BackupRestoreTest(config)
 }
 
 func BackupRestoreWithRestic() {
-	BackupRestoreTest(false)
+	config := BackupRestoreTestConfig{false, "", false}
+	BackupRestoreTest(config)
 }
 
-func BackupRestoreTest(useVolumeSnapshots bool) {
+func BackupRestoreRetainedPVWithSnapshots() {
+	config := BackupRestoreTestConfig{true, "overlays/sc-reclaim-policy/", true}
+	BackupRestoreTest(config)
+}
+
+func BackupRestoreRetainedPVWithRestic() {
+	config := BackupRestoreTestConfig{false, "overlays/sc-reclaim-policy/", true}
+	BackupRestoreTest(config)
+}
+
+func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 
 	var (
 		backupName, restoreName, kibishiiNamespace string
@@ -48,25 +66,34 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 		veleroCfg                                  VeleroConfig
 	)
 	provideSnapshotVolumesParmInBackup = false
+	useVolumeSnapshots := backupRestoreTestConfig.useVolumeSnapshots
 
 	BeforeEach(func() {
 		veleroCfg = VeleroCfg
+
+		veleroCfg.KibishiiDirectory = veleroCfg.KibishiiDirectory + backupRestoreTestConfig.kibishiiPatchSubDir
 		veleroCfg.UseVolumeSnapshots = useVolumeSnapshots
 		veleroCfg.UseNodeAgent = !useVolumeSnapshots
 		if useVolumeSnapshots && veleroCfg.CloudProvider == "kind" {
 			Skip("Volume snapshots not supported on kind")
 		}
+
 		var err error
 		flag.Parse()
 		UUIDgen, err = uuid.NewRandom()
 		kibishiiNamespace = "k-" + UUIDgen.String()
 		Expect(err).To(Succeed())
+		DeleteStorageClass(context.Background(), *veleroCfg.ClientToInstallVelero, KibishiiStorageClassName)
 	})
 
 	AfterEach(func() {
 		if !veleroCfg.Debug {
 			By("Clean backups after test", func() {
 				DeleteAllBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
+				if backupRestoreTestConfig.isRetainPVTest {
+					CleanAllRetainedPV(context.Background(), *veleroCfg.ClientToInstallVelero)
+				}
+				DeleteStorageClass(context.Background(), *veleroCfg.ClientToInstallVelero, KibishiiStorageClassName)
 			})
 			if veleroCfg.InstallVelero {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
@@ -106,6 +133,9 @@ func BackupRestoreTest(useVolumeSnapshots bool) {
 		})
 
 		It("should successfully back up and restore to an additional BackupStorageLocation with unique credentials", func() {
+			if backupRestoreTestConfig.isRetainPVTest {
+				Skip("It's tested by 1st test case")
+			}
 			if veleroCfg.AdditionalBSLProvider == "" {
 				Skip("no additional BSL provider given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
