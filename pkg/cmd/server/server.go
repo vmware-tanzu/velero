@@ -1062,13 +1062,13 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 	}
 
 	for i, backup := range backups.Items {
-		if backup.Status.Phase != velerov1api.BackupPhaseInProgress && backup.Status.Phase != velerov1api.BackupPhaseWaitingForPluginOperations {
+		if backup.Status.Phase != velerov1api.BackupPhaseInProgress {
 			log.Debugf("the status of backup %q is %q, skip", backup.GetName(), backup.Status.Phase)
 			continue
 		}
 		updated := backup.DeepCopy()
 		updated.Status.Phase = velerov1api.BackupPhaseFailed
-		updated.Status.FailureReason = fmt.Sprintf("found a backup with status %q during the server starting, mark it as %q", velerov1api.BackupPhaseInProgress, updated.Status.Phase)
+		updated.Status.FailureReason = fmt.Sprintf("found a backup with status %q during the server starting, mark it as %q", backup.Status.Phase, updated.Status.Phase)
 		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&backups.Items[i])); err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch backup %q", backup.GetName())
@@ -1086,13 +1086,13 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 		return
 	}
 	for i, restore := range restores.Items {
-		if restore.Status.Phase != velerov1api.RestorePhaseInProgress && restore.Status.Phase != velerov1api.RestorePhaseWaitingForPluginOperations {
+		if restore.Status.Phase != velerov1api.RestorePhaseInProgress {
 			log.Debugf("the status of restore %q is %q, skip", restore.GetName(), restore.Status.Phase)
 			continue
 		}
 		updated := restore.DeepCopy()
 		updated.Status.Phase = velerov1api.RestorePhaseFailed
-		updated.Status.FailureReason = fmt.Sprintf("found a restore with status %q during the server starting, mark it as %q", velerov1api.RestorePhaseInProgress, updated.Status.Phase)
+		updated.Status.FailureReason = fmt.Sprintf("found a restore with status %q during the server starting, mark it as %q", restore.Status.Phase, updated.Status.Phase)
 		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&restores.Items[i])); err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch restore %q", restore.GetName())
@@ -1115,7 +1115,9 @@ func markDataUploadsCancel(ctx context.Context, client ctrlclient.Client, backup
 		du := dataUploads.Items[i]
 		if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted ||
 			du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared ||
-			du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
+			du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress ||
+			du.Status.Phase == velerov2alpha1api.DataUploadPhaseNew ||
+			du.Status.Phase == "" {
 			err := controller.UpdateDataUploadWithRetry(ctx, client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, log.WithField("dataupload", du.Name),
 				func(dataUpload *velerov2alpha1api.DataUpload) {
 					dataUpload.Spec.Cancel = true
@@ -1143,7 +1145,9 @@ func markDataDownloadsCancel(ctx context.Context, client ctrlclient.Client, rest
 		dd := dataDownloads.Items[i]
 		if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted ||
 			dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared ||
-			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
+			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress ||
+			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseNew ||
+			dd.Status.Phase == "" {
 			err := controller.UpdateDataDownloadWithRetry(ctx, client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, log.WithField("datadownload", dd.Name),
 				func(dataDownload *velerov2alpha1api.DataDownload) {
 					dataDownload.Spec.Cancel = true
