@@ -115,6 +115,7 @@ type kubernetesRestorer struct {
 	podGetter                  cache.Getter
 	credentialFileStore        credentials.FileStore
 	kbClient                   crclient.Client
+	featureVerifier            features.Verifier
 }
 
 // NewKubernetesRestorer creates a new kubernetesRestorer.
@@ -132,6 +133,7 @@ func NewKubernetesRestorer(
 	podGetter cache.Getter,
 	credentialStore credentials.FileStore,
 	kbClient crclient.Client,
+	featureVerifier features.Verifier,
 ) (Restorer, error) {
 	return &kubernetesRestorer{
 		discoveryHelper:            discoveryHelper,
@@ -156,6 +158,7 @@ func NewKubernetesRestorer(
 		podGetter:           podGetter,
 		credentialFileStore: credentialStore,
 		kbClient:            kbClient,
+		featureVerifier:     featureVerifier,
 	}, nil
 }
 
@@ -321,6 +324,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		itemOperationsList:             req.GetItemOperationsList(),
 		resourceModifiers:              req.ResourceModifiers,
 		disableInformerCache:           req.DisableInformerCache,
+		featureVerifier:                kr.featureVerifier,
 	}
 
 	return restoreCtx.execute()
@@ -372,6 +376,7 @@ type restoreContext struct {
 	itemOperationsList             *[]*itemoperation.RestoreOperation
 	resourceModifiers              *resourcemodifiers.ResourceModifiers
 	disableInformerCache           bool
+	featureVerifier                features.Verifier
 }
 
 type resourceClientKey struct {
@@ -1310,6 +1315,11 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			}).Infof("Dynamically re-provisioning persistent volume because it has a related CSI VolumeSnapshot.")
 			ctx.pvsToProvision.Insert(name)
 
+			if ready, err := ctx.featureVerifier.Verify(velerov1api.CSIFeatureFlag); !ready {
+				ctx.log.Errorf("Failed to verify CSI modules, ready %v, err %v", ready, err)
+				errs.Add(namespace, fmt.Errorf("CSI modules are not ready for restore. Check CSI feature is enabled and CSI plugin is installed"))
+			}
+
 			// Return early because we don't want to restore the PV itself, we
 			// want to dynamically re-provision it.
 			return warnings, errs, itemExists
@@ -1321,6 +1331,11 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				"groupResource": groupResource.String(),
 			}).Infof("Dynamically re-provisioning persistent volume because it has a related snapshot DataUpload.")
 			ctx.pvsToProvision.Insert(name)
+
+			if ready, err := ctx.featureVerifier.Verify(velerov1api.CSIFeatureFlag); !ready {
+				ctx.log.Errorf("Failed to verify CSI modules, ready %v, err %v", ready, err)
+				errs.Add(namespace, fmt.Errorf("CSI modules are not ready for restore. Check CSI feature is enabled and CSI plugin is installed"))
+			}
 
 			// Return early because we don't want to restore the PV itself, we
 			// want to dynamically re-provision it.
