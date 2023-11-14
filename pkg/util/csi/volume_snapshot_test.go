@@ -360,17 +360,41 @@ func TestEnsureDeleteVSC(t *testing.T) {
 		name      string
 		clientObj []runtime.Object
 		reactors  []reactor
-		vscName   string
+		vscObj    *snapshotv1api.VolumeSnapshotContent
 		err       string
 	}{
 		{
-			name:    "delete fail",
-			vscName: "fake-vsc",
-			err:     "error to delete volume snapshot content: volumesnapshotcontents.snapshot.storage.k8s.io \"fake-vsc\" not found",
+			name:   "remove finalizer fail",
+			vscObj: vscObj,
+			reactors: []reactor{
+				{
+					verb:     "patch",
+					resource: "volumesnapshotcontents",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-patch-error")
+					},
+				},
+			},
+			err: "error to remove protect finalizer from vsc fake-vsc: error patching VSC: fake-patch-error",
+		},
+		{
+			name:      "delete fail",
+			vscObj:    vscObj,
+			clientObj: []runtime.Object{vscObj},
+			reactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "volumesnapshotcontents",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-delete-error")
+					},
+				},
+			},
+			err: "error to delete volume snapshot content: fake-delete-error",
 		},
 		{
 			name:      "wait fail",
-			vscName:   "fake-vsc",
+			vscObj:    vscObj,
 			clientObj: []runtime.Object{vscObj},
 			reactors: []reactor{
 				{
@@ -385,7 +409,7 @@ func TestEnsureDeleteVSC(t *testing.T) {
 		},
 		{
 			name:      "success",
-			vscName:   "fake-vsc",
+			vscObj:    vscObj,
 			clientObj: []runtime.Object{vscObj},
 		},
 	}
@@ -398,7 +422,7 @@ func TestEnsureDeleteVSC(t *testing.T) {
 				fakeSnapshotClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
 			}
 
-			err := EnsureDeleteVSC(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vscName, time.Millisecond)
+			err := EnsureDeleteVSC(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vscObj, time.Millisecond)
 			if err != nil {
 				assert.EqualError(t, err, test.err)
 			} else {
@@ -601,7 +625,8 @@ func TestRetainVSC(t *testing.T) {
 			clientObj: []runtime.Object{vscObj},
 			updated: &snapshotv1api.VolumeSnapshotContent{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "fake-vsc",
+					Name:       "fake-vsc",
+					Finalizers: []string{volumeSnapshotContentProtectFinalizer},
 				},
 				Spec: snapshotv1api.VolumeSnapshotContentSpec{
 					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
