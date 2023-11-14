@@ -112,7 +112,7 @@ func TestSnapshotSource(t *testing.T) {
 			notError: true,
 		},
 		{
-			name: "failed to load snapshot",
+			name: "failed to load snapshot, should fallback to full backup and not error",
 			args: []mockArgs{
 				{methodName: "LoadSnapshot", returns: []interface{}{manifest, errors.New("failed to load snapshot")}},
 				{methodName: "SaveSnapshot", returns: []interface{}{manifest.ID, nil}},
@@ -122,7 +122,7 @@ func TestSnapshotSource(t *testing.T) {
 				{methodName: "Upload", returns: []interface{}{manifest, nil}},
 				{methodName: "Flush", returns: []interface{}{nil}},
 			},
-			notError: false,
+			notError: true,
 		},
 		{
 			name: "failed to save snapshot",
