@@ -152,36 +152,53 @@ func EnsureDeleteVS(ctx context.Context, snapshotClient snapshotter.SnapshotV1In
 	return nil
 }
 
+func RemoveVSCProtect(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface, vscName string, timeout time.Duration) error {
+	err := wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
+		vsc, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vscName, metav1.GetOptions{})
+		if err != nil {
+			return false, errors.Wrapf(err, "error to get VolumeSnapshotContent %s", vscName)
+		}
+
+		vsc.Finalizers = stringslice.Except(vsc.Finalizers, volumeSnapshotContentProtectFinalizer)
+
+		_, err = snapshotClient.VolumeSnapshotContents().Update(ctx, vsc, metav1.UpdateOptions{})
+		if err == nil {
+			return true, nil
+		}
+
+		if !apierrors.IsConflict(err) {
+			return false, errors.Wrapf(err, "error to update VolumeSnapshotContent %s", vscName)
+		}
+
+		return false, nil
+	})
+
+	return err
+}
+
 // EnsureDeleteVSC asserts the existence of a VSC by name, deletes it and waits for its disappearance and returns errors on any failure
 func EnsureDeleteVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface,
-	vsc *snapshotv1api.VolumeSnapshotContent, timeout time.Duration) error {
-	_, err := patchVSC(ctx, snapshotClient, vsc, func(updated *snapshotv1api.VolumeSnapshotContent) {
-		updated.Finalizers = stringslice.Except(updated.Finalizers, volumeSnapshotContentProtectFinalizer)
-	})
-	if err != nil {
-		return errors.Wrapf(err, "error to remove protect finalizer from vsc %s", vsc.Name)
-	}
-
-	err = snapshotClient.VolumeSnapshotContents().Delete(ctx, vsc.Name, metav1.DeleteOptions{})
+	vscName string, timeout time.Duration) error {
+	err := snapshotClient.VolumeSnapshotContents().Delete(ctx, vscName, metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrap(err, "error to delete volume snapshot content")
 	}
 
 	err = wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
-		_, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vsc.Name, metav1.GetOptions{})
+		_, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vscName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 
-			return false, errors.Wrapf(err, fmt.Sprintf("error to get VolumeSnapshotContent %s", vsc.Name))
+			return false, errors.Wrapf(err, fmt.Sprintf("error to get VolumeSnapshotContent %s", vscName))
 		}
 
 		return false, nil
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, "error to assure VolumeSnapshotContent is deleted, %s", vsc.Name)
+		return errors.Wrapf(err, "error to assure VolumeSnapshotContent is deleted, %s", vscName)
 	}
 
 	return nil
