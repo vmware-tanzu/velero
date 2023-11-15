@@ -1,0 +1,1 @@
+Fix issue #7068, due to a behavior of CSI external snapshotter, manipulations of VS and VSC may not be handled in the same order inside external snapshotter as the API is called. So add a protection finalizer to ensure the order

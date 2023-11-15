@@ -34,6 +34,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/stringptr"
 
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 type reactor struct {
@@ -360,26 +362,16 @@ func TestEnsureDeleteVSC(t *testing.T) {
 		name      string
 		clientObj []runtime.Object
 		reactors  []reactor
-		vscObj    *snapshotv1api.VolumeSnapshotContent
+		vscName   string
 		err       string
 	}{
 		{
-			name:   "remove finalizer fail",
-			vscObj: vscObj,
-			reactors: []reactor{
-				{
-					verb:     "patch",
-					resource: "volumesnapshotcontents",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.New("fake-patch-error")
-					},
-				},
-			},
-			err: "error to remove protect finalizer from vsc fake-vsc: error patching VSC: fake-patch-error",
+			name:    "delete fail on VSC not found",
+			vscName: "fake-vsc",
 		},
 		{
-			name:      "delete fail",
-			vscObj:    vscObj,
+			name:      "delete fail on others",
+			vscName:   "fake-vsc",
 			clientObj: []runtime.Object{vscObj},
 			reactors: []reactor{
 				{
@@ -394,7 +386,7 @@ func TestEnsureDeleteVSC(t *testing.T) {
 		},
 		{
 			name:      "wait fail",
-			vscObj:    vscObj,
+			vscName:   "fake-vsc",
 			clientObj: []runtime.Object{vscObj},
 			reactors: []reactor{
 				{
@@ -409,7 +401,7 @@ func TestEnsureDeleteVSC(t *testing.T) {
 		},
 		{
 			name:      "success",
-			vscObj:    vscObj,
+			vscName:   "fake-vsc",
 			clientObj: []runtime.Object{vscObj},
 		},
 	}
@@ -422,8 +414,8 @@ func TestEnsureDeleteVSC(t *testing.T) {
 				fakeSnapshotClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
 			}
 
-			err := EnsureDeleteVSC(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vscObj, time.Millisecond)
-			if err != nil {
+			err := EnsureDeleteVSC(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vscName, time.Millisecond)
+			if test.err != "" {
 				assert.EqualError(t, err, test.err)
 			} else {
 				assert.NoError(t, err)
@@ -655,6 +647,101 @@ func TestRetainVSC(t *testing.T) {
 				assert.Equal(t, *test.updated, *returned)
 			} else {
 				assert.Nil(t, returned)
+			}
+		})
+	}
+}
+
+func TestRemoveVSCProtect(t *testing.T) {
+	vscObj := &snapshotv1api.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "fake-vsc",
+			Finalizers: []string{volumeSnapshotContentProtectFinalizer},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		clientObj []runtime.Object
+		reactors  []reactor
+		vsc       string
+		updated   *snapshotv1api.VolumeSnapshotContent
+		timeout   time.Duration
+		err       string
+	}{
+		{
+			name: "get vsc error",
+			vsc:  "fake-vsc",
+			err:  "error to get VolumeSnapshotContent fake-vsc: volumesnapshotcontents.snapshot.storage.k8s.io \"fake-vsc\" not found",
+		},
+		{
+			name:      "update vsc fail",
+			vsc:       "fake-vsc",
+			clientObj: []runtime.Object{vscObj},
+			reactors: []reactor{
+				{
+					verb:     "update",
+					resource: "volumesnapshotcontents",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-update-error")
+					},
+				},
+			},
+			err: "error to update VolumeSnapshotContent fake-vsc: fake-update-error",
+		},
+		{
+			name:      "update vsc timeout",
+			vsc:       "fake-vsc",
+			clientObj: []runtime.Object{vscObj},
+			reactors: []reactor{
+				{
+					verb:     "update",
+					resource: "volumesnapshotcontents",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, &apierrors.StatusError{ErrStatus: metav1.Status{
+							Reason: metav1.StatusReasonConflict,
+						}}
+					},
+				},
+			},
+			timeout: time.Second,
+			err:     "timed out waiting for the condition",
+		},
+		{
+			name:      "succeed",
+			vsc:       "fake-vsc",
+			clientObj: []runtime.Object{vscObj},
+			timeout:   time.Second,
+			updated: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "fake-vsc",
+					Finalizers: []string{},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeSnapshotClient := snapshotFake.NewSimpleClientset(test.clientObj...)
+
+			for _, reactor := range test.reactors {
+				fakeSnapshotClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			err := RemoveVSCProtect(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vsc, test.timeout)
+
+			if len(test.err) == 0 {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, test.err)
+			}
+
+			if test.updated != nil {
+				updated, err := fakeSnapshotClient.SnapshotV1().VolumeSnapshotContents().Get(context.Background(), test.vsc, metav1.GetOptions{})
+				assert.NoError(t, err)
+
+				assert.Equal(t, test.updated.Finalizers, updated.Finalizers)
 			}
 		})
 	}
