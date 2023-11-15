@@ -21,11 +21,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	snapshotfake "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/fake"
 	snapshotinformers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
@@ -42,6 +44,10 @@ import (
 	testclocks "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
+
+	fakeClient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
@@ -1663,5 +1669,65 @@ func Test_getLastSuccessBySchedule(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, getLastSuccessBySchedule(tc.backups))
 		})
+	}
+}
+
+// Unit tests to make sure that the backup's status is updated correctly during reconcile.
+// To clear up confusion whether status can be updated with Patch alone without status writer and not kbClient.Status().Patch()
+func TestPatchResourceWorksWithStatus(t *testing.T) {
+	type args struct {
+		original *velerov1api.Backup
+		updated  *velerov1api.Backup
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "patch backup status",
+			args: args{
+				original: defaultBackup().SnapshotMoveData(false).Result(),
+				updated: defaultBackup().SnapshotMoveData(false).WithStatus(velerov1api.BackupStatus{
+					CSIVolumeSnapshotsCompleted: 1,
+				}).Result(),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			error := velerov1api.AddToScheme(scheme)
+			if error != nil {
+				t.Errorf("PatchResource() error = %v", error)
+			}
+			fakeClient := fakeClient.NewClientBuilder().WithScheme(scheme).WithObjects(tt.args.original).Build()
+			fromCluster := &velerov1api.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tt.args.original.Name,
+					Namespace: tt.args.original.Namespace,
+				},
+			}
+			// check original exists
+			if err := fakeClient.Get(context.Background(), kbclient.ObjectKeyFromObject(tt.args.updated), fromCluster); err != nil {
+				t.Errorf("PatchResource() error = %v", err)
+			}
+			// ignore resourceVersion
+			tt.args.updated.ResourceVersion = fromCluster.ResourceVersion
+			tt.args.original.ResourceVersion = fromCluster.ResourceVersion
+			if err := kubeutil.PatchResource(tt.args.original, tt.args.updated, fakeClient); (err != nil) != tt.wantErr {
+				t.Errorf("PatchResource() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			// check updated exists
+			if err := fakeClient.Get(context.Background(), kbclient.ObjectKeyFromObject(tt.args.updated), fromCluster); err != nil {
+				t.Errorf("PatchResource() error = %v", err)
+			}
+
+			// check fromCluster is equal to updated
+			if !reflect.DeepEqual(fromCluster, tt.args.updated) {
+				t.Error(cmp.Diff(fromCluster, tt.args.updated))
+			}
+		})
+
 	}
 }

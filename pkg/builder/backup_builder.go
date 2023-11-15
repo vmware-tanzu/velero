@@ -299,3 +299,9 @@ func (b *BackupBuilder) DataMover(name string) *BackupBuilder {
 	b.object.Spec.DataMover = name
 	return b
 }
+
+// WithStatus sets the Backup's status.
+func (b *BackupBuilder) WithStatus(status velerov1api.BackupStatus) *BackupBuilder {
+	b.object.Status = status
+	return b
+}
