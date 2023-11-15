@@ -429,6 +429,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 					backupNames = append(backupNames, backup.backup.Name)
 					backupStore.On("GetBackupMetadata", backup.backup.Name).Return(backup.backup, nil)
 					backupStore.On("GetPodVolumeBackups", backup.backup.Name).Return(backup.podVolumeBackups, nil)
+					backupStore.On("BackupExists", "bucket-1", backup.backup.Name).Return(true, nil)
 				}
 				backupStore.On("ListBackups").Return(backupNames, nil)
 			}

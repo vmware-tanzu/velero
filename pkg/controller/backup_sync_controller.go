@@ -142,6 +142,16 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		log = log.WithField("backup", backupName)
 		log.Info("Attempting to sync backup into cluster")
 
+		exist, err := backupStore.BackupExists(location.Spec.ObjectStorage.Bucket, backupName)
+		if err != nil {
+			log.WithError(errors.WithStack(err)).Error("Error checking backup exist from backup store")
+			continue
+		}
+		if !exist {
+			log.Debugf("backup %s doesn't exist in backup store, skip", backupName)
+			continue
+		}
+
 		backup, err := backupStore.GetBackupMetadata(backupName)
 		if err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error getting backup metadata from backup store")
