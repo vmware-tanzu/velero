@@ -275,13 +275,13 @@ func (s *nodeAgentServer) run() {
 	}
 
 	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.kubeClient, s.csiSnapshotClient.SnapshotV1(), repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
-	s.markDataUploadsCancel(dataUploadReconciler)
+	s.attemptDataUploadResume(dataUploadReconciler)
 	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
 	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.kubeClient, repoEnsurer, credentialGetter, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
-	s.markDataDownloadsCancel(dataDownloadReconciler)
+	s.attemptDataDownloadResume(dataDownloadReconciler)
 	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}
@@ -355,65 +355,28 @@ func (s *nodeAgentServer) markInProgressCRsFailed() {
 	s.markInProgressPVRsFailed(client)
 }
 
-func (s *nodeAgentServer) markDataUploadsCancel(r *controller.DataUploadReconciler) {
+func (s *nodeAgentServer) attemptDataUploadResume(r *controller.DataUploadReconciler) {
 	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
 	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
 	if err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
 		return
 	}
-	if dataUploads, err := r.FindDataUploads(s.ctx, client, s.namespace); err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to find data uploads")
-	} else {
-		for i := range dataUploads {
-			du := dataUploads[i]
-			if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted ||
-				du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared ||
-				du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
-				err = controller.UpdateDataUploadWithRetry(s.ctx, client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, s.logger.WithField("dataupload", du.Name),
-					func(dataUpload *velerov2alpha1api.DataUpload) {
-						dataUpload.Spec.Cancel = true
-						dataUpload.Status.Message = fmt.Sprintf("found a dataupload with status %q during the node-agent starting, mark it as cancel", du.Status.Phase)
-					})
-
-				if err != nil {
-					s.logger.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", du.GetName())
-					continue
-				}
-				s.logger.WithField("dataupload", du.GetName()).Warn(du.Status.Message)
-			}
-		}
+	if err := r.AttemptDataUploadResume(s.ctx, client, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+		s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data upload resume")
 	}
 }
 
-func (s *nodeAgentServer) markDataDownloadsCancel(r *controller.DataDownloadReconciler) {
+func (s *nodeAgentServer) attemptDataDownloadResume(r *controller.DataDownloadReconciler) {
 	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
 	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
 	if err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
 		return
 	}
-	if dataDownloads, err := r.FindDataDownloads(s.ctx, client, s.namespace); err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to find data downloads")
-	} else {
-		for i := range dataDownloads {
-			dd := dataDownloads[i]
-			if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted ||
-				dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared ||
-				dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
-				err = controller.UpdateDataDownloadWithRetry(s.ctx, client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, s.logger.WithField("datadownload", dd.Name),
-					func(dataDownload *velerov2alpha1api.DataDownload) {
-						dataDownload.Spec.Cancel = true
-						dataDownload.Status.Message = fmt.Sprintf("found a datadownload with status %q during the node-agent starting, mark it as cancel", dd.Status.Phase)
-					})
 
-				if err != nil {
-					s.logger.WithError(errors.WithStack(err)).Errorf("failed to mark datadownload %q cancel", dd.GetName())
-					continue
-				}
-				s.logger.WithField("datadownload", dd.GetName()).Warn(dd.Status.Message)
-			}
-		}
+	if err := r.AttemptDataDownloadResume(s.ctx, client, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+		s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data download resume")
 	}
 }
 
