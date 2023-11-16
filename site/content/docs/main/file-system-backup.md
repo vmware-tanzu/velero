@@ -185,7 +185,7 @@ The following sections provide more details on the two approaches.
 
 In this approach, Velero will back up all pod volumes using FSB with the exception of:  
 
-- Volumes mounting the default service account token, Kubernetes secrets, and config maps
+- Volumes mounting the default service account token, Kubernetes Secrets, and ConfigMaps
 - Hostpath volumes
 
 It is possible to exclude volumes from being backed up using the `backup.velero.io/backup-volumes-excludes` 
