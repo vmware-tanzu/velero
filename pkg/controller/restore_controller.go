@@ -515,6 +515,11 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		return errors.Wrap(err, "error fetching volume snapshots metadata")
 	}
 
+	csiVolumeSnapshots, err := backupStore.GetCSIVolumeSnapshots(restore.Spec.BackupName)
+	if err != nil {
+		return errors.Wrap(err, "fail to fetch CSI VolumeSnapshots metadata")
+	}
+
 	restoreLog.Info("starting restore")
 
 	var podVolumeBackups []*api.PodVolumeBackup
@@ -531,6 +536,7 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		BackupReader:         backupFile,
 		ResourceModifiers:    resourceModifiers,
 		DisableInformerCache: r.disableInformerCache,
+		CSIVolumeSnapshots:   csiVolumeSnapshots,
 	}
 	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, pluginManager)
 

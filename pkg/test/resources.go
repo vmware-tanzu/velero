@@ -142,6 +142,17 @@ func ServiceAccounts(items ...metav1.Object) *APIResource {
 	}
 }
 
+func ConfigMaps(items ...metav1.Object) *APIResource {
+	return &APIResource{
+		Group:      "",
+		Version:    "v1",
+		Name:       "configmaps",
+		ShortName:  "cm",
+		Namespaced: true,
+		Items:      items,
+	}
+}
+
 func CRDs(items ...metav1.Object) *APIResource {
 	return &APIResource{
 		Group:      "apiextensions.k8s.io",
