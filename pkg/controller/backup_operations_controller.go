@@ -19,7 +19,10 @@ package controller
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"time"
+
+	v2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -291,7 +294,7 @@ func getBackupItemOperationProgress(
 			if err != nil {
 				operation.Status.Phase = itemoperation.OperationPhaseFailed
 				operation.Status.Error = err.Error()
-				errs = append(errs, err.Error())
+				errs = append(errs, wrapErrMsg(err.Error(), bia))
 				changes = true
 				failedCount++
 				continue
@@ -300,7 +303,7 @@ func getBackupItemOperationProgress(
 			if err != nil {
 				operation.Status.Phase = itemoperation.OperationPhaseFailed
 				operation.Status.Error = err.Error()
-				errs = append(errs, err.Error())
+				errs = append(errs, wrapErrMsg(err.Error(), bia))
 				changes = true
 				failedCount++
 				continue
@@ -338,7 +341,7 @@ func getBackupItemOperationProgress(
 				if operationProgress.Err != "" {
 					operation.Status.Phase = itemoperation.OperationPhaseFailed
 					operation.Status.Error = operationProgress.Err
-					errs = append(errs, operationProgress.Err)
+					errs = append(errs, wrapErrMsg(operationProgress.Err, bia))
 					changes = true
 					failedCount++
 					continue
@@ -353,7 +356,7 @@ func getBackupItemOperationProgress(
 				_ = bia.Cancel(operation.Spec.OperationID, backup)
 				operation.Status.Phase = itemoperation.OperationPhaseFailed
 				operation.Status.Error = "Asynchronous action timed out"
-				errs = append(errs, operation.Status.Error)
+				errs = append(errs, wrapErrMsg(operation.Status.Error, bia))
 				changes = true
 				failedCount++
 				continue
@@ -372,4 +375,16 @@ func getBackupItemOperationProgress(
 		}
 	}
 	return inProgressOperations, changes, completedCount, failedCount, errs
+}
+
+// wrap the error message to include the BIA name
+func wrapErrMsg(errMsg string, bia v2.BackupItemAction) string {
+	plugin := "unknown"
+	if bia != nil {
+		plugin = bia.Name()
+	}
+	if len(errMsg) > 0 {
+		errMsg += ", "
+	}
+	return fmt.Sprintf("%splugin: %s", errMsg, plugin)
 }
