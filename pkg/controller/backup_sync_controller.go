@@ -173,34 +173,7 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		backup.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(backup.Spec.StorageLocation)
 
 		//check for the ownership references. If they do not exist, remove them.
-		listedReferences := backup.ObjectMeta.OwnerReferences
-		foundReferences := make([]metav1.OwnerReference, 0)
-		for _, v := range listedReferences {
-			switch v.Kind {
-			case "Schedule":
-
-				schedule := new(velerov1api.Schedule)
-				err := b.client.Get(ctx, types.NamespacedName{
-					Name:      v.Name,
-					Namespace: backup.Namespace,
-				}, schedule)
-				switch {
-				case err != nil && apierrors.IsNotFound(err):
-					log.Warn("Removing missing schedule ownership reference from backup")
-					continue
-				case schedule.UID != v.UID:
-					log.Warnf("Removing schedule ownership reference with mismatched UIDs. Expected %s, got %s", v.UID, schedule.UID)
-					continue
-				case err != nil && !apierrors.IsNotFound(err):
-					log.WithError(errors.WithStack(err)).Error("Error finding schedule ownership reference, keeping schedule on backup")
-				}
-			default:
-				log.Warnf("Unable to check ownership reference for unknown kind, %s", v.Kind)
-			}
-
-			foundReferences = append(foundReferences, v)
-		}
-		backup.ObjectMeta.OwnerReferences = foundReferences
+		backup.ObjectMeta.OwnerReferences = b.filterBackupOwnerReferences(ctx, backup, log)
 
 		// attempt to create backup custom resource via API
 		err = b.client.Create(ctx, backup, &client.CreateOptions{})
@@ -315,6 +288,35 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (b *backupSyncReconciler) filterBackupOwnerReferences(ctx context.Context, backup *velerov1api.Backup, log logrus.FieldLogger) []metav1.OwnerReference {
+	listedReferences := backup.ObjectMeta.OwnerReferences
+	foundReferences := make([]metav1.OwnerReference, 0)
+	for _, v := range listedReferences {
+		switch v.Kind {
+		case "Schedule":
+			schedule := new(velerov1api.Schedule)
+			err := b.client.Get(ctx, types.NamespacedName{
+				Name:      v.Name,
+				Namespace: backup.Namespace,
+			}, schedule)
+			switch {
+			case err != nil && apierrors.IsNotFound(err):
+				log.Warnf("Removing missing schedule ownership reference %s/%s from backup", backup.Namespace, v.Name)
+				continue
+			case schedule.UID != v.UID:
+				log.Warnf("Removing schedule ownership reference with mismatched UIDs. Expected %s, got %s", v.UID, schedule.UID)
+				continue
+			case err != nil && !apierrors.IsNotFound(err):
+				log.WithError(errors.WithStack(err)).Error("Error finding schedule ownership reference, keeping schedule on backup")
+			}
+		default:
+			log.Warnf("Unable to check ownership reference for unknown kind, %s", v.Kind)
+		}
+		foundReferences = append(foundReferences, v)
+	}
+	return foundReferences
 }
 
 // SetupWithManager is used to setup controller and its watching sources.
