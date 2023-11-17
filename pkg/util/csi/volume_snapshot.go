@@ -31,6 +31,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/stringptr"
+	"github.com/vmware-tanzu/velero/pkg/util/stringslice"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/typed/volumesnapshot/v1"
@@ -41,7 +42,8 @@ import (
 )
 
 const (
-	waitInternal = 2 * time.Second
+	waitInternal                          = 2 * time.Second
+	volumeSnapshotContentProtectFinalizer = "velero.io/volume-snapshot-content-protect-finalizer"
 )
 
 // WaitVolumeSnapshotReady waits a VS to become ready to use until the timeout reaches
@@ -97,36 +99,17 @@ func GetVolumeSnapshotContentForVolumeSnapshot(volSnap *snapshotv1api.VolumeSnap
 	return vsc, nil
 }
 
-// RetainVSC updates the VSC's deletion policy to Retain and return the update VSC
+// RetainVSC updates the VSC's deletion policy to Retain and add a finalier and then return the update VSC
 func RetainVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface,
 	vsc *snapshotv1api.VolumeSnapshotContent) (*snapshotv1api.VolumeSnapshotContent, error) {
 	if vsc.Spec.DeletionPolicy == snapshotv1api.VolumeSnapshotContentRetain {
 		return vsc, nil
 	}
-	origBytes, err := json.Marshal(vsc)
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling original VSC")
-	}
 
-	updated := vsc.DeepCopy()
-	updated.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
-
-	updatedBytes, err := json.Marshal(updated)
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling updated VSC")
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(origBytes, updatedBytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating json merge patch for VSC")
-	}
-
-	retained, err := snapshotClient.VolumeSnapshotContents().Patch(ctx, vsc.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-	if err != nil {
-		return nil, errors.Wrap(err, "error patching VSC")
-	}
-
-	return retained, nil
+	return patchVSC(ctx, snapshotClient, vsc, func(updated *snapshotv1api.VolumeSnapshotContent) {
+		updated.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
+		updated.Finalizers = append(updated.Finalizers, volumeSnapshotContentProtectFinalizer)
+	})
 }
 
 // DeleteVolumeSnapshotContentIfAny deletes a VSC by name if it exists, and log an error when the deletion fails
@@ -169,11 +152,35 @@ func EnsureDeleteVS(ctx context.Context, snapshotClient snapshotter.SnapshotV1In
 	return nil
 }
 
+func RemoveVSCProtect(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface, vscName string, timeout time.Duration) error {
+	err := wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
+		vsc, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vscName, metav1.GetOptions{})
+		if err != nil {
+			return false, errors.Wrapf(err, "error to get VolumeSnapshotContent %s", vscName)
+		}
+
+		vsc.Finalizers = stringslice.Except(vsc.Finalizers, volumeSnapshotContentProtectFinalizer)
+
+		_, err = snapshotClient.VolumeSnapshotContents().Update(ctx, vsc, metav1.UpdateOptions{})
+		if err == nil {
+			return true, nil
+		}
+
+		if !apierrors.IsConflict(err) {
+			return false, errors.Wrapf(err, "error to update VolumeSnapshotContent %s", vscName)
+		}
+
+		return false, nil
+	})
+
+	return err
+}
+
 // EnsureDeleteVSC asserts the existence of a VSC by name, deletes it and waits for its disappearance and returns errors on any failure
 func EnsureDeleteVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface,
 	vscName string, timeout time.Duration) error {
 	err := snapshotClient.VolumeSnapshotContents().Delete(ctx, vscName, metav1.DeleteOptions{})
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrap(err, "error to delete volume snapshot content")
 	}
 
@@ -207,4 +214,32 @@ func DeleteVolumeSnapshotIfAny(ctx context.Context, snapshotClient snapshotter.S
 			log.WithError(err).Errorf("Failed to delete volume snapshot %s/%s", vsNamespace, vsName)
 		}
 	}
+}
+
+func patchVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface,
+	vsc *snapshotv1api.VolumeSnapshotContent, updateFunc func(*snapshotv1api.VolumeSnapshotContent)) (*snapshotv1api.VolumeSnapshotContent, error) {
+	origBytes, err := json.Marshal(vsc)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling original VSC")
+	}
+
+	updated := vsc.DeepCopy()
+	updateFunc(updated)
+
+	updatedBytes, err := json.Marshal(updated)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling updated VSC")
+	}
+
+	patchBytes, err := jsonpatch.CreateMergePatch(origBytes, updatedBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating json merge patch for VSC")
+	}
+
+	patched, err := snapshotClient.VolumeSnapshotContents().Patch(ctx, vsc.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	if err != nil {
+		return nil, errors.Wrap(err, "error patching VSC")
+	}
+
+	return patched, nil
 }

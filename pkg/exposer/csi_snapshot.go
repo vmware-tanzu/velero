@@ -128,6 +128,13 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 
 	curLog.WithField("vs name", volumeSnapshot.Name).Infof("VS is deleted in namespace %s", volumeSnapshot.Namespace)
 
+	err = csi.RemoveVSCProtect(ctx, e.csiSnapshotClient, vsc.Name, csiExposeParam.Timeout)
+	if err != nil {
+		return errors.Wrap(err, "error to remove protect from volume snapshot content")
+	}
+
+	curLog.WithField("vsc name", vsc.Name).Infof("Removed protect from VSC")
+
 	err = csi.EnsureDeleteVSC(ctx, e.csiSnapshotClient, vsc.Name, csiExposeParam.Timeout)
 	if err != nil {
 		return errors.Wrap(err, "error to delete volume snapshot content")
