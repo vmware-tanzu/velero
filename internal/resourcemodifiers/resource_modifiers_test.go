@@ -280,7 +280,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 						Operation: "replace",
 						Path:      "/value/bool",
 						Value:     `"true"`,
-					},					
+					},
 				},
 			},
 		},
@@ -309,7 +309,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 						Operation: "replace",
 						Path:      "/value/bool",
 						Value:     "true",
-					},					
+					},
 				},
 			},
 		},
@@ -589,30 +589,30 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 	}{
 		{
 			name: "configmap true false string",
-			fields: fields{				
-					Version: "v1",
-					ResourceModifierRules: []ResourceModifierRule{
-						{
-							Conditions: Conditions{
-								GroupResource:     "configmaps",
-								ResourceNameRegex: ".*",
-							},
-							Patches: []JSONPatch{							
-								{
-									Operation: "replace",
-									Path:      "/data/test",
-									Value:     `"false"`,
-								},
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupResource:     "configmaps",
+							ResourceNameRegex: ".*",
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "replace",
+								Path:      "/data/test",
+								Value:     `"false"`,
 							},
 						},
 					},
+				},
 			},
 			args: args{
 				obj:           cmTrue.DeepCopy(),
 				groupResource: "configmaps",
 			},
 			wantErr: false,
-			wantObj: cmFalse.DeepCopy(),		
+			wantObj: cmFalse.DeepCopy(),
 		},
 		{
 			name: "Invalid Regex throws error",
