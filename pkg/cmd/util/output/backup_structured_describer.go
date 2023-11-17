@@ -68,18 +68,10 @@ func DescribeBackupInSF(
 
 		DescribeBackupSpecInSF(d, backup.Spec)
 
-		DescribeBackupStatusInSF(ctx, kbClient, d, backup, details, insecureSkipTLSVerify, caCertFile)
+		DescribeBackupStatusInSF(ctx, kbClient, d, backup, details, insecureSkipTLSVerify, caCertFile, podVolumeBackups)
 
 		if len(deleteRequests) > 0 {
 			DescribeDeleteBackupRequestsInSF(d, deleteRequests)
-		}
-
-		if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-			DescribeCSIVolumeSnapshotsInSF(d, details, volumeSnapshotContents)
-		}
-
-		if len(podVolumeBackups) > 0 {
-			DescribePodVolumeBackupsInSF(d, podVolumeBackups, details)
 		}
 	}, outputFormat)
 }
@@ -234,7 +226,8 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 }
 
 // DescribeBackupStatusInSF describes a backup status in structured format.
-func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *StructuredDescriber, backup *velerov1api.Backup, details bool, insecureSkipTLSVerify bool, caCertPath string) {
+func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *StructuredDescriber, backup *velerov1api.Backup, details bool,
+	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackups []velerov1api.PodVolumeBackup) {
 	status := backup.Status
 	backupStatusInfo := make(map[string]interface{})
 
@@ -274,35 +267,9 @@ func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *
 		describeBackupResourceListInSF(ctx, kbClient, backupStatusInfo, backup, insecureSkipTLSVerify, caCertPath)
 	}
 
-	// In consideration of decoding structured output conveniently, the three separate fields were created here
-	// the field of "veleroNativeSnapshots" displays the brief snapshots info
-	// the field of "errorGettingSnapshots" displays the error message if it fails to get snapshot info
-	// the field of "veleroNativeSnapshotsDetail" displays the detailed snapshots info
-	if status.VolumeSnapshotsAttempted > 0 {
-		if !details {
-			backupStatusInfo["veleroNativeSnapshots"] = fmt.Sprintf("%d of %d snapshots completed successfully", status.VolumeSnapshotsCompleted, status.VolumeSnapshotsAttempted)
-			return
-		}
-
-		buf := new(bytes.Buffer)
-		if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
-			backupStatusInfo["errorGettingSnapshots"] = fmt.Sprintf("<error getting snapshot info: %v>", err)
-			return
-		}
-
-		var snapshots []*volume.Snapshot
-		if err := json.NewDecoder(buf).Decode(&snapshots); err != nil {
-			backupStatusInfo["errorGettingSnapshots"] = fmt.Sprintf("<error reading snapshot info: %v>", err)
-			return
-		}
-
-		snapshotDetails := make(map[string]interface{})
-		for _, snap := range snapshots {
-			describeSnapshotInSF(snap.Spec.PersistentVolumeName, snap.Status.ProviderSnapshotID, snap.Spec.VolumeType, snap.Spec.VolumeAZ, snap.Spec.VolumeIOPS, snapshotDetails)
-		}
-		backupStatusInfo["veleroNativeSnapshotsDetail"] = snapshotDetails
-		return
-	}
+	backupVolumes := make(map[string]interface{})
+	describeBackupVolumesInSF(ctx, kbClient, backup, details, insecureSkipTLSVerify, caCertPath, podVolumeBackups, backupVolumes)
+	backupStatusInfo["backupVolumes"] = backupVolumes
 }
 
 func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Client, backupStatusInfo map[string]interface{}, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) {
@@ -332,18 +299,129 @@ func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Clien
 	backupStatusInfo["resourceList"] = resourceList
 }
 
-func describeSnapshotInSF(pvName, snapshotID, volumeType, volumeAZ string, iops *int64, snapshotDetails map[string]interface{}) {
-	snapshotInfo := make(map[string]string)
-	iopsString := "<N/A>"
-	if iops != nil {
-		iopsString = fmt.Sprintf("%d", *iops)
+func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, backup *velerov1api.Backup, details bool,
+	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackupCRs []velerov1api.PodVolumeBackup, backupVolumes map[string]interface{}) {
+
+	buf := new(bytes.Buffer)
+	if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeInfos, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
+		backupVolumes["errorGetBackupVolumeInfo"] = fmt.Sprintf("error getting backup volume info: %v", err)
+		return
 	}
 
-	snapshotInfo["snapshotID"] = snapshotID
-	snapshotInfo["type"] = volumeType
-	snapshotInfo["availabilityZone"] = volumeAZ
-	snapshotInfo["IOPS"] = iopsString
-	snapshotDetails[pvName] = snapshotInfo
+	var volumeInfos *volume.VolumeInfos
+	if err := json.NewDecoder(buf).Decode(&volumeInfos); err != nil {
+		backupVolumes["errorReadBackupVolumeInfo"] = fmt.Sprintf("error reading backup volume info: %v", err)
+		return
+	}
+
+	nativeSnapshots := []*volume.VolumeInfo{}
+	csiSnapshots := []*volume.VolumeInfo{}
+	for _, info := range volumeInfos.VolumeInfos {
+		switch info.BackupMethod {
+		case volume.NativeSnapshot:
+			nativeSnapshots = append(nativeSnapshots, &info)
+		case volume.CSISnapshot:
+			csiSnapshots = append(csiSnapshots, &info)
+		}
+	}
+
+	describeNativeSnapshotsInSF(details, nativeSnapshots, backupVolumes)
+
+	csiSnapshotDetails := make(map[string]interface{})
+	describeCSISnapshotsInSF(details, csiSnapshots, csiSnapshotDetails)
+	backupVolumes["csiSnapshots"] = csiSnapshotDetails
+
+	describePodVolumeBackupsInSF(podVolumeBackupCRs, details, backupVolumes)
+}
+
+func describeNativeSnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVolumes map[string]interface{}) {
+	if len(infos) == 0 {
+		backupVolumes["nativeSnapshots"] = "<none included>"
+	}
+
+	snapshotDetails := make(map[string]interface{})
+	for _, info := range infos {
+		describNativeSnapshotInSF(details, info, snapshotDetails)
+	}
+	backupVolumes["nativeSnapshots"] = snapshotDetails
+}
+
+func describNativeSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDetails map[string]interface{}) {
+
+	if details {
+		snapshotInfo := make(map[string]string)
+		snapshotInfo["snapshotID"] = info.NativeSnapshotInfo.SnapshotHandle
+		snapshotInfo["type"] = info.NativeSnapshotInfo.VolumeType
+		snapshotInfo["availabilityZone"] = info.NativeSnapshotInfo.VolumeAZ
+		snapshotInfo["IOPS"] = info.NativeSnapshotInfo.IOPS
+
+		snapshotDetails[info.PVName] = snapshotInfo
+	} else {
+		snapshotDetails[info.PVName] = "specify --details for more information"
+	}
+}
+
+func describeCSISnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVolumes map[string]interface{}) {
+	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
+		return
+	}
+
+	if len(infos) == 0 {
+		backupVolumes["csiSnapshots"] = "CSI Snapshots: <none included>"
+		return
+	}
+
+	snapshotDetails := make(map[string]interface{})
+	for _, info := range infos {
+		describeCSISnapshotInSF(details, info, snapshotDetails)
+	}
+	backupVolumes["csiSnapshots"] = snapshotDetails
+}
+
+func describeCSISnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDetails map[string]interface{}) {
+	snapshotDetail := make(map[string]interface{})
+	snapshotDetail["operationID"] = info.OperationID
+
+	describeLocalSnapshotInSF(details, info, snapshotDetail)
+	describeDataMovementInSF(details, info, snapshotDetail)
+
+	snapshotDetails[info.PVCName] = snapshotDetail
+}
+
+// describeVSCInSF describes CSI volume snapshot contents in structured format.
+func describeLocalSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDetail map[string]interface{}) {
+	if !info.PreserveLocalSnapshot {
+		return
+	}
+
+	if details {
+		localSnapshot := make(map[string]interface{})
+		localSnapshot["snapshotContentName"] = info.CSISnapshotInfo.VSCName
+		localSnapshot["storageSnapshotID"] = info.CSISnapshotInfo.SnapshotHandle
+		localSnapshot["snapshotSize(bytes)"] = info.CSISnapshotInfo.Size
+		localSnapshot["csiDriver"] = info.CSISnapshotInfo.Driver
+
+		snapshotDetail["snapshot"] = localSnapshot
+	} else {
+		snapshotDetail["snapshot"] = "specify --details for more information"
+	}
+}
+
+func describeDataMovementInSF(details bool, info *volume.VolumeInfo, snapshotDetail map[string]interface{}) {
+	if !info.SnapshotDataMoved {
+		return
+	}
+
+	if details {
+		dataMovement := make(map[string]interface{})
+		dataMovement["dataMover"] = info.SnapshotDataMovementInfo.DataMover
+		dataMovement["uploaderType"] = info.SnapshotDataMovementInfo.UploaderType
+		dataMovement["repositorySnapshotID"] = info.SnapshotDataMovementInfo.SnapshotHandle
+
+		snapshotDetail["dataMovement"] = dataMovement
+	} else {
+		snapshotDetail["dataMovement"] = "specify --details for more information"
+	}
 }
 
 // DescribeDeleteBackupRequestsInSF describes delete backup requests in structured format.
@@ -368,9 +446,9 @@ func DescribeDeleteBackupRequestsInSF(d *StructuredDescriber, requests []velerov
 	d.Describe("deletionAttempts", deletionAttempts)
 }
 
-// DescribePodVolumeBackupsInSF describes pod volume backups in structured format.
-func DescribePodVolumeBackupsInSF(d *StructuredDescriber, backups []velerov1api.PodVolumeBackup, details bool) {
-	PodVolumeBackupsInfo := make(map[string]interface{})
+// describePodVolumeBackupsInSF describes pod volume backups in structured format.
+func describePodVolumeBackupsInSF(backups []velerov1api.PodVolumeBackup, details bool, backupVolumes map[string]interface{}) {
+	podVolumeBackupsInfo := make(map[string]interface{})
 	// Get the type of pod volume uploader. Since the uploader only comes from a single source, we can
 	// take the uploader type from the first element of the array.
 	var uploaderType string
@@ -380,7 +458,7 @@ func DescribePodVolumeBackupsInSF(d *StructuredDescriber, backups []velerov1api.
 		return
 	}
 	// type display the type of pod volume backups
-	PodVolumeBackupsInfo["type"] = uploaderType
+	podVolumeBackupsInfo["uploderType"] = uploaderType
 
 	podVolumeBackupsDetails := make(map[string]interface{})
 	// separate backups by phase (combining <none> and New into a single group)
@@ -415,56 +493,8 @@ func DescribePodVolumeBackupsInSF(d *StructuredDescriber, backups []velerov1api.
 		podVolumeBackupsDetails[phase] = backupsByPods
 	}
 	// Pod Volume Backups Details display the detailed pod volume backups info
-	PodVolumeBackupsInfo["podVolumeBackupsDetails"] = podVolumeBackupsDetails
-	d.Describe("podVolumeBackups", PodVolumeBackupsInfo)
-}
-
-// DescribeCSIVolumeSnapshotsInSF describes CSI volume snapshots in structured format.
-func DescribeCSIVolumeSnapshotsInSF(d *StructuredDescriber, details bool, volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent) {
-	CSIVolumeSnapshotsInfo := make(map[string]interface{})
-	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		return
-	}
-
-	if len(volumeSnapshotContents) == 0 {
-		return
-	}
-
-	// In consideration of decoding structured output conveniently, the two separate fields were created here
-	// the field of 'CSI Volume Snapshots Count' displays the count of CSI Volume Snapshots
-	// the field of 'CSI Volume Snapshots Details' displays the content of CSI Volume Snapshots
-	if !details {
-		CSIVolumeSnapshotsInfo["CSIVolumeSnapshotsCount"] = len(volumeSnapshotContents)
-	} else {
-		vscDetails := make(map[string]interface{})
-		for _, vsc := range volumeSnapshotContents {
-			DescribeVSCInSF(details, vsc, vscDetails)
-		}
-		CSIVolumeSnapshotsInfo["CSIVolumeSnapshotsDetails"] = vscDetails
-	}
-	d.Describe("CSIVolumeSnapshots", CSIVolumeSnapshotsInfo)
-}
-
-// DescribeVSCInSF describes CSI volume snapshot contents in structured format.
-func DescribeVSCInSF(details bool, vsc snapshotv1api.VolumeSnapshotContent, vscDetails map[string]interface{}) {
-	content := make(map[string]interface{})
-	if vsc.Status == nil {
-		vscDetails[vsc.Name] = content
-		return
-	}
-
-	if vsc.Status.SnapshotHandle != nil {
-		content["storageSnapshotID"] = *vsc.Status.SnapshotHandle
-	}
-
-	if vsc.Status.RestoreSize != nil {
-		content["snapshotSize(bytes)"] = *vsc.Status.RestoreSize
-	}
-
-	if vsc.Status.ReadyToUse != nil {
-		content["readyToUse"] = *vsc.Status.ReadyToUse
-	}
-	vscDetails[vsc.Name] = content
+	podVolumeBackupsInfo["podVolumeBackupsDetails"] = podVolumeBackupsDetails
+	backupVolumes["podVolumeBackups"] = podVolumeBackupsInfo
 }
 
 // DescribeBackupResultsInSF describes errors and warnings in structured format.
