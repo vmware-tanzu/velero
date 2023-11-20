@@ -222,7 +222,7 @@ func TestGetVolumesByPod(t *testing.T) {
 			},
 		},
 		{
-			name:                     "should exclude volumes mounting config maps",
+			name:                     "should exclude volumes mounting ConfigMaps",
 			defaultVolumesToFsBackup: true,
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{

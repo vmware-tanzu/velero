@@ -541,7 +541,7 @@ High priorities:
   - PVs go before PVCs because PVCs depend on them.
   - PVCs go before pods or controllers so they can be mounted as volumes.
   - Service accounts go before secrets so service account token secrets can be filled automatically.
-  - Secrets and config maps go before pods or controllers so they can be mounted
+  - Secrets and ConfigMaps go before pods or controllers so they can be mounted
     as volumes.
   - Limit ranges go before pods or controllers so pods can use them.
   - Pods go before controllers so they can be explicitly restored and potentially

@@ -29,7 +29,7 @@ During restore, the proposal is that Velero will determine if the `APIGroupVersi
 The proposed code starts with creating three lists for each backed up resource. The three lists will be created by
   (1) reading the directory names in the backup tarball file and seeing which API group versions were backed up from the source cluster,
   (2) looking at the target cluster and determining which API group versions are supported, and
-  (3) getting config maps from the target cluster in order to get user-defined prioritization of versions.
+  (3) getting ConfigMaps from the target cluster in order to get user-defined prioritization of versions.
 
   The three lists will be used to create a map of chosen versions for each resource to restore. If there is a user-defined list of priority versions, the versions will be checked against the supported versions lists. The highest user-defined priority version that is/was supported by both target and source clusters will be the chosen version for that resource. If no user specified versions are supported by neither target nor source, the versions will be logged and the restore will continue with other prioritizations.
 
