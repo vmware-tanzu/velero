@@ -1,1 +1,0 @@
-Fix issue 6913: Velero Built-in Datamover: Backup stucks in phase WaitingForPluginOperations when Node Agent pod gets restarted
