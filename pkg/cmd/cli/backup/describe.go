@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"os"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,7 +30,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
-	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/label"
 )
 
@@ -56,14 +53,6 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 		Run: func(c *cobra.Command, args []string) {
 			kbClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
-
-			var csiClient *snapshotv1client.Clientset
-			if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-				clientConfig, err := f.ClientConfig()
-				cmd.CheckError(err)
-				csiClient, err = snapshotv1client.NewForConfig(clientConfig)
-				cmd.CheckError(err)
-			}
 
 			if outputFormat != "plaintext" && outputFormat != "json" {
 				cmd.CheckError(fmt.Errorf("invalid output format '%s'. valid value are 'plaintext, json'", outputFormat))
@@ -104,23 +93,13 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeBackups for backup %s: %v\n", backup.Name, err)
 				}
 
-				// declare vscList up here since it may be empty and we'll pass the empty Items field into DescribeBackup
-				vscList := new(snapshotv1api.VolumeSnapshotContentList)
-				if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-					opts := label.NewListOptionsForBackup(backup.Name)
-					vscList, err = csiClient.SnapshotV1().VolumeSnapshotContents().List(context.TODO(), opts)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "error getting VolumeSnapshotContent objects for backup %s: %v\n", backup.Name, err)
-					}
-				}
-
 				// structured output only applies to a single backup in case of OOM
 				// To describe the list of backups in structured format, users could iterate over the list and describe backup one after another.
 				if len(backups.Items) == 1 && outputFormat != "plaintext" {
-					s := output.DescribeBackupInSF(context.Background(), kbClient, &backups.Items[i], deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, insecureSkipTLSVerify, caCertFile, outputFormat)
+					s := output.DescribeBackupInSF(context.Background(), kbClient, &backups.Items[i], deleteRequestList.Items, podVolumeBackupList.Items, details, insecureSkipTLSVerify, caCertFile, outputFormat)
 					fmt.Print(s)
 				} else {
-					s := output.DescribeBackup(context.Background(), kbClient, &backups.Items[i], deleteRequestList.Items, podVolumeBackupList.Items, vscList.Items, details, insecureSkipTLSVerify, caCertFile)
+					s := output.DescribeBackup(context.Background(), kbClient, &backups.Items[i], deleteRequestList.Items, podVolumeBackupList.Items, details, insecureSkipTLSVerify, caCertFile)
 					if first {
 						first = false
 						fmt.Print(s)

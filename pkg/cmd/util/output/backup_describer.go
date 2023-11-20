@@ -27,8 +27,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-
 	"github.com/fatih/color"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -38,6 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -50,7 +49,6 @@ func DescribeBackup(
 	backup *velerov1api.Backup,
 	deleteRequests []velerov1api.DeleteBackupRequest,
 	podVolumeBackups []velerov1api.PodVolumeBackup,
-	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
 	details bool,
 	insecureSkipTLSVerify bool,
 	caCertFile string,
@@ -347,6 +345,7 @@ func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Desc
 	}
 
 	describeBackupVolumes(ctx, kbClient, d, backup, details, insecureSkipTLSVerify, caCertPath, podVolumeBackups)
+
 	d.Println()
 }
 
@@ -415,6 +414,11 @@ func describeBackupResourceList(ctx context.Context, kbClient kbclient.Client, d
 
 func describeBackupVolumes(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, details bool,
 	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackupCRs []velerov1api.PodVolumeBackup) {
+	if boolptr.IsSetToFalse(backup.Spec.SnapshotVolumes) {
+		d.Println("Backup Volumes: <none included>")
+		return
+	}
+
 	d.Println("Backup Volumes:")
 
 	buf := new(bytes.Buffer)
@@ -431,12 +435,12 @@ func describeBackupVolumes(ctx context.Context, kbClient kbclient.Client, d *Des
 
 	nativeSnapshots := []*volume.VolumeInfo{}
 	csiSnapshots := []*volume.VolumeInfo{}
-	for _, info := range volumeInfos.VolumeInfos {
-		switch info.BackupMethod {
+	for i := range volumeInfos.VolumeInfos {
+		switch volumeInfos.VolumeInfos[i].BackupMethod {
 		case volume.NativeSnapshot:
-			nativeSnapshots = append(nativeSnapshots, &info)
+			nativeSnapshots = append(nativeSnapshots, &volumeInfos.VolumeInfos[i])
 		case volume.CSISnapshot:
-			csiSnapshots = append(csiSnapshots, &info)
+			csiSnapshots = append(csiSnapshots, &volumeInfos.VolumeInfos[i])
 		}
 	}
 

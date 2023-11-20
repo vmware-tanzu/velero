@@ -26,13 +26,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	"github.com/vmware-tanzu/velero/pkg/features"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -44,7 +43,6 @@ func DescribeBackupInSF(
 	backup *velerov1api.Backup,
 	deleteRequests []velerov1api.DeleteBackupRequest,
 	podVolumeBackups []velerov1api.PodVolumeBackup,
-	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
 	details bool,
 	insecureSkipTLSVerify bool,
 	caCertFile string,
@@ -267,9 +265,7 @@ func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *
 		describeBackupResourceListInSF(ctx, kbClient, backupStatusInfo, backup, insecureSkipTLSVerify, caCertPath)
 	}
 
-	backupVolumes := make(map[string]interface{})
-	describeBackupVolumesInSF(ctx, kbClient, backup, details, insecureSkipTLSVerify, caCertPath, podVolumeBackups, backupVolumes)
-	backupStatusInfo["backupVolumes"] = backupVolumes
+	describeBackupVolumesInSF(ctx, kbClient, backup, details, insecureSkipTLSVerify, caCertPath, podVolumeBackups, backupStatusInfo)
 }
 
 func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Client, backupStatusInfo map[string]interface{}, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) {
@@ -300,7 +296,13 @@ func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Clien
 }
 
 func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, backup *velerov1api.Backup, details bool,
-	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackupCRs []velerov1api.PodVolumeBackup, backupVolumes map[string]interface{}) {
+	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackupCRs []velerov1api.PodVolumeBackup, backupStatusInfo map[string]interface{}) {
+	if boolptr.IsSetToFalse(backup.Spec.SnapshotVolumes) {
+		backupStatusInfo["backupVolumes"] = "<none included>"
+		return
+	}
+
+	backupVolumes := make(map[string]interface{})
 
 	buf := new(bytes.Buffer)
 	if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeInfos, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
@@ -316,12 +318,12 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 
 	nativeSnapshots := []*volume.VolumeInfo{}
 	csiSnapshots := []*volume.VolumeInfo{}
-	for _, info := range volumeInfos.VolumeInfos {
-		switch info.BackupMethod {
+	for i := range volumeInfos.VolumeInfos {
+		switch volumeInfos.VolumeInfos[i].BackupMethod {
 		case volume.NativeSnapshot:
-			nativeSnapshots = append(nativeSnapshots, &info)
+			nativeSnapshots = append(nativeSnapshots, &volumeInfos.VolumeInfos[i])
 		case volume.CSISnapshot:
-			csiSnapshots = append(csiSnapshots, &info)
+			csiSnapshots = append(csiSnapshots, &volumeInfos.VolumeInfos[i])
 		}
 	}
 
@@ -332,11 +334,14 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 	backupVolumes["csiSnapshots"] = csiSnapshotDetails
 
 	describePodVolumeBackupsInSF(podVolumeBackupCRs, details, backupVolumes)
+
+	backupStatusInfo["backupVolumes"] = backupVolumes
 }
 
 func describeNativeSnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVolumes map[string]interface{}) {
 	if len(infos) == 0 {
 		backupVolumes["nativeSnapshots"] = "<none included>"
+		return
 	}
 
 	snapshotDetails := make(map[string]interface{})
@@ -347,7 +352,6 @@ func describeNativeSnapshotsInSF(details bool, infos []*volume.VolumeInfo, backu
 }
 
 func describNativeSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDetails map[string]interface{}) {
-
 	if details {
 		snapshotInfo := make(map[string]string)
 		snapshotInfo["snapshotID"] = info.NativeSnapshotInfo.SnapshotHandle

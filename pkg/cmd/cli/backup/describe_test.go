@@ -39,7 +39,7 @@ func TestNewDescribeCommand(t *testing.T) {
 	// create a factory
 	f := &factorymocks.Factory{}
 	backupName := "bk-describe-1"
-	testBackup := builder.ForBackup(cmdtest.VeleroNameSpace, backupName).Result()
+	testBackup := builder.ForBackup(cmdtest.VeleroNameSpace, backupName).SnapshotVolumes(false).Result()
 
 	clientConfig := rest.Config{}
 	kbClient := test.NewFakeControllerRuntimeClient(t)
@@ -68,7 +68,7 @@ func TestNewDescribeCommand(t *testing.T) {
 	stdout, _, err := veleroexec.RunCommand(cmd)
 
 	if err == nil {
-		assert.Contains(t, stdout, "Velero-Native Snapshots: <none included>")
+		assert.Contains(t, stdout, "Backup Volumes: <none included>")
 		assert.Contains(t, stdout, "Or label selector:  <none>")
 		assert.Contains(t, stdout, fmt.Sprintf("Name:         %s", backupName))
 		return

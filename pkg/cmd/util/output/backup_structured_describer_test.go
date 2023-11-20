@@ -266,7 +266,7 @@ func TestDescribePodVolumeBackupsInSF(t *testing.T) {
 	}
 }
 
-func TestDescribeSnapshotInSF(t *testing.T) {
+func TestDescribeNativeSnapshotsInSF(t *testing.T) {
 	testcases := []struct {
 		name         string
 		volumeInfo   []*volume.VolumeInfo
