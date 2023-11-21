@@ -1,1 +1,1 @@
-change the metrics backup_attempt_total default value to 1.
+change the metrics backup_last_status default value to 1.
