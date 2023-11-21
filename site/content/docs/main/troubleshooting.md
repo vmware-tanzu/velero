@@ -231,7 +231,7 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
 [6]: https://github.com/vmware-tanzu/helm-charts/blob/main/charts/velero
 [7]: https://github.com/vmware-tanzu/helm-charts/blob/main/charts/velero/values.yaml#L44
 [8]: https://github.com/vmware-tanzu/helm-charts/blob/main/charts/velero/values.yaml#L49-L52
-[9]: https://kubectl.docs.kubernetes.io/pages/container_debugging/port_forward_to_pods.html
+[9]: https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#port-forward
 [10]: locations.md
 [11]: /plugins
 [12]: https://kubernetes.io/docs/concepts/configuration/secret/#editing-a-secret
