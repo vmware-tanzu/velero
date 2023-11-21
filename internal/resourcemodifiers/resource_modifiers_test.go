@@ -241,6 +241,64 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			},
 		},
 	}
+	cm9 := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupResource: deployments.apps\n    resourceNameRegex: \"^test-.*$\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: replace\n    path: \"/value/bool\"\n    value: \"\\\"true\\\"\"\n\n\n",
+		},
+	}
+
+	rules9 := &ResourceModifiers{
+		Version: "v1",
+		ResourceModifierRules: []ResourceModifierRule{
+			{
+				Conditions: Conditions{
+					GroupResource:     "deployments.apps",
+					ResourceNameRegex: "^test-.*$",
+					Namespaces:        []string{"bar", "foo"},
+				},
+				Patches: []JSONPatch{
+					{
+						Operation: "replace",
+						Path:      "/value/bool",
+						Value:     `"true"`,
+					},
+				},
+			},
+		},
+	}
+	cm10 := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "test-namespace",
+		},
+		Data: map[string]string{
+			"sub.yml": "version: v1\nresourceModifierRules:\n- conditions:\n    groupResource: deployments.apps\n    resourceNameRegex: \"^test-.*$\"\n    namespaces:\n    - bar\n    - foo\n  patches:\n  - operation: replace\n    path: \"/value/bool\"\n    value: \"true\"\n\n\n",
+		},
+	}
+
+	rules10 := &ResourceModifiers{
+		Version: "v1",
+		ResourceModifierRules: []ResourceModifierRule{
+			{
+				Conditions: Conditions{
+					GroupResource:     "deployments.apps",
+					ResourceNameRegex: "^test-.*$",
+					Namespaces:        []string{"bar", "foo"},
+				},
+				Patches: []JSONPatch{
+					{
+						Operation: "replace",
+						Path:      "/value/bool",
+						Value:     "true",
+					},
+				},
+			},
+		},
+	}
 
 	type args struct {
 		cm *v1.ConfigMap
@@ -321,6 +379,22 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 				cm: cm8,
 			},
 			want:    rules8,
+			wantErr: false,
+		},
+		{
+			name: "bool value as string",
+			args: args{
+				cm: cm9,
+			},
+			want:    rules9,
+			wantErr: false,
+		},
+		{
+			name: "bool value as bool",
+			args: args{
+				cm: cm10,
+			},
+			want:    rules10,
 			wantErr: false,
 		},
 	}
@@ -465,7 +539,24 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			},
 		},
 	}
-
+	cmTrue := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"data": map[string]interface{}{
+				"test": "true",
+			},
+		},
+	}
+	cmFalse := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"data": map[string]interface{}{
+				"test": "false",
+			},
+		},
+	}
 	type fields struct {
 		Version               string
 		ResourceModifierRules []ResourceModifierRule
@@ -481,6 +572,33 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 		wantErr bool
 		wantObj *unstructured.Unstructured
 	}{
+		{
+			name: "configmap true false string",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupResource:     "configmaps",
+							ResourceNameRegex: ".*",
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "replace",
+								Path:      "/data/test",
+								Value:     `"false"`,
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           cmTrue.DeepCopy(),
+				groupResource: "configmaps",
+			},
+			wantErr: false,
+			wantObj: cmFalse.DeepCopy(),
+		},
 		{
 			name: "Invalid Regex throws error",
 			fields: fields{
