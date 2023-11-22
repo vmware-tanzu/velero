@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -42,18 +41,14 @@ import (
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
-	"github.com/vmware-tanzu/velero/pkg/itemoperation"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
@@ -319,8 +314,8 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	request := &pkgbackup.Request{
 		Backup:           backup.DeepCopy(), // don't modify items in the cache
 		SkippedPVTracker: pkgbackup.NewSkipPVTracker(),
-		PVMap:            map[string]pkgbackup.PvcPvInfo{},
 	}
+	request.VolumesInformation.InitPVMap()
 
 	// set backup major version - deprecated, use Status.FormatVersion
 	request.Status.Version = pkgbackup.BackupVersion
@@ -737,9 +732,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	if logFile, err := backupLog.GetPersistFile(); err != nil {
 		fatalErrs = append(fatalErrs, errors.Wrap(err, "error getting backup log file"))
 	} else {
-		backup.VolumeInfos.VolumeInfos = generateVolumeInfo(backup, volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses, b.globalCRClient, backupLog)
-
-		if errs := persistBackup(backup, backupFile, logFile, backupStore, volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses, results); len(errs) > 0 {
+		if errs := persistBackup(backup, backupFile, logFile, backupStore, volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses, results, b.globalCRClient, backupLog); len(errs) > 0 {
 			fatalErrs = append(fatalErrs, errs...)
 		}
 	}
@@ -796,8 +789,10 @@ func persistBackup(backup *pkgbackup.Request,
 	backupStore persistence.BackupStore,
 	csiVolumeSnapshots []snapshotv1api.VolumeSnapshot,
 	csiVolumeSnapshotContents []snapshotv1api.VolumeSnapshotContent,
-	csiVolumesnapshotClasses []snapshotv1api.VolumeSnapshotClass,
+	csiVolumeSnapshotClasses []snapshotv1api.VolumeSnapshotClass,
 	results map[string]results.Result,
+	crClient kbclient.Client,
+	logger logrus.FieldLogger,
 ) []error {
 	persistErrs := []error{}
 	backupJSON := new(bytes.Buffer)
@@ -832,7 +827,7 @@ func persistBackup(backup *pkgbackup.Request,
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
-	csiSnapshotClassesJSON, errs := encode.ToJSONGzip(csiVolumesnapshotClasses, "csi volume snapshot classes list")
+	csiSnapshotClassesJSON, errs := encode.ToJSONGzip(csiVolumeSnapshotClasses, "csi volume snapshot classes list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
@@ -847,7 +842,8 @@ func persistBackup(backup *pkgbackup.Request,
 		persistErrs = append(persistErrs, errs...)
 	}
 
-	volumeInfoJSON, errs := encode.ToJSONGzip(backup.VolumeInfos, "backup volumes information")
+	volumeInfoJSON, errs := encode.ToJSONGzip(backup.VolumesInformation.GenerateVolumeInfo(backup, csiVolumeSnapshots,
+		csiVolumeSnapshotContents, csiVolumeSnapshotClasses, crClient, logger), "backup volumes information")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
@@ -911,329 +907,4 @@ func oldAndNewFilterParametersUsedTogether(backupSpec velerov1api.BackupSpec) bo
 		(len(backupSpec.ExcludedNamespaceScopedResources) > 0)
 
 	return haveOldResourceFilterParameters && haveNewResourceFilterParameters
-}
-
-func generateVolumeInfo(backup *pkgbackup.Request, csiVolumeSnapshots []snapshotv1api.VolumeSnapshot,
-	csiVolumeSnapshotContents []snapshotv1api.VolumeSnapshotContent, csiVolumesnapshotClasses []snapshotv1api.VolumeSnapshotClass,
-	crClient kbclient.Client, logger logrus.FieldLogger) []volume.VolumeInfo {
-	volumeInfos := make([]volume.VolumeInfo, 0)
-
-	skippedVolumeInfos := generateVolumeInfoForSkippedPV(backup, logger)
-	volumeInfos = append(volumeInfos, skippedVolumeInfos...)
-
-	nativeSnapshotVolumeInfos := generateVolumeInfoForVeleroNativeSnapshot(backup, logger)
-	volumeInfos = append(volumeInfos, nativeSnapshotVolumeInfos...)
-
-	csiVolumeInfos := generateVolumeInfoForCSIVolumeSnapshot(backup, csiVolumeSnapshots, csiVolumeSnapshotContents, csiVolumesnapshotClasses, logger)
-	volumeInfos = append(volumeInfos, csiVolumeInfos...)
-
-	pvbVolumeInfos := generateVolumeInfoFromPVB(backup, crClient, logger)
-	volumeInfos = append(volumeInfos, pvbVolumeInfos...)
-
-	dataUploadVolumeInfos := generateVolumeInfoFromDataUpload(backup, crClient, logger)
-	volumeInfos = append(volumeInfos, dataUploadVolumeInfos...)
-
-	return volumeInfos
-}
-
-// generateVolumeInfoForSkippedPV generate VolumeInfos for SkippedPV.
-func generateVolumeInfoForSkippedPV(backup *pkgbackup.Request, logger logrus.FieldLogger) []volume.VolumeInfo {
-	tmpVolumeInfos := make([]volume.VolumeInfo, 0)
-
-	for _, skippedPV := range backup.SkippedPVTracker.Summary() {
-		if pvcPVInfo, ok := backup.PVMap[skippedPV.Name]; ok {
-			volumeInfo := volume.VolumeInfo{
-				PVCName:           pvcPVInfo.PVCName,
-				PVCNamespace:      pvcPVInfo.PVCNamespace,
-				PVName:            skippedPV.Name,
-				SnapshotDataMoved: false,
-				Skipped:           true,
-				SkippedReason:     skippedPV.SerializeSkipReasons(),
-				PVInfo: volume.PVInfo{
-					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
-					Labels:        pvcPVInfo.PV.Labels,
-				},
-			}
-			tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
-		} else {
-			logger.Warnf("Cannot find info for PV %s", skippedPV.Name)
-			continue
-		}
-	}
-
-	return tmpVolumeInfos
-}
-
-// generateVolumeInfoForVeleroNativeSnapshot generate VolumeInfos for Velero native snapshot
-func generateVolumeInfoForVeleroNativeSnapshot(backup *pkgbackup.Request, logger logrus.FieldLogger) []volume.VolumeInfo {
-	tmpVolumeInfos := make([]volume.VolumeInfo, 0)
-
-	for _, nativeSnapshot := range backup.VolumeSnapshots {
-		var iops int64
-		if nativeSnapshot.Spec.VolumeIOPS != nil {
-			iops = *nativeSnapshot.Spec.VolumeIOPS
-		}
-
-		if pvcPVInfo, ok := backup.PVMap[nativeSnapshot.Spec.PersistentVolumeName]; ok {
-			volumeInfo := volume.VolumeInfo{
-				BackupMethod:      volume.NativeSnapshot,
-				PVCName:           pvcPVInfo.PVCName,
-				PVCNamespace:      pvcPVInfo.PVCNamespace,
-				PVName:            pvcPVInfo.PV.Name,
-				SnapshotDataMoved: false,
-				Skipped:           false,
-				NativeSnapshotInfo: volume.NativeSnapshotInfo{
-					SnapshotHandle: nativeSnapshot.Status.ProviderSnapshotID,
-					VolumeType:     nativeSnapshot.Spec.VolumeType,
-					VolumeAZ:       nativeSnapshot.Spec.VolumeAZ,
-					IOPS:           strconv.FormatInt(iops, 10),
-				},
-				PVInfo: volume.PVInfo{
-					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
-					Labels:        pvcPVInfo.PV.Labels,
-				},
-			}
-
-			tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
-		} else {
-			logger.Warnf("cannot find info for PV %s", nativeSnapshot.Spec.PersistentVolumeName)
-			continue
-		}
-	}
-
-	return tmpVolumeInfos
-}
-
-// generateVolumeInfoForCSIVolumeSnapshot generate VolumeInfos for CSI VolumeSnapshot
-func generateVolumeInfoForCSIVolumeSnapshot(backup *pkgbackup.Request, csiVolumeSnapshots []snapshotv1api.VolumeSnapshot,
-	csiVolumeSnapshotContents []snapshotv1api.VolumeSnapshotContent, csiVolumesnapshotClasses []snapshotv1api.VolumeSnapshotClass,
-	logger logrus.FieldLogger) []volume.VolumeInfo {
-	tmpVolumeInfos := make([]volume.VolumeInfo, 0)
-
-	for _, volumeSnapshot := range csiVolumeSnapshots {
-		var volumeSnapshotClass *snapshotv1api.VolumeSnapshotClass
-		var volumeSnapshotContent *snapshotv1api.VolumeSnapshotContent
-
-		// This is protective logic. The passed-in VS should be all related
-		// to this backup.
-		if volumeSnapshot.Labels[velerov1api.BackupNameLabel] != backup.Name {
-			continue
-		}
-
-		if volumeSnapshot.Spec.VolumeSnapshotClassName == nil {
-			logger.Warnf("Cannot find VolumeSnapshotClass for VolumeSnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
-			continue
-		}
-
-		if volumeSnapshot.Status == nil || volumeSnapshot.Status.BoundVolumeSnapshotContentName == nil {
-			logger.Warnf("Cannot fine VolumeSnapshotContent for VolumeSnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
-			continue
-		}
-
-		if volumeSnapshot.Spec.Source.PersistentVolumeClaimName == nil {
-			logger.Warnf("VolumeSnapshot %s/%s doesn't have a source PVC", volumeSnapshot.Namespace, volumeSnapshot.Name)
-			continue
-		}
-
-		for index := range csiVolumesnapshotClasses {
-			if *volumeSnapshot.Spec.VolumeSnapshotClassName == csiVolumesnapshotClasses[index].Name {
-				volumeSnapshotClass = &csiVolumesnapshotClasses[index]
-			}
-		}
-
-		for index := range csiVolumeSnapshotContents {
-			if *volumeSnapshot.Status.BoundVolumeSnapshotContentName == csiVolumeSnapshotContents[index].Name {
-				volumeSnapshotContent = &csiVolumeSnapshotContents[index]
-			}
-		}
-
-		if volumeSnapshotClass == nil || volumeSnapshotContent == nil {
-			logger.Warnf("fail to get VolumeSnapshotContent or VolumeSnapshotClass for VolumeSnapshot: %s/%s",
-				volumeSnapshot.Namespace, volumeSnapshot.Name)
-			continue
-		}
-
-		var operation itemoperation.BackupOperation
-		for _, op := range *backup.GetItemOperationsList() {
-			if op.Spec.ResourceIdentifier.GroupResource.String() == kuberesource.VolumeSnapshots.String() &&
-				op.Spec.ResourceIdentifier.Name == volumeSnapshot.Name &&
-				op.Spec.ResourceIdentifier.Namespace == volumeSnapshot.Namespace {
-				operation = *op
-			}
-		}
-
-		var size int64
-		if volumeSnapshot.Status.RestoreSize != nil {
-			size = volumeSnapshot.Status.RestoreSize.Value()
-		}
-		snapshotHandle := ""
-		if volumeSnapshotContent.Status.SnapshotHandle != nil {
-			snapshotHandle = *volumeSnapshotContent.Status.SnapshotHandle
-		}
-		if pvcPVInfo, ok := backup.PVMap[volumeSnapshot.Namespace+"/"+*volumeSnapshot.Spec.Source.PersistentVolumeClaimName]; ok {
-			volumeInfo := volume.VolumeInfo{
-				BackupMethod:          volume.CSISnapshot,
-				PVCName:               pvcPVInfo.PVCName,
-				PVCNamespace:          pvcPVInfo.PVCNamespace,
-				PVName:                pvcPVInfo.PV.Name,
-				Skipped:               false,
-				SnapshotDataMoved:     false,
-				PreserveLocalSnapshot: true,
-				OperationID:           operation.Spec.OperationID,
-				StartTimestamp:        &(volumeSnapshot.CreationTimestamp),
-				CSISnapshotInfo: volume.CSISnapshotInfo{
-					VSCName:        *volumeSnapshot.Status.BoundVolumeSnapshotContentName,
-					Size:           size,
-					Driver:         volumeSnapshotClass.Driver,
-					SnapshotHandle: snapshotHandle,
-				},
-				PVInfo: volume.PVInfo{
-					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
-					Labels:        pvcPVInfo.PV.Labels,
-				},
-			}
-
-			tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
-		} else {
-			logger.Warnf("cannot find info for PVC %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Spec.Source.PersistentVolumeClaimName)
-			continue
-		}
-	}
-
-	return tmpVolumeInfos
-}
-
-// generateVolumeInfoFromPVB generate VolumeInfo for PVB.
-func generateVolumeInfoFromPVB(backup *pkgbackup.Request, crClient kbclient.Client, logger logrus.FieldLogger) []volume.VolumeInfo {
-	tmpVolumeInfos := make([]volume.VolumeInfo, 0)
-
-	for _, pvb := range backup.PodVolumeBackups {
-		volumeInfo := volume.VolumeInfo{
-			BackupMethod:      volume.PodVolumeBackup,
-			SnapshotDataMoved: false,
-			Skipped:           false,
-			StartTimestamp:    pvb.Status.StartTimestamp,
-			PVBInfo: volume.PodVolumeBackupInfo{
-				SnapshotHandle: pvb.Status.SnapshotID,
-				Size:           pvb.Status.Progress.TotalBytes,
-				UploaderType:   pvb.Spec.UploaderType,
-				VolumeName:     pvb.Spec.Volume,
-				PodName:        pvb.Spec.Pod.Name,
-				PodNamespace:   pvb.Spec.Pod.Namespace,
-				NodeName:       pvb.Spec.Node,
-			},
-		}
-
-		pod := new(corev1api.Pod)
-		pvcName := ""
-		err := crClient.Get(context.TODO(), kbclient.ObjectKey{Namespace: pvb.Spec.Pod.Namespace, Name: pvb.Spec.Pod.Name}, pod)
-		if err != nil {
-			logger.WithError(err).Warn("Fail to get pod for PodVolumeBackup: ", pvb.Name)
-			continue
-		}
-		for _, volume := range pod.Spec.Volumes {
-			if volume.Name == pvb.Spec.Volume && volume.PersistentVolumeClaim != nil {
-				pvcName = volume.PersistentVolumeClaim.ClaimName
-			}
-		}
-
-		if pvcName != "" {
-			if pvcPVInfo, ok := backup.PVMap[pod.Namespace+"/"+pvcName]; ok {
-				volumeInfo.PVCName = pvcPVInfo.PVCName
-				volumeInfo.PVCNamespace = pvcPVInfo.PVCNamespace
-				volumeInfo.PVName = pvcPVInfo.PV.Name
-				volumeInfo.PVInfo = volume.PVInfo{
-					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
-					Labels:        pvcPVInfo.PV.Labels,
-				}
-			} else {
-				logger.Warnf("Cannot find info for PVC %s/%s", pod.Namespace, pvcName)
-				continue
-			}
-		} else {
-			logger.Debug("The PVB %s doesn't have a corresponding PVC", pvb.Name)
-		}
-
-		tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
-	}
-
-	return tmpVolumeInfos
-}
-
-// generateVolumeInfoFromDataUpload generate VolumeInfo for DataUpload.
-func generateVolumeInfoFromDataUpload(backup *pkgbackup.Request, crClient kbclient.Client, logger logrus.FieldLogger) []volume.VolumeInfo {
-	tmpVolumeInfos := make([]volume.VolumeInfo, 0)
-	vsClassList := new(snapshotv1api.VolumeSnapshotClassList)
-	if err := crClient.List(context.TODO(), vsClassList); err != nil {
-		logger.WithError(err).Errorf("cannot list VolumeSnapshotClass %s", err.Error())
-		return tmpVolumeInfos
-	}
-
-	for _, operation := range *backup.GetItemOperationsList() {
-		if operation.Spec.ResourceIdentifier.GroupResource.String() == kuberesource.PersistentVolumeClaims.String() {
-			var duIdentifier velero.ResourceIdentifier
-
-			for _, identifier := range operation.Spec.PostOperationItems {
-				if identifier.GroupResource.String() == "datauploads.velero.io" {
-					duIdentifier = identifier
-				}
-			}
-			if duIdentifier.Empty() {
-				logger.Warnf("cannot find DataUpload for PVC %s/%s backup async operation",
-					operation.Spec.ResourceIdentifier.Namespace, operation.Spec.ResourceIdentifier.Name)
-				continue
-			}
-
-			dataUpload := new(velerov2alpha1.DataUpload)
-			err := crClient.Get(
-				context.TODO(),
-				kbclient.ObjectKey{
-					Namespace: duIdentifier.Namespace,
-					Name:      duIdentifier.Name},
-				dataUpload,
-			)
-			if err != nil {
-				logger.Warnf("fail to get DataUpload for operation %s: %s", operation.Spec.OperationID, err.Error())
-				continue
-			}
-
-			driverUsedByVSClass := ""
-			for index := range vsClassList.Items {
-				if vsClassList.Items[index].Name == dataUpload.Spec.CSISnapshot.SnapshotClass {
-					driverUsedByVSClass = vsClassList.Items[index].Driver
-				}
-			}
-
-			if pvcPVInfo, ok := backup.PVMap[operation.Spec.ResourceIdentifier.Namespace+"/"+operation.Spec.ResourceIdentifier.Name]; ok {
-				volumeInfo := volume.VolumeInfo{
-					BackupMethod:      volume.CSISnapshot,
-					PVCName:           pvcPVInfo.PVCName,
-					PVCNamespace:      pvcPVInfo.PVCNamespace,
-					PVName:            pvcPVInfo.PV.Name,
-					SnapshotDataMoved: true,
-					Skipped:           false,
-					OperationID:       operation.Spec.OperationID,
-					StartTimestamp:    operation.Status.Created,
-					CSISnapshotInfo: volume.CSISnapshotInfo{
-						Driver: driverUsedByVSClass,
-					},
-					SnapshotDataMovementInfo: volume.SnapshotDataMovementInfo{
-						DataMover:    dataUpload.Spec.DataMover,
-						UploaderType: "kopia",
-					},
-					PVInfo: volume.PVInfo{
-						ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
-						Labels:        pvcPVInfo.PV.Labels,
-					},
-				}
-
-				tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
-			} else {
-				logger.Warnf("Cannot find info for PVC %s/%s", operation.Spec.ResourceIdentifier.Namespace, operation.Spec.ResourceIdentifier.Name)
-				continue
-			}
-		}
-	}
-
-	return tmpVolumeInfos
 }

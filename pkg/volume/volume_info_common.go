@@ -26,10 +26,6 @@ const (
 	CSISnapshot     VolumeBackupMethod = "CSISnapshot"
 )
 
-type VolumeInfoVersion struct {
-	Version string `json:"version"`
-}
-
 type VolumeInfos struct {
 	VolumeInfos []VolumeInfo `json:"volumeInfos"`
 }

@@ -108,6 +108,7 @@ type PVInfo struct {
 ### How the VolumeInfo array is generated.
 The function `persistBackup` has `backup *pkgbackup.Request` in parameters.
 From it, the `VolumeSnapshots`, `PodVolumeBackups`, `CSISnapshots`, `itemOperationsList`, and `SkippedPVTracker` can be read. All of them will be iterated and merged into the `VolumeInfo` array, and then persisted into backup repository in function `persistBackup`.
+After going through all the available sources, Velero will check whether there are still some PVs left. If there is any, Velero will generate VolumeInfo for them. The VolumeInfo will contain the PVC namespace, PVC name, PV name and the PVInfo structure.
 
 Please notice that the change happened in async operations are not reflected in the new metadata file. The file only covers the volume changes happen in the Velero server process scope.
 
@@ -125,7 +126,7 @@ type BackupStore interface {
 ### How the VolumeInfo array is used.
 
 #### Generate the PVC backed-up information summary
-The downstream tools can use this VolumeInfo array to format and display their volume information. This is in the scope of this feature.
+The downstream tools can use this VolumeInfo array to format and display their volume information. This is not in the scope of this feature.
 
 #### Retrieve volume backed-up information for `velero backup describe` command
 The `velero backup describe` can also use this VolumeInfo array structure to display the volume information. The snapshot data mover volume should use this structure at first, then the Velero native snapshot, CSI snapshot, and PodVolumeBackup can also use this structure. The detailed implementation is also not in this feature's scope.

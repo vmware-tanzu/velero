@@ -62,6 +62,7 @@ type Request struct {
 	ResourceModifiers    *resourcemodifiers.ResourceModifiers
 	DisableInformerCache bool
 	CSIVolumeSnapshots   []*snapshotv1api.VolumeSnapshot
+	VolumeInfoMap        map[string]volume.VolumeInfo
 }
 
 type restoredItemStatus struct {

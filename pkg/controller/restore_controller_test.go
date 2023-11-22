@@ -235,6 +235,7 @@ func TestRestoreReconcile(t *testing.T) {
 		putRestoreLogErr                error
 		expectedFinalPhase              string
 		addValidFinalizer               bool
+		emptyVolumeInfo                 bool
 	}{
 		{
 			name:                     "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
@@ -415,6 +416,18 @@ func TestRestoreReconcile(t *testing.T) {
 			backup:      defaultBackup().StorageLocation("default").Result(),
 			expectedErr: false,
 		},
+		{
+			name:                  "valid restore with empty VolumeInfos",
+			location:              defaultStorageLocation,
+			restore:               NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseNew).Result(),
+			backup:                defaultBackup().StorageLocation("default").Result(),
+			emptyVolumeInfo:       true,
+			expectedErr:           false,
+			expectedPhase:         string(velerov1api.RestorePhaseInProgress),
+			expectedStartTime:     &timestamp,
+			expectedCompletedTime: &timestamp,
+			expectedRestorerCall:  NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseInProgress).Result(),
+		},
 	}
 
 	formatFlag := logging.FormatText
@@ -482,6 +495,11 @@ func TestRestoreReconcile(t *testing.T) {
 				backupStore.On("PutRestoreResults", test.backup.Name, test.restore.Name, mock.Anything).Return(nil)
 				backupStore.On("PutRestoredResourceList", test.restore.Name, mock.Anything).Return(nil)
 				backupStore.On("PutRestoreItemOperations", mock.Anything, mock.Anything).Return(nil)
+				if test.emptyVolumeInfo == true {
+					backupStore.On("GetBackupVolumeInfos", test.backup.Name).Return(nil, nil)
+				} else {
+					backupStore.On("GetBackupVolumeInfos", test.backup.Name).Return(&volume.VolumeInfos{}, nil)
+				}
 
 				volumeSnapshots := []*volume.Snapshot{
 					{
