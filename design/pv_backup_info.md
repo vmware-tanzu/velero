@@ -61,7 +61,7 @@ type VolumeInfo struct {
 // CSISnapshotInfo is used for displaying the CSI snapshot status
 type CSISnapshotInfo struct {
     SnapshotHandle  string       // It's the storage provider's snapshot ID for CSI.
-    Size            int64        // The snapshot corresponding volume size. Some of the volume backup methods cannot retrieve the data by current design, for example, the Velero native snapshot.
+    Size            int64        // The snapshot corresponding volume size.
 
     Driver          string  // The name of the CSI driver.
     VSCName         string // The name of the VolumeSnapshotContent. 
@@ -70,7 +70,7 @@ type CSISnapshotInfo struct {
 // SnapshotDataMovementInfo is used for displaying the snapshot data mover status.
 type SnapshotDataMovementInfo struct {
     DataMover        string    // The data mover used by the backup. The valid values are `velero` and ``(equals to `velero`).
-    UploaderType     string    // The type of the uploader that uploads the snapshot data. The valid values are `kopia` and `restic`. It's useful for file-system backup and snapshot data mover.
+    UploaderType     string    // The type of the uploader that uploads the snapshot data. The valid values are `kopia` and `restic`.
     RetainedSnapshot string    // The name or ID of the snapshot associated object(SAO). SAO is used to support local snapshots for the snapshot data mover, e.g. it could be a VolumeSnapshot for CSI snapshot data moign/pv_backup_info.
     SnapshotHandle string  	   // It's the filesystem repository's snapshot ID.
 	
@@ -79,7 +79,6 @@ type SnapshotDataMovementInfo struct {
 // VeleroNativeSnapshotInfo is used for displaying the Velero native snapshot status.
 type VeleroNativeSnapshotInfo struct {
     SnapshotHandle      string       // It's the storage provider's snapshot ID for the Velero-native snapshot.
-    Size                int64        // The snapshot corresponding volume size. Some of the volume backup methods cannot retrieve the data by current design, for example, the Velero native snapshot.
 
     VolumeType string    // The cloud provider snapshot volume type.
     VolumeAZ   string    // The cloud provider snapshot volume's availability zones.
@@ -89,11 +88,12 @@ type VeleroNativeSnapshotInfo struct {
 // PodVolumeBackupInfo is used for displaying the PodVolumeBackup snapshot status.
 type PodVolumeBackupInfo struct {
     SnapshotHandle      string       // It's the file-system uploader's snapshot ID for PodVolumeBackup.
-    Size                int64        // The snapshot corresponding volume size. Some of the volume backup methods cannot retrieve the data by current design, for example, the Velero native snapshot.
+    Size                int64        // The snapshot corresponding volume size.
 
-    UploaderType  string    // The type of the uploader that uploads the data. The valid values are `kopia` and `restic`. It's useful for file-system backup and snapshot data mover.
+    UploaderType  string    // The type of the uploader that uploads the data. The valid values are `kopia` and `restic`.
     VolumeName    string   // The PVC's corresponding volume name used by Pod: https://github.com/kubernetes/kubernetes/blob/e4b74dd12fa8cb63c174091d5536a10b8ec19d34/pkg/apis/core/types.go#L48
-    PodName       string   // The Pod name mounting this PVC. The format should be <namespace-name>/<pod-name>.
+    PodName       string   // The Pod name mounting this PVC.
+    PodNamespace  string   // The Pod namespace.
     NodeName      string   // The PVB-taken k8s node's name.
 }
 

@@ -71,6 +71,7 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 	req := &Request{
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
+		PVMap:            map[string]PvcPvInfo{},
 	}
 	backupFile := bytes.NewBuffer([]byte{})
 
@@ -84,8 +85,8 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 			builder.ForDeployment("zoo", "raz").Result(),
 		),
 		test.PVs(
-			builder.ForPersistentVolume("bar").Result(),
-			builder.ForPersistentVolume("baz").Result(),
+			builder.ForPersistentVolume("bar").ClaimRef("foo", "pvc1").Result(),
+			builder.ForPersistentVolume("baz").ClaimRef("bar", "pvc2").Result(),
 		),
 	}
 	for _, resource := range apiResources {

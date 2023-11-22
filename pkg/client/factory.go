@@ -24,6 +24,7 @@ import (
 	k8scheme "k8s.io/client-go/kubernetes/scheme"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -156,6 +157,9 @@ func (f *factory) KubebuilderClient() (kbclient.Client, error) {
 		return nil, err
 	}
 	if err := apiextv1.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+	if err := snapshotv1api.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
 	kubebuilderClient, err := kbclient.New(clientConfig, kbclient.Options{
