@@ -92,6 +92,8 @@ These instructions start the Velero server and a Minio instance that is accessib
       * Set `s3ForcePathStyle=true` for parameter `--backup-location-config` when installing Velero. This is the preferred way.
       * Make MinIO server support virtual-host style address. Add the [MINIO_DOMAIN environment variable](https://min.io/docs/minio/linux/reference/minio-server/settings/core.html#id5) for MinIO server will do the magic.
 
+    `--backup-location-config xxx`.You can reference [supported-providers](https://velero.io/docs/main/supported-providers/)'s plugin Config Options Table.
+
 
 1. Deploy the example nginx application:
 

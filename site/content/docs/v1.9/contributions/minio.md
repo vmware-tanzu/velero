@@ -87,6 +87,8 @@ These instructions start the Velero server and a Minio instance that is accessib
 
     This example also assumes you have named your Minio bucket "velero".
 
+    `--backup-location-config xxx`.You can reference [supported-providers](https://velero.io/docs/main/supported-providers/)'s plugin Config Options Table.
+
 
 1. Deploy the example nginx application:
 
