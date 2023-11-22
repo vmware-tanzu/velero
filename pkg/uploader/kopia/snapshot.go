@@ -28,10 +28,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/kopia"
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-
 	"github.com/kopia/kopia/fs"
 	"github.com/kopia/kopia/fs/localfs"
 	"github.com/kopia/kopia/repo"
@@ -41,6 +37,11 @@ import (
 	"github.com/kopia/kopia/snapshot/restore"
 	"github.com/kopia/kopia/snapshot/snapshotfs"
 	"github.com/pkg/errors"
+
+	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
+	"github.com/vmware-tanzu/velero/pkg/kopia"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
 // All function mainly used to make testing more convenient
@@ -104,9 +105,14 @@ func getDefaultPolicy() *policy.Policy {
 	}
 }
 
-func setupDefaultPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snapshot.SourceInfo) (*policy.Tree, error) {
+func setupPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snapshot.SourceInfo, uploaderCfg shared.UploaderConfig) (*policy.Tree, error) {
 	// some internal operations from Kopia code retrieves policies from repo directly, so we need to persist the policy to repo
-	err := setPolicyFunc(ctx, rep, sourceInfo, getDefaultPolicy())
+	curPolicy := getDefaultPolicy()
+	if uploaderCfg.ParallelFilesUpload > 0 {
+		curPolicy.UploadPolicy.MaxParallelFileReads = newOptionalInt(uploaderCfg.ParallelFilesUpload)
+	}
+
+	err := setPolicyFunc(ctx, rep, sourceInfo, curPolicy)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to set policy")
 	}
@@ -127,7 +133,7 @@ func setupDefaultPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceIn
 
 // Backup backup specific sourcePath and update progress
 func Backup(ctx context.Context, fsUploader SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string,
-	forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+	forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg shared.UploaderConfig, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 	if fsUploader == nil {
 		return nil, false, errors.New("get empty kopia uploader")
 	}
@@ -172,7 +178,7 @@ func Backup(ctx context.Context, fsUploader SnapshotUploader, repoWriter repo.Re
 	}
 
 	kopiaCtx := kopia.SetupKopiaLog(ctx, log)
-	snapID, snapshotSize, err := SnapshotSource(kopiaCtx, repoWriter, fsUploader, sourceInfo, sourceEntry, forceFull, parentSnapshot, tags, log, "Kopia Uploader")
+	snapID, snapshotSize, err := SnapshotSource(kopiaCtx, repoWriter, fsUploader, sourceInfo, sourceEntry, forceFull, parentSnapshot, tags, uploaderCfg, log, "Kopia Uploader")
 	if err != nil {
 		return nil, false, err
 	}
@@ -223,6 +229,7 @@ func SnapshotSource(
 	forceFull bool,
 	parentSnapshot string,
 	snapshotTags map[string]string,
+	uploaderCfg shared.UploaderConfig,
 	log logrus.FieldLogger,
 	description string,
 ) (string, int64, error) {
@@ -258,7 +265,7 @@ func SnapshotSource(
 		log.Infof("Using parent snapshot %s, start time %v, end time %v, description %s", previous[i].ID, previous[i].StartTime.ToTime(), previous[i].EndTime.ToTime(), previous[i].Description)
 	}
 
-	policyTree, err := setupDefaultPolicy(ctx, rep, sourceInfo)
+	policyTree, err := setupPolicy(ctx, rep, sourceInfo, uploaderCfg)
 	if err != nil {
 		return "", 0, errors.Wrapf(err, "unable to set policy for si %v", sourceInfo)
 	}

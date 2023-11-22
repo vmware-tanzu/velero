@@ -59,7 +59,7 @@ Last Backup:  <never>
 	input2 := builder.ForSchedule("velero", "schedule-2").
 		Phase(velerov1api.SchedulePhaseEnabled).
 		CronSchedule("0 0 * * *").
-		Template(builder.ForBackup("velero", "backup-1").Result().Spec).
+		Template(builder.ForBackup("velero", "backup-1").ParallelFilesUpload(10).Result().Spec).
 		LastBackupTime("2023-06-25 15:04:05").Result()
 	expect2 := `Name:         schedule-2
 Namespace:    velero
@@ -67,6 +67,9 @@ Labels:       <none>
 Annotations:  <none>
 
 Phase:  Enabled
+
+Uploader config:
+  Parallel files upload:  10
 
 Paused:  false
 

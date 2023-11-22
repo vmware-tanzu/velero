@@ -691,7 +691,8 @@ type Provider interface {
 		tags map[string]string,
 		forceFull bool,
 		parentSnapshot string,
-		volMode uploader.PersistentVolumeMode,
+                volMode uploader.PersistentVolumeMode,
+		uploaderCfg shared.UploaderConfig,
 		updater uploader.ProgressUpdater) (string, bool, error)
 
   RunRestore(
