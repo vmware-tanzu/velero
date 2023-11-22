@@ -4,7 +4,6 @@ import (
 	"context"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,25 +16,23 @@ import (
 
 // Common function to update the status of CSI snapshots
 // returns VolumeSnapshot, VolumeSnapshotContent, VolumeSnapshotClasses referenced
-func UpdateBackupCSISnapshotsStatus(client kbclient.Client, volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister, backup *velerov1api.Backup, backupLog logrus.FieldLogger) (volumeSnapshots []snapshotv1api.VolumeSnapshot, volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent, volumeSnapshotClasses []snapshotv1api.VolumeSnapshotClass) {
+func UpdateBackupCSISnapshotsStatus(client kbclient.Client, globalCRClient kbclient.Client, backup *velerov1api.Backup, backupLog logrus.FieldLogger) (volumeSnapshots []snapshotv1api.VolumeSnapshot, volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent, volumeSnapshotClasses []snapshotv1api.VolumeSnapshotClass) {
 	if boolptr.IsSetToTrue(backup.Spec.SnapshotMoveData) {
 		backupLog.Info("backup SnapshotMoveData is set to true, skip VolumeSnapshot resource persistence.")
 	} else if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		selector := label.NewSelectorForBackup(backup.Name)
 		vscList := &snapshotv1api.VolumeSnapshotContentList{}
 
-		if volumeSnapshotLister != nil {
-			tmpVSs, err := volumeSnapshotLister.List(label.NewSelectorForBackup(backup.Name))
-			if err != nil {
-				backupLog.Error(err)
-			}
-			for _, vs := range tmpVSs {
-				volumeSnapshots = append(volumeSnapshots, *vs)
-			}
-		}
-
-		err := client.List(context.Background(), vscList, &kbclient.ListOptions{LabelSelector: selector})
+		vsList := new(snapshotv1api.VolumeSnapshotList)
+		err := globalCRClient.List(context.TODO(), vsList, &kbclient.ListOptions{
+			LabelSelector: label.NewSelectorForBackup(backup.Name),
+		})
 		if err != nil {
+			backupLog.Error(err)
+		}
+		volumeSnapshots = append(volumeSnapshots, vsList.Items...)
+
+		if err := client.List(context.Background(), vscList, &kbclient.ListOptions{LabelSelector: selector}); err != nil {
 			backupLog.Error(err)
 		}
 		if len(vscList.Items) >= 0 {

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSummary(t *testing.T) {
@@ -40,4 +41,15 @@ func TestSummary(t *testing.T) {
 		},
 	}
 	assert.Equal(t, expected, tracker.Summary())
+}
+
+func TestSerializeSkipReasons(t *testing.T) {
+	tracker := NewSkipPVTracker()
+	//tracker.Track("pv5", "", "skipped due to policy")
+	tracker.Track("pv3", podVolumeApproach, "it's set to opt-out")
+	tracker.Track("pv3", csiSnapshotApproach, "not applicable for CSI ")
+
+	for _, skippedPV := range tracker.Summary() {
+		require.Equal(t, "csiSnapshot: not applicable for CSI ;podvolume: it's set to opt-out;", skippedPV.SerializeSkipReasons())
+	}
 }
