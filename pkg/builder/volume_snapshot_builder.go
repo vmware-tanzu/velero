@@ -67,3 +67,8 @@ func (v *VolumeSnapshotBuilder) BoundVolumeSnapshotContentName(vscName string) *
 	v.object.Status.BoundVolumeSnapshotContentName = &vscName
 	return v
 }
+
+func (v *VolumeSnapshotBuilder) SourcePVC(name string) *VolumeSnapshotBuilder {
+	v.object.Spec.Source.PersistentVolumeClaimName = &name
+	return v
+}

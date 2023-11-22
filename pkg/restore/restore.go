@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -68,6 +69,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	csiutil "github.com/vmware-tanzu/velero/pkg/util/csi"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
@@ -113,6 +115,7 @@ type kubernetesRestorer struct {
 	podGetter                  cache.Getter
 	credentialFileStore        credentials.FileStore
 	kbClient                   crclient.Client
+	featureVerifier            features.Verifier
 }
 
 // NewKubernetesRestorer creates a new kubernetesRestorer.
@@ -130,6 +133,7 @@ func NewKubernetesRestorer(
 	podGetter cache.Getter,
 	credentialStore credentials.FileStore,
 	kbClient crclient.Client,
+	featureVerifier features.Verifier,
 ) (Restorer, error) {
 	return &kubernetesRestorer{
 		discoveryHelper:            discoveryHelper,
@@ -154,6 +158,7 @@ func NewKubernetesRestorer(
 		podGetter:           podGetter,
 		credentialFileStore: credentialStore,
 		kbClient:            kbClient,
+		featureVerifier:     featureVerifier,
 	}, nil
 }
 
@@ -298,6 +303,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		pvsToProvision:                 sets.NewString(),
 		pvRestorer:                     pvRestorer,
 		volumeSnapshots:                req.VolumeSnapshots,
+		csiVolumeSnapshots:             req.CSIVolumeSnapshots,
 		podVolumeBackups:               req.PodVolumeBackups,
 		resourceTerminatingTimeout:     kr.resourceTerminatingTimeout,
 		resourceTimeout:                kr.resourceTimeout,
@@ -310,7 +316,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		discoveryHelper:                kr.discoveryHelper,
 		resourcePriorities:             kr.resourcePriorities,
 		resourceRestoreHooks:           resourceRestoreHooks,
-		hooksErrs:                      make(chan error),
+		hooksErrs:                      make(chan hook.HookErrInfo),
 		waitExecHookHandler:            waitExecHookHandler,
 		hooksContext:                   hooksCtx,
 		hooksCancelFunc:                hooksCancelFunc,
@@ -318,6 +324,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		itemOperationsList:             req.GetItemOperationsList(),
 		resourceModifiers:              req.ResourceModifiers,
 		disableInformerCache:           req.DisableInformerCache,
+		featureVerifier:                kr.featureVerifier,
 	}
 
 	return restoreCtx.execute()
@@ -347,6 +354,7 @@ type restoreContext struct {
 	pvsToProvision                 sets.String
 	pvRestorer                     PVRestorer
 	volumeSnapshots                []*volume.Snapshot
+	csiVolumeSnapshots             []*snapshotv1api.VolumeSnapshot
 	podVolumeBackups               []*velerov1api.PodVolumeBackup
 	resourceTerminatingTimeout     time.Duration
 	resourceTimeout                time.Duration
@@ -359,7 +367,7 @@ type restoreContext struct {
 	discoveryHelper                discovery.Helper
 	resourcePriorities             Priorities
 	hooksWaitGroup                 sync.WaitGroup
-	hooksErrs                      chan error
+	hooksErrs                      chan hook.HookErrInfo
 	resourceRestoreHooks           []hook.ResourceRestoreHook
 	waitExecHookHandler            hook.WaitExecHookHandler
 	hooksContext                   go_context.Context
@@ -368,6 +376,7 @@ type restoreContext struct {
 	itemOperationsList             *[]*itemoperation.RestoreOperation
 	resourceModifiers              *resourcemodifiers.ResourceModifiers
 	disableInformerCache           bool
+	featureVerifier                features.Verifier
 }
 
 type resourceClientKey struct {
@@ -654,8 +663,8 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 		ctx.hooksWaitGroup.Wait()
 		close(ctx.hooksErrs)
 	}()
-	for err := range ctx.hooksErrs {
-		errs.Velero = append(errs.Velero, err.Error())
+	for errInfo := range ctx.hooksErrs {
+		errs.Add(errInfo.Namespace, errInfo.Err)
 	}
 	ctx.log.Info("Done waiting for all post-restore exec hooks to complete")
 
@@ -1287,15 +1296,57 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			}
 
 		case hasPodVolumeBackup(obj, ctx):
-			ctx.log.Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
+			ctx.log.WithFields(logrus.Fields{
+				"namespace":     obj.GetNamespace(),
+				"name":          obj.GetName(),
+				"groupResource": groupResource.String(),
+			}).Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
 			ctx.pvsToProvision.Insert(name)
 
 			// Return early because we don't want to restore the PV itself, we
 			// want to dynamically re-provision it.
 			return warnings, errs, itemExists
 
+		case hasCSIVolumeSnapshot(ctx, obj):
+			ctx.log.WithFields(logrus.Fields{
+				"namespace":     obj.GetNamespace(),
+				"name":          obj.GetName(),
+				"groupResource": groupResource.String(),
+			}).Infof("Dynamically re-provisioning persistent volume because it has a related CSI VolumeSnapshot.")
+			ctx.pvsToProvision.Insert(name)
+
+			if ready, err := ctx.featureVerifier.Verify(velerov1api.CSIFeatureFlag); !ready {
+				ctx.log.Errorf("Failed to verify CSI modules, ready %v, err %v", ready, err)
+				errs.Add(namespace, fmt.Errorf("CSI modules are not ready for restore. Check CSI feature is enabled and CSI plugin is installed"))
+			}
+
+			// Return early because we don't want to restore the PV itself, we
+			// want to dynamically re-provision it.
+			return warnings, errs, itemExists
+
+		case hasSnapshotDataUpload(ctx, obj):
+			ctx.log.WithFields(logrus.Fields{
+				"namespace":     obj.GetNamespace(),
+				"name":          obj.GetName(),
+				"groupResource": groupResource.String(),
+			}).Infof("Dynamically re-provisioning persistent volume because it has a related snapshot DataUpload.")
+			ctx.pvsToProvision.Insert(name)
+
+			if ready, err := ctx.featureVerifier.Verify(velerov1api.CSIFeatureFlag); !ready {
+				ctx.log.Errorf("Failed to verify CSI modules, ready %v, err %v", ready, err)
+				errs.Add(namespace, fmt.Errorf("CSI modules are not ready for restore. Check CSI feature is enabled and CSI plugin is installed"))
+			}
+
+			// Return early because we don't want to restore the PV itself, we
+			// want to dynamically re-provision it.
+			return warnings, errs, itemExists
+
 		case hasDeleteReclaimPolicy(obj.Object):
-			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
+			ctx.log.WithFields(logrus.Fields{
+				"namespace":     obj.GetNamespace(),
+				"name":          obj.GetName(),
+				"groupResource": groupResource.String(),
+			}).Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
 			ctx.pvsToProvision.Insert(name)
 
 			// Return early because we don't want to restore the PV itself, we
@@ -1303,7 +1354,11 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs, itemExists
 
 		default:
-			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
+			ctx.log.WithFields(logrus.Fields{
+				"namespace":     obj.GetNamespace(),
+				"name":          obj.GetName(),
+				"groupResource": groupResource.String(),
+			}).Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
 
 			// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
 			_, err = remapClaimRefNS(ctx, obj)
@@ -1334,6 +1389,13 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	for _, action := range ctx.getApplicableActions(groupResource, namespace) {
 		if !action.Selector.Matches(labels.Set(obj.GetLabels())) {
+			continue
+		}
+
+		// If the EnableCSI feature is not enabled, but the executing action is from CSI plugin, skip the action.
+		if csiutil.ShouldSkipAction(action.Name()) {
+			ctx.log.Infof("Skip action %s for resource %s:%s/%s, because the CSI feature is not enabled. Feature setting is %s.",
+				action.Name(), groupResource.String(), obj.GetNamespace(), obj.GetName(), features.Serialize())
 			continue
 		}
 
@@ -1466,7 +1528,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	if ctx.resourceModifiers != nil {
-		if errList := ctx.resourceModifiers.ApplyResourceModifierRules(obj, groupResource.String(), ctx.log); errList != nil {
+		if errList := ctx.resourceModifiers.ApplyResourceModifierRules(obj, groupResource.String(), ctx.kbClient.Scheme(), ctx.log); errList != nil {
 			for _, err := range errList {
 				errs.Add(namespace, err)
 			}
@@ -1524,18 +1586,17 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	if restoreErr != nil {
-		// check for the existence of the object in cluster, if no error then it implies that object exists
-		// and if err then we want to judge whether there is an existing error in the previous creation.
-		// if so, we will return the 'get' error.
-		// otherwise, we will return the original creation error.
+		// check for the existence of the object that failed creation due to alreadyExist in cluster, if no error then it implies that object exists.
+		// and if err then itemExists remains false as we were not able to confirm the existence of the object via Get call or creation call.
+		// We return the get error as a warning to notify the user that the object could exist in cluster and we were not able to confirm it.
 		if !ctx.disableInformerCache {
 			fromCluster, err = ctx.getResource(groupResource, obj, namespace, name)
 		} else {
 			fromCluster, err = resourceClient.Get(name, metav1.GetOptions{})
 		}
 		if err != nil && isAlreadyExistsError {
-			ctx.log.Errorf("Error retrieving in-cluster version of %s: %v", kube.NamespaceAndName(obj), err)
-			errs.Add(namespace, err)
+			ctx.log.Warnf("Unable to retrieve in-cluster version of %s: %v, object won't be restored by velero or have restore labels, and existing resource policy is not applied", kube.NamespaceAndName(obj), err)
+			warnings.Add(namespace, err)
 			return warnings, errs, itemExists
 		}
 	}
@@ -1891,10 +1952,11 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 		// on the ctx.podVolumeErrs channel.
 		defer ctx.hooksWaitGroup.Done()
 
+		podNs := createdObj.GetNamespace()
 		pod := new(v1.Pod)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(createdObj.UnstructuredContent(), &pod); err != nil {
 			ctx.log.WithError(err).Error("error converting unstructured pod")
-			ctx.hooksErrs <- err
+			ctx.hooksErrs <- hook.HookErrInfo{Namespace: podNs, Err: err}
 			return
 		}
 		execHooksByContainer, err := hook.GroupRestoreExecHooks(
@@ -1904,7 +1966,7 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 		)
 		if err != nil {
 			ctx.log.WithError(err).Errorf("error getting exec hooks for pod %s/%s", pod.Namespace, pod.Name)
-			ctx.hooksErrs <- err
+			ctx.hooksErrs <- hook.HookErrInfo{Namespace: podNs, Err: err}
 			return
 		}
 
@@ -1914,7 +1976,7 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 
 			for _, err := range errs {
 				// Errors are already logged in the HandleHooks method.
-				ctx.hooksErrs <- err
+				ctx.hooksErrs <- hook.HookErrInfo{Namespace: podNs, Err: err}
 			}
 		}
 	}()
@@ -1928,6 +1990,55 @@ func hasSnapshot(pvName string, snapshots []*volume.Snapshot) bool {
 	}
 
 	return false
+}
+
+func hasCSIVolumeSnapshot(ctx *restoreContext, unstructuredPV *unstructured.Unstructured) bool {
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.Object, pv); err != nil {
+		ctx.log.WithError(err).Warnf("Unable to convert PV from unstructured to structured")
+		return false
+	}
+
+	for _, vs := range ctx.csiVolumeSnapshots {
+		if pv.Spec.ClaimRef.Name == *vs.Spec.Source.PersistentVolumeClaimName &&
+			pv.Spec.ClaimRef.Namespace == vs.Namespace {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSnapshotDataUpload(ctx *restoreContext, unstructuredPV *unstructured.Unstructured) bool {
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.Object, pv); err != nil {
+		ctx.log.WithError(err).Warnf("Unable to convert PV from unstructured to structured")
+		return false
+	}
+
+	if pv.Spec.ClaimRef == nil {
+		return false
+	}
+
+	dataUploadResultList := new(v1.ConfigMapList)
+	err := ctx.kbClient.List(go_context.TODO(), dataUploadResultList, &crclient.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			velerov1api.RestoreUIDLabel:       label.GetValidName(string(ctx.restore.GetUID())),
+			velerov1api.PVCNamespaceNameLabel: label.GetValidName(pv.Spec.ClaimRef.Namespace + "." + pv.Spec.ClaimRef.Name),
+			velerov1api.ResourceUsageLabel:    label.GetValidName(string(velerov1api.VeleroResourceUsageDataUploadResult)),
+		}),
+	})
+	if err != nil {
+		ctx.log.WithError(err).Warnf("Fail to list DataUpload result CM.")
+		return false
+	}
+
+	if len(dataUploadResultList.Items) != 1 {
+		ctx.log.WithError(fmt.Errorf("dataupload result number is not expected")).
+			Warnf("Got %d DataUpload result. Expect one.", len(dataUploadResultList.Items))
+		return false
+	}
+
+	return true
 }
 
 func hasPodVolumeBackup(unstructuredPV *unstructured.Unstructured, ctx *restoreContext) bool {

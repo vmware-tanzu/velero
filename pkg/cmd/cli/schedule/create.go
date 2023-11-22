@@ -115,7 +115,7 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	var orders map[string]string
 
-	veleroClient, err := f.Client()
+	crClient, err := f.KubebuilderClient()
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	_, err = veleroClient.VeleroV1().Schedules(schedule.Namespace).Create(context.TODO(), schedule, metav1.CreateOptions{})
+	err = crClient.Create(context.TODO(), schedule)
 	if err != nil {
 		return err
 	}

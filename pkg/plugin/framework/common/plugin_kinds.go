@@ -41,7 +41,7 @@ const (
 	// PluginKindRestoreItemAction represents a restore item action plugin.
 	PluginKindRestoreItemAction PluginKind = "RestoreItemAction"
 
-	// PluginKindRestoreItemAction represents a v2 restore item action plugin.
+	// PluginKindRestoreItemActionV2 represents a v2 restore item action plugin.
 	PluginKindRestoreItemActionV2 PluginKind = "RestoreItemActionV2"
 
 	// PluginKindDeleteItemAction represents a delete item action plugin.

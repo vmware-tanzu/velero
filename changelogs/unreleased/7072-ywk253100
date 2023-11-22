@@ -1,0 +1,1 @@
+Truncate the credential file to avoid the change of secret content messing it up

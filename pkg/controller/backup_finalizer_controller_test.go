@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -43,12 +44,14 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerotestmocks "github.com/vmware-tanzu/velero/pkg/test/mocks"
 )
 
-func mockBackupFinalizerReconciler(fakeClient kbclient.Client, fakeClock *testclocks.FakeClock) (*backupFinalizerReconciler, *fakeBackupper) {
+func mockBackupFinalizerReconciler(fakeClient kbclient.Client, fakeVolumeSnapshotLister snapshotv1listers.VolumeSnapshotLister, fakeClock *testclocks.FakeClock) (*backupFinalizerReconciler, *fakeBackupper) {
 	backupper := new(fakeBackupper)
 	return NewBackupFinalizerReconciler(
 		fakeClient,
+		fakeVolumeSnapshotLister,
 		fakeClock,
 		backupper,
 		func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
@@ -160,7 +163,10 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 			}
 
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, initObjs...)
-			reconciler, backupper := mockBackupFinalizerReconciler(fakeClient, fakeClock)
+
+			fakeVolumeSnapshotLister := velerotestmocks.NewVolumeSnapshotLister(t)
+
+			reconciler, backupper := mockBackupFinalizerReconciler(fakeClient, fakeVolumeSnapshotLister, fakeClock)
 			pluginManager.On("CleanupClients").Return(nil)
 			backupStore.On("GetBackupItemOperations", test.backup.Name).Return(test.backupOperations, nil)
 			backupStore.On("GetBackupContents", mock.Anything).Return(io.NopCloser(bytes.NewReader([]byte("hello world"))), nil)

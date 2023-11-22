@@ -243,10 +243,10 @@ func SnapshotSource(
 
 			mani, err := loadSnapshotFunc(ctx, rep, manifest.ID(parentSnapshot))
 			if err != nil {
-				return "", 0, errors.Wrapf(err, "Failed to load previous snapshot %v from kopia", parentSnapshot)
+				log.WithError(err).Warnf("Failed to load previous snapshot %v from kopia, fallback to full backup", parentSnapshot)
+			} else {
+				previous = append(previous, mani)
 			}
-
-			previous = append(previous, mani)
 		} else {
 			log.Infof("Searching for parent snapshot")
 

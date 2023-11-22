@@ -69,7 +69,7 @@ type DataDownloadReconciler struct {
 	metrics           *metrics.ServerMetrics
 }
 
-func NewDataDownloadReconciler(client client.Client, kubeClient kubernetes.Interface,
+func NewDataDownloadReconciler(client client.Client, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
 	repoEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter, nodeName string, preparingTimeout time.Duration, logger logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:            client,
@@ -81,7 +81,7 @@ func NewDataDownloadReconciler(client client.Client, kubeClient kubernetes.Inter
 		nodeName:          nodeName,
 		repositoryEnsurer: repoEnsurer,
 		restoreExposer:    exposer.NewGenericRestoreExposer(kubeClient, logger),
-		dataPathMgr:       datapath.NewManager(1),
+		dataPathMgr:       dataPathMgr,
 		preparingTimeout:  preparingTimeout,
 		metrics:           metrics,
 	}
@@ -287,12 +287,13 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	} else if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
 		log.Info("Data download is in progress")
 		if dd.Spec.Cancel {
+			log.Info("Data download is being canceled")
 			fsRestore := r.dataPathMgr.GetAsyncBR(dd.Name)
 			if fsRestore == nil {
+				r.OnDataDownloadCancelled(ctx, dd.GetNamespace(), dd.GetName())
 				return ctrl.Result{}, nil
 			}
 
-			log.Info("Data download is being canceled")
 			// Update status to Canceling.
 			original := dd.DeepCopy()
 			dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseCanceling
@@ -300,7 +301,6 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				log.WithError(err).Error("error updating data download status")
 				return ctrl.Result{}, err
 			}
-
 			fsRestore.Cancel()
 			return ctrl.Result{}, nil
 		}

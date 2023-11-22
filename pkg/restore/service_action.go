@@ -66,6 +66,9 @@ func (a *ServiceAction) Execute(input *velero.RestoreItemActionExecuteInput) (*v
 		if err := deleteNodePorts(service); err != nil {
 			return nil, err
 		}
+		if err := deleteHealthCheckNodePort(service); err != nil {
+			return nil, err
+		}
 	}
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(service)
@@ -74,6 +77,72 @@ func (a *ServiceAction) Execute(input *velero.RestoreItemActionExecuteInput) (*v
 	}
 
 	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
+}
+
+func deleteHealthCheckNodePort(service *corev1api.Service) error {
+	// Check service type and external traffic policy setting,
+	// if the setting is not applicable for HealthCheckNodePort, return early.
+	if service.Spec.ExternalTrafficPolicy != corev1api.ServiceExternalTrafficPolicyTypeLocal ||
+		service.Spec.Type != corev1api.ServiceTypeLoadBalancer {
+		return nil
+	}
+
+	// HealthCheckNodePort is already 0, return.
+	if service.Spec.HealthCheckNodePort == 0 {
+		return nil
+	}
+
+	// Search HealthCheckNodePort from server's last-applied-configuration
+	// annotation(HealthCheckNodePort is specified by `kubectl apply` command)
+	lastAppliedConfig, ok := service.Annotations[annotationLastAppliedConfig]
+	if ok {
+		appliedServiceUnstructured := new(map[string]interface{})
+		if err := json.Unmarshal([]byte(lastAppliedConfig), appliedServiceUnstructured); err != nil {
+			return errors.WithStack(err)
+		}
+
+		healthCheckNodePort, exist, err := unstructured.NestedFloat64(*appliedServiceUnstructured, "spec", "healthCheckNodePort")
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		// Found healthCheckNodePort in lastAppliedConfig annotation,
+		// and the value is not 0. No need to delete, return.
+		if exist && healthCheckNodePort != 0 {
+			return nil
+		}
+	}
+
+	// Search HealthCheckNodePort from ManagedFields(HealthCheckNodePort
+	// is specified by `kubectl apply --server-side` command).
+	for _, entry := range service.GetManagedFields() {
+		if entry.FieldsV1 == nil {
+			continue
+		}
+		fields := new(map[string]interface{})
+		if err := json.Unmarshal(entry.FieldsV1.Raw, fields); err != nil {
+			return errors.WithStack(err)
+		}
+
+		_, exist, err := unstructured.NestedMap(*fields, "f:spec", "f:healthCheckNodePort")
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if !exist {
+			continue
+		}
+		// Because the format in ManagedFields is `f:healthCheckNodePort: {}`,
+		// cannot get the value, check whether exists is enough.
+		// Found healthCheckNodePort in ManagedFields.
+		// No need to delete. Return.
+		return nil
+	}
+
+	// Cannot find HealthCheckNodePort from Annotation and
+	// ManagedFields, which means it's auto-generated. Delete it.
+	service.Spec.HealthCheckNodePort = 0
+
+	return nil
 }
 
 func deleteNodePorts(service *corev1api.Service) error {

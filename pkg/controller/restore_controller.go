@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -376,7 +377,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 	}
 
 	var resourceModifiers *resourcemodifiers.ResourceModifiers = nil
-	if restore.Spec.ResourceModifier != nil && restore.Spec.ResourceModifier.Kind == resourcemodifiers.ConfigmapRefType {
+	if restore.Spec.ResourceModifier != nil && strings.EqualFold(restore.Spec.ResourceModifier.Kind, resourcemodifiers.ConfigmapRefType) {
 		ResourceModifierConfigMap := &corev1api.ConfigMap{}
 		err := r.kbClient.Get(context.Background(), client.ObjectKey{Namespace: restore.Namespace, Name: restore.Spec.ResourceModifier.Name}, ResourceModifierConfigMap)
 		if err != nil {
@@ -514,6 +515,11 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		return errors.Wrap(err, "error fetching volume snapshots metadata")
 	}
 
+	csiVolumeSnapshots, err := backupStore.GetCSIVolumeSnapshots(restore.Spec.BackupName)
+	if err != nil {
+		return errors.Wrap(err, "fail to fetch CSI VolumeSnapshots metadata")
+	}
+
 	restoreLog.Info("starting restore")
 
 	var podVolumeBackups []*api.PodVolumeBackup
@@ -530,6 +536,7 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		BackupReader:         backupFile,
 		ResourceModifiers:    resourceModifiers,
 		DisableInformerCache: r.disableInformerCache,
+		CSIVolumeSnapshots:   csiVolumeSnapshots,
 	}
 	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, pluginManager)
 

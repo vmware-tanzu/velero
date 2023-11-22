@@ -53,7 +53,7 @@ var getGCPCredentials = repoconfig.GetGCPCredentials
 var getS3BucketRegion = repoconfig.GetAWSBucketRegion
 
 type localFuncTable struct {
-	getStorageVariables   func(*velerov1api.BackupStorageLocation, string, string) (map[string]string, error)
+	getStorageVariables   func(*velerov1api.BackupStorageLocation, string, string, credentials.FileStore) (map[string]string, error)
 	getStorageCredentials func(*velerov1api.BackupStorageLocation, credentials.FileStore) (map[string]string, error)
 }
 
@@ -347,7 +347,7 @@ func (urp *unifiedRepoProvider) GetStoreOptions(param interface{}) (map[string]s
 		return map[string]string{}, errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
 	}
 
-	storeVar, err := funcTable.getStorageVariables(repoParam.BackupLocation, urp.repoBackend, repoParam.BackupRepo.Spec.VolumeNamespace)
+	storeVar, err := funcTable.getStorageVariables(repoParam.BackupLocation, urp.repoBackend, repoParam.BackupRepo.Spec.VolumeNamespace, urp.credentialGetter.FromFile)
 	if err != nil {
 		return map[string]string{}, errors.Wrap(err, "error to get storage variables")
 	}
@@ -433,7 +433,7 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 
 		if credValue != nil {
 			result[udmrepo.StoreOptionS3KeyID] = credValue.AccessKeyID
-			result[udmrepo.StoreOptionS3Provider] = credValue.ProviderName
+			result[udmrepo.StoreOptionS3Provider] = credValue.Source
 			result[udmrepo.StoreOptionS3SecretKey] = credValue.SecretAccessKey
 			result[udmrepo.StoreOptionS3Token] = credValue.SessionToken
 		}
@@ -447,7 +447,8 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 	return result, nil
 }
 
-func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoBackend string, repoName string) (map[string]string, error) {
+func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoBackend string, repoName string,
+	credentialFileStore credentials.FileStore) (map[string]string, error) {
 	result := make(map[string]string)
 
 	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider, backupLocation.Spec.Config)
@@ -458,6 +459,13 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 	config := backupLocation.Spec.Config
 	if config == nil {
 		config = map[string]string{}
+	}
+	if backupLocation.Spec.Credential != nil {
+		credsFile, err := credentialFileStore.Path(backupLocation.Spec.Credential)
+		if err != nil {
+			return map[string]string{}, errors.WithStack(err)
+		}
+		config[repoconfig.CredentialsFileKey] = credsFile
 	}
 
 	bucket := strings.Trim(config["bucket"], "/")
@@ -477,9 +485,11 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 
 		var err error
 		if s3URL == "" {
-			region, err = getS3BucketRegion(bucket)
-			if err != nil {
-				return map[string]string{}, errors.Wrap(err, "error get s3 bucket region")
+			if region == "" {
+				region, err = getS3BucketRegion(bucket)
+				if err != nil {
+					return map[string]string{}, errors.Wrap(err, "error get s3 bucket region")
+				}
 			}
 
 			s3URL = fmt.Sprintf("s3-%s.amazonaws.com", region)

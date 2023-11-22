@@ -21,12 +21,10 @@ import (
 	"context"
 	"os"
 
-	goerr "errors"
-
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	s3manager "github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/pkg/errors"
 )
 
@@ -64,7 +62,7 @@ func GetS3ResticEnvVars(config map[string]string) (map[string]string, error) {
 		result[awsSecretKeyEnvVar] = creds.SecretAccessKey
 		result[awsSessTokenEnvVar] = creds.SessionToken
 		result[awsCredentialsFileEnvVar] = ""
-		result[awsProfileEnvVar] = ""
+		result[awsProfileEnvVar] = "" // profile is not needed since we have the credentials from profile via GetS3Credentials
 		result[awsConfigFileEnvVar] = ""
 	}
 
@@ -73,27 +71,29 @@ func GetS3ResticEnvVars(config map[string]string) (map[string]string, error) {
 
 // GetS3Credentials gets the S3 credential values according to the information
 // of the provided config or the system's environment variables
-func GetS3Credentials(config map[string]string) (*credentials.Value, error) {
+func GetS3Credentials(config map[string]string) (*aws.Credentials, error) {
 	if os.Getenv(awsRoleEnvVar) != "" {
 		return nil, nil
 	}
 
-	opts := session.Options{}
+	var opts []func(*awsconfig.LoadOptions) error
 	credentialsFile := config[CredentialsFileKey]
 	if credentialsFile == "" {
 		credentialsFile = os.Getenv(awsCredentialsFileEnvVar)
 	}
 	if credentialsFile != "" {
-		opts.SharedConfigFiles = append(opts.SharedConfigFiles, credentialsFile)
-		opts.SharedConfigState = session.SharedConfigEnable
+		opts = append(opts, awsconfig.WithSharedCredentialsFiles([]string{credentialsFile}),
+			// To support the existing use case where config file is passed
+			// as credentials of a BSL
+			awsconfig.WithSharedConfigFiles([]string{credentialsFile}))
 	}
+	opts = append(opts, awsconfig.WithSharedConfigProfile(config[awsProfileKey]))
 
-	sess, err := session.NewSessionWithOptions(opts)
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(), opts...)
 	if err != nil {
 		return nil, err
 	}
-
-	creds, err := sess.Config.Credentials.Get()
+	creds, err := cfg.Credentials.Retrieve(context.Background())
 
 	return &creds, err
 }
@@ -101,33 +101,17 @@ func GetS3Credentials(config map[string]string) (*credentials.Value, error) {
 // GetAWSBucketRegion returns the AWS region that a bucket is in, or an error
 // if the region cannot be determined.
 func GetAWSBucketRegion(bucket string) (string, error) {
-	sess, err := session.NewSession()
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background())
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
-
-	var region string
-	var requestErrs []error
-
-	for _, partition := range endpoints.DefaultPartitions() {
-		for regionHint := range partition.Regions() {
-			region, err = s3manager.GetBucketRegion(context.Background(), sess, bucket, regionHint)
-			if err != nil {
-				requestErrs = append(requestErrs, errors.Wrapf(err, "error to get region with hint %s", regionHint))
-			}
-
-			// we only need to try a single region hint per partition, so break after the first
-			break
-		}
-
-		if region != "" {
-			return region, nil
-		}
+	client := s3.NewFromConfig(cfg)
+	region, err := s3manager.GetBucketRegion(context.Background(), client, bucket)
+	if err != nil {
+		return "", errors.WithStack(err)
 	}
-
-	if requestErrs == nil {
-		return "", errors.Errorf("unable to determine region by bucket %s", bucket)
-	} else {
-		return "", errors.Wrapf(goerr.Join(requestErrs...), "error to get region by bucket %s", bucket)
+	if region == "" {
+		return "", errors.New("unable to determine bucket's region")
 	}
+	return region, nil
 }

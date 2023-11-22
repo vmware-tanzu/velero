@@ -163,6 +163,8 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		Spec: appsv1.DaemonSetSpec{},
 	}
 
+	dataPathMgr := datapath.NewManager(1)
+
 	now, err := time.Parse(time.RFC1123, time.RFC1123)
 	if err != nil {
 		return nil, err
@@ -218,7 +220,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 	if err != nil {
 		return nil, err
 	}
-	return NewDataUploadReconciler(fakeClient, fakeKubeClient, fakeSnapshotClient.SnapshotV1(), nil,
+	return NewDataUploadReconciler(fakeClient, fakeKubeClient, fakeSnapshotClient.SnapshotV1(), dataPathMgr, nil,
 		testclocks.NewFakeClock(now), &credentials.CredentialGetter{FromFile: credentialFileStore}, "test_node", fakeFS, time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
 }
 

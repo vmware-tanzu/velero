@@ -26,8 +26,8 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util"
 )
 
 func TestIsReadyToValidate(t *testing.T) {
@@ -163,7 +163,7 @@ func TestListBackupStorageLocations(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			client := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(tt.backupLocations).Build()
+			client := fake.NewClientBuilder().WithScheme(util.VeleroScheme).WithRuntimeObjects(tt.backupLocations).Build()
 			if tt.expectError {
 				_, err := ListBackupStorageLocations(context.Background(), client, "ns-1")
 				g.Expect(err).NotTo(BeNil())

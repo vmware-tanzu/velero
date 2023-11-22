@@ -50,6 +50,11 @@ type DefaultListWatchFactory struct {
 	PodsGetter cache.Getter
 }
 
+type HookErrInfo struct {
+	Namespace string
+	Err       error
+}
+
 func (d *DefaultListWatchFactory) NewListWatch(namespace string, selector fields.Selector) cache.ListerWatcher {
 	return cache.NewListWatchFromClient(d.PodsGetter, "pods", namespace, selector)
 }
@@ -158,8 +163,8 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 				if hook.Hook.WaitTimeout.Duration != 0 && time.Since(waitStart) > hook.Hook.WaitTimeout.Duration {
 					err := fmt.Errorf("hook %s in container %s expired before executing", hook.HookName, hook.Hook.Container)
 					hookLog.Error(err)
+					errors = append(errors, err)
 					if hook.Hook.OnError == velerov1api.HookErrorModeFail {
-						errors = append(errors, err)
 						cancel()
 						return
 					}
@@ -172,8 +177,9 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 				}
 				if err := e.PodCommandExecutor.ExecutePodCommand(hookLog, podMap, pod.Namespace, pod.Name, hook.HookName, eh); err != nil {
 					hookLog.WithError(err).Error("Error executing hook")
+					err = fmt.Errorf("hook %s in container %s failed to execute, err: %v", hook.HookName, hook.Hook.Container, err)
+					errors = append(errors, err)
 					if hook.Hook.OnError == velerov1api.HookErrorModeFail {
-						errors = append(errors, err)
 						cancel()
 						return
 					}
@@ -204,10 +210,9 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	podWatcher.Run(ctx.Done())
 
 	// There are some cases where this function could return with unexecuted hooks: the pod may
-	// be deleted, a hook with OnError mode Fail could fail, or it may timeout waiting for
+	// be deleted, a hook could fail, or it may timeout waiting for
 	// containers to become ready.
-	// Each unexecuted hook is logged as an error but only hooks with OnError mode Fail return
-	// an error from this function.
+	// Each unexecuted hook is logged as an error and this error will be returned from this function.
 	for _, hooks := range byContainer {
 		for _, hook := range hooks {
 			if hook.executed {
@@ -222,9 +227,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 				},
 			)
 			hookLog.Error(err)
-			if hook.Hook.OnError == velerov1api.HookErrorModeFail {
-				errors = append(errors, err)
-			}
+			errors = append(errors, err)
 		}
 	}
 

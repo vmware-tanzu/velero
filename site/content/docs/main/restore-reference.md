@@ -280,21 +280,23 @@ There are two ways to delete a Restore object:
 1. Deleting with `velero restore delete` will delete the Custom Resource representing the restore, along with its individual log and results files. It will not delete any objects that were created by the restore in your cluster.
 2. Deleting with `kubectl -n velero delete restore` will delete the Custom Resource representing the restore. It will not delete restore log or results files from object storage, or any objects that were created during the restore in your cluster.
 
-## What happens to NodePorts when restoring Services
+## What happens to NodePorts and HealthCheckNodePort when restoring Services
 
-During a restore, Velero deletes **Auto assigned** NodePorts by default and Services get new **auto assigned** nodePorts after restore.
+During a restore, Velero deletes **Auto assigned** NodePorts and HealthCheckNodePort by default and Services get new **auto assigned** nodePorts and healthCheckNodePort after restore.
 
-Velero auto detects **explicitly specified** NodePorts using **`last-applied-config`** annotation and they are **preserved** after restore. NodePorts can be explicitly specified as `.spec.ports[*].nodePort` field on Service definition.
+Velero auto detects **explicitly specified** NodePorts using **`last-applied-config`** annotation and **`managedFields`**. They are **preserved** after restore. NodePorts can be explicitly specified as `.spec.ports[*].nodePort` field on Service definition.
 
-### Always Preserve NodePorts
+Velero will do the same to the `HealthCheckNodePort` as `NodePorts`.
 
-It is not always possible to set nodePorts explicitly on some big clusters because of operational complexity. As the Kubernetes [NodePort documentation](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport) states, "if you want a specific port number, you can specify a value in the `nodePort` field. The control plane will either allocate you that port or report that the API transaction failed. This means that you need to take care of possible port collisions yourself. You also have to use a valid port number, one that's inside the range configured for NodePort use.""
+### Always Preserve NodePorts and HealthCheckNodePort
+
+It is not always possible to set nodePorts and healthCheckNodePort explicitly on some big clusters because of operational complexity. As the Kubernetes [NodePort documentation](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport) states, "if you want a specific port number, you can specify a value in the `nodePort` field. The control plane will either allocate you that port or report that the API transaction failed. This means that you need to take care of possible port collisions yourself. You also have to use a valid port number, one that's inside the range configured for NodePort use.""
 
 The clusters which are not explicitly specifying nodePorts may still need to restore original NodePorts in the event of a disaster. Auto assigned nodePorts are typically defined on Load Balancers located in front of cluster. Changing all these nodePorts on Load Balancers is another operation complexity you are responsible for updating after disaster if nodePorts are changed.
 
-Use the `velero restore create ` command's `--preserve-nodeports` flag to preserve Service nodePorts always, regardless of whether nodePorts are explicitly specified or not. This flag is used for preserving the original nodePorts from a backup and can be used as `--preserve-nodeports` or `--preserve-nodeports=true`. If this flag is present, Velero will not remove the nodePorts when restoring a Service, but will try to use the nodePorts from the backup.
+Use the `velero restore create ` command's `--preserve-nodeports` flag to preserve Service nodePorts and healthCheckNodePort always, regardless of whether nodePorts are explicitly specified or not. This flag is used for preserving the original nodePorts and healthCheckNodePort from a backup and can be used as `--preserve-nodeports` or `--preserve-nodeports=true`. If this flag is present, Velero will not remove the nodePorts and healthCheckNodePort when restoring a Service, but will try to use the nodePorts from the backup.
 
-Trying to preserve nodePorts may cause port conflicts when restoring on situations below:
+Trying to preserve nodePorts and healthCheckNodePort may cause port conflicts when restoring on situations below:
 
 - If the nodePort from the backup is already allocated on the target cluster then Velero prints error log as shown below and continues the restore operation.
 

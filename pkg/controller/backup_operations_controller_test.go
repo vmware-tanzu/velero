@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	v2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -286,6 +288,7 @@ func TestBackupOperationsReconcile(t *testing.T) {
 			backupStore.On("PutBackupItemOperations", mock.Anything, mock.Anything).Return(nil)
 			backupStore.On("PutBackupMetadata", mock.Anything, mock.Anything).Return(nil)
 			for _, operation := range test.backupOperations {
+				bia.On("Name").Return("test")
 				bia.On("Progress", operation.Spec.OperationID, mock.Anything).
 					Return(velero.OperationProgress{
 						Completed: test.operationComplete,
@@ -305,6 +308,43 @@ func TestBackupOperationsReconcile(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, test.expectPhase, backupAfter.Status.Phase)
+		})
+	}
+}
+
+func TestWrapErrMsg(t *testing.T) {
+	bia2 := &biav2mocks.BackupItemAction{}
+	bia2.On("Name").Return("test-bia")
+	cases := []struct {
+		name     string
+		inputErr string
+		plugin   v2.BackupItemAction
+		expect   string
+	}{
+		{
+			name:     "empty error message",
+			inputErr: "",
+			plugin:   bia2,
+			expect:   "plugin: test-bia",
+		},
+		{
+			name:     "nil bia",
+			inputErr: "some error happened",
+			plugin:   nil,
+			expect:   "some error happened, plugin: unknown",
+		},
+		{
+			name:     "regular error and bia",
+			inputErr: "some error happened",
+			plugin:   bia2,
+			expect:   "some error happened, plugin: test-bia",
+		},
+	}
+
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			got := wrapErrMsg(test.inputErr, test.plugin)
+			assert.Equal(t, test.expect, got)
 		})
 	}
 }

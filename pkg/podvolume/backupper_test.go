@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,17 +31,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrlfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"k8s.io/client-go/kubernetes"
-	kubefake "k8s.io/client-go/kubernetes/fake"
 	clientTesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	velerofake "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 func TestIsHostPathVolume(t *testing.T) {
@@ -101,15 +98,14 @@ func TestIsHostPathVolume(t *testing.T) {
 			VolumeName: "pv-1",
 		},
 	}
-	pvGetter := &fakePVGetter{
-		pv: &corev1api.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "pv-1",
-			},
-			Spec: corev1api.PersistentVolumeSpec{},
+	pv := &corev1api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv-1",
 		},
+		Spec: corev1api.PersistentVolumeSpec{},
 	}
-	isHostPath, err = isHostPathVolume(vol, pvc, pvGetter)
+	crClient1 := velerotest.NewFakeControllerRuntimeClient(t, pv)
+	isHostPath, err = isHostPathVolume(vol, pvc, crClient1)
 	assert.Nil(t, err)
 	assert.False(t, isHostPath)
 
@@ -130,33 +126,21 @@ func TestIsHostPathVolume(t *testing.T) {
 			VolumeName: "pv-1",
 		},
 	}
-	pvGetter = &fakePVGetter{
-		pv: &corev1api.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "pv-1",
-			},
-			Spec: corev1api.PersistentVolumeSpec{
-				PersistentVolumeSource: corev1api.PersistentVolumeSource{
-					HostPath: &corev1api.HostPathVolumeSource{},
-				},
+	pv = &corev1api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pv-1",
+		},
+		Spec: corev1api.PersistentVolumeSpec{
+			PersistentVolumeSource: corev1api.PersistentVolumeSource{
+				HostPath: &corev1api.HostPathVolumeSource{},
 			},
 		},
 	}
-	isHostPath, err = isHostPathVolume(vol, pvc, pvGetter)
+	crClient2 := velerotest.NewFakeControllerRuntimeClient(t, pv)
+
+	isHostPath, err = isHostPathVolume(vol, pvc, crClient2)
 	assert.Nil(t, err)
 	assert.True(t, isHostPath)
-}
-
-type fakePVGetter struct {
-	pv *corev1api.PersistentVolume
-}
-
-func (g *fakePVGetter) Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1api.PersistentVolume, error) {
-	if g.pv != nil {
-		return g.pv, nil
-	}
-
-	return nil, errors.New("item not found")
 }
 
 func Test_backupper_BackupPodVolumes_log_test(t *testing.T) {
@@ -322,6 +306,7 @@ func createPVBObj(fail bool, withSnapshot bool, index int, uploaderType string) 
 func TestBackupPodVolumes(t *testing.T) {
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	ctxWithCancel, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -510,40 +495,6 @@ func TestBackupPodVolumes(t *testing.T) {
 			bsl:           "fake-bsl",
 		},
 		{
-			name: "create PVB fail",
-			volumes: []string{
-				"fake-volume-1",
-				"fake-volume-2",
-			},
-			sourcePod: createPodObj(true, true, true, 2),
-			kubeClientObj: []runtime.Object{
-				createNodeAgentPodObj(true),
-				createPVCObj(1),
-				createPVCObj(2),
-				createPVObj(1, false),
-				createPVObj(2, false),
-			},
-			ctlClientObj: []runtime.Object{
-				createBackupRepoObj(),
-			},
-			veleroReactors: []reactor{
-				{
-					verb:     "create",
-					resource: "podvolumebackups",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.New("fake-create-error")
-					},
-				},
-			},
-			runtimeScheme: scheme,
-			uploaderType:  "kopia",
-			bsl:           "fake-bsl",
-			errs: []string{
-				"fake-create-error",
-				"fake-create-error",
-			},
-		},
-		{
 			name: "context cancelled",
 			ctx:  ctxWithCancel,
 			volumes: []string{
@@ -630,23 +581,28 @@ func TestBackupPodVolumes(t *testing.T) {
 				fakeClientBuilder = fakeClientBuilder.WithScheme(test.runtimeScheme)
 			}
 
-			fakeCtlClient := fakeClientBuilder.WithRuntimeObjects(test.ctlClientObj...).Build()
+			objList := append(test.ctlClientObj, test.veleroClientObj...)
+			objList = append(objList, test.kubeClientObj...)
+			fakeCtrlClient := fakeClientBuilder.WithRuntimeObjects(objList...).Build()
 
-			fakeKubeClient := kubefake.NewSimpleClientset(test.kubeClientObj...)
-			var kubeClient kubernetes.Interface = fakeKubeClient
-
-			fakeVeleroClient := velerofake.NewSimpleClientset(test.veleroClientObj...)
-			for _, reactor := range test.veleroReactors {
-				fakeVeleroClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			fakeCRWatchClient := velerotest.NewFakeControllerRuntimeWatchClient(t, test.kubeClientObj...)
+			lw := kube.InternalLW{
+				Client:     fakeCRWatchClient,
+				Namespace:  velerov1api.DefaultNamespace,
+				ObjectList: new(velerov1api.PodVolumeBackupList),
 			}
-			var veleroClient versioned.Interface = fakeVeleroClient
 
-			ensurer := repository.NewEnsurer(fakeCtlClient, velerotest.NewLogger(), time.Millisecond)
+			pvbInformer := cache.NewSharedIndexInformer(&lw, &velerov1api.PodVolumeBackup{}, 0, cache.Indexers{})
+
+			go pvbInformer.Run(ctx.Done())
+			require.True(t, cache.WaitForCacheSync(ctx.Done(), pvbInformer.HasSynced))
+
+			ensurer := repository.NewEnsurer(fakeCtrlClient, velerotest.NewLogger(), time.Millisecond)
 
 			backupObj := builder.ForBackup(velerov1api.DefaultNamespace, "fake-backup").Result()
 			backupObj.Spec.StorageLocation = test.bsl
 
-			factory := NewBackupperFactory(repository.NewRepoLocker(), ensurer, veleroClient, kubeClient.CoreV1(), kubeClient.CoreV1(), kubeClient.CoreV1(), velerotest.NewLogger())
+			factory := NewBackupperFactory(repository.NewRepoLocker(), ensurer, fakeCtrlClient, pvbInformer, velerotest.NewLogger())
 			bp, err := factory.NewBackupper(ctx, backupObj, test.uploaderType)
 
 			require.NoError(t, err)

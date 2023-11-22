@@ -429,6 +429,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 					backupNames = append(backupNames, backup.backup.Name)
 					backupStore.On("GetBackupMetadata", backup.backup.Name).Return(backup.backup, nil)
 					backupStore.On("GetPodVolumeBackups", backup.backup.Name).Return(backup.podVolumeBackups, nil)
+					backupStore.On("BackupExists", "bucket-1", backup.backup.Name).Return(true, nil)
 				}
 				backupStore.On("ListBackups").Return(backupNames, nil)
 			}
@@ -723,5 +724,175 @@ var _ = Describe("Backup Sync Reconciler", func() {
 		testObjList = backupSyncSourceOrderFunc(locationList)
 		Expect(testObjList).To(BeEquivalentTo(locationList))
 
+	})
+
+	When("testing validateOwnerReferences", func() {
+
+		testCases := []struct {
+			name               string
+			backup             *velerov1api.Backup
+			toCreate           []ctrlClient.Object
+			expectedReferences []metav1.OwnerReference
+		}{
+			{
+				name: "handles empty owner references",
+				backup: &velerov1api.Backup{
+					ObjectMeta: metav1.ObjectMeta{
+						OwnerReferences: []metav1.OwnerReference{},
+					},
+				},
+				expectedReferences: []metav1.OwnerReference{},
+			},
+			{
+				name: "handles missing schedule",
+				backup: &velerov1api.Backup{
+					ObjectMeta: metav1.ObjectMeta{
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind: "Schedule",
+								Name: "some name",
+							},
+						},
+					},
+				},
+				expectedReferences: []metav1.OwnerReference{},
+			},
+			{
+				name: "handles existing reference",
+				backup: &velerov1api.Backup{
+					ObjectMeta: metav1.ObjectMeta{
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind: "Schedule",
+								Name: "existing-schedule",
+							},
+						},
+						Namespace: "test-namespace",
+					},
+				},
+				toCreate: []ctrlClient.Object{
+					&velerov1api.Schedule{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "existing-schedule",
+							Namespace: "test-namespace",
+						},
+					},
+				},
+				expectedReferences: []metav1.OwnerReference{
+					{
+						Kind: "Schedule",
+						Name: "existing-schedule",
+					},
+				},
+			},
+			{
+				name: "handles existing mismatched UID",
+				backup: &velerov1api.Backup{
+					ObjectMeta: metav1.ObjectMeta{
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind: "Schedule",
+								Name: "existing-schedule",
+								UID:  "backup-UID",
+							},
+						},
+						Namespace: "test-namespace",
+					},
+				},
+				toCreate: []ctrlClient.Object{
+					&velerov1api.Schedule{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "existing-schedule",
+							Namespace: "test-namespace",
+							UID:       "schedule-UID",
+						},
+					},
+				},
+				expectedReferences: []metav1.OwnerReference{},
+			},
+			{
+				name: "handles multiple references",
+				backup: &velerov1api.Backup{
+					ObjectMeta: metav1.ObjectMeta{
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind: "Schedule",
+								Name: "existing-schedule",
+								UID:  "1",
+							},
+							{
+								Kind: "Schedule",
+								Name: "missing-schedule",
+								UID:  "2",
+							},
+							{
+								Kind: "Schedule",
+								Name: "mismatched-uid-schedule",
+								UID:  "3",
+							},
+							{
+								Kind: "Schedule",
+								Name: "another-existing-schedule",
+								UID:  "4",
+							},
+						},
+						Namespace: "test-namespace",
+					},
+				},
+				toCreate: []ctrlClient.Object{
+					&velerov1api.Schedule{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "existing-schedule",
+							Namespace: "test-namespace",
+							UID:       "1",
+						},
+					},
+					&velerov1api.Schedule{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "mismatched-uid-schedule",
+							Namespace: "test-namespace",
+							UID:       "not-3",
+						},
+					},
+					&velerov1api.Schedule{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "another-existing-schedule",
+							Namespace: "test-namespace",
+							UID:       "4",
+						},
+					},
+				},
+				expectedReferences: []metav1.OwnerReference{
+					{
+						Kind: "Schedule",
+						Name: "existing-schedule",
+						UID:  "1",
+					},
+					{
+						Kind: "Schedule",
+						Name: "another-existing-schedule",
+						UID:  "4",
+					},
+				},
+			},
+		}
+		for _, test := range testCases {
+			test := test
+			It(test.name, func() {
+				logger := velerotest.NewLogger()
+				b := backupSyncReconciler{
+					client: ctrlfake.NewClientBuilder().Build(),
+				}
+
+				//create all required schedules as needed.
+				for _, creatable := range test.toCreate {
+					err := b.client.Create(context.Background(), creatable)
+					Expect(err).ShouldNot(HaveOccurred())
+				}
+
+				references := b.filterBackupOwnerReferences(context.Background(), test.backup, logger)
+				Expect(references).To(BeEquivalentTo(test.expectedReferences))
+			})
+		}
 	})
 })

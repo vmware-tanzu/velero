@@ -79,8 +79,8 @@ type DataUploadReconciler struct {
 	metrics             *metrics.ServerMetrics
 }
 
-func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interface,
-	csiSnapshotClient snapshotter.SnapshotV1Interface, repoEnsurer *repository.Ensurer, clock clocks.WithTickerAndDelayedExecution,
+func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interface, csiSnapshotClient snapshotter.SnapshotV1Interface,
+	dataPathMgr *datapath.Manager, repoEnsurer *repository.Ensurer, clock clocks.WithTickerAndDelayedExecution,
 	cred *credentials.CredentialGetter, nodeName string, fs filesystem.Interface, preparingTimeout time.Duration, log logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:              client,
@@ -93,7 +93,7 @@ func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interfa
 		logger:              log,
 		repoEnsurer:         repoEnsurer,
 		snapshotExposerList: map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(kubeClient, csiSnapshotClient, log)},
-		dataPathMgr:         datapath.NewManager(1),
+		dataPathMgr:         dataPathMgr,
 		preparingTimeout:    preparingTimeout,
 		metrics:             metrics,
 	}
@@ -292,13 +292,15 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
 		log.Info("Data upload is in progress")
 		if du.Spec.Cancel {
-			fsBackup := r.dataPathMgr.GetAsyncBR(du.Name)
-			if fsBackup == nil {
-				return ctrl.Result{}, nil
-			}
 			log.Info("Data upload is being canceled")
 
-			// Update status to Canceling.
+			fsBackup := r.dataPathMgr.GetAsyncBR(du.Name)
+			if fsBackup == nil {
+				r.OnDataUploadCancelled(ctx, du.GetNamespace(), du.GetName())
+				return ctrl.Result{}, nil
+			}
+
+			// Update status to Canceling
 			original := du.DeepCopy()
 			du.Status.Phase = velerov2alpha1api.DataUploadPhaseCanceling
 			if err := r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
@@ -761,7 +763,9 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			StorageClass:     du.Spec.CSISnapshot.StorageClass,
 			HostingPodLabels: map[string]string{velerov1api.DataUploadLabel: du.Name},
 			AccessMode:       accessMode,
-			Timeout:          du.Spec.OperationTimeout.Duration,
+			OperationTimeout: du.Spec.OperationTimeout.Duration,
+			ExposeTimeout:    r.preparingTimeout,
+			VolumeSize:       pvc.Spec.Resources.Requests[corev1.ResourceStorage],
 		}, nil
 	}
 	return nil, nil

@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"sort"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -51,7 +49,6 @@ type Request struct {
 	VolumeSnapshots           []*volume.Snapshot
 	PodVolumeBackups          []*velerov1api.PodVolumeBackup
 	BackedUpItems             map[itemKey]struct{}
-	CSISnapshots              []snapshotv1api.VolumeSnapshot
 	itemOperationsList        *[]*itemoperation.BackupOperation
 	ResPolicies               *resourcepolicies.Policies
 	SkippedPVTracker          *skipPVTracker

@@ -626,10 +626,9 @@ Therefore, we have below principles:
 
 We will address the two principles step by step. As the first step, VBDM’s parallelism is designed as below:  
 - We don’t create the load balancing mechanism for the first step, we don’t detect the accessibility of the volume/volume snapshot explicitly. Instead, we create the backupPod/restorePod under the help of Kubernetes, Kubernetes schedules the backupPod/restorePod to the appropriate node, then the data movement controller on that node will handle the DataUpload/DataDownload CR there, so the resource will be consumed from that node.
-- We don’t expose the configurable concurrency value in one node, instead, the concurrency value in value will be set to 1, that is, there is no concurrency in one node.
+- We expose the configurable concurrency value per node, for details of how the concurrency number constraints various backups and restores which share VGDP, check the [node-agent concurrency design][3].  
 
 As for the resource consumption, it is related to the data scale of the data movement activity and it is charged to node-agent pods, so users should configure enough resource to node-agent pods.  
-Meanwhile, Pod Volume Backup/Restore are also running in node-agent pods, we don’t restrict the concurrency of these two types. For example, in one node, one Pod Volume Backup and one DataUpload could run at the same time, in this case, the resource will be shared by the two activities.  
 
 ## Progress Report
 When a DUCR/DDCR is in InProgress phase, users could check the progress.  
@@ -665,6 +664,9 @@ At present, VBDM doesn't support recovery, so it will follow the second rule.
 
 ## Kopia For Block Device
 To work with block devices, VGDP will be updated. Today, when Kopia attempts to create a snapshot of the block device, it will error because kopia does not support this file type. Kopia does have a nice set of interfaces that are able to be extended though.
+
+**Notice**
+The Kopia block mode uploader only supports non-Windows platforms, because the block mode code invokes some system calls that are not present in the Windows platform.
 
 To achieve the necessary information to determine the type of volume that is being used, we will need to pass in the volume mode in provider interface.
 
@@ -967,5 +969,6 @@ Restore command is kept as is.
 
 
 
-[1]: ../unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
-[2]: ../general-progress-monitoring.md
+[1]: ../Implemented/unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
+[2]: ../Implemented/general-progress-monitoring.md
+[3]: ../node-agent-concurrency.md
