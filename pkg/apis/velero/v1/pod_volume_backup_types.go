@@ -52,8 +52,10 @@ type PodVolumeBackupSpec struct {
 	// +optional
 	Tags map[string]string `json:"tags,omitempty"`
 
-	// UploaderConfig specifies the configuration for the uploader.
-	UploaderConfig shared.UploaderConfig `json:"uploaderConfig,omitempty"`
+	// UploaderSettings are a map of key-value pairs that should be applied to the
+	// uploader configuration.
+	// +optional
+	UploaderSettings map[string]string `json:"uploaderSettings,omitempty"`
 }
 
 // PodVolumeBackupPhase represents the lifecycle phase of a PodVolumeBackup.

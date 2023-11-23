@@ -38,6 +38,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/util/uploaderconfig"
 )
 
 // Backupper can execute pod volume backups of volumes in a pod.
@@ -300,7 +301,11 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			}
 		}
 
-		volumeBackup := newPodVolumeBackup(backup, pod, volume, repoIdentifier, b.uploaderType, pvc)
+		volumeBackup, err := newPodVolumeBackup(backup, pod, volume, repoIdentifier, b.uploaderType, pvc)
+		if err != nil {
+			errs = append(errs, errors.Wrapf(err, "error creating PodVolumeBackup for volume %s", volumeName))
+			continue
+		}
 		if err := veleroclient.CreateRetryGenerateName(b.crClient, b.ctx, volumeBackup); err != nil {
 			errs = append(errs, err)
 			continue
@@ -353,7 +358,7 @@ func isHostPathVolume(volume *corev1api.Volume, pvc *corev1api.PersistentVolumeC
 	return pv.Spec.HostPath != nil, nil
 }
 
-func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume corev1api.Volume, repoIdentifier, uploaderType string, pvc *corev1api.PersistentVolumeClaim) *velerov1api.PodVolumeBackup {
+func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume corev1api.Volume, repoIdentifier, uploaderType string, pvc *corev1api.PersistentVolumeClaim) (*velerov1api.PodVolumeBackup, error) {
 	pvb := &velerov1api.PodVolumeBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    backup.Namespace,
@@ -392,7 +397,6 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume c
 			BackupStorageLocation: backup.Spec.StorageLocation,
 			RepoIdentifier:        repoIdentifier,
 			UploaderType:          uploaderType,
-			UploaderConfig:        backup.Spec.UploaderConfig,
 		},
 	}
 
@@ -411,5 +415,15 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume c
 		pvb.Spec.Tags["pvc-uid"] = string(pvc.UID)
 	}
 
-	return pvb
+	if backup.Spec.BackupConfig != nil {
+		configJSON, err := uploaderconfig.MarshalToPVBConfig(backup.Spec.BackupConfig)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to marshal backup config")
+		}
+		pvb.Spec.UploaderSettings = map[string]string{
+			uploaderconfig.PodVolumeBackups: configJSON,
+		}
+	}
+
+	return pvb, nil
 }

@@ -302,7 +302,10 @@ func (b *BackupBuilder) DataMover(name string) *BackupBuilder {
 
 // ParallelFilesUpload sets the Backup's uploader parallel uploads
 func (b *BackupBuilder) ParallelFilesUpload(parallel int) *BackupBuilder {
-	b.object.Spec.UploaderConfig.ParallelFilesUpload = parallel
+	if b.object.Spec.BackupConfig == nil {
+		b.object.Spec.BackupConfig = &velerov1api.BackupConfig{}
+	}
+	b.object.Spec.BackupConfig.ParallelFilesUpload = parallel
 	return b
 }
 

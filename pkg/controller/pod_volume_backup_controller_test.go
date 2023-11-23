@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
-	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
@@ -104,7 +103,7 @@ func (b *fakeFSBR) Init(ctx context.Context, bslName string, sourceNamespace str
 	return nil
 }
 
-func (b *fakeFSBR) StartBackup(source datapath.AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, uploaderConfigs shared.UploaderConfig) error {
+func (b *fakeFSBR) StartBackup(source datapath.AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, uploaderConfigs map[string]string) error {
 	pvb := b.pvb
 
 	original := b.pvb.DeepCopy()
@@ -116,7 +115,7 @@ func (b *fakeFSBR) StartBackup(source datapath.AccessPoint, realSource string, p
 	return nil
 }
 
-func (b *fakeFSBR) StartRestore(snapshotID string, target datapath.AccessPoint) error {
+func (b *fakeFSBR) StartRestore(snapshotID string, target datapath.AccessPoint, uploaderConfigs map[string]string) error {
 	return nil
 }
 

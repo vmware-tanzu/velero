@@ -60,9 +60,6 @@ type DataUploadSpec struct {
 	// OperationTimeout specifies the time used to wait internal operations,
 	// before returning error as timeout.
 	OperationTimeout metav1.Duration `json:"operationTimeout"`
-
-	// UploaderConfig specifies the configuration for the uploader.
-	UploaderConfig shared.UploaderConfig `json:"uploaderConfig,omitempty"`
 }
 
 type SnapshotType string

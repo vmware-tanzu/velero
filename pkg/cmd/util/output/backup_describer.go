@@ -88,7 +88,7 @@ func DescribeBackup(
 			DescribeResourcePolicies(d, backup.Spec.ResourcePolicy)
 		}
 
-		if backup.Spec.UploaderConfig.ParallelFilesUpload > 0 {
+		if backup.Spec.BackupConfig != nil && backup.Spec.BackupConfig.ParallelFilesUpload > 0 {
 			d.Println()
 			DescribeUploaderConfig(d, backup.Spec)
 		}
@@ -138,7 +138,7 @@ func DescribeResourcePolicies(d *Describer, resPolicies *v1.TypedLocalObjectRefe
 // DescribeUploaderConfig describes uploader config in human-readable format
 func DescribeUploaderConfig(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("Uploader config:\n")
-	d.Printf("\tParallel files upload:\t%d\n", spec.UploaderConfig.ParallelFilesUpload)
+	d.Printf("\tParallel files upload:\t%d\n", spec.BackupConfig.ParallelFilesUpload)
 }
 
 // DescribeBackupSpec describes a backup spec in human-readable format.

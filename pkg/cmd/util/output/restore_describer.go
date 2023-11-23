@@ -177,6 +177,11 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		d.Println()
 		d.Printf("Preserve Service NodePorts:\t%s\n", BoolPointerString(restore.Spec.PreserveNodePorts, "false", "true", "auto"))
 
+		if restore.Spec.RestoreConfig != nil && restore.Spec.RestoreConfig.WriteSparseFiles {
+			d.Println()
+			d.Printf("Write Sparse Files:\t%T\n", restore.Spec.RestoreConfig.WriteSparseFiles)
+		}
+
 		d.Println()
 		describeRestoreItemOperations(ctx, kbClient, d, restore, details, insecureSkipTLSVerify, caCertFile)
 

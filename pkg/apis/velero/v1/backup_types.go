@@ -19,8 +19,6 @@ package v1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 )
 
 type Metadata struct {
@@ -178,10 +176,16 @@ type BackupSpec struct {
 	// +optional
 	DataMover string `json:"datamover,omitempty"`
 
-	// UploaderConfig specifies the configuration for the uploader.
+	// BackupConfig defines the configuration for the backup.
 	// +optional
-	// +nullable
-	UploaderConfig shared.UploaderConfig `json:"uploaderConfig,omitempty"`
+	BackupConfig *BackupConfig `json:"backupConfig,omitempty"`
+}
+
+// BackupConfig defines the configuration for the backup.
+type BackupConfig struct {
+	// ParallelFilesUpload is the number of files parallel uploads to perform when using the uploader.
+	// +optional
+	ParallelFilesUpload int `json:"parallelFilesUpload,omitempty"`
 }
 
 // BackupHooks contains custom behaviors that should be executed at different phases of the backup.

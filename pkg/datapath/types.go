@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
-	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
@@ -63,10 +62,10 @@ type AsyncBR interface {
 	Init(ctx context.Context, bslName string, sourceNamespace string, uploaderType string, repositoryType string, repoIdentifier string, repositoryEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter) error
 
 	// StartBackup starts an asynchronous data path instance for backup
-	StartBackup(source AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, uploaderConfig shared.UploaderConfig) error
+	StartBackup(source AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, dataMoverConfig map[string]string) error
 
 	// StartRestore starts an asynchronous data path instance for restore
-	StartRestore(snapshotID string, target AccessPoint) error
+	StartRestore(snapshotID string, target AccessPoint, uploaderConfigs map[string]string) error
 
 	// Cancel cancels an asynchronous data path instance
 	Cancel()

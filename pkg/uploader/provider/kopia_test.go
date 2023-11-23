@@ -34,7 +34,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/credentials/mocks"
-	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	udmrepo "github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
@@ -69,34 +68,34 @@ func TestRunBackup(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		hookBackupFunc func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg shared.UploaderConfig, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error)
+		hookBackupFunc func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error)
 		volMode        uploader.PersistentVolumeMode
 		notError       bool
 	}{
 		{
 			name: "success to backup",
-			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg shared.UploaderConfig, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 				return &uploader.SnapshotInfo{}, false, nil
 			},
 			notError: true,
 		},
 		{
 			name: "get error to backup",
-			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg shared.UploaderConfig, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 				return &uploader.SnapshotInfo{}, false, errors.New("failed to backup")
 			},
 			notError: false,
 		},
 		{
 			name: "got empty snapshot",
-			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg shared.UploaderConfig, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 				return nil, true, errors.New("snapshot is empty")
 			},
 			notError: false,
 		},
 		{
 			name: "success to backup block mode volume",
-			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg shared.UploaderConfig, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 				return &uploader.SnapshotInfo{}, false, nil
 			},
 			volMode:  uploader.PersistentVolumeBlock,
@@ -109,7 +108,7 @@ func TestRunBackup(t *testing.T) {
 				tc.volMode = uploader.PersistentVolumeFilesystem
 			}
 			BackupFunc = tc.hookBackupFunc
-			_, _, err := kp.RunBackup(context.Background(), "var", "", nil, false, "", tc.volMode, shared.UploaderConfig{}, &updater)
+			_, _, err := kp.RunBackup(context.Background(), "var", "", nil, false, "", tc.volMode, map[string]string{}, &updater)
 			if tc.notError {
 				assert.NoError(t, err)
 			} else {
@@ -126,27 +125,27 @@ func TestRunRestore(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		hookRestoreFunc func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error)
+		hookRestoreFunc func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error)
 		notError        bool
 		volMode         uploader.PersistentVolumeMode
 	}{
 		{
 			name: "normal restore",
-			hookRestoreFunc: func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
+			hookRestoreFunc: func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
 				return 0, 0, nil
 			},
 			notError: true,
 		},
 		{
 			name: "failed to restore",
-			hookRestoreFunc: func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
+			hookRestoreFunc: func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
 				return 0, 0, errors.New("failed to restore")
 			},
 			notError: false,
 		},
 		{
 			name: "normal block mode restore",
-			hookRestoreFunc: func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
+			hookRestoreFunc: func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
 				return 0, 0, nil
 			},
 			volMode:  uploader.PersistentVolumeBlock,
@@ -160,7 +159,7 @@ func TestRunRestore(t *testing.T) {
 				tc.volMode = uploader.PersistentVolumeFilesystem
 			}
 			RestoreFunc = tc.hookRestoreFunc
-			err := kp.RunRestore(context.Background(), "", "/var", tc.volMode, &updater)
+			err := kp.RunRestore(context.Background(), "", "/var", tc.volMode, map[string]string{}, &updater)
 			if tc.notError {
 				assert.NoError(t, err)
 			} else {

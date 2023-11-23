@@ -147,7 +147,7 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return c.errorOut(ctx, pvr, err, "error to initialize data path", log)
 	}
 
-	if err := fsRestore.StartRestore(pvr.Spec.SnapshotID, volumePath); err != nil {
+	if err := fsRestore.StartRestore(pvr.Spec.SnapshotID, volumePath, pvr.Spec.UploaderSettings); err != nil {
 		return c.errorOut(ctx, pvr, err, "error starting data path restore", log)
 	}
 

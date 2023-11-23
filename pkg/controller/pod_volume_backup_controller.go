@@ -178,7 +178,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	if err := fsBackup.StartBackup(path, "", parentSnapshotID, false, pvb.Spec.Tags, pvb.Spec.UploaderConfig); err != nil {
+	if err := fsBackup.StartBackup(path, "", parentSnapshotID, false, pvb.Spec.Tags, pvb.Spec.UploaderSettings); err != nil {
 		return r.errorOut(ctx, &pvb, err, "error starting data path backup", log)
 	}
 

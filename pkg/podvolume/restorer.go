@@ -38,6 +38,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/util/uploaderconfig"
 )
 
 type RestoreData struct {
@@ -176,7 +177,11 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 			}
 		}
 
-		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, repoIdentifier, backupInfo.uploaderType, data.SourceNamespace, pvc)
+		volumeRestore, err := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, repoIdentifier, backupInfo.uploaderType, data.SourceNamespace, pvc)
+		if err != nil {
+			errs = append(errs, errors.Wrapf(err, "error creating PodVolumeRestore for volume %s", volume))
+			continue
+		}
 
 		if err := veleroclient.CreateRetryGenerateName(r.crClient, r.ctx, volumeRestore); err != nil {
 			errs = append(errs, errors.WithStack(err))
@@ -246,7 +251,7 @@ ForEachVolume:
 	return errs
 }
 
-func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backupLocation, volume, snapshot, repoIdentifier, uploaderType, sourceNamespace string, pvc *corev1api.PersistentVolumeClaim) *velerov1api.PodVolumeRestore {
+func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backupLocation, volume, snapshot, repoIdentifier, uploaderType, sourceNamespace string, pvc *corev1api.PersistentVolumeClaim) (*velerov1api.PodVolumeRestore, error) {
 	pvr := &velerov1api.PodVolumeRestore{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    restore.Namespace,
@@ -285,7 +290,19 @@ func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backu
 		// this label is not used by velero, but useful for debugging.
 		pvr.Labels[velerov1api.PVCUIDLabel] = string(pvc.UID)
 	}
-	return pvr
+
+	if restore.Spec.RestoreConfig != nil {
+		configJSON, err := uploaderconfig.MarshalToPVRConfig(restore.Spec.RestoreConfig)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to marshal restore config")
+		}
+
+		pvr.Spec.UploaderSettings = map[string]string{
+			uploaderconfig.PodVolumeRestores: configJSON,
+		}
+	}
+
+	return pvr, nil
 }
 
 func getVolumesRepositoryType(volumes map[string]volumeBackupInfo) (string, error) {

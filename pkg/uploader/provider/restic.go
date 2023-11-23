@@ -18,6 +18,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -27,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
-	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
@@ -123,7 +123,7 @@ func (rp *resticProvider) RunBackup(
 	forceFull bool,
 	parentSnapshot string,
 	volMode uploader.PersistentVolumeMode,
-	uploaderCfg shared.UploaderConfig,
+	uploaderCfg map[string]string,
 	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {
 		return "", false, errors.New("Need to initial backup progress updater first")
@@ -146,8 +146,18 @@ func (rp *resticProvider) RunBackup(
 		"parentSnapshot": parentSnapshot,
 	})
 
-	if uploaderCfg.ParallelFilesUpload > 0 {
-		log.Warnf("ParallelFilesUpload is set to %d, but restic does not support parallel file uploads. Ignoring.", uploaderCfg.ParallelFilesUpload)
+	backupCfg := velerov1api.BackupConfig{}
+	// currently, we only have one uploader config in one uploader config so we can just loop through it
+	for configItem, jsonConfig := range uploaderCfg {
+		err := json.Unmarshal([]byte(jsonConfig), &backupCfg)
+		if err != nil {
+			return "", false, errors.Wrapf(err, "failed to parse %s config", configItem)
+		}
+		break
+	}
+
+	if backupCfg.ParallelFilesUpload > 0 {
+		log.Warnf("ParallelFilesUpload is set to %d, but restic does not support parallel file uploads. Ignoring.", backupCfg.ParallelFilesUpload)
 	}
 
 	backupCmd := resticBackupCMDFunc(rp.repoIdentifier, rp.credentialsFile, path, tags)
@@ -191,6 +201,7 @@ func (rp *resticProvider) RunRestore(
 	snapshotID string,
 	volumePath string,
 	volMode uploader.PersistentVolumeMode,
+	uploaderCfg map[string]string,
 	updater uploader.ProgressUpdater) error {
 	if updater == nil {
 		return errors.New("Need to initial backup progress updater first")
@@ -210,8 +221,34 @@ func (rp *resticProvider) RunRestore(
 	if len(rp.extraFlags) != 0 {
 		restoreCmd.ExtraFlags = append(restoreCmd.ExtraFlags, rp.extraFlags...)
 	}
+
+	extraFlags, err := rp.parseRestoreExtraFlags(uploaderCfg)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse uploader config")
+	} else if len(extraFlags) != 0 {
+		restoreCmd.ExtraFlags = append(restoreCmd.ExtraFlags, extraFlags...)
+	}
+
 	stdout, stderr, err := restic.RunRestore(restoreCmd, log, updater)
 
-	log.Infof("Run command=%s, stdout=%s, stderr=%s", restoreCmd.Command, stdout, stderr)
+	log.Infof("Run command=%v, stdout=%s, stderr=%s", restoreCmd, stdout, stderr)
 	return err
+}
+
+func (rp *resticProvider) parseRestoreExtraFlags(uploaderCfg map[string]string) ([]string, error) {
+	extraFlags := []string{}
+	restoreCfg := velerov1api.RestoreConfig{}
+	// currently, we only have one uploader config in map so we can just loop through it
+	for configItem, jsonConfig := range uploaderCfg {
+		err := json.Unmarshal([]byte(jsonConfig), &restoreCfg)
+		if err != nil {
+			return extraFlags, errors.Wrapf(err, "failed to parse %s uploader config", configItem)
+		}
+		break
+	}
+
+	if restoreCfg.WriteSparseFiles {
+		extraFlags = append(extraFlags, "--sparse")
+	}
+	return extraFlags, nil
 }

@@ -48,7 +48,7 @@ func DescribeSchedule(schedule *v1.Schedule) string {
 			DescribeResourcePolicies(d, schedule.Spec.Template.ResourcePolicy)
 		}
 
-		if schedule.Spec.Template.UploaderConfig.ParallelFilesUpload > 0 {
+		if schedule.Spec.Template.BackupConfig != nil && schedule.Spec.Template.BackupConfig.ParallelFilesUpload > 0 {
 			d.Println()
 			DescribeUploaderConfig(d, schedule.Spec.Template)
 		}

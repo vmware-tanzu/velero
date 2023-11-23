@@ -194,6 +194,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		Scheme:   scheme,
 		NewCache: cache.BuilderWithOptions(cacheOption),
 	})
+
 	if err != nil {
 		cancelFunc()
 		return nil, err

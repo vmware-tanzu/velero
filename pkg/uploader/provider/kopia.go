@@ -30,7 +30,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/uploader/kopia"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
-	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	repokeys "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
@@ -120,7 +119,7 @@ func (kp *kopiaProvider) RunBackup(
 	forceFull bool,
 	parentSnapshot string,
 	volMode uploader.PersistentVolumeMode,
-	uploaderCfg shared.UploaderConfig,
+	uploaderCfg map[string]string,
 	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {
 		return "", false, errors.New("Need to initial backup progress updater first")
@@ -205,6 +204,7 @@ func (kp *kopiaProvider) RunRestore(
 	snapshotID string,
 	volumePath string,
 	volMode uploader.PersistentVolumeMode,
+	uploaderCfg map[string]string,
 	updater uploader.ProgressUpdater) error {
 	log := kp.log.WithFields(logrus.Fields{
 		"snapshotID": snapshotID,
@@ -228,7 +228,7 @@ func (kp *kopiaProvider) RunRestore(
 	// We use the cancel channel to control the restore cancel, so don't pass a context with cancel to Kopia restore.
 	// Otherwise, Kopia restore will not response to the cancel control but return an arbitrary error.
 	// Kopia restore cancel is not designed as well as Kopia backup which uses the context to control backup cancel all the way.
-	size, fileCount, err := RestoreFunc(context.Background(), repoWriter, progress, snapshotID, volumePath, volMode, log, restoreCancel)
+	size, fileCount, err := RestoreFunc(context.Background(), repoWriter, progress, snapshotID, volumePath, volMode, uploaderCfg, log, restoreCancel)
 
 	if err != nil {
 		return errors.Wrapf(err, "Failed to run kopia restore")

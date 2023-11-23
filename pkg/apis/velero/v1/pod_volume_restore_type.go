@@ -48,6 +48,11 @@ type PodVolumeRestoreSpec struct {
 
 	// SourceNamespace is the original namespace for namaspace mapping.
 	SourceNamespace string `json:"sourceNamespace"`
+
+	// UploaderSettings are a map of key-value pairs that should be applied to the
+	// uploader configuration.
+	// +optional
+	UploaderSettings map[string]string `json:"uploaderSettings,omitempty"`
 }
 
 // PodVolumeRestorePhase represents the lifecycle phase of a PodVolumeRestore.

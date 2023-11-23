@@ -25,7 +25,7 @@ type UploaderConfig struct {
 }
 ```
 
-### Integration with Backup CRD
+### Integration with Backup & Restore CRD
 The Velero CLI will support an uploader configuration-related flag, allowing users to set the value when creating backups or restores. This value will be stored in the `UploaderConfig` field within the `Backup` CRD and `Restore` CRD:
 
 ```go
@@ -121,6 +121,45 @@ Roughly, the process is as follows:
 2. When users perform file system backups, UploaderConfig is passed to the PodVolumeBackup CR. When users use the Data-mover for backups, it is passed to the DataUpload CR. 
 3. Each respective controller within the CRs calls the uploader, and the ParallelFilesUpload from UploaderConfig in CRs is passed to the uploader. 
 4. When the uploader subsequently calls the Kopia API, it can use the ParallelFilesUpload to set the MaxParallelFileReads parameter, and if the uploader calls the Restic command it would output one warning log for Restic does not support this feature.
+
+### Sparse Option For Kopia & Restic Restore
+In many system files, there are numerous zero bytes or empty blocks that still occupy physical storage space. Sparse backup employs a more intelligent approach by only backing up the actual data-containing portions. For those empty blocks or zero bytes, it merely records their presence without actually storing them. This can significantly reduce the storage space required for backups, especially in situations where there is a substantial amount of empty data in large file systems.
+
+Below are the key steps that should be added to support this new feature.
+#### Velero CLI 
+The Velero CLI will support a `--write-sparse-files` flag, allowing users to set the `WriteSparseFiles` value when creating restores with Restic or Kopia uploader.
+
+#### UploaderConfig 
+below the sub-option `WriteSparseFiles` is added into UploaderConfig:
+
+```go
+type UploaderConfig struct {
+    // +optional
+	WriteSparseFiles bool `json:"writeSparseFiles,omitempty"`
+}
+```
+
+### Enable Sparse in Restic
+For Restic, it could be enabled by pass the flag `--sparse` in creating restore:
+
+```bash
+restic restore create --sparse $snapshotID
+```
+
+### Enable Sparse in Kopia
+For Kopia, it could be enabled this feature by the `WriteSparseFiles` field in the [FilesystemOutput](https://pkg.go.dev/github.com/kopia/kopia@v0.13.0/snapshot/restore#FilesystemOutput).
+
+```golang
+fsOutput := &restore.FilesystemOutput{
+		WriteSparseFiles:       veleroCfg.WriteSparseFiles,
+	}
+```
+
+Roughly, the process is as follows: 
+1. Users pass the WriteSparseFiles parameter and its value through the Velero CLI. This parameter and its value are stored as a sub-option within UploaderConfig and then placed into the Restore CR. 
+2. When users perform file system restores, UploaderConfig is passed to the PodVolumeRestore CR. When users use the Data-mover for restores, it is passed to the DataDownload CR. 
+3. Each respective controller within the CRs calls the uploader, and the WriteSparseFiles from UploaderConfig in CRs is passed to the uploader. 
+4. When the uploader subsequently calls the Kopia API, it can use the WriteSparseFiles to set the WriteSparseFiles parameter, and if the uploader calls the Restic command it would append `--sparse` flag within the restore command.
 
 ## Alternatives Considered
 To enhance extensibility further, the option of storing `UploaderConfig` in a Kubernetes ConfigMap can be explored, this approach would allow the addition and modification of configuration options without the need to modify the CRD.

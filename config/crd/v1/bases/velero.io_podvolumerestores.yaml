@@ -119,6 +119,12 @@ spec:
                 description: SourceNamespace is the original namespace for namaspace
                   mapping.
                 type: string
+              uploaderSettings:
+                additionalProperties:
+                  type: string
+                description: UploaderSettings are a map of key-value pairs that should
+                  be applied to the uploader configuration.
+                type: object
               uploaderType:
                 description: UploaderType is the type of the uploader to handle the
                   data transfer.

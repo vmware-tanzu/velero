@@ -387,6 +387,14 @@ spec:
                 - name
                 type: object
                 x-kubernetes-map-type: atomic
+              restoreConfig:
+                description: RestoreConfig specifies the configuration for the restore.
+                properties:
+                  writeSparseFiles:
+                    description: WriteSparseFiles is a flag to indicate whether write
+                      files sparsely or not.
+                    type: boolean
+                type: object
               restorePVs:
                 description: RestorePVs specifies whether to restore all included
                   PVs from snapshot

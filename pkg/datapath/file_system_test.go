@@ -25,7 +25,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader/provider"
 	providerMock "github.com/vmware-tanzu/velero/pkg/uploader/provider/mocks"
@@ -101,7 +100,7 @@ func TestAsyncBackup(t *testing.T) {
 			fs.initialized = true
 			fs.callbacks = test.callbacks
 
-			err := fs.StartBackup(AccessPoint{ByPath: test.path}, "", "", false, nil, shared.UploaderConfig{})
+			err := fs.StartBackup(AccessPoint{ByPath: test.path}, "", "", false, nil, make(map[string]string))
 			require.Equal(t, nil, err)
 
 			<-finish
@@ -179,12 +178,12 @@ func TestAsyncRestore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fs := newFileSystemBR("job-1", "test", nil, "velero", Callbacks{}, velerotest.NewLogger()).(*fileSystemBR)
 			mockProvider := providerMock.NewProvider(t)
-			mockProvider.On("RunRestore", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.err)
+			mockProvider.On("RunRestore", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.err)
 			fs.uploaderProv = mockProvider
 			fs.initialized = true
 			fs.callbacks = test.callbacks
 
-			err := fs.StartRestore(test.snapshot, AccessPoint{ByPath: test.path})
+			err := fs.StartRestore(test.snapshot, AccessPoint{ByPath: test.path}, make(map[string]string))
 			require.Equal(t, nil, err)
 
 			<-finish

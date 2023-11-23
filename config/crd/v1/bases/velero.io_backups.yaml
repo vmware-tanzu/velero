@@ -35,6 +35,14 @@ spec:
           spec:
             description: BackupSpec defines the specification for a Velero backup.
             properties:
+              backupConfig:
+                description: BackupConfig defines the configuration for the backup.
+                properties:
+                  parallelFilesUpload:
+                    description: ParallelFilesUpload is the number of files parallel
+                      uploads to perform when using the uploader.
+                    type: integer
+                type: object
               csiSnapshotTimeout:
                 description: CSISnapshotTimeout specifies the time used to wait for
                   CSI VolumeSnapshot status turns to ReadyToUse during creation, before
@@ -477,15 +485,6 @@ spec:
                 description: TTL is a time.Duration-parseable string describing how
                   long the Backup should be retained for.
                 type: string
-              uploaderConfig:
-                description: UploaderConfig specifies the configuration for the uploader.
-                nullable: true
-                properties:
-                  parallelFilesUpload:
-                    description: ParallelFilesUpload is the number of files parallel
-                      uploads to perform when using the uploader.
-                    type: integer
-                type: object
               volumeSnapshotLocations:
                 description: VolumeSnapshotLocations is a list containing names of
                   VolumeSnapshotLocations associated with this backup.
