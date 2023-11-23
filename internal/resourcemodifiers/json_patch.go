@@ -19,30 +19,37 @@ type JSONPatch struct {
 }
 
 func (p *JSONPatch) ToString() string {
-	if addQuotes(p.Value) {
+	if addQuotes(&p.Value) {
 		return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": "%s"}`, p.Operation, p.From, p.Path, p.Value)
 	}
 	return fmt.Sprintf(`{"op": "%s", "from": "%s", "path": "%s", "value": %s}`, p.Operation, p.From, p.Path, p.Value)
 }
 
-func addQuotes(value string) bool {
-	if value == "" {
+func addQuotes(value *string) bool {
+	if *value == "" {
+		return true
+	}
+	// if value is escaped, remove escape and add quotes
+	// this is useful for scenarios where boolean, null and numbers are required to be set as string.
+	if strings.HasPrefix(*value, "\"") && strings.HasSuffix(*value, "\"") {
+		*value = strings.TrimPrefix(*value, "\"")
+		*value = strings.TrimSuffix(*value, "\"")
 		return true
 	}
 	// if value is null, then don't add quotes
-	if value == "null" {
+	if *value == "null" {
 		return false
 	}
 	// if value is a boolean, then don't add quotes
-	if _, err := strconv.ParseBool(value); err == nil {
+	if strings.ToLower(*value) == "true" || strings.ToLower(*value) == "false" {
 		return false
 	}
 	// if value is a json object or array, then don't add quotes.
-	if strings.HasPrefix(value, "{") || strings.HasPrefix(value, "[") {
+	if strings.HasPrefix(*value, "{") || strings.HasPrefix(*value, "[") {
 		return false
 	}
 	// if value is a number, then don't add quotes
-	if _, err := strconv.ParseFloat(value, 64); err == nil {
+	if _, err := strconv.ParseFloat(*value, 64); err == nil {
 		return false
 	}
 	return true
