@@ -303,6 +303,11 @@ func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *
 		backupStatusInfo["veleroNativeSnapshotsDetail"] = snapshotDetails
 		return
 	}
+
+	if status.HookStatus != nil {
+		backupStatusInfo["hooksAttempted"] = status.HookStatus.HooksAttempted
+		backupStatusInfo["hooksFailed"] = status.HookStatus.HooksFailed
+	}
 }
 
 func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Client, backupStatusInfo map[string]interface{}, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) {
