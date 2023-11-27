@@ -544,6 +544,23 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 		errs.Merge(&e)
 	}
 
+	var createdOrUpdatedCRDs bool
+	for _, restoredItem := range ctx.restoredItems {
+		if restoredItem.action == itemRestoreResultCreated || restoredItem.action == itemRestoreResultUpdated {
+			createdOrUpdatedCRDs = true
+			break
+		}
+	}
+	// If we just restored custom resource definitions (CRDs), refresh
+	// discovery because the restored CRDs may have created or updated new APIs that
+	// didn't previously exist in the cluster, and we want to be able to
+	// resolve & restore instances of them in subsequent loop iterations.
+	if createdOrUpdatedCRDs {
+		if err := ctx.discoveryHelper.Refresh(); err != nil {
+			warnings.Add("", errors.Wrap(err, "refresh discovery after restoring CRDs"))
+		}
+	}
+
 	// Restore everything else
 	selectedResourceCollection, _, w, e := ctx.getOrderedResourceCollection(
 		backupResources,
@@ -762,15 +779,6 @@ func (ctx *restoreContext) processSelectedResource(
 		}
 	}
 
-	// If we just restored custom resource definitions (CRDs), refresh
-	// discovery because the restored CRDs may have created new APIs that
-	// didn't previously exist in the cluster, and we want to be able to
-	// resolve & restore instances of them in subsequent loop iterations.
-	if groupResource == kuberesource.CustomResourceDefinitions {
-		if err := ctx.discoveryHelper.Refresh(); err != nil {
-			warnings.Add("", errors.Wrap(err, "refresh discovery after restoring CRDs"))
-		}
-	}
 	return processedItems, warnings, errs
 }
 
