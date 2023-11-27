@@ -24,16 +24,14 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
 	"github.com/pkg/errors"
-
-	"github.com/vmware-tanzu/velero/test/util/report"
-	"github.com/vmware-tanzu/velero/test/util/velero"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	. "github.com/vmware-tanzu/velero/test"
 	"github.com/vmware-tanzu/velero/test/perf/metrics"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	"github.com/vmware-tanzu/velero/test/util/report"
+	"github.com/vmware-tanzu/velero/test/util/velero"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
@@ -86,8 +84,8 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 		By(fmt.Sprintf("Run test %s ...... \n", test.GetTestCase().CaseBaseName))
 		BeforeEach(func() {
 			// Using the global velero config which covered the installation for most common cases
-			if VeleroCfg.InstallVelero {
-				Expect(PrepareVelero(context.Background(), test.GetTestCase().CaseBaseName)).To(Succeed())
+			if InstallVelero {
+				Expect(PrepareVelero(context.Background(), test.GetTestCase().CaseBaseName, VeleroCfg)).To(Succeed())
 			}
 		})
 		It(test.GetTestMsg().Text, func() {

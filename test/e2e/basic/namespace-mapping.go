@@ -64,7 +64,7 @@ func (n *NamespaceMapping) Init() error {
 	n.MappedNamespaceList = mappedNSList
 	fmt.Println(mappedNSList)
 	n.BackupArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", n.BackupName,
+		"create", "--namespace", n.VeleroCfg.VeleroNamespace, "backup", n.BackupName,
 		"--include-namespaces", strings.Join(*n.NSIncluded, ","), "--wait",
 	}
 	if n.UseVolumeSnapshots {
@@ -74,7 +74,7 @@ func (n *NamespaceMapping) Init() error {
 		n.BackupArgs = append(n.BackupArgs, "--default-volumes-to-fs-backup")
 	}
 	n.RestoreArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", n.RestoreName,
+		"create", "--namespace", n.VeleroCfg.VeleroNamespace, "restore", n.RestoreName,
 		"--from-backup", n.BackupName, "--namespace-mappings", mappedNS,
 		"--wait",
 	}
@@ -89,9 +89,9 @@ func (n *NamespaceMapping) CreateResources() error {
 			Expect(CreateNamespace(n.Ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
 		})
 		By("Deploy sample workload of Kibishii", func() {
-			Expect(KibishiiPrepareBeforeBackup(n.Ctx, n.Client, VeleroCfg.CloudProvider,
-				ns, VeleroCfg.RegistryCredentialFile, VeleroCfg.Features,
-				VeleroCfg.KibishiiDirectory, false, n.kibishiiData)).To(Succeed())
+			Expect(KibishiiPrepareBeforeBackup(n.Ctx, n.Client, n.VeleroCfg.CloudProvider,
+				ns, n.VeleroCfg.RegistryCredentialFile, n.VeleroCfg.Features,
+				n.VeleroCfg.KibishiiDirectory, false, n.kibishiiData)).To(Succeed())
 		})
 	}
 	return nil

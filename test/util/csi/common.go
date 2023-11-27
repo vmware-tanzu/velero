@@ -85,7 +85,7 @@ func GetCsiSnapshotHandle(client TestClient, backupName string) ([]string, error
 	}
 
 	if len(snapshotHandleList) == 0 {
-		fmt.Printf("No VolumeSnapshotContent from backup %s", backupName)
+		fmt.Printf("No VolumeSnapshotContent from backup %s\n", backupName)
 	}
 	return snapshotHandleList, nil
 }
@@ -122,7 +122,7 @@ func GetCsiSnapshotHandleV1(client TestClient, backupName string) ([]string, err
 	}
 
 	if len(snapshotHandleList) == 0 {
-		fmt.Printf("No VolumeSnapshotContent from backup %s", backupName)
+		fmt.Printf("No VolumeSnapshotContent from backup %s\n", backupName)
 	}
 	return snapshotHandleList, nil
 }
@@ -179,8 +179,8 @@ func CheckVolumeSnapshotCR(client TestClient, backupName string, expectedCount i
 		return nil, errors.New("API version is invalid")
 	}
 	if len(snapshotContentNameList) != expectedCount {
-		return nil, errors.New(fmt.Sprintf("Snapshot count %d is not as expect %d", len(snapshotContentNameList), expectedCount))
+		return nil, errors.New(fmt.Sprintf("Snapshot content count %d is not as expect %d", len(snapshotContentNameList), expectedCount))
 	}
-	fmt.Println(snapshotContentNameList)
+	fmt.Printf("snapshotContentNameList: %v \n", snapshotContentNameList)
 	return snapshotContentNameList, nil
 }

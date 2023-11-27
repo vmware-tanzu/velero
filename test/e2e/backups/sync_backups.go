@@ -56,7 +56,7 @@ func BackupsSyncTest() {
 
 	BeforeEach(func() {
 		flag.Parse()
-		if VeleroCfg.InstallVelero {
+		if InstallVelero {
 			veleroCfg := VeleroCfg
 			veleroCfg.UseVolumeSnapshots = false
 			Expect(VeleroInstall(context.Background(), &VeleroCfg, false)).To(Succeed())
@@ -68,7 +68,7 @@ func BackupsSyncTest() {
 			By("Clean backups after test", func() {
 				DeleteAllBackups(context.Background(), *VeleroCfg.ClientToInstallVelero)
 			})
-			if VeleroCfg.InstallVelero {
+			if InstallVelero {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
 				Expect(VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())

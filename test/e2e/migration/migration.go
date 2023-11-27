@@ -63,15 +63,12 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 		if useVolumeSnapshots && veleroCfg.CloudProvider == "kind" {
 			Skip("Volume snapshots not supported on kind")
 		}
-		if useVolumeSnapshots && veleroCfg.CloudProvider == "aws" && !veleroCfg.SnapshotMoveData {
-			Skip("Volume snapshots migration not supported on AWS provisioned by Sheperd public pool")
-		}
 
 		if veleroCfg.DefaultCluster == "" && veleroCfg.StandbyCluster == "" {
 			Skip("Migration test needs 2 clusters")
 		}
 		// need to uninstall Velero first in case of the affection of the existing global velero installation
-		if veleroCfg.InstallVelero {
+		if InstallVelero {
 			By("Uninstall Velero", func() {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
@@ -100,7 +97,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				DeleteNamespace(context.Background(), *veleroCfg.StandbyClient, migrationNamespace, true)
 			})
 
-			if veleroCfg.InstallVelero {
+			if InstallVelero {
 				By(fmt.Sprintf("Delete sample workload namespace %s", migrationNamespace), func() {
 					DeleteNamespace(context.Background(), *veleroCfg.StandbyClient, migrationNamespace, true)
 				})
@@ -258,7 +255,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			}
 
 			if useVolumeSnapshots && veleroCfg.CloudProvider == "azure" &&
-				strings.EqualFold(veleroCfg.Features, "EnableCSI") &&
+				strings.EqualFold(veleroCfg.Features, FeatureCSI) &&
 				!OriginVeleroCfg.SnapshotMoveData {
 				By("Sleep 5 minutes to avoid snapshot recreated by unknown reason ", func() {
 					time.Sleep(5 * time.Minute)

@@ -141,7 +141,7 @@ func getPluginsByVersion(version, cloudProvider, objectStoreProvider, feature st
 		plugins = append(plugins, pluginsForObjectStoreProvider...)
 	}
 
-	if strings.EqualFold(feature, "EnableCSI") {
+	if strings.EqualFold(feature, FeatureCSI) {
 		pluginsForFeature, ok = cloudMap["csi"]
 		if !ok {
 			return nil, errors.Errorf("fail to get CSI plugins by version: %s ", version)
@@ -640,7 +640,7 @@ func getPlugins(ctx context.Context, veleroCfg VeleroConfig) ([]string, error) {
 				return nil, errors.WithMessage(err, "failed to get velero version")
 			}
 		}
-		if veleroCfg.SnapshotMoveData && veleroCfg.DataMoverPlugin == "" {
+		if veleroCfg.SnapshotMoveData && veleroCfg.DataMoverPlugin == "" && !veleroCfg.IsUpgradeTest {
 			needDataMoverPlugin = true
 		}
 		plugins, err = getPluginsByVersion(version, cloudProvider, objectStoreProvider, feature, needDataMoverPlugin)
@@ -1199,7 +1199,7 @@ func GetSnapshotCheckPoint(client TestClient, VeleroCfg VeleroConfig, expectCoun
 	snapshotCheckPoint.ExpectCount = expectCount
 	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
 	snapshotCheckPoint.PodName = KibishiiPVCNameList
-	if VeleroCfg.CloudProvider == "azure" && strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
+	if (VeleroCfg.CloudProvider == "azure" || VeleroCfg.CloudProvider == "aws") && strings.EqualFold(VeleroCfg.Features, FeatureCSI) {
 		snapshotCheckPoint.EnableCSI = true
 		resourceName := "snapshot.storage.k8s.io"
 
@@ -1215,7 +1215,7 @@ func GetSnapshotCheckPoint(client TestClient, VeleroCfg VeleroConfig, expectCoun
 			return snapshotCheckPoint, errors.Wrapf(err, "Fail to get Azure CSI snapshot content")
 		}
 	}
-	fmt.Println(snapshotCheckPoint)
+	fmt.Printf("snapshotCheckPoint: %v \n", snapshotCheckPoint)
 	return snapshotCheckPoint, nil
 }
 

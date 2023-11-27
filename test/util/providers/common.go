@@ -168,7 +168,7 @@ func IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig
 	} else {
 		err = s.IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupName, snapshotCheck)
 		if err != nil {
-			return errors.Wrapf(err, fmt.Sprintf("Fail to get snapshot of backup%s", backupName))
+			return errors.Wrapf(err, fmt.Sprintf("Fail to get snapshot of backup %s", backupName))
 		}
 	}
 	return nil

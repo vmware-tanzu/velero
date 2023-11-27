@@ -30,7 +30,6 @@ import (
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/kibishii"
-
 	. "github.com/vmware-tanzu/velero/test/util/providers"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -69,8 +68,8 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 		flag.Parse()
 		UUIDgen, err = uuid.NewRandom()
 		Expect(err).To(Succeed())
-		if veleroCfg.InstallVelero {
-			Expect(PrepareVelero(context.Background(), "BSL Deletion")).To(Succeed())
+		if InstallVelero {
+			Expect(PrepareVelero(context.Background(), "BSL Deletion", veleroCfg)).To(Succeed())
 		}
 	})
 

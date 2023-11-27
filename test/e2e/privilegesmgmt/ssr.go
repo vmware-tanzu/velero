@@ -43,8 +43,8 @@ func SSRTest() {
 	BeforeEach(func() {
 		flag.Parse()
 		veleroCfg.UseVolumeSnapshots = false
-		if veleroCfg.InstallVelero {
-			Expect(PrepareVelero(context.Background(), "SSR test")).To(Succeed())
+		if InstallVelero {
+			Expect(PrepareVelero(context.Background(), "SSR test", veleroCfg)).To(Succeed())
 		}
 	})
 

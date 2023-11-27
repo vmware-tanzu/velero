@@ -77,7 +77,13 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 		if useVolumeSnapshots && veleroCfg.CloudProvider == "kind" {
 			Skip("Volume snapshots not supported on kind")
 		}
-
+		// [SKIP]: Static provisioning for vSphere CSI driver works differently from other drivers.
+		//         For vSphere CSI, after you create a PV specifying an existing volume handle, CSI
+		//         syncer will need to register it with CNS. For other CSI drivers, static provisioning
+		//         usually does not go through storage system at all.  That's probably why it took longer
+		if backupRestoreTestConfig.isRetainPVTest && veleroCfg.CloudProvider == "vsphere" {
+			Skip("Skip due to vSphere CSI driver long time issue of Static provisioning")
+		}
 		var err error
 		flag.Parse()
 		UUIDgen, err = uuid.NewRandom()
@@ -95,7 +101,7 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 				}
 				DeleteStorageClass(context.Background(), *veleroCfg.ClientToInstallVelero, KibishiiStorageClassName)
 			})
-			if veleroCfg.InstallVelero {
+			if InstallVelero {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
 				err = VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)
@@ -106,7 +112,7 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 
 	When("kibishii is the sample workload", func() {
 		It("should be successfully backed up and restored to the default BackupStorageLocation", func() {
-			if veleroCfg.InstallVelero {
+			if InstallVelero {
 				if useVolumeSnapshots {
 					//Install node agent also
 					veleroCfg.UseNodeAgent = useVolumeSnapshots
@@ -147,7 +153,7 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 			if veleroCfg.AdditionalBSLCredentials == "" {
 				Skip("no additional BSL credentials given, not running multiple BackupStorageLocation with unique credentials tests")
 			}
-			if veleroCfg.InstallVelero {
+			if InstallVelero {
 				if useVolumeSnapshots {
 					veleroCfg.DefaultVolumesToFsBackup = !useVolumeSnapshots
 				} else { //FS volume backup

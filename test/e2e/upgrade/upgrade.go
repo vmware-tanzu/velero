@@ -61,7 +61,8 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 
 	BeforeEach(func() {
 		veleroCfg = VeleroCfg
-		if !veleroCfg.InstallVelero {
+		veleroCfg.IsUpgradeTest = true
+		if !InstallVelero {
 			Skip("Upgrade test should not be triggered if veleroCfg.InstallVelero is set to false")
 		}
 		if (len(veleroCfg.UpgradeFromVeleroVersion)) == 0 {
@@ -74,7 +75,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			Skip("VeleroCLI should be provide")
 		}
 		// need to uninstall Velero first in case of the affection of the existing global velero installation
-		if veleroCfg.InstallVelero {
+		if InstallVelero {
 			By("Uninstall Velero", func() {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
@@ -91,7 +92,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			By(fmt.Sprintf("Delete sample workload namespace %s", upgradeNamespace), func() {
 				DeleteNamespace(context.Background(), *veleroCfg.ClientToInstallVelero, upgradeNamespace, true)
 			})
-			if veleroCfg.InstallVelero {
+			if InstallVelero {
 				By("Uninstall Velero", func() {
 					ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 					defer ctxCancel()
@@ -210,7 +211,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 					fmt.Sprintf("failed to delete namespace %s", upgradeNamespace))
 			})
 
-			if useVolumeSnapshots && veleroCfg.CloudProvider == "azure" && strings.EqualFold(veleroCfg.Features, "EnableCSI") {
+			if useVolumeSnapshots && veleroCfg.CloudProvider == "azure" && strings.EqualFold(veleroCfg.Features, FeatureCSI) {
 				// Upgrade test is not running daily since no CSI plugin v1.0 released, because builds before
 				//   v1.0 have issues to fail upgrade case.
 				By("Sleep 5 minutes to avoid snapshot recreated by unknown reason ", func() {
