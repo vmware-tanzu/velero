@@ -269,7 +269,7 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 	}
 
 	if options.NodeAgentPodCPURequest != "" {
-		args = append(args, fmt.Sprintf("--node-agent-pod-mem-request=%v", options.NodeAgentPodCPURequest))
+		args = append(args, fmt.Sprintf("--node-agent-pod-cpu-request=%v", options.NodeAgentPodCPURequest))
 	}
 
 	if options.NodeAgentPodMemLimit != "" {
