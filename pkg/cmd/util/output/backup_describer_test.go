@@ -20,6 +20,22 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
+func TestDescribeUploaderConfig(t *testing.T) {
+	input := builder.ForBackup("test-ns", "test-backup-1").ParallelFilesUpload(10).Result().Spec
+	d := &Describer{
+		Prefix: "",
+		out:    &tabwriter.Writer{},
+		buf:    &bytes.Buffer{},
+	}
+	d.out.Init(d.buf, 0, 8, 2, ' ', 0)
+	DescribeUploaderConfig(d, input)
+	d.out.Flush()
+	expect := `Uploader config:
+  Parallel files upload:  10
+`
+	assert.Equal(t, expect, d.buf.String())
+}
+
 func TestDescribeResourcePolicies(t *testing.T) {
 	input := &v1.TypedLocalObjectReference{
 		Kind: "configmap",

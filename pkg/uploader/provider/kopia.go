@@ -30,6 +30,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/uploader/kopia"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	repokeys "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
@@ -119,6 +120,7 @@ func (kp *kopiaProvider) RunBackup(
 	forceFull bool,
 	parentSnapshot string,
 	volMode uploader.PersistentVolumeMode,
+	uploaderCfg shared.UploaderConfig,
 	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {
 		return "", false, errors.New("Need to initial backup progress updater first")
@@ -158,7 +160,7 @@ func (kp *kopiaProvider) RunBackup(
 		realSource = fmt.Sprintf("%s/%s/%s", kp.requestorType, uploader.KopiaType, realSource)
 	}
 
-	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, realSource, forceFull, parentSnapshot, volMode, tags, log)
+	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, realSource, forceFull, parentSnapshot, volMode, uploaderCfg, tags, log)
 	if err != nil {
 		if kpUploader.IsCanceled() {
 			log.Error("Kopia backup is canceled")

@@ -18,6 +18,7 @@ package builder
 
 import (
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -68,7 +69,21 @@ func (v *VolumeSnapshotBuilder) BoundVolumeSnapshotContentName(vscName string) *
 	return v
 }
 
+// SourcePVC set the built VolumeSnapshot's spec.Source.PersistentVolumeClaimName.
 func (v *VolumeSnapshotBuilder) SourcePVC(name string) *VolumeSnapshotBuilder {
 	v.object.Spec.Source.PersistentVolumeClaimName = &name
+	return v
+}
+
+// RestoreSize set the built VolumeSnapshot's status.RestoreSize.
+func (v *VolumeSnapshotBuilder) RestoreSize(size string) *VolumeSnapshotBuilder {
+	resourceSize := resource.MustParse(size)
+	v.object.Status.RestoreSize = &resourceSize
+	return v
+}
+
+// VolumeSnapshotClass set the built VolumeSnapshot's spec.VolumeSnapshotClassName value.
+func (v *VolumeSnapshotBuilder) VolumeSnapshotClass(name string) *VolumeSnapshotBuilder {
+	v.object.Spec.VolumeSnapshotClassName = &name
 	return v
 }

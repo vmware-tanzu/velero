@@ -106,6 +106,7 @@ type CreateOptions struct {
 	ItemOperationTimeout            time.Duration
 	ResPoliciesConfigmap            string
 	client                          kbclient.WithWatch
+	ParallelFilesUpload             int
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -151,6 +152,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 
 	flags.StringVar(&o.ResPoliciesConfigmap, "resource-policies-configmap", "", "Reference to the resource policies configmap that backup using")
 	flags.StringVar(&o.DataMover, "data-mover", "", "Specify the data mover to be used by the backup. If the parameter is not set or set as 'velero', the built-in data mover will be used")
+	flags.IntVar(&o.ParallelFilesUpload, "parallel-files-upload", 0, "Number of files uploads simultaneously when running a backup. This is only applicable for the kopia uploader")
 }
 
 // BindWait binds the wait flag separately so it is not called by other create
@@ -395,6 +397,9 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 		}
 		if o.ResPoliciesConfigmap != "" {
 			backupBuilder.ResourcePolicies(o.ResPoliciesConfigmap)
+		}
+		if o.ParallelFilesUpload > 0 {
+			backupBuilder.ParallelFilesUpload(o.ParallelFilesUpload)
 		}
 	}
 

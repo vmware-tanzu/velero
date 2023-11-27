@@ -29,8 +29,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
-
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
@@ -42,21 +40,21 @@ import (
 
 // backupFinalizerReconciler reconciles a Backup object
 type backupFinalizerReconciler struct {
-	client               kbclient.Client
-	volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister
-	clock                clocks.WithTickerAndDelayedExecution
-	backupper            pkgbackup.Backupper
-	newPluginManager     func(logrus.FieldLogger) clientmgmt.Manager
-	backupTracker        BackupTracker
-	metrics              *metrics.ServerMetrics
-	backupStoreGetter    persistence.ObjectBackupStoreGetter
-	log                  logrus.FieldLogger
+	client            kbclient.Client
+	globalCRClient    kbclient.Client
+	clock             clocks.WithTickerAndDelayedExecution
+	backupper         pkgbackup.Backupper
+	newPluginManager  func(logrus.FieldLogger) clientmgmt.Manager
+	backupTracker     BackupTracker
+	metrics           *metrics.ServerMetrics
+	backupStoreGetter persistence.ObjectBackupStoreGetter
+	log               logrus.FieldLogger
 }
 
 // NewBackupFinalizerReconciler initializes and returns backupFinalizerReconciler struct.
 func NewBackupFinalizerReconciler(
 	client kbclient.Client,
-	volumeSnapshotLister snapshotv1listers.VolumeSnapshotLister,
+	globalCRClient kbclient.Client,
 	clock clocks.WithTickerAndDelayedExecution,
 	backupper pkgbackup.Backupper,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
@@ -67,6 +65,7 @@ func NewBackupFinalizerReconciler(
 ) *backupFinalizerReconciler {
 	return &backupFinalizerReconciler{
 		client:            client,
+		globalCRClient:    globalCRClient,
 		clock:             clock,
 		backupper:         backupper,
 		newPluginManager:  newPluginManager,
@@ -191,7 +190,7 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 	recordBackupMetrics(log, backup, outBackupFile, r.metrics, true)
 
-	pkgbackup.UpdateBackupCSISnapshotsStatus(r.client, r.volumeSnapshotLister, backup, log)
+	pkgbackup.UpdateBackupCSISnapshotsStatus(r.client, r.globalCRClient, backup, log)
 	// update backup metadata in object store
 	backupJSON := new(bytes.Buffer)
 	if err := encode.To(backup, "json", backupJSON); err != nil {

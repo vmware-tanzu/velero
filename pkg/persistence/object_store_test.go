@@ -768,6 +768,13 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindRestoreResourceList:   "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-resource-list.json.gz",
 			},
 		},
+		{
+			name:       "",
+			targetName: "my-backup",
+			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
+				velerov1api.DownloadTargetKindBackupVolumeInfos: "backups/my-backup/my-backup-volumeinfos.json.gz",
+			},
+		},
 	}
 
 	for _, test := range tests {

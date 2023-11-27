@@ -300,6 +300,12 @@ func (b *BackupBuilder) DataMover(name string) *BackupBuilder {
 	return b
 }
 
+// ParallelFilesUpload sets the Backup's uploader parallel uploads
+func (b *BackupBuilder) ParallelFilesUpload(parallel int) *BackupBuilder {
+	b.object.Spec.UploaderConfig.ParallelFilesUpload = parallel
+	return b
+}
+
 // WithStatus sets the Backup's status.
 func (b *BackupBuilder) WithStatus(status velerov1api.BackupStatus) *BackupBuilder {
 	b.object.Status = status

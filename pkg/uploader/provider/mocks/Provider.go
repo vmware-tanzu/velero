@@ -7,6 +7,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	shared "github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
+
 	uploader "github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
@@ -29,30 +31,30 @@ func (_m *Provider) Close(ctx context.Context) error {
 	return r0
 }
 
-// RunBackup provides a mock function with given fields: ctx, path, realSource, tags, forceFull, parentSnapshot, updater
-func (_m *Provider) RunBackup(ctx context.Context, path string, realSource string, tags map[string]string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, updater uploader.ProgressUpdater) (string, bool, error) {
-	ret := _m.Called(ctx, path, realSource, tags, forceFull, parentSnapshot, volMode, updater)
+// RunBackup provides a mock function with given fields: ctx, path, realSource, tags, forceFull, parentSnapshot, volMode, uploaderCfg, updater
+func (_m *Provider) RunBackup(ctx context.Context, path string, realSource string, tags map[string]string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg shared.UploaderConfig, updater uploader.ProgressUpdater) (string, bool, error) {
+	ret := _m.Called(ctx, path, realSource, tags, forceFull, parentSnapshot, volMode, uploaderCfg, updater)
 
 	var r0 string
 	var r1 bool
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, map[string]string, bool, string, uploader.ProgressUpdater) (string, bool, error)); ok {
-		return rf(ctx, path, realSource, tags, forceFull, parentSnapshot, updater)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, map[string]string, bool, string, uploader.PersistentVolumeMode, shared.UploaderConfig, uploader.ProgressUpdater) (string, bool, error)); ok {
+		return rf(ctx, path, realSource, tags, forceFull, parentSnapshot, volMode, uploaderCfg, updater)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, map[string]string, bool, string, uploader.ProgressUpdater) string); ok {
-		r0 = rf(ctx, path, realSource, tags, forceFull, parentSnapshot, updater)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, map[string]string, bool, string, uploader.PersistentVolumeMode, shared.UploaderConfig, uploader.ProgressUpdater) string); ok {
+		r0 = rf(ctx, path, realSource, tags, forceFull, parentSnapshot, volMode, uploaderCfg, updater)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, map[string]string, bool, string, uploader.ProgressUpdater) bool); ok {
-		r1 = rf(ctx, path, realSource, tags, forceFull, parentSnapshot, updater)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, map[string]string, bool, string, uploader.PersistentVolumeMode, shared.UploaderConfig, uploader.ProgressUpdater) bool); ok {
+		r1 = rf(ctx, path, realSource, tags, forceFull, parentSnapshot, volMode, uploaderCfg, updater)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, string, map[string]string, bool, string, uploader.ProgressUpdater) error); ok {
-		r2 = rf(ctx, path, realSource, tags, forceFull, parentSnapshot, updater)
+	if rf, ok := ret.Get(2).(func(context.Context, string, string, map[string]string, bool, string, uploader.PersistentVolumeMode, shared.UploaderConfig, uploader.ProgressUpdater) error); ok {
+		r2 = rf(ctx, path, realSource, tags, forceFull, parentSnapshot, volMode, uploaderCfg, updater)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -60,13 +62,13 @@ func (_m *Provider) RunBackup(ctx context.Context, path string, realSource strin
 	return r0, r1, r2
 }
 
-// RunRestore provides a mock function with given fields: ctx, snapshotID, volumePath, updater
+// RunRestore provides a mock function with given fields: ctx, snapshotID, volumePath, volMode, updater
 func (_m *Provider) RunRestore(ctx context.Context, snapshotID string, volumePath string, volMode uploader.PersistentVolumeMode, updater uploader.ProgressUpdater) error {
 	ret := _m.Called(ctx, snapshotID, volumePath, volMode, updater)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, uploader.ProgressUpdater) error); ok {
-		r0 = rf(ctx, snapshotID, volumePath, updater)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, uploader.PersistentVolumeMode, uploader.ProgressUpdater) error); ok {
+		r0 = rf(ctx, snapshotID, volumePath, volMode, updater)
 	} else {
 		r0 = ret.Error(0)
 	}

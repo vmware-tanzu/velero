@@ -23,21 +23,16 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
-	"reflect"
 	"strings"
 	"time"
 
 	logrusr "github.com/bombsimon/logrusr/v3"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
-	snapshotv1informers "github.com/kubernetes-csi/external-snapshotter/client/v4/informers/externalversions"
-	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v4/listers/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	corev1api "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -244,15 +239,17 @@ func NewCommand(f client.Factory) *cobra.Command {
 }
 
 type server struct {
-	namespace             string
-	metricsAddress        string
-	kubeClientConfig      *rest.Config
-	kubeClient            kubernetes.Interface
-	discoveryClient       discovery.DiscoveryInterface
-	discoveryHelper       velerodiscovery.Helper
-	dynamicClient         dynamic.Interface
-	csiSnapshotClient     *snapshotv1client.Clientset
-	csiSnapshotLister     snapshotv1listers.VolumeSnapshotLister
+	namespace        string
+	metricsAddress   string
+	kubeClientConfig *rest.Config
+	kubeClient       kubernetes.Interface
+	discoveryClient  discovery.DiscoveryInterface
+	discoveryHelper  velerodiscovery.Helper
+	dynamicClient    dynamic.Interface
+	// controller-runtime client. the difference from the controller-manager's client
+	// is that the the controller-manager's client is limited to list namespaced-scoped
+	// resources in the namespace where Velero is installed, or the cluster-scoped
+	// resources. The crClient doesn't have the limitation.
 	crClient              ctrlclient.Client
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
@@ -399,23 +396,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		featureVerifier:       featureVerifier,
 	}
 
-	// Setup CSI snapshot client and lister
-	var csiSnapClient *snapshotv1client.Clientset
-	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		csiSnapClient, err = snapshotv1client.NewForConfig(clientConfig)
-		if err != nil {
-			cancelFunc()
-			return nil, err
-		}
-		s.csiSnapshotClient = csiSnapClient
-
-		s.csiSnapshotLister, err = s.getCSIVolumeSnapshotListers()
-		if err != nil {
-			cancelFunc()
-			return nil, err
-		}
-	}
-
 	return s, nil
 }
 
@@ -541,7 +521,7 @@ High priorities:
   - PVs go before PVCs because PVCs depend on them.
   - PVCs go before pods or controllers so they can be mounted as volumes.
   - Service accounts go before secrets so service account token secrets can be filled automatically.
-  - Secrets and config maps go before pods or controllers so they can be mounted
+  - Secrets and ConfigMaps go before pods or controllers so they can be mounted
     as volumes.
   - Limit ranges go before pods or controllers so pods can use them.
   - Pods go before controllers so they can be explicitly restored and potentially
@@ -613,40 +593,6 @@ func (s *server) initRepoManager() error {
 	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.credentialSecretStore, s.logger)
 
 	return nil
-}
-
-func (s *server) getCSIVolumeSnapshotListers() (vsLister snapshotv1listers.VolumeSnapshotLister, err error) {
-	_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1api.SchemeGroupVersion.String())
-	switch {
-	case apierrors.IsNotFound(err):
-		// CSI is enabled, but the required CRDs aren't installed, so halt.
-		s.logger.Warnf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", velerov1api.CSIFeatureFlag, snapshotv1api.SchemeGroupVersion.String())
-		err = nil
-	case err == nil:
-		wrapper := NewCSIInformerFactoryWrapper(s.csiSnapshotClient)
-
-		s.logger.Debug("Creating CSI listers")
-		// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
-		vsLister = wrapper.factory.Snapshot().V1().VolumeSnapshots().Lister()
-
-		// start the informers & and wait for the caches to sync
-		wrapper.Start(s.ctx.Done())
-		s.logger.Info("Waiting for informer caches to sync")
-		csiCacheSyncResults := wrapper.WaitForCacheSync(s.ctx.Done())
-		s.logger.Info("Done waiting for informer caches to sync")
-
-		for informer, synced := range csiCacheSyncResults {
-			if !synced {
-				err = errors.Errorf("cache was not synced for informer %v", informer)
-				return
-			}
-			s.logger.WithField("informer", informer).Info("Informer cache synced")
-		}
-	case err != nil:
-		s.logger.Errorf("fail to find snapshot v1 schema: %s", err)
-	}
-
-	return vsLister, err
 }
 
 func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string) error {
@@ -775,10 +721,10 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.metrics,
 			backupStoreGetter,
 			s.config.formatFlag.Parse(),
-			s.csiSnapshotLister,
 			s.credentialFileStore,
 			s.config.maxConcurrentK8SConnections,
 			s.config.defaultSnapshotMoveData,
+			s.crClient,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.Backup)
 		}
@@ -837,7 +783,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		cmd.CheckError(err)
 		r := controller.NewBackupFinalizerReconciler(
 			s.mgr.GetClient(),
-			s.csiSnapshotLister,
+			s.crClient,
 			clock.RealClock{},
 			backupper,
 			newPluginManager,
@@ -1027,37 +973,6 @@ func (s *server) runProfiler() {
 	}
 }
 
-// CSIInformerFactoryWrapper is a proxy around the CSI SharedInformerFactory that checks the CSI feature flag before performing operations.
-type CSIInformerFactoryWrapper struct {
-	factory snapshotv1informers.SharedInformerFactory
-}
-
-func NewCSIInformerFactoryWrapper(c snapshotv1client.Interface) *CSIInformerFactoryWrapper {
-	// If no namespace is specified, all namespaces are watched.
-	// This is desirable for VolumeSnapshots, as we want to query for all VolumeSnapshots across all namespaces using this informer
-	w := &CSIInformerFactoryWrapper{}
-
-	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		w.factory = snapshotv1informers.NewSharedInformerFactoryWithOptions(c, 0)
-	}
-	return w
-}
-
-// Start proxies the Start call to the CSI SharedInformerFactory.
-func (w *CSIInformerFactoryWrapper) Start(stopCh <-chan struct{}) {
-	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		w.factory.Start(stopCh)
-	}
-}
-
-// WaitForCacheSync proxies the WaitForCacheSync call to the CSI SharedInformerFactory.
-func (w *CSIInformerFactoryWrapper) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
-	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		return w.factory.WaitForCacheSync(stopCh)
-	}
-	return nil
-}
-
 // if there is a restarting during the reconciling of backups/restores/etc, these CRs may be stuck in progress status
 // markInProgressCRsFailed tries to mark the in progress CRs as failed when starting the server to avoid the issue
 func markInProgressCRsFailed(ctx context.Context, cfg *rest.Config, scheme *runtime.Scheme, namespace string, log logrus.FieldLogger) {
@@ -1081,13 +996,13 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 	}
 
 	for i, backup := range backups.Items {
-		if backup.Status.Phase != velerov1api.BackupPhaseInProgress && backup.Status.Phase != velerov1api.BackupPhaseWaitingForPluginOperations {
+		if backup.Status.Phase != velerov1api.BackupPhaseInProgress {
 			log.Debugf("the status of backup %q is %q, skip", backup.GetName(), backup.Status.Phase)
 			continue
 		}
 		updated := backup.DeepCopy()
 		updated.Status.Phase = velerov1api.BackupPhaseFailed
-		updated.Status.FailureReason = fmt.Sprintf("found a backup with status %q during the server starting, mark it as %q", velerov1api.BackupPhaseInProgress, updated.Status.Phase)
+		updated.Status.FailureReason = fmt.Sprintf("found a backup with status %q during the server starting, mark it as %q", backup.Status.Phase, updated.Status.Phase)
 		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&backups.Items[i])); err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch backup %q", backup.GetName())
@@ -1105,13 +1020,13 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 		return
 	}
 	for i, restore := range restores.Items {
-		if restore.Status.Phase != velerov1api.RestorePhaseInProgress && restore.Status.Phase != velerov1api.RestorePhaseWaitingForPluginOperations {
+		if restore.Status.Phase != velerov1api.RestorePhaseInProgress {
 			log.Debugf("the status of restore %q is %q, skip", restore.GetName(), restore.Status.Phase)
 			continue
 		}
 		updated := restore.DeepCopy()
 		updated.Status.Phase = velerov1api.RestorePhaseFailed
-		updated.Status.FailureReason = fmt.Sprintf("found a restore with status %q during the server starting, mark it as %q", velerov1api.RestorePhaseInProgress, updated.Status.Phase)
+		updated.Status.FailureReason = fmt.Sprintf("found a restore with status %q during the server starting, mark it as %q", restore.Status.Phase, updated.Status.Phase)
 		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&restores.Items[i])); err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch restore %q", restore.GetName())
@@ -1134,7 +1049,9 @@ func markDataUploadsCancel(ctx context.Context, client ctrlclient.Client, backup
 		du := dataUploads.Items[i]
 		if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted ||
 			du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared ||
-			du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
+			du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress ||
+			du.Status.Phase == velerov2alpha1api.DataUploadPhaseNew ||
+			du.Status.Phase == "" {
 			err := controller.UpdateDataUploadWithRetry(ctx, client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, log.WithField("dataupload", du.Name),
 				func(dataUpload *velerov2alpha1api.DataUpload) {
 					dataUpload.Spec.Cancel = true
@@ -1162,7 +1079,9 @@ func markDataDownloadsCancel(ctx context.Context, client ctrlclient.Client, rest
 		dd := dataDownloads.Items[i]
 		if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted ||
 			dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared ||
-			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
+			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress ||
+			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseNew ||
+			dd.Status.Phase == "" {
 			err := controller.UpdateDataDownloadWithRetry(ctx, client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, log.WithField("datadownload", dd.Name),
 				func(dataDownload *velerov2alpha1api.DataDownload) {
 					dataDownload.Spec.Cancel = true

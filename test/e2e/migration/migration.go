@@ -273,15 +273,16 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			}
 
 			By(fmt.Sprintf("Install Velero in cluster-B (%s) to restore workload", veleroCfg.StandbyCluster), func() {
+				//Ensure workload of "migrationNamespace" existed in cluster-A
 				ns, err := GetNamespace(context.Background(), *veleroCfg.DefaultClient, migrationNamespace)
 				Expect(ns.Name).To(Equal(migrationNamespace))
-				Expect(err).NotTo(HaveOccurred())
+				Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("get namespace in cluster-B err: %v", err))
 
+				//Ensure cluster-B is the target cluster
 				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyCluster)).To(Succeed())
 				_, err = GetNamespace(context.Background(), *veleroCfg.StandbyClient, migrationNamespace)
 				Expect(err).To(HaveOccurred())
 				strings.Contains(fmt.Sprint(err), "namespaces \""+migrationNamespace+"\" not found")
-
 				fmt.Println(err)
 
 				veleroCfg.ClientToInstallVelero = veleroCfg.StandbyClient
@@ -335,7 +336,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 
 			By(fmt.Sprintf("Verify workload %s after restore ", migrationNamespace), func() {
 				Expect(KibishiiVerifyAfterRestore(*veleroCfg.StandbyClient, migrationNamespace,
-					oneHourTimeout, &KibishiiData)).To(Succeed(), "Fail to verify workload after restore")
+					oneHourTimeout, &KibishiiData, "")).To(Succeed(), "Fail to verify workload after restore")
 			})
 
 			// TODO: delete backup created by case self, not all

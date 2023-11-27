@@ -46,7 +46,7 @@ func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup bool) ([]strin
 		if pv.Secret != nil {
 			continue
 		}
-		// don't backup volumes mounting config maps. Config maps will be backed up separately.
+		// don't backup volumes mounting ConfigMaps. ConfigMaps will be backed up separately.
 		if pv.ConfigMap != nil {
 			continue
 		}

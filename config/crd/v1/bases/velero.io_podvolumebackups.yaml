@@ -121,6 +121,14 @@ spec:
                 description: Tags are a map of key-value pairs that should be applied
                   to the volume backup as tags.
                 type: object
+              uploaderConfig:
+                description: UploaderConfig specifies the configuration for the uploader.
+                properties:
+                  parallelFilesUpload:
+                    description: ParallelFilesUpload is the number of files parallel
+                      uploads to perform when using the uploader.
+                    type: integer
+                type: object
               uploaderType:
                 description: UploaderType is the type of the uploader to handle the
                   data transfer.

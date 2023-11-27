@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"sort"
 
+	corev1api "k8s.io/api/core/v1"
+
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -52,6 +54,16 @@ type Request struct {
 	itemOperationsList        *[]*itemoperation.BackupOperation
 	ResPolicies               *resourcepolicies.Policies
 	SkippedPVTracker          *skipPVTracker
+	// A map contains the backup-included PV detail content.
+	// The key is PV name or PVC name(The format is PVC-namespace/PVC-name)
+	PVMap       map[string]PvcPvInfo
+	VolumeInfos volume.VolumeInfos
+}
+
+type PvcPvInfo struct {
+	PVCName      string
+	PVCNamespace string
+	PV           corev1api.PersistentVolume
 }
 
 // GetItemOperationsList returns ItemOperationsList, initializing it if necessary

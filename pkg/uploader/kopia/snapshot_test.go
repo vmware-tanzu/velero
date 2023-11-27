@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	repomocks "github.com/vmware-tanzu/velero/pkg/repository/mocks"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	uploadermocks "github.com/vmware-tanzu/velero/pkg/uploader/mocks"
@@ -94,9 +95,10 @@ func TestSnapshotSource(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name     string
-		args     []mockArgs
-		notError bool
+		name        string
+		args        []mockArgs
+		uploaderCfg shared.UploaderConfig
+		notError    bool
 	}{
 		{
 			name: "regular test",
@@ -151,6 +153,20 @@ func TestSnapshotSource(t *testing.T) {
 			notError: false,
 		},
 		{
+			name: "set policy with ParallelFilesUpload",
+			args: []mockArgs{
+				{methodName: "LoadSnapshot", returns: []interface{}{manifest, nil}},
+				{methodName: "SaveSnapshot", returns: []interface{}{manifest.ID, nil}},
+				{methodName: "TreeForSource", returns: []interface{}{nil, nil}},
+				{methodName: "ApplyRetentionPolicy", returns: []interface{}{nil, nil}},
+				{methodName: "SetPolicy", returns: []interface{}{nil}},
+				{methodName: "Upload", returns: []interface{}{manifest, nil}},
+				{methodName: "Flush", returns: []interface{}{nil}},
+			},
+			uploaderCfg: shared.UploaderConfig{ParallelFilesUpload: 10},
+			notError:    true,
+		},
+		{
 			name: "failed to upload snapshot",
 			args: []mockArgs{
 				{methodName: "LoadSnapshot", returns: []interface{}{manifest, nil}},
@@ -182,7 +198,7 @@ func TestSnapshotSource(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s := injectSnapshotFuncs()
 			MockFuncs(s, tc.args)
-			_, _, err = SnapshotSource(ctx, s.repoWriterMock, s.uploderMock, sourceInfo, rootDir, false, "/", nil, log, "TestSnapshotSource")
+			_, _, err = SnapshotSource(ctx, s.repoWriterMock, s.uploderMock, sourceInfo, rootDir, false, "/", nil, tc.uploaderCfg, log, "TestSnapshotSource")
 			if tc.notError {
 				assert.NoError(t, err)
 			} else {
@@ -630,9 +646,9 @@ func TestBackup(t *testing.T) {
 			var snapshotInfo *uploader.SnapshotInfo
 			var err error
 			if tc.isEmptyUploader {
-				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), nil, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, tc.tags, &logrus.Logger{})
+				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), nil, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, shared.UploaderConfig{}, tc.tags, &logrus.Logger{})
 			} else {
-				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), s.uploderMock, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, tc.tags, &logrus.Logger{})
+				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), s.uploderMock, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, shared.UploaderConfig{}, tc.tags, &logrus.Logger{})
 			}
 			// Check if the returned error matches the expected error
 			if tc.expectedError != nil {

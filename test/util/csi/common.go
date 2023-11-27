@@ -21,13 +21,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -128,6 +126,7 @@ func GetCsiSnapshotHandleV1(client TestClient, backupName string) ([]string, err
 	}
 	return snapshotHandleList, nil
 }
+
 func GetVolumeSnapshotContentNameByPod(client TestClient, podName, namespace, backupName string) (string, error) {
 	pvcList, err := GetPvcByPVCName(context.Background(), namespace, podName)
 	if err != nil {

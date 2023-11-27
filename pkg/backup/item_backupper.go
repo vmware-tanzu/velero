@@ -250,6 +250,10 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	namespace = metadata.GetNamespace()
 
 	if groupResource == kuberesource.PersistentVolumes {
+		if err := ib.addVolumeInfo(obj, log); err != nil {
+			backupErrs = append(backupErrs, err)
+		}
+
 		if err := ib.takePVSnapshot(obj, log); err != nil {
 			backupErrs = append(backupErrs, err)
 		}
@@ -683,6 +687,39 @@ func (ib *itemBackupper) unTrackSkippedPV(obj runtime.Unstructured, groupResourc
 	} else if err != nil {
 		log.WithError(err).Warnf("unable to get PV name, skip untracking.")
 	}
+}
+
+func (ib *itemBackupper) addVolumeInfo(obj runtime.Unstructured, log logrus.FieldLogger) error {
+	pv := new(corev1api.PersistentVolume)
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pv)
+	if err != nil {
+		log.WithError(err).Warnf("Fail to convert PV")
+		return err
+	}
+
+	if ib.backupRequest.PVMap == nil {
+		ib.backupRequest.PVMap = make(map[string]PvcPvInfo)
+	}
+
+	pvcName := ""
+	pvcNamespace := ""
+	if pv.Spec.ClaimRef != nil {
+		pvcName = pv.Spec.ClaimRef.Name
+		pvcNamespace = pv.Spec.ClaimRef.Namespace
+
+		ib.backupRequest.PVMap[pvcNamespace+"/"+pvcName] = PvcPvInfo{
+			PVCName:      pvcName,
+			PVCNamespace: pvcNamespace,
+			PV:           *pv,
+		}
+	}
+
+	ib.backupRequest.PVMap[pv.Name] = PvcPvInfo{
+		PVCName:      pvcName,
+		PVCNamespace: pvcNamespace,
+		PV:           *pv,
+	}
+	return nil
 }
 
 // convert the input object to PV/PVC and get the PV name

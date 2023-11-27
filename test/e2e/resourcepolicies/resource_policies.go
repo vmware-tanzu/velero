@@ -24,7 +24,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -164,7 +163,7 @@ func (r *ResourcePoliciesCase) Verify() error {
 					if vol.Name != volName {
 						continue
 					}
-					content, err := ReadFileFromPodVolume(r.Ctx, ns, pod.Name, "container-busybox", vol.Name, FileName)
+					content, _, err := ReadFileFromPodVolume(r.Ctx, ns, pod.Name, "container-busybox", vol.Name, FileName)
 					if i%2 == 0 {
 						Expect(err).To(HaveOccurred(), "Expected file not found") // File should not exist
 					} else {
