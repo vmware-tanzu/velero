@@ -438,8 +438,13 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	if err := kube.PatchResource(backupRequest.Backup, updated, kb.kbClient); err != nil {
 		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress and hook status")
 	}
-	skippedPVSummary, _ := json.Marshal(backupRequest.SkippedPVTracker.Summary())
+
+	var skippedPVSummary []byte
+	if skippedPVSummary, err = json.Marshal(backupRequest.SkippedPVTracker.Summary()); err != nil {
+		log.WithError(errors.WithStack(err)).Warn("Fail to generate skipped PV summary.")
+	}
 	log.Infof("Summary for skipped PVs: %s", skippedPVSummary)
+
 	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(backupRequest.BackedUpItems), ItemsBackedUp: len(backupRequest.BackedUpItems)}
 	log.WithField("progress", "").Infof("Backed up a total of %d items", len(backupRequest.BackedUpItems))
 

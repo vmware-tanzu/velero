@@ -164,6 +164,6 @@ func (d *StructuredDescriber) JSONEncode() string {
 	encoder := json.NewEncoder(byteBuffer)
 	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "    ")
-	_ = encoder.Encode(d.output)
+	encoder.Encode(d.output)
 	return byteBuffer.String()
 }

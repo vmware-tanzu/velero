@@ -58,9 +58,12 @@ func genConfigmap(bak *velerov1.Backup, du velerov2alpha1.DataUpload) *corev1api
 		SnapshotID:            du.Status.SnapshotID,
 		RepositoryType:        GetUploaderType(du.Spec.DataMover),
 	}
-	b, _ := json.Marshal(snapshot)
+	b, err := json.Marshal(snapshot)
+	if err != nil {
+		return nil
+	}
 	data := make(map[string]string)
-	_ = json.Unmarshal(b, &data)
+	json.Unmarshal(b, &data)
 	return &corev1api.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: corev1api.SchemeGroupVersion.String(),
