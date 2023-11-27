@@ -25,6 +25,7 @@ import (
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/perf/test"
+	"github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
@@ -34,7 +35,7 @@ type RestoreTest struct {
 
 func (r *RestoreTest) Init() error {
 	r.TestCase.Init()
-	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 1*time.Hour)
+	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 6*time.Hour)
 	r.CaseBaseName = "restore"
 	r.RestoreName = "restore-" + r.CaseBaseName + "-" + r.UUIDgen
 
@@ -43,7 +44,7 @@ func (r *RestoreTest) Init() error {
 		FailedMSG: "Failed to restore resources",
 		Text:      fmt.Sprintf("Should restore resources success"),
 	}
-	return r.clearUpResourcesBeforRestore()
+	return nil
 }
 
 func (r *RestoreTest) clearUpResourcesBeforRestore() error {
@@ -52,6 +53,11 @@ func (r *RestoreTest) clearUpResourcesBeforRestore() error {
 }
 
 func (r *RestoreTest) Restore() error {
+	// we need to clear up all resources before do the restore test
+	err := r.clearUpResourcesBeforRestore()
+	if err != nil {
+		return errors.Wrapf(err, "failed to clear up resources before do the restore test")
+	}
 	var backupName string
 	if VeleroCfg.BackupForRestore != "" {
 		backupName = VeleroCfg.BackupForRestore
@@ -69,6 +75,16 @@ func (r *RestoreTest) Restore() error {
 	r.RestoreArgs = []string{
 		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", r.RestoreName,
 		"--from-backup", r.BackupName, "--wait",
+	}
+
+	if !VeleroCfg.DeleteClusterResource {
+		joinedNsMapping, err := k8s.GetMappingNamespaces(r.Ctx, r.Client, *r.NSExcluded)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get mapping namespaces in init")
+		}
+
+		r.RestoreArgs = append(r.RestoreArgs, "--namespace-mappings")
+		r.RestoreArgs = append(r.RestoreArgs, joinedNsMapping)
 	}
 
 	return r.TestCase.Restore()

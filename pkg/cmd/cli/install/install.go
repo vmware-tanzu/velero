@@ -73,6 +73,7 @@ type Options struct {
 	UseVolumeSnapshots              bool
 	DefaultRepoMaintenanceFrequency time.Duration
 	GarbageCollectionFrequency      time.Duration
+	PodVolumeOperationTimeout       time.Duration
 	Plugins                         flag.StringArray
 	NoDefaultBackupLocation         bool
 	CRDsOnly                        bool
@@ -116,6 +117,7 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.Wait, "wait", o.Wait, "Wait for Velero deployment to be ready. Optional.")
 	flags.DurationVar(&o.DefaultRepoMaintenanceFrequency, "default-repo-maintain-frequency", o.DefaultRepoMaintenanceFrequency, "How often 'maintain' is run for backup repositories by default. Optional.")
 	flags.DurationVar(&o.GarbageCollectionFrequency, "garbage-collection-frequency", o.GarbageCollectionFrequency, "How often the garbage collection runs for expired backups.(default 1h)")
+	flags.DurationVar(&o.PodVolumeOperationTimeout, "pod-volume-operation-timeout", o.PodVolumeOperationTimeout, "How long to wait for pod volume operations to complete before timing out(default 4h). Optional.")
 	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment")
 	flags.BoolVar(&o.CRDsOnly, "crds-only", o.CRDsOnly, "Only generate CustomResourceDefinition resources. Useful for updating CRDs for an existing Velero install.")
 	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "File containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
@@ -209,6 +211,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		VSLConfig:                       o.VolumeSnapshotConfig.Data(),
 		DefaultRepoMaintenanceFrequency: o.DefaultRepoMaintenanceFrequency,
 		GarbageCollectionFrequency:      o.GarbageCollectionFrequency,
+		PodVolumeOperationTimeout:       o.PodVolumeOperationTimeout,
 		Plugins:                         o.Plugins,
 		NoDefaultBackupLocation:         o.NoDefaultBackupLocation,
 		CACertData:                      caCertData,
@@ -424,6 +427,10 @@ func (o *Options) Validate(c *cobra.Command, args []string, f client.Factory) er
 
 	if o.GarbageCollectionFrequency < 0 {
 		return errors.New("--garbage-collection-frequency must be non-negative")
+	}
+
+	if o.PodVolumeOperationTimeout < 0 {
+		return errors.New("--pod-volume-operation-timeout must be non-negative")
 	}
 
 	return nil

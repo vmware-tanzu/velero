@@ -32,7 +32,7 @@ type BackupTest struct {
 
 func (b *BackupTest) Init() error {
 	b.TestCase.Init()
-	b.Ctx, b.CtxCancel = context.WithTimeout(context.Background(), 1*time.Hour)
+	b.Ctx, b.CtxCancel = context.WithTimeout(context.Background(), 6*time.Hour)
 	b.CaseBaseName = "backup"
 	b.BackupName = "backup-" + b.CaseBaseName + "-" + b.UUIDgen
 
