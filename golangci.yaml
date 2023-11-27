@@ -326,6 +326,7 @@ linters:
     - unused
     - usestdlibvars
     - whitespace
+    - dupword
   fast: false
 
 
