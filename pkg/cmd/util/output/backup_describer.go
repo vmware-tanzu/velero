@@ -507,7 +507,6 @@ func describeCSISnapshots(d *Describer, details bool, infos []*volume.VolumeInfo
 
 func describeCSISnapshot(d *Describer, details bool, info *volume.VolumeInfo) {
 	d.Printf("\t\t%s:\n", info.PVCName)
-	d.Printf("\t\t\tOperation ID: %s\n", info.OperationID)
 
 	describeLocalSnapshot(d, details, info)
 	describeDataMovement(d, details, info)
@@ -520,12 +519,16 @@ func describeLocalSnapshot(d *Describer, details bool, info *volume.VolumeInfo) 
 
 	if details {
 		d.Printf("\t\t\tSnapshot:\n")
+		if !info.SnapshotDataMoved {
+			d.Printf("\t\t\t\tOperation ID: %s\n", info.OperationID)
+		}
+
 		d.Printf("\t\t\t\tSnapshot Content Name: %s\n", info.CSISnapshotInfo.VSCName)
 		d.Printf("\t\t\t\tStorage Snapshot ID: %s\n", info.CSISnapshotInfo.SnapshotHandle)
 		d.Printf("\t\t\t\tSnapshot Size (bytes): %d\n", info.CSISnapshotInfo.Size)
 		d.Printf("\t\t\t\tCSI Driver: %s\n", info.CSISnapshotInfo.Driver)
 	} else {
-		d.Printf("\t\t\tSnapshot: %s\n", "specify --details for more information")
+		d.Printf("\t\t\tSnapshot: %s\n", "included, specify --details for more information")
 	}
 }
 
@@ -536,11 +539,16 @@ func describeDataMovement(d *Describer, details bool, info *volume.VolumeInfo) {
 
 	if details {
 		d.Printf("\t\t\tData Movement:\n")
-		d.Printf("\t\t\t\tData Mover: %s\n", info.SnapshotDataMovementInfo.DataMover)
+		d.Printf("\t\t\t\tOperation ID: %s\n", info.OperationID)
+
+		dataMover := "velero"
+		if info.SnapshotDataMovementInfo.DataMover != "" {
+			dataMover = info.SnapshotDataMovementInfo.DataMover
+		}
+		d.Printf("\t\t\t\tData Mover: %s\n", dataMover)
 		d.Printf("\t\t\t\tUploader Type: %s\n", info.SnapshotDataMovementInfo.UploaderType)
-		d.Printf("\t\t\t\tRepository Snapshot ID: %s\n", info.SnapshotDataMovementInfo.SnapshotHandle)
 	} else {
-		d.Printf("\t\t\tData Movement: %s\n", "specify --details for more information")
+		d.Printf("\t\t\tData Movement: %s\n", "included, specify --details for more information")
 	}
 }
 

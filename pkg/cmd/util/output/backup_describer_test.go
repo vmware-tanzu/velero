@@ -402,8 +402,7 @@ func TestCSISnapshots(t *testing.T) {
 			},
 			expect: `  CSI Snapshots:
     pvc-1:
-      Operation ID: fake-operation-1
-      Snapshot: specify --details for more information
+      Snapshot: included, specify --details for more information
 `,
 		},
 		{
@@ -425,8 +424,8 @@ func TestCSISnapshots(t *testing.T) {
 			inputDetails: true,
 			expect: `  CSI Snapshots:
     pvc-2:
-      Operation ID: fake-operation-2
       Snapshot:
+        Operation ID: fake-operation-2
         Snapshot Content Name: vsc-2
         Storage Snapshot ID: snapshot-2
         Snapshot Size (bytes): 1024
@@ -450,8 +449,7 @@ func TestCSISnapshots(t *testing.T) {
 			},
 			expect: `  CSI Snapshots:
     pvc-3:
-      Operation ID: fake-operation-3
-      Data Movement: specify --details for more information
+      Data Movement: included, specify --details for more information
 `,
 		},
 		{
@@ -472,11 +470,33 @@ func TestCSISnapshots(t *testing.T) {
 			inputDetails: true,
 			expect: `  CSI Snapshots:
     pvc-4:
-      Operation ID: fake-operation-4
       Data Movement:
+        Operation ID: fake-operation-4
         Data Mover: velero
         Uploader Type: fake-uploader
-        Repository Snapshot ID: fake-repo-id-4
+`,
+		},
+		{
+			name: "details, data movement, data mover is empty",
+			volumeInfo: []*volume.VolumeInfo{
+				{
+					BackupMethod:      volume.CSISnapshot,
+					PVCName:           "pvc-5",
+					SnapshotDataMoved: true,
+					OperationID:       "fake-operation-5",
+					SnapshotDataMovementInfo: volume.SnapshotDataMovementInfo{
+						UploaderType:   "fake-uploader",
+						SnapshotHandle: "fake-repo-id-5",
+					},
+				},
+			},
+			inputDetails: true,
+			expect: `  CSI Snapshots:
+    pvc-5:
+      Data Movement:
+        Operation ID: fake-operation-5
+        Data Mover: velero
+        Uploader Type: fake-uploader
 `,
 		},
 	}

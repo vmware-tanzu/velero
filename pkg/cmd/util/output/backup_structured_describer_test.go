@@ -361,8 +361,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			expect: map[string]interface{}{
 				"csiSnapshots": map[string]interface{}{
 					"pvc-1": map[string]interface{}{
-						"operationID": "fake-operation-1",
-						"snapshot":    "specify --details for more information",
+						"snapshot": "included, specify --details for more information",
 					},
 				},
 			},
@@ -387,8 +386,8 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			expect: map[string]interface{}{
 				"csiSnapshots": map[string]interface{}{
 					"pvc-2": map[string]interface{}{
-						"operationID": "fake-operation-2",
 						"snapshot": map[string]interface{}{
+							"operationID":         "fake-operation-2",
 							"snapshotContentName": "vsc-2",
 							"storageSnapshotID":   "snapshot-2",
 							"snapshotSize(bytes)": int64(1024),
@@ -416,8 +415,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			expect: map[string]interface{}{
 				"csiSnapshots": map[string]interface{}{
 					"pvc-3": map[string]interface{}{
-						"operationID":  "fake-operation-3",
-						"dataMovement": "specify --details for more information",
+						"dataMovement": "included, specify --details for more information",
 					},
 				},
 			},
@@ -441,11 +439,37 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			expect: map[string]interface{}{
 				"csiSnapshots": map[string]interface{}{
 					"pvc-4": map[string]interface{}{
-						"operationID": "fake-operation-4",
 						"dataMovement": map[string]interface{}{
-							"dataMover":            "velero",
-							"uploaderType":         "fake-uploader",
-							"repositorySnapshotID": "fake-repo-id-4",
+							"operationID":  "fake-operation-4",
+							"dataMover":    "velero",
+							"uploaderType": "fake-uploader",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "details, data movement, data mover is empty",
+			volumeInfo: []*volume.VolumeInfo{
+				{
+					BackupMethod:      volume.CSISnapshot,
+					PVCName:           "pvc-4",
+					SnapshotDataMoved: true,
+					OperationID:       "fake-operation-4",
+					SnapshotDataMovementInfo: volume.SnapshotDataMovementInfo{
+						UploaderType:   "fake-uploader",
+						SnapshotHandle: "fake-repo-id-4",
+					},
+				},
+			},
+			inputDetails: true,
+			expect: map[string]interface{}{
+				"csiSnapshots": map[string]interface{}{
+					"pvc-4": map[string]interface{}{
+						"dataMovement": map[string]interface{}{
+							"operationID":  "fake-operation-4",
+							"dataMover":    "velero",
+							"uploaderType": "fake-uploader",
 						},
 					},
 				},

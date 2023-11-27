@@ -329,9 +329,7 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 
 	describeNativeSnapshotsInSF(details, nativeSnapshots, backupVolumes)
 
-	csiSnapshotDetails := make(map[string]interface{})
-	describeCSISnapshotsInSF(details, csiSnapshots, csiSnapshotDetails)
-	backupVolumes["csiSnapshots"] = csiSnapshotDetails
+	describeCSISnapshotsInSF(details, csiSnapshots, backupVolumes)
 
 	describePodVolumeBackupsInSF(podVolumeBackupCRs, details, backupVolumes)
 
@@ -384,7 +382,6 @@ func describeCSISnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVo
 
 func describeCSISnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDetails map[string]interface{}) {
 	snapshotDetail := make(map[string]interface{})
-	snapshotDetail["operationID"] = info.OperationID
 
 	describeLocalSnapshotInSF(details, info, snapshotDetail)
 	describeDataMovementInSF(details, info, snapshotDetail)
@@ -400,6 +397,11 @@ func describeLocalSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDe
 
 	if details {
 		localSnapshot := make(map[string]interface{})
+
+		if !info.SnapshotDataMoved {
+			localSnapshot["operationID"] = info.OperationID
+		}
+
 		localSnapshot["snapshotContentName"] = info.CSISnapshotInfo.VSCName
 		localSnapshot["storageSnapshotID"] = info.CSISnapshotInfo.SnapshotHandle
 		localSnapshot["snapshotSize(bytes)"] = info.CSISnapshotInfo.Size
@@ -407,7 +409,7 @@ func describeLocalSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDe
 
 		snapshotDetail["snapshot"] = localSnapshot
 	} else {
-		snapshotDetail["snapshot"] = "specify --details for more information"
+		snapshotDetail["snapshot"] = "included, specify --details for more information"
 	}
 }
 
@@ -418,13 +420,19 @@ func describeDataMovementInSF(details bool, info *volume.VolumeInfo, snapshotDet
 
 	if details {
 		dataMovement := make(map[string]interface{})
-		dataMovement["dataMover"] = info.SnapshotDataMovementInfo.DataMover
+		dataMovement["operationID"] = info.OperationID
+
+		dataMover := "velero"
+		if info.SnapshotDataMovementInfo.DataMover != "" {
+			dataMover = info.SnapshotDataMovementInfo.DataMover
+		}
+		dataMovement["dataMover"] = dataMover
+
 		dataMovement["uploaderType"] = info.SnapshotDataMovementInfo.UploaderType
-		dataMovement["repositorySnapshotID"] = info.SnapshotDataMovementInfo.SnapshotHandle
 
 		snapshotDetail["dataMovement"] = dataMovement
 	} else {
-		snapshotDetail["dataMovement"] = "specify --details for more information"
+		snapshotDetail["dataMovement"] = "included, specify --details for more information"
 	}
 }
 
