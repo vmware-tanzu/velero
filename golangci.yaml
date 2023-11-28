@@ -330,6 +330,7 @@ linters:
     - errchkjson
     - ginkgolinter
     - nilerr
+    - noctx
   fast: false
 
 

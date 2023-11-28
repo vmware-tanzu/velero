@@ -123,7 +123,7 @@ func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name strin
 		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
 	}
 
-	httpReq, err := http.NewRequest(http.MethodGet, created.Status.DownloadURL, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, created.Status.DownloadURL, nil)
 	if err != nil {
 		return err
 	}
