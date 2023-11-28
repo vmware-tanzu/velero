@@ -441,6 +441,11 @@ type BackupStatus struct {
 	// BackupItemAction operations for this backup which ended with an error.
 	// +optional
 	BackupItemOperationsFailed int `json:"backupItemOperationsFailed,omitempty"`
+
+	// HookStatus contains information about the status of the hooks.
+	// +optional
+	// +nullable
+	HookStatus *HookStatus `json:"hookStatus,omitempty"`
 }
 
 // BackupProgress stores information about the progress of a Backup's execution.
@@ -456,6 +461,19 @@ type BackupProgress struct {
 	// backup tarball so far.
 	// +optional
 	ItemsBackedUp int `json:"itemsBackedUp,omitempty"`
+}
+
+// HookStatus stores information about the status of the hooks.
+type HookStatus struct {
+	// HooksAttempted is the total number of attempted hooks
+	// Specifically, HooksAttempted represents the number of hooks that failed to execute
+	// and the number of hooks that executed successfully.
+	// +optional
+	HooksAttempted int `json:"hooksAttempted,omitempty"`
+
+	// HooksFailed is the total number of hooks which ended with an error
+	// +optional
+	HooksFailed int `json:"hooksFailed,omitempty"`
 }
 
 // +genclient

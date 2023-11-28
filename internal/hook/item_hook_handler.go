@@ -82,6 +82,7 @@ type ItemHookHandler interface {
 		obj runtime.Unstructured,
 		resourceHooks []ResourceHook,
 		phase hookPhase,
+		hookTracker *HookTracker,
 	) error
 }
 
@@ -200,6 +201,7 @@ func (h *DefaultItemHookHandler) HandleHooks(
 	obj runtime.Unstructured,
 	resourceHooks []ResourceHook,
 	phase hookPhase,
+	hookTracker *HookTracker,
 ) error {
 	// We only support hooks on pods right now
 	if groupResource != kuberesource.Pods {
@@ -221,15 +223,21 @@ func (h *DefaultItemHookHandler) HandleHooks(
 		hookFromAnnotations = getPodExecHookFromAnnotations(metadata.GetAnnotations(), "", log)
 	}
 	if hookFromAnnotations != nil {
+		hookTracker.Add(namespace, name, hookFromAnnotations.Container, HookSourceAnnotation, "", phase)
+
 		hookLog := log.WithFields(
 			logrus.Fields{
-				"hookSource": "annotation",
+				"hookSource": HookSourceAnnotation,
 				"hookType":   "exec",
 				"hookPhase":  phase,
 			},
 		)
+
+		hookTracker.Record(namespace, name, hookFromAnnotations.Container, HookSourceAnnotation, "", phase, false)
 		if err := h.PodCommandExecutor.ExecutePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, "<from-annotation>", hookFromAnnotations); err != nil {
 			hookLog.WithError(err).Error("Error executing hook")
+			hookTracker.Record(namespace, name, hookFromAnnotations.Container, HookSourceAnnotation, "", phase, true)
+
 			if hookFromAnnotations.OnError == velerov1api.HookErrorModeFail {
 				return err
 			}
@@ -240,6 +248,8 @@ func (h *DefaultItemHookHandler) HandleHooks(
 
 	labels := labels.Set(metadata.GetLabels())
 	// Otherwise, check for hooks defined in the backup spec.
+	// modeFailError records the error from the hook with "Fail" error mode
+	var modeFailError error
 	for _, resourceHook := range resourceHooks {
 		if !resourceHook.Selector.applicableTo(groupResource, namespace, labels) {
 			continue
@@ -251,21 +261,30 @@ func (h *DefaultItemHookHandler) HandleHooks(
 		} else {
 			hooks = resourceHook.Post
 		}
+
 		for _, hook := range hooks {
 			if groupResource == kuberesource.Pods {
 				if hook.Exec != nil {
-					hookLog := log.WithFields(
-						logrus.Fields{
-							"hookSource": "backupSpec",
-							"hookType":   "exec",
-							"hookPhase":  phase,
-						},
-					)
-					err := h.PodCommandExecutor.ExecutePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, resourceHook.Name, hook.Exec)
-					if err != nil {
-						hookLog.WithError(err).Error("Error executing hook")
-						if hook.Exec.OnError == velerov1api.HookErrorModeFail {
-							return err
+					hookTracker.Add(namespace, name, hook.Exec.Container, HookSourceSpec, resourceHook.Name, phase)
+					// The remaining hooks will only be executed if modeFailError is nil.
+					// Otherwise, execution will stop and only hook collection will occur.
+					if modeFailError == nil {
+						hookLog := log.WithFields(
+							logrus.Fields{
+								"hookSource": HookSourceSpec,
+								"hookType":   "exec",
+								"hookPhase":  phase,
+							},
+						)
+
+						hookTracker.Record(namespace, name, hook.Exec.Container, HookSourceSpec, resourceHook.Name, phase, false)
+						err := h.PodCommandExecutor.ExecutePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, resourceHook.Name, hook.Exec)
+						if err != nil {
+							hookLog.WithError(err).Error("Error executing hook")
+							hookTracker.Record(namespace, name, hook.Exec.Container, HookSourceSpec, resourceHook.Name, phase, true)
+							if hook.Exec.OnError == velerov1api.HookErrorModeFail {
+								modeFailError = err
+							}
 						}
 					}
 				}
@@ -273,7 +292,7 @@ func (h *DefaultItemHookHandler) HandleHooks(
 		}
 	}
 
-	return nil
+	return modeFailError
 }
 
 // NoOpItemHookHandler is the an itemHookHandler for the Finalize controller where hooks don't run
@@ -285,6 +304,7 @@ func (h *NoOpItemHookHandler) HandleHooks(
 	obj runtime.Unstructured,
 	resourceHooks []ResourceHook,
 	phase hookPhase,
+	hookTracker *HookTracker,
 ) error {
 	return nil
 }
@@ -514,6 +534,7 @@ func GroupRestoreExecHooks(
 	resourceRestoreHooks []ResourceRestoreHook,
 	pod *corev1api.Pod,
 	log logrus.FieldLogger,
+	hookTrack *HookTracker,
 ) (map[string][]PodExecRestoreHook, error) {
 	byContainer := map[string][]PodExecRestoreHook{}
 
@@ -530,10 +551,11 @@ func GroupRestoreExecHooks(
 		if hookFromAnnotation.Container == "" {
 			hookFromAnnotation.Container = pod.Spec.Containers[0].Name
 		}
+		hookTrack.Add(metadata.GetNamespace(), metadata.GetName(), hookFromAnnotation.Container, HookSourceAnnotation, "<from-annotation>", hookPhase(""))
 		byContainer[hookFromAnnotation.Container] = []PodExecRestoreHook{
 			{
 				HookName:   "<from-annotation>",
-				HookSource: "annotation",
+				HookSource: HookSourceAnnotation,
 				Hook:       *hookFromAnnotation,
 			},
 		}
@@ -554,7 +576,7 @@ func GroupRestoreExecHooks(
 			named := PodExecRestoreHook{
 				HookName:   rrh.Name,
 				Hook:       *rh.Exec,
-				HookSource: "backupSpec",
+				HookSource: HookSourceSpec,
 			}
 			// default to false if attr WaitForReady not set
 			if named.Hook.WaitForReady == nil {
@@ -564,6 +586,7 @@ func GroupRestoreExecHooks(
 			if named.Hook.Container == "" {
 				named.Hook.Container = pod.Spec.Containers[0].Name
 			}
+			hookTrack.Add(metadata.GetNamespace(), metadata.GetName(), named.Hook.Container, HookSourceSpec, rrh.Name, hookPhase(""))
 			byContainer[named.Hook.Container] = append(byContainer[named.Hook.Container], named)
 		}
 	}
