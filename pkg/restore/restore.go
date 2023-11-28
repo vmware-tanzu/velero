@@ -713,6 +713,9 @@ func (ctx *restoreContext) processSelectedResource(
 
 	for namespace, selectedItems := range selectedResource.selectedItemsByNamespace {
 		for _, selectedItem := range selectedItems {
+			if groupResource == kuberesource.Namespaces {
+				namespace = selectedItem.name
+			}
 			// If we don't know whether this namespace exists yet, attempt to create
 			// it in order to ensure it exists. Try to get it from the backup tarball
 			// (in order to get any backed-up metadata), but if we don't find it there,
@@ -748,6 +751,10 @@ func (ctx *restoreContext) processSelectedResource(
 				// Keep track of namespaces that we know exist so we don't
 				// have to try to create them multiple times.
 				existingNamespaces.Insert(selectedItem.targetNamespace)
+			}
+			// For namespaces resources we don't need to following steps
+			if groupResource == kuberesource.Namespaces {
+				continue
 			}
 
 			obj, err := archive.Unmarshal(ctx.fileSystem, selectedItem.path)
@@ -2267,12 +2274,6 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 			continue
 		}
 
-		// We don't want to explicitly restore namespace API objs because we'll handle
-		// them as a special case prior to restoring anything into them
-		if groupResource == kuberesource.Namespaces {
-			continue
-		}
-
 		// Check if the resource is present in the backup
 		resourceList := backupResources[groupResource.String()]
 		if resourceList == nil {
@@ -2288,24 +2289,17 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 				continue
 			}
 
-			// get target namespace to restore into, if different
-			// from source namespace
-			targetNamespace := namespace
-			if target, ok := ctx.restore.Spec.NamespaceMapping[namespace]; ok {
-				targetNamespace = target
-			}
-
-			if targetNamespace == "" && boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
+			if namespace == "" && boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
 				ctx.log.Infof("Skipping resource %s because it's cluster-scoped", resource)
 				continue
 			}
 
-			if targetNamespace == "" && !boolptr.IsSetToTrue(ctx.restore.Spec.IncludeClusterResources) && !ctx.namespaceIncludesExcludes.IncludeEverything() {
+			if namespace == "" && !boolptr.IsSetToTrue(ctx.restore.Spec.IncludeClusterResources) && !ctx.namespaceIncludesExcludes.IncludeEverything() {
 				ctx.log.Infof("Skipping resource %s because it's cluster-scoped and only specific namespaces are included in the restore", resource)
 				continue
 			}
 
-			res, w, e := ctx.getSelectedRestoreableItems(groupResource.String(), targetNamespace, namespace, items)
+			res, w, e := ctx.getSelectedRestoreableItems(groupResource.String(), ctx.restore.Spec.NamespaceMapping, namespace, items)
 			warnings.Merge(&w)
 			errs.Merge(&e)
 
@@ -2321,7 +2315,7 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 // getSelectedRestoreableItems applies Kubernetes selectors on individual items
 // of each resource type to create a list of items which will be actually
 // restored.
-func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace, originalNamespace string, items []string) (restoreableResource, results.Result, results.Result) {
+func (ctx *restoreContext) getSelectedRestoreableItems(resource string, namespaceMapping map[string]string, originalNamespace string, items []string) (restoreableResource, results.Result, results.Result) {
 	warnings, errs := results.Result{}, results.Result{}
 
 	restorable := restoreableResource{
@@ -2330,6 +2324,11 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace
 
 	if restorable.selectedItemsByNamespace == nil {
 		restorable.selectedItemsByNamespace = make(map[string][]restoreableItem)
+	}
+
+	targetNamespace := originalNamespace
+	if target, ok := namespaceMapping[originalNamespace]; ok {
+		targetNamespace = target
 	}
 
 	if targetNamespace != "" {
@@ -2391,6 +2390,15 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace
 		if skipItem {
 			ctx.log.Infof("restore orSelector labels did not match, skipping restore of item: %s", skipItem, item)
 			continue
+		}
+
+		if resource == kuberesource.Namespaces.String() {
+			// handle remapping for namespace resource
+			if target, ok := namespaceMapping[item]; ok {
+				targetNamespace = target
+			} else {
+				targetNamespace = item
+			}
 		}
 
 		selectedItem := restoreableItem{
