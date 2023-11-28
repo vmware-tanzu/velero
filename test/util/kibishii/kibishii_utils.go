@@ -51,6 +51,7 @@ type KibishiiData struct {
 var DefaultKibishiiWorkerCounts = 2
 var DefaultKibishiiData = &KibishiiData{2, 10, 10, 1024, 1024, 0, DefaultKibishiiWorkerCounts}
 
+var KibishiiPodNameList = []string{"kibishii-deployment-0", "kibishii-deployment-1"}
 var KibishiiPVCNameList = []string{"kibishii-data-kibishii-deployment-0", "kibishii-data-kibishii-deployment-1"}
 var KibishiiStorageClassName = "kibishii-storage-class"
 
@@ -107,6 +108,8 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 	}
 
 	fmt.Printf("VeleroBackupNamespace done %s\n", time.Now().Format("2006-01-02 15:04:05"))
+
+	// Checkpoint for a successful backup
 	if useVolumeSnapshots {
 		if providerName == "vsphere" {
 			// Wait for uploads started by the Velero Plugin for vSphere to complete
@@ -165,9 +168,47 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		}
 	}
 
+	// Modify PV data right after backup. If PV's reclaim policy is retain, PV will be restored with the origin resource config
+	fileName := "file-" + kibishiiNamespace
+	fileBaseContent := fileName
+	fmt.Printf("Re-poulate volume  %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	for _, pod := range KibishiiPodNameList {
+		// To ensure Kibishii verification result is accurate
+		ClearKibishiiData(oneHourTimeout, kibishiiNamespace, pod, "kibishii", "data")
+
+		fileContent := fileBaseContent + pod
+		err := CreateFileToPod(oneHourTimeout, kibishiiNamespace, pod, "kibishii", "data",
+			fileName, fileContent)
+		if err != nil {
+			return errors.Wrapf(err, "failed to create file %s", fileName)
+		}
+	}
+	fmt.Printf("Re-poulate volume done %s\n", time.Now().Format("2006-01-02 15:04:05"))
+
+	pvList := []string{}
+	if strings.Contains(veleroCfg.KibishiiDirectory, "sc-reclaim-policy") {
+		// Get leftover PV list for PV cleanup
+		for _, pvc := range KibishiiPVCNameList {
+			pv, err := GetPvName(oneHourTimeout, client, pvc, kibishiiNamespace)
+			if err != nil {
+				errors.Wrapf(err, "failed to delete namespace %s", kibishiiNamespace)
+			}
+			pvList = append(pvList, pv)
+		}
+	}
+
 	fmt.Printf("Simulating a disaster by removing namespace %s %s\n", kibishiiNamespace, time.Now().Format("2006-01-02 15:04:05"))
 	if err := DeleteNamespace(oneHourTimeout, client, kibishiiNamespace, true); err != nil {
 		return errors.Wrapf(err, "failed to delete namespace %s", kibishiiNamespace)
+	}
+
+	if strings.Contains(veleroCfg.KibishiiDirectory, "sc-reclaim-policy") {
+		// In scenario of CSI PV-retain-policy test, to restore PV of the backed up resource, we should make sure
+		// there are no PVs of the same name left, because in previous test step, PV's reclaim policy is retain,
+		// so PVs are not deleted although workload namespace is destroyed.
+		if err := DeletePVs(oneHourTimeout, *veleroCfg.ClientToInstallVelero, pvList); err != nil {
+			return errors.Wrapf(err, "failed to delete PVs %v", pvList)
+		}
 	}
 
 	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
@@ -191,10 +232,12 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 			return errors.New(fmt.Sprintf("PVR count %d is not as expected %d", len(pvrs), pvCount))
 		}
 	}
+
 	fmt.Printf("KibishiiVerifyAfterRestore %s\n", time.Now().Format("2006-01-02 15:04:05"))
-	if err := KibishiiVerifyAfterRestore(client, kibishiiNamespace, oneHourTimeout, DefaultKibishiiData); err != nil {
+	if err := KibishiiVerifyAfterRestore(client, kibishiiNamespace, oneHourTimeout, DefaultKibishiiData, fileName); err != nil {
 		return errors.Wrapf(err, "Error verifying kibishii after restore")
 	}
+
 	fmt.Printf("kibishii test completed successfully %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	return nil
 }
@@ -309,6 +352,15 @@ func waitForKibishiiPods(ctx context.Context, client TestClient, kibishiiNamespa
 	return WaitForPods(ctx, client, kibishiiNamespace, []string{"jump-pad", "etcd0", "etcd1", "etcd2", "kibishii-deployment-0", "kibishii-deployment-1"})
 }
 
+func KibishiiGenerateData(oneHourTimeout context.Context, kibishiiNamespace string, kibishiiData *KibishiiData) error {
+	fmt.Printf("generateData %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	if err := generateData(oneHourTimeout, kibishiiNamespace, kibishiiData); err != nil {
+		return errors.Wrap(err, "Failed to generate data")
+	}
+	fmt.Printf("generateData done %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	return nil
+}
+
 func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClient,
 	providerName, kibishiiNamespace, registryCredentialFile, veleroFeatures,
 	kibishiiDirectory string, useVolumeSnapshots bool, kibishiiData *KibishiiData) error {
@@ -338,16 +390,12 @@ func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClie
 	if kibishiiData == nil {
 		kibishiiData = DefaultKibishiiData
 	}
-	fmt.Printf("generateData %s\n", time.Now().Format("2006-01-02 15:04:05"))
-	if err := generateData(oneHourTimeout, kibishiiNamespace, kibishiiData); err != nil {
-		return errors.Wrap(err, "Failed to generate data")
-	}
-	fmt.Printf("generateData done %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	KibishiiGenerateData(oneHourTimeout, kibishiiNamespace, kibishiiData)
 	return nil
 }
 
 func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, oneHourTimeout context.Context,
-	kibishiiData *KibishiiData) error {
+	kibishiiData *KibishiiData, incrementalFileName string) error {
 	if kibishiiData == nil {
 		kibishiiData = DefaultKibishiiData
 	}
@@ -357,6 +405,18 @@ func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, one
 	if err := waitForKibishiiPods(oneHourTimeout, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to wait for ready status of kibishii pods in %s", kibishiiNamespace)
 	}
+	if incrementalFileName != "" {
+		for _, pod := range KibishiiPodNameList {
+			exist, err := FileExistInPV(oneHourTimeout, kibishiiNamespace, pod, "kibishii", "data", incrementalFileName)
+			if err != nil {
+				return errors.Wrapf(err, fmt.Sprintf("fail to get file %s", incrementalFileName))
+			}
+
+			if exist {
+				return errors.New("Unexpected incremental data exist")
+			}
+		}
+	}
 
 	// TODO - check that namespace exists
 	fmt.Printf("running kibishii verify\n")
@@ -364,4 +424,12 @@ func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, one
 		return errors.Wrap(err, "Failed to verify data generated by kibishii")
 	}
 	return nil
+}
+
+func ClearKibishiiData(ctx context.Context, namespace, podName, containerName, dir string) error {
+	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
+		"--", "/bin/sh", "-c", "rm -rf /" + dir + "/*"}
+	cmd := exec.CommandContext(ctx, "kubectl", arg...)
+	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
+	return cmd.Run()
 }

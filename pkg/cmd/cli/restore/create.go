@@ -149,7 +149,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 
 	flags.StringVar(&o.ResourceModifierConfigMap, "resource-modifier-configmap", "", "Reference to the resource modifier configmap that restore will use")
 
-	f = flags.VarPF(&o.WriteSparseFiles, "write-sparse-files", "", "Whether to write sparse files when restoring volumes using restic or kopia")
+	f = flags.VarPF(&o.WriteSparseFiles, "write-sparse-files", "", "Whether to write sparse files when restoring volumes")
 	f.NoOptDefVal = cmd.FALSE
 }
 
@@ -323,7 +323,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			ItemOperationTimeout: metav1.Duration{
 				Duration: o.ItemOperationTimeout,
 			},
-			RestoreConfig: &api.RestoreConfig{
+			UploaderConfigForRestore: &api.UploaderConfigForRestore{
 				WriteSparseFiles: boolptr.IsSetToTrue(o.WriteSparseFiles.Value),
 			},
 		},

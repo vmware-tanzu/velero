@@ -274,7 +274,6 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				return r.errorOut(ctx, du, err, "error to create data path", log)
 			}
 		}
-
 		// Update status to InProgress
 		original := du.DeepCopy()
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseInProgress
@@ -344,7 +343,8 @@ func (r *DataUploadReconciler) runCancelableDataUpload(ctx context.Context, fsBa
 	tags := map[string]string{
 		velerov1api.AsyncOperationIDLabel: du.Labels[velerov1api.AsyncOperationIDLabel],
 	}
-	if err := fsBackup.StartBackup(path, fmt.Sprintf("%s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC), "", false, tags, *du.Spec.DataMoverConfig); err != nil {
+
+	if err := fsBackup.StartBackup(path, fmt.Sprintf("%s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC), "", false, tags, du.Spec.DataMoverConfig); err != nil {
 		return r.errorOut(ctx, du, err, "error starting data path backup", log)
 	}
 
@@ -581,7 +581,7 @@ func (r *DataUploadReconciler) findDataUploadForPod(podObj client.Object) []reco
 	return []reconcile.Request{requests}
 }
 
-func (r *DataUploadReconciler) FindDataUploads(ctx context.Context, cli client.Client, ns string) ([]velerov2alpha1api.DataUpload, error) {
+func (r *DataUploadReconciler) FindDataUploadsByPod(ctx context.Context, cli client.Client, ns string) ([]velerov2alpha1api.DataUpload, error) {
 	pods := &corev1.PodList{}
 	var dataUploads []velerov2alpha1api.DataUpload
 	if err := cli.List(ctx, pods, &client.ListOptions{Namespace: ns}); err != nil {
@@ -603,6 +603,51 @@ func (r *DataUploadReconciler) FindDataUploads(ctx context.Context, cli client.C
 		}
 	}
 	return dataUploads, nil
+}
+
+func (r *DataUploadReconciler) findAcceptDataUploadsByNodeLabel(ctx context.Context, cli client.Client, ns string) ([]velerov2alpha1api.DataUpload, error) {
+	dataUploads := &velerov2alpha1api.DataUploadList{}
+	if err := cli.List(ctx, dataUploads, &client.ListOptions{Namespace: ns}); err != nil {
+		r.logger.WithError(errors.WithStack(err)).Error("failed to list datauploads")
+		return nil, errors.Wrapf(err, "failed to list datauploads")
+	}
+
+	var result []velerov2alpha1api.DataUpload
+	for _, du := range dataUploads.Items {
+		if du.Status.Phase != velerov2alpha1api.DataUploadPhaseAccepted {
+			continue
+		}
+		if du.Labels[acceptNodeLabelKey] == r.nodeName {
+			result = append(result, du)
+		}
+	}
+	return result, nil
+}
+
+func (r *DataUploadReconciler) CancelAcceptedDataupload(ctx context.Context, cli client.Client, ns string) {
+	r.logger.Infof("Reset accepted dataupload for node %s", r.nodeName)
+	dataUploads, err := r.findAcceptDataUploadsByNodeLabel(ctx, cli, ns)
+	if err != nil {
+		r.logger.WithError(err).Error("failed to find dataupload")
+		return
+	}
+
+	for _, du := range dataUploads {
+		if du.Spec.Cancel {
+			continue
+		}
+		err = UpdateDataUploadWithRetry(ctx, cli, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, r.logger.WithField("dataupload", du.Name),
+			func(dataUpload *velerov2alpha1api.DataUpload) {
+				dataUpload.Spec.Cancel = true
+				dataUpload.Status.Message = fmt.Sprintf("found a dataupload with status %q during the node-agent starting, mark it as cancel", du.Status.Phase)
+			})
+
+		r.logger.WithField("dataupload", du.GetName()).Warn(du.Status.Message)
+		if err != nil {
+			r.logger.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", du.GetName())
+			continue
+		}
+	}
 }
 
 func (r *DataUploadReconciler) prepareDataUpload(du *velerov2alpha1api.DataUpload) {
@@ -832,4 +877,35 @@ func UpdateDataUploadWithRetry(ctx context.Context, client client.Client, namesp
 		}
 		return true, nil
 	})
+}
+
+func (r *DataUploadReconciler) AttemptDataUploadResume(ctx context.Context, cli client.Client, logger *logrus.Entry, ns string) error {
+	if dataUploads, err := r.FindDataUploadsByPod(ctx, cli, ns); err != nil {
+		return errors.Wrap(err, "failed to find data uploads")
+	} else {
+		for _, du := range dataUploads {
+			if du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared {
+				// keep doing nothing let controller re-download the data
+				// the Prepared CR could be still handled by dataupload controller after node-agent restart
+				logger.WithField("dataupload", du.GetName()).Debug("find a dataupload with status prepared")
+			} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
+				err = UpdateDataUploadWithRetry(ctx, cli, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, logger.WithField("dataupload", du.Name),
+					func(dataUpload *velerov2alpha1api.DataUpload) {
+						dataUpload.Spec.Cancel = true
+						dataUpload.Status.Message = fmt.Sprintf("found a dataupload with status %q during the node-agent starting, mark it as cancel", du.Status.Phase)
+					})
+
+				if err != nil {
+					logger.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q into canceled", du.GetName())
+					continue
+				}
+				logger.WithField("dataupload", du.GetName()).Debug("mark dataupload into canceled")
+			}
+		}
+	}
+
+	//If the data upload is in Accepted status, the volume snapshot may be deleted and the exposed pod may not be created
+	// so we need to mark the data upload as canceled for it may not be recoverable
+	r.CancelAcceptedDataupload(ctx, cli, ns)
+	return nil
 }

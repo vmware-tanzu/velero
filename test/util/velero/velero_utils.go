@@ -1561,3 +1561,62 @@ func InstallTestStorageClasses(path string) error {
 	}
 	return InstallStorageClass(ctx, tmpFile.Name())
 }
+
+func GetPvName(ctx context.Context, client TestClient, pvcName, namespace string) (string, error) {
+
+	pvcList, err := GetPvcByPVCName(context.Background(), namespace, pvcName)
+	if err != nil {
+		return "", err
+	}
+
+	if len(pvcList) != 1 {
+		return "", errors.New(fmt.Sprintf("Only 1 PV of PVC %s pod %s should be found under namespace %s", pvcList[0], pvcName, namespace))
+	}
+
+	pvList, err := GetPvByPvc(context.Background(), namespace, pvcList[0])
+	if err != nil {
+		return "", err
+	}
+	if len(pvList) != 1 {
+		return "", errors.New(fmt.Sprintf("Only 1 PV of PVC %s pod %s should be found under namespace %s", pvcList[0], pvcName, namespace))
+	}
+
+	return pvList[0], nil
+
+}
+func DeletePVs(ctx context.Context, client TestClient, pvList []string) error {
+	for _, pv := range pvList {
+		args := []string{"delete", "pv", pv, "--timeout=0s"}
+		fmt.Println(args)
+		err := exec.CommandContext(ctx, "kubectl", args...).Run()
+		if err != nil {
+			return errors.New(fmt.Sprintf("Deleted PV  %s ", pv))
+		}
+	}
+	return nil
+}
+
+func CleanAllRetainedPV(ctx context.Context, client TestClient) {
+
+	pvNameList, err := GetAllPVNames(ctx, client)
+	if err != nil {
+		fmt.Println("fail to list PV")
+	}
+	for _, pv := range pvNameList {
+		args := []string{"patch", "pv", pv, "-p", "{\"spec\":{\"persistentVolumeReclaimPolicy\":\"Delete\"}}"}
+		fmt.Println(args)
+		cmd := exec.CommandContext(ctx, "kubectl", args...)
+		stdout, errMsg, err := veleroexec.RunCommand(cmd)
+		if err != nil {
+			fmt.Printf("fail to patch PV %s reclaim policy to delete: stdout: %s, stderr: %s", pv, stdout, errMsg)
+		}
+
+		args = []string{"delete", "pv", pv, "--timeout=60s"}
+		fmt.Println(args)
+		cmd = exec.CommandContext(ctx, "kubectl", args...)
+		stdout, errMsg, err = veleroexec.RunCommand(cmd)
+		if err != nil {
+			fmt.Printf("fail to delete PV %s reclaim policy to delete: stdout: %s, stderr: %s", pv, stdout, errMsg)
+		}
+	}
+}

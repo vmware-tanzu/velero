@@ -1,7 +1,7 @@
 package uploaderconfig
 
 import (
-	"encoding/json"
+	"strconv"
 
 	"github.com/pkg/errors"
 
@@ -9,74 +9,42 @@ import (
 )
 
 const (
-	PodVolumeBackups  = "PodVolumeBackups"
-	PodVolumeRestores = "PodVolumeRestores"
-	DataUploads       = "DataUploads"
-	DataDownloads     = "DataDownloads"
+	parallelFilesUpload = "ParallelFilesUpload"
+	writeSparseFiles    = "WriteSparseFiles"
 )
 
-type PVBConfig struct {
-	ParallelFilesUpload int `json:"parallelFilesUpload,omitempty"`
+func StoreBackupConfig(config *velerov1api.UploaderConfigForBackup) *map[string]string {
+	data := make(map[string]string)
+	data[parallelFilesUpload] = strconv.Itoa(config.ParallelFilesUpload)
+	return &data
 }
 
-type PVRConfig struct {
-	WriteSparseFiles bool `json:"writeSparseFiles,omitempty"`
+func StoreRestoreConfig(config *velerov1api.UploaderConfigForRestore) *map[string]string {
+	data := make(map[string]string)
+	data[writeSparseFiles] = strconv.FormatBool(config.WriteSparseFiles)
+	return &data
 }
 
-func MarshalToPVBConfig(backupConfig *velerov1api.BackupConfig) (string, error) {
-	jsonData, err := json.Marshal(backupConfig)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to marshal backup config")
-	}
-
-	var pvb PVBConfig
-	err = json.Unmarshal(jsonData, &pvb)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to unmarshal backup config")
-	}
-
-	finalJSONData, err := json.Marshal(pvb)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to marshal backup config")
-	}
-
-	return string(finalJSONData), nil
-}
-
-func MarshalToPVRConfig(restoreConfig *velerov1api.RestoreConfig) (string, error) {
-	jsonData, err := json.Marshal(restoreConfig)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to marshal restore config")
-	}
-
-	var pvr PVRConfig
-	err = json.Unmarshal(jsonData, &pvr)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to unmarshal restore config")
-	}
-
-	finalJSONData, err := json.Marshal(pvr)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to marshal restore config")
-	}
-
-	return string(finalJSONData), nil
-}
-
-func ParseBackupConfig(str string) (velerov1api.BackupConfig, error) {
-	var config velerov1api.BackupConfig
-	err := json.Unmarshal([]byte(str), &config)
-	if err != nil {
-		return velerov1api.BackupConfig{}, err
+func GetBackupConfig(data *map[string]string) (velerov1api.UploaderConfigForBackup, error) {
+	config := velerov1api.UploaderConfigForBackup{}
+	var err error
+	if item, ok := (*data)[parallelFilesUpload]; ok {
+		config.ParallelFilesUpload, err = strconv.Atoi(item)
+		if err != nil {
+			return velerov1api.UploaderConfigForBackup{}, errors.Wrap(err, "failed to parse ParallelFilesUpload")
+		}
 	}
 	return config, nil
 }
 
-func ParseRestoreConfig(str string) (velerov1api.RestoreConfig, error) {
-	var config velerov1api.RestoreConfig
-	err := json.Unmarshal([]byte(str), &config)
-	if err != nil {
-		return velerov1api.RestoreConfig{}, err
+func GetRestoreConfig(data *map[string]string) (velerov1api.UploaderConfigForRestore, error) {
+	config := velerov1api.UploaderConfigForRestore{}
+	var err error
+	if item, ok := (*data)[writeSparseFiles]; ok {
+		config.WriteSparseFiles, err = strconv.ParseBool(item)
+		if err != nil {
+			return velerov1api.UploaderConfigForRestore{}, errors.Wrap(err, "failed to parse WriteSparseFiles")
+		}
 	}
 	return config, nil
 }

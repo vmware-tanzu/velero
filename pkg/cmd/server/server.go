@@ -34,6 +34,7 @@ import (
 	"github.com/spf13/cobra"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
@@ -990,7 +991,7 @@ func markInProgressCRsFailed(ctx context.Context, cfg *rest.Config, scheme *runt
 
 func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, namespace string, log logrus.FieldLogger) {
 	backups := &velerov1api.BackupList{}
-	if err := client.List(ctx, backups, &ctrlclient.MatchingFields{"metadata.namespace": namespace}); err != nil {
+	if err := client.List(ctx, backups, &ctrlclient.ListOptions{Namespace: namespace}); err != nil {
 		log.WithError(errors.WithStack(err)).Error("failed to list backups")
 		return
 	}
@@ -1015,7 +1016,7 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 
 func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client, namespace string, log logrus.FieldLogger) {
 	restores := &velerov1api.RestoreList{}
-	if err := client.List(ctx, restores, &ctrlclient.MatchingFields{"metadata.namespace": namespace}); err != nil {
+	if err := client.List(ctx, restores, &ctrlclient.ListOptions{Namespace: namespace}); err != nil {
 		log.WithError(errors.WithStack(err)).Error("failed to list restores")
 		return
 	}
@@ -1040,7 +1041,12 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 func markDataUploadsCancel(ctx context.Context, client ctrlclient.Client, backup velerov1api.Backup, log logrus.FieldLogger) {
 	dataUploads := &velerov2alpha1api.DataUploadList{}
 
-	if err := client.List(ctx, dataUploads, &ctrlclient.MatchingFields{"metadata.namespace": backup.GetNamespace()}, &ctrlclient.MatchingLabels{velerov1api.BackupUIDLabel: string(backup.GetUID())}); err != nil {
+	if err := client.List(ctx, dataUploads, &ctrlclient.ListOptions{
+		Namespace: backup.GetNamespace(),
+		LabelSelector: labels.Set(map[string]string{
+			velerov1api.BackupUIDLabel: string(backup.GetUID()),
+		}).AsSelector(),
+	}); err != nil {
 		log.WithError(errors.WithStack(err)).Error("failed to list dataUploads")
 		return
 	}
@@ -1070,7 +1076,12 @@ func markDataUploadsCancel(ctx context.Context, client ctrlclient.Client, backup
 func markDataDownloadsCancel(ctx context.Context, client ctrlclient.Client, restore velerov1api.Restore, log logrus.FieldLogger) {
 	dataDownloads := &velerov2alpha1api.DataDownloadList{}
 
-	if err := client.List(ctx, dataDownloads, &ctrlclient.MatchingFields{"metadata.namespace": restore.GetNamespace()}, &ctrlclient.MatchingLabels{velerov1api.RestoreUIDLabel: string(restore.GetUID())}); err != nil {
+	if err := client.List(ctx, dataDownloads, &ctrlclient.ListOptions{
+		Namespace: restore.GetNamespace(),
+		LabelSelector: labels.Set(map[string]string{
+			velerov1api.RestoreUIDLabel: string(restore.GetUID()),
+		}).AsSelector(),
+	}); err != nil {
 		log.WithError(errors.WithStack(err)).Error("failed to list dataDownloads")
 		return
 	}

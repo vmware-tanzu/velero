@@ -88,7 +88,7 @@ func DescribeBackup(
 			DescribeResourcePolicies(d, backup.Spec.ResourcePolicy)
 		}
 
-		if backup.Spec.BackupConfig != nil && backup.Spec.BackupConfig.ParallelFilesUpload > 0 {
+		if backup.Spec.UploaderConfigForBackup != nil && backup.Spec.UploaderConfigForBackup.ParallelFilesUpload > 0 {
 			d.Println()
 			DescribeUploaderConfig(d, backup.Spec)
 		}
@@ -138,7 +138,7 @@ func DescribeResourcePolicies(d *Describer, resPolicies *v1.TypedLocalObjectRefe
 // DescribeUploaderConfig describes uploader config in human-readable format
 func DescribeUploaderConfig(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("Uploader config:\n")
-	d.Printf("\tParallel files upload:\t%d\n", spec.BackupConfig.ParallelFilesUpload)
+	d.Printf("\tParallel files upload:\t%d\n", spec.UploaderConfigForBackup.ParallelFilesUpload)
 }
 
 // DescribeBackupSpec describes a backup spec in human-readable format.
@@ -392,6 +392,12 @@ func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Desc
 	}
 
 	d.Printf("Velero-Native Snapshots: <none included>\n")
+
+	if status.HookStatus != nil {
+		d.Println()
+		d.Printf("HooksAttempted:\t%d\n", status.HookStatus.HooksAttempted)
+		d.Printf("HooksFailed:\t%d\n", status.HookStatus.HooksFailed)
+	}
 }
 
 func describeBackupItemOperations(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, details bool, insecureSkipTLSVerify bool, caCertPath string) {

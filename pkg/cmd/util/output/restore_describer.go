@@ -177,13 +177,19 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		d.Println()
 		d.Printf("Preserve Service NodePorts:\t%s\n", BoolPointerString(restore.Spec.PreserveNodePorts, "false", "true", "auto"))
 
-		if restore.Spec.RestoreConfig != nil && restore.Spec.RestoreConfig.WriteSparseFiles {
+		if restore.Spec.UploaderConfigForRestore != nil && restore.Spec.UploaderConfigForRestore.WriteSparseFiles {
 			d.Println()
-			d.Printf("Write Sparse Files:\t%T\n", restore.Spec.RestoreConfig.WriteSparseFiles)
+			d.Printf("Write Sparse Files:\t%T\n", restore.Spec.UploaderConfigForRestore.WriteSparseFiles)
 		}
 
 		d.Println()
 		describeRestoreItemOperations(ctx, kbClient, d, restore, details, insecureSkipTLSVerify, caCertFile)
+
+		if restore.Status.HookStatus != nil {
+			d.Println()
+			d.Printf("HooksAttempted: \t%d\n", restore.Status.HookStatus.HooksAttempted)
+			d.Printf("HooksFailed: \t%d\n", restore.Status.HookStatus.HooksFailed)
+		}
 
 		if details {
 			describeRestoreResourceList(ctx, kbClient, d, restore, insecureSkipTLSVerify, caCertFile)

@@ -102,7 +102,7 @@ func (n *NamespaceMapping) Verify() error {
 		n.kibishiiData.Levels = len(*n.NSIncluded) + index
 		By(fmt.Sprintf("Verify workload %s after restore ", ns), func() {
 			Expect(KibishiiVerifyAfterRestore(n.Client, ns,
-				n.Ctx, n.kibishiiData)).To(Succeed(), "Fail to verify workload after restore")
+				n.Ctx, n.kibishiiData, "")).To(Succeed(), "Fail to verify workload after restore")
 		})
 	}
 	for _, ns := range *n.NSIncluded {

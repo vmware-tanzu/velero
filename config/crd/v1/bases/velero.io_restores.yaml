@@ -387,14 +387,6 @@ spec:
                 - name
                 type: object
                 x-kubernetes-map-type: atomic
-              restoreConfig:
-                description: RestoreConfig specifies the configuration for the restore.
-                properties:
-                  writeSparseFiles:
-                    description: WriteSparseFiles is a flag to indicate whether write
-                      files sparsely or not.
-                    type: boolean
-                type: object
               restorePVs:
                 description: RestorePVs specifies whether to restore all included
                   PVs from snapshot
@@ -426,6 +418,14 @@ spec:
                   restore from the most recent successful backup created from this
                   schedule.
                 type: string
+              uploaderConfig:
+                description: UploaderConfig specifies the configuration for the restore.
+                properties:
+                  writeSparseFiles:
+                    description: WriteSparseFiles is a flag to indicate whether write
+                      files sparsely or not.
+                    type: boolean
+                type: object
             required:
             - backupName
             type: object
@@ -448,6 +448,22 @@ spec:
                 description: FailureReason is an error that caused the entire restore
                   to fail.
                 type: string
+              hookStatus:
+                description: HookStatus contains information about the status of the
+                  hooks.
+                nullable: true
+                properties:
+                  hooksAttempted:
+                    description: HooksAttempted is the total number of attempted hooks
+                      Specifically, HooksAttempted represents the number of hooks
+                      that failed to execute and the number of hooks that executed
+                      successfully.
+                    type: integer
+                  hooksFailed:
+                    description: HooksFailed is the total number of hooks which ended
+                      with an error
+                    type: integer
+                type: object
               phase:
                 description: Phase is the current state of the Restore
                 enum:

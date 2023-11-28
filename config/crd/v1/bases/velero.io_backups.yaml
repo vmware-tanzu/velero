@@ -35,14 +35,6 @@ spec:
           spec:
             description: BackupSpec defines the specification for a Velero backup.
             properties:
-              backupConfig:
-                description: BackupConfig defines the configuration for the backup.
-                properties:
-                  parallelFilesUpload:
-                    description: ParallelFilesUpload is the number of files parallel
-                      uploads to perform when using the uploader.
-                    type: integer
-                type: object
               csiSnapshotTimeout:
                 description: CSISnapshotTimeout specifies the time used to wait for
                   CSI VolumeSnapshot status turns to ReadyToUse during creation, before
@@ -485,6 +477,14 @@ spec:
                 description: TTL is a time.Duration-parseable string describing how
                   long the Backup should be retained for.
                 type: string
+              uploaderConfig:
+                description: UploaderConfig specifies the configuration for the uploader.
+                properties:
+                  parallelFilesUpload:
+                    description: ParallelFilesUpload is the number of files parallel
+                      uploads to perform when using the uploader.
+                    type: integer
+                type: object
               volumeSnapshotLocations:
                 description: VolumeSnapshotLocations is a list containing names of
                   VolumeSnapshotLocations associated with this backup.
@@ -543,6 +543,22 @@ spec:
                 description: FormatVersion is the backup format version, including
                   major, minor, and patch version.
                 type: string
+              hookStatus:
+                description: HookStatus contains information about the status of the
+                  hooks.
+                nullable: true
+                properties:
+                  hooksAttempted:
+                    description: HooksAttempted is the total number of attempted hooks
+                      Specifically, HooksAttempted represents the number of hooks
+                      that failed to execute and the number of hooks that executed
+                      successfully.
+                    type: integer
+                  hooksFailed:
+                    description: HooksFailed is the total number of hooks which ended
+                      with an error
+                    type: integer
+                type: object
               phase:
                 description: Phase is the current state of the Backup.
                 enum:

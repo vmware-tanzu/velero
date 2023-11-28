@@ -15,7 +15,7 @@ When naming your plugin, keep in mind that the name needs to conform to these ru
 - have two parts separated by '/'
 - none of the above parts can be empty
 - the prefix is a valid DNS subdomain name
-- a plugin with the same name cannot not already exist
+- a plugin with the same name cannot already exist
 
 ### Some examples:
 

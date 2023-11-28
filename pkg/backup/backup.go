@@ -302,6 +302,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 		itemHookHandler: &hook.DefaultItemHookHandler{
 			PodCommandExecutor: kb.podCommandExecutor,
 		},
+		hookTracker: hook.NewHookTracker(),
 	}
 
 	// helper struct to send current progress between the main
@@ -427,8 +428,15 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 	updated.Status.Progress.TotalItems = len(backupRequest.BackedUpItems)
 	updated.Status.Progress.ItemsBackedUp = len(backupRequest.BackedUpItems)
 
+	// update the hooks execution status
+	if updated.Status.HookStatus == nil {
+		updated.Status.HookStatus = &velerov1api.HookStatus{}
+	}
+	updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed = itemBackupper.hookTracker.Stat()
+	log.Infof("hookTracker: %+v, hookAttempted: %d, hookFailed: %d", itemBackupper.hookTracker.GetTracker(), updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed)
+
 	if err := kube.PatchResource(backupRequest.Backup, updated, kb.kbClient); err != nil {
-		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress")
+		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress and hook status")
 	}
 	skippedPVSummary, _ := json.Marshal(backupRequest.SkippedPVTracker.Summary())
 	log.Infof("Summary for skipped PVs: %s", skippedPVSummary)
@@ -598,6 +606,7 @@ func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
 		discoveryHelper:          kb.discoveryHelper,
 		itemHookHandler:          &hook.NoOpItemHookHandler{},
 		podVolumeSnapshotTracker: newPVCSnapshotTracker(),
+		hookTracker:              hook.NewHookTracker(),
 	}
 	updateFiles := make(map[string]FileForArchive)
 	backedUpGroupResources := map[schema.GroupResource]bool{}

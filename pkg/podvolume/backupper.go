@@ -301,11 +301,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			}
 		}
 
-		volumeBackup, err := newPodVolumeBackup(backup, pod, volume, repoIdentifier, b.uploaderType, pvc)
-		if err != nil {
-			errs = append(errs, errors.Wrapf(err, "error creating PodVolumeBackup for volume %s", volumeName))
-			continue
-		}
+		volumeBackup := newPodVolumeBackup(backup, pod, volume, repoIdentifier, b.uploaderType, pvc)
 		if err := veleroclient.CreateRetryGenerateName(b.crClient, b.ctx, volumeBackup); err != nil {
 			errs = append(errs, err)
 			continue
@@ -358,7 +354,7 @@ func isHostPathVolume(volume *corev1api.Volume, pvc *corev1api.PersistentVolumeC
 	return pv.Spec.HostPath != nil, nil
 }
 
-func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume corev1api.Volume, repoIdentifier, uploaderType string, pvc *corev1api.PersistentVolumeClaim) (*velerov1api.PodVolumeBackup, error) {
+func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume corev1api.Volume, repoIdentifier, uploaderType string, pvc *corev1api.PersistentVolumeClaim) *velerov1api.PodVolumeBackup {
 	pvb := &velerov1api.PodVolumeBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    backup.Namespace,
@@ -415,15 +411,9 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume c
 		pvb.Spec.Tags["pvc-uid"] = string(pvc.UID)
 	}
 
-	if backup.Spec.BackupConfig != nil {
-		configJSON, err := uploaderconfig.MarshalToPVBConfig(backup.Spec.BackupConfig)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to marshal backup config")
-		}
-		pvb.Spec.UploaderSettings = map[string]string{
-			uploaderconfig.PodVolumeBackups: configJSON,
-		}
+	if backup.Spec.UploaderConfigForBackup != nil {
+		pvb.Spec.UploaderSettings = uploaderconfig.StoreBackupConfig(backup.Spec.UploaderConfigForBackup)
 	}
 
-	return pvb, nil
+	return pvb
 }

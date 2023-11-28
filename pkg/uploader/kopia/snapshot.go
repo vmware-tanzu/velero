@@ -18,7 +18,6 @@ package kopia
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -39,7 +38,7 @@ import (
 	"github.com/kopia/kopia/snapshot/snapshotfs"
 	"github.com/pkg/errors"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/util/uploaderconfig"
 
 	"github.com/vmware-tanzu/velero/pkg/kopia"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
@@ -107,21 +106,18 @@ func getDefaultPolicy() *policy.Policy {
 	}
 }
 
-func setupPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snapshot.SourceInfo, uploaderCfg map[string]string) (*policy.Tree, error) {
+func setupPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snapshot.SourceInfo, uploaderCfg *map[string]string) (*policy.Tree, error) {
 	// some internal operations from Kopia code retrieves policies from repo directly, so we need to persist the policy to repo
-	backupCfg := velerov1api.BackupConfig{}
-	// currently, we only have one uploader config in one uploader config so we can just loop through it
-	for configItem, jsonConfig := range uploaderCfg {
-		err := json.Unmarshal([]byte(jsonConfig), &backupCfg)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse %s uploader config", configItem)
-		}
-		break
-	}
-
 	curPolicy := getDefaultPolicy()
-	if backupCfg.ParallelFilesUpload > 0 {
-		curPolicy.UploadPolicy.MaxParallelFileReads = newOptionalInt(backupCfg.ParallelFilesUpload)
+
+	if uploaderCfg != nil {
+		uploaderConfig, err := uploaderconfig.GetBackupConfig(uploaderCfg)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get uploader config")
+		}
+		if uploaderConfig.ParallelFilesUpload > 0 {
+			curPolicy.UploadPolicy.MaxParallelFileReads = newOptionalInt(uploaderConfig.ParallelFilesUpload)
+		}
 	}
 
 	err := setPolicyFunc(ctx, rep, sourceInfo, curPolicy)
@@ -145,7 +141,7 @@ func setupPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snap
 
 // Backup backup specific sourcePath and update progress
 func Backup(ctx context.Context, fsUploader SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string,
-	forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+	forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg *map[string]string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 	if fsUploader == nil {
 		return nil, false, errors.New("get empty kopia uploader")
 	}
@@ -241,7 +237,7 @@ func SnapshotSource(
 	forceFull bool,
 	parentSnapshot string,
 	snapshotTags map[string]string,
-	uploaderCfg map[string]string,
+	uploaderCfg *map[string]string,
 	log logrus.FieldLogger,
 	description string,
 ) (string, int64, error) {
@@ -373,7 +369,7 @@ func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sour
 }
 
 // Restore restore specific sourcePath with given snapshotID and update progress
-func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string,
+func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, uploaderCfg *map[string]string,
 	log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
 	log.Info("Start to restore...")
 
@@ -396,23 +392,20 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 		return 0, 0, errors.Wrapf(err, "Unable to resolve path %v", dest)
 	}
 
-	restoreCfg := velerov1api.RestoreConfig{}
-	// currently, we only have one uploader config in map so we can just loop through it
-	for configItem, jsonConfig := range uploaderCfg {
-		err := json.Unmarshal([]byte(jsonConfig), &restoreCfg)
-		if err != nil {
-			return 0, 0, errors.Wrapf(err, "failed to parse %s uploader config", configItem)
-		}
-		break
-	}
-
 	fsOutput := &restore.FilesystemOutput{
 		TargetPath:             path,
 		OverwriteDirectories:   true,
 		OverwriteFiles:         true,
 		OverwriteSymlinks:      true,
 		IgnorePermissionErrors: true,
-		WriteSparseFiles:       restoreCfg.WriteSparseFiles,
+	}
+
+	if uploaderCfg != nil {
+		restoreCfg, err := uploaderconfig.GetRestoreConfig(uploaderCfg)
+		if err != nil {
+			return 0, 0, errors.Wrap(err, "failed to get uploader config")
+		}
+		fsOutput.WriteSparseFiles = restoreCfg.WriteSparseFiles
 	}
 	log.Debugf("Restore filesystem output %v", fsOutput)
 

@@ -96,7 +96,7 @@ func TestSnapshotSource(t *testing.T) {
 	testCases := []struct {
 		name        string
 		args        []mockArgs
-		uploaderCfg map[string]string
+		uploaderCfg *map[string]string
 		notError    bool
 	}{
 		{
@@ -152,7 +152,7 @@ func TestSnapshotSource(t *testing.T) {
 			notError: false,
 		},
 		{
-			name: "set policy with ParallelFilesUpload",
+			name: "set policy with parallel files upload",
 			args: []mockArgs{
 				{methodName: "LoadSnapshot", returns: []interface{}{manifest, nil}},
 				{methodName: "SaveSnapshot", returns: []interface{}{manifest.ID, nil}},
@@ -162,8 +162,10 @@ func TestSnapshotSource(t *testing.T) {
 				{methodName: "Upload", returns: []interface{}{manifest, nil}},
 				{methodName: "Flush", returns: []interface{}{nil}},
 			},
-			uploaderCfg: map[string]string{"ParallelFilesUpload": "10"},
-			notError:    true,
+			uploaderCfg: &map[string]string{
+				"ParallelFilesUpload": "10",
+			},
+			notError: true,
 		},
 		{
 			name: "failed to upload snapshot",
@@ -645,9 +647,9 @@ func TestBackup(t *testing.T) {
 			var snapshotInfo *uploader.SnapshotInfo
 			var err error
 			if tc.isEmptyUploader {
-				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), nil, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, make(map[string]string), tc.tags, &logrus.Logger{})
+				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), nil, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, &map[string]string{}, tc.tags, &logrus.Logger{})
 			} else {
-				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), s.uploderMock, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, make(map[string]string), tc.tags, &logrus.Logger{})
+				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), s.uploderMock, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, &map[string]string{}, tc.tags, &logrus.Logger{})
 			}
 			// Check if the returned error matches the expected error
 			if tc.expectedError != nil {
@@ -786,7 +788,7 @@ func TestRestore(t *testing.T) {
 			repoWriterMock.On("OpenObject", mock.Anything, mock.Anything).Return(em, nil)
 
 			progress := new(Progress)
-			bytesRestored, fileCount, err := Restore(context.Background(), repoWriterMock, progress, tc.snapshotID, tc.dest, tc.volMode, make(map[string]string), logrus.New(), nil)
+			bytesRestored, fileCount, err := Restore(context.Background(), repoWriterMock, progress, tc.snapshotID, tc.dest, tc.volMode, &map[string]string{}, logrus.New(), nil)
 
 			// Check if the returned error matches the expected error
 			if tc.expectedError != nil {

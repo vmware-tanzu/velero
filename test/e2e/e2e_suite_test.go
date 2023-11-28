@@ -28,6 +28,7 @@ import (
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/backup"
 	. "github.com/vmware-tanzu/velero/test/e2e/backups"
@@ -49,6 +50,7 @@ import (
 )
 
 func init() {
+	VeleroCfg.Options = &install.Options{}
 	flag.StringVar(&VeleroCfg.CloudProvider, "cloud-provider", "", "cloud that Velero will be installed into.  Required.")
 	flag.StringVar(&VeleroCfg.ObjectStoreProvider, "object-store-provider", "", "provider of object store plugin. Required if cloud-provider is kind, otherwise ignored.")
 	flag.StringVar(&VeleroCfg.BSLBucket, "bucket", "", "name of the object storage bucket where backups from e2e tests should be stored. Required.")
@@ -101,6 +103,10 @@ var _ = Describe("[APIGroup][APIExtensions] CRD of apiextentions v1beta1 should 
 var _ = Describe("[Basic][Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupRestoreWithRestic)
 
 var _ = Describe("[Basic][Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreWithSnapshots)
+
+var _ = Describe("[Basic][Snapshot][RetainPV] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreRetainedPVWithSnapshots)
+
+var _ = Describe("[Basic][Restic][RetainPV] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreRetainedPVWithRestic)
 
 var _ = Describe("[Basic][ClusterResource] Backup/restore of cluster resources", ResourcesCheckTest)
 

@@ -22,10 +22,9 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/util/retry"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 func CreatePersistentVolume(client TestClient, name string) (*corev1.PersistentVolume, error) {
@@ -92,4 +91,17 @@ func ClearClaimRefForFailedPVs(ctx context.Context, client TestClient) error {
 	}
 
 	return nil
+}
+
+func GetAllPVNames(ctx context.Context, client TestClient) ([]string, error) {
+	var pvNameList []string
+	pvList, err := client.ClientGo.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to List PV")
+	}
+
+	for _, pvName := range pvList.Items {
+		pvNameList = append(pvNameList, pvName.Name)
+	}
+	return pvNameList, nil
 }

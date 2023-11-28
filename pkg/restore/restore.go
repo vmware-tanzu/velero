@@ -325,6 +325,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		resourceModifiers:              req.ResourceModifiers,
 		disableInformerCache:           req.DisableInformerCache,
 		featureVerifier:                kr.featureVerifier,
+		hookTracker:                    hook.NewHookTracker(),
 	}
 
 	return restoreCtx.execute()
@@ -377,6 +378,7 @@ type restoreContext struct {
 	resourceModifiers              *resourcemodifiers.ResourceModifiers
 	disableInformerCache           bool
 	featureVerifier                features.Verifier
+	hookTracker                    *hook.HookTracker
 }
 
 type resourceClientKey struct {
@@ -544,6 +546,23 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 		errs.Merge(&e)
 	}
 
+	var createdOrUpdatedCRDs bool
+	for _, restoredItem := range ctx.restoredItems {
+		if restoredItem.action == itemRestoreResultCreated || restoredItem.action == itemRestoreResultUpdated {
+			createdOrUpdatedCRDs = true
+			break
+		}
+	}
+	// If we just restored custom resource definitions (CRDs), refresh
+	// discovery because the restored CRDs may have created or updated new APIs that
+	// didn't previously exist in the cluster, and we want to be able to
+	// resolve & restore instances of them in subsequent loop iterations.
+	if createdOrUpdatedCRDs {
+		if err := ctx.discoveryHelper.Refresh(); err != nil {
+			warnings.Add("", errors.Wrap(err, "refresh discovery after restoring CRDs"))
+		}
+	}
+
 	// Restore everything else
 	selectedResourceCollection, _, w, e := ctx.getOrderedResourceCollection(
 		backupResources,
@@ -629,11 +648,6 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 	updated.Status.Progress.TotalItems = len(ctx.restoredItems)
 	updated.Status.Progress.ItemsRestored = len(ctx.restoredItems)
 
-	err = kube.PatchResource(ctx.restore, updated, ctx.kbClient)
-	if err != nil {
-		ctx.log.WithError(errors.WithStack((err))).Warn("Updating restore status.progress")
-	}
-
 	// Wait for all of the pod volume restore goroutines to be done, which is
 	// only possible once all of their errors have been received by the loop
 	// below, then close the podVolumeErrs channel so the loop terminates.
@@ -667,6 +681,19 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 		errs.Add(errInfo.Namespace, errInfo.Err)
 	}
 	ctx.log.Info("Done waiting for all post-restore exec hooks to complete")
+
+	// update hooks execution status
+	if updated.Status.HookStatus == nil {
+		updated.Status.HookStatus = &velerov1api.HookStatus{}
+	}
+	updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed = ctx.hookTracker.Stat()
+	ctx.log.Infof("hookTracker: %+v, hookAttempted: %d, hookFailed: %d", ctx.hookTracker.GetTracker(), updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed)
+
+	// patch the restore status
+	err = kube.PatchResource(ctx.restore, updated, ctx.kbClient)
+	if err != nil {
+		ctx.log.WithError(errors.WithStack((err))).Warn("Updating restore status")
+	}
 
 	return warnings, errs
 }
@@ -762,15 +789,6 @@ func (ctx *restoreContext) processSelectedResource(
 		}
 	}
 
-	// If we just restored custom resource definitions (CRDs), refresh
-	// discovery because the restored CRDs may have created new APIs that
-	// didn't previously exist in the cluster, and we want to be able to
-	// resolve & restore instances of them in subsequent loop iterations.
-	if groupResource == kuberesource.CustomResourceDefinitions {
-		if err := ctx.discoveryHelper.Refresh(); err != nil {
-			warnings.Add("", errors.Wrap(err, "refresh discovery after restoring CRDs"))
-		}
-	}
 	return processedItems, warnings, errs
 }
 
@@ -1963,6 +1981,7 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 			ctx.resourceRestoreHooks,
 			pod,
 			ctx.log,
+			ctx.hookTracker,
 		)
 		if err != nil {
 			ctx.log.WithError(err).Errorf("error getting exec hooks for pod %s/%s", pod.Namespace, pod.Name)
@@ -1970,7 +1989,7 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 			return
 		}
 
-		if errs := ctx.waitExecHookHandler.HandleHooks(ctx.hooksContext, ctx.log, pod, execHooksByContainer); len(errs) > 0 {
+		if errs := ctx.waitExecHookHandler.HandleHooks(ctx.hooksContext, ctx.log, pod, execHooksByContainer, ctx.hookTracker); len(errs) > 0 {
 			ctx.log.WithError(kubeerrs.NewAggregate(errs)).Error("unable to successfully execute post-restore hooks")
 			ctx.hooksCancelFunc()
 

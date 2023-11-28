@@ -124,13 +124,13 @@ type RestoreSpec struct {
 	// +nullable
 	ResourceModifier *v1.TypedLocalObjectReference `json:"resourceModifier,omitempty"`
 
-	// RestoreConfig specifies the configuration for the restore.
+	// UploaderConfig specifies the configuration for the restore.
 	// +optional
-	RestoreConfig *RestoreConfig `json:"restoreConfig,omitempty"`
+	UploaderConfigForRestore *UploaderConfigForRestore `json:"uploaderConfig,omitempty"`
 }
 
-// RestoreConfig defines the configuration for the restore.
-type RestoreConfig struct {
+// UploaderConfigForRestore defines the configuration for the restore.
+type UploaderConfigForRestore struct {
 	// WriteSparseFiles is a flag to indicate whether write files sparsely or not.
 	// +optional
 	WriteSparseFiles bool `json:"writeSparseFiles,omitempty"`
@@ -356,6 +356,11 @@ type RestoreStatus struct {
 	// RestoreItemAction operations for this restore which ended with an error.
 	// +optional
 	RestoreItemOperationsFailed int `json:"restoreItemOperationsFailed,omitempty"`
+
+	// HookStatus contains information about the status of the hooks.
+	// +optional
+	// +nullable
+	HookStatus *HookStatus `json:"hookStatus,omitempty"`
 }
 
 // RestoreProgress stores information about the restore's execution progress

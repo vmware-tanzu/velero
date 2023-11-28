@@ -194,3 +194,42 @@ func NamespaceShouldNotExist(ctx context.Context, client TestClient, namespace s
 	}
 	return nil
 }
+
+func GetBackupNamespaces(ctx context.Context, client TestClient, excludeNS []string) ([]string, error) {
+	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, errors.Wrap(err, "Could not retrieve namespaces")
+	}
+	var backupNamespaces []string
+	for _, checkNamespace := range namespaces.Items {
+		isExclude := false
+		for k := range excludeNS {
+			if checkNamespace.Name == excludeNS[k] {
+				isExclude = true
+			}
+		}
+		if !isExclude {
+			backupNamespaces = append(backupNamespaces, checkNamespace.Name)
+		}
+	}
+	return backupNamespaces, nil
+}
+
+func GetMappingNamespaces(ctx context.Context, client TestClient, excludeNS []string) (string, error) {
+	ns, err := GetBackupNamespaces(ctx, client, excludeNS)
+	if err != nil {
+		return "", errors.Wrap(err, "Could not retrieve namespaces")
+	} else if len(ns) == 0 {
+		return "", errors.Wrap(err, "Get empty namespaces in backup")
+	}
+
+	nsMapping := []string{}
+	for _, n := range ns {
+		nsMapping = append(nsMapping, n+":mapping-"+n)
+	}
+	joinedNsMapping := strings.Join(nsMapping, ",")
+	if len(joinedNsMapping) > 0 {
+		joinedNsMapping = joinedNsMapping[:len(joinedNsMapping)-1]
+	}
+	return joinedNsMapping, nil
+}
