@@ -166,7 +166,11 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					err := fmt.Errorf("hook %s in container %s expired before executing", hook.HookName, hook.Hook.Container)
 					hookLog.Error(err)
 					errors = append(errors, err)
-					hookTracker.Record(newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true)
+
+					errTracker := hookTracker.Record(newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true)
+					if errTracker != nil {
+						hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
+					}
 
 					if hook.Hook.OnError == velerov1api.HookErrorModeFail {
 						cancel()
@@ -179,17 +183,24 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					OnError:   hook.Hook.OnError,
 					Timeout:   hook.Hook.ExecTimeout,
 				}
-				hookTracker.Record(newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), false)
-				if err := e.PodCommandExecutor.ExecutePodCommand(hookLog, podMap, pod.Namespace, pod.Name, hook.HookName, eh); err != nil {
-					hookLog.WithError(err).Error("Error executing hook")
-					err = fmt.Errorf("hook %s in container %s failed to execute, err: %v", hook.HookName, hook.Hook.Container, err)
-					errors = append(errors, err)
-					hookTracker.Record(newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true)
 
-					if hook.Hook.OnError == velerov1api.HookErrorModeFail {
-						cancel()
-						return
-					}
+				hookFailed := false
+				var hookErr error
+				if hookErr = e.PodCommandExecutor.ExecutePodCommand(hookLog, podMap, pod.Namespace, pod.Name, hook.HookName, eh); hookErr != nil {
+					hookLog.WithError(hookErr).Error("Error executing hook")
+					hookErr = fmt.Errorf("hook %s in container %s failed to execute, err: %v", hook.HookName, hook.Hook.Container, hookErr)
+					errors = append(errors, hookErr)
+					hookFailed = true
+				}
+
+				errTracker := hookTracker.Record(newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), hookFailed)
+				if errTracker != nil {
+					hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
+				}
+
+				if hookErr != nil && hook.Hook.OnError == velerov1api.HookErrorModeFail {
+					cancel()
+					return
 				}
 			}
 			delete(byContainer, containerName)
@@ -233,7 +244,12 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					"hookPhase":  "post",
 				},
 			)
-			hookTracker.Record(pod.Namespace, pod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true)
+
+			errTracker := hookTracker.Record(pod.Namespace, pod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true)
+			if errTracker != nil {
+				hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
+			}
+
 			hookLog.Error(err)
 			errors = append(errors, err)
 		}

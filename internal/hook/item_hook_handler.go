@@ -233,14 +233,19 @@ func (h *DefaultItemHookHandler) HandleHooks(
 			},
 		)
 
-		hookTracker.Record(namespace, name, hookFromAnnotations.Container, HookSourceAnnotation, "", phase, false)
-		if err := h.PodCommandExecutor.ExecutePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, "<from-annotation>", hookFromAnnotations); err != nil {
-			hookLog.WithError(err).Error("Error executing hook")
-			hookTracker.Record(namespace, name, hookFromAnnotations.Container, HookSourceAnnotation, "", phase, true)
+		hookFailed := false
+		var errExec error
+		if errExec = h.PodCommandExecutor.ExecutePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, "<from-annotation>", hookFromAnnotations); errExec != nil {
+			hookLog.WithError(errExec).Error("Error executing hook")
+			hookFailed = true
+		}
+		errTracker := hookTracker.Record(namespace, name, hookFromAnnotations.Container, HookSourceAnnotation, "", phase, hookFailed)
+		if errTracker != nil {
+			hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
+		}
 
-			if hookFromAnnotations.OnError == velerov1api.HookErrorModeFail {
-				return err
-			}
+		if errExec != nil && hookFromAnnotations.OnError == velerov1api.HookErrorModeFail {
+			return errExec
 		}
 
 		return nil
@@ -277,14 +282,18 @@ func (h *DefaultItemHookHandler) HandleHooks(
 							},
 						)
 
-						hookTracker.Record(namespace, name, hook.Exec.Container, HookSourceSpec, resourceHook.Name, phase, false)
+						hookFailed := false
 						err := h.PodCommandExecutor.ExecutePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, resourceHook.Name, hook.Exec)
 						if err != nil {
 							hookLog.WithError(err).Error("Error executing hook")
-							hookTracker.Record(namespace, name, hook.Exec.Container, HookSourceSpec, resourceHook.Name, phase, true)
+							hookFailed = true
 							if hook.Exec.OnError == velerov1api.HookErrorModeFail {
 								modeFailError = err
 							}
+						}
+						errTracker := hookTracker.Record(namespace, name, hook.Exec.Container, HookSourceSpec, resourceHook.Name, phase, hookFailed)
+						if errTracker != nil {
+							hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 						}
 					}
 				}

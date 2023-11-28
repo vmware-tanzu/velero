@@ -1216,6 +1216,37 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 			hookTracker:    hookTracker3,
 			expectedFailed: 2,
 		},
+		{
+			name:          "a hook was recorded before added to tracker",
+			groupResource: "pods",
+			initialPod: builder.ForPod("default", "my-pod").
+				Containers(&v1.Container{
+					Name: "container1",
+				}).
+				ContainerStatuses(&v1.ContainerStatus{
+					Name: "container1",
+					State: v1.ContainerState{
+						Waiting: &v1.ContainerStateWaiting{},
+					},
+				}).
+				Result(),
+			byContainer: map[string][]PodExecRestoreHook{
+				"container1": {
+					{
+						HookName:   "my-hook-1",
+						HookSource: HookSourceSpec,
+						Hook: velerov1api.ExecRestoreHook{
+							Container:   "container1",
+							Command:     []string{"/usr/bin/foo"},
+							OnError:     velerov1api.HookErrorModeContinue,
+							WaitTimeout: metav1.Duration{Duration: time.Millisecond},
+						},
+					},
+				},
+			},
+			hookTracker:    NewHookTracker(),
+			expectedFailed: 0,
+		},
 	}
 
 	for _, test := range tests1 {
