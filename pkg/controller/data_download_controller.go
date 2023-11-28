@@ -151,6 +151,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Info("Data download starting")
 
 		if _, err := r.getTargetPVC(ctx, dd); err != nil {
+			log.WithField("error", err).Debugf("Cannot find target PVC for DataDownload yet. Retry later.")
 			return ctrl.Result{Requeue: true}, nil
 		}
 

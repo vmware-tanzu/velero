@@ -328,6 +328,8 @@ linters:
     - whitespace
     - dupword
     - errchkjson
+    - ginkgolinter
+    - nilerr
   fast: false
 
 
