@@ -486,7 +486,7 @@ func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
 	concurrentNum := math.MaxInt32
 
 	for _, rule := range configs.DataPathConcurrency.PerNodeConfig {
-		selector, err := metav1.LabelSelectorAsSelector(&rule.NodeSelector)
+		selector, err := metav1.LabelSelectorAsSelector(&(rule.NodeSelector))
 		if err != nil {
 			s.logger.WithError(err).Warnf("Failed to parse rule with label selector %s, skip it", rule.NodeSelector.String())
 			continue

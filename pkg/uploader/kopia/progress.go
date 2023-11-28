@@ -33,7 +33,7 @@ type Throttle struct {
 
 func (t *Throttle) ShouldOutput() bool {
 	nextOutputTimeUnixNano := atomic.LoadInt64(&t.throttle)
-	if nowNano := time.Now().UnixNano(); nowNano > nextOutputTimeUnixNano { //nolint:forbidigo
+	if nowNano := time.Now().UnixNano(); nowNano > nextOutputTimeUnixNano {
 		if atomic.CompareAndSwapInt64(&t.throttle, nextOutputTimeUnixNano, nowNano+t.interval.Nanoseconds()) {
 			return true
 		}

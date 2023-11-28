@@ -546,7 +546,8 @@ func (r *backupDeletionReconciler) deleteMovedSnapshots(ctx context.Context, bac
 		snapshot := repository.SnapshotIdentifier{}
 		b, err := json.Marshal(cm.Data)
 		if err != nil {
-			r.logger.WithError(err).Infof("Fail to encode JSON: %v", cm.Data)
+			errs = append(errs, errors.Wrapf(err, "fail to marshal the snapshot info into JSON"))
+			continue
 		}
 		if err := json.Unmarshal(b, &snapshot); err != nil {
 			errs = append(errs, errors.Wrapf(err, "failed to unmarshal snapshot info"))

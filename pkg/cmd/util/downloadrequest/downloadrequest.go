@@ -111,7 +111,7 @@ func Stream(ctx context.Context, kbClient kbclient.Client, namespace, name strin
 	httpClient := new(http.Client)
 	httpClient.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: insecureSkipTLSVerify, //nolint:gosec
+			InsecureSkipVerify: insecureSkipTLSVerify, //nolint:gosec // This parameter is useful for some scenarios.
 			RootCAs:            caPool,
 		},
 		IdleConnTimeout:       timeout,
