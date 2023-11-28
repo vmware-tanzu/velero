@@ -331,6 +331,7 @@ linters:
     - ginkgolinter
     - nilerr
     - noctx
+    - nolintlint
   fast: false
 
 
