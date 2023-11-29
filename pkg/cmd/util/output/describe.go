@@ -164,6 +164,11 @@ func (d *StructuredDescriber) JSONEncode() string {
 	encoder := json.NewEncoder(byteBuffer)
 	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "    ")
-	_ = encoder.Encode(d.output)
+
+	err := encoder.Encode(d.output)
+	if err != nil {
+		fmt.Printf("fail to encode %s", err.Error())
+		return ""
+	}
 	return byteBuffer.String()
 }

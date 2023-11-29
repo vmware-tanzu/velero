@@ -1900,7 +1900,7 @@ func shouldRenamePV(ctx *restoreContext, obj *unstructured.Unstructured, client 
 // remapClaimRefNS remaps a PersistentVolume's claimRef.Namespace based on a
 // restore's NamespaceMappings, if necessary. Returns true if the namespace was
 // remapped, false if it was not required.
-func remapClaimRefNS(ctx *restoreContext, obj *unstructured.Unstructured) (bool, error) { //nolint:unparam
+func remapClaimRefNS(ctx *restoreContext, obj *unstructured.Unstructured) (bool, error) { //nolint:unparam // ignore the result 0 (bool) is never used warning.
 	if len(ctx.restore.Spec.NamespaceMapping) == 0 {
 		ctx.log.Debug("Persistent volume does not need to have the claimRef.namespace remapped because restore is not remapping any namespaces")
 		return false, nil
@@ -2315,7 +2315,7 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 // getSelectedRestoreableItems applies Kubernetes selectors on individual items
 // of each resource type to create a list of items which will be actually
 // restored.
-func (ctx *restoreContext) getSelectedRestoreableItems(resource string, namespaceMapping map[string]string, originalNamespace string, items []string) (restoreableResource, results.Result, results.Result) {
+func (ctx *restoreContext) getSelectedRestoreableItems(resource string, namespaceMapping map[string]string, originalNamespace string, items []string) (restoreableResource, results.Result, results.Result) { //nolint:unparam // Ignore the warnings is always nil warning.
 	warnings, errs := results.Result{}, results.Result{}
 
 	restorable := restoreableResource{
@@ -2430,7 +2430,7 @@ func removeRestoreLabels(obj metav1.Object) {
 }
 
 // updates the backup/restore labels
-func (ctx *restoreContext) updateBackupRestoreLabels(fromCluster, fromClusterWithLabels *unstructured.Unstructured, namespace string, resourceClient client.Dynamic) (warnings, errs results.Result) {
+func (ctx *restoreContext) updateBackupRestoreLabels(fromCluster, fromClusterWithLabels *unstructured.Unstructured, namespace string, resourceClient client.Dynamic) (warnings, errs results.Result) { //nolint:unparam // Ignore the warnings is nil warning.
 	patchBytes, err := generatePatch(fromCluster, fromClusterWithLabels)
 	if err != nil {
 		ctx.log.Errorf("error generating patch for %s %s: %v", fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster), err)

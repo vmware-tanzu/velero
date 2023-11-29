@@ -83,7 +83,7 @@ const (
 	// AsyncOperationIDLabel is the label key used to identify the async operation ID
 	AsyncOperationIDLabel = "velero.io/async-operation-id"
 
-	// PVCNameLabel is the label key used to identify the the PVC's namespace and name.
+	// PVCNameLabel is the label key used to identify the PVC's namespace and name.
 	// The format is <namespace>/<name>.
 	PVCNamespaceNameLabel = "velero.io/pvc-namespace-name"
 

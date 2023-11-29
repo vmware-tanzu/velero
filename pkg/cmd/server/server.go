@@ -248,7 +248,7 @@ type server struct {
 	discoveryHelper  velerodiscovery.Helper
 	dynamicClient    dynamic.Interface
 	// controller-runtime client. the difference from the controller-manager's client
-	// is that the the controller-manager's client is limited to list namespaced-scoped
+	// is that the controller-manager's client is limited to list namespaced-scoped
 	// resources in the namespace where Velero is installed, or the cluster-scoped
 	// resources. The crClient doesn't have the limitation.
 	crClient              ctrlclient.Client
