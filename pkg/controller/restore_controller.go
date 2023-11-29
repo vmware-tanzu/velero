@@ -44,6 +44,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
+	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/label"
@@ -56,7 +57,6 @@ import (
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 // nonRestorableResources is an exclusion list  for the restoration process. Any resources
@@ -521,13 +521,13 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		return errors.Wrap(err, "fail to fetch CSI VolumeSnapshots metadata")
 	}
 
-	backupVolumeInfoMap := make(map[string]volume.VolumeInfo)
+	backupVolumeInfoMap := make(map[string]internalVolume.VolumeInfo)
 	volumeInfos, err := backupStore.GetBackupVolumeInfos(restore.Spec.BackupName)
-	if err != nil || volumeInfos == nil {
+	if err != nil || len(volumeInfos) == 0 {
 		restoreLog.Infof("Backup %s doesn't have volumeinfos metadata file.", restore.Spec.BackupName)
 	} else {
-		for _, volumeInfo := range volumeInfos.VolumeInfos {
-			backupVolumeInfoMap[volumeInfo.PVName] = volumeInfo
+		for _, volumeInfo := range volumeInfos {
+			backupVolumeInfoMap[volumeInfo.PVName] = *volumeInfo
 		}
 	}
 

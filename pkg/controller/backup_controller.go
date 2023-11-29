@@ -40,6 +40,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/storage"
+	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -315,7 +316,7 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 		Backup:           backup.DeepCopy(), // don't modify items in the cache
 		SkippedPVTracker: pkgbackup.NewSkipPVTracker(),
 	}
-	request.VolumesInformation.InitPVMap()
+	request.VolumesInformation.Init()
 
 	// set backup major version - deprecated, use Status.FormatVersion
 	request.Status.Version = pkgbackup.BackupVersion
@@ -586,7 +587,7 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 
 	// add credential to config for each location
 	for _, location := range providerLocations {
-		err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(location, b.credentialFileStore)
+		err = internalVolume.UpdateVolumeSnapshotLocationWithCredentialConfig(location, b.credentialFileStore)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("error adding credentials to volume snapshot location named %s: %v", location.Name, err))
 			continue
@@ -842,8 +843,15 @@ func persistBackup(backup *pkgbackup.Request,
 		persistErrs = append(persistErrs, errs...)
 	}
 
-	volumeInfoJSON, errs := encode.ToJSONGzip(backup.VolumesInformation.GenerateVolumeInfo(backup, csiVolumeSnapshots,
-		csiVolumeSnapshotContents, csiVolumeSnapshotClasses, crClient, logger), "backup volumes information")
+	backup.FillVolumesInformation()
+
+	volumeInfoJSON, errs := encode.ToJSONGzip(backup.VolumesInformation.Result(
+		csiVolumeSnapshots,
+		csiVolumeSnapshotContents,
+		csiVolumeSnapshotClasses,
+		crClient,
+		logger,
+	), "backup volumes information")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}

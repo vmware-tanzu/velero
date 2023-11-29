@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
+	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -62,7 +63,7 @@ type Request struct {
 	ResourceModifiers    *resourcemodifiers.ResourceModifiers
 	DisableInformerCache bool
 	CSIVolumeSnapshots   []*snapshotv1api.VolumeSnapshot
-	VolumeInfoMap        map[string]volume.VolumeInfo
+	VolumeInfoMap        map[string]internalVolume.VolumeInfo
 }
 
 type restoredItemStatus struct {

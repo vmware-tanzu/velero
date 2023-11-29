@@ -241,31 +241,16 @@ func TestRandom(t *testing.T) {
 
 func TestAddVolumeInfo(t *testing.T) {
 	tests := []struct {
-		name               string
-		pv                 *corev1api.PersistentVolume
-		expectedVolumeInfo map[string]PvcPvInfo
+		name string
+		pv   *corev1api.PersistentVolume
 	}{
 		{
 			name: "PV has ClaimRef",
 			pv:   builder.ForPersistentVolume("testPV").ClaimRef("testNS", "testPVC").Result(),
-			expectedVolumeInfo: map[string]PvcPvInfo{
-				"testPV": {
-					PVCName:      "testPVC",
-					PVCNamespace: "testNS",
-					PV:           *builder.ForPersistentVolume("testPV").ClaimRef("testNS", "testPVC").Result(),
-				},
-			},
 		},
 		{
 			name: "PV has no ClaimRef",
 			pv:   builder.ForPersistentVolume("testPV").Result(),
-			expectedVolumeInfo: map[string]PvcPvInfo{
-				"testPV": {
-					PVCName:      "",
-					PVCNamespace: "",
-					PV:           *builder.ForPersistentVolume("testPV").Result(),
-				},
-			},
 		},
 	}
 
@@ -273,7 +258,7 @@ func TestAddVolumeInfo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ib := itemBackupper{}
 			ib.backupRequest = new(Request)
-			ib.backupRequest.VolumesInformation.InitPVMap()
+			ib.backupRequest.VolumesInformation.Init()
 
 			pvObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pv)
 			require.NoError(t, err)
@@ -281,7 +266,6 @@ func TestAddVolumeInfo(t *testing.T) {
 
 			err = ib.addVolumeInfo(&unstructured.Unstructured{Object: pvObj}, logger)
 			require.NoError(t, err)
-			//require.Equal(t, tc.expectedVolumeInfo, ib.backupRequest.VolumesInformation.GetPVMap())
 		})
 	}
 }

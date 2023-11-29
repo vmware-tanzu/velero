@@ -706,11 +706,8 @@ func (ib *itemBackupper) addVolumeInfo(obj runtime.Unstructured, log logrus.Fiel
 		pvcNamespace = pv.Spec.ClaimRef.Namespace
 	}
 
-	ib.backupRequest.VolumesInformation.InsertPVMap(pv.Name, PvcPvInfo{
-		PVCName:      pvcName,
-		PVCNamespace: pvcNamespace,
-		PV:           *pv,
-	})
+	ib.backupRequest.VolumesInformation.InsertPVMap(*pv, pvcName, pvcNamespace)
+
 	return nil
 }
 

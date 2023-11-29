@@ -53,6 +53,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
+	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -389,7 +390,7 @@ type restoreContext struct {
 	disableInformerCache           bool
 	featureVerifier                features.Verifier
 	hookTracker                    *hook.HookTracker
-	volumeInfoMap                  map[string]volume.VolumeInfo
+	volumeInfoMap                  map[string]internalVolume.VolumeInfo
 }
 
 type resourceClientKey struct {
@@ -1248,11 +1249,11 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			ctx.log.Infof("Find VolumeInfo for PV %s.", obj.GetName())
 
 			switch volumeInfo.BackupMethod {
-			case volume.NativeSnapshot:
+			case internalVolume.NativeSnapshot:
 				pvCondition = pvHasNativeSnapshot
-			case volume.PodVolumeBackup:
+			case internalVolume.PodVolumeBackup:
 				pvCondition = pvHasPodVolumeBackup
-			case volume.CSISnapshot:
+			case internalVolume.CSISnapshot:
 				if volumeInfo.SnapshotDataMoved {
 					pvCondition = pvHasDataUpload
 				} else {

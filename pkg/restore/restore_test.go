@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	kubetesting "k8s.io/client-go/testing"
 
+	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -70,7 +71,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 		apiResources  []*test.APIResource
 		tarball       io.Reader
 		want          map[*test.APIResource][]string
-		volumeInfoMap map[string]volume.VolumeInfo
+		volumeInfoMap map[string]internalVolume.VolumeInfo
 	}{
 		{
 			name:    "Restore PV with native snapshot",
@@ -83,11 +84,11 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]volume.VolumeInfo{
+			volumeInfoMap: map[string]internalVolume.VolumeInfo{
 				"pv-1": {
-					BackupMethod: volume.NativeSnapshot,
+					BackupMethod: internalVolume.NativeSnapshot,
 					PVName:       "pv-1",
-					NativeSnapshotInfo: volume.NativeSnapshotInfo{
+					NativeSnapshotInfo: internalVolume.NativeSnapshotInfo{
 						SnapshotHandle: "testSnapshotHandle",
 					},
 				},
@@ -107,11 +108,11 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]volume.VolumeInfo{
+			volumeInfoMap: map[string]internalVolume.VolumeInfo{
 				"pv-1": {
-					BackupMethod: volume.PodVolumeBackup,
+					BackupMethod: internalVolume.PodVolumeBackup,
 					PVName:       "pv-1",
-					PVBInfo: volume.PodVolumeBackupInfo{
+					PVBInfo: internalVolume.PodVolumeBackupInfo{
 						SnapshotHandle: "testSnapshotHandle",
 						Size:           100,
 						NodeName:       "testNode",
@@ -133,12 +134,12 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]volume.VolumeInfo{
+			volumeInfoMap: map[string]internalVolume.VolumeInfo{
 				"pv-1": {
-					BackupMethod:      volume.CSISnapshot,
+					BackupMethod:      internalVolume.CSISnapshot,
 					SnapshotDataMoved: false,
 					PVName:            "pv-1",
-					CSISnapshotInfo: volume.CSISnapshotInfo{
+					CSISnapshotInfo: internalVolume.CSISnapshotInfo{
 						Driver: "pd.csi.storage.gke.io",
 					},
 				},
@@ -158,15 +159,15 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]volume.VolumeInfo{
+			volumeInfoMap: map[string]internalVolume.VolumeInfo{
 				"pv-1": {
-					BackupMethod:      volume.CSISnapshot,
+					BackupMethod:      internalVolume.CSISnapshot,
 					SnapshotDataMoved: true,
 					PVName:            "pv-1",
-					CSISnapshotInfo: volume.CSISnapshotInfo{
+					CSISnapshotInfo: internalVolume.CSISnapshotInfo{
 						Driver: "pd.csi.storage.gke.io",
 					},
-					SnapshotDataMovementInfo: volume.SnapshotDataMovementInfo{
+					SnapshotDataMovementInfo: internalVolume.SnapshotDataMovementInfo{
 						DataMover: "velero",
 					},
 				},
@@ -186,7 +187,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]volume.VolumeInfo{
+			volumeInfoMap: map[string]internalVolume.VolumeInfo{
 				"pv-1": {
 					PVName:  "pv-1",
 					Skipped: true,
@@ -207,7 +208,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]volume.VolumeInfo{
+			volumeInfoMap: map[string]internalVolume.VolumeInfo{
 				"pv-1": {
 					PVName:  "pv-1",
 					Skipped: true,

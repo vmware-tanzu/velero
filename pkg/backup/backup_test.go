@@ -72,7 +72,6 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
 	}
-	req.VolumesInformation.InitPVMap()
 
 	backupFile := bytes.NewBuffer([]byte{})
 

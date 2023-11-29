@@ -26,7 +26,6 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -35,7 +34,7 @@ func TestInternalLW(t *testing.T) {
 	client := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 	lw := InternalLW{
 		Client:     client,
-		Namespace:  cmdtest.VeleroNameSpace,
+		Namespace:  "velero",
 		ObjectList: new(velerov1api.BackupList),
 	}
 
