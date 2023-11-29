@@ -176,7 +176,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			name: "global number is invalid",
 			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
 				return &nodeagent.Configs{
-					DataPathConcurrency: &nodeagent.DataPathConcurrency{
+					LoadConcurrency: &nodeagent.LoadConcurrency{
 						GlobalConfig: -1,
 					},
 				}, nil
@@ -188,7 +188,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			name: "global number is valid",
 			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
 				return &nodeagent.Configs{
-					DataPathConcurrency: &nodeagent.DataPathConcurrency{
+					LoadConcurrency: &nodeagent.LoadConcurrency{
 						GlobalConfig: globalNum,
 					},
 				}, nil
@@ -199,7 +199,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			name: "node is not found",
 			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
 				return &nodeagent.Configs{
-					DataPathConcurrency: &nodeagent.DataPathConcurrency{
+					LoadConcurrency: &nodeagent.LoadConcurrency{
 						GlobalConfig: globalNum,
 						PerNodeConfig: []nodeagent.RuledConfigs{
 							{
@@ -217,7 +217,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			name: "failed to get selector",
 			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
 				return &nodeagent.Configs{
-					DataPathConcurrency: &nodeagent.DataPathConcurrency{
+					LoadConcurrency: &nodeagent.LoadConcurrency{
 						GlobalConfig: globalNum,
 						PerNodeConfig: []nodeagent.RuledConfigs{
 							{
@@ -237,7 +237,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			name: "rule number is invalid",
 			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
 				return &nodeagent.Configs{
-					DataPathConcurrency: &nodeagent.DataPathConcurrency{
+					LoadConcurrency: &nodeagent.LoadConcurrency{
 						GlobalConfig: globalNum,
 						PerNodeConfig: []nodeagent.RuledConfigs{
 							{
@@ -257,7 +257,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			name: "label doesn't match",
 			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
 				return &nodeagent.Configs{
-					DataPathConcurrency: &nodeagent.DataPathConcurrency{
+					LoadConcurrency: &nodeagent.LoadConcurrency{
 						GlobalConfig: globalNum,
 						PerNodeConfig: []nodeagent.RuledConfigs{
 							{
@@ -277,7 +277,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			name: "match one rule",
 			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
 				return &nodeagent.Configs{
-					DataPathConcurrency: &nodeagent.DataPathConcurrency{
+					LoadConcurrency: &nodeagent.LoadConcurrency{
 						GlobalConfig: globalNum,
 						PerNodeConfig: []nodeagent.RuledConfigs{
 							{
@@ -297,7 +297,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			name: "match multiple rules",
 			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
 				return &nodeagent.Configs{
-					DataPathConcurrency: &nodeagent.DataPathConcurrency{
+					LoadConcurrency: &nodeagent.LoadConcurrency{
 						GlobalConfig: globalNum,
 						PerNodeConfig: []nodeagent.RuledConfigs{
 							{
@@ -321,7 +321,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			name: "match multiple rules 2",
 			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
 				return &nodeagent.Configs{
-					DataPathConcurrency: &nodeagent.DataPathConcurrency{
+					LoadConcurrency: &nodeagent.LoadConcurrency{
 						GlobalConfig: globalNum,
 						PerNodeConfig: []nodeagent.RuledConfigs{
 							{

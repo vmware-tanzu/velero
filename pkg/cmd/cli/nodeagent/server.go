@@ -498,19 +498,19 @@ func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
 		return defaultNum
 	}
 
-	if configs == nil || configs.DataPathConcurrency == nil {
+	if configs == nil || configs.LoadConcurrency == nil {
 		s.logger.Infof("Concurrency configs are not found, use the default number %v", defaultNum)
 		return defaultNum
 	}
 
-	globalNum := configs.DataPathConcurrency.GlobalConfig
+	globalNum := configs.LoadConcurrency.GlobalConfig
 
 	if globalNum <= 0 {
 		s.logger.Warnf("Global number %v is invalid, use the default value %v", globalNum, defaultNum)
 		globalNum = defaultNum
 	}
 
-	if len(configs.DataPathConcurrency.PerNodeConfig) == 0 {
+	if len(configs.LoadConcurrency.PerNodeConfig) == 0 {
 		return globalNum
 	}
 
@@ -522,7 +522,7 @@ func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
 
 	concurrentNum := math.MaxInt32
 
-	for _, rule := range configs.DataPathConcurrency.PerNodeConfig {
+	for _, rule := range configs.LoadConcurrency.PerNodeConfig {
 		selector, err := metav1.LabelSelectorAsSelector(&rule.NodeSelector)
 		if err != nil {
 			s.logger.WithError(err).Warnf("Failed to parse rule with label selector %s, skip it", rule.NodeSelector.String())
