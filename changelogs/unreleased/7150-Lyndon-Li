@@ -1,0 +1,1 @@
+Fix issue #7135, check pod status before checking node-agent pod status
