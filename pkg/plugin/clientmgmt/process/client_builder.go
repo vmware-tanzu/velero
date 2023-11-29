@@ -80,7 +80,7 @@ func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 			string(common.PluginKindDeleteItemAction):    framework.NewDeleteItemActionPlugin(common.ClientLogger(b.clientLogger)),
 		},
 		Logger: b.pluginLogger,
-		Cmd:    exec.Command(b.commandName, b.commandArgs...), //nolint
+		Cmd:    exec.Command(b.commandName, b.commandArgs...), //nolint:gosec // Internal call. No need to check the command line.
 	}
 }
 

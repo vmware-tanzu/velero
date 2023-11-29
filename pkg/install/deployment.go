@@ -41,6 +41,7 @@ type podTemplateConfig struct {
 	withSecret                      bool
 	defaultRepoMaintenanceFrequency time.Duration
 	garbageCollectionFrequency      time.Duration
+	podVolumeOperationTimeout       time.Duration
 	plugins                         []string
 	features                        []string
 	defaultVolumesToFsBackup        bool
@@ -112,6 +113,12 @@ func WithDefaultRepoMaintenanceFrequency(val time.Duration) podTemplateOption {
 func WithGarbageCollectionFrequency(val time.Duration) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.garbageCollectionFrequency = val
+	}
+}
+
+func WithPodVolumeOperationTimeout(val time.Duration) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.podVolumeOperationTimeout = val
 	}
 }
 
@@ -210,6 +217,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 
 	if c.garbageCollectionFrequency > 0 {
 		args = append(args, fmt.Sprintf("--garbage-collection-frequency=%v", c.garbageCollectionFrequency))
+	}
+
+	if c.podVolumeOperationTimeout > 0 {
+		args = append(args, fmt.Sprintf("--fs-backup-timeout=%v", c.podVolumeOperationTimeout))
 	}
 
 	deployment := &appsv1.Deployment{

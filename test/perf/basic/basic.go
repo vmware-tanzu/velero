@@ -18,12 +18,14 @@ package basic
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/perf/test"
+	"github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 type BasicTest struct {
@@ -32,7 +34,7 @@ type BasicTest struct {
 
 func (b *BasicTest) Init() error {
 	b.TestCase.Init()
-	b.Ctx, b.CtxCancel = context.WithTimeout(context.Background(), 1*time.Hour)
+	b.Ctx, b.CtxCancel = context.WithTimeout(context.Background(), 6*time.Hour)
 	b.CaseBaseName = "backuprestore"
 	b.BackupName = "backup-" + b.CaseBaseName + "-" + b.UUIDgen
 	b.RestoreName = "restore-" + b.CaseBaseName + "-" + b.UUIDgen
@@ -49,10 +51,20 @@ func (b *BasicTest) Init() error {
 		"--from-backup", b.BackupName, "--wait",
 	}
 
+	if !VeleroCfg.DeleteClusterResource {
+		joinedNsMapping, err := k8s.GetMappingNamespaces(b.Ctx, b.Client, *b.NSExcluded)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get mapping namespaces in init")
+		}
+
+		b.RestoreArgs = append(b.RestoreArgs, "--namespace-mappings")
+		b.RestoreArgs = append(b.RestoreArgs, joinedNsMapping)
+	}
+
 	b.TestMsg = &TestMSG{
 		Desc:      "Do backup and restore resources for performance test",
 		FailedMSG: "Failed to backup and restore resources",
-		Text:      fmt.Sprintf("Should backup and restore resources success"),
+		Text:      "Should backup and restore resources success",
 	}
 	return nil
 }

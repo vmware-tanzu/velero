@@ -199,6 +199,7 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 
 			err = kube.IsPodScheduled(newObj)
 			if err != nil {
+				r.log.WithField("error", err).Debugf("Pod %s/%s is not scheduled yet", newObj.GetNamespace(), newObj.GetName())
 				return false, nil
 			}
 			return true, nil

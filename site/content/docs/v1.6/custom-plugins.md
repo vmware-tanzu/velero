@@ -37,7 +37,7 @@ When naming your plugin, keep in mind that the full name needs to conform to the
 - have two parts, prefix + name, separated by '/'
 - none of the above parts can be empty
 - the prefix is a valid DNS subdomain name
-- a plugin with the same prefix + name cannot not already exist
+- a plugin with the same prefix + name cannot already exist
 
 ### Some examples:
 

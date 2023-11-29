@@ -39,6 +39,7 @@ type WaitExecHookHandler interface {
 		log logrus.FieldLogger,
 		pod *v1.Pod,
 		byContainer map[string][]PodExecRestoreHook,
+		hookTrack *HookTracker,
 	) []error
 }
 
@@ -73,6 +74,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	log logrus.FieldLogger,
 	pod *v1.Pod,
 	byContainer map[string][]PodExecRestoreHook,
+	hookTracker *HookTracker,
 ) []error {
 	if pod == nil {
 		return nil
@@ -164,6 +166,8 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					err := fmt.Errorf("hook %s in container %s expired before executing", hook.HookName, hook.Hook.Container)
 					hookLog.Error(err)
 					errors = append(errors, err)
+					hookTracker.Record(newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true)
+
 					if hook.Hook.OnError == velerov1api.HookErrorModeFail {
 						cancel()
 						return
@@ -175,10 +179,13 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					OnError:   hook.Hook.OnError,
 					Timeout:   hook.Hook.ExecTimeout,
 				}
+				hookTracker.Record(newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), false)
 				if err := e.PodCommandExecutor.ExecutePodCommand(hookLog, podMap, pod.Namespace, pod.Name, hook.HookName, eh); err != nil {
 					hookLog.WithError(err).Error("Error executing hook")
 					err = fmt.Errorf("hook %s in container %s failed to execute, err: %v", hook.HookName, hook.Hook.Container, err)
 					errors = append(errors, err)
+					hookTracker.Record(newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true)
+
 					if hook.Hook.OnError == velerov1api.HookErrorModeFail {
 						cancel()
 						return
@@ -226,6 +233,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					"hookPhase":  "post",
 				},
 			)
+			hookTracker.Record(pod.Namespace, pod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true)
 			hookLog.Error(err)
 			errors = append(errors, err)
 		}

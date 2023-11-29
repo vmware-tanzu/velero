@@ -1080,7 +1080,7 @@ func generateVolumeInfoForCSIVolumeSnapshot(backup *pkgbackup.Request, csiVolume
 				SnapshotDataMoved:     false,
 				PreserveLocalSnapshot: true,
 				OperationID:           operation.Spec.OperationID,
-				StartTimestamp:        &volumeSnapshot.CreationTimestamp,
+				StartTimestamp:        &(volumeSnapshot.CreationTimestamp),
 				CSISnapshotInfo: volume.CSISnapshotInfo{
 					VSCName:        *volumeSnapshot.Status.BoundVolumeSnapshotContentName,
 					Size:           size,

@@ -76,6 +76,17 @@ NFS_SERVER_PATH ?=
 UPLOADER_TYPE ?=
 TEST_CASE_DESCRIBE ?= 'velero performance test'
 BACKUP_FOR_RESTORE ?=
+Delete_Cluster_Resource ?= false
+Debug_Velero_Pod_Restart ?= false
+NODE_AGENT_POD_CPU_LIMIT ?= 4
+NODE_AGENT_POD_MEM_LIMIT ?= 4Gi
+NODE_AGENT_POD_CPU_REQUEST ?= 2
+NODE_AGENT_POD_MEM_REQUEST ?= 2Gi
+VELERO_POD_CPU_LIMIT ?= 4
+VELERO_POD_MEM_LIMIT ?= 4Gi
+VELERO_POD_CPU_REQUEST ?= 2
+VELERO_POD_MEM_REQUEST ?= 2Gi
+POD_VOLUME_OPERATION_TIMEOUT ?= 6h
 
 .PHONY:ginkgo
 ginkgo: # Make sure ginkgo is in $GOPATH/bin
@@ -110,7 +121,18 @@ run: ginkgo
 		-uploader-type=$(UPLOADER_TYPE) \
 		-nfs-server-path=$(NFS_SERVER_PATH) \
 		-test-case-describe=$(TEST_CASE_DESCRIBE) \
-		-backup-for-restore=$(BACKUP_FOR_RESTORE)
+		-backup-for-restore=$(BACKUP_FOR_RESTORE) \
+		-delete-cluster-resource=$(Delete_Cluster_Resource) \
+		-debug-velero-pod-restart=$(Debug_Velero_Pod_Restart) \
+		-node-agent-pod-cpu-limit=$(NODE_AGENT_POD_CPU_LIMIT) \
+		-node-agent-pod-mem-limit=$(NODE_AGENT_POD_MEM_LIMIT) \
+		-node-agent-pod-cpu-request=$(NODE_AGENT_POD_CPU_REQUEST) \
+		-node-agent-pod-mem-request=$(NODE_AGENT_POD_MEM_REQUEST) \
+		-velero-pod-cpu-limit=$(VELERO_POD_CPU_LIMIT) \
+		-velero-pod-mem-limit=$(VELERO_POD_MEM_LIMIT) \
+		-velero-pod-cpu-request=$(VELERO_POD_CPU_REQUEST) \
+		-velero-pod-mem-request=$(VELERO_POD_MEM_REQUEST) \
+		-pod-volume-operation-timeout=$(POD_VOLUME_OPERATION_TIMEOUT)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

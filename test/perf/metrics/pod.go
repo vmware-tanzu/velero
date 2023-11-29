@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -29,6 +30,7 @@ import (
 )
 
 const PodResourceDesc = "Resource consumption"
+const PodMetricsTimeout = 5 * time.Minute
 
 type PodMetrics struct {
 	Client             *metricsclientset.Clientset
@@ -39,31 +41,31 @@ type PodMetrics struct {
 }
 
 func (p *PodMetrics) Update() error {
-	cpu, mem, err := metrics.GetPodUsageMetrics(p.Ctx, p.Client, p.PodName, p.Namespace)
+	cpu, mem, err := metrics.GetPodUsageMetrics(p.Ctx, p.Client, p.PodName, p.Namespace, PodMetricsTimeout)
 	if err != nil {
 		return errors.WithStack(err)
-	} else {
-		keyMaxCPU := p.PodName + ":MaxCPU"
-		curCPU := cpu.MilliValue()
-		if curCPU > p.Metrics[keyMaxCPU] {
-			p.Metrics[keyMaxCPU] = curCPU
-		}
-
-		keyMaxMem := p.PodName + ":MaxMemory"
-		curMem := mem.MilliValue()
-		if curMem > p.Metrics[keyMaxMem] {
-			p.Metrics[keyMaxMem] = curMem
-		}
-
-		keyAvgCPU := p.PodName + ":AverageCPU"
-		preAvgCPU := p.Metrics[keyAvgCPU]
-		p.Metrics[keyAvgCPU] = (preAvgCPU*p.count + curCPU) / (p.count + 1)
-
-		keyAvgMem := p.PodName + ":AverageMemory"
-		preAvgMem := p.Metrics[keyAvgMem]
-		p.Metrics[keyAvgMem] = (preAvgMem*p.count + curMem) / (p.count + 1)
-		p.count++
 	}
+	keyMaxCPU := p.PodName + ":MaxCPU"
+	curCPU := cpu.MilliValue()
+	if curCPU > p.Metrics[keyMaxCPU] {
+		p.Metrics[keyMaxCPU] = curCPU
+	}
+
+	keyMaxMem := p.PodName + ":MaxMemory"
+	curMem := mem.MilliValue()
+	if curMem > p.Metrics[keyMaxMem] {
+		p.Metrics[keyMaxMem] = curMem
+	}
+
+	keyAvgCPU := p.PodName + ":AverageCPU"
+	preAvgCPU := p.Metrics[keyAvgCPU]
+	p.Metrics[keyAvgCPU] = (preAvgCPU*p.count + curCPU) / (p.count + 1)
+
+	keyAvgMem := p.PodName + ":AverageMemory"
+	preAvgMem := p.Metrics[keyAvgMem]
+	p.Metrics[keyAvgMem] = (preAvgMem*p.count + curMem) / (p.count + 1)
+	p.count++
+
 	return nil
 }
 

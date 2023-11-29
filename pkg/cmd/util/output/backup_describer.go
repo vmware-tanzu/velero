@@ -358,6 +358,12 @@ func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Desc
 	describeBackupVolumes(ctx, kbClient, d, backup, details, insecureSkipTLSVerify, caCertPath, podVolumeBackups)
 
 	d.Println()
+
+	if status.HookStatus != nil {
+		d.Println()
+		d.Printf("HooksAttempted:\t%d\n", status.HookStatus.HooksAttempted)
+		d.Printf("HooksFailed:\t%d\n", status.HookStatus.HooksFailed)
+	}
 }
 
 func describeBackupItemOperations(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, details bool, insecureSkipTLSVerify bool, caCertPath string) {

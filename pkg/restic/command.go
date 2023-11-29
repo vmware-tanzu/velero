@@ -77,7 +77,7 @@ func (c *Command) String() string {
 // Cmd returns an exec.Cmd for the command.
 func (c *Command) Cmd() *exec.Cmd {
 	parts := c.StringSlice()
-	cmd := exec.Command(parts[0], parts[1:]...) //nolint
+	cmd := exec.Command(parts[0], parts[1:]...) //nolint:gosec // Internal call. No need to check the parameter.
 	cmd.Dir = c.Dir
 
 	if len(c.Env) > 0 {
