@@ -325,6 +325,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		resourceModifiers:              req.ResourceModifiers,
 		disableInformerCache:           req.DisableInformerCache,
 		featureVerifier:                kr.featureVerifier,
+		hookTracker:                    hook.NewHookTracker(),
 	}
 
 	return restoreCtx.execute()
@@ -377,6 +378,7 @@ type restoreContext struct {
 	resourceModifiers              *resourcemodifiers.ResourceModifiers
 	disableInformerCache           bool
 	featureVerifier                features.Verifier
+	hookTracker                    *hook.HookTracker
 }
 
 type resourceClientKey struct {
@@ -646,11 +648,6 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 	updated.Status.Progress.TotalItems = len(ctx.restoredItems)
 	updated.Status.Progress.ItemsRestored = len(ctx.restoredItems)
 
-	err = kube.PatchResource(ctx.restore, updated, ctx.kbClient)
-	if err != nil {
-		ctx.log.WithError(errors.WithStack((err))).Warn("Updating restore status.progress")
-	}
-
 	// Wait for all of the pod volume restore goroutines to be done, which is
 	// only possible once all of their errors have been received by the loop
 	// below, then close the podVolumeErrs channel so the loop terminates.
@@ -685,6 +682,19 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 	}
 	ctx.log.Info("Done waiting for all post-restore exec hooks to complete")
 
+	// update hooks execution status
+	if updated.Status.HookStatus == nil {
+		updated.Status.HookStatus = &velerov1api.HookStatus{}
+	}
+	updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed = ctx.hookTracker.Stat()
+	ctx.log.Infof("hookTracker: %+v, hookAttempted: %d, hookFailed: %d", ctx.hookTracker.GetTracker(), updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed)
+
+	// patch the restore status
+	err = kube.PatchResource(ctx.restore, updated, ctx.kbClient)
+	if err != nil {
+		ctx.log.WithError(errors.WithStack((err))).Warn("Updating restore status")
+	}
+
 	return warnings, errs
 }
 
@@ -703,6 +713,9 @@ func (ctx *restoreContext) processSelectedResource(
 
 	for namespace, selectedItems := range selectedResource.selectedItemsByNamespace {
 		for _, selectedItem := range selectedItems {
+			if groupResource == kuberesource.Namespaces {
+				namespace = selectedItem.name
+			}
 			// If we don't know whether this namespace exists yet, attempt to create
 			// it in order to ensure it exists. Try to get it from the backup tarball
 			// (in order to get any backed-up metadata), but if we don't find it there,
@@ -738,6 +751,10 @@ func (ctx *restoreContext) processSelectedResource(
 				// Keep track of namespaces that we know exist so we don't
 				// have to try to create them multiple times.
 				existingNamespaces.Insert(selectedItem.targetNamespace)
+			}
+			// For namespaces resources we don't need to following steps
+			if groupResource == kuberesource.Namespaces {
+				continue
 			}
 
 			obj, err := archive.Unmarshal(ctx.fileSystem, selectedItem.path)
@@ -1883,7 +1900,7 @@ func shouldRenamePV(ctx *restoreContext, obj *unstructured.Unstructured, client 
 // remapClaimRefNS remaps a PersistentVolume's claimRef.Namespace based on a
 // restore's NamespaceMappings, if necessary. Returns true if the namespace was
 // remapped, false if it was not required.
-func remapClaimRefNS(ctx *restoreContext, obj *unstructured.Unstructured) (bool, error) { //nolint:unparam
+func remapClaimRefNS(ctx *restoreContext, obj *unstructured.Unstructured) (bool, error) { //nolint:unparam // ignore the result 0 (bool) is never used warning.
 	if len(ctx.restore.Spec.NamespaceMapping) == 0 {
 		ctx.log.Debug("Persistent volume does not need to have the claimRef.namespace remapped because restore is not remapping any namespaces")
 		return false, nil
@@ -1971,6 +1988,7 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 			ctx.resourceRestoreHooks,
 			pod,
 			ctx.log,
+			ctx.hookTracker,
 		)
 		if err != nil {
 			ctx.log.WithError(err).Errorf("error getting exec hooks for pod %s/%s", pod.Namespace, pod.Name)
@@ -1978,7 +1996,7 @@ func (ctx *restoreContext) waitExec(createdObj *unstructured.Unstructured) {
 			return
 		}
 
-		if errs := ctx.waitExecHookHandler.HandleHooks(ctx.hooksContext, ctx.log, pod, execHooksByContainer); len(errs) > 0 {
+		if errs := ctx.waitExecHookHandler.HandleHooks(ctx.hooksContext, ctx.log, pod, execHooksByContainer, ctx.hookTracker); len(errs) > 0 {
 			ctx.log.WithError(kubeerrs.NewAggregate(errs)).Error("unable to successfully execute post-restore hooks")
 			ctx.hooksCancelFunc()
 
@@ -2256,12 +2274,6 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 			continue
 		}
 
-		// We don't want to explicitly restore namespace API objs because we'll handle
-		// them as a special case prior to restoring anything into them
-		if groupResource == kuberesource.Namespaces {
-			continue
-		}
-
 		// Check if the resource is present in the backup
 		resourceList := backupResources[groupResource.String()]
 		if resourceList == nil {
@@ -2277,24 +2289,17 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 				continue
 			}
 
-			// get target namespace to restore into, if different
-			// from source namespace
-			targetNamespace := namespace
-			if target, ok := ctx.restore.Spec.NamespaceMapping[namespace]; ok {
-				targetNamespace = target
-			}
-
-			if targetNamespace == "" && boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
+			if namespace == "" && boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
 				ctx.log.Infof("Skipping resource %s because it's cluster-scoped", resource)
 				continue
 			}
 
-			if targetNamespace == "" && !boolptr.IsSetToTrue(ctx.restore.Spec.IncludeClusterResources) && !ctx.namespaceIncludesExcludes.IncludeEverything() {
+			if namespace == "" && !boolptr.IsSetToTrue(ctx.restore.Spec.IncludeClusterResources) && !ctx.namespaceIncludesExcludes.IncludeEverything() {
 				ctx.log.Infof("Skipping resource %s because it's cluster-scoped and only specific namespaces are included in the restore", resource)
 				continue
 			}
 
-			res, w, e := ctx.getSelectedRestoreableItems(groupResource.String(), targetNamespace, namespace, items)
+			res, w, e := ctx.getSelectedRestoreableItems(groupResource.String(), ctx.restore.Spec.NamespaceMapping, namespace, items)
 			warnings.Merge(&w)
 			errs.Merge(&e)
 
@@ -2310,7 +2315,7 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 // getSelectedRestoreableItems applies Kubernetes selectors on individual items
 // of each resource type to create a list of items which will be actually
 // restored.
-func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace, originalNamespace string, items []string) (restoreableResource, results.Result, results.Result) {
+func (ctx *restoreContext) getSelectedRestoreableItems(resource string, namespaceMapping map[string]string, originalNamespace string, items []string) (restoreableResource, results.Result, results.Result) { //nolint:unparam // Ignore the warnings is always nil warning.
 	warnings, errs := results.Result{}, results.Result{}
 
 	restorable := restoreableResource{
@@ -2319,6 +2324,11 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace
 
 	if restorable.selectedItemsByNamespace == nil {
 		restorable.selectedItemsByNamespace = make(map[string][]restoreableItem)
+	}
+
+	targetNamespace := originalNamespace
+	if target, ok := namespaceMapping[originalNamespace]; ok {
+		targetNamespace = target
 	}
 
 	if targetNamespace != "" {
@@ -2382,6 +2392,15 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource, targetNamespace
 			continue
 		}
 
+		if resource == kuberesource.Namespaces.String() {
+			// handle remapping for namespace resource
+			if target, ok := namespaceMapping[item]; ok {
+				targetNamespace = target
+			} else {
+				targetNamespace = item
+			}
+		}
+
 		selectedItem := restoreableItem{
 			path:            itemPath,
 			name:            item,
@@ -2411,7 +2430,7 @@ func removeRestoreLabels(obj metav1.Object) {
 }
 
 // updates the backup/restore labels
-func (ctx *restoreContext) updateBackupRestoreLabels(fromCluster, fromClusterWithLabels *unstructured.Unstructured, namespace string, resourceClient client.Dynamic) (warnings, errs results.Result) {
+func (ctx *restoreContext) updateBackupRestoreLabels(fromCluster, fromClusterWithLabels *unstructured.Unstructured, namespace string, resourceClient client.Dynamic) (warnings, errs results.Result) { //nolint:unparam // Ignore the warnings is nil warning.
 	patchBytes, err := generatePatch(fromCluster, fromClusterWithLabels)
 	if err != nil {
 		ctx.log.Errorf("error generating patch for %s %s: %v", fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster), err)

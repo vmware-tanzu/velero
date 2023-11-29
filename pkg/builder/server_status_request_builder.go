@@ -29,7 +29,7 @@ type ServerStatusRequestBuilder struct {
 	object *velerov1api.ServerStatusRequest
 }
 
-// ForServerStatusRequest is the constructor for for a ServerStatusRequestBuilder.
+// ForServerStatusRequest is the constructor for a ServerStatusRequestBuilder.
 func ForServerStatusRequest(ns, name, resourceVersion string) *ServerStatusRequestBuilder {
 	return &ServerStatusRequestBuilder{
 		object: &velerov1api.ServerStatusRequest{

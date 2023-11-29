@@ -326,6 +326,12 @@ linters:
     - unused
     - usestdlibvars
     - whitespace
+    - dupword
+    - errchkjson
+    - ginkgolinter
+    - nilerr
+    - noctx
+    - nolintlint
   fast: false
 
 

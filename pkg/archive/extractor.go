@@ -84,7 +84,7 @@ func (e *Extractor) readBackup(tarRdr *tar.Reader) (string, error) {
 			return "", err
 		}
 
-		target := filepath.Join(dir, header.Name) //nolint:gosec
+		target := filepath.Join(dir, header.Name) //nolint:gosec // Internal usage. No need to check.
 
 		switch header.Typeflag {
 		case tar.TypeDir:

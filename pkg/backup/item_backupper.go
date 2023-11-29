@@ -78,6 +78,7 @@ type itemBackupper struct {
 
 	itemHookHandler                    hook.ItemHookHandler
 	snapshotLocationVolumeSnapshotters map[string]vsv1.VolumeSnapshotter
+	hookTracker                        *hook.HookTracker
 }
 
 type FileForArchive struct {
@@ -184,7 +185,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	)
 
 	log.Debug("Executing pre hooks")
-	if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePre); err != nil {
+	if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePre, ib.hookTracker); err != nil {
 		return false, itemFiles, err
 	}
 	if optedOut, podName := ib.podVolumeSnapshotTracker.OptedoutByPod(namespace, name); optedOut {
@@ -234,7 +235,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 
 		// if there was an error running actions, execute post hooks and return
 		log.Debug("Executing post hooks")
-		if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePost); err != nil {
+		if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePost, ib.hookTracker); err != nil {
 			backupErrs = append(backupErrs, err)
 		}
 		return false, itemFiles, kubeerrs.NewAggregate(backupErrs)
@@ -293,7 +294,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	}
 
 	log.Debug("Executing post hooks")
-	if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePost); err != nil {
+	if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePost, ib.hookTracker); err != nil {
 		backupErrs = append(backupErrs, err)
 	}
 

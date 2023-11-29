@@ -303,7 +303,7 @@ func (c *PodVolumeRestoreReconciler) OnDataPathCompleted(ctx context.Context, na
 	// Write a done file with name=<restore-uid> into the just-created .velero dir
 	// within the volume. The velero init container on the pod is waiting
 	// for this file to exist in each restored volume before completing.
-	if err := os.WriteFile(filepath.Join(volumePath, ".velero", string(restoreUID)), nil, 0644); err != nil { //nolint:gosec
+	if err := os.WriteFile(filepath.Join(volumePath, ".velero", string(restoreUID)), nil, 0644); err != nil { //nolint:gosec // Internal usage. No need to check.
 		_, _ = c.errorOut(ctx, &pvr, err, "error writing done file", log)
 		return
 	}
