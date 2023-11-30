@@ -50,6 +50,7 @@ type podTemplateConfig struct {
 	defaultSnapshotMoveData         bool
 	privilegedNodeAgent             bool
 	disableInformerCache            bool
+	scheduleSkipImmediately         bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -170,6 +171,12 @@ func WithPrivilegedNodeAgent() podTemplateOption {
 	}
 }
 
+func WithScheduleSkipImmediately(b bool) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.scheduleSkipImmediately = b
+	}
+}
+
 func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment {
 	// TODO: Add support for server args
 	c := &podTemplateConfig{
@@ -201,6 +208,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 
 	if c.disableInformerCache {
 		args = append(args, "--disable-informer-cache=true")
+	}
+
+	if c.scheduleSkipImmediately {
+		args = append(args, "--schedule-skip-immediately=true")
 	}
 
 	if len(c.uploaderType) > 0 {

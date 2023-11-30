@@ -83,6 +83,7 @@ type Options struct {
 	UploaderType                    string
 	DefaultSnapshotMoveData         bool
 	DisableInformerCache            bool
+	ScheduleSkipImmediately         bool
 }
 
 // BindFlags adds command line values to the options struct.
@@ -126,6 +127,7 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.UploaderType, "uploader-type", o.UploaderType, fmt.Sprintf("The type of uploader to transfer the data of pod volumes, the supported values are '%s', '%s'", uploader.ResticType, uploader.KopiaType))
 	flags.BoolVar(&o.DefaultSnapshotMoveData, "default-snapshot-move-data", o.DefaultSnapshotMoveData, "Bool flag to configure Velero server to move data by default for all snapshots supporting data movement. Optional.")
 	flags.BoolVar(&o.DisableInformerCache, "disable-informer-cache", o.DisableInformerCache, "Disable informer cache for Get calls on restore. With this enabled, it will speed up restore in cases where there are backup resources which already exist in the cluster, but for very large clusters this will increase velero memory usage. Default is false (don't disable). Optional.")
+	flags.BoolVar(&o.ScheduleSkipImmediately, "schedule-skip-immediately", o.ScheduleSkipImmediately, "Skip the first scheduled backup immediately after creating a schedule. Default is false (don't skip).")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -154,6 +156,7 @@ func NewInstallOptions() *Options {
 		UploaderType:             uploader.KopiaType,
 		DefaultSnapshotMoveData:  false,
 		DisableInformerCache:     true,
+		ScheduleSkipImmediately:  false,
 	}
 }
 
@@ -220,6 +223,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		UploaderType:                    o.UploaderType,
 		DefaultSnapshotMoveData:         o.DefaultSnapshotMoveData,
 		DisableInformerCache:            o.DisableInformerCache,
+		ScheduleSkipImmediately:         o.ScheduleSkipImmediately,
 	}, nil
 }
 

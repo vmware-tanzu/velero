@@ -44,10 +44,11 @@ const (
 
 type scheduleReconciler struct {
 	client.Client
-	namespace string
-	logger    logrus.FieldLogger
-	clock     clocks.WithTickerAndDelayedExecution
-	metrics   *metrics.ServerMetrics
+	namespace       string
+	logger          logrus.FieldLogger
+	clock           clocks.WithTickerAndDelayedExecution
+	metrics         *metrics.ServerMetrics
+	skipImmediately bool
 }
 
 func NewScheduleReconciler(
@@ -55,13 +56,15 @@ func NewScheduleReconciler(
 	logger logrus.FieldLogger,
 	client client.Client,
 	metrics *metrics.ServerMetrics,
+	skipImmediately bool,
 ) *scheduleReconciler {
 	return &scheduleReconciler{
-		Client:    client,
-		namespace: namespace,
-		logger:    logger,
-		clock:     clocks.RealClock{},
-		metrics:   metrics,
+		Client:          client,
+		namespace:       namespace,
+		logger:          logger,
+		clock:           clocks.RealClock{},
+		metrics:         metrics,
+		skipImmediately: skipImmediately,
 	}
 }
 
@@ -99,10 +102,17 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 		return ctrl.Result{}, errors.Wrapf(err, "error getting schedule %s", req.String())
 	}
-
 	c.metrics.InitSchedule(schedule.Name)
 
 	original := schedule.DeepCopy()
+
+	if schedule.Spec.SkipImmediately == nil {
+		schedule.Spec.SkipImmediately = &c.skipImmediately
+	}
+	if schedule.Spec.SkipImmediately != nil && *schedule.Spec.SkipImmediately {
+		*schedule.Spec.SkipImmediately = false
+		schedule.Status.LastSkipped = &metav1.Time{Time: c.clock.Now()}
+	}
 
 	// validation - even if the item is Enabled, we can't trust it
 	// so re-validate
@@ -116,10 +126,25 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		schedule.Status.Phase = velerov1.SchedulePhaseEnabled
 	}
 
-	// update status if it's changed
+	scheduleNeedsPatch := false
+	errStringArr := make([]string, 0)
 	if currentPhase != schedule.Status.Phase {
+		scheduleNeedsPatch = true
+		errStringArr = append(errStringArr, fmt.Sprintf("phase to %s", schedule.Status.Phase))
+	}
+	// update spec.SkipImmediately if it's changed
+	if original.Spec.SkipImmediately != schedule.Spec.SkipImmediately {
+		scheduleNeedsPatch = true
+		errStringArr = append(errStringArr, fmt.Sprintf("spec.skipImmediately to %v", schedule.Spec.SkipImmediately))
+	}
+	// update status if it's changed
+	if original.Status.LastSkipped != schedule.Status.LastSkipped {
+		scheduleNeedsPatch = true
+		errStringArr = append(errStringArr, fmt.Sprintf("last skipped to %v", schedule.Status.LastSkipped))
+	}
+	if scheduleNeedsPatch {
 		if err := c.Patch(ctx, schedule, client.MergeFrom(original)); err != nil {
-			return ctrl.Result{}, errors.Wrapf(err, "error updating phase of schedule %s to %s", req.String(), schedule.Status.Phase)
+			return ctrl.Result{}, errors.Wrapf(err, "error updating %v for schedule %s", errStringArr, req.String())
 		}
 	}
 
@@ -132,13 +157,15 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// If there are backup created by this schedule still in New or InProgress state,
 	// skip current backup creation to avoid running overlap backups.
 	// As the schedule must be validated before checking whether it's due, we cannot put the checking log in Predicate
-	if c.ifDue(schedule, cronSchedule) && !c.checkIfBackupInNewOrProgress(schedule) {
+	due, nextRunTime := c.ifDue(schedule, cronSchedule)
+	durationTillNextRun := nextRunTime.Sub(c.clock.Now())
+	if due && !c.checkIfBackupInNewOrProgress(schedule) {
 		if err := c.submitBackup(ctx, schedule); err != nil {
-			return ctrl.Result{}, errors.Wrapf(err, "error submit backup for schedule %s", req.String())
+			return ctrl.Result{RequeueAfter: durationTillNextRun}, errors.Wrapf(err, "error submit backup for schedule %s", req.String())
 		}
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: durationTillNextRun}, nil
 }
 
 func parseCronSchedule(itm *velerov1.Schedule, logger logrus.FieldLogger) (cron.Schedule, []string) {
@@ -208,16 +235,16 @@ func (c *scheduleReconciler) checkIfBackupInNewOrProgress(schedule *velerov1.Sch
 }
 
 // ifDue check whether schedule is due to create a new backup.
-func (c *scheduleReconciler) ifDue(schedule *velerov1.Schedule, cronSchedule cron.Schedule) bool {
+func (c *scheduleReconciler) ifDue(schedule *velerov1.Schedule, cronSchedule cron.Schedule) (bool, time.Time) {
 	isDue, nextRunTime := getNextRunTime(schedule, cronSchedule, c.clock.Now())
 	log := c.logger.WithField("schedule", kube.NamespaceAndName(schedule))
 
 	if !isDue {
 		log.WithField("nextRunTime", nextRunTime).Debug("Schedule is not due, skipping")
-		return false
+		return false, nextRunTime
 	}
 
-	return true
+	return true, nextRunTime
 }
 
 // submitBackup create a backup from schedule.
@@ -248,6 +275,9 @@ func getNextRunTime(schedule *velerov1.Schedule, cronSchedule cron.Schedule, asO
 		lastBackupTime = schedule.Status.LastBackup.Time
 	} else {
 		lastBackupTime = schedule.CreationTimestamp.Time
+	}
+	if schedule.Status.LastSkipped != nil && schedule.Status.LastSkipped.After(lastBackupTime) {
+		lastBackupTime = schedule.Status.LastSkipped.Time
 	}
 
 	nextRunTime := cronSchedule.Next(lastBackupTime)
