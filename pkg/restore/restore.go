@@ -81,15 +81,6 @@ var resourceMustHave = []string{
 	"datauploads.velero.io",
 }
 
-const (
-	pvHasNativeSnapshot = iota + 1
-	pvHasPodVolumeBackup
-	pvHasCSIVolumeSnapshot
-	pvHasDataUpload
-	pvHasReclaimPolicyAsDelete
-	pvHasReclaimPolicyAsRetain
-)
-
 type VolumeSnapshotterGetter interface {
 	GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error)
 }
@@ -1244,28 +1235,56 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	if groupResource == kuberesource.PersistentVolumes {
-		pvCondition := 0
 		if volumeInfo, ok := ctx.volumeInfoMap[obj.GetName()]; ok {
 			ctx.log.Infof("Find VolumeInfo for PV %s.", obj.GetName())
 
 			switch volumeInfo.BackupMethod {
 			case internalVolume.NativeSnapshot:
-				pvCondition = pvHasNativeSnapshot
-			case internalVolume.PodVolumeBackup:
-				pvCondition = pvHasPodVolumeBackup
-			case internalVolume.CSISnapshot:
-				if volumeInfo.SnapshotDataMoved {
-					pvCondition = pvHasDataUpload
-				} else {
-					pvCondition = pvHasCSIVolumeSnapshot
+				obj, err = ctx.handlePVHasNativeSnapshot(obj, resourceClient)
+				if err != nil {
+					errs.Add(namespace, err)
+					return warnings, errs, itemExists
 				}
+
+				name = obj.GetName()
+
+			case internalVolume.PodVolumeBackup:
+				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
+				ctx.pvsToProvision.Insert(name)
+
+				// Return early because we don't want to restore the PV itself, we
+				// want to dynamically re-provision it.
+				return warnings, errs, itemExists
+
+			case internalVolume.CSISnapshot:
+				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a CSI VolumeSnapshot or a related snapshot DataUpload.")
+				ctx.pvsToProvision.Insert(name)
+
+				if ready, err := ctx.featureVerifier.Verify(velerov1api.CSIFeatureFlag); !ready {
+					ctx.log.Errorf("Failed to verify CSI modules, ready %v, err %v", ready, err)
+					errs.Add(namespace, fmt.Errorf("CSI modules are not ready for restore. Check CSI feature is enabled and CSI plugin is installed"))
+				}
+
+				// Return early because we don't want to restore the PV itself, we
+				// want to dynamically re-provision it.
+				return warnings, errs, itemExists
+
 			// When the PV data is skipped from backup, it's VolumeInfo BackupMethod
 			// is not set, and it will fall into the default case.
 			default:
 				if hasDeleteReclaimPolicy(obj.Object) {
-					pvCondition = pvHasReclaimPolicyAsDelete
+					restoreLogger.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
+					ctx.pvsToProvision.Insert(name)
+
+					// Return early because we don't want to restore the PV itself, we
+					// want to dynamically re-provision it.
+					return warnings, errs, itemExists
 				} else {
-					pvCondition = pvHasReclaimPolicyAsRetain
+					obj, err = ctx.handleSkippedPVHasRetainPolicy(obj, resourceID, restoreLogger)
+					if err != nil {
+						errs.Add(namespace, err)
+						return warnings, errs, itemExists
+					}
 				}
 			}
 		} else {
@@ -1275,79 +1294,52 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 			switch {
 			case hasSnapshot(name, ctx.volumeSnapshots):
-				pvCondition = pvHasNativeSnapshot
+				obj, err = ctx.handlePVHasNativeSnapshot(obj, resourceClient)
+				if err != nil {
+					errs.Add(namespace, err)
+					return warnings, errs, itemExists
+				}
+
+				name = obj.GetName()
+
 			case hasPodVolumeBackup(obj, ctx):
-				pvCondition = pvHasPodVolumeBackup
+				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
+				ctx.pvsToProvision.Insert(name)
+
+				// Return early because we don't want to restore the PV itself, we
+				// want to dynamically re-provision it.
+				return warnings, errs, itemExists
+
 			case hasCSIVolumeSnapshot(ctx, obj):
-				pvCondition = pvHasCSIVolumeSnapshot
+				fallthrough
 			case hasSnapshotDataUpload(ctx, obj):
-				pvCondition = pvHasDataUpload
+				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a CSI VolumeSnapshot or a related snapshot DataUpload.")
+				ctx.pvsToProvision.Insert(name)
+
+				if ready, err := ctx.featureVerifier.Verify(velerov1api.CSIFeatureFlag); !ready {
+					ctx.log.Errorf("Failed to verify CSI modules, ready %v, err %v", ready, err)
+					errs.Add(namespace, fmt.Errorf("CSI modules are not ready for restore. Check CSI feature is enabled and CSI plugin is installed"))
+				}
+
+				// Return early because we don't want to restore the PV itself, we
+				// want to dynamically re-provision it.
+				return warnings, errs, itemExists
+
 			case hasDeleteReclaimPolicy(obj.Object):
-				pvCondition = pvHasReclaimPolicyAsDelete
+				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
+				ctx.pvsToProvision.Insert(name)
+
+				// Return early because we don't want to restore the PV itself, we
+				// want to dynamically re-provision it.
+				return warnings, errs, itemExists
+
 			default:
-				pvCondition = pvHasReclaimPolicyAsRetain
+				obj, err = ctx.handleSkippedPVHasRetainPolicy(obj, resourceID, restoreLogger)
+				if err != nil {
+					errs.Add(namespace, err)
+					return warnings, errs, itemExists
+				}
 			}
-		}
-
-		switch pvCondition {
-		case pvHasNativeSnapshot:
-			obj, err = ctx.handlePVHasNativeSnapshot(obj, resourceClient)
-			if err != nil {
-				errs.Add(namespace, err)
-				return warnings, errs, itemExists
-			}
-
-			name = obj.GetName()
-
-		case pvHasPodVolumeBackup:
-			restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
-			ctx.pvsToProvision.Insert(name)
-
-			// Return early because we don't want to restore the PV itself, we
-			// want to dynamically re-provision it.
-			return warnings, errs, itemExists
-
-		case pvHasCSIVolumeSnapshot:
-			fallthrough
-		case pvHasDataUpload:
-			restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a CSI VolumeSnapshot or a related snapshot DataUpload.")
-			ctx.pvsToProvision.Insert(name)
-
-			if ready, err := ctx.featureVerifier.Verify(velerov1api.CSIFeatureFlag); !ready {
-				ctx.log.Errorf("Failed to verify CSI modules, ready %v, err %v", ready, err)
-				errs.Add(namespace, fmt.Errorf("CSI modules are not ready for restore. Check CSI feature is enabled and CSI plugin is installed"))
-			}
-
-			// Return early because we don't want to restore the PV itself, we
-			// want to dynamically re-provision it.
-			return warnings, errs, itemExists
-
-		case pvHasReclaimPolicyAsDelete:
-			restoreLogger.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
-			ctx.pvsToProvision.Insert(name)
-
-			// Return early because we don't want to restore the PV itself, we
-			// want to dynamically re-provision it.
-			return warnings, errs, itemExists
-
-		case pvHasReclaimPolicyAsRetain:
-			restoreLogger.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
-
-			// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
-			_, err = remapClaimRefNS(ctx, obj)
-			if err != nil {
-				errs.Add(namespace, err)
-				return warnings, errs, itemExists
-			}
-			obj = resetVolumeBindingInfo(obj)
-			// We call the pvRestorer here to clear out the PV's claimRef.UID,
-			// so it can be re-claimed when its PVC is restored and gets a new UID.
-			updatedObj, err := ctx.pvRestorer.executePVAction(obj)
-			if err != nil {
-				errs.Add(namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
-				return warnings, errs, itemExists
-			}
-			obj = updatedObj
 		}
 	}
 
@@ -2516,4 +2508,28 @@ func (ctx *restoreContext) handlePVHasNativeSnapshot(obj *unstructured.Unstructu
 	}
 
 	return retObj, nil
+}
+
+func (ctx *restoreContext) handleSkippedPVHasRetainPolicy(
+	obj *unstructured.Unstructured,
+	resourceID string,
+	logger logrus.FieldLogger,
+) (*unstructured.Unstructured, error) {
+	logger.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
+
+	// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
+	if _, err := remapClaimRefNS(ctx, obj); err != nil {
+		return nil, err
+	}
+
+	obj = resetVolumeBindingInfo(obj)
+
+	// We call the pvRestorer here to clear out the PV's claimRef.UID,
+	// so it can be re-claimed when its PVC is restored and gets a new UID.
+	updatedObj, err := ctx.pvRestorer.executePVAction(obj)
+	if err != nil {
+		return nil, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err)
+	}
+
+	return updatedObj, nil
 }

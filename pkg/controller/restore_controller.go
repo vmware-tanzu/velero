@@ -523,8 +523,9 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 
 	backupVolumeInfoMap := make(map[string]internalVolume.VolumeInfo)
 	volumeInfos, err := backupStore.GetBackupVolumeInfos(restore.Spec.BackupName)
-	if err != nil || len(volumeInfos) == 0 {
-		restoreLog.Infof("Backup %s doesn't have volumeinfos metadata file.", restore.Spec.BackupName)
+	if err != nil {
+		restoreLog.WithError(err).Errorf("fail to get VolumeInfos metadata file for backup %s", restore.Spec.BackupName)
+		return errors.WithStack(err)
 	} else {
 		for _, volumeInfo := range volumeInfos {
 			backupVolumeInfoMap[volumeInfo.PVName] = *volumeInfo
