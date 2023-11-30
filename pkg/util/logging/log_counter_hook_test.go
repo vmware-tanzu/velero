@@ -1,155 +1,135 @@
 package logging
 
 import (
-	"reflect"
-	"sync"
+	"errors"
+	"fmt"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
-type fields struct {
-	mu      sync.RWMutex
-	counts  map[logrus.Level]int
-	entries map[logrus.Level]*results.Result
+func TestLogHook_Fire(t *testing.T) {
+	hook := NewLogHook()
+
+	entry := &logrus.Entry{
+		Level: logrus.ErrorLevel,
+		Data: logrus.Fields{
+			"namespace": "test-namespace",
+			"error":     errors.New("test-error"),
+			"resource":  "test-resource",
+			"name":      "test-name",
+		},
+		Message: "test-message",
+	}
+
+	err := hook.Fire(entry)
+	assert.NoError(t, err)
+
+	// Verify the counts
+	assert.Equal(t, 1, hook.counts[logrus.ErrorLevel])
+
+	// Verify the entries
+	expectedResult := &results.Result{}
+	expectedResult.Add("test-namespace", fmt.Errorf(" resource: /test-resource name: /test-name message: /test-message error: /%v", entry.Data["error"]))
+	assert.Equal(t, expectedResult, hook.entries[logrus.ErrorLevel])
+
+	entry1 := &logrus.Entry{
+		Level: logrus.ErrorLevel,
+		Data: logrus.Fields{
+			"error.message": errors.New("test-error"),
+			"resource":      "test-resource",
+			"name":          "test-name",
+		},
+		Message: "test-message",
+	}
+
+	err = hook.Fire(entry1)
+	assert.NoError(t, err)
+
+	// Verify the counts
+	assert.Equal(t, 2, hook.counts[logrus.ErrorLevel])
+
+	// Verify the entries
+	expectedResult = &results.Result{}
+	expectedResult.Add("test-namespace", fmt.Errorf(" resource: /test-resource name: /test-name message: /test-message error: /%v", entry.Data["error"]))
+	expectedResult.AddVeleroError(fmt.Errorf(" resource: /test-resource name: /test-name message: /test-message error: /%v", entry1.Data["error.message"]))
+	assert.Equal(t, expectedResult, hook.entries[logrus.ErrorLevel])
 }
 
-func TestLogHook_Fire(t *testing.T) {
-	type args struct {
-		entry *logrus.Entry
+func TestLogHook_Levels(t *testing.T) {
+	hook := NewLogHook()
+
+	levels := hook.Levels()
+
+	expectedLevels := []logrus.Level{
+		logrus.PanicLevel,
+		logrus.FatalLevel,
+		logrus.ErrorLevel,
+		logrus.WarnLevel,
+		logrus.InfoLevel,
+		logrus.DebugLevel,
+		logrus.TraceLevel,
 	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "test",
-			fields: fields{
-				mu: sync.RWMutex{},
-				counts: map[logrus.Level]int{
-					logrus.ErrorLevel: 1,
-				},
-				entries: map[logrus.Level]*results.Result{
-					logrus.ErrorLevel: {
-						Velero: []string{"test error"},
-					},
-				},
-			},
-			args: args{
-				entry: &logrus.Entry{
-					Level: logrus.ErrorLevel,
-					Data: map[string]interface{}{
-						"namespace": "test",
-						"error":     errors.New("test error"),
-					},
-				},
-			},
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &LogHook{
-				mu:      tt.fields.mu,
-				counts:  tt.fields.counts,
-				entries: tt.fields.entries,
-			}
-			if err := h.Fire(tt.args.entry); (err != nil) != tt.wantErr {
-				t.Errorf("LogHook.Fire() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
+
+	assert.Equal(t, expectedLevels, levels)
 }
 
 func TestLogHook_GetCount(t *testing.T) {
-	type args struct {
-		level logrus.Level
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   int
-	}{
-		{
-			name: "test",
-			fields: fields{
-				mu: sync.RWMutex{},
-				counts: map[logrus.Level]int{
-					logrus.ErrorLevel: 1,
-				},
-				entries: map[logrus.Level]*results.Result{
-					logrus.ErrorLevel: {
-						Velero: []string{"test error"},
-					},
-				},
-			},
-			args: args{
-				level: logrus.ErrorLevel,
-			},
-			want: 1,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &LogHook{
-				mu:      tt.fields.mu,
-				counts:  tt.fields.counts,
-				entries: tt.fields.entries,
-			}
-			if got := h.GetCount(tt.args.level); got != tt.want {
-				t.Errorf("LogHook.GetCount() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	hook := NewLogHook()
+
+	// Set up test data
+	hook.counts[logrus.ErrorLevel] = 5
+	hook.counts[logrus.WarnLevel] = 10
+
+	// Test GetCount for ErrorLevel
+	count := hook.GetCount(logrus.ErrorLevel)
+	assert.Equal(t, 5, count)
+
+	// Test GetCount for WarnLevel
+	count = hook.GetCount(logrus.WarnLevel)
+	assert.Equal(t, 10, count)
+
+	// Test GetCount for other levels
+	count = hook.GetCount(logrus.InfoLevel)
+	assert.Equal(t, 0, count)
+
+	count = hook.GetCount(logrus.DebugLevel)
+	assert.Equal(t, 0, count)
 }
 
 func TestLogHook_GetEntries(t *testing.T) {
-	type args struct {
-		level logrus.Level
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   results.Result
-	}{
-		{
-			name: "test",
-			fields: fields{
-				mu: sync.RWMutex{},
-				counts: map[logrus.Level]int{
-					logrus.ErrorLevel: 1,
-				},
-				entries: map[logrus.Level]*results.Result{
-					logrus.ErrorLevel: {
-						Velero: []string{"test error"},
-					},
-				},
-			},
-			args: args{
-				level: logrus.ErrorLevel,
-			},
-			want: results.Result{
-				Velero: []string{"test error"},
-			},
+	hook := NewLogHook()
+
+	// Set up test data
+	entry := &logrus.Entry{
+		Level: logrus.ErrorLevel,
+		Data: logrus.Fields{
+			"namespace": "test-namespace",
+			"error":     errors.New("test-error"),
+			"resource":  "test-resource",
+			"name":      "test-name",
 		},
+		Message: "test-message",
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &LogHook{
-				mu:      tt.fields.mu,
-				counts:  tt.fields.counts,
-				entries: tt.fields.entries,
-			}
-			if got := h.GetEntries(tt.args.level); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("LogHook.GetEntries() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	expectedResult := &results.Result{}
+	expectedResult.Add("test-namespace", fmt.Errorf(" resource: /test-resource name: /test-name message: /test-message error: /%v", entry.Data["error"]))
+	hook.entries[logrus.ErrorLevel] = expectedResult
+
+	// Test GetEntries for ErrorLevel
+	result := hook.GetEntries(logrus.ErrorLevel)
+	assert.Equal(t, *expectedResult, result)
+
+	// Test GetEntries for WarnLevel
+	result = hook.GetEntries(logrus.WarnLevel)
+	assert.Equal(t, results.Result{}, result)
+
+	// Test GetEntries for other levels
+	result = hook.GetEntries(logrus.InfoLevel)
+	assert.Equal(t, results.Result{}, result)
+
+	result = hook.GetEntries(logrus.DebugLevel)
+	assert.Equal(t, results.Result{}, result)
 }
