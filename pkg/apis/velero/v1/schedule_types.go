@@ -42,6 +42,13 @@ type ScheduleSpec struct {
 	// Paused specifies whether the schedule is paused or not
 	// +optional
 	Paused bool `json:"paused,omitempty"`
+
+	// SkipImmediately specifies whether to skip backup if schedule is due immediately from `schedule.status.lastBackup` timestamp when schedule is unpaused or if schedule is new.
+	// If true, backup will be skipped immediately when schedule is unpaused if it is due based on .Status.LastBackupTimestamp or schedule is new, and will run at next schedule time.
+	// If false, backup will not be skipped immediately when schedule is unpaused, but will run at next schedule time.
+	// If empty, will follow server configuration (default: false).
+	// +optional
+	SkipImmediately *bool `json:"skipImmediately,omitempty"`
 }
 
 // SchedulePhase is a string representation of the lifecycle phase
@@ -74,6 +81,11 @@ type ScheduleStatus struct {
 	// +optional
 	// +nullable
 	LastBackup *metav1.Time `json:"lastBackup,omitempty"`
+
+	// LastSkipped is the last time a Schedule was skipped
+	// +optional
+	// +nullable
+	LastSkipped *metav1.Time `json:"lastSkipped,omitempty"`
 
 	// ValidationErrors is a slice of all validation errors (if
 	// applicable)

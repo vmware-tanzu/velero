@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	testclocks "k8s.io/utils/clock/testing"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -36,6 +37,7 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
+// Test reconcile function of schedule controller. Pause is not covered as event filter will not allow it through
 func TestReconcileOfSchedule(t *testing.T) {
 	require.Nil(t, velerov1.AddToScheme(scheme.Scheme))
 
@@ -44,15 +46,17 @@ func TestReconcileOfSchedule(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                     string
-		scheduleKey              string
-		schedule                 *velerov1.Schedule
-		fakeClockTime            string
-		expectedPhase            string
-		expectedValidationErrors []string
-		expectedBackupCreate     *velerov1.Backup
-		expectedLastBackup       string
-		backup                   *velerov1.Backup
+		name                      string
+		scheduleKey               string
+		schedule                  *velerov1.Schedule
+		fakeClockTime             string
+		expectedPhase             string
+		expectedValidationErrors  []string
+		expectedBackupCreate      *velerov1.Backup
+		expectedLastBackup        string
+		expectedLastSkipped       string
+		backup                    *velerov1.Backup
+		reconcilerSkipImmediately bool
 	}{
 		{
 			name:        "missing schedule triggers no backup",
@@ -89,6 +93,13 @@ func TestReconcileOfSchedule(t *testing.T) {
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
+			name:                "schedule with phase New and SkipImmediately gets validated and does not trigger a backup",
+			schedule:            newScheduleBuilder(velerov1.SchedulePhaseNew).CronSchedule("@every 5m").SkipImmediately(pointer.Bool(true)).Result(),
+			fakeClockTime:       "2017-01-01 12:00:00",
+			expectedPhase:       string(velerov1.SchedulePhaseEnabled),
+			expectedLastSkipped: "2017-01-01 12:00:00",
+		},
+		{
 			name:                 "schedule with phase Enabled gets re-validated and triggers a backup if valid",
 			schedule:             newScheduleBuilder(velerov1.SchedulePhaseEnabled).CronSchedule("@every 5m").Result(),
 			fakeClockTime:        "2017-01-01 12:00:00",
@@ -102,6 +113,35 @@ func TestReconcileOfSchedule(t *testing.T) {
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "name")).Result(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
+		},
+		{
+			name:                 "schedule that's already run but has SkippedImmediately=nil gets LastBackup updated",
+			schedule:             newScheduleBuilder(velerov1.SchedulePhaseEnabled).CronSchedule("@every 5m").LastBackupTime("2000-01-01 00:00:00").SkipImmediately(nil).Result(),
+			fakeClockTime:        "2017-01-01 12:00:00",
+			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "name")).Result(),
+			expectedLastBackup:   "2017-01-01 12:00:00",
+		},
+		{
+			name:                 "schedule that's already run but has SkippedImmediately=false gets LastBackup updated",
+			schedule:             newScheduleBuilder(velerov1.SchedulePhaseEnabled).CronSchedule("@every 5m").LastBackupTime("2000-01-01 00:00:00").SkipImmediately(pointer.Bool(false)).Result(),
+			fakeClockTime:        "2017-01-01 12:00:00",
+			expectedBackupCreate: builder.ForBackup("ns", "name-20170101120000").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "name")).Result(),
+			expectedLastBackup:   "2017-01-01 12:00:00",
+		},
+		{
+			name:                      "schedule that's already run, server has skipImmediately set to true, and Schedule has SkippedImmediately=nil do not get LastBackup updated",
+			schedule:                  newScheduleBuilder(velerov1.SchedulePhaseEnabled).CronSchedule("@every 5m").LastBackupTime("2000-01-01 00:00:00").SkipImmediately(nil).Result(),
+			fakeClockTime:             "2017-01-01 12:00:00",
+			expectedLastBackup:        "2000-01-01 00:00:00",
+			expectedLastSkipped:       "2017-01-01 12:00:00",
+			reconcilerSkipImmediately: true,
+		},
+		{
+			name:                "schedule that's already run but has SkippedImmediately=true do not get LastBackup updated",
+			schedule:            newScheduleBuilder(velerov1.SchedulePhaseEnabled).CronSchedule("@every 5m").LastBackupTime("2000-01-01 00:00:00").SkipImmediately(pointer.Bool(true)).Result(),
+			fakeClockTime:       "2017-01-01 12:00:00",
+			expectedLastBackup:  "2000-01-01 00:00:00",
+			expectedLastSkipped: "2017-01-01 12:00:00",
 		},
 		{
 			name:          "schedule already has backup in New state.",
@@ -120,7 +160,7 @@ func TestReconcileOfSchedule(t *testing.T) {
 				err      error
 			)
 
-			reconciler := NewScheduleReconciler("namespace", logger, client, metrics.NewServerMetrics())
+			reconciler := NewScheduleReconciler("namespace", logger, client, metrics.NewServerMetrics(), test.reconcilerSkipImmediately)
 
 			if test.fakeClockTime != "" {
 				testTime, err = time.Parse("2006-01-02 15:04:05", test.fakeClockTime)
@@ -151,7 +191,13 @@ func TestReconcileOfSchedule(t *testing.T) {
 			}
 			if len(test.expectedLastBackup) > 0 {
 				require.Nil(t, err)
+				require.NotNil(t, schedule.Status.LastBackup)
 				assert.Equal(t, parseTime(test.expectedLastBackup).Unix(), schedule.Status.LastBackup.Unix())
+			}
+			if len(test.expectedLastSkipped) > 0 {
+				require.Nil(t, err)
+				require.NotNil(t, schedule.Status.LastSkipped)
+				assert.Equal(t, parseTime(test.expectedLastSkipped).Unix(), schedule.Status.LastSkipped.Unix())
 			}
 
 			backups := &velerov1.BackupList{}
@@ -403,7 +449,7 @@ func TestCheckIfBackupInNewOrProgress(t *testing.T) {
 	err = client.Create(ctx, newBackup)
 	require.NoError(t, err, "fail to create backup in New phase in TestCheckIfBackupInNewOrProgress: %v", err)
 
-	reconciler := NewScheduleReconciler("ns", logger, client, metrics.NewServerMetrics())
+	reconciler := NewScheduleReconciler("ns", logger, client, metrics.NewServerMetrics(), false)
 	result := reconciler.checkIfBackupInNewOrProgress(testSchedule)
 	assert.True(t, result)
 
@@ -418,7 +464,7 @@ func TestCheckIfBackupInNewOrProgress(t *testing.T) {
 	err = client.Create(ctx, inProgressBackup)
 	require.NoError(t, err, "fail to create backup in InProgress phase in TestCheckIfBackupInNewOrProgress: %v", err)
 
-	reconciler = NewScheduleReconciler("namespace", logger, client, metrics.NewServerMetrics())
+	reconciler = NewScheduleReconciler("namespace", logger, client, metrics.NewServerMetrics(), false)
 	result = reconciler.checkIfBackupInNewOrProgress(testSchedule)
 	assert.True(t, result)
 }

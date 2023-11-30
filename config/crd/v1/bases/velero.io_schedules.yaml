@@ -61,6 +61,16 @@ spec:
                 description: Schedule is a Cron expression defining when to run the
                   Backup.
                 type: string
+              skipImmediately:
+                description: 'SkipImmediately specifies whether to skip backup if
+                  schedule is due immediately from `schedule.status.lastBackup` timestamp
+                  when schedule is unpaused or if schedule is new. If true, backup
+                  will be skipped immediately when schedule is unpaused if it is due
+                  based on .Status.LastBackupTimestamp or schedule is new, and will
+                  run at next schedule time. If false, backup will not be skipped
+                  immediately when schedule is unpaused, but will run at next schedule
+                  time. If empty, will follow server configuration (default: false).'
+                type: boolean
               template:
                 description: Template is the definition of the Backup to be run on
                   the provided schedule
@@ -546,6 +556,11 @@ spec:
               lastBackup:
                 description: LastBackup is the last time a Backup was run for this
                   Schedule schedule
+                format: date-time
+                nullable: true
+                type: string
+              lastSkipped:
+                description: LastSkipped is the last time a Schedule was skipped
                 format: date-time
                 nullable: true
                 type: string
