@@ -433,23 +433,24 @@ spec:
   volume: nginx-log
 ```
 We will add the flag for both CLI installation and Helm Chart Installation. Specifically:
-- Helm Chart Installation: add the "--pod-volume-backup-uploader" flag into its value.yaml and then generate the deployments according to the value. Value.yaml is the user-provided configuration file, therefore, users could set this value at the time of installation. The changes in Value.yaml are as below:
+- Helm Chart Installation: add the "--uploaderType" and "--default-volumes-to-fs-backup" flag into its value.yaml and then generate the deployments according to the value. Value.yaml is the user-provided configuration file, therefore, users could set this value at the time of installation. The changes in Value.yaml are as below:
 ```
           command:
             - /velero
           args:
             - server
           {{- with .Values.configuration }}
-            {{- if .pod-volume-backup-uploader "restic" }}
-            - --legacy
-            {{- end }} 
+		    - --uploader-type={{ default "restic" .uploaderType }}
+			{{- if .defaultVolumesToFsBackup }}
+            - --default-volumes-to-fs-backup
+            {{- end }}
 ```     
-- CLI Installation: add the "--pod-volume-backup-uploader" flag into the installation command line, and then create the two deployments accordingly. Users could change the option at the time of installation. The CLI is as below:  
-```velero install --pod-volume-backup-uploader=restic```  
-```velero install --pod-volume-backup-uploader=kopia``` 
+- CLI Installation: add the "--uploaderType" and "--default-volumes-to-fs-backup" flag into the installation command line, and then create the two deployments accordingly. Users could change the option at the time of installation. The CLI is as below:  
+```velero install --uploader-type=restic --default-volumes-to-fs-backup --use-node-agent```  
+```velero install --uploader-type=kopia --default-volumes-to-fs-backup --use-node-agent``` 
 
 ## Upgrade
-For upgrade, we allow users to change the path by specifying "--pod-volume-backup-uploader" flag in the same way as the fresh installation. Therefore, the flag change should be applied to the Velero server after upgrade. Additionally, We need to add a label to Velero server to indicate the current path, so as to provide an easy for querying it.  
+For upgrade, we allow users to change the path by specifying "--uploader-type" flag in the same way as the fresh installation. Therefore, the flag change should be applied to the Velero server after upgrade. Additionally, We need to add a label to Velero server to indicate the current path, so as to provide an easy for querying it.  
 Moreover, if users upgrade from the old release, we need to change the existing Restic Daemonset name to VeleroNodeAgent daemonSet. The name change should be applied after upgrade.  
 The recommended way for upgrade is to modify the related Velero resource directly through kubectl, the above changes will be applied in the same way. We need to modify the Velero doc for all these changes.  
 
@@ -459,7 +460,7 @@ Below Velero CLI or its output needs some changes:
 - ```Velero restore describe```: the output should indicate the path  
 - ```Velero restic repo get```: the name of this CLI should be changed to a generic one, for example, "Velero repo get"; the output of this CLI should print all the backup repository if Restic repository and Unified Repository exist at the same time  
 
-At present, we don't have a requirement for selecting the path during backup, so we don't change the ```Velero backup create``` CLI for now. If there is a requirement in future, we could simply add a flag similar to "--pod-volume-backup-uploader" to select the path.  
+At present, we don't have a requirement for selecting the path during backup, so we don't change the ```Velero backup create``` CLI for now. If there is a requirement in future, we could simply add a flag similar to "--uploader-type" to select the path.  
 
 ## CR Example
 Below sample files demonstrate complete CRs with all the changes mentioned above:
