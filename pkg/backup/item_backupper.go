@@ -384,8 +384,8 @@ func (ib *itemBackupper) executeActions(
 			// snapshot was skipped by CSI plugin
 			ib.trackSkippedPV(obj, groupResource, csiSnapshotApproach, "skipped b/c it's not a CSI volume", log)
 			delete(u.GetAnnotations(), skippedNoCSIPVAnnotation)
-		} else if actionName == csiBIAPluginName || actionName == vsphereBIAPluginName {
-			// the snapshot has been taken
+		} else if (actionName == csiBIAPluginName || actionName == vsphereBIAPluginName) && !boolptr.IsSetToFalse(ib.backupRequest.Backup.Spec.SnapshotVolumes) {
+			// the snapshot has been taken by the BIA plugin
 			ib.unTrackSkippedPV(obj, groupResource, log)
 		}
 		mustInclude := u.GetAnnotations()[mustIncludeAdditionalItemAnnotation] == "true" || finalize
