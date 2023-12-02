@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"fmt"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
@@ -13,6 +14,40 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
+
+// Tracks volume snapshots for this backup.
+// Completion status will be updated in backup_operations_controller.go via ProgressOperations information.
+var (
+	backupVolumeSnapshotTracker map[string]map[string]bool // backup name -> namespace/volume snapshot name -> completion status
+)
+
+func TrackVolumeSnapshotsForBackup(backup *velerov1api.Backup, volumeSnapshots []snapshotv1api.VolumeSnapshot, backupLog logrus.FieldLogger) {
+	if backupVolumeSnapshotTracker == nil {
+		backupVolumeSnapshotTracker = make(map[string]map[string]bool, 0)
+	}
+	if backupVolumeSnapshotTracker[backup.Name] == nil {
+		backupVolumeSnapshotTracker[backup.Name] = make(map[string]bool, 0)
+	}
+	for _, vs := range volumeSnapshots {
+		backupVolumeSnapshotTracker[backup.Name][VolumeSnapshotStatusTrackerName(&vs)] = false
+	}
+	backupLog.Infof("Tracking %d volume snapshots for backup %s", len(volumeSnapshots), backup.Name)
+}
+
+func VolumeSnapshotStatusTrackerName(vs *snapshotv1api.VolumeSnapshot) string {
+	return fmt.Sprintf("%s/%s", vs.Namespace, vs.Name)
+}
+
+func GetVolumeSnapshotTrackerNamesForBackupName(backupName string) map[string]bool {
+	return backupVolumeSnapshotTracker[backupName]
+}
+
+func UntrackVolumeSnapshotsForBackup(backup *velerov1api.Backup) {
+	if backupVolumeSnapshotTracker == nil {
+		return
+	}
+	delete(backupVolumeSnapshotTracker, backup.Name)
+}
 
 // Common function to update the status of CSI snapshots
 // returns VolumeSnapshot, VolumeSnapshotContent, VolumeSnapshotClasses referenced
@@ -30,6 +65,7 @@ func UpdateBackupCSISnapshotsStatus(client kbclient.Client, globalCRClient kbcli
 		if err != nil {
 			backupLog.Error(err)
 		}
+
 		volumeSnapshots = append(volumeSnapshots, vsList.Items...)
 
 		if err := client.List(context.Background(), vscList, &kbclient.ListOptions{LabelSelector: selector}); err != nil {

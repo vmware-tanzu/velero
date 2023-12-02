@@ -190,7 +190,6 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 	recordBackupMetrics(log, backup, outBackupFile, r.metrics, true)
 
-	pkgbackup.UpdateBackupCSISnapshotsStatus(r.client, r.globalCRClient, backup, log)
 	// update backup metadata in object store
 	backupJSON := new(bytes.Buffer)
 	if err := encode.To(backup, "json", backupJSON); err != nil {
