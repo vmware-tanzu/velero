@@ -51,9 +51,6 @@ const (
 	BackupRepositoryPhaseNew      BackupRepositoryPhase = "New"
 	BackupRepositoryPhaseReady    BackupRepositoryPhase = "Ready"
 	BackupRepositoryPhaseNotReady BackupRepositoryPhase = "NotReady"
-
-	BackupRepositoryTypeRestic string = "restic"
-	BackupRepositoryTypeKopia  string = "kopia"
 )
 
 // BackupRepositoryStatus is the current status of a BackupRepository.

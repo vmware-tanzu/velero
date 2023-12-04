@@ -56,6 +56,9 @@ spec:
               existingResourcePolicy:
                 description: ExistingResourcePolicy specifies the restore behavior
                   for the Kubernetes resource to be restored
+                enum:
+                - none
+                - update
                 nullable: true
                 type: string
               hooks:

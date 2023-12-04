@@ -62,6 +62,7 @@ type DataUploadSpec struct {
 	OperationTimeout metav1.Duration `json:"operationTimeout"`
 }
 
+// +kubebuilder:validation:Enum=CSI
 type SnapshotType string
 
 const (

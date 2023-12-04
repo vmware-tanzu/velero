@@ -288,7 +288,13 @@ const (
 	// RestorePhaseFailed means the restore was unable to execute.
 	// The failing error is recorded in status.FailureReason.
 	RestorePhaseFailed RestorePhase = "Failed"
+)
 
+// PolicyType helps specify the ExistingResourcePolicy
+// +kubebuilder:validation:Enum=none;update
+type PolicyType string
+
+const (
 	// PolicyTypeNone means velero will not overwrite the resource
 	// in cluster with the one in backup whether changed/unchanged.
 	PolicyTypeNone PolicyType = "none"
@@ -411,6 +417,3 @@ type RestoreList struct {
 
 	Items []Restore `json:"items"`
 }
-
-// PolicyType helps specify the ExistingResourcePolicy
-type PolicyType string
