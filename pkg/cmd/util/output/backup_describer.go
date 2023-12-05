@@ -22,10 +22,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	"github.com/pkg/errors"
 
 	"github.com/fatih/color"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -438,26 +442,40 @@ func describeBackupVolumes(ctx context.Context, kbClient kbclient.Client, d *Des
 
 	d.Println("Backup Volumes:")
 
-	buf := new(bytes.Buffer)
-	if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeInfos, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
-		d.Printf("\t<error getting backup volume info: %v>\n", err)
-		return
-	}
-
-	var volumeInfos *volume.VolumeInfos
-	if err := json.NewDecoder(buf).Decode(&volumeInfos); err != nil {
-		d.Printf("\t<error reading backup volume info: %v>\n", err)
-		return
-	}
-
 	nativeSnapshots := []*volume.VolumeInfo{}
 	csiSnapshots := []*volume.VolumeInfo{}
-	for i := range volumeInfos.VolumeInfos {
-		switch volumeInfos.VolumeInfos[i].BackupMethod {
-		case volume.NativeSnapshot:
-			nativeSnapshots = append(nativeSnapshots, &volumeInfos.VolumeInfos[i])
-		case volume.CSISnapshot:
-			csiSnapshots = append(csiSnapshots, &volumeInfos.VolumeInfos[i])
+
+	buf := new(bytes.Buffer)
+	err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeInfos, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath)
+	if err == downloadrequest.ErrNotFound {
+		nativeSnapshots, err = retrieveNativeSnapshotLegacy(ctx, kbClient, backup, insecureSkipTLSVerify, caCertPath)
+		if err != nil {
+			d.Printf("\t<error concluding native snapshot info: %v>\n", err)
+			return
+		}
+
+		csiSnapshots, err = retrieveCSISnapshotLegacy(ctx, kbClient, backup, insecureSkipTLSVerify, caCertPath)
+		if err != nil {
+			d.Printf("\t<error concluding CSI snapshot info: %v>\n", err)
+			return
+		}
+	} else if err != nil {
+		d.Printf("\t<error getting backup volume info: %v>\n", err)
+		return
+	} else {
+		var volumeInfos *volume.VolumeInfos
+		if err := json.NewDecoder(buf).Decode(&volumeInfos); err != nil {
+			d.Printf("\t<error reading backup volume info: %v>\n", err)
+			return
+		}
+
+		for i := range volumeInfos.VolumeInfos {
+			switch volumeInfos.VolumeInfos[i].BackupMethod {
+			case volume.NativeSnapshot:
+				nativeSnapshots = append(nativeSnapshots, &volumeInfos.VolumeInfos[i])
+			case volume.CSISnapshot:
+				csiSnapshots = append(csiSnapshots, &volumeInfos.VolumeInfos[i])
+			}
 		}
 	}
 
@@ -469,6 +487,113 @@ func describeBackupVolumes(ctx context.Context, kbClient kbclient.Client, d *Des
 
 	describePodVolumeBackups(d, details, podVolumeBackupCRs)
 	d.Println()
+}
+
+func retrieveNativeSnapshotLegacy(ctx context.Context, kbClient kbclient.Client, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) ([]*volume.VolumeInfo, error) {
+	status := backup.Status
+	nativeSnapshots := []*volume.VolumeInfo{}
+
+	if status.VolumeSnapshotsAttempted == 0 {
+		return nativeSnapshots, nil
+	}
+
+	buf := new(bytes.Buffer)
+	if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
+		return nativeSnapshots, errors.Wrapf(err, "error to download native snapshot info")
+	}
+
+	var snapshots []*volume.Snapshot
+	if err := json.NewDecoder(buf).Decode(&snapshots); err != nil {
+		return nativeSnapshots, errors.Wrapf(err, "error to decode native snapshot info")
+	}
+
+	for _, snap := range snapshots {
+		volumeInfo := volume.VolumeInfo{
+			PVName: snap.Spec.PersistentVolumeName,
+			NativeSnapshotInfo: volume.NativeSnapshotInfo{
+				SnapshotHandle: snap.Status.ProviderSnapshotID,
+				VolumeType:     snap.Spec.VolumeType,
+				VolumeAZ:       snap.Spec.VolumeAZ,
+			},
+		}
+
+		if snap.Spec.VolumeIOPS != nil {
+			volumeInfo.NativeSnapshotInfo.IOPS = strconv.FormatInt(*snap.Spec.VolumeIOPS, 10)
+		}
+
+		nativeSnapshots = append(nativeSnapshots, &volumeInfo)
+	}
+
+	return nativeSnapshots, nil
+}
+
+func retrieveCSISnapshotLegacy(ctx context.Context, kbClient kbclient.Client, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) ([]*volume.VolumeInfo, error) {
+	csiSnapshots := []*volume.VolumeInfo{}
+
+	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
+		return csiSnapshots, nil
+	}
+
+	vsBuf := new(bytes.Buffer)
+	err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindCSIBackupVolumeSnapshots, vsBuf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath)
+	if err != nil {
+		return csiSnapshots, errors.Wrapf(err, "error to download vs list")
+	}
+
+	var vsList []snapshotv1api.VolumeSnapshot
+	if err := json.NewDecoder(vsBuf).Decode(&vsList); err != nil {
+		return csiSnapshots, errors.Wrapf(err, "error to decode vs list")
+	}
+
+	vscBuf := new(bytes.Buffer)
+	err = downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindCSIBackupVolumeSnapshotContents, vscBuf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath)
+	if err != nil {
+		return csiSnapshots, errors.Wrapf(err, "error to download vsc list")
+	}
+
+	var vscList []snapshotv1api.VolumeSnapshotContent
+	if err := json.NewDecoder(vsBuf).Decode(&vscList); err != nil {
+		return csiSnapshots, errors.Wrapf(err, "error to decode vsc list")
+	}
+
+	for _, vsc := range vscList {
+		volInfo := volume.VolumeInfo{
+			CSISnapshotInfo: volume.CSISnapshotInfo{
+				VSCName: vsc.Name,
+				Driver:  vsc.Spec.Driver,
+			},
+		}
+
+		if vsc.Status != nil && vsc.Status.SnapshotHandle != nil {
+			volInfo.CSISnapshotInfo.SnapshotHandle = *vsc.Status.SnapshotHandle
+		}
+
+		if vsc.Status != nil && vsc.Status.RestoreSize != nil {
+			volInfo.CSISnapshotInfo.Size = *vsc.Status.RestoreSize
+		}
+
+		for _, vs := range vsList {
+			if vs.Spec.Source.VolumeSnapshotContentName == nil {
+				continue
+			}
+
+			if vs.Spec.Source.PersistentVolumeClaimName == nil {
+				continue
+			}
+
+			if *vs.Spec.Source.VolumeSnapshotContentName == vsc.Name {
+				volInfo.PVCName = *vs.Spec.Source.PersistentVolumeClaimName
+			}
+		}
+
+		if volInfo.PVCName == "" {
+			volInfo.PVCName = "<PVC name not found>"
+		}
+
+		csiSnapshots = append(csiSnapshots, &volInfo)
+	}
+
+	return csiSnapshots, nil
 }
 
 func describeNativeSnapshots(d *Describer, details bool, infos []*volume.VolumeInfo) {

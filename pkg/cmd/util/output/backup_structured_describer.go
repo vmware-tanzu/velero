@@ -309,26 +309,40 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 
 	backupVolumes := make(map[string]interface{})
 
-	buf := new(bytes.Buffer)
-	if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeInfos, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
-		backupVolumes["errorGetBackupVolumeInfo"] = fmt.Sprintf("error getting backup volume info: %v", err)
-		return
-	}
-
-	var volumeInfos *volume.VolumeInfos
-	if err := json.NewDecoder(buf).Decode(&volumeInfos); err != nil {
-		backupVolumes["errorReadBackupVolumeInfo"] = fmt.Sprintf("error reading backup volume info: %v", err)
-		return
-	}
-
 	nativeSnapshots := []*volume.VolumeInfo{}
 	csiSnapshots := []*volume.VolumeInfo{}
-	for i := range volumeInfos.VolumeInfos {
-		switch volumeInfos.VolumeInfos[i].BackupMethod {
-		case volume.NativeSnapshot:
-			nativeSnapshots = append(nativeSnapshots, &volumeInfos.VolumeInfos[i])
-		case volume.CSISnapshot:
-			csiSnapshots = append(csiSnapshots, &volumeInfos.VolumeInfos[i])
+
+	buf := new(bytes.Buffer)
+	err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeInfos, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath)
+	if err == downloadrequest.ErrNotFound {
+		nativeSnapshots, err = retrieveNativeSnapshotLegacy(ctx, kbClient, backup, insecureSkipTLSVerify, caCertPath)
+		if err != nil {
+			backupVolumes["errorConcludeNativeSnapshot"] = fmt.Sprintf("error concluding native snapshot info: %v", err)
+			return
+		}
+
+		csiSnapshots, err = retrieveCSISnapshotLegacy(ctx, kbClient, backup, insecureSkipTLSVerify, caCertPath)
+		if err != nil {
+			backupVolumes["errorConcludeCSISnapshot"] = fmt.Sprintf("error concluding CSI snapshot info: %v", err)
+			return
+		}
+	} else if err != nil {
+		backupVolumes["errorGetBackupVolumeInfo"] = fmt.Sprintf("error getting backup volume info: %v", err)
+		return
+	} else {
+		var volumeInfos *volume.VolumeInfos
+		if err := json.NewDecoder(buf).Decode(&volumeInfos); err != nil {
+			backupVolumes["errorReadBackupVolumeInfo"] = fmt.Sprintf("error reading backup volume info: %v", err)
+			return
+		}
+
+		for i := range volumeInfos.VolumeInfos {
+			switch volumeInfos.VolumeInfos[i].BackupMethod {
+			case volume.NativeSnapshot:
+				nativeSnapshots = append(nativeSnapshots, &volumeInfos.VolumeInfos[i])
+			case volume.CSISnapshot:
+				csiSnapshots = append(csiSnapshots, &volumeInfos.VolumeInfos[i])
+			}
 		}
 	}
 
