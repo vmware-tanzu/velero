@@ -71,8 +71,8 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 	req := &Request{
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
-		PVMap:            map[string]PvcPvInfo{},
 	}
+
 	backupFile := bytes.NewBuffer([]byte{})
 
 	apiResources := []*test.APIResource{

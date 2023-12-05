@@ -44,6 +44,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
+	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/label"
@@ -520,6 +521,17 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		return errors.Wrap(err, "fail to fetch CSI VolumeSnapshots metadata")
 	}
 
+	backupVolumeInfoMap := make(map[string]internalVolume.VolumeInfo)
+	volumeInfos, err := backupStore.GetBackupVolumeInfos(restore.Spec.BackupName)
+	if err != nil {
+		restoreLog.WithError(err).Errorf("fail to get VolumeInfos metadata file for backup %s", restore.Spec.BackupName)
+		return errors.WithStack(err)
+	} else {
+		for _, volumeInfo := range volumeInfos {
+			backupVolumeInfoMap[volumeInfo.PVName] = *volumeInfo
+		}
+	}
+
 	restoreLog.Info("starting restore")
 
 	var podVolumeBackups []*api.PodVolumeBackup
@@ -537,6 +549,7 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		ResourceModifiers:    resourceModifiers,
 		DisableInformerCache: r.disableInformerCache,
 		CSIVolumeSnapshots:   csiVolumeSnapshots,
+		VolumeInfoMap:        backupVolumeInfoMap,
 	}
 	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, pluginManager)
 

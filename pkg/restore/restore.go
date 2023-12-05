@@ -53,6 +53,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
+	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -326,6 +327,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		disableInformerCache:           req.DisableInformerCache,
 		featureVerifier:                kr.featureVerifier,
 		hookTracker:                    hook.NewHookTracker(),
+		volumeInfoMap:                  req.VolumeInfoMap,
 	}
 
 	return restoreCtx.execute()
@@ -379,6 +381,7 @@ type restoreContext struct {
 	disableInformerCache           bool
 	featureVerifier                features.Verifier
 	hookTracker                    *hook.HookTracker
+	volumeInfoMap                  map[string]internalVolume.VolumeInfo
 }
 
 type resourceClientKey struct {
@@ -1122,15 +1125,17 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	itemExists := false
 	resourceID := getResourceID(groupResource, namespace, obj.GetName())
 
+	restoreLogger := ctx.log.WithFields(logrus.Fields{
+		"namespace":     obj.GetNamespace(),
+		"name":          obj.GetName(),
+		"groupResource": groupResource.String(),
+	})
+
 	// Check if group/resource should be restored. We need to do this here since
 	// this method may be getting called for an additional item which is a group/resource
 	// that's excluded.
 	if !ctx.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
-		ctx.log.WithFields(logrus.Fields{
-			"namespace":     obj.GetNamespace(),
-			"name":          obj.GetName(),
-			"groupResource": groupResource.String(),
-		}).Info("Not restoring item because resource is excluded")
+		restoreLogger.Info("Not restoring item because resource is excluded")
 		return warnings, errs, itemExists
 	}
 
@@ -1142,11 +1147,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// to check the *original* namespace, not the remapped one if it's been remapped.
 	if namespace != "" {
 		if !ctx.namespaceIncludesExcludes.ShouldInclude(obj.GetNamespace()) && !ctx.resourceMustHave.Has(groupResource.String()) {
-			ctx.log.WithFields(logrus.Fields{
-				"namespace":     obj.GetNamespace(),
-				"name":          obj.GetName(),
-				"groupResource": groupResource.String(),
-			}).Info("Not restoring item because namespace is excluded")
+			restoreLogger.Info("Not restoring item because namespace is excluded")
 			return warnings, errs, itemExists
 		}
 
@@ -1170,11 +1171,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 	} else {
 		if boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
-			ctx.log.WithFields(logrus.Fields{
-				"namespace":     obj.GetNamespace(),
-				"name":          obj.GetName(),
-				"groupResource": groupResource.String(),
-			}).Info("Not restoring item because it's cluster-scoped")
+			restoreLogger.Info("Not restoring item because it's cluster-scoped")
 			return warnings, errs, itemExists
 		}
 	}
@@ -1238,168 +1235,111 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	if groupResource == kuberesource.PersistentVolumes {
-		switch {
-		case hasSnapshot(name, ctx.volumeSnapshots):
-			oldName := obj.GetName()
-			shouldRenamePV, err := shouldRenamePV(ctx, obj, resourceClient)
-			if err != nil {
-				errs.Add(namespace, err)
-				return warnings, errs, itemExists
-			}
+		if volumeInfo, ok := ctx.volumeInfoMap[obj.GetName()]; ok {
+			ctx.log.Infof("Find VolumeInfo for PV %s.", obj.GetName())
 
-			// Check to see if the claimRef.namespace field needs to be remapped,
-			// and do so if necessary.
-			_, err = remapClaimRefNS(ctx, obj)
-			if err != nil {
-				errs.Add(namespace, err)
-				return warnings, errs, itemExists
-			}
-
-			var shouldRestoreSnapshot bool
-			if !shouldRenamePV {
-				// Check if the PV exists in the cluster before attempting to create
-				// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
-				shouldRestoreSnapshot, err = ctx.shouldRestore(name, resourceClient)
+			switch volumeInfo.BackupMethod {
+			case internalVolume.NativeSnapshot:
+				obj, err = ctx.handlePVHasNativeSnapshot(obj, resourceClient)
 				if err != nil {
-					errs.Add(namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
+					errs.Add(namespace, err)
 					return warnings, errs, itemExists
 				}
-			} else {
-				// If we're renaming the PV, we're going to give it a new random name,
-				// so we can assume it doesn't already exist in the cluster and therefore
-				// we should proceed with restoring from snapshot.
-				shouldRestoreSnapshot = true
-			}
 
-			if shouldRestoreSnapshot {
-				// Reset the PV's binding status so that Kubernetes can properly
-				// associate it with the restored PVC.
-				obj = resetVolumeBindingInfo(obj)
+				name = obj.GetName()
 
-				// Even if we're renaming the PV, obj still has the old name here, because the pvRestorer
-				// uses the original name to look up metadata about the snapshot.
-				ctx.log.Infof("Restoring persistent volume from snapshot.")
-				updatedObj, err := ctx.pvRestorer.executePVAction(obj)
-				if err != nil {
-					errs.Add(namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
+			case internalVolume.PodVolumeBackup:
+				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
+				ctx.pvsToProvision.Insert(name)
+
+				// Return early because we don't want to restore the PV itself, we
+				// want to dynamically re-provision it.
+				return warnings, errs, itemExists
+
+			case internalVolume.CSISnapshot:
+				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a CSI VolumeSnapshot or a related snapshot DataUpload.")
+				ctx.pvsToProvision.Insert(name)
+
+				if ready, err := ctx.featureVerifier.Verify(velerov1api.CSIFeatureFlag); !ready {
+					ctx.log.Errorf("Failed to verify CSI modules, ready %v, err %v", ready, err)
+					errs.Add(namespace, fmt.Errorf("CSI modules are not ready for restore. Check CSI feature is enabled and CSI plugin is installed"))
+				}
+
+				// Return early because we don't want to restore the PV itself, we
+				// want to dynamically re-provision it.
+				return warnings, errs, itemExists
+
+			// When the PV data is skipped from backup, it's VolumeInfo BackupMethod
+			// is not set, and it will fall into the default case.
+			default:
+				if hasDeleteReclaimPolicy(obj.Object) {
+					restoreLogger.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
+					ctx.pvsToProvision.Insert(name)
+
+					// Return early because we don't want to restore the PV itself, we
+					// want to dynamically re-provision it.
 					return warnings, errs, itemExists
-				}
-				obj = updatedObj
-
-				// VolumeSnapshotter has modified the PV name, we should rename the PV.
-				if oldName != obj.GetName() {
-					shouldRenamePV = true
-				}
-			}
-
-			if shouldRenamePV {
-				var pvName string
-				if oldName == obj.GetName() {
-					// pvRestorer hasn't modified the PV name, we need to rename the PV.
-					pvName, err = ctx.pvRenamer(oldName)
+				} else {
+					obj, err = ctx.handleSkippedPVHasRetainPolicy(obj, resourceID, restoreLogger)
 					if err != nil {
-						errs.Add(namespace, errors.Wrapf(err, "error renaming PV"))
+						errs.Add(namespace, err)
 						return warnings, errs, itemExists
 					}
-				} else {
-					// VolumeSnapshotter could have modified the PV name through
-					// function `SetVolumeID`,
-					pvName = obj.GetName()
+				}
+			}
+		} else {
+			// TODO: VolumeInfo is adopted and old logic is deprecated in v1.13.
+			// Remove the old logic in v1.15.
+			ctx.log.Infof("Cannot find VolumeInfo for PV %s.", obj.GetName())
+
+			switch {
+			case hasSnapshot(name, ctx.volumeSnapshots):
+				obj, err = ctx.handlePVHasNativeSnapshot(obj, resourceClient)
+				if err != nil {
+					errs.Add(namespace, err)
+					return warnings, errs, itemExists
 				}
 
-				ctx.renamedPVs[oldName] = pvName
-				obj.SetName(pvName)
-				name = pvName
+				name = obj.GetName()
 
-				// Add the original PV name as an annotation.
-				annotations := obj.GetAnnotations()
-				if annotations == nil {
-					annotations = map[string]string{}
+			case hasPodVolumeBackup(obj, ctx):
+				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
+				ctx.pvsToProvision.Insert(name)
+
+				// Return early because we don't want to restore the PV itself, we
+				// want to dynamically re-provision it.
+				return warnings, errs, itemExists
+
+			case hasCSIVolumeSnapshot(ctx, obj):
+				fallthrough
+			case hasSnapshotDataUpload(ctx, obj):
+				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a CSI VolumeSnapshot or a related snapshot DataUpload.")
+				ctx.pvsToProvision.Insert(name)
+
+				if ready, err := ctx.featureVerifier.Verify(velerov1api.CSIFeatureFlag); !ready {
+					ctx.log.Errorf("Failed to verify CSI modules, ready %v, err %v", ready, err)
+					errs.Add(namespace, fmt.Errorf("CSI modules are not ready for restore. Check CSI feature is enabled and CSI plugin is installed"))
 				}
-				annotations["velero.io/original-pv-name"] = oldName
-				obj.SetAnnotations(annotations)
-			}
 
-		case hasPodVolumeBackup(obj, ctx):
-			ctx.log.WithFields(logrus.Fields{
-				"namespace":     obj.GetNamespace(),
-				"name":          obj.GetName(),
-				"groupResource": groupResource.String(),
-			}).Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
-			ctx.pvsToProvision.Insert(name)
-
-			// Return early because we don't want to restore the PV itself, we
-			// want to dynamically re-provision it.
-			return warnings, errs, itemExists
-
-		case hasCSIVolumeSnapshot(ctx, obj):
-			ctx.log.WithFields(logrus.Fields{
-				"namespace":     obj.GetNamespace(),
-				"name":          obj.GetName(),
-				"groupResource": groupResource.String(),
-			}).Infof("Dynamically re-provisioning persistent volume because it has a related CSI VolumeSnapshot.")
-			ctx.pvsToProvision.Insert(name)
-
-			if ready, err := ctx.featureVerifier.Verify(velerov1api.CSIFeatureFlag); !ready {
-				ctx.log.Errorf("Failed to verify CSI modules, ready %v, err %v", ready, err)
-				errs.Add(namespace, fmt.Errorf("CSI modules are not ready for restore. Check CSI feature is enabled and CSI plugin is installed"))
-			}
-
-			// Return early because we don't want to restore the PV itself, we
-			// want to dynamically re-provision it.
-			return warnings, errs, itemExists
-
-		case hasSnapshotDataUpload(ctx, obj):
-			ctx.log.WithFields(logrus.Fields{
-				"namespace":     obj.GetNamespace(),
-				"name":          obj.GetName(),
-				"groupResource": groupResource.String(),
-			}).Infof("Dynamically re-provisioning persistent volume because it has a related snapshot DataUpload.")
-			ctx.pvsToProvision.Insert(name)
-
-			if ready, err := ctx.featureVerifier.Verify(velerov1api.CSIFeatureFlag); !ready {
-				ctx.log.Errorf("Failed to verify CSI modules, ready %v, err %v", ready, err)
-				errs.Add(namespace, fmt.Errorf("CSI modules are not ready for restore. Check CSI feature is enabled and CSI plugin is installed"))
-			}
-
-			// Return early because we don't want to restore the PV itself, we
-			// want to dynamically re-provision it.
-			return warnings, errs, itemExists
-
-		case hasDeleteReclaimPolicy(obj.Object):
-			ctx.log.WithFields(logrus.Fields{
-				"namespace":     obj.GetNamespace(),
-				"name":          obj.GetName(),
-				"groupResource": groupResource.String(),
-			}).Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
-			ctx.pvsToProvision.Insert(name)
-
-			// Return early because we don't want to restore the PV itself, we
-			// want to dynamically re-provision it.
-			return warnings, errs, itemExists
-
-		default:
-			ctx.log.WithFields(logrus.Fields{
-				"namespace":     obj.GetNamespace(),
-				"name":          obj.GetName(),
-				"groupResource": groupResource.String(),
-			}).Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
-
-			// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
-			_, err = remapClaimRefNS(ctx, obj)
-			if err != nil {
-				errs.Add(namespace, err)
+				// Return early because we don't want to restore the PV itself, we
+				// want to dynamically re-provision it.
 				return warnings, errs, itemExists
-			}
-			obj = resetVolumeBindingInfo(obj)
-			// We call the pvRestorer here to clear out the PV's claimRef.UID,
-			// so it can be re-claimed when its PVC is restored and gets a new UID.
-			updatedObj, err := ctx.pvRestorer.executePVAction(obj)
-			if err != nil {
-				errs.Add(namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
+
+			case hasDeleteReclaimPolicy(obj.Object):
+				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
+				ctx.pvsToProvision.Insert(name)
+
+				// Return early because we don't want to restore the PV itself, we
+				// want to dynamically re-provision it.
 				return warnings, errs, itemExists
+
+			default:
+				obj, err = ctx.handleSkippedPVHasRetainPolicy(obj, resourceID, restoreLogger)
+				if err != nil {
+					errs.Add(namespace, err)
+					return warnings, errs, itemExists
+				}
 			}
-			obj = updatedObj
 		}
 	}
 
@@ -2490,4 +2430,106 @@ func (ctx *restoreContext) processUpdateResourcePolicy(fromCluster, fromClusterW
 		ctx.log.Infof("%s %s successfully updated", obj.GroupVersionKind().Kind, kube.NamespaceAndName(obj))
 	}
 	return warnings, errs
+}
+
+func (ctx *restoreContext) handlePVHasNativeSnapshot(obj *unstructured.Unstructured, resourceClient client.Dynamic) (*unstructured.Unstructured, error) {
+	retObj := obj.DeepCopy()
+	oldName := obj.GetName()
+	shouldRenamePV, err := shouldRenamePV(ctx, retObj, resourceClient)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check to see if the claimRef.namespace field needs to be remapped,
+	// and do so if necessary.
+	_, err = remapClaimRefNS(ctx, retObj)
+	if err != nil {
+		return nil, err
+	}
+
+	var shouldRestoreSnapshot bool
+	if !shouldRenamePV {
+		// Check if the PV exists in the cluster before attempting to create
+		// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
+		shouldRestoreSnapshot, err = ctx.shouldRestore(oldName, resourceClient)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", oldName)
+		}
+	} else {
+		// If we're renaming the PV, we're going to give it a new random name,
+		// so we can assume it doesn't already exist in the cluster and therefore
+		// we should proceed with restoring from snapshot.
+		shouldRestoreSnapshot = true
+	}
+
+	if shouldRestoreSnapshot {
+		// Reset the PV's binding status so that Kubernetes can properly
+		// associate it with the restored PVC.
+		retObj = resetVolumeBindingInfo(retObj)
+
+		// Even if we're renaming the PV, obj still has the old name here, because the pvRestorer
+		// uses the original name to look up metadata about the snapshot.
+		ctx.log.Infof("Restoring persistent volume from snapshot.")
+		retObj, err = ctx.pvRestorer.executePVAction(retObj)
+		if err != nil {
+			return nil, fmt.Errorf("error executing PVAction for %s: %v", getResourceID(kuberesource.PersistentVolumes, "", oldName), err)
+		}
+
+		// VolumeSnapshotter has modified the PV name, we should rename the PV.
+		if oldName != retObj.GetName() {
+			shouldRenamePV = true
+		}
+	}
+
+	if shouldRenamePV {
+		var pvName string
+		if oldName == retObj.GetName() {
+			// pvRestorer hasn't modified the PV name, we need to rename the PV.
+			pvName, err = ctx.pvRenamer(oldName)
+			if err != nil {
+				return nil, errors.Wrapf(err, "error renaming PV")
+			}
+		} else {
+			// VolumeSnapshotter could have modified the PV name through
+			// function `SetVolumeID`,
+			pvName = retObj.GetName()
+		}
+
+		ctx.renamedPVs[oldName] = pvName
+		retObj.SetName(pvName)
+
+		// Add the original PV name as an annotation.
+		annotations := retObj.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations["velero.io/original-pv-name"] = oldName
+		retObj.SetAnnotations(annotations)
+	}
+
+	return retObj, nil
+}
+
+func (ctx *restoreContext) handleSkippedPVHasRetainPolicy(
+	obj *unstructured.Unstructured,
+	resourceID string,
+	logger logrus.FieldLogger,
+) (*unstructured.Unstructured, error) {
+	logger.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
+
+	// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
+	if _, err := remapClaimRefNS(ctx, obj); err != nil {
+		return nil, err
+	}
+
+	obj = resetVolumeBindingInfo(obj)
+
+	// We call the pvRestorer here to clear out the PV's claimRef.UID,
+	// so it can be re-claimed when its PVC is restored and gets a new UID.
+	updatedObj, err := ctx.pvRestorer.executePVAction(obj)
+	if err != nil {
+		return nil, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err)
+	}
+
+	return updatedObj, nil
 }

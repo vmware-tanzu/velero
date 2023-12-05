@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
@@ -1067,27 +1068,25 @@ func TestNewObjectBackupStoreGetterConfig(t *testing.T) {
 func TestGetBackupVolumeInfos(t *testing.T) {
 	tests := []struct {
 		name           string
-		volumeInfo     *volume.VolumeInfos
+		volumeInfo     []*internalVolume.VolumeInfo
 		volumeInfoStr  string
 		expectedErr    string
-		expectedResult []volume.VolumeInfo
+		expectedResult []*internalVolume.VolumeInfo
 	}{
 		{
 			name: "No VolumeInfos, expect no error.",
 		},
 		{
 			name: "Valid VolumeInfo, should pass.",
-			volumeInfo: &volume.VolumeInfos{
-				VolumeInfos: []volume.VolumeInfo{
-					{
-						PVCName:           "pvcName",
-						PVName:            "pvName",
-						Skipped:           true,
-						SnapshotDataMoved: false,
-					},
+			volumeInfo: []*internalVolume.VolumeInfo{
+				{
+					PVCName:           "pvcName",
+					PVName:            "pvName",
+					Skipped:           true,
+					SnapshotDataMoved: false,
 				},
 			},
-			expectedResult: []volume.VolumeInfo{
+			expectedResult: []*internalVolume.VolumeInfo{
 				{
 					PVCName:           "pvcName",
 					PVName:            "pvName",
@@ -1098,8 +1097,8 @@ func TestGetBackupVolumeInfos(t *testing.T) {
 		},
 		{
 			name:          "Invalid VolumeInfo string, should also pass.",
-			volumeInfoStr: `{"volumeInfos": [{"abc": "123", "def": "456", "pvcName": "pvcName"}]}`,
-			expectedResult: []volume.VolumeInfo{
+			volumeInfoStr: `[{"abc": "123", "def": "456", "pvcName": "pvcName"}]`,
+			expectedResult: []*internalVolume.VolumeInfo{
 				{
 					PVCName: "pvcName",
 				},
@@ -1141,7 +1140,7 @@ func TestGetBackupVolumeInfos(t *testing.T) {
 			}
 
 			if len(tc.expectedResult) > 0 {
-				require.Equal(t, tc.expectedResult, result.VolumeInfos)
+				require.Equal(t, tc.expectedResult, result)
 			}
 
 		})

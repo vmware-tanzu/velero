@@ -699,28 +699,15 @@ func (ib *itemBackupper) addVolumeInfo(obj runtime.Unstructured, log logrus.Fiel
 		return err
 	}
 
-	if ib.backupRequest.PVMap == nil {
-		ib.backupRequest.PVMap = make(map[string]PvcPvInfo)
-	}
-
 	pvcName := ""
 	pvcNamespace := ""
 	if pv.Spec.ClaimRef != nil {
 		pvcName = pv.Spec.ClaimRef.Name
 		pvcNamespace = pv.Spec.ClaimRef.Namespace
-
-		ib.backupRequest.PVMap[pvcNamespace+"/"+pvcName] = PvcPvInfo{
-			PVCName:      pvcName,
-			PVCNamespace: pvcNamespace,
-			PV:           *pv,
-		}
 	}
 
-	ib.backupRequest.PVMap[pv.Name] = PvcPvInfo{
-		PVCName:      pvcName,
-		PVCNamespace: pvcNamespace,
-		PV:           *pv,
-	}
+	ib.backupRequest.VolumesInformation.InsertPVMap(*pv, pvcName, pvcNamespace)
+
 	return nil
 }
 

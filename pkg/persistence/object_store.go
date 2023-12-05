@@ -31,6 +31,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -73,6 +74,7 @@ type BackupStore interface {
 	GetCSIVolumeSnapshots(name string) ([]*snapshotv1api.VolumeSnapshot, error)
 	GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1api.VolumeSnapshotContent, error)
 	GetCSIVolumeSnapshotClasses(name string) ([]*snapshotv1api.VolumeSnapshotClass, error)
+	GetBackupVolumeInfos(name string) ([]*internalVolume.VolumeInfo, error)
 
 	// BackupExists checks if the backup metadata file exists in object storage.
 	BackupExists(bucket, backupName string) (bool, error)
@@ -493,8 +495,8 @@ func (s *objectBackupStore) GetPodVolumeBackups(name string) ([]*velerov1api.Pod
 	return podVolumeBackups, nil
 }
 
-func (s *objectBackupStore) GetBackupVolumeInfos(name string) (*volume.VolumeInfos, error) {
-	var volumeInfos *volume.VolumeInfos
+func (s *objectBackupStore) GetBackupVolumeInfos(name string) ([]*internalVolume.VolumeInfo, error) {
+	volumeInfos := make([]*internalVolume.VolumeInfo, 0)
 
 	res, err := tryGet(s.objectStore, s.bucket, s.layout.getBackupVolumeInfoKey(name))
 	if err != nil {
