@@ -42,11 +42,13 @@ import (
 	"k8s.io/client-go/dynamic"
 	kubetesting "k8s.io/client-go/testing"
 
+	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	verifiermocks "github.com/vmware-tanzu/velero/pkg/features/mocks"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
@@ -60,6 +62,199 @@ import (
 	. "github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
+
+func TestRestorePVWithVolumeInfo(t *testing.T) {
+	tests := []struct {
+		name          string
+		restore       *velerov1api.Restore
+		backup        *velerov1api.Backup
+		apiResources  []*test.APIResource
+		tarball       io.Reader
+		want          map[*test.APIResource][]string
+		volumeInfoMap map[string]internalVolume.VolumeInfo
+	}{
+		{
+			name:    "Restore PV with native snapshot",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]internalVolume.VolumeInfo{
+				"pv-1": {
+					BackupMethod: internalVolume.NativeSnapshot,
+					PVName:       "pv-1",
+					NativeSnapshotInfo: internalVolume.NativeSnapshotInfo{
+						SnapshotHandle: "testSnapshotHandle",
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {"/pv-1"},
+			},
+		},
+		{
+			name:    "Restore PV with PVB",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]internalVolume.VolumeInfo{
+				"pv-1": {
+					BackupMethod: internalVolume.PodVolumeBackup,
+					PVName:       "pv-1",
+					PVBInfo: internalVolume.PodVolumeBackupInfo{
+						SnapshotHandle: "testSnapshotHandle",
+						Size:           100,
+						NodeName:       "testNode",
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {},
+			},
+		},
+		{
+			name:    "Restore PV with CSI VolumeSnapshot",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]internalVolume.VolumeInfo{
+				"pv-1": {
+					BackupMethod:      internalVolume.CSISnapshot,
+					SnapshotDataMoved: false,
+					PVName:            "pv-1",
+					CSISnapshotInfo: internalVolume.CSISnapshotInfo{
+						Driver: "pd.csi.storage.gke.io",
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {},
+			},
+		},
+		{
+			name:    "Restore PV with DataUpload",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]internalVolume.VolumeInfo{
+				"pv-1": {
+					BackupMethod:      internalVolume.CSISnapshot,
+					SnapshotDataMoved: true,
+					PVName:            "pv-1",
+					CSISnapshotInfo: internalVolume.CSISnapshotInfo{
+						Driver: "pd.csi.storage.gke.io",
+					},
+					SnapshotDataMovementInfo: internalVolume.SnapshotDataMovementInfo{
+						DataMover: "velero",
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {},
+			},
+		},
+		{
+			name:    "Restore PV with ClaimPolicy as Delete",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]internalVolume.VolumeInfo{
+				"pv-1": {
+					PVName:  "pv-1",
+					Skipped: true,
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {},
+			},
+		},
+		{
+			name:    "Restore PV with ClaimPolicy as Retain",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]internalVolume.VolumeInfo{
+				"pv-1": {
+					PVName:  "pv-1",
+					Skipped: true,
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {"/pv-1"},
+			},
+		},
+	}
+
+	features.Enable("EnableCSI")
+	finder := new(verifiermocks.PluginFinder)
+	finder.On("Find", mock.Anything, mock.Anything).Return(true)
+	verifier := features.NewVerifier(finder)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.DiscoveryClient.WithAPIResource(r)
+			}
+			require.NoError(t, h.restorer.discoveryHelper.Refresh())
+			h.restorer.featureVerifier = verifier
+
+			data := &Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+				VolumeInfoMap:    tc.volumeInfoMap,
+			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				nil, // restoreItemActions
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+			assertAPIContents(t, h, tc.want)
+		})
+	}
+}
 
 // TestRestoreResourceFiltering runs restores with different combinations
 // of resource filters (included/excluded resources, included/excluded

@@ -16,7 +16,10 @@ limitations under the License.
 
 package hook
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 const (
 	HookSourceAnnotation = "annotation"
@@ -69,6 +72,8 @@ func NewHookTracker() *HookTracker {
 }
 
 // Add adds a hook to the tracker
+// Add must precede the Record for each individual hook.
+// In other words, a hook must be added to the tracker before its execution result is recorded.
 func (ht *HookTracker) Add(podNamespace, podName, container, source, hookName string, hookPhase hookPhase) {
 	ht.lock.Lock()
 	defer ht.lock.Unlock()
@@ -91,7 +96,9 @@ func (ht *HookTracker) Add(podNamespace, podName, container, source, hookName st
 }
 
 // Record records the hook's execution status
-func (ht *HookTracker) Record(podNamespace, podName, container, source, hookName string, hookPhase hookPhase, hookFailed bool) {
+// Add must precede the Record for each individual hook.
+// In other words, a hook must be added to the tracker before its execution result is recorded.
+func (ht *HookTracker) Record(podNamespace, podName, container, source, hookName string, hookPhase hookPhase, hookFailed bool) error {
 	ht.lock.Lock()
 	defer ht.lock.Unlock()
 
@@ -104,12 +111,16 @@ func (ht *HookTracker) Record(podNamespace, podName, container, source, hookName
 		hookName:     hookName,
 	}
 
+	var err error
 	if _, ok := ht.tracker[key]; ok {
 		ht.tracker[key] = hookTrackerVal{
 			hookFailed:   hookFailed,
 			hookExecuted: true,
 		}
+	} else {
+		err = fmt.Errorf("hook not exist in hooks tracker, hook key: %v", key)
 	}
+	return err
 }
 
 // Stat calculates the number of attempted hooks and failed hooks

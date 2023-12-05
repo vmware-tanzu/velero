@@ -60,8 +60,11 @@ func (h *LogHook) Fire(entry *logrus.Entry) error {
 
 	namespace, isNamespacePresent := entry.Data["namespace"]
 	errorField, isErrorFieldPresent := entry.Data["error"]
+	// When JSON logging format is enabled, error message is placed at "error.message" instead of "error"
+	errorMsgField, isErrorMsgFieldPresent := entry.Data["error.message"]
 	resourceField, isResourceFieldPresent := entry.Data["resource"]
 	nameField, isNameFieldPresent := entry.Data["name"]
+	msgField, isMsgFieldPresent := entry.Message, true
 
 	entryMessage := ""
 	if isResourceFieldPresent {
@@ -70,8 +73,14 @@ func (h *LogHook) Fire(entry *logrus.Entry) error {
 	if isNameFieldPresent {
 		entryMessage = fmt.Sprintf("%s name: /%s", entryMessage, nameField.(string))
 	}
+	if isMsgFieldPresent {
+		entryMessage = fmt.Sprintf("%s message: /%v", entryMessage, msgField)
+	}
 	if isErrorFieldPresent {
 		entryMessage = fmt.Sprintf("%s error: /%v", entryMessage, errorField)
+	}
+	if isErrorMsgFieldPresent {
+		entryMessage = fmt.Sprintf("%s error: /%v", entryMessage, errorMsgField)
 	}
 
 	if isNamespacePresent {

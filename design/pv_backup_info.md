@@ -125,7 +125,7 @@ type BackupStore interface {
 ### How the VolumeInfo array is used.
 
 #### Generate the PVC backed-up information summary
-The downstream tools can use this VolumeInfo array to format and display their volume information. This is in the scope of this feature.
+The downstream tools can use this VolumeInfo array to format and display their volume information. This is not in the scope of this feature.
 
 #### Retrieve volume backed-up information for `velero backup describe` command
 The `velero backup describe` can also use this VolumeInfo array structure to display the volume information. The snapshot data mover volume should use this structure at first, then the Velero native snapshot, CSI snapshot, and PodVolumeBackup can also use this structure. The detailed implementation is also not in this feature's scope.

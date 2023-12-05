@@ -170,6 +170,31 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	}
 	log.Infof("pod %s/%s has volumes to backup: %v", pod.Namespace, pod.Name, volumesToBackup)
 
+	var (
+		pvcSummary = NewPVCBackupSummary()
+		podVolumes = make(map[string]corev1api.Volume)
+		errs       = []error{}
+	)
+
+	// put the pod's volumes and the PVC associated in maps for efficient lookup below
+	for _, podVolume := range pod.Spec.Volumes {
+		podVolumes[podVolume.Name] = podVolume
+		if podVolume.PersistentVolumeClaim != nil {
+			pvc := new(corev1api.PersistentVolumeClaim)
+			err := b.crClient.Get(context.TODO(), ctrlclient.ObjectKey{Namespace: pod.Namespace, Name: podVolume.PersistentVolumeClaim.ClaimName}, pvc)
+			if err != nil {
+				errs = append(errs, errors.Wrap(err, "error getting persistent volume claim for volume"))
+				continue
+			}
+			pvcSummary.pvcMap[podVolume.Name] = pvc
+		}
+	}
+
+	if err := kube.IsPodRunning(pod); err != nil {
+		skipAllPodVolumes(pod, volumesToBackup, err, pvcSummary, log)
+		return nil, pvcSummary, nil
+	}
+
 	err := nodeagent.IsRunningInNode(b.ctx, backup.Namespace, pod.Spec.NodeName, b.crClient)
 	if err != nil {
 		return nil, nil, []error{err}
@@ -198,36 +223,10 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	b.resultsLock.Unlock()
 
 	var (
-		errs               []error
 		podVolumeBackups   []*velerov1api.PodVolumeBackup
-		podVolumes         = make(map[string]corev1api.Volume)
 		mountedPodVolumes  = sets.String{}
 		attachedPodDevices = sets.String{}
 	)
-	pvcSummary := NewPVCBackupSummary()
-
-	// put the pod's volumes and the PVC associated in maps for efficient lookup below
-	for _, podVolume := range pod.Spec.Volumes {
-		podVolumes[podVolume.Name] = podVolume
-		if podVolume.PersistentVolumeClaim != nil {
-			pvc := new(corev1api.PersistentVolumeClaim)
-			err := b.crClient.Get(context.TODO(), ctrlclient.ObjectKey{Namespace: pod.Namespace, Name: podVolume.PersistentVolumeClaim.ClaimName}, pvc)
-			if err != nil {
-				errs = append(errs, errors.Wrap(err, "error getting persistent volume claim for volume"))
-				continue
-			}
-			pvcSummary.pvcMap[podVolume.Name] = pvc
-		}
-	}
-
-	if err := kube.IsPodRunning(pod); err != nil {
-		for _, volumeName := range volumesToBackup {
-			err := errors.Wrapf(err, "backup for volume %s is skipped", volumeName)
-			log.WithError(err).Warn("Skip pod volume")
-			pvcSummary.addSkipped(volumeName, fmt.Sprintf("the pod the PVC is mounted to, %s/%s, is not running", pod.Namespace, pod.Name))
-		}
-		return nil, pvcSummary, nil
-	}
 
 	for _, container := range pod.Spec.Containers {
 		for _, volumeMount := range container.VolumeMounts {
@@ -331,6 +330,13 @@ ForEachVolume:
 	b.resultsLock.Unlock()
 
 	return podVolumeBackups, pvcSummary, errs
+}
+
+func skipAllPodVolumes(pod *corev1api.Pod, volumesToBackup []string, err error, pvcSummary *PVCBackupSummary, log logrus.FieldLogger) {
+	for _, volumeName := range volumesToBackup {
+		log.WithError(err).Warnf("Skip pod volume %s", volumeName)
+		pvcSummary.addSkipped(volumeName, fmt.Sprintf("encountered a problem with backing up the PVC of pod %s/%s: %v", pod.Namespace, pod.Name, err))
+	}
 }
 
 // isHostPathVolume returns true if the volume is either a hostPath pod volume or a persistent

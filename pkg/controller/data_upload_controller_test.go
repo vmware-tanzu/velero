@@ -683,7 +683,7 @@ func TestFindDataUploadForPod(t *testing.T) {
 		{
 			name: "find dataUpload for pod",
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Labels(map[string]string{velerov1api.DataUploadLabel: dataUploadName}).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Labels(map[string]string{velerov1api.DataUploadLabel: dataUploadName}).Status(corev1.PodStatus{Phase: corev1.PodRunning}).Result(),
 			checkFunc: func(du *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
 				// Assert that the function returns a single request
 				assert.Len(t, requests, 1)

@@ -53,3 +53,12 @@ func TestSerializeSkipReasons(t *testing.T) {
 		require.Equal(t, "csiSnapshot: not applicable for CSI ;podvolume: it's set to opt-out;", skippedPV.SerializeSkipReasons())
 	}
 }
+
+func TestTrackUntrack(t *testing.T) {
+	// If a pv is untracked explicitly it can't be Tracked again, b/c the pv is considered backed up already.
+	tracker := NewSkipPVTracker()
+	tracker.Track("pv3", podVolumeApproach, "it's set to opt-out")
+	tracker.Untrack("pv3")
+	tracker.Track("pv3", csiSnapshotApproach, "not applicable for CSI ")
+	assert.Equal(t, 0, len(tracker.Summary()))
+}

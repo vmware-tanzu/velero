@@ -20,10 +20,9 @@ import (
 	"fmt"
 	"sort"
 
-	corev1api "k8s.io/api/core/v1"
-
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
+	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
@@ -54,17 +53,11 @@ type Request struct {
 	itemOperationsList        *[]*itemoperation.BackupOperation
 	ResPolicies               *resourcepolicies.Policies
 	SkippedPVTracker          *skipPVTracker
-	// A map contains the backup-included PV detail content.
-	// The key is PV name or PVC name(The format is PVC-namespace/PVC-name)
-	PVMap       map[string]PvcPvInfo
-	VolumeInfos volume.VolumeInfos
+	VolumesInformation        internalVolume.VolumesInformation
 }
 
-type PvcPvInfo struct {
-	PVCName      string
-	PVCNamespace string
-	PV           corev1api.PersistentVolume
-}
+// VolumesInformation contains the information needs by generating
+// the backup VolumeInfo array.
 
 // GetItemOperationsList returns ItemOperationsList, initializing it if necessary
 func (r *Request) GetItemOperationsList() *[]*itemoperation.BackupOperation {
@@ -93,4 +86,18 @@ func (r *Request) BackupResourceList() map[string][]string {
 	}
 
 	return resources
+}
+
+func (r *Request) FillVolumesInformation() {
+	skippedPVMap := make(map[string]string)
+
+	for _, skippedPV := range r.SkippedPVTracker.Summary() {
+		skippedPVMap[skippedPV.Name] = skippedPV.SerializeSkipReasons()
+	}
+
+	r.VolumesInformation.SkippedPVs = skippedPVMap
+	r.VolumesInformation.NativeSnapshots = r.VolumeSnapshots
+	r.VolumesInformation.PodVolumeBackups = r.PodVolumeBackups
+	r.VolumesInformation.BackupOperations = *r.GetItemOperationsList()
+	r.VolumesInformation.BackupName = r.Backup.Name
 }

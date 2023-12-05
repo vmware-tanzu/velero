@@ -50,7 +50,7 @@ func TestHookTracker_Add(t *testing.T) {
 func TestHookTracker_Record(t *testing.T) {
 	tracker := NewHookTracker()
 	tracker.Add("ns1", "pod1", "container1", HookSourceAnnotation, "h1", PhasePre)
-	tracker.Record("ns1", "pod1", "container1", HookSourceAnnotation, "h1", PhasePre, true)
+	err := tracker.Record("ns1", "pod1", "container1", HookSourceAnnotation, "h1", PhasePre, true)
 
 	key := hookTrackerKey{
 		podNamespace: "ns1",
@@ -63,6 +63,11 @@ func TestHookTracker_Record(t *testing.T) {
 
 	info := tracker.tracker[key]
 	assert.True(t, info.hookFailed)
+	assert.Nil(t, err)
+
+	err = tracker.Record("ns2", "pod2", "container1", HookSourceAnnotation, "h1", PhasePre, true)
+	assert.NotNil(t, err)
+
 }
 
 func TestHookTracker_Stat(t *testing.T) {
