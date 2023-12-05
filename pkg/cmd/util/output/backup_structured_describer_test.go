@@ -9,9 +9,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 
 	"github.com/stretchr/testify/assert"
 
@@ -238,7 +238,7 @@ func TestDescribePodVolumeBackupsInSF(t *testing.T) {
 			name:         "empty list",
 			inputPVBList: []velerov1api.PodVolumeBackup{},
 			inputDetails: false,
-			expect:       map[string]interface{}{},
+			expect:       map[string]interface{}{"podVolumeBackups": "<none included>"},
 		},
 		{
 			name:         "2 completed pvbs",

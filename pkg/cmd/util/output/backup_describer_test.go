@@ -6,9 +6,9 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 
 	"github.com/stretchr/testify/require"
 
@@ -544,7 +544,8 @@ func TestDescribePodVolumeBackups(t *testing.T) {
 			name:         "empty list",
 			inputPVBList: []velerov1api.PodVolumeBackup{},
 			inputDetails: true,
-			expect:       ``,
+			expect: `  Pod Volume Backups: <none included>
+`,
 		},
 		{
 			name:         "2 completed pvbs no details",

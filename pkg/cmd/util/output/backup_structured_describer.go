@@ -28,12 +28,12 @@ import (
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 // DescribeBackupInSF describes a backup in structured format.
@@ -330,18 +330,18 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 		backupVolumes["errorGetBackupVolumeInfo"] = fmt.Sprintf("error getting backup volume info: %v", err)
 		return
 	} else {
-		var volumeInfos *volume.VolumeInfos
+		var volumeInfos []volume.VolumeInfo
 		if err := json.NewDecoder(buf).Decode(&volumeInfos); err != nil {
 			backupVolumes["errorReadBackupVolumeInfo"] = fmt.Sprintf("error reading backup volume info: %v", err)
 			return
 		}
 
-		for i := range volumeInfos.VolumeInfos {
-			switch volumeInfos.VolumeInfos[i].BackupMethod {
+		for i := range volumeInfos {
+			switch volumeInfos[i].BackupMethod {
 			case volume.NativeSnapshot:
-				nativeSnapshots = append(nativeSnapshots, &volumeInfos.VolumeInfos[i])
+				nativeSnapshots = append(nativeSnapshots, &volumeInfos[i])
 			case volume.CSISnapshot:
-				csiSnapshots = append(csiSnapshots, &volumeInfos.VolumeInfos[i])
+				csiSnapshots = append(csiSnapshots, &volumeInfos[i])
 			}
 		}
 	}
@@ -388,7 +388,7 @@ func describeCSISnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVo
 	}
 
 	if len(infos) == 0 {
-		backupVolumes["csiSnapshots"] = "CSI Snapshots: <none included>"
+		backupVolumes["csiSnapshots"] = "<none included>"
 		return
 	}
 
@@ -486,6 +486,7 @@ func describePodVolumeBackupsInSF(backups []velerov1api.PodVolumeBackup, details
 	if len(backups) > 0 {
 		uploaderType = backups[0].Spec.UploaderType
 	} else {
+		backupVolumes["podVolumeBackups"] = "<none included>"
 		return
 	}
 	// type display the type of pod volume backups

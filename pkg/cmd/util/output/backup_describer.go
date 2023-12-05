@@ -40,10 +40,11 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
-	"github.com/vmware-tanzu/velero/pkg/volume"
+	nativesnap "github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 // DescribeBackup describes a backup in human-readable format.
@@ -463,18 +464,18 @@ func describeBackupVolumes(ctx context.Context, kbClient kbclient.Client, d *Des
 		d.Printf("\t<error getting backup volume info: %v>\n", err)
 		return
 	} else {
-		var volumeInfos *volume.VolumeInfos
+		var volumeInfos []volume.VolumeInfo
 		if err := json.NewDecoder(buf).Decode(&volumeInfos); err != nil {
 			d.Printf("\t<error reading backup volume info: %v>\n", err)
 			return
 		}
 
-		for i := range volumeInfos.VolumeInfos {
-			switch volumeInfos.VolumeInfos[i].BackupMethod {
+		for i := range volumeInfos {
+			switch volumeInfos[i].BackupMethod {
 			case volume.NativeSnapshot:
-				nativeSnapshots = append(nativeSnapshots, &volumeInfos.VolumeInfos[i])
+				nativeSnapshots = append(nativeSnapshots, &volumeInfos[i])
 			case volume.CSISnapshot:
-				csiSnapshots = append(csiSnapshots, &volumeInfos.VolumeInfos[i])
+				csiSnapshots = append(csiSnapshots, &volumeInfos[i])
 			}
 		}
 	}
@@ -486,7 +487,6 @@ func describeBackupVolumes(ctx context.Context, kbClient kbclient.Client, d *Des
 	d.Println()
 
 	describePodVolumeBackups(d, details, podVolumeBackupCRs)
-	d.Println()
 }
 
 func retrieveNativeSnapshotLegacy(ctx context.Context, kbClient kbclient.Client, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) ([]*volume.VolumeInfo, error) {
@@ -502,7 +502,7 @@ func retrieveNativeSnapshotLegacy(ctx context.Context, kbClient kbclient.Client,
 		return nativeSnapshots, errors.Wrapf(err, "error to download native snapshot info")
 	}
 
-	var snapshots []*volume.Snapshot
+	var snapshots []*nativesnap.Snapshot
 	if err := json.NewDecoder(buf).Decode(&snapshots); err != nil {
 		return nativeSnapshots, errors.Wrapf(err, "error to decode native snapshot info")
 	}
@@ -528,9 +528,14 @@ func retrieveNativeSnapshotLegacy(ctx context.Context, kbClient kbclient.Client,
 }
 
 func retrieveCSISnapshotLegacy(ctx context.Context, kbClient kbclient.Client, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) ([]*volume.VolumeInfo, error) {
+	status := backup.Status
 	csiSnapshots := []*volume.VolumeInfo{}
 
 	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
+		return csiSnapshots, nil
+	}
+
+	if status.CSIVolumeSnapshotsAttempted == 0 {
 		return csiSnapshots, nil
 	}
 
@@ -552,12 +557,13 @@ func retrieveCSISnapshotLegacy(ctx context.Context, kbClient kbclient.Client, ba
 	}
 
 	var vscList []snapshotv1api.VolumeSnapshotContent
-	if err := json.NewDecoder(vsBuf).Decode(&vscList); err != nil {
+	if err := json.NewDecoder(vscBuf).Decode(&vscList); err != nil {
 		return csiSnapshots, errors.Wrapf(err, "error to decode vsc list")
 	}
 
 	for _, vsc := range vscList {
 		volInfo := volume.VolumeInfo{
+			PreserveLocalSnapshot: true,
 			CSISnapshotInfo: volume.CSISnapshotInfo{
 				VSCName: vsc.Name,
 				Driver:  vsc.Spec.Driver,
@@ -573,7 +579,7 @@ func retrieveCSISnapshotLegacy(ctx context.Context, kbClient kbclient.Client, ba
 		}
 
 		for _, vs := range vsList {
-			if vs.Spec.Source.VolumeSnapshotContentName == nil {
+			if vs.Status.BoundVolumeSnapshotContentName == nil {
 				continue
 			}
 
@@ -581,7 +587,7 @@ func retrieveCSISnapshotLegacy(ctx context.Context, kbClient kbclient.Client, ba
 				continue
 			}
 
-			if *vs.Spec.Source.VolumeSnapshotContentName == vsc.Name {
+			if *vs.Status.BoundVolumeSnapshotContentName == vsc.Name {
 				volInfo.PVCName = *vs.Spec.Source.PersistentVolumeClaimName
 			}
 		}
@@ -650,7 +656,7 @@ func describeLocalSnapshot(d *Describer, details bool, info *volume.VolumeInfo) 
 
 	if details {
 		d.Printf("\t\t\tSnapshot:\n")
-		if !info.SnapshotDataMoved {
+		if !info.SnapshotDataMoved && info.OperationID != "" {
 			d.Printf("\t\t\t\tOperation ID: %s\n", info.OperationID)
 		}
 
@@ -761,6 +767,7 @@ func describePodVolumeBackups(d *Describer, details bool, podVolumeBackups []vel
 	if len(podVolumeBackups) > 0 {
 		uploaderType = podVolumeBackups[0].Spec.UploaderType
 	} else {
+		d.Printf("\tPod Volume Backups: <none included>\n")
 		return
 	}
 
