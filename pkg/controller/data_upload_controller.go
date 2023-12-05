@@ -521,10 +521,6 @@ func (r *DataUploadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						return false
 					}
 
-					if newObj.Status.Phase != corev1.PodRunning {
-						return false
-					}
-
 					if newObj.Spec.NodeName != r.nodeName {
 						return false
 					}
@@ -547,37 +543,56 @@ func (r *DataUploadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *DataUploadReconciler) findDataUploadForPod(podObj client.Object) []reconcile.Request {
 	pod := podObj.(*corev1.Pod)
 	du, err := findDataUploadByPod(r.client, *pod)
+	log := r.logger.WithFields(logrus.Fields{
+		"Backup pod": pod.Name,
+	})
+
 	if err != nil {
-		r.logger.WithField("Backup pod", pod.Name).WithError(err).Error("unable to get dataupload")
+		log.WithError(err).Error("unable to get dataupload")
 		return []reconcile.Request{}
 	} else if du == nil {
-		r.logger.WithField("Backup pod", pod.Name).Error("get empty DataUpload")
+		log.Error("get empty DataUpload")
 		return []reconcile.Request{}
 	}
+	log = log.WithFields(logrus.Fields{
+		"Datadupload": du.Name,
+	})
 
 	if du.Status.Phase != velerov2alpha1api.DataUploadPhaseAccepted {
 		return []reconcile.Request{}
 	}
 
-	r.logger.WithField("Backup pod", pod.Name).Infof("Preparing dataupload %s", du.Name)
-	// we don't expect anyone else update the CR during the Prepare process
-	updated, err := r.exclusiveUpdateDataUpload(context.Background(), du, r.prepareDataUpload)
-	if err != nil || !updated {
-		r.logger.WithFields(logrus.Fields{
-			"Dataupload": du.Name,
-			"Backup pod": pod.Name,
-			"updated":    updated,
-		}).WithError(err).Warn("failed to patch dataupload, prepare will halt for this dataupload")
+	if pod.Status.Phase == corev1.PodRunning {
+		log.Info("Preparing dataupload")
+		// we don't expect anyone else update the CR during the Prepare process
+		updated, err := r.exclusiveUpdateDataUpload(context.Background(), du, r.prepareDataUpload)
+		if err != nil || !updated {
+			log.WithField("updated", updated).WithError(err).Warn("failed to update dataupload, prepare will halt for this dataupload")
+			return []reconcile.Request{}
+		}
+	} else if unrecoverable, reason := kube.IsPodUnrecoverable(pod, log); unrecoverable { // let the abnormal backup pod failed early
+		err := UpdateDataUploadWithRetry(context.Background(), r.client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, r.logger.WithField("dataupload", du.Name),
+			func(dataUpload *velerov2alpha1api.DataUpload) {
+				dataUpload.Spec.Cancel = true
+				dataUpload.Status.Message = fmt.Sprintf("dataupload mark as cancel to failed early for exposing pod %s/%s is in abnormal status for reason %s", pod.Namespace, pod.Name, reason)
+			})
+
+		if err != nil {
+			log.WithError(err).Warn("failed to cancel dataupload, and it will wait for prepare timeout")
+			return []reconcile.Request{}
+		}
+		log.Info("Exposed pod is in abnormal status and dataupload is marked as cancel")
+	} else {
 		return []reconcile.Request{}
 	}
 
-	requests := reconcile.Request{
+	request := reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: du.Namespace,
 			Name:      du.Name,
 		},
 	}
-	return []reconcile.Request{requests}
+	return []reconcile.Request{request}
 }
 
 func (r *DataUploadReconciler) FindDataUploadsByPod(ctx context.Context, cli client.Client, ns string) ([]velerov2alpha1api.DataUpload, error) {

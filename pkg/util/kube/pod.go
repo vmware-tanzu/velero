@@ -17,6 +17,7 @@ package kube
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -109,4 +110,24 @@ func EnsureDeletePod(ctx context.Context, podGetter corev1client.CoreV1Interface
 	}
 
 	return nil
+}
+
+// IsPodUnrecoverable checks if the pod is in an abnormal state and could not be recovered
+// It could not cover all the cases but we could add more cases in the future
+func IsPodUnrecoverable(pod *corev1api.Pod, log logrus.FieldLogger) (bool, string) {
+	// Check the Phase field
+	if pod.Status.Phase == corev1api.PodFailed || pod.Status.Phase == corev1api.PodUnknown {
+		log.Warnf("Pod is in abnormal state %s", pod.Status.Phase)
+		return true, fmt.Sprintf("Pod is in abnormal state %s", pod.Status.Phase)
+	}
+
+	// Check the Status field
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		// If the container's image state is ImagePullBackOff, it indicates an image pull failure
+		if containerStatus.State.Waiting != nil && (containerStatus.State.Waiting.Reason == "ImagePullBackOff" || containerStatus.State.Waiting.Reason == "ErrImageNeverPull") {
+			log.Warnf("Container %s in Pod %s/%s is in pull image failed with reason %s", containerStatus.Name, pod.Namespace, pod.Name, containerStatus.State.Waiting.Reason)
+			return true, fmt.Sprintf("Container %s in Pod %s/%s is in pull image failed with reason %s", containerStatus.Name, pod.Namespace, pod.Name, containerStatus.State.Waiting.Reason)
+		}
+	}
+	return false, ""
 }

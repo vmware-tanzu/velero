@@ -343,3 +343,82 @@ func TestDeletePodIfAny(t *testing.T) {
 		})
 	}
 }
+
+func TestIsPodUnrecoverable(t *testing.T) {
+	tests := []struct {
+		name string
+		pod  *corev1api.Pod
+		want bool
+	}{
+		{
+			name: "pod is in failed state",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					Phase: corev1api.PodFailed,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "pod is in unknown state",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					Phase: corev1api.PodUnknown,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "container image pull failure",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					ContainerStatuses: []corev1api.ContainerStatus{
+						{State: corev1api.ContainerState{Waiting: &corev1api.ContainerStateWaiting{Reason: "ImagePullBackOff"}}},
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "container image pull failure with different reason",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					ContainerStatuses: []corev1api.ContainerStatus{
+						{State: corev1api.ContainerState{Waiting: &corev1api.ContainerStateWaiting{Reason: "ErrImageNeverPull"}}},
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "container image pull failure with different reason",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					ContainerStatuses: []corev1api.ContainerStatus{
+						{State: corev1api.ContainerState{Waiting: &corev1api.ContainerStateWaiting{Reason: "OtherReason"}}},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "pod is normal",
+			pod: &corev1api.Pod{
+				Status: corev1api.PodStatus{
+					Phase: corev1api.PodRunning,
+					ContainerStatuses: []corev1api.ContainerStatus{
+						{Ready: true, State: corev1api.ContainerState{Running: &corev1api.ContainerStateRunning{}}},
+					},
+				},
+			},
+			want: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, _ := IsPodUnrecoverable(test.pod, velerotest.NewLogger())
+			assert.Equal(t, test.want, got)
+		})
+	}
+}
