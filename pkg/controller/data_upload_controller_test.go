@@ -296,7 +296,7 @@ func (f *fakeDataUploadFSBR) Init(ctx context.Context, bslName string, sourceNam
 	return nil
 }
 
-func (f *fakeDataUploadFSBR) StartBackup(source datapath.AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, uploaderConfigs *map[string]string) error {
+func (f *fakeDataUploadFSBR) StartBackup(source datapath.AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, uploaderConfigs map[string]string) error {
 	du := f.du
 	original := f.du.DeepCopy()
 	du.Status.Phase = velerov2alpha1api.DataUploadPhaseCompleted
@@ -306,7 +306,7 @@ func (f *fakeDataUploadFSBR) StartBackup(source datapath.AccessPoint, realSource
 	return nil
 }
 
-func (f *fakeDataUploadFSBR) StartRestore(snapshotID string, target datapath.AccessPoint, uploaderConfigs *map[string]string) error {
+func (f *fakeDataUploadFSBR) StartRestore(snapshotID string, target datapath.AccessPoint, uploaderConfigs map[string]string) error {
 	return nil
 }
 

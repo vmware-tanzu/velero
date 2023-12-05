@@ -100,7 +100,7 @@ func TestAsyncBackup(t *testing.T) {
 			fs.initialized = true
 			fs.callbacks = test.callbacks
 
-			err := fs.StartBackup(AccessPoint{ByPath: test.path}, "", "", false, nil, &map[string]string{})
+			err := fs.StartBackup(AccessPoint{ByPath: test.path}, "", "", false, nil, map[string]string{})
 			require.Equal(t, nil, err)
 
 			<-finish
@@ -183,7 +183,7 @@ func TestAsyncRestore(t *testing.T) {
 			fs.initialized = true
 			fs.callbacks = test.callbacks
 
-			err := fs.StartRestore(test.snapshot, AccessPoint{ByPath: test.path}, &map[string]string{})
+			err := fs.StartRestore(test.snapshot, AccessPoint{ByPath: test.path}, map[string]string{})
 			require.Equal(t, nil, err)
 
 			<-finish

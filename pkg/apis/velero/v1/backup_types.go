@@ -178,10 +178,11 @@ type BackupSpec struct {
 
 	// UploaderConfig specifies the configuration for the uploader.
 	// +optional
-	UploaderConfigForBackup *UploaderConfigForBackup `json:"uploaderConfig,omitempty"`
+	// +nullable
+	UploaderConfig *UploaderConfigForBackup `json:"uploaderConfig,omitempty"`
 }
 
-// UploaderConfigForBackup defines the configuration for the backup.
+// UploaderConfigForBackup defines the configuration for the uploader when doing backup.
 type UploaderConfigForBackup struct {
 	// ParallelFilesUpload is the number of files parallel uploads to perform when using the uploader.
 	// +optional

@@ -517,6 +517,7 @@ spec:
                   uploaderConfig:
                     description: UploaderConfig specifies the configuration for the
                       uploader.
+                    nullable: true
                     properties:
                       parallelFilesUpload:
                         description: ParallelFilesUpload is the number of files parallel

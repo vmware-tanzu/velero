@@ -103,7 +103,7 @@ func (d *DataUploadBuilder) OperationTimeout(timeout metav1.Duration) *DataUploa
 }
 
 // DataMoverConfig sets the DataUpload's DataMoverConfig.
-func (d *DataUploadBuilder) DataMoverConfig(config *map[string]string) *DataUploadBuilder {
+func (d *DataUploadBuilder) DataMoverConfig(config map[string]string) *DataUploadBuilder {
 	d.object.Spec.DataMoverConfig = config
 	return d
 }

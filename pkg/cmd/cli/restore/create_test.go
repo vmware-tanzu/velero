@@ -84,7 +84,7 @@ func TestCreateCommand(t *testing.T) {
 		includeClusterResources := "true"
 		allowPartiallyFailed := "true"
 		itemOperationTimeout := "10m0s"
-		writeSparseFiles := "false"
+		writeSparseFiles := "true"
 
 		flags := new(pflag.FlagSet)
 		o := NewCreateOptions()

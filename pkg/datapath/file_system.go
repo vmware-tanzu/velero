@@ -129,7 +129,7 @@ func (fs *fileSystemBR) Close(ctx context.Context) {
 	fs.log.WithField("user", fs.jobName).Info("FileSystemBR is closed")
 }
 
-func (fs *fileSystemBR) StartBackup(source AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, uploaderConfig *map[string]string) error {
+func (fs *fileSystemBR) StartBackup(source AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, uploaderConfig map[string]string) error {
 	if !fs.initialized {
 		return errors.New("file system data path is not initialized")
 	}
@@ -150,7 +150,7 @@ func (fs *fileSystemBR) StartBackup(source AccessPoint, realSource string, paren
 	return nil
 }
 
-func (fs *fileSystemBR) StartRestore(snapshotID string, target AccessPoint, uploaderConfigs *map[string]string) error {
+func (fs *fileSystemBR) StartRestore(snapshotID string, target AccessPoint, uploaderConfigs map[string]string) error {
 	if !fs.initialized {
 		return errors.New("file system data path is not initialized")
 	}

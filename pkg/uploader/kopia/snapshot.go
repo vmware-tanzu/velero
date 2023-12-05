@@ -38,11 +38,10 @@ import (
 	"github.com/kopia/kopia/snapshot/snapshotfs"
 	"github.com/pkg/errors"
 
-	"github.com/vmware-tanzu/velero/pkg/util/uploaderconfig"
-
 	"github.com/vmware-tanzu/velero/pkg/kopia"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+	uploaderutil "github.com/vmware-tanzu/velero/pkg/uploader/util"
 )
 
 // All function mainly used to make testing more convenient
@@ -106,17 +105,17 @@ func getDefaultPolicy() *policy.Policy {
 	}
 }
 
-func setupPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snapshot.SourceInfo, uploaderCfg *map[string]string) (*policy.Tree, error) {
+func setupPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snapshot.SourceInfo, uploaderCfg map[string]string) (*policy.Tree, error) {
 	// some internal operations from Kopia code retrieves policies from repo directly, so we need to persist the policy to repo
 	curPolicy := getDefaultPolicy()
 
-	if uploaderCfg != nil {
-		uploaderConfig, err := uploaderconfig.GetBackupConfig(uploaderCfg)
+	if len(uploaderCfg) > 0 {
+		parallelUpload, err := uploaderutil.GetParallelFilesUpload(uploaderCfg)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get uploader config")
 		}
-		if uploaderConfig.ParallelFilesUpload > 0 {
-			curPolicy.UploadPolicy.MaxParallelFileReads = newOptionalInt(uploaderConfig.ParallelFilesUpload)
+		if parallelUpload > 0 {
+			curPolicy.UploadPolicy.MaxParallelFileReads = newOptionalInt(parallelUpload)
 		}
 	}
 
@@ -141,7 +140,7 @@ func setupPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snap
 
 // Backup backup specific sourcePath and update progress
 func Backup(ctx context.Context, fsUploader SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string,
-	forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg *map[string]string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
+	forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 	if fsUploader == nil {
 		return nil, false, errors.New("get empty kopia uploader")
 	}
@@ -237,7 +236,7 @@ func SnapshotSource(
 	forceFull bool,
 	parentSnapshot string,
 	snapshotTags map[string]string,
-	uploaderCfg *map[string]string,
+	uploaderCfg map[string]string,
 	log logrus.FieldLogger,
 	description string,
 ) (string, int64, error) {
@@ -369,7 +368,7 @@ func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sour
 }
 
 // Restore restore specific sourcePath with given snapshotID and update progress
-func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, uploaderCfg *map[string]string,
+func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string,
 	log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error) {
 	log.Info("Start to restore...")
 
@@ -400,13 +399,16 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 		IgnorePermissionErrors: true,
 	}
 
-	if uploaderCfg != nil {
-		restoreCfg, err := uploaderconfig.GetRestoreConfig(uploaderCfg)
+	if len(uploaderCfg) > 0 {
+		writeSparseFiles, err := uploaderutil.GetWriteSparseFiles(uploaderCfg)
 		if err != nil {
 			return 0, 0, errors.Wrap(err, "failed to get uploader config")
 		}
-		fsOutput.WriteSparseFiles = restoreCfg.WriteSparseFiles
+		if writeSparseFiles {
+			fsOutput.WriteSparseFiles = true
+		}
 	}
+
 	log.Debugf("Restore filesystem output %v", fsOutput)
 
 	err = fsOutput.Init(ctx)

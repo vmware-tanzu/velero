@@ -126,14 +126,16 @@ type RestoreSpec struct {
 
 	// UploaderConfig specifies the configuration for the restore.
 	// +optional
-	UploaderConfigForRestore *UploaderConfigForRestore `json:"uploaderConfig,omitempty"`
+	// +nullable
+	UploaderConfig *UploaderConfigForRestore `json:"uploaderConfig,omitempty"`
 }
 
 // UploaderConfigForRestore defines the configuration for the restore.
 type UploaderConfigForRestore struct {
 	// WriteSparseFiles is a flag to indicate whether write files sparsely or not.
 	// +optional
-	WriteSparseFiles bool `json:"writeSparseFiles,omitempty"`
+	// +nullable
+	WriteSparseFiles *bool `json:"writeSparseFiles,omitempty"`
 }
 
 // RestoreHooks contains custom behaviors that should be executed during or post restore.

@@ -51,7 +51,7 @@ type DataUploadSpec struct {
 	// DataMoverConfig is for data-mover-specific configuration fields.
 	// +optional
 	// +nullable
-	DataMoverConfig *map[string]string `json:"dataMoverConfig,omitempty"`
+	DataMoverConfig map[string]string `json:"dataMoverConfig,omitempty"`
 
 	// Cancel indicates request to cancel the ongoing DataUpload. It can be set
 	// when the DataUpload is in InProgress phase

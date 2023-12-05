@@ -226,13 +226,9 @@ func (in *DataUploadSpec) DeepCopyInto(out *DataUploadSpec) {
 	}
 	if in.DataMoverConfig != nil {
 		in, out := &in.DataMoverConfig, &out.DataMoverConfig
-		*out = new(map[string]string)
-		if **in != nil {
-			in, out := *in, *out
-			*out = make(map[string]string, len(*in))
-			for key, val := range *in {
-				(*out)[key] = val
-			}
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
 		}
 	}
 	out.OperationTimeout = in.OperationTimeout

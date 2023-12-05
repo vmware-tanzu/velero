@@ -174,6 +174,6 @@ func (b *RestoreBuilder) ItemOperationTimeout(timeout time.Duration) *RestoreBui
 
 // WriteSparseFiles sets the Restore's uploader write sparse files
 func (b *RestoreBuilder) WriteSparseFiles(val bool) *RestoreBuilder {
-	b.object.Spec.UploaderConfigForRestore.WriteSparseFiles = val
+	b.object.Spec.UploaderConfig.WriteSparseFiles = &val
 	return b
 }

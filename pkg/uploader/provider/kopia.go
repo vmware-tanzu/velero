@@ -119,7 +119,7 @@ func (kp *kopiaProvider) RunBackup(
 	forceFull bool,
 	parentSnapshot string,
 	volMode uploader.PersistentVolumeMode,
-	uploaderCfg *map[string]string,
+	uploaderCfg map[string]string,
 	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {
 		return "", false, errors.New("Need to initial backup progress updater first")
@@ -204,7 +204,7 @@ func (kp *kopiaProvider) RunRestore(
 	snapshotID string,
 	volumePath string,
 	volMode uploader.PersistentVolumeMode,
-	uploaderCfg *map[string]string,
+	uploaderCfg map[string]string,
 	updater uploader.ProgressUpdater) error {
 	log := kp.log.WithFields(logrus.Fields{
 		"snapshotID": snapshotID,

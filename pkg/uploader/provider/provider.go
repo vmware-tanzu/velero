@@ -49,7 +49,7 @@ type Provider interface {
 		forceFull bool,
 		parentSnapshot string,
 		volMode uploader.PersistentVolumeMode,
-		uploaderCfg *map[string]string,
+		uploaderCfg map[string]string,
 		updater uploader.ProgressUpdater) (string, bool, error)
 	// RunRestore which will do restore for one specific volume with given snapshot id and return error
 	// updater is used for updating backup progress which implement by third-party
@@ -58,7 +58,7 @@ type Provider interface {
 		snapshotID string,
 		volumePath string,
 		volMode uploader.PersistentVolumeMode,
-		uploaderConfig *map[string]string,
+		uploaderConfig map[string]string,
 		updater uploader.ProgressUpdater) error
 	// Close which will close related repository
 	Close(ctx context.Context) error

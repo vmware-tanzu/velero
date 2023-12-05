@@ -36,9 +36,9 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
+	uploaderutil "github.com/vmware-tanzu/velero/pkg/uploader/util"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/pkg/util/uploaderconfig"
 )
 
 // Backupper can execute pod volume backups of volumes in a pod.
@@ -411,8 +411,8 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume c
 		pvb.Spec.Tags["pvc-uid"] = string(pvc.UID)
 	}
 
-	if backup.Spec.UploaderConfigForBackup != nil {
-		pvb.Spec.UploaderSettings = uploaderconfig.StoreBackupConfig(backup.Spec.UploaderConfigForBackup)
+	if backup.Spec.UploaderConfig != nil {
+		pvb.Spec.UploaderSettings = uploaderutil.StoreBackupConfig(backup.Spec.UploaderConfig)
 	}
 
 	return pvb

@@ -55,7 +55,8 @@ type PodVolumeBackupSpec struct {
 	// UploaderSettings are a map of key-value pairs that should be applied to the
 	// uploader configuration.
 	// +optional
-	UploaderSettings *map[string]string `json:"uploaderSettings,omitempty"`
+	// +nullable
+	UploaderSettings map[string]string `json:"uploaderSettings,omitempty"`
 }
 
 // PodVolumeBackupPhase represents the lifecycle phase of a PodVolumeBackup.

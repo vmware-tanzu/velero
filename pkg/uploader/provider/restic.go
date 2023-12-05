@@ -30,8 +30,8 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+	uploaderutil "github.com/vmware-tanzu/velero/pkg/uploader/util"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
-	"github.com/vmware-tanzu/velero/pkg/util/uploaderconfig"
 )
 
 // resticBackupCMDFunc and resticRestoreCMDFunc are mainly used to make testing more convenient
@@ -123,7 +123,7 @@ func (rp *resticProvider) RunBackup(
 	forceFull bool,
 	parentSnapshot string,
 	volMode uploader.PersistentVolumeMode,
-	uploaderCfg *map[string]string,
+	uploaderCfg map[string]string,
 	updater uploader.ProgressUpdater) (string, bool, error) {
 	if updater == nil {
 		return "", false, errors.New("Need to initial backup progress updater first")
@@ -146,14 +146,13 @@ func (rp *resticProvider) RunBackup(
 		"parentSnapshot": parentSnapshot,
 	})
 
-	if uploaderCfg != nil {
-		uploaderConfig, err := uploaderconfig.GetBackupConfig(uploaderCfg)
+	if len(uploaderCfg) > 0 {
+		parallelFilesUpload, err := uploaderutil.GetParallelFilesUpload(uploaderCfg)
 		if err != nil {
 			return "", false, errors.Wrap(err, "failed to get uploader config")
 		}
-
-		if uploaderConfig.ParallelFilesUpload > 0 {
-			log.Warnf("ParallelFilesUpload is set to %d, but restic does not support parallel file uploads. Ignoring.", uploaderConfig.ParallelFilesUpload)
+		if parallelFilesUpload > 0 {
+			log.Warnf("ParallelFilesUpload is set to %d, but restic does not support parallel file uploads. Ignoring.", parallelFilesUpload)
 		}
 	}
 
@@ -198,7 +197,7 @@ func (rp *resticProvider) RunRestore(
 	snapshotID string,
 	volumePath string,
 	volMode uploader.PersistentVolumeMode,
-	uploaderCfg *map[string]string,
+	uploaderCfg map[string]string,
 	updater uploader.ProgressUpdater) error {
 	if updater == nil {
 		return errors.New("Need to initial backup progress updater first")
@@ -219,13 +218,11 @@ func (rp *resticProvider) RunRestore(
 		restoreCmd.ExtraFlags = append(restoreCmd.ExtraFlags, rp.extraFlags...)
 	}
 
-	if uploaderCfg != nil {
-		extraFlags, err := rp.parseRestoreExtraFlags(uploaderCfg)
-		if err != nil {
-			return errors.Wrap(err, "failed to parse uploader config")
-		} else if len(extraFlags) != 0 {
-			restoreCmd.ExtraFlags = append(restoreCmd.ExtraFlags, extraFlags...)
-		}
+	extraFlags, err := rp.parseRestoreExtraFlags(uploaderCfg)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse uploader config")
+	} else if len(extraFlags) != 0 {
+		restoreCmd.ExtraFlags = append(restoreCmd.ExtraFlags, extraFlags...)
 	}
 
 	stdout, stderr, err := restic.RunRestore(restoreCmd, log, updater)
@@ -234,15 +231,20 @@ func (rp *resticProvider) RunRestore(
 	return err
 }
 
-func (rp *resticProvider) parseRestoreExtraFlags(uploaderCfg *map[string]string) ([]string, error) {
+func (rp *resticProvider) parseRestoreExtraFlags(uploaderCfg map[string]string) ([]string, error) {
 	extraFlags := []string{}
-	uploaderConfig, err := uploaderconfig.GetRestoreConfig(uploaderCfg)
+	if len(uploaderCfg) == 0 {
+		return extraFlags, nil
+	}
+
+	writeSparseFiles, err := uploaderutil.GetWriteSparseFiles(uploaderCfg)
 	if err != nil {
 		return extraFlags, errors.Wrap(err, "failed to get uploader config")
 	}
 
-	if uploaderConfig.WriteSparseFiles {
+	if writeSparseFiles {
 		extraFlags = append(extraFlags, "--sparse")
 	}
+
 	return extraFlags, nil
 }

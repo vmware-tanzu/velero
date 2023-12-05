@@ -36,9 +36,9 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
+	uploaderutil "github.com/vmware-tanzu/velero/pkg/uploader/util"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/pkg/util/uploaderconfig"
 )
 
 type RestoreData struct {
@@ -286,8 +286,8 @@ func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backu
 		pvr.Labels[velerov1api.PVCUIDLabel] = string(pvc.UID)
 	}
 
-	if restore.Spec.UploaderConfigForRestore != nil {
-		pvr.Spec.UploaderSettings = uploaderconfig.StoreRestoreConfig(restore.Spec.UploaderConfigForRestore)
+	if restore.Spec.UploaderConfig != nil {
+		pvr.Spec.UploaderSettings = uploaderutil.StoreRestoreConfig(restore.Spec.UploaderConfig)
 	}
 
 	return pvr

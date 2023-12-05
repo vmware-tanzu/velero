@@ -124,6 +124,7 @@ spec:
                   type: string
                 description: UploaderSettings are a map of key-value pairs that should
                   be applied to the uploader configuration.
+                nullable: true
                 type: object
               uploaderType:
                 description: UploaderType is the type of the uploader to handle the
