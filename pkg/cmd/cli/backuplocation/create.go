@@ -31,6 +31,7 @@ import (
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -204,19 +205,13 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 	if o.DefaultBackupStorageLocation {
 		// There is one and only one default backup storage location.
-		// Disable any existing default backup storage location.
-		locations := new(velerov1api.BackupStorageLocationList)
-		if err := kbClient.List(context.Background(), locations, &kbclient.ListOptions{Namespace: f.Namespace()}); err != nil {
+		// Disable any existing default backup storage location first.
+		defalutBSLs, err := storage.GetDefaultBackupStorageLocations(context.Background(), kbClient, f.Namespace())
+		if err != nil {
 			return errors.WithStack(err)
 		}
-		for i, location := range locations.Items {
-			if location.Spec.Default {
-				location.Spec.Default = false
-				if err := kbClient.Update(context.Background(), &locations.Items[i], &kbclient.UpdateOptions{}); err != nil {
-					return errors.WithStack(err)
-				}
-				break
-			}
+		if len(defalutBSLs.Items) > 0 {
+			return errors.New("there is already exist default backup storage location, please unset it first or do not set --default flag")
 		}
 	}
 

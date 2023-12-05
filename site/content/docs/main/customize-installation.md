@@ -181,18 +181,43 @@ To configure additional locations after running `velero install`, use the `veler
 
 ### Set default backup storage location or volume snapshot locations
 
-When performing backups, Velero needs to know where to backup your data. This means that if you configure multiple locations, you must specify the location Velero should use each time you run `velero backup create`, or you can set a default backup storage location or default volume snapshot locations. If you only have one backup storage llocation or volume snapshot location set for a provider, Velero will automatically use that location as the default.
+When performing backups, Velero needs to know where to backup your data. This means that if you configure multiple locations, you must specify the location Velero should use each time you run `velero backup create`, or you can set a default backup storage location or default volume snapshot locations. If you only have one backup storage location or volume snapshot location set for a provider, Velero will automatically use that location as the default.
 
-Set a default backup storage location by passing a `--default` flag with when running `velero backup-location create`.
+#### Set default backup storage location
+currently, Velero could set the default backup storage location as below:
+- First way: Set a default backup storage location by passing a `--default` flag when running `velero backup-location create`.
 
-```
-velero backup-location create backups-primary \
+  ```
+  velero backup-location create backups-primary \
     --provider aws \
     --bucket velero-backups \
     --config region=us-east-1 \
     --default
-```
-
+  ```
+- Second way: Set a default backup storage location by passing a  `--default` flag when running `velero backup-location set`.
+  ```bash
+  velero backup-location set backups-primary --default
+  ```
+  We also could remove the default backup storage location by this command, below is one example
+  ```bash
+  velero backup-location set backups-primary --default=false
+  ```
+- Third way: Set a default backup storage location by passing `--default-backup-storage-location` flag on the `velero server` command.
+   ```bash
+  velero server --default-backup-storage-location backups-primary
+   ```
+Note: Only could have one default backup storage location, which means it's not allowed to set two default backup storage locations at the same time, the priorities among these three are as follows:
+- if velero server side has specified one default backup storage location, suppose it's `A`
+  - if `A` backup storage location exists, it's not allowed to set a new default backup storage location
+  - if `A` does not exist
+    - if using `velero backup-location set` or `velero backup-location create --default` command
+      - it could be successful if no default backup storage location exists.
+      - it would fail if already exist one default backup storage location. (So it need to remove other default backup storage location at first)
+- if velero server side has not specified one default backup storage location
+  - if using `velero backup-location set` or `velero backup-location create --default` command
+    - it could be successful if no default backup storage location exists.
+    - it would fail if already exist one default backup storage location. (So it need to remove other default backup storage location at first)
+#### Set default volume snapshot location
 You can set a default volume snapshot location for each of your volume snapshot providers using the `--default-volume-snapshot-locations` flag on the `velero server` command.
 
 ```
