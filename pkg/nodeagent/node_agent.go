@@ -34,16 +34,15 @@ import (
 
 const (
 	// daemonSet is the name of the Velero node agent daemonset.
-	daemonSet             = "node-agent"
-	configName            = "node-agent-configs"
-	dataPathConConfigName = "data-path-concurrency"
+	daemonSet  = "node-agent"
+	configName = "node-agent-configs"
 )
 
 var (
 	ErrDaemonSetNotFound = errors.New("daemonset not found")
 )
 
-type DataPathConcurrency struct {
+type LoadConcurrency struct {
 	// GlobalConfig specifies the concurrency number to all nodes for which per-node config is not specified
 	GlobalConfig int `json:"globalConfig,omitempty"`
 
@@ -60,8 +59,8 @@ type RuledConfigs struct {
 }
 
 type Configs struct {
-	// DataPathConcurrency is the config for data path concurrency per node.
-	DataPathConcurrency *DataPathConcurrency `json:"dataPathConcurrency,omitempty"`
+	// LoadConcurrency is the config for data path load concurrency per node.
+	LoadConcurrency *LoadConcurrency `json:"loadConcurrency,omitempty"`
 }
 
 // IsRunning checks if the node agent daemonset is running properly. If not, return the error found

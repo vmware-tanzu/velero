@@ -244,7 +244,7 @@ func TestGetConfigs(t *testing.T) {
 	cm := builder.ForConfigMap("fake-ns", "node-agent-configs").Result()
 	cmWithInvalidDataFormat := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("fake-key", "wrong").Result()
 	cmWithoutCocurrentData := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("fake-key", "{\"someothers\":{\"someother\": 10}}").Result()
-	cmWithValidData := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("fake-key", "{\"dataPathConcurrency\":{\"globalConfig\": 5}}").Result()
+	cmWithValidData := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("fake-key", "{\"loadConcurrency\":{\"globalConfig\": 5}}").Result()
 
 	tests := []struct {
 		name          string
@@ -303,7 +303,7 @@ func TestGetConfigs(t *testing.T) {
 				cmWithValidData,
 			},
 			expectResult: &Configs{
-				DataPathConcurrency: &DataPathConcurrency{
+				LoadConcurrency: &LoadConcurrency{
 					GlobalConfig: 5,
 				},
 			},
@@ -324,10 +324,10 @@ func TestGetConfigs(t *testing.T) {
 
 				if test.expectResult == nil {
 					assert.Nil(t, result)
-				} else if test.expectResult.DataPathConcurrency == nil {
-					assert.Nil(t, result.DataPathConcurrency)
+				} else if test.expectResult.LoadConcurrency == nil {
+					assert.Nil(t, result.LoadConcurrency)
 				} else {
-					assert.Equal(t, *test.expectResult.DataPathConcurrency, *result.DataPathConcurrency)
+					assert.Equal(t, *test.expectResult.LoadConcurrency, *result.LoadConcurrency)
 				}
 			} else {
 				assert.EqualError(t, err, test.expectErr)
