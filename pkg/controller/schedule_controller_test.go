@@ -176,6 +176,12 @@ func TestReconcileOfSchedule(t *testing.T) {
 				require.Nil(t, client.Create(ctx, test.backup))
 			}
 
+			scheduleb4reconcile := &velerov1.Schedule{}
+			err = client.Get(ctx, types.NamespacedName{Namespace: "ns", Name: "name"}, scheduleb4reconcile)
+			if test.schedule != nil {
+				require.Nil(t, err)
+			}
+
 			_, err = reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "ns", Name: "name"}})
 			require.Nil(t, err)
 
@@ -198,6 +204,12 @@ func TestReconcileOfSchedule(t *testing.T) {
 				require.Nil(t, err)
 				require.NotNil(t, schedule.Status.LastSkipped)
 				assert.Equal(t, parseTime(test.expectedLastSkipped).Unix(), schedule.Status.LastSkipped.Unix())
+			}
+
+			// we expect reconcile to flip SkipImmediately to false if it's true or the server is configured to skip immediately and the schedule doesn't have it set
+			if scheduleb4reconcile.Spec.SkipImmediately != nil && *scheduleb4reconcile.Spec.SkipImmediately ||
+				test.reconcilerSkipImmediately && scheduleb4reconcile.Spec.SkipImmediately == nil {
+				assert.Equal(t, schedule.Spec.SkipImmediately, pointer.Bool(false))
 			}
 
 			backups := &velerov1.BackupList{}
