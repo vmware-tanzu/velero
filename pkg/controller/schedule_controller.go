@@ -157,15 +157,13 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// If there are backup created by this schedule still in New or InProgress state,
 	// skip current backup creation to avoid running overlap backups.
 	// As the schedule must be validated before checking whether it's due, we cannot put the checking log in Predicate
-	due, nextRunTime := c.ifDue(schedule, cronSchedule)
-	durationTillNextRun := nextRunTime.Sub(c.clock.Now())
-	if due && !c.checkIfBackupInNewOrProgress(schedule) {
+	if c.ifDue(schedule, cronSchedule) && !c.checkIfBackupInNewOrProgress(schedule) {
 		if err := c.submitBackup(ctx, schedule); err != nil {
-			return ctrl.Result{RequeueAfter: durationTillNextRun}, errors.Wrapf(err, "error submit backup for schedule %s", req.String())
+			return ctrl.Result{}, errors.Wrapf(err, "error submit backup for schedule %s", req.String())
 		}
 	}
 
-	return ctrl.Result{RequeueAfter: durationTillNextRun}, nil
+	return ctrl.Result{}, nil
 }
 
 func parseCronSchedule(itm *velerov1.Schedule, logger logrus.FieldLogger) (cron.Schedule, []string) {
@@ -235,16 +233,16 @@ func (c *scheduleReconciler) checkIfBackupInNewOrProgress(schedule *velerov1.Sch
 }
 
 // ifDue check whether schedule is due to create a new backup.
-func (c *scheduleReconciler) ifDue(schedule *velerov1.Schedule, cronSchedule cron.Schedule) (bool, time.Time) {
+func (c *scheduleReconciler) ifDue(schedule *velerov1.Schedule, cronSchedule cron.Schedule) bool {
 	isDue, nextRunTime := getNextRunTime(schedule, cronSchedule, c.clock.Now())
 	log := c.logger.WithField("schedule", kube.NamespaceAndName(schedule))
 
 	if !isDue {
 		log.WithField("nextRunTime", nextRunTime).Debug("Schedule is not due, skipping")
-		return false, nextRunTime
+		return false
 	}
 
-	return true, nextRunTime
+	return true
 }
 
 // submitBackup create a backup from schedule.
