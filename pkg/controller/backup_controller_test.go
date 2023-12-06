@@ -46,7 +46,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/pkg/backup"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 
@@ -1746,7 +1745,7 @@ func TestGenerateVolumeInfoForSkippedPV(t *testing.T) {
 	tests := []struct {
 		name                string
 		skippedPVName       string
-		pvMap               map[string]backup.PvcPvInfo
+		pvMap               map[string]pkgbackup.PvcPvInfo
 		expectedVolumeInfos []volume.VolumeInfo
 	}{
 		{
@@ -1757,7 +1756,7 @@ func TestGenerateVolumeInfoForSkippedPV(t *testing.T) {
 		{
 			name:          "Normal Skipped PV info",
 			skippedPVName: "testPV",
-			pvMap: map[string]backup.PvcPvInfo{
+			pvMap: map[string]pkgbackup.PvcPvInfo{
 				"velero/testPVC": {
 					PVCName:      "testPVC",
 					PVCNamespace: "velero",
@@ -1805,8 +1804,8 @@ func TestGenerateVolumeInfoForSkippedPV(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			request := new(backup.Request)
-			request.SkippedPVTracker = backup.NewSkipPVTracker()
+			request := new(pkgbackup.Request)
+			request.SkippedPVTracker = pkgbackup.NewSkipPVTracker()
 			if tc.skippedPVName != "" {
 				request.SkippedPVTracker.Track(tc.skippedPVName, "CSI", "skipped for PodVolumeBackup")
 			}
@@ -1829,7 +1828,7 @@ func TestGenerateVolumeInfoForCSIVolumeSnapshot(t *testing.T) {
 		volumeSnapshot        snapshotv1api.VolumeSnapshot
 		volumeSnapshotContent snapshotv1api.VolumeSnapshotContent
 		volumeSnapshotClass   snapshotv1api.VolumeSnapshotClass
-		pvMap                 map[string]backup.PvcPvInfo
+		pvMap                 map[string]pkgbackup.PvcPvInfo
 		operation             *itemoperation.BackupOperation
 		expectedVolumeInfos   []volume.VolumeInfo
 	}{
@@ -1934,7 +1933,7 @@ func TestGenerateVolumeInfoForCSIVolumeSnapshot(t *testing.T) {
 			},
 			volumeSnapshotClass:   *builder.ForVolumeSnapshotClass("testClass").Driver("pd.csi.storage.gke.io").Result(),
 			volumeSnapshotContent: *builder.ForVolumeSnapshotContent("testContent").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: stringPtr("testSnapshotHandle")}).Result(),
-			pvMap: map[string]backup.PvcPvInfo{
+			pvMap: map[string]pkgbackup.PvcPvInfo{
 				"velero/testPVC": {
 					PVCName:      "testPVC",
 					PVCNamespace: "velero",
@@ -1990,7 +1989,7 @@ func TestGenerateVolumeInfoForCSIVolumeSnapshot(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			request := new(backup.Request)
+			request := new(pkgbackup.Request)
 			request.Backup = new(velerov1api.Backup)
 			if tc.pvMap != nil {
 				request.PVMap = tc.pvMap
@@ -2012,7 +2011,7 @@ func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 	tests := []struct {
 		name                string
 		nativeSnapshot      volume.Snapshot
-		pvMap               map[string]backup.PvcPvInfo
+		pvMap               map[string]pkgbackup.PvcPvInfo
 		expectedVolumeInfos []volume.VolumeInfo
 	}{
 		{
@@ -2037,7 +2036,7 @@ func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 		},
 		{
 			name: "Normal native snapshot",
-			pvMap: map[string]backup.PvcPvInfo{
+			pvMap: map[string]pkgbackup.PvcPvInfo{
 				"testPV": {
 					PVCName:      "testPVC",
 					PVCNamespace: "velero",
@@ -2088,7 +2087,7 @@ func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			request := new(backup.Request)
+			request := new(pkgbackup.Request)
 			request.VolumeSnapshots = append(request.VolumeSnapshots, &tc.nativeSnapshot)
 			if tc.pvMap != nil {
 				request.PVMap = tc.pvMap
@@ -2106,7 +2105,7 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 		name                string
 		pvb                 *velerov1api.PodVolumeBackup
 		pod                 *corev1api.Pod
-		pvMap               map[string]backup.PvcPvInfo
+		pvMap               map[string]pkgbackup.PvcPvInfo
 		expectedVolumeInfos []volume.VolumeInfo
 	}{
 		{
@@ -2171,7 +2170,7 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 		},
 		{
 			name: "PVB's volume has a PVC",
-			pvMap: map[string]backup.PvcPvInfo{
+			pvMap: map[string]pkgbackup.PvcPvInfo{
 				"velero/testPVC": {
 					PVCName:      "testPVC",
 					PVCNamespace: "velero",
@@ -2250,7 +2249,7 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 		volumeSnapshotClass *snapshotv1api.VolumeSnapshotClass
 		dataUpload          *velerov2alpha1.DataUpload
 		operation           *itemoperation.BackupOperation
-		pvMap               map[string]backup.PvcPvInfo
+		pvMap               map[string]pkgbackup.PvcPvInfo
 		expectedVolumeInfos []volume.VolumeInfo
 	}{
 		{
@@ -2346,7 +2345,7 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 					},
 				},
 			},
-			pvMap: map[string]backup.PvcPvInfo{
+			pvMap: map[string]pkgbackup.PvcPvInfo{
 				"velero/testPVC": {
 					PVCName:      "testPVC",
 					PVCNamespace: "velero",
@@ -2413,7 +2412,7 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 					Created: &now,
 				},
 			},
-			pvMap: map[string]backup.PvcPvInfo{
+			pvMap: map[string]pkgbackup.PvcPvInfo{
 				"velero/testPVC": {
 					PVCName:      "testPVC",
 					PVCNamespace: "velero",
@@ -2455,7 +2454,7 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			request := new(backup.Request)
+			request := new(pkgbackup.Request)
 			operationList := request.GetItemOperationsList()
 			if tc.operation != nil {
 				*operationList = append(*operationList, tc.operation)
