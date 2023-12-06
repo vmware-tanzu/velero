@@ -333,7 +333,7 @@ func (r *DataDownloadReconciler) runCancelableDataPath(ctx context.Context, fsRe
 	}
 	log.WithField("path", path.ByPath).Info("fs init")
 
-	if err := fsRestore.StartRestore(dd.Spec.SnapshotID, path); err != nil {
+	if err := fsRestore.StartRestore(dd.Spec.SnapshotID, path, dd.Spec.DataMoverConfig); err != nil {
 		return r.errorOut(ctx, dd, err, fmt.Sprintf("error starting data path %s restore", path.ByPath), log)
 	}
 

@@ -418,6 +418,16 @@ spec:
                   restore from the most recent successful backup created from this
                   schedule.
                 type: string
+              uploaderConfig:
+                description: UploaderConfig specifies the configuration for the restore.
+                nullable: true
+                properties:
+                  writeSparseFiles:
+                    description: WriteSparseFiles is a flag to indicate whether write
+                      files sparsely or not.
+                    nullable: true
+                    type: boolean
+                type: object
             required:
             - backupName
             type: object

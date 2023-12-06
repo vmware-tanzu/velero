@@ -36,6 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
+	uploaderutil "github.com/vmware-tanzu/velero/pkg/uploader/util"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -177,7 +178,6 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 		}
 
 		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, repoIdentifier, backupInfo.uploaderType, data.SourceNamespace, pvc)
-
 		if err := veleroclient.CreateRetryGenerateName(r.crClient, r.ctx, volumeRestore); err != nil {
 			errs = append(errs, errors.WithStack(err))
 			continue
@@ -286,6 +286,11 @@ func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, backu
 		// this label is not used by velero, but useful for debugging.
 		pvr.Labels[velerov1api.PVCUIDLabel] = string(pvc.UID)
 	}
+
+	if restore.Spec.UploaderConfig != nil {
+		pvr.Spec.UploaderSettings = uploaderutil.StoreRestoreConfig(restore.Spec.UploaderConfig)
+	}
+
 	return pvr
 }
 

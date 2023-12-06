@@ -28,7 +28,7 @@ func TestDescribeUploaderConfig(t *testing.T) {
 		buf:    &bytes.Buffer{},
 	}
 	d.out.Init(d.buf, 0, 8, 2, ' ', 0)
-	DescribeUploaderConfig(d, input)
+	DescribeUploaderConfigForBackup(d, input)
 	d.out.Flush()
 	expect := `Uploader config:
   Parallel files upload:  10

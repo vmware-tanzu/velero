@@ -51,7 +51,7 @@ type DataUploadSpec struct {
 	// DataMoverConfig is for data-mover-specific configuration fields.
 	// +optional
 	// +nullable
-	DataMoverConfig *map[string]string `json:"dataMoverConfig,omitempty"`
+	DataMoverConfig map[string]string `json:"dataMoverConfig,omitempty"`
 
 	// Cancel indicates request to cancel the ongoing DataUpload. It can be set
 	// when the DataUpload is in InProgress phase
@@ -60,9 +60,6 @@ type DataUploadSpec struct {
 	// OperationTimeout specifies the time used to wait internal operations,
 	// before returning error as timeout.
 	OperationTimeout metav1.Duration `json:"operationTimeout"`
-
-	// UploaderConfig specifies the configuration for the uploader.
-	UploaderConfig shared.UploaderConfig `json:"uploaderConfig,omitempty"`
 }
 
 type SnapshotType string

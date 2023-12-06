@@ -36,6 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
+	uploaderutil "github.com/vmware-tanzu/velero/pkg/uploader/util"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -398,7 +399,6 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume c
 			BackupStorageLocation: backup.Spec.StorageLocation,
 			RepoIdentifier:        repoIdentifier,
 			UploaderType:          uploaderType,
-			UploaderConfig:        backup.Spec.UploaderConfig,
 		},
 	}
 
@@ -415,6 +415,10 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume c
 
 		// this tag is not used by velero, but useful for debugging.
 		pvb.Spec.Tags["pvc-uid"] = string(pvc.UID)
+	}
+
+	if backup.Spec.UploaderConfig != nil {
+		pvb.Spec.UploaderSettings = uploaderutil.StoreBackupConfig(backup.Spec.UploaderConfig)
 	}
 
 	return pvb

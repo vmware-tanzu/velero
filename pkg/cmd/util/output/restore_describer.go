@@ -32,6 +32,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
@@ -177,6 +178,11 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		d.Println()
 		d.Printf("Preserve Service NodePorts:\t%s\n", BoolPointerString(restore.Spec.PreserveNodePorts, "false", "true", "auto"))
 
+		if restore.Spec.UploaderConfig != nil && boolptr.IsSetToTrue(restore.Spec.UploaderConfig.WriteSparseFiles) {
+			d.Println()
+			DescribeUploaderConfigForRestore(d, restore.Spec)
+		}
+
 		d.Println()
 		describeRestoreItemOperations(ctx, kbClient, d, restore, details, insecureSkipTLSVerify, caCertFile)
 
@@ -191,6 +197,12 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 			d.Println()
 		}
 	})
+}
+
+// DescribeUploaderConfigForRestore describes uploader config in human-readable format
+func DescribeUploaderConfigForRestore(d *Describer, spec velerov1api.RestoreSpec) {
+	d.Printf("Uploader config:\n")
+	d.Printf("\tWrite Sparse Files:\t%T\n", boolptr.IsSetToTrue(spec.UploaderConfig.WriteSparseFiles))
 }
 
 func describeRestoreItemOperations(ctx context.Context, kbClient kbclient.Client, d *Describer, restore *velerov1api.Restore, details bool, insecureSkipTLSVerify bool, caCertPath string) {
