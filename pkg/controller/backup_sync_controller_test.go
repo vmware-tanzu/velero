@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -33,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	testclocks "k8s.io/utils/clock/testing"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -430,6 +430,8 @@ var _ = Describe("Backup Sync Reconciler", func() {
 					backupStore.On("GetBackupMetadata", backup.backup.Name).Return(backup.backup, nil)
 					backupStore.On("GetPodVolumeBackups", backup.backup.Name).Return(backup.podVolumeBackups, nil)
 					backupStore.On("BackupExists", "bucket-1", backup.backup.Name).Return(true, nil)
+					backupStore.On("GetCSIVolumeSnapshotClasses", backup.backup.Name).Return([]*snapshotv1api.VolumeSnapshotClass{}, nil)
+					backupStore.On("GetCSIVolumeSnapshotContents", backup.backup.Name).Return([]*snapshotv1api.VolumeSnapshotContent{}, nil)
 				}
 				backupStore.On("ListBackups").Return(backupNames, nil)
 			}

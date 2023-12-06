@@ -31,6 +31,8 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
@@ -187,10 +189,12 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		r.metrics.RegisterBackupPartialFailure(backupScheduleName)
 		r.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
 	}
+
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+	backup.Status.CSIVolumeSnapshotsCompleted = updateCSIVolumeSnapshotsCompleted(operations)
+
 	recordBackupMetrics(log, backup, outBackupFile, r.metrics, true)
 
-	pkgbackup.UpdateBackupCSISnapshotsStatus(r.client, r.globalCRClient, backup, log)
 	// update backup metadata in object store
 	backupJSON := new(bytes.Buffer)
 	if err := encode.To(backup, "json", backupJSON); err != nil {
@@ -213,4 +217,20 @@ func (r *backupFinalizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Backup{}).
 		Complete(r)
+}
+
+// updateCSIVolumeSnapshotsCompleted calculate the completed VS number according to
+// the backup's async operation list.
+func updateCSIVolumeSnapshotsCompleted(
+	operations []*itemoperation.BackupOperation) int {
+	completedNum := 0
+
+	for index := range operations {
+		if operations[index].Spec.ResourceIdentifier.String() == kuberesource.VolumeSnapshots.String() &&
+			operations[index].Status.Phase == itemoperation.OperationPhaseCompleted {
+			completedNum++
+		}
+	}
+
+	return completedNum
 }
