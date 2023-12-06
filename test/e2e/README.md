@@ -9,20 +9,27 @@ If you previously ran unit tests using the `go test ./...` command or any of its
 ## Prerequisites
 
 Running the E2E tests expects:
-1. A running Kubernetes cluster:
+1. One or two running Kubernetes clusters, migration scenario needs 2 clusters:
     1. With DNS and CNI installed.
     1. Compatible with Velero- running Kubernetes v1.10 or later.
     1. With necessary storage drivers/provisioners installed.
+
 1. `kubectl` installed locally.
+
+#### Note for migration scenario
+_Default Cluster_ refers to source cluster to backup from. Whereas _Standby Cluster_ refers to destination cluster to restore to.
 
 ## Limitations
 
 These are the current set of limitations with the E2E tests.
 
 1. E2E tests only accepts credentials only for a single provider and for that reason, only tests for a single provider can be run at a time.
-1. Each E2E test suite installs an instance of Velero to run tests and uninstalls it after test completion. It is possible that a test suite may be installing Velero while another may be uninstalling Velero. This race condition can lead to tests being flaky and cause false negatives. The options for resolving this are:
-    1. Make each test suite setup wait for Velero to be uninstalled before attempting to install as part of its setup.
-    1. Make each test suite install Velero in a different namespace.
+1. To avoid debugging or coding effort, we only have one test suite for Velero E2E test, and run in random order as ginkgo default behavior.
+1. Flag `-install-velero` is for purpose of having tests on an existed Velero instance, but by default `-install-velero` is set to true, because it's mandatory for some of cases to testing on specific version of Velero, such as upgrade and migration tests. In upgrade tests, we must install a specific old version and then upgrade it to  the target version, multiple installations is involved here, also migration tests have the same situation with upgrade tests, therefore if you're going to test against an existed Velero instance, make sure to skip upgrade and migration tests from a single E2E test execution.
+1. To improve E2E test execution efficiency, E2E tests will skip re-installation between test cases except for those which need a fresh Velero installation like upgrade , migration and some other test cases. When starting a E2E test execution which setting flag `-install-velero` with the default value(true), there will be a Velero installation at the beginning, then test cases will be run in random order, and test cases behavior is as below: 
+    1. If the scheduled test case is upgrade (or other cases needs a fresh Velero installation), then upgrade test will uninstall the current Velero instance at the beginning and uninstall the tested Velero instance in the end to avoid unexpected installation parameters for the following test cases. 
+    1. If the scheduled test case is the normal one,  it will check the existence of Velero instance, if no one there then start a new standard instaillation, otherwise proceeding test steps.
+
 
 ## Configuration for E2E tests
 
@@ -36,16 +43,41 @@ the object-store-provider to be specified.
 1. `-object-store-provider`: Object store provider to use. Required when kind is the cloud provider.
 1. `-velerocli`: Path to the velero application to use. Optional, by default uses `velero` in the `$PATH`
 1. `-velero-image`: Image for the velero server to be tested. Optional, by default uses `velero/velero:main`
+1. `-restore-helper-image`: Image for the velero restore helper to be tested. Optional, by default it is the built-in image address of velero image.
+1. `-plugins `: Provider plugins to be tested.
 1. `-bsl-config`: Configuration to use for the backup storage location. Format is key1=value1,key2=value2. Optional.
 1. `-prefix`: Prefix in the `bucket`, under which all Velero data should be stored within the bucket. Optional.
 1. `-vsl-config`: Configuration to use for the volume snapshot location. Format is key1=value1,key2=value2. Optional.
-1. `-velero-namespace`: Namespace to install velero in.  Optional, defaults to "velero".
+1. `-velero-namespace`: Namespace to install velero in. Optional, defaults to "velero".
 1. `-install-velero`: Specifies whether to install/uninstall velero for the tests.  Optional, defaults to "true".
+1. `-use-node-agent`: Whether deploy node agent daemonset velero during the test.  Optional.
+1. `-use-volume-snapshots`: Whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.
+1. `-additional-bsl-plugins`: Additional plugins to be tested.
 1. `-additional-bsl-object-store-provider`: Provider of object store plugin for additional backup storage location. Required if testing multiple credentials support.
 1. `-additional-bsl-bucket`: Name of the object storage bucket for additional backup storage location. Required if testing multiple credentials support.
 1. `-additional-bsl-prefix`: Prefix in the `additional-bsl-bucket`, under which all Velero data should be stored. Optional.
 1. `-additional-bsl-config`: Configuration to use for the additional backup storage location. Format is key1=value1,key2=value2. Optional.
 1. `-additional-bsl-credentials-file`: File containing credentials for the additional backup storage location. Required if testing multiple credentials support.
+1. `-velero-version`: Image version for the velero server to be tested with. It's set for upgrade test to verify Velero image version is installed as expected. Required if upgrade test is included in the test.
+1. `-upgrade-from-velero-version`: Comma-separated list of Velero version to be tested with for the pre-upgrade velero server.
+1. `-upgrade-from-velero-cli`: Comma-separated list of velero application for the pre-upgrade velero server.
+1. `-migrate-from-velero-version`: Comma-separated list of Velero version to be tested with on source cluster.
+1. `-migrate-from-velero-cli`: Comma-separated list of velero application on source cluster.
+1. `-features`: Comma-separated list of features to enable for this Velero process.
+1. `-registry-credential-file`: File containing credential for the image registry, follows the same format rules as the ~/.docker/config.json file. This credential will be loaded in Velero server pod to help on Docker Hub rate limit issue.
+1. `-kibishii-directory`: The file directory or URL path to install Kibishii. It's configurable in case the default path is not accessible for your own test environment.
+1. `-debug-e2e-test`: A Switch for enable or disable test data cleaning action.
+1. `-garbage-collection-frequency`: frequency of garbage collection. It is a parameter for Velero installation. Optional.
+1. `-velero-server-debug-mode`: A switch for enable or disable having debug log of Velero server.
+1. `-default-cluster`: Default (source) cluster's kube config context, it's for migration test.
+1. `-standby-cluster`: Standby (destination) cluster's kube config context, it's for migration test.
+1. `-uploader-type`: Type of uploader for persistent volume backup.
+1. `-snapshot-move-data`: A Switch for taking backup with Velero's data mover, if data-mover-plugin is not provided, using built-in plugin.
+1. `-data-mover-plugin`: Customized plugin for data mover.
+1. `-standby-cluster-cloud-provider`: Cloud provider for standby cluster.
+1. `-standby-cluster-plugins`: Plugins provider for standby cluster.
+1. `-standby-cluster-object-store-provider`: Object store provider for standby cluster.
+1. `-debug-velero-pod-restart`: A switch for debugging velero pod restart.
 
 These configurations or parameters are used to generate install options for Velero for each test suite.
 
@@ -64,16 +96,44 @@ Below is a mapping between `make` variables to E2E configuration flags.
 1. `OBJECT_STORE_PROVIDER`: `-object-store-provider`. Required when kind is the cloud provider.
 1. `VELERO_CLI`: the `-velerocli`. Optional.
 1. `VELERO_IMAGE`: the `-velero-image`. Optional.
+1. `RESTORE_HELPER_IMAGE `: the `-restore-helper-image`. Optional.
+1. `VERSION `: the `-velero-version`. Optional.
+1. `VELERO_NAMESPACE `: the `-velero-namespace`. Optional.
+1. `PLUGINS `: the `-plugins`. Optional.
 1. `BSL_PREFIX`: `-prefix`. Optional.
 1. `BSL_CONFIG`: `-bsl-config`. Optional.
 1. `VSL_CONFIG`: `-vsl-config`. Optional.
+1. `UPGRADE_FROM_VELERO_CLI `: `-upgrade-from-velero-cli`. Optional.
+1. `UPGRADE_FROM_VELERO_VERSION `: `-upgrade-from-velero-version`. Optional.
+1. `MIGRATE_FROM_VELERO_CLI `: `-migrate-from-velero-cli`. Optional.
+1. `MIGRATE_FROM_VELERO_VERSION `: `-migrate-from-velero-version`. Optional.
+1. `ADDITIONAL_BSL_PLUGINS `: `-additional-bsl-plugins`. Optional.
 1. `ADDITIONAL_OBJECT_STORE_PROVIDER`: `-additional-bsl-object-store-provider`. Optional.
 1. `ADDITIONAL_CREDS_FILE`: `-additional-bsl-bucket`. Optional.
 1. `ADDITIONAL_BSL_BUCKET`: `-additional-bsl-prefix`. Optional.
 1. `ADDITIONAL_BSL_PREFIX`: `-additional-bsl-config`. Optional.
 1. `ADDITIONAL_BSL_CONFIG`: `-additional-bsl-credentials-file`. Optional.
+1. `FEATURES`: `-features`. Optional.
+1. `REGISTRY_CREDENTIAL_FILE`: `-registry-credential-file`. Optional.
+1. `KIBISHII_DIRECTORY`: `-kibishii-directory`. Optional.
+1. `DEBUG_E2E_TEST`: `-debug-e2e-test`. Optional.
+1. `VELERO_SERVER_DEBUG_MODE`: `-velero-server-debug-mode`. Optional.
+1. `DEFAULT_CLUSTER`: `-default-cluster`. Optional.
+1. `STANDBY_CLUSTER`: `-standby-cluster`. Optional.
+1. `UPLOADER_TYPE`: `-uploader-type`. Optional.
+1. `SNAPSHOT_MOVE_DATA`: `-snapshot-move-data`. Optional.
+1. `DATA_MOVER_plugin`: `-data-mover-plugin`. Optional.
+1. `STANDBY_CLUSTER_CLOUD_PROVIDER`: `-standby-cluster-cloud-provider`. Optional.
+1. `STANDBY_CLUSTER_PLUGINS`: `-dstandby-cluster-plugins`. Optional.
+1. `STANDBY_CLUSTER_OBJECT_STORE_PROVIDER`: `-standby-cluster-object-store-provider`. Optional.
+1. `INSTALL_VELERO `: `-install-velero`. Optional.
+1. `DEBUG_VELERO_POD_RESTART`: `-debug-velero-pod-restart`. Optional.
 
-For example, E2E tests can be run from Velero repository roots using the commands below:
+
+
+#### For example, E2E tests can be run from Velero repository roots using the commands below:
+
+Basic examples:
 
 1. Run Velero tests in a kind cluster with AWS (or Minio) as the storage provider:
     ```bash
@@ -98,13 +158,119 @@ For example, E2E tests can be run from Velero repository roots using the command
       CLOUD_PROVIDER=kind OBJECT_STORE_PROVIDER=aws BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> BSL_PREFIX=<PREFIX_UNDER_BUCKET> CREDS_FILE=/path/to/aws-creds \
       ADDITIONAL_OBJECT_STORE_PROVIDER=azure ADDITIONAL_BSL_BUCKET=<BUCKET_FOR_AZURE_BSL> ADDITIONAL_BSL_PREFIX=<PREFIX_UNDER_BUCKET> ADDITIONAL_BSL_CONFIG=<CONFIG_FOR_AZURE_BUCKET> ADDITIONAL_CREDS_FILE=/path/to/azure-creds
     ```
-   Please refer to `velero-plugin-for-microsoft-azure` documentation for instruction to [set up permissions for Velero](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#set-permissions-for-velero) and to [set up azure storage account and blob container](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup-azure-storage-account-and-blob-container)
+
+Upgrade examples:
+
+1. Run Velero upgrade tests with pre-upgrade version:
+
+    This example will run 1 upgrade tests: v1.11.0 ~ target.
+    
+    ```bash
+    make test-e2e \
+      CLOUD_PROVIDER=aws  BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> CREDS_FILE=/path/to/aws-creds \
+      UPGRADE_FROM_VELERO_VERSION=v1.11.0
+    ```
+1. Run Velero upgrade tests with pre-upgrade version list:
+
+    This example will run 2 upgrade tests: v1.10.2 ~ target and v1.11.0 ~ target.
+    
+    ```bash
+    make test-e2e \
+      CLOUD_PROVIDER=aws  BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> CREDS_FILE=/path/to/aws-creds \
+      UPGRADE_FROM_VELERO_VERSION=v1.10.2,v1.11.0
+    ```
+
+
+
+Migration examples:
+
+1. Migration between 2 cluster of the same provider tests:
+    
+    Before running migration test, we should prepare kubeconfig file which contains config of each cluster under test, and set `DEFAULT_CLUSTER` and `STANDBY_CLUSTER` with the corresponding context value in kubeconfig file.
+ 
+    `MIGRATE_FROM_VELERO_VERSION` includes a keyword of `self`, which means migration from Velero under test (specified by `VELERO_IMAGE`) to the same Velero. This variable can be set to `v1.10.0`, `v1.10.0,v1.11.1`, `self` or `v1.11.0,self`.
+
+    ```bash
+    make test-e2e \
+      CLOUD_PROVIDER=aws  BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> CREDS_FILE=/path/to/aws-creds \
+      DEFAULT_CLUSTER=<CONTEXT_OF_WORKLOAD_CLUSTER_DEFAULT> \
+      STANDBY_CLUSTER=<CONTEXT_OF_WORKLOAD_CLUSTER_STANDBY> \
+      MIGRATE_FROM_VELERO_VERSION=v1.11.0,self
+    ```
+
+
+1. Datamover tests:
+
+    The example shows all essential `make` variables for a Datamover test which is migrate from a AKS cluster to a EKS cluster. 
+
+    Note: STANDBY_CLUSTER_CLOUD_PROVIDER and STANDBY_CLUSTER_OBJECT_STORE_PROVIDER is essential here, it is for identify plugins to be installed on target cluster, since DEFAULT cluster's provider is different from STANDBY cluster, plugins are different as well.
+    ```bash
+    make test-e2e
+      CLOUD_PROVIDER=azure \
+      DEFAULT_CLUSTER=<AKS_CLUSTER_KUBECONFIG_CONTEXT> \
+      STANDBY_CLUSTER=<EKS_CLUSTER_KUBECONFIG_CONTEXT> \ 
+      FEATURES=EnableCSI \
+      OBJECT_STORE_PROVIDER=aws \
+      CREDS_FILE=<AWS_CREDENTIAL_FILE> \ 
+      BSL_CONFIG=region=<AWS_REGION> \ 
+      BSL_BUCKET=<S3_BUCKET> \ 
+      BSL_PREFIX=<S3_BUCKET_PREFIC> \ 
+      VSL_CONFIG=region=<AWS_REGION> \ 
+      SNAPSHOT_MOVE_DATA=true \ 
+      STANDBY_CLUSTER_CLOUD_PROVIDER=aws \ 
+      STANDBY_CLUSTER_OBJECT_STORE_PROVIDER=aws \
+      GINKGO_FOCUS=Migration
+    ```
 
 ## Filtering tests
 
 Velero E2E tests uses [Ginkgo](https://onsi.github.io/ginkgo/) testing framework which allows a subset of the tests to be run using the [`-focus` and `-skip`](https://onsi.github.io/ginkgo/#focused-specs) flags to ginkgo.
 
-The `-focus` flag is passed to ginkgo using the `GINKGO_FOCUS` make variable. This can be used to focus on specific tests.
+For filtering tests, using `make` variables `GINKGO_FOCUS` and `GINKGO_SKIP`  :
+1. `GINKGO_FOCUS`: Dot-separated list of labels to be included for Ginkgo description-based filtering. Optional. The `-focus` flag is passed to ginkgo using the `GINKGO_FOCUS` `make` variable. This can be used to focus on specific tests. 
+1. `GINKGO_SKIP`: Dot-separated list of labels to be excluded for Ginkgo description-based filtering.Optional. The `-skip ` flag is passed to ginkgo using the `GINKGO_SKIP` `make` variable. This can be used to skip specific tests.
+
+
+
+`GINKGO_FOCUS`/`GINKGO_SKIP` can be interpreted into multiple `-focus`/`-skip ` describe in [Description-Based Filtering](https://onsi.github.io/ginkgo/#description-based-filtering:~:text=Description%2DBased%20Filtering) by dot-separated format for test execution management please refer to examples below.:
+
+
+For example, E2E tests can be run with specific cases to be included and/or excluded using the commands below:
+1. Run Velero tests with specific cases to be included:
+    ```bash
+    make test-e2e \
+      GINKGO_FOCUS =Basic\][\Restic  \
+      CLOUD_PROVIDER=aws BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> BSL_PREFIX=<PREFIX_UNDER_BUCKET> CREDS_FILE=/path/to/aws-creds
+    ```
+    In this example, only case  `[Basic][Restic]` is included.
+
+1. Run Velero tests with specific cases to be excluded:
+    ```bash
+    make test-e2e \
+      GINKGO_SKIP=Scale.Schedule.TTL.Upgrade\]\[Restic.Migration\][\Restic  \
+      CLOUD_PROVIDER=aws BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> BSL_PREFIX=<PREFIX_UNDER_BUCKET> CREDS_FILE=/path/to/aws-creds
+    ```
+    In this example, case `Scale`, `Schedule`, `TTL`, `[Upgrade][Restic]` and `[Migration][Restic]` will be skipped.
+
+
+
+## Full Tests execution
+
+As we provided several examples for E2E test execution, what if no filter is involved and despite difference of test environment, is that a full test that covered all features on some certain environment, unfortunately, to prevent long time running or for some special test scenarioes, there're some tests need to be run in a single execution or pipeline with specific parameters provided. 
+
+
+
+### Suggested pipelines for full test
+Following pipelines should cover all E2E tests along with proper filters:
+
+1. **CSI pipeline:** As we can see lots of labels in E2E test code, there're many snapshot-labeled test scripts. To cover CSI scenario, a pipeline with CSI enabled should be a good choice, otherwise, we will double all the snapshot cases for CSI scenario, it's very time-wasting. By providing `FEATURES=EnableCSI` and  `PLUGINS=<provider-plugin-images>,velero/velero-plugin-for-csi:<target-version>`, a CSI pipeline is ready for testing.
+1. **Data mover pipeline:** Data mover scenario is the same scenario with migaration test except the restriction of migaration between different providers, so it better to separated it out from other pipelines. Please refer the example in previous.
+1. **Restic/Kopia backup path pipelines:**
+    1. **Restic pipeline:** For the same reason of saving time, set `UPLOADER_TYPE` to `restic` for all file system backup test cases;
+    1. **Kopia pipeline:** Set `UPLOADER_TYPE` to `kopia` for all file system backup test cases;
+1. **Long time pipeline:** Long time cases should be group into one pipeline, currently these test cases with labels `Scale`, `Schedule` or `TTL` can be group into a pipeline, and make sure to skip them off in any other pipelines.
+    
+**Note:** please organize filters among proper pipelines for other test cases.
 
 ## Adding tests
 
