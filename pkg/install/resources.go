@@ -255,6 +255,7 @@ type VeleroOptions struct {
 	UploaderType                    string
 	DefaultSnapshotMoveData         bool
 	DisableInformerCache            bool
+	ScheduleSkipImmediately         bool
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -338,6 +339,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		WithGarbageCollectionFrequency(o.GarbageCollectionFrequency),
 		WithPodVolumeOperationTimeout(o.PodVolumeOperationTimeout),
 		WithUploaderType(o.UploaderType),
+		WithScheduleSkipImmediately(o.ScheduleSkipImmediately),
 	}
 
 	if len(o.Features) > 0 {

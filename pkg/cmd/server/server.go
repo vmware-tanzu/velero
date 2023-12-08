@@ -133,6 +133,7 @@ type serverConfig struct {
 	maxConcurrentK8SConnections                                             int
 	defaultSnapshotMoveData                                                 bool
 	disableInformerCache                                                    bool
+	scheduleSkipImmediately                                                 bool
 }
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -163,6 +164,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			maxConcurrentK8SConnections:    defaultMaxConcurrentK8SConnections,
 			defaultSnapshotMoveData:        false,
 			disableInformerCache:           defaultDisableInformerCache,
+			scheduleSkipImmediately:        false,
 		}
 	)
 
@@ -235,6 +237,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().IntVar(&config.maxConcurrentK8SConnections, "max-concurrent-k8s-connections", config.maxConcurrentK8SConnections, "Max concurrent connections number that Velero can create with kube-apiserver. Default is 30.")
 	command.Flags().BoolVar(&config.defaultSnapshotMoveData, "default-snapshot-move-data", config.defaultSnapshotMoveData, "Move data by default for all snapshots supporting data movement.")
 	command.Flags().BoolVar(&config.disableInformerCache, "disable-informer-cache", config.disableInformerCache, "Disable informer cache for Get calls on restore. With this enabled, it will speed up restore in cases where there are backup resources which already exist in the cluster, but for very large clusters this will increase velero memory usage. Default is false (don't disable).")
+	command.Flags().BoolVar(&config.scheduleSkipImmediately, "schedule-skip-immediately", config.scheduleSkipImmediately, "Skip the first scheduled backup immediately after creating a schedule. Default is false (don't skip).")
 
 	return command
 }
@@ -915,7 +918,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	if _, ok := enabledRuntimeControllers[controller.Schedule]; ok {
-		if err := controller.NewScheduleReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.metrics).SetupWithManager(s.mgr); err != nil {
+		if err := controller.NewScheduleReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.metrics, s.config.scheduleSkipImmediately).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.Schedule)
 		}
 	}

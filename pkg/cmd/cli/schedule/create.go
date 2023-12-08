@@ -82,6 +82,7 @@ example: "@every 2h30m".`,
 
 type CreateOptions struct {
 	BackupOptions              *backup.CreateOptions
+	SkipOptions                *SkipOptions
 	Schedule                   string
 	UseOwnerReferencesInBackup bool
 	Paused                     bool
@@ -90,11 +91,13 @@ type CreateOptions struct {
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
 		BackupOptions: backup.NewCreateOptions(),
+		SkipOptions:   NewSkipOptions(),
 	}
 }
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	o.BackupOptions.BindFlags(flags)
+	o.SkipOptions.BindFlags(flags)
 	flags.StringVar(&o.Schedule, "schedule", o.Schedule, "A cron expression specifying a recurring schedule for this backup to run")
 	flags.BoolVar(&o.UseOwnerReferencesInBackup, "use-owner-references-in-backup", o.UseOwnerReferencesInBackup, "Specifies whether to use OwnerReferences on backups created by this Schedule. Notice: if set to true, when schedule is deleted, backups will be deleted too.")
 	flags.BoolVar(&o.Paused, "paused", o.Paused, "Specifies whether the newly created schedule is paused or not.")
@@ -160,6 +163,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			Schedule:                   o.Schedule,
 			UseOwnerReferencesInBackup: &o.UseOwnerReferencesInBackup,
 			Paused:                     o.Paused,
+			SkipImmediately:            o.SkipOptions.SkipImmediately.Value,
 		},
 	}
 

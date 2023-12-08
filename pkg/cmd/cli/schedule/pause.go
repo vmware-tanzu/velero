@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
@@ -36,6 +37,7 @@ import (
 // NewPauseCommand creates the command for pause
 func NewPauseCommand(f client.Factory, use string) *cobra.Command {
 	o := cli.NewSelectOptions("pause", "schedule")
+	pauseOpts := NewPauseOptions()
 
 	c := &cobra.Command{
 		Use:   use,
@@ -54,16 +56,31 @@ func NewPauseCommand(f client.Factory, use string) *cobra.Command {
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args))
 			cmd.CheckError(o.Validate())
-			cmd.CheckError(runPause(f, o, true))
+			cmd.CheckError(runPause(f, o, true, pauseOpts.SkipOptions.SkipImmediately.Value))
 		},
 	}
 
 	o.BindFlags(c.Flags())
+	pauseOpts.BindFlags(c.Flags())
 
 	return c
 }
 
-func runPause(f client.Factory, o *cli.SelectOptions, paused bool) error {
+type PauseOptions struct {
+	SkipOptions *SkipOptions
+}
+
+func NewPauseOptions() *PauseOptions {
+	return &PauseOptions{
+		SkipOptions: NewSkipOptions(),
+	}
+}
+
+func (o *PauseOptions) BindFlags(flags *pflag.FlagSet) {
+	o.SkipOptions.BindFlags(flags)
+}
+
+func runPause(f client.Factory, o *cli.SelectOptions, paused bool, skipImmediately *bool) error {
 	crClient, err := f.KubebuilderClient()
 	if err != nil {
 		return err
@@ -120,6 +137,7 @@ func runPause(f client.Factory, o *cli.SelectOptions, paused bool) error {
 			continue
 		}
 		schedule.Spec.Paused = paused
+		schedule.Spec.SkipImmediately = skipImmediately
 		if err := crClient.Update(context.TODO(), schedule); err != nil {
 			return errors.Wrapf(err, "failed to update schedule %s", schedule.Name)
 		}
