@@ -25,28 +25,28 @@ import (
 )
 
 const (
-	parallelFilesUpload = "ParallelFilesUpload"
-	writeSparseFiles    = "WriteSparseFiles"
+	ParallelFilesUpload = "ParallelFilesUpload"
+	WriteSparseFiles    = "WriteSparseFiles"
 )
 
 func StoreBackupConfig(config *velerov1api.UploaderConfigForBackup) map[string]string {
 	data := make(map[string]string)
-	data[parallelFilesUpload] = strconv.Itoa(config.ParallelFilesUpload)
+	data[ParallelFilesUpload] = strconv.Itoa(config.ParallelFilesUpload)
 	return data
 }
 
 func StoreRestoreConfig(config *velerov1api.UploaderConfigForRestore) map[string]string {
 	data := make(map[string]string)
 	if config.WriteSparseFiles != nil {
-		data[writeSparseFiles] = strconv.FormatBool(*config.WriteSparseFiles)
+		data[WriteSparseFiles] = strconv.FormatBool(*config.WriteSparseFiles)
 	} else {
-		data[writeSparseFiles] = strconv.FormatBool(false)
+		data[WriteSparseFiles] = strconv.FormatBool(false)
 	}
 	return data
 }
 
 func GetParallelFilesUpload(uploaderCfg map[string]string) (int, error) {
-	parallelFilesUpload, ok := uploaderCfg[parallelFilesUpload]
+	parallelFilesUpload, ok := uploaderCfg[ParallelFilesUpload]
 	if ok {
 		parallelFilesUploadInt, err := strconv.Atoi(parallelFilesUpload)
 		if err != nil {
@@ -58,7 +58,7 @@ func GetParallelFilesUpload(uploaderCfg map[string]string) (int, error) {
 }
 
 func GetWriteSparseFiles(uploaderCfg map[string]string) (bool, error) {
-	writeSparseFiles, ok := uploaderCfg[writeSparseFiles]
+	writeSparseFiles, ok := uploaderCfg[WriteSparseFiles]
 	if ok {
 		writeSparseFilesBool, err := strconv.ParseBool(writeSparseFiles)
 		if err != nil {
