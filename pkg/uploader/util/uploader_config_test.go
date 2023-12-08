@@ -31,7 +31,7 @@ func TestStoreBackupConfig(t *testing.T) {
 	}
 
 	expectedData := map[string]string{
-		parallelFilesUpload: "3",
+		ParallelFilesUpload: "3",
 	}
 
 	result := StoreBackupConfig(config)
@@ -42,19 +42,52 @@ func TestStoreBackupConfig(t *testing.T) {
 }
 
 func TestStoreRestoreConfig(t *testing.T) {
-	boolTrue := true
-	config := &velerov1api.UploaderConfigForRestore{
-		WriteSparseFiles: &boolTrue,
+	var (
+		boolTrue  = true
+		boolFalse = false
+	)
+	testCases := []struct {
+		name         string
+		config       *velerov1api.UploaderConfigForRestore
+		expectedData map[string]string
+	}{
+		{
+			name: "WriteSparseFiles is true",
+			config: &velerov1api.UploaderConfigForRestore{
+				WriteSparseFiles: &boolTrue,
+			},
+			expectedData: map[string]string{
+				WriteSparseFiles: "true",
+			},
+		},
+		{
+			name: "WriteSparseFiles is false",
+			config: &velerov1api.UploaderConfigForRestore{
+				WriteSparseFiles: &boolFalse,
+			},
+			expectedData: map[string]string{
+				WriteSparseFiles: "false",
+			},
+		},
+		{
+			name: "WriteSparseFiles is nil",
+			config: &velerov1api.UploaderConfigForRestore{
+				WriteSparseFiles: nil,
+			},
+			expectedData: map[string]string{
+				WriteSparseFiles: "false", // Assuming default value is false for nil case
+			},
+		},
 	}
 
-	expectedData := map[string]string{
-		writeSparseFiles: "true",
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := StoreRestoreConfig(tc.config)
 
-	result := StoreRestoreConfig(config)
-
-	if !reflect.DeepEqual(result, expectedData) {
-		t.Errorf("Expected: %v, but got: %v", expectedData, result)
+			if !reflect.DeepEqual(result, tc.expectedData) {
+				t.Errorf("Expected: %v, but got: %v", tc.expectedData, result)
+			}
+		})
 	}
 }
 
@@ -67,7 +100,7 @@ func TestGetParallelFilesUpload(t *testing.T) {
 	}{
 		{
 			name:           "Valid ParallelFilesUpload",
-			uploaderCfg:    map[string]string{parallelFilesUpload: "5"},
+			uploaderCfg:    map[string]string{ParallelFilesUpload: "5"},
 			expectedResult: 5,
 			expectedError:  nil,
 		},
@@ -79,7 +112,7 @@ func TestGetParallelFilesUpload(t *testing.T) {
 		},
 		{
 			name:           "Invalid ParallelFilesUpload (not a number)",
-			uploaderCfg:    map[string]string{parallelFilesUpload: "invalid"},
+			uploaderCfg:    map[string]string{ParallelFilesUpload: "invalid"},
 			expectedResult: 0,
 			expectedError:  errors.Wrap(errors.New("strconv.Atoi: parsing \"invalid\": invalid syntax"), "failed to parse ParallelFilesUpload config"),
 		},
@@ -109,19 +142,19 @@ func TestGetWriteSparseFiles(t *testing.T) {
 	}{
 		{
 			name:           "Valid WriteSparseFiles (true)",
-			uploaderCfg:    map[string]string{writeSparseFiles: "true"},
+			uploaderCfg:    map[string]string{WriteSparseFiles: "true"},
 			expectedResult: true,
 			expectedError:  nil,
 		},
 		{
 			name:           "Valid WriteSparseFiles (false)",
-			uploaderCfg:    map[string]string{writeSparseFiles: "false"},
+			uploaderCfg:    map[string]string{WriteSparseFiles: "false"},
 			expectedResult: false,
 			expectedError:  nil,
 		},
 		{
 			name:           "Invalid WriteSparseFiles (not a boolean)",
-			uploaderCfg:    map[string]string{writeSparseFiles: "invalid"},
+			uploaderCfg:    map[string]string{WriteSparseFiles: "invalid"},
 			expectedResult: false,
 			expectedError:  errors.Wrap(errors.New("strconv.ParseBool: parsing \"invalid\": invalid syntax"), "failed to parse WriteSparseFiles config"),
 		},
