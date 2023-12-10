@@ -1,0 +1,163 @@
+# Documentation reference https://github.com/golangci/golangci-lint/blob/v1.57.1/.golangci.reference.yml
+run:
+  timeout: 20m
+  skip-dirs:
+    - third_party/*
+  skip-dirs-use-default: false
+  modules-download-mode: readonly
+  allow-parallel-runners: false
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
+  sort-results: true
+
+linters-settings:
+  dogsled:
+    max-blank-identifiers: 2
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  goconst:
+    min-len: 3
+    min-occurrences: 5
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: github.com/vmware-tanzu/velero
+  govet:
+    disable-all: false
+    enable:
+      - atomicalign
+    enable-all: false
+  misspell:
+    locale: US
+  nakedret:
+    max-func-lines: 30
+  nolintlint:
+    allow-unused: false
+    allow-no-explanation: []
+    require-explanation: true
+    require-specific: true
+  revive:
+    # TODO: enable them all
+    # enable-all-rules: true
+    rules:
+      - name: unexported-return
+        disabled: true # TODO should be false?
+  testifylint:
+    # TODO: enable them all
+    disable:
+      - bool-compare
+      - compares
+      - error-is-as
+      - error-nil
+      - expected-actual
+      - go-require
+      - float-compare
+      - require-error
+      - suite-dont-use-pkg
+      - suite-extra-assert-call
+      - suite-thelper
+    enable:
+      - empty
+      - len
+  unparam:
+    check-exported: true
+  whitespace:
+    multi-if: false
+    multi-func: false
+
+linters:
+  disable-all: true
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - dogsled
+    - dupword
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - exportloopref
+    - ginkgolinter
+    - goconst
+    - gofmt
+    - goheader
+    - goimports
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - importas
+    - ineffassign
+    - misspell
+    - nakedret
+    - nilerr
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - revive
+    - staticcheck
+    - stylecheck
+    - testifylint
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - whitespace
+  fast: false
+
+issues:
+  exclude-rules:
+    - linters:
+        - staticcheck
+      # grpc-go still uses github.com/golang/protobuf/proto.
+      text: "github.com/golang/protobuf/proto"
+    - linters:
+        - staticcheck
+      # Kopia still depends on this.
+      text: "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
+    - linters:
+        - staticcheck
+      # No need to report deprecate for DefaultVolumesToRestic.
+      text: "DefaultVolumesToRestic"
+     # TODO: remove all excludes for test files
+    - path: ".*_test.go$"
+      linters:
+        - dupword
+        - errcheck
+        - ginkgolinter
+        - goconst
+        - gosec
+        - govet
+        - staticcheck
+        - stylecheck
+        - unconvert
+        - unparam
+        - unused
+    - path: test/
+      linters:
+        - bodyclose
+        - dupword
+        - errcheck
+        - goconst
+        - gosec
+        - gosimple
+        - ginkgolinter
+        - nilerr
+        - noctx
+        - staticcheck
+        - stylecheck
+        - unconvert
+        - unparam
+        - unused
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+severity:
+  default-severity: error
+  case-sensitive: false
