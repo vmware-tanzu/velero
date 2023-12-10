@@ -2277,6 +2277,7 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource string, namespac
 		ctx.log.Infof("Resource '%s' will be restored at cluster scope", resource)
 	}
 
+	resourceForPath := resource
 	// If the APIGroupVersionsFeatureFlag is enabled, the item path will be
 	// updated to include the API group version that was chosen for restore. For
 	// example, for "horizontalpodautoscalers.autoscaling", if v2beta1 is chosen
@@ -2288,11 +2289,11 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource string, namespac
 	// required backup format version has been met.
 	cgv, ok := ctx.chosenGrpVersToRestore[resource]
 	if ok {
-		resource = filepath.Join(resource, cgv.Dir)
+		resourceForPath = filepath.Join(resource, cgv.Dir)
 	}
 
 	for _, item := range items {
-		itemPath := archive.GetItemFilePath(ctx.restoreDir, resource, originalNamespace, item)
+		itemPath := archive.GetItemFilePath(ctx.restoreDir, resourceForPath, originalNamespace, item)
 
 		obj, err := archive.Unmarshal(ctx.fileSystem, itemPath)
 		if err != nil {
