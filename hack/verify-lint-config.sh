@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2017 the Velero contributors.
+# Copyright the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,5 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HACK_DIR=$(dirname "${BASH_SOURCE[0]}")
-"${HACK_DIR}"/update-1fmt.sh --verify
+CMD="golangci-lint config verify"
+echo "Running $CMD"
+
+exec $CMD
