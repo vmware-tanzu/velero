@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2020 the Velero contributors.
+# Copyright the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ golangci-lint cache status
 
 # Enable GL_DEBUG line below for debug messages for golangci-lint
 # export GL_DEBUG=loader,gocritic,env
-CMD="golangci-lint run"
+CMD="golangci-lint run $@"
 echo "Running $CMD"
 
-eval $CMD
+exec $CMD

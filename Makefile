@@ -236,12 +236,14 @@ endif
 
 lint:
 ifneq ($(SKIP_TESTS), 1)
+	@$(MAKE) shell CMD="-c 'hack/verify-lint-config.sh'"
 	@$(MAKE) shell CMD="-c 'hack/lint.sh'"
 endif
 
-local-lint:
+lint-fix:
 ifneq ($(SKIP_TESTS), 1)
-	@hack/lint.sh
+	@$(MAKE) shell CMD="-c 'hack/verify-lint-config.sh'"
+	@$(MAKE) shell CMD="-c 'hack/lint.sh --fix'"
 endif
 
 update:
