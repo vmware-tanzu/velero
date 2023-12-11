@@ -586,6 +586,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		backupLocation           *velerov1api.BackupStorageLocation
 		defaultVolumesToFsBackup bool
 		defaultSnapshotMoveData  bool
+		enableCSI                bool
 		expectedResult           *velerov1api.Backup
 		backupExists             bool
 		existenceCheckError      error
@@ -1025,6 +1026,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			backup:                   defaultBackup().SnapshotMoveData(true).Result(),
 			backupLocation:           defaultBackupLocation,
 			defaultVolumesToFsBackup: false,
+			enableCSI:                true,
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Backup",
@@ -1065,6 +1067,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			backup:                   defaultBackup().SnapshotMoveData(false).Result(),
 			backupLocation:           defaultBackupLocation,
 			defaultVolumesToFsBackup: false,
+			enableCSI:                true,
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Backup",
@@ -1105,6 +1108,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			backup:                   defaultBackup().Result(),
 			backupLocation:           defaultBackupLocation,
 			defaultVolumesToFsBackup: false,
+			enableCSI:                true,
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Backup",
@@ -1187,6 +1191,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			backupLocation:           defaultBackupLocation,
 			defaultVolumesToFsBackup: false,
 			defaultSnapshotMoveData:  true,
+			enableCSI:                true,
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Backup",
@@ -1362,7 +1367,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			require.NoError(t, fakeClient.Create(context.Background(), defaultBackupLocation))
 
 			// Enable CSI feature flag for SnapshotDataMovement test.
-			if strings.Contains(test.name, "backup with snapshot data movement") {
+			if test.enableCSI {
 				features.Enable(velerov1api.CSIFeatureFlag)
 			}
 
@@ -1371,7 +1376,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			assert.Nil(t, err)
 
 			// Disable CSI feature to not impact other test cases.
-			if strings.Contains(test.name, "backup with snapshot data movement") {
+			if test.enableCSI {
 				features.Disable(velerov1api.CSIFeatureFlag)
 			}
 
