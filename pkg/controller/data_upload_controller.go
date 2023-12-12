@@ -141,7 +141,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				log.Errorf("failed to add finalizer with error %s for %s/%s", err.Error(), du.Namespace, du.Name)
 				return ctrl.Result{}, err
 			} else if !succeeded {
-				log.Warnf("failed to add finilizer for %s/%s and will requeue later", du.Namespace, du.Name)
+				log.Warnf("failed to add finalizer for %s/%s and will requeue later", du.Namespace, du.Name)
 				return ctrl.Result{Requeue: true}, nil
 			}
 		}
@@ -311,7 +311,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 		return ctrl.Result{}, nil
 	} else {
-		// put the finilizer remove action here for all cr will goes to the final status, we could check finalizer and do remove action in final status
+		// put the finalizer remove action here for all cr will goes to the final status, we could check finalizer and do remove action in final status
 		// instead of intermediate state.
 		// remove finalizer no matter whether the cr is being deleted or not for it is no longer needed when internal resources are all cleaned up
 		// also in final status cr won't block the direct delete of the velero namespace
