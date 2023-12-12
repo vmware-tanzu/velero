@@ -19,6 +19,7 @@ package providers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -65,6 +66,7 @@ func (s GCSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix
 		}
 	}
 }
+
 func (s GCSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) error {
 	q := &storage.Query{
 		Prefix: bslPrefix,
@@ -140,4 +142,14 @@ func (s GCSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObj
 		fmt.Printf("Snapshot count %d is as expected %d\n", snapshotCountFound, len(snapshotCheck.SnapshotIDList))
 		return nil
 	}
+}
+
+func (s GCSStorage) GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, objectKey string) (io.ReadCloser, error) {
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx, option.WithCredentialsFile(cloudCredentialsFile))
+	if err != nil {
+		return nil, errors.Wrapf(err, "fail to create GCloud client")
+	}
+
+	return client.Bucket(bslBucket).Object(strings.Join([]string{bslPrefix, objectKey}, "/")).NewReader(ctx)
 }

@@ -27,6 +27,7 @@ import (
 
 const StorageClassName = "e2e-storage-class"
 const StorageClassName2 = "e2e-storage-class-2"
+const CSIStorageClassName = "e2e-csi-storage-class"
 const FeatureCSI = "EnableCSI"
 
 var InstallVelero bool

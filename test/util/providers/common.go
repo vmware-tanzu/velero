@@ -17,13 +17,17 @@ limitations under the License.
 package providers
 
 import (
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
 	. "github.com/vmware-tanzu/velero/test"
 	velero "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -32,6 +36,7 @@ type ObjectsInStorage interface {
 	IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) (bool, error)
 	DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) error
 	IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupName string, snapshotCheck SnapshotCheckPoint) error
+	GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, objectKey string) (io.ReadCloser, error)
 }
 
 func ObjectsShouldBeInBucket(objectStoreProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string) error {
@@ -188,4 +193,60 @@ func IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig
 		}
 	}
 	return nil
+}
+
+func GetVolumeInfoMetadataContent(
+	cloudProvider,
+	cloudCredentialsFile,
+	bslBucket,
+	bslPrefix,
+	bslConfig,
+	backupName,
+	subPrefix string,
+) (io.Reader, error) {
+	bslPrefix = strings.Trim(getFullPrefix(bslPrefix, subPrefix), "/")
+	volumeFileName := backupName + "-volumeinfo.json.gz"
+	fmt.Printf("|| VERIFICATION || - Get backup %s volumeinfo file in storage %s\n", backupName, bslPrefix)
+	s, err := getProvider(cloudProvider)
+	if err != nil {
+		return nil, errors.Wrapf(err, fmt.Sprintf("Cloud provider %s is not valid", cloudProvider))
+	}
+
+	return s.GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, volumeFileName)
+}
+
+func GetVolumeInfo(
+	cloudProvider,
+	cloudCredentialsFile,
+	bslBucket,
+	bslPrefix,
+	bslConfig,
+	backupName,
+	subPrefix string,
+) ([]*volume.VolumeInfo, error) {
+	readCloser, err := GetVolumeInfoMetadataContent(cloudProvider,
+		cloudCredentialsFile,
+		bslBucket,
+		bslPrefix,
+		bslConfig,
+		backupName,
+		subPrefix,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	gzr, err := gzip.NewReader(readCloser)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer gzr.Close()
+
+	volumeInfos := make([]*volume.VolumeInfo, 0)
+
+	if err := json.NewDecoder(gzr).Decode(&volumeInfos); err != nil {
+		return nil, errors.Wrap(err, "error decoding object data")
+	}
+
+	return volumeInfos, nil
 }

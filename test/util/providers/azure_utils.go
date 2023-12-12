@@ -18,6 +18,7 @@ package providers
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -363,4 +364,33 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupN
 		fmt.Printf("Snapshot count %d is as expected %d\n", snapshotCountFound, snapshotCheck.ExpectCount)
 		return nil
 	}
+}
+
+func (s AzureStorage) GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, objectKey string) (io.ReadCloser, error) {
+	ctx := context.Background()
+	accountName, accountKey, err := getStorageCredential(cloudCredentialsFile, bslConfig)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Fail to get storage account name and  key of bucket %s", bslBucket)
+	}
+
+	credential, err := azblob.NewSharedKeyCredential(accountName, accountKey)
+	if err != nil {
+		log.Fatal("Invalid credentials with error: " + err.Error())
+	}
+	p := azblob.NewPipeline(credential, azblob.PipelineOptions{})
+
+	URL, _ := url.Parse(
+		fmt.Sprintf("https://%s.blob.core.windows.net/%s", accountName, bslBucket))
+
+	containerURL := azblob.NewContainerURL(*URL, p)
+	_, err = containerURL.Create(ctx, azblob.Metadata{}, azblob.PublicAccessNone)
+	handleErrors(err)
+
+	blobURL := containerURL.NewBlockBlobURL(strings.Join([]string{bslPrefix, objectKey}, "/"))
+	downloadResponse, err := blobURL.Download(ctx, 0, 0, azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
+	if err != nil {
+		handleErrors(err)
+	}
+
+	return downloadResponse.Body(azblob.RetryReaderOptions{}), nil
 }

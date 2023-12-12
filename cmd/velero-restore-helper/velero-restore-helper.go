@@ -73,7 +73,7 @@ func done() bool {
 			return false
 		}
 
-		fmt.Printf("Found %s", doneFile)
+		fmt.Printf("Found the done file %s\n", doneFile)
 	}
 
 	return true

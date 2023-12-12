@@ -204,6 +204,12 @@ func KubectlApplyByFile(ctx context.Context, file string) error {
 	return exec.CommandContext(ctx, "kubectl", args...).Run()
 }
 
+func KubectlDeleteByFile(ctx context.Context, file string) error {
+	args := []string{"delete", "-f", file, "--force=true"}
+	fmt.Println(args)
+	return exec.CommandContext(ctx, "kubectl", args...).Run()
+}
+
 func KubectlConfigUseContext(ctx context.Context, kubectlContext string) error {
 	cmd := exec.CommandContext(ctx, "kubectl",
 		"config", "use-context", kubectlContext)
