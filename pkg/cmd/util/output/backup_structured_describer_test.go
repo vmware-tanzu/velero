@@ -337,11 +337,27 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 	}()
 
 	testcases := []struct {
-		name         string
-		volumeInfo   []*volume.VolumeInfo
-		inputDetails bool
-		expect       map[string]interface{}
+		name             string
+		volumeInfo       []*volume.VolumeInfo
+		inputDetails     bool
+		expect           map[string]interface{}
+		legacyInfoSource bool
 	}{
+		{
+			name:       "empty info, not legacy",
+			volumeInfo: []*volume.VolumeInfo{},
+			expect: map[string]interface{}{
+				"csiSnapshots": "<none included>",
+			},
+		},
+		{
+			name:             "empty info, legacy",
+			volumeInfo:       []*volume.VolumeInfo{},
+			legacyInfoSource: true,
+			expect: map[string]interface{}{
+				"csiSnapshots": "<none included or not detectable>",
+			},
+		},
 		{
 			name: "no details, local snapshot",
 			volumeInfo: []*volume.VolumeInfo{
@@ -480,7 +496,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(tt *testing.T) {
 			output := make(map[string]interface{})
-			describeCSISnapshotsInSF(tc.inputDetails, tc.volumeInfo, output)
+			describeCSISnapshotsInSF(tc.inputDetails, tc.volumeInfo, output, tc.legacyInfoSource)
 			assert.True(tt, reflect.DeepEqual(output, tc.expect))
 		})
 	}
