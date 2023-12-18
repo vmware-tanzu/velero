@@ -41,9 +41,8 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			crClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
-			var schedules *v1.ScheduleList
+			schedules := new(v1.ScheduleList)
 			if len(args) > 0 {
-				schedules = new(v1.ScheduleList)
 				for _, name := range args {
 					schedule := new(v1.Schedule)
 					err := crClient.Get(context.TODO(), ctrlclient.ObjectKey{Namespace: f.Namespace(), Name: name}, schedule)
