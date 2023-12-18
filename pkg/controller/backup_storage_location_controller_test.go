@@ -51,7 +51,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			expectedPhase     velerov1api.BackupStorageLocationPhase
 		}{
 			{
-				backupLocation:    builder.ForBackupStorageLocation("ns-1", "location-1").ValidationFrequency(1 * time.Second).Result(),
+				backupLocation:    builder.ForBackupStorageLocation("ns-1", "location-1").ValidationFrequency(1 * time.Second).Default(true).Result(),
 				isValidError:      nil,
 				expectedIsDefault: true,
 				expectedPhase:     velerov1api.BackupStorageLocationPhaseAvailable,
@@ -206,7 +206,7 @@ func TestEnsureSingleDefaultBSL(t *testing.T) {
 			defaultBackupInfo: storage.DefaultBackupLocationInfo{
 				StorageLocation: "location-2",
 			},
-			expectedDefaultSet: true,
+			expectedDefaultSet: false,
 			expectedError:      nil,
 		},
 		{

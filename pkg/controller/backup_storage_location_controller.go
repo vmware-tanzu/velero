@@ -250,26 +250,7 @@ func (r *backupStorageLocationReconciler) ensureSingleDefaultBSL(locationList ve
 			}
 		}
 	} else if len(defaultBSLs) == 0 { // no default BSL
-		// find the BSL that matches the "velero server --default-backup-storage-location"
-		var defaultBSL *velerov1api.BackupStorageLocation
-		for i, location := range locationList.Items {
-			if location.Name == r.defaultBackupLocationInfo.StorageLocation {
-				defaultBSL = &locationList.Items[i]
-				break
-			}
-		}
-
-		// set the default BSL
-		if defaultBSL != nil {
-			defaultBSL.Spec.Default = true
-			defaultFound = true
-			if err := r.client.Update(r.ctx, defaultBSL); err != nil {
-				return defaultFound, errors.Wrapf(err, "failed to set default backup storage location %q", defaultBSL.Name)
-			}
-			r.log.Debugf("update default backup storage location %q to true", defaultBSL.Name)
-		} else {
-			defaultFound = false
-		}
+		defaultFound = false
 	} else { // only 1 default BSL
 		defaultFound = true
 	}

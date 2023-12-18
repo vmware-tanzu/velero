@@ -431,10 +431,52 @@ func (s *server) run() error {
 		return err
 	}
 
-	markInProgressCRsFailed(s.ctx, s.mgr.GetConfig(), s.mgr.GetScheme(), s.namespace, s.logger)
+	if err := s.setupBeforeControllerRun(); err != nil {
+		return err
+	}
 
 	if err := s.runControllers(s.config.defaultVolumeSnapshotLocations); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// setupBeforeControllerRun do any setup that needs to happen before the controllers are started.
+func (s *server) setupBeforeControllerRun() error {
+	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
+	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	markInProgressCRsFailed(s.ctx, client, s.namespace, s.logger)
+
+	if err := setDefaultBackupLocation(s.ctx, client, s.namespace, s.config.defaultBackupLocation, s.logger); err != nil {
+		return err
+	}
+	return nil
+}
+
+// setDefaultBackupLocation set the BSL that matches the "velero server --default-backup-storage-location"
+func setDefaultBackupLocation(ctx context.Context, client ctrlclient.Client, namespace, defaultBackupLocation string, logger logrus.FieldLogger) error {
+	if defaultBackupLocation == "" {
+		logger.Debug("No default backup storage location specified. Velero will not automatically select a backup storage location for new backups.")
+		return nil
+	}
+
+	backupLocation := &velerov1api.BackupStorageLocation{}
+	if err := client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: defaultBackupLocation}, backupLocation); err != nil {
+		return errors.WithStack(err)
+	}
+
+	if !backupLocation.Spec.Default {
+		backupLocation.Spec.Default = true
+		if err := client.Update(ctx, backupLocation); err != nil {
+			return errors.WithStack(err)
+		}
+
+		logger.WithField("backupStorageLocation", defaultBackupLocation).Info("Set backup storage location as default")
 	}
 
 	return nil
@@ -979,14 +1021,7 @@ func (s *server) runProfiler() {
 
 // if there is a restarting during the reconciling of backups/restores/etc, these CRs may be stuck in progress status
 // markInProgressCRsFailed tries to mark the in progress CRs as failed when starting the server to avoid the issue
-func markInProgressCRsFailed(ctx context.Context, cfg *rest.Config, scheme *runtime.Scheme, namespace string, log logrus.FieldLogger) {
-	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
-	client, err := ctrlclient.New(cfg, ctrlclient.Options{Scheme: scheme})
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("failed to create client")
-		return
-	}
-
+func markInProgressCRsFailed(ctx context.Context, client ctrlclient.Client, namespace string, log logrus.FieldLogger) {
 	markInProgressBackupsFailed(ctx, client, namespace, log)
 
 	markInProgressRestoresFailed(ctx, client, namespace, log)
