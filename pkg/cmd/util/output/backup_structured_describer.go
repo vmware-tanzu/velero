@@ -311,6 +311,7 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 
 	nativeSnapshots := []*volume.VolumeInfo{}
 	csiSnapshots := []*volume.VolumeInfo{}
+	legacyInfoSource := false
 
 	buf := new(bytes.Buffer)
 	err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeInfos, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath)
@@ -326,6 +327,8 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 			backupVolumes["errorConcludeCSISnapshot"] = fmt.Sprintf("error concluding CSI snapshot info: %v", err)
 			return
 		}
+
+		legacyInfoSource = true
 	} else if err != nil {
 		backupVolumes["errorGetBackupVolumeInfo"] = fmt.Sprintf("error getting backup volume info: %v", err)
 		return
@@ -348,7 +351,7 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 
 	describeNativeSnapshotsInSF(details, nativeSnapshots, backupVolumes)
 
-	describeCSISnapshotsInSF(details, csiSnapshots, backupVolumes)
+	describeCSISnapshotsInSF(details, csiSnapshots, backupVolumes, legacyInfoSource)
 
 	describePodVolumeBackupsInSF(podVolumeBackupCRs, details, backupVolumes)
 
@@ -382,13 +385,17 @@ func describNativeSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDe
 	}
 }
 
-func describeCSISnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVolumes map[string]interface{}) {
+func describeCSISnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVolumes map[string]interface{}, legacyInfoSource bool) {
 	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		return
 	}
 
 	if len(infos) == 0 {
-		backupVolumes["csiSnapshots"] = "<none included>"
+		if legacyInfoSource {
+			backupVolumes["csiSnapshots"] = "<none included or not detectable>"
+		} else {
+			backupVolumes["csiSnapshots"] = "<none included>"
+		}
 		return
 	}
 

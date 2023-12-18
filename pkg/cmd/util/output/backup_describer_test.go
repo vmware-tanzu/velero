@@ -379,11 +379,25 @@ func TestCSISnapshots(t *testing.T) {
 	}()
 
 	testcases := []struct {
-		name         string
-		volumeInfo   []*volume.VolumeInfo
-		inputDetails bool
-		expect       string
+		name             string
+		volumeInfo       []*volume.VolumeInfo
+		inputDetails     bool
+		expect           string
+		legacyInfoSource bool
 	}{
+		{
+			name:       "empty info, not legacy",
+			volumeInfo: []*volume.VolumeInfo{},
+			expect: `  CSI Snapshots: <none included>
+`,
+		},
+		{
+			name:             "empty info, legacy",
+			volumeInfo:       []*volume.VolumeInfo{},
+			legacyInfoSource: true,
+			expect: `  CSI Snapshots: <none included or not detectable>
+`,
+		},
 		{
 			name: "no details, local snapshot",
 			volumeInfo: []*volume.VolumeInfo{
@@ -509,7 +523,7 @@ func TestCSISnapshots(t *testing.T) {
 				buf:    &bytes.Buffer{},
 			}
 			d.out.Init(d.buf, 0, 8, 2, ' ', 0)
-			describeCSISnapshots(d, tc.inputDetails, tc.volumeInfo)
+			describeCSISnapshots(d, tc.inputDetails, tc.volumeInfo, tc.legacyInfoSource)
 			d.out.Flush()
 			assert.Equal(t, tc.expect, d.buf.String())
 		})
