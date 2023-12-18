@@ -661,7 +661,9 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 			backup.Status.VolumeSnapshotsCompleted++
 		}
 	}
-	volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses := pkgbackup.UpdateBackupCSISnapshotsStatus(b.kbClient, b.volumeSnapshotLister, backup.Backup, backupLog)
+	volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses := pkgbackup.GetBackupCSIResources(b.kbClient, b.volumeSnapshotLister, backup.Backup, backupLog)
+	// Update CSIVolumeSnapshotsAttempted
+	backup.Status.CSIVolumeSnapshotsAttempted = len(volumeSnapshots)
 
 	// Iterate over backup item operations and update progress.
 	// Any errors on operations at this point should be added to backup errors.
@@ -760,6 +762,7 @@ func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, bac
 		backupDurationSeconds := float64(backupDuration / time.Second)
 		serverMetrics.RegisterBackupDuration(backupScheduleName, backupDurationSeconds)
 	}
+
 	if !finalize {
 		serverMetrics.RegisterVolumeSnapshotAttempts(backupScheduleName, backup.Status.VolumeSnapshotsAttempted)
 		serverMetrics.RegisterVolumeSnapshotSuccesses(backupScheduleName, backup.Status.VolumeSnapshotsCompleted)
@@ -767,8 +770,6 @@ func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, bac
 
 		if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 			serverMetrics.RegisterCSISnapshotAttempts(backupScheduleName, backup.Name, backup.Status.CSIVolumeSnapshotsAttempted)
-			serverMetrics.RegisterCSISnapshotSuccesses(backupScheduleName, backup.Name, backup.Status.CSIVolumeSnapshotsCompleted)
-			serverMetrics.RegisterCSISnapshotFailures(backupScheduleName, backup.Name, backup.Status.CSIVolumeSnapshotsAttempted-backup.Status.CSIVolumeSnapshotsCompleted)
 		}
 
 		if backup.Status.Progress != nil {
@@ -779,6 +780,9 @@ func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, bac
 		if backup.Status.Warnings > 0 {
 			serverMetrics.RegisterBackupWarning(backupScheduleName)
 		}
+	} else if features.IsEnabled(velerov1api.CSIFeatureFlag) {
+		serverMetrics.RegisterCSISnapshotSuccesses(backupScheduleName, backup.Name, backup.Status.CSIVolumeSnapshotsCompleted)
+		serverMetrics.RegisterCSISnapshotFailures(backupScheduleName, backup.Name, backup.Status.CSIVolumeSnapshotsAttempted-backup.Status.CSIVolumeSnapshotsCompleted)
 	}
 }
 

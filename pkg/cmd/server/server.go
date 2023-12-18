@@ -824,7 +824,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		cmd.CheckError(err)
 		r := controller.NewBackupFinalizerReconciler(
 			s.mgr.GetClient(),
-			s.csiSnapshotLister,
 			clock.RealClock{},
 			backupper,
 			newPluginManager,
