@@ -43,9 +43,8 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			crClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
-			var schedules *api.ScheduleList
+			schedules := new(api.ScheduleList)
 			if len(args) > 0 {
-				schedules = new(api.ScheduleList)
 				for _, name := range args {
 					schedule := new(api.Schedule)
 					err := crClient.Get(context.TODO(), ctrlclient.ObjectKey{Name: name, Namespace: f.Namespace()}, schedule)
