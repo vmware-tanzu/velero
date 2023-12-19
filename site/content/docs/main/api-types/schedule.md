@@ -127,6 +127,10 @@ spec:
     snapshotMoveData: true
     # The data mover to be used by the backup. If the value is "" or "velero", the built-in data mover will be used.
     datamover: velero
+    # UploaderConfig specifies the configuration for the uploader
+    uploaderConfig:
+        # ParallelFilesUpload is the number of files parallel uploads to perform when using the uploader.
+        parallelFilesUpload: 10
     metadata:
       labels:
         labelname: somelabelvalue

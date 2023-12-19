@@ -17,73 +17,90 @@ Velero is widely used for backing up and restoring Kubernetes clusters. In vario
 To achieve extensibility in Velero Uploader configurations, the following key components and changes are proposed:
 
 ### UploaderConfig Structure
-A new data structure, `UploaderConfig`, will be defined to store Uploader configurations. This structure will include the configuration options related to backup and restore for Uploader:
+Two new data structures, `UploaderConfigForBackup` and `UploaderConfigForRestore`, will be defined to store Uploader configurations. These structures will include the configuration options related to backup and restore for Uploader:
 
 ```go
-type UploaderConfig struct {
-    // sub-options
+type UploaderConfigForBackup struct {
+}
+
+type UploaderConfigForRestore struct {
 }
 ```
 
-### Integration with Backup CRD
+### Integration with Backup & Restore CRD
 The Velero CLI will support an uploader configuration-related flag, allowing users to set the value when creating backups or restores. This value will be stored in the `UploaderConfig` field within the `Backup` CRD and `Restore` CRD:
 
 ```go
 type BackupSpec struct {
-    UploaderConfig shared.UploaderConfig `json:"uploaderConfig,omitempty"`
+	// UploaderConfig specifies the configuration for the uploader.
+	// +optional
+	// +nullable
+	UploaderConfig *UploaderConfigForBackup `json:"uploaderConfig,omitempty"`
 }
 
 type RestoreSpec struct {
-    UploaderConfig shared.UploaderConfig `json:"uploaderConfig,omitempty"`
+	// UploaderConfig specifies the configuration for the restore.
+	// +optional
+	// +nullable
+	UploaderConfig *UploaderConfigForRestore `json:"uploaderConfig,omitempty"`
 }
 ```
 
 ### Configuration Propagated to Different CRDs
 The configuration specified in `UploaderConfig` needs to be effective for backup and restore both by file system way and data-mover way. 
-Therefore, the `UploaderConfig` field value from the `Backup` CRD should be propagated to `PodVolumeBackup` and `DataUpload` CRDs:
+Therefore, the `UploaderConfig` field value from the `Backup` CRD should be propagated to `PodVolumeBackup` and `DataUpload` CRDs.
+
+We aim for the configurations in PodVolumeBackup to originate not only from UploaderConfig in Backup but also potentially from other sources such as the server or configmap. Simultaneously, to align with the configurations in DataUpload's `DataMoverConfig map[string]string`, we have defined an `UploaderSettings map[string]string` here to record the configurations in PodVolumeBackup.
 
 ```go
 type PodVolumeBackupSpec struct {
-    ...
-    UploaderConfig shared.UploaderConfig `json:"uploaderConfig,omitempty"`
-}
-
-type DataUploadSpec struct {
-    ...
-    UploaderConfig shared.UploaderConfig `json:"uploaderConfig,omitempty"`
+	// UploaderSettings are a map of key-value pairs that should be applied to the
+	// uploader configuration.
+	// +optional
+	// +nullable
+	UploaderSettings map[string]string `json:"uploaderSettings,omitempty"`
 }
 ```
+
+`UploaderConfig` will be stored in DataUpload's `DataMoverConfig map[string]string` field.
 
 Also the `UploaderConfig` field value from the `Restore` CRD should be propagated to `PodVolumeRestore` and `DataDownload` CRDs:
 
 ```go
 type PodVolumeRestoreSpec struct {
-    ...
-    UploaderConfig shared.UploaderConfig `json:"uploaderConfig,omitempty"`
-}
-
-type DataDownloadSpec struct {
-    ...
-    UploaderConfig shared.UploaderConfig `json:"uploaderConfig,omitempty"`
+	// UploaderSettings are a map of key-value pairs that should be applied to the
+	// uploader configuration.
+	// +optional
+	// +nullable
+	UploaderSettings map[string]string `json:"uploaderSettings,omitempty"`
 }
 ```
+Also `UploaderConfig` will be stored in DataUpload's `DataMoverConfig map[string]string` field.
+
+### Store and Get Configuration
+We need to store and retrieve configurations in the PodVolumeBackup and DataUpload structs. This involves type conversion based on the configuration type, storing it in a map[string]string, or performing type conversion from this map for retrieval.
+
+PodVolumeRestore and DataDownload are also similar.
 
 ## Sub-options in UploaderConfig
-Adding fields above in CRDs can accommodate any future additions to Uploader configurations by adding new fields to the `UploaderConfig` structure.
+Adding fields above in CRDs can accommodate any future additions to Uploader configurations by adding new fields to the `UploaderConfigForBackup` or `UploaderConfigForRestore` structures.
 
 ### Parallel Files Upload
 This section focuses on enabling the configuration for the number of parallel file uploads during backups.
 below are the key steps that should be added to support this new feature.
 
-#### Velero CLI 
+#### Velero CLI
 The Velero CLI will support a `--parallel-files-upload` flag, allowing users to set the `ParallelFilesUpload` value when creating backups.
 
-#### UploaderConfig 
+#### UploaderConfig
 below the sub-option `ParallelFilesUpload` is added into UploaderConfig:
 
 ```go
-type UploaderConfig struct {
-    ParallelFilesUpload int `json:"parallelFilesUpload,omitempty"`
+// UploaderConfigForBackup defines the configuration for the uploader when doing backup.
+type UploaderConfigForBackup struct {
+	// ParallelFilesUpload is the number of files parallel uploads to perform when using the uploader.
+	// +optional
+	ParallelFilesUpload int `json:"parallelFilesUpload,omitempty"`
 }
 ```
 
@@ -102,8 +119,8 @@ Velero can set the `MaxParallelFileReads` parameter for Kopia's upload policy as
 
 ```go
 curPolicy := getDefaultPolicy()
-if uploaderCfg.ParallelFilesUpload > 0 {
-    curPolicy.UploadPolicy.MaxParallelFileReads = newOptionalInt(uploaderCfg.ParallelFilesUpload)
+if parallelUpload > 0 {
+	curPolicy.UploadPolicy.MaxParallelFileReads = newOptionalInt(parallelUpload)
 }
 ```
 
@@ -111,16 +128,54 @@ if uploaderCfg.ParallelFilesUpload > 0 {
 As Restic does not support parallel file upload, the configuration would not take effect, so we should output a warning when the user sets the `ParallelFilesUpload` value by using Restic to do a backup.
 
 ```go
-if uploaderCfg.ParallelFilesUpload > 0 {
-		log.Warnf("ParallelFilesUpload is set to %d, but Restic does not support parallel file uploads. Ignoring", uploaderCfg.ParallelFilesUpload)
+if parallelFilesUpload > 0 {
+	log.Warnf("ParallelFilesUpload is set to %d, but Restic does not support parallel file uploads. Ignoring", parallelFilesUpload)
 	}
 ```
 
 Roughly, the process is as follows: 
 1. Users pass the ParallelFilesUpload parameter and its value through the Velero CLI. This parameter and its value are stored as a sub-option within UploaderConfig and then placed into the Backup CR. 
 2. When users perform file system backups, UploaderConfig is passed to the PodVolumeBackup CR. When users use the Data-mover for backups, it is passed to the DataUpload CR. 
-3. Each respective controller within the CRs calls the uploader, and the ParallelFilesUpload from UploaderConfig in CRs is passed to the uploader. 
+3. The configuration will be stored in map[string]string type of field in CR.
+3. Each respective controller within the CRs calls the uploader, and the ParallelFilesUpload from map in CRs is passed to the uploader.
 4. When the uploader subsequently calls the Kopia API, it can use the ParallelFilesUpload to set the MaxParallelFileReads parameter, and if the uploader calls the Restic command it would output one warning log for Restic does not support this feature.
+
+### Sparse Option For Kopia & Restic Restore
+In many system files, numerous zero bytes or empty blocks persist, occupying physical storage space. Sparse restore employs a more intelligent approach, including appropriately handling empty blocks, thereby achieving the correct system state. This write sparse files mechanism aims to enhance restore efficiency while maintaining restoration accuracy.
+Below are the key steps that should be added to support this new feature.
+#### Velero CLI
+The Velero CLI will support a `--write-sparse-files` flag, allowing users to set the `WriteSparseFiles` value when creating restores with Restic or Kopia uploader.
+#### UploaderConfig
+below the sub-option `WriteSparseFiles` is added into UploaderConfig:
+```go
+// UploaderConfigForRestore defines the configuration for the restore.
+type UploaderConfigForRestore struct {
+	// WriteSparseFiles is a flag to indicate whether write files sparsely or not.
+	// +optional
+	// +nullable
+	WriteSparseFiles *bool `json:"writeSparseFiles,omitempty"`
+}
+```
+
+### Enable Sparse in Restic
+For Restic, it could be enabled by pass the flag `--sparse` in creating restore:
+```bash
+restic restore create --sparse $snapshotID
+```
+### Enable Sparse in Kopia
+For Kopia, it could be enabled this feature by the `WriteSparseFiles` field in the [FilesystemOutput](https://pkg.go.dev/github.com/kopia/kopia@v0.13.0/snapshot/restore#FilesystemOutput).
+
+```go
+fsOutput := &restore.FilesystemOutput{
+		WriteSparseFiles:       uploaderutil.GetWriteSparseFiles(uploaderCfg),
+	}
+```
+Roughly, the process is as follows:
+1. Users pass the WriteSparseFiles parameter and its value through the Velero CLI. This parameter and its value are stored as a sub-option within UploaderConfig and then placed into the Restore CR.
+2. When users perform file system restores, UploaderConfig is passed to the PodVolumeRestore CR. When users use the Data-mover for restores, it is passed to the DataDownload CR.
+3. The configuration will be stored in map[string]string type of field in CR.
+4. Each respective controller within the CRs calls the uploader, and the WriteSparseFiles from map in CRs is passed to the uploader.
+5. When the uploader subsequently calls the Kopia API, it can use the WriteSparseFiles to set the WriteSparseFiles parameter, and if the uploader calls the Restic command it would append `--sparse` flag within the restore command.
 
 ## Alternatives Considered
 To enhance extensibility further, the option of storing `UploaderConfig` in a Kubernetes ConfigMap can be explored, this approach would allow the addition and modification of configuration options without the need to modify the CRD.
