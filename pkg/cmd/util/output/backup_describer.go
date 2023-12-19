@@ -362,8 +362,6 @@ func DescribeBackupStatus(ctx context.Context, kbClient kbclient.Client, d *Desc
 
 	describeBackupVolumes(ctx, kbClient, d, backup, details, insecureSkipTLSVerify, caCertPath, podVolumeBackups)
 
-	d.Println()
-
 	if status.HookStatus != nil {
 		d.Println()
 		d.Printf("HooksAttempted:\t%d\n", status.HookStatus.HooksAttempted)
