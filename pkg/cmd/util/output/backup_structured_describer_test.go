@@ -1,3 +1,19 @@
+/*
+Copyright the Velero contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package output
 
 import (
@@ -279,7 +295,7 @@ func TestDescribeNativeSnapshotsInSF(t *testing.T) {
 				{
 					BackupMethod: volume.NativeSnapshot,
 					PVName:       "pv-1",
-					NativeSnapshotInfo: volume.NativeSnapshotInfo{
+					NativeSnapshotInfo: &volume.NativeSnapshotInfo{
 						SnapshotHandle: "snapshot-1",
 						VolumeType:     "ebs",
 						VolumeAZ:       "us-east-2",
@@ -299,7 +315,7 @@ func TestDescribeNativeSnapshotsInSF(t *testing.T) {
 				{
 					BackupMethod: volume.NativeSnapshot,
 					PVName:       "pv-1",
-					NativeSnapshotInfo: volume.NativeSnapshotInfo{
+					NativeSnapshotInfo: &volume.NativeSnapshotInfo{
 						SnapshotHandle: "snapshot-1",
 						VolumeType:     "ebs",
 						VolumeAZ:       "us-east-2",
@@ -365,12 +381,12 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 					BackupMethod:          volume.CSISnapshot,
 					PVCName:               "pvc-1",
 					PreserveLocalSnapshot: true,
-					OperationID:           "fake-operation-1",
-					CSISnapshotInfo: volume.CSISnapshotInfo{
+					CSISnapshotInfo: &volume.CSISnapshotInfo{
 						SnapshotHandle: "snapshot-1",
 						Size:           1024,
 						Driver:         "fake-driver",
 						VSCName:        "vsc-1",
+						OperationID:    "fake-operation-1",
 					},
 				},
 			},
@@ -389,12 +405,12 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 					BackupMethod:          volume.CSISnapshot,
 					PVCName:               "pvc-2",
 					PreserveLocalSnapshot: true,
-					OperationID:           "fake-operation-2",
-					CSISnapshotInfo: volume.CSISnapshotInfo{
+					CSISnapshotInfo: &volume.CSISnapshotInfo{
 						SnapshotHandle: "snapshot-2",
 						Size:           1024,
 						Driver:         "fake-driver",
 						VSCName:        "vsc-2",
+						OperationID:    "fake-operation-2",
 					},
 				},
 			},
@@ -420,11 +436,11 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 					BackupMethod:      volume.CSISnapshot,
 					PVCName:           "pvc-3",
 					SnapshotDataMoved: true,
-					OperationID:       "fake-operation-3",
-					SnapshotDataMovementInfo: volume.SnapshotDataMovementInfo{
+					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
 						DataMover:      "velero",
 						UploaderType:   "fake-uploader",
 						SnapshotHandle: "fake-repo-id-3",
+						OperationID:    "fake-operation-3",
 					},
 				},
 			},
@@ -443,11 +459,11 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 					BackupMethod:      volume.CSISnapshot,
 					PVCName:           "pvc-4",
 					SnapshotDataMoved: true,
-					OperationID:       "fake-operation-4",
-					SnapshotDataMovementInfo: volume.SnapshotDataMovementInfo{
+					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
 						DataMover:      "velero",
 						UploaderType:   "fake-uploader",
 						SnapshotHandle: "fake-repo-id-4",
+						OperationID:    "fake-operation-4",
 					},
 				},
 			},
@@ -471,10 +487,10 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 					BackupMethod:      volume.CSISnapshot,
 					PVCName:           "pvc-4",
 					SnapshotDataMoved: true,
-					OperationID:       "fake-operation-4",
-					SnapshotDataMovementInfo: volume.SnapshotDataMovementInfo{
+					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
 						UploaderType:   "fake-uploader",
 						SnapshotHandle: "fake-repo-id-4",
+						OperationID:    "fake-operation-4",
 					},
 				},
 			},

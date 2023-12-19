@@ -513,7 +513,7 @@ func retrieveNativeSnapshotLegacy(ctx context.Context, kbClient kbclient.Client,
 	for _, snap := range snapshots {
 		volumeInfo := volume.VolumeInfo{
 			PVName: snap.Spec.PersistentVolumeName,
-			NativeSnapshotInfo: volume.NativeSnapshotInfo{
+			NativeSnapshotInfo: &volume.NativeSnapshotInfo{
 				SnapshotHandle: snap.Status.ProviderSnapshotID,
 				VolumeType:     snap.Spec.VolumeType,
 				VolumeAZ:       snap.Spec.VolumeAZ,
@@ -567,7 +567,7 @@ func retrieveCSISnapshotLegacy(ctx context.Context, kbClient kbclient.Client, ba
 	for _, vsc := range vscList {
 		volInfo := volume.VolumeInfo{
 			PreserveLocalSnapshot: true,
-			CSISnapshotInfo: volume.CSISnapshotInfo{
+			CSISnapshotInfo: &volume.CSISnapshotInfo{
 				VSCName: vsc.Name,
 				Driver:  vsc.Spec.Driver,
 			},
@@ -663,8 +663,8 @@ func describeLocalSnapshot(d *Describer, details bool, info *volume.VolumeInfo) 
 
 	if details {
 		d.Printf("\t\t\tSnapshot:\n")
-		if !info.SnapshotDataMoved && info.OperationID != "" {
-			d.Printf("\t\t\t\tOperation ID: %s\n", info.OperationID)
+		if !info.SnapshotDataMoved && info.CSISnapshotInfo.OperationID != "" {
+			d.Printf("\t\t\t\tOperation ID: %s\n", info.CSISnapshotInfo.OperationID)
 		}
 
 		d.Printf("\t\t\t\tSnapshot Content Name: %s\n", info.CSISnapshotInfo.VSCName)
@@ -683,7 +683,7 @@ func describeDataMovement(d *Describer, details bool, info *volume.VolumeInfo) {
 
 	if details {
 		d.Printf("\t\t\tData Movement:\n")
-		d.Printf("\t\t\t\tOperation ID: %s\n", info.OperationID)
+		d.Printf("\t\t\t\tOperation ID: %s\n", info.SnapshotDataMovementInfo.OperationID)
 
 		dataMover := "velero"
 		if info.SnapshotDataMovementInfo.DataMover != "" {
