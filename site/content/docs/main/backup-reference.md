@@ -10,6 +10,11 @@ It is possible to exclude individual items from being backed up, even if they ma
 ```bash
 kubectl label -n <ITEM_NAMESPACE> <RESOURCE>/<NAME> velero.io/exclude-from-backup=true
 ```
+## Parallel Files Upload
+If using fs-backup with Kopia uploader or CSI snapshot data movements, it's allowed to configure the option for parallel files upload, which could accelerate the backup:
+```bash
+velero backup create <BACKUP_NAME> --include-namespaces <NAMESPACE> --parallel-files-upload <NUM> --wait
+```
 
 ## Specify Backup Orders of Resources of Specific Kind
 

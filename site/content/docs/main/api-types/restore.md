@@ -39,6 +39,10 @@ spec:
   # asynchronous BackupItemAction operations
   # The default value is 1 hour.
   itemOperationTimeout: 1h
+  # UploaderConfig specifies the configuration for the restore.
+  uploaderConfig:
+    # WriteSparseFiles is a flag to indicate whether write files sparsely or not
+    writeSparseFiles: true
   # Array of namespaces to include in the restore. If unspecified, all namespaces are included.
   # Optional.
   includedNamespaces:
