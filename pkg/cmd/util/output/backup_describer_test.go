@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/vmware-tanzu/velero/internal/volume"
-	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 
 	"github.com/stretchr/testify/require"
@@ -373,11 +372,6 @@ func TestDescribeNativeSnapshots(t *testing.T) {
 }
 
 func TestCSISnapshots(t *testing.T) {
-	features.Enable(velerov1api.CSIFeatureFlag)
-	defer func() {
-		features.Disable(velerov1api.CSIFeatureFlag)
-	}()
-
 	testcases := []struct {
 		name             string
 		volumeInfo       []*volume.VolumeInfo
