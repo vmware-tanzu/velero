@@ -31,7 +31,6 @@ import (
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
-	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
@@ -386,10 +385,6 @@ func describNativeSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDe
 }
 
 func describeCSISnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVolumes map[string]interface{}, legacyInfoSource bool) {
-	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		return
-	}
-
 	if len(infos) == 0 {
 		if legacyInfoSource {
 			backupVolumes["csiSnapshots"] = "<none included or not detectable>"

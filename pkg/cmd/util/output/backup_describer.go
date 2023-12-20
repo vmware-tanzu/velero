@@ -37,7 +37,6 @@ import (
 	veleroapishared "github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
-	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 
 	"github.com/vmware-tanzu/velero/internal/volume"
@@ -532,10 +531,6 @@ func retrieveCSISnapshotLegacy(ctx context.Context, kbClient kbclient.Client, ba
 	status := backup.Status
 	csiSnapshots := []*volume.VolumeInfo{}
 
-	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		return csiSnapshots, nil
-	}
-
 	if status.CSIVolumeSnapshotsAttempted == 0 {
 		return csiSnapshots, nil
 	}
@@ -628,10 +623,6 @@ func describNativeSnapshot(d *Describer, details bool, info *volume.VolumeInfo) 
 }
 
 func describeCSISnapshots(d *Describer, details bool, infos []*volume.VolumeInfo, legacyInfoSource bool) {
-	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
-		return
-	}
-
 	if len(infos) == 0 {
 		if legacyInfoSource {
 			d.Printf("\tCSI Snapshots: <none included or not detectable>\n")

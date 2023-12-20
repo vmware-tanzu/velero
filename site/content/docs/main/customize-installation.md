@@ -67,7 +67,7 @@ $ kubectl -n velero edit daemonset/node-agent
 For some features it may be necessary to use the `--features` flag to the Velero client. This may be done by passing the `--features` on every command run using the Velero CLI or the by setting the features in the velero client config file using the `velero client config set` command as shown below:
 
 ```bash
-velero client config set features=EnableCSI
+velero client config set features=feature1,feature2...
 ```
 
 This stores the config in a file at `$HOME/.config/velero/config.json`.

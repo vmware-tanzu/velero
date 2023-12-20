@@ -10,7 +10,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/internal/volume"
-	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 
 	"github.com/stretchr/testify/assert"
@@ -331,11 +330,6 @@ func TestDescribeNativeSnapshotsInSF(t *testing.T) {
 }
 
 func TestDescribeCSISnapshotsInSF(t *testing.T) {
-	features.Enable(velerov1api.CSIFeatureFlag)
-	defer func() {
-		features.Disable(velerov1api.CSIFeatureFlag)
-	}()
-
 	testcases := []struct {
 		name             string
 		volumeInfo       []*volume.VolumeInfo
