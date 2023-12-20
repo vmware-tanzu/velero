@@ -193,8 +193,8 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		}
 
 		if details {
-			describeRestoreResourceList(ctx, kbClient, d, restore, insecureSkipTLSVerify, caCertFile)
 			d.Println()
+			describeRestoreResourceList(ctx, kbClient, d, restore, insecureSkipTLSVerify, caCertFile)
 		}
 	})
 }
