@@ -125,7 +125,13 @@ func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
 				return errors.WithStack(err)
 			}
 			if len(defalutBSLs.Items) > 0 {
-				return errors.New("there is already a default backup storage location")
+				if len(defalutBSLs.Items) == 1 && defalutBSLs.Items[0].Name == o.Name {
+					// the default backup storage location is the one we want to set
+					// so we do not need to do anything
+					fmt.Printf("Backup storage location %q is already the default backup storage location.\n", o.Name)
+					return nil
+				}
+				return errors.New("there are already exist default backup storage locations, please unset them first")
 			}
 		}
 	} else {
