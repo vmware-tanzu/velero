@@ -420,7 +420,7 @@ func describeLocalSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDe
 		localSnapshot := make(map[string]interface{})
 
 		if !info.SnapshotDataMoved {
-			localSnapshot["operationID"] = info.OperationID
+			localSnapshot["operationID"] = info.CSISnapshotInfo.OperationID
 		}
 
 		localSnapshot["snapshotContentName"] = info.CSISnapshotInfo.VSCName
@@ -441,7 +441,7 @@ func describeDataMovementInSF(details bool, info *volume.VolumeInfo, snapshotDet
 
 	if details {
 		dataMovement := make(map[string]interface{})
-		dataMovement["operationID"] = info.OperationID
+		dataMovement["operationID"] = info.SnapshotDataMovementInfo.OperationID
 
 		dataMover := "velero"
 		if info.SnapshotDataMovementInfo.DataMover != "" {

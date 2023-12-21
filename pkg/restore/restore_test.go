@@ -88,7 +88,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 				"pv-1": {
 					BackupMethod: internalVolume.NativeSnapshot,
 					PVName:       "pv-1",
-					NativeSnapshotInfo: internalVolume.NativeSnapshotInfo{
+					NativeSnapshotInfo: &internalVolume.NativeSnapshotInfo{
 						SnapshotHandle: "testSnapshotHandle",
 					},
 				},
@@ -112,7 +112,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 				"pv-1": {
 					BackupMethod: internalVolume.PodVolumeBackup,
 					PVName:       "pv-1",
-					PVBInfo: internalVolume.PodVolumeBackupInfo{
+					PVBInfo: &internalVolume.PodVolumeBackupInfo{
 						SnapshotHandle: "testSnapshotHandle",
 						Size:           100,
 						NodeName:       "testNode",
@@ -139,7 +139,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 					BackupMethod:      internalVolume.CSISnapshot,
 					SnapshotDataMoved: false,
 					PVName:            "pv-1",
-					CSISnapshotInfo: internalVolume.CSISnapshotInfo{
+					CSISnapshotInfo: &internalVolume.CSISnapshotInfo{
 						Driver: "pd.csi.storage.gke.io",
 					},
 				},
@@ -164,10 +164,10 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 					BackupMethod:      internalVolume.CSISnapshot,
 					SnapshotDataMoved: true,
 					PVName:            "pv-1",
-					CSISnapshotInfo: internalVolume.CSISnapshotInfo{
+					CSISnapshotInfo: &internalVolume.CSISnapshotInfo{
 						Driver: "pd.csi.storage.gke.io",
 					},
-					SnapshotDataMovementInfo: internalVolume.SnapshotDataMovementInfo{
+					SnapshotDataMovementInfo: &internalVolume.SnapshotDataMovementInfo{
 						DataMover: "velero",
 					},
 				},

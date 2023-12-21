@@ -103,7 +103,7 @@ func TestGenerateVolumeInfoForSkippedPV(t *testing.T) {
 					PVName:        "testPV",
 					Skipped:       true,
 					SkippedReason: "CSI: skipped for PodVolumeBackup",
-					PVInfo: PVInfo{
+					PVInfo: &PVInfo{
 						ReclaimPolicy: "Delete",
 						Labels: map[string]string{
 							"a": "b",
@@ -229,13 +229,13 @@ func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 					PVCNamespace: "velero",
 					PVName:       "testPV",
 					BackupMethod: NativeSnapshot,
-					PVInfo: PVInfo{
+					PVInfo: &PVInfo{
 						ReclaimPolicy: "Delete",
 						Labels: map[string]string{
 							"a": "b",
 						},
 					},
-					NativeSnapshotInfo: NativeSnapshotInfo{
+					NativeSnapshotInfo: &NativeSnapshotInfo{
 						SnapshotHandle: "pvc-b31e3386-4bbb-4937-95d-7934cd62-b0a1-494b-95d7-0687440e8d0c",
 						VolumeType:     "ssd",
 						VolumeAZ:       "us-central1-a",
@@ -411,16 +411,16 @@ func TestGenerateVolumeInfoForCSIVolumeSnapshot(t *testing.T) {
 					PVCNamespace:          "velero",
 					PVName:                "testPV",
 					BackupMethod:          CSISnapshot,
-					OperationID:           "testID",
 					StartTimestamp:        &now,
 					PreserveLocalSnapshot: true,
-					CSISnapshotInfo: CSISnapshotInfo{
+					CSISnapshotInfo: &CSISnapshotInfo{
 						Driver:         "pd.csi.storage.gke.io",
 						SnapshotHandle: "testSnapshotHandle",
 						Size:           107374182400,
 						VSCName:        "testContent",
+						OperationID:    "testID",
 					},
-					PVInfo: PVInfo{
+					PVInfo: &PVInfo{
 						ReclaimPolicy: "Delete",
 						Labels: map[string]string{
 							"a": "b",
@@ -495,7 +495,7 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 					PVCNamespace: "",
 					PVName:       "",
 					BackupMethod: PodVolumeBackup,
-					PVBInfo: PodVolumeBackupInfo{
+					PVBInfo: &PodVolumeBackupInfo{
 						PodName:      "testPod",
 						PodNamespace: "velero",
 					},
@@ -567,11 +567,11 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 					PVCNamespace: "velero",
 					PVName:       "testPV",
 					BackupMethod: PodVolumeBackup,
-					PVBInfo: PodVolumeBackupInfo{
+					PVBInfo: &PodVolumeBackupInfo{
 						PodName:      "testPod",
 						PodNamespace: "velero",
 					},
-					PVInfo: PVInfo{
+					PVInfo: &PVInfo{
 						ReclaimPolicy: string(corev1api.PersistentVolumeReclaimDelete),
 						Labels:        map[string]string{"a": "b"},
 					},
@@ -729,12 +729,18 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 					PVName:            "testPV",
 					BackupMethod:      CSISnapshot,
 					SnapshotDataMoved: true,
-					OperationID:       "testOperation",
-					SnapshotDataMovementInfo: SnapshotDataMovementInfo{
+					CSISnapshotInfo: &CSISnapshotInfo{
+						SnapshotHandle: FieldValueIsUnknown,
+						VSCName:        FieldValueIsUnknown,
+						OperationID:    FieldValueIsUnknown,
+						Size:           0,
+					},
+					SnapshotDataMovementInfo: &SnapshotDataMovementInfo{
 						DataMover:    "velero",
 						UploaderType: "kopia",
+						OperationID:  "testOperation",
 					},
-					PVInfo: PVInfo{
+					PVInfo: &PVInfo{
 						ReclaimPolicy: string(corev1api.PersistentVolumeReclaimDelete),
 						Labels:        map[string]string{"a": "b"},
 					},
@@ -796,16 +802,20 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 					PVName:            "testPV",
 					BackupMethod:      CSISnapshot,
 					SnapshotDataMoved: true,
-					OperationID:       "testOperation",
 					StartTimestamp:    &now,
-					CSISnapshotInfo: CSISnapshotInfo{
-						Driver: "pd.csi.storage.gke.io",
+					CSISnapshotInfo: &CSISnapshotInfo{
+						VSCName:        FieldValueIsUnknown,
+						SnapshotHandle: FieldValueIsUnknown,
+						OperationID:    FieldValueIsUnknown,
+						Size:           0,
+						Driver:         "pd.csi.storage.gke.io",
 					},
-					SnapshotDataMovementInfo: SnapshotDataMovementInfo{
+					SnapshotDataMovementInfo: &SnapshotDataMovementInfo{
 						DataMover:    "velero",
 						UploaderType: "kopia",
+						OperationID:  "testOperation",
 					},
-					PVInfo: PVInfo{
+					PVInfo: &PVInfo{
 						ReclaimPolicy: string(corev1api.PersistentVolumeReclaimDelete),
 						Labels:        map[string]string{"a": "b"},
 					},

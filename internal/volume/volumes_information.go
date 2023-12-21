@@ -42,6 +42,10 @@ const (
 	CSISnapshot     VolumeBackupMethod = "CSISnapshot"
 )
 
+const (
+	FieldValueIsUnknown string = "unknown"
+)
+
 type VolumeInfo struct {
 	// The PVC's name.
 	PVCName string `json:"pvcName,omitempty"`
@@ -72,14 +76,11 @@ type VolumeInfo struct {
 	// Snapshot starts timestamp.
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 
-	// The Async Operation's ID.
-	OperationID string `json:"operationID,omitempty"`
-
-	CSISnapshotInfo          CSISnapshotInfo          `json:"csiSnapshotInfo,omitempty"`
-	SnapshotDataMovementInfo SnapshotDataMovementInfo `json:"snapshotDataMovementInfo,omitempty"`
-	NativeSnapshotInfo       NativeSnapshotInfo       `json:"nativeSnapshotInfo,omitempty"`
-	PVBInfo                  PodVolumeBackupInfo      `json:"pvbInfo,omitempty"`
-	PVInfo                   PVInfo                   `json:"pvInfo,omitempty"`
+	CSISnapshotInfo          *CSISnapshotInfo          `json:"csiSnapshotInfo,omitempty"`
+	SnapshotDataMovementInfo *SnapshotDataMovementInfo `json:"snapshotDataMovementInfo,omitempty"`
+	NativeSnapshotInfo       *NativeSnapshotInfo       `json:"nativeSnapshotInfo,omitempty"`
+	PVBInfo                  *PodVolumeBackupInfo      `json:"pvbInfo,omitempty"`
+	PVInfo                   *PVInfo                   `json:"pvInfo,omitempty"`
 }
 
 // CSISnapshotInfo is used for displaying the CSI snapshot status
@@ -95,6 +96,9 @@ type CSISnapshotInfo struct {
 
 	// The name of the VolumeSnapshotContent.
 	VSCName string `json:"vscName"`
+
+	// The Async Operation's ID.
+	OperationID string `json:"operationID"`
 }
 
 // SnapshotDataMovementInfo is used for displaying the snapshot data mover status.
@@ -112,6 +116,9 @@ type SnapshotDataMovementInfo struct {
 
 	// It's the filesystem repository's snapshot ID.
 	SnapshotHandle string `json:"snapshotHandle"`
+
+	// The Async Operation's ID.
+	OperationID string `json:"operationID"`
 }
 
 // NativeSnapshotInfo is used for displaying the Velero native snapshot status.
@@ -244,7 +251,7 @@ func (v *VolumesInformation) generateVolumeInfoForSkippedPV() {
 				SnapshotDataMoved: false,
 				Skipped:           true,
 				SkippedReason:     skippedReason,
-				PVInfo: PVInfo{
+				PVInfo: &PVInfo{
 					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
 					Labels:        pvcPVInfo.PV.Labels,
 				},
@@ -277,13 +284,13 @@ func (v *VolumesInformation) generateVolumeInfoForVeleroNativeSnapshot() {
 				PVName:            pvcPVInfo.PV.Name,
 				SnapshotDataMoved: false,
 				Skipped:           false,
-				NativeSnapshotInfo: NativeSnapshotInfo{
+				NativeSnapshotInfo: &NativeSnapshotInfo{
 					SnapshotHandle: nativeSnapshot.Status.ProviderSnapshotID,
 					VolumeType:     nativeSnapshot.Spec.VolumeType,
 					VolumeAZ:       nativeSnapshot.Spec.VolumeAZ,
 					IOPS:           strconv.FormatInt(iops, 10),
 				},
-				PVInfo: PVInfo{
+				PVInfo: &PVInfo{
 					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
 					Labels:        pvcPVInfo.PV.Labels,
 				},
@@ -372,15 +379,15 @@ func (v *VolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 				Skipped:               false,
 				SnapshotDataMoved:     false,
 				PreserveLocalSnapshot: true,
-				OperationID:           operation.Spec.OperationID,
 				StartTimestamp:        &(volumeSnapshot.CreationTimestamp),
-				CSISnapshotInfo: CSISnapshotInfo{
+				CSISnapshotInfo: &CSISnapshotInfo{
 					VSCName:        *volumeSnapshot.Status.BoundVolumeSnapshotContentName,
 					Size:           size,
 					Driver:         volumeSnapshotClass.Driver,
 					SnapshotHandle: snapshotHandle,
+					OperationID:    operation.Spec.OperationID,
 				},
-				PVInfo: PVInfo{
+				PVInfo: &PVInfo{
 					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
 					Labels:        pvcPVInfo.PV.Labels,
 				},
@@ -406,7 +413,7 @@ func (v *VolumesInformation) generateVolumeInfoFromPVB() {
 			SnapshotDataMoved: false,
 			Skipped:           false,
 			StartTimestamp:    pvb.Status.StartTimestamp,
-			PVBInfo: PodVolumeBackupInfo{
+			PVBInfo: &PodVolumeBackupInfo{
 				SnapshotHandle: pvb.Status.SnapshotID,
 				Size:           pvb.Status.Progress.TotalBytes,
 				UploaderType:   pvb.Spec.UploaderType,
@@ -435,7 +442,7 @@ func (v *VolumesInformation) generateVolumeInfoFromPVB() {
 				volumeInfo.PVCName = pvcPVInfo.PVCName
 				volumeInfo.PVCNamespace = pvcPVInfo.PVCNamespace
 				volumeInfo.PVName = pvcPVInfo.PV.Name
-				volumeInfo.PVInfo = PVInfo{
+				volumeInfo.PVInfo = &PVInfo{
 					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
 					Labels:        pvcPVInfo.PV.Labels,
 				}
@@ -498,6 +505,11 @@ func (v *VolumesInformation) generateVolumeInfoFromDataUpload() {
 			}
 
 			if pvcPVInfo := v.retrievePvcPvInfo("", operation.Spec.ResourceIdentifier.Name, operation.Spec.ResourceIdentifier.Namespace); pvcPVInfo != nil {
+				dataMover := "velero"
+				if dataUpload.Spec.DataMover != "" {
+					dataMover = dataUpload.Spec.DataMover
+				}
+
 				volumeInfo := &VolumeInfo{
 					BackupMethod:      CSISnapshot,
 					PVCName:           pvcPVInfo.PVCName,
@@ -505,16 +517,19 @@ func (v *VolumesInformation) generateVolumeInfoFromDataUpload() {
 					PVName:            pvcPVInfo.PV.Name,
 					SnapshotDataMoved: true,
 					Skipped:           false,
-					OperationID:       operation.Spec.OperationID,
 					StartTimestamp:    operation.Status.Created,
-					CSISnapshotInfo: CSISnapshotInfo{
-						Driver: driverUsedByVSClass,
+					CSISnapshotInfo: &CSISnapshotInfo{
+						SnapshotHandle: FieldValueIsUnknown,
+						VSCName:        FieldValueIsUnknown,
+						OperationID:    FieldValueIsUnknown,
+						Driver:         driverUsedByVSClass,
 					},
-					SnapshotDataMovementInfo: SnapshotDataMovementInfo{
-						DataMover:    dataUpload.Spec.DataMover,
+					SnapshotDataMovementInfo: &SnapshotDataMovementInfo{
+						DataMover:    dataMover,
 						UploaderType: "kopia",
+						OperationID:  operation.Spec.OperationID,
 					},
-					PVInfo: PVInfo{
+					PVInfo: &PVInfo{
 						ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
 						Labels:        pvcPVInfo.PV.Labels,
 					},
