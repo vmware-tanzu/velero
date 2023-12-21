@@ -397,6 +397,7 @@ func TestCSISnapshots(t *testing.T) {
 			volumeInfo: []*volume.VolumeInfo{
 				{
 					BackupMethod:          volume.CSISnapshot,
+					PVCNamespace:          "pvc-ns-1",
 					PVCName:               "pvc-1",
 					PreserveLocalSnapshot: true,
 					OperationID:           "fake-operation-1",
@@ -409,7 +410,7 @@ func TestCSISnapshots(t *testing.T) {
 				},
 			},
 			expect: `  CSI Snapshots:
-    pvc-1:
+    pvc-ns-1/pvc-1:
       Snapshot: included, specify --details for more information
 `,
 		},
@@ -418,6 +419,7 @@ func TestCSISnapshots(t *testing.T) {
 			volumeInfo: []*volume.VolumeInfo{
 				{
 					BackupMethod:          volume.CSISnapshot,
+					PVCNamespace:          "pvc-ns-2",
 					PVCName:               "pvc-2",
 					PreserveLocalSnapshot: true,
 					OperationID:           "fake-operation-2",
@@ -431,7 +433,7 @@ func TestCSISnapshots(t *testing.T) {
 			},
 			inputDetails: true,
 			expect: `  CSI Snapshots:
-    pvc-2:
+    pvc-ns-2/pvc-2:
       Snapshot:
         Operation ID: fake-operation-2
         Snapshot Content Name: vsc-2
@@ -445,6 +447,7 @@ func TestCSISnapshots(t *testing.T) {
 			volumeInfo: []*volume.VolumeInfo{
 				{
 					BackupMethod:      volume.CSISnapshot,
+					PVCNamespace:      "pvc-ns-3",
 					PVCName:           "pvc-3",
 					SnapshotDataMoved: true,
 					OperationID:       "fake-operation-3",
@@ -456,7 +459,7 @@ func TestCSISnapshots(t *testing.T) {
 				},
 			},
 			expect: `  CSI Snapshots:
-    pvc-3:
+    pvc-ns-3/pvc-3:
       Data Movement: included, specify --details for more information
 `,
 		},
@@ -465,6 +468,7 @@ func TestCSISnapshots(t *testing.T) {
 			volumeInfo: []*volume.VolumeInfo{
 				{
 					BackupMethod:      volume.CSISnapshot,
+					PVCNamespace:      "pvc-ns-4",
 					PVCName:           "pvc-4",
 					SnapshotDataMoved: true,
 					OperationID:       "fake-operation-4",
@@ -477,7 +481,7 @@ func TestCSISnapshots(t *testing.T) {
 			},
 			inputDetails: true,
 			expect: `  CSI Snapshots:
-    pvc-4:
+    pvc-ns-4/pvc-4:
       Data Movement:
         Operation ID: fake-operation-4
         Data Mover: velero
@@ -489,6 +493,7 @@ func TestCSISnapshots(t *testing.T) {
 			volumeInfo: []*volume.VolumeInfo{
 				{
 					BackupMethod:      volume.CSISnapshot,
+					PVCNamespace:      "pvc-ns-5",
 					PVCName:           "pvc-5",
 					SnapshotDataMoved: true,
 					OperationID:       "fake-operation-5",
@@ -500,7 +505,7 @@ func TestCSISnapshots(t *testing.T) {
 			},
 			inputDetails: true,
 			expect: `  CSI Snapshots:
-    pvc-5:
+    pvc-ns-5/pvc-5:
       Data Movement:
         Operation ID: fake-operation-5
         Data Mover: velero
