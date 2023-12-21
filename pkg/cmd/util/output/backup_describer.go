@@ -585,6 +585,7 @@ func retrieveCSISnapshotLegacy(ctx context.Context, kbClient kbclient.Client, ba
 
 			if *vs.Status.BoundVolumeSnapshotContentName == vsc.Name {
 				volInfo.PVCName = *vs.Spec.Source.PersistentVolumeClaimName
+				volInfo.PVCNamespace = vs.Namespace
 			}
 		}
 
@@ -639,7 +640,7 @@ func describeCSISnapshots(d *Describer, details bool, infos []*volume.VolumeInfo
 }
 
 func describeCSISnapshot(d *Describer, details bool, info *volume.VolumeInfo) {
-	d.Printf("\t\t%s:\n", info.PVCName)
+	d.Printf("\t\t%s:\n", fmt.Sprintf("%s/%s", info.PVCNamespace, info.PVCName))
 
 	describeLocalSnapshot(d, details, info)
 	describeDataMovement(d, details, info)

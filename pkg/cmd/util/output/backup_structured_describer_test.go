@@ -357,6 +357,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			volumeInfo: []*volume.VolumeInfo{
 				{
 					BackupMethod:          volume.CSISnapshot,
+					PVCNamespace:          "pvc-ns-1",
 					PVCName:               "pvc-1",
 					PreserveLocalSnapshot: true,
 					OperationID:           "fake-operation-1",
@@ -370,7 +371,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			},
 			expect: map[string]interface{}{
 				"csiSnapshots": map[string]interface{}{
-					"pvc-1": map[string]interface{}{
+					"pvc-ns-1/pvc-1": map[string]interface{}{
 						"snapshot": "included, specify --details for more information",
 					},
 				},
@@ -381,6 +382,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			volumeInfo: []*volume.VolumeInfo{
 				{
 					BackupMethod:          volume.CSISnapshot,
+					PVCNamespace:          "pvc-ns-2",
 					PVCName:               "pvc-2",
 					PreserveLocalSnapshot: true,
 					OperationID:           "fake-operation-2",
@@ -395,7 +397,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			inputDetails: true,
 			expect: map[string]interface{}{
 				"csiSnapshots": map[string]interface{}{
-					"pvc-2": map[string]interface{}{
+					"pvc-ns-2/pvc-2": map[string]interface{}{
 						"snapshot": map[string]interface{}{
 							"operationID":         "fake-operation-2",
 							"snapshotContentName": "vsc-2",
@@ -412,6 +414,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			volumeInfo: []*volume.VolumeInfo{
 				{
 					BackupMethod:      volume.CSISnapshot,
+					PVCNamespace:      "pvc-ns-3",
 					PVCName:           "pvc-3",
 					SnapshotDataMoved: true,
 					OperationID:       "fake-operation-3",
@@ -424,7 +427,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			},
 			expect: map[string]interface{}{
 				"csiSnapshots": map[string]interface{}{
-					"pvc-3": map[string]interface{}{
+					"pvc-ns-3/pvc-3": map[string]interface{}{
 						"dataMovement": "included, specify --details for more information",
 					},
 				},
@@ -435,6 +438,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			volumeInfo: []*volume.VolumeInfo{
 				{
 					BackupMethod:      volume.CSISnapshot,
+					PVCNamespace:      "pvc-ns-4",
 					PVCName:           "pvc-4",
 					SnapshotDataMoved: true,
 					OperationID:       "fake-operation-4",
@@ -448,7 +452,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			inputDetails: true,
 			expect: map[string]interface{}{
 				"csiSnapshots": map[string]interface{}{
-					"pvc-4": map[string]interface{}{
+					"pvc-ns-4/pvc-4": map[string]interface{}{
 						"dataMovement": map[string]interface{}{
 							"operationID":  "fake-operation-4",
 							"dataMover":    "velero",
@@ -463,6 +467,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			volumeInfo: []*volume.VolumeInfo{
 				{
 					BackupMethod:      volume.CSISnapshot,
+					PVCNamespace:      "pvc-ns-4",
 					PVCName:           "pvc-4",
 					SnapshotDataMoved: true,
 					OperationID:       "fake-operation-4",
@@ -475,7 +480,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 			inputDetails: true,
 			expect: map[string]interface{}{
 				"csiSnapshots": map[string]interface{}{
-					"pvc-4": map[string]interface{}{
+					"pvc-ns-4/pvc-4": map[string]interface{}{
 						"dataMovement": map[string]interface{}{
 							"operationID":  "fake-operation-4",
 							"dataMover":    "velero",
