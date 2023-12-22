@@ -19,7 +19,6 @@ package mocks
 import (
 	"context"
 
-	"github.com/kopia/kopia/repo/manifest"
 	"github.com/kopia/kopia/snapshot/policy"
 	"github.com/stretchr/testify/mock"
 
@@ -57,15 +56,15 @@ func (_m *Policy) TreeForSource(ctx context.Context, rep repo.Repository, si sna
 }
 
 // ApplyRetentionPolicy provides a mock function with given fields: ctx, rep, sourceInfo, reallyDelete
-func (_m *Policy) ApplyRetentionPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snapshot.SourceInfo, reallyDelete bool) ([]manifest.ID, error) {
+func (_m *Policy) ApplyRetentionPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snapshot.SourceInfo, reallyDelete bool) ([]*snapshot.Manifest, error) {
 	ret := _m.Called(ctx, rep, sourceInfo, reallyDelete)
 
-	var r0 []manifest.ID
-	if rf, ok := ret.Get(0).(func(context.Context, repo.RepositoryWriter, snapshot.SourceInfo, bool) []manifest.ID); ok {
+	var r0 []*snapshot.Manifest
+	if rf, ok := ret.Get(0).(func(context.Context, repo.RepositoryWriter, snapshot.SourceInfo, bool) []*snapshot.Manifest); ok {
 		r0 = rf(ctx, rep, sourceInfo, reallyDelete)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]manifest.ID)
+			r0 = ret.Get(0).([]*snapshot.Manifest)
 		}
 	}
 
