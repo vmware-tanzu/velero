@@ -60,6 +60,7 @@ func injectSnapshotFuncs() *snapshotMockes {
 		repoWriterMock: &repomocks.RepositoryWriter{},
 	}
 
+	applyRetentionPolicyFunc = s.policyMock.ApplyRetentionPolicy
 	setPolicyFunc = s.policyMock.SetPolicy
 	treeForSourceFunc = s.policyMock.TreeForSource
 	loadSnapshotFunc = s.snapshotMock.LoadSnapshot
