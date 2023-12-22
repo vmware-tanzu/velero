@@ -16,6 +16,7 @@ If you're using Velero and want to add your organization to this list,
 <a href="https://mayadata.io/" border="0" target="_blank"><img alt="mayadata.io" src="site/static/img/adopters/mayadata.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://www.replicated.com/" border="0" target="_blank"><img alt="replicated.com" src="site/static/img/adopters/replicated-logo-red.svg" height="50"></a>
 <a href="https://cloudcasa.io/" border="0" target="_blank"><img alt="cloudcasa.io" src="site/static/img/adopters/cloudcasa.svg" height="50"></a>
+<a href="https://azure.microsoft.com/" border="0" target="_blank"><img alt="azure.com" src="site/static/img/adopters/azure.svg" height="50"></a>
 ## Success Stories
 
 Below is a list of adopters of Velero in **production environments** that have
@@ -63,6 +64,9 @@ Replicated uses the Velero open source project to enable snapshots in [KOTS][101
 
 **[CloudCasa][103]**<br>
 [Catalogic Software][104] integrates Velero with [CloudCasa][103] - A Smart Home in the Cloud for Backups. CloudCasa is a simple, scalable, cloud-native solution providing data protection and disaster recovery as a service. This solution is built using Kubernetes for protecting Kubernetes clusters.<br>
+
+**[Microsoft Azure][105]**<br>
+[Azure Backup for AKS][106] is an Azure native, Kubernetes aware, Enterprise ready backup for containerized applications deployed on Azure Kubernetes Service (AKS). AKS Backup utilizes Velero to perform backup and restore operations to protect stateful applications in AKS clusters.<br>
 
 ## Adding your organization to the list of Velero Adopters
 
@@ -118,3 +122,6 @@ If you would like to add your logo to a future `Adopters of Velero` section on [
 
 [103]: https://cloudcasa.io/
 [104]: https://www.catalogicsoftware.com/
+
+[105]: https://azure.microsoft.com/
+[106]: https://learn.microsoft.com/azure/backup/backup-overview
