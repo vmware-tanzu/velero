@@ -168,7 +168,7 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 		var pvc *corev1api.PersistentVolumeClaim
 		if ok {
 			if volumeObj.PersistentVolumeClaim != nil {
-				pvc := new(corev1api.PersistentVolumeClaim)
+				pvc = new(corev1api.PersistentVolumeClaim)
 				err := r.crClient.Get(context.TODO(), ctrlclient.ObjectKey{Namespace: data.Pod.Namespace, Name: volumeObj.PersistentVolumeClaim.ClaimName}, pvc)
 				if err != nil {
 					errs = append(errs, errors.Wrap(err, "error getting persistent volume claim for volume"))
