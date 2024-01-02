@@ -128,7 +128,7 @@ If depreciation proposal passes by supermajority votes, the feature is deprecate
 
 The deprecation window is the period from the release in which the deprecation takes effect through the release in which the feature is removed. During this period, only critical security vulnerabilities and catastrophic bugs should be fixed.
 
-**Note:** If a deprecated feature must remain available for general use for two releases after deprecation, perhaps a backup that uses this deprecated feature must be fully-supported for restore for four releases.
+**Note:** If a backup relies on a deprecated feature, then backups made with the last Velero release before this feature is removed must still be restorable in version `n+2`. For instance, something like restic feature support, that might mean that restic is removed from the list of supported uploader types in version `n` but the underlying implementation required to restore from a restic backup won't be removed until release `n+2`.
 
 ## Updating Governance
 
