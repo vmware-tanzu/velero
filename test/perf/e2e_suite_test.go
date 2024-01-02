@@ -30,7 +30,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	. "github.com/vmware-tanzu/velero/test"
-
 	"github.com/vmware-tanzu/velero/test/perf/backup"
 	"github.com/vmware-tanzu/velero/test/perf/basic"
 	"github.com/vmware-tanzu/velero/test/perf/restore"
@@ -41,7 +40,7 @@ import (
 )
 
 func init() {
-	VeleroCfg.Options = &install.Options{}
+	VeleroCfg.Options = install.Options{}
 	flag.StringVar(&VeleroCfg.CloudProvider, "cloud-provider", "", "cloud that Velero will be installed into.  Required.")
 	flag.StringVar(&VeleroCfg.ObjectStoreProvider, "object-store-provider", "", "provider of object store plugin. Required if cloud-provider is kind, otherwise ignored.")
 	flag.StringVar(&VeleroCfg.BSLBucket, "bucket", "", "name of the object storage bucket where backups from e2e tests should be stored. Required.")
@@ -56,7 +55,7 @@ func init() {
 	flag.StringVar(&VeleroCfg.BSLPrefix, "prefix", "", "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flag.StringVar(&VeleroCfg.VSLConfig, "vsl-config", "", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flag.StringVar(&VeleroCfg.VeleroNamespace, "velero-namespace", "velero", "namespace to install Velero into")
-	flag.BoolVar(&VeleroCfg.InstallVelero, "install-velero", true, "install/uninstall velero during the test.  Optional.")
+	flag.BoolVar(&InstallVelero, "install-velero", true, "install/uninstall velero during the test.  Optional.")
 	flag.BoolVar(&VeleroCfg.UseNodeAgent, "use-node-agent", true, "whether deploy node agent daemonset velero during the test.  Optional.")
 	flag.StringVar(&VeleroCfg.RegistryCredentialFile, "registry-credential-file", "", "file containing credential for the image registry, follows the same format rules as the ~/.docker/config.json file. Optional.")
 	flag.StringVar(&VeleroCfg.NodeAgentPodCPULimit, "node-agent-pod-cpu-limit", "4", "CPU limit for node agent pod. Optional.")
@@ -120,15 +119,15 @@ func TestE2e(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	if VeleroCfg.InstallVelero {
+	if InstallVelero {
 		By("Install test resources before testing BeforeSuite")
-		Expect(PrepareVelero(context.Background(), "install resource before testing")).To(Succeed())
+		Expect(PrepareVelero(context.Background(), "install resource before testing", VeleroCfg)).To(Succeed())
 	}
 })
 
 var _ = AfterSuite(func() {
 	Expect(report.GenerateYamlReport()).To(Succeed())
-	if VeleroCfg.InstallVelero && !VeleroCfg.Debug {
+	if InstallVelero && !VeleroCfg.Debug {
 		By("release test resources after testing")
 		Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
 	}

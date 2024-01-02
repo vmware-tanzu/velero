@@ -26,7 +26,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
 	"github.com/pkg/errors"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -83,15 +82,15 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 		BeforeEach(func() {
 			flag.Parse()
 			// Using the global velero config which covered the installation for most common cases
-			veleroCfg := VeleroCfg
+			veleroCfg := test.GetTestCase().VeleroCfg
 			// TODO: Skip nodeport test until issue https://github.com/kubernetes/kubernetes/issues/114384 fixed
 			// TODO: Although this issue is closed, but it's not fixed.
 			// TODO: After bump up k8s version in AWS pipeline, this issue also apply for AWS pipeline.
 			if (veleroCfg.CloudProvider == "azure" || veleroCfg.CloudProvider == "aws") && strings.Contains(test.GetTestCase().CaseBaseName, "nodeport") {
 				Skip("Skip due to issue https://github.com/kubernetes/kubernetes/issues/114384 on AKS")
 			}
-			if veleroCfg.InstallVelero {
-				Expect(PrepareVelero(context.Background(), test.GetTestCase().CaseBaseName)).To(Succeed())
+			if InstallVelero {
+				Expect(PrepareVelero(context.Background(), test.GetTestCase().CaseBaseName, veleroCfg)).To(Succeed())
 			}
 		})
 		It(test.GetTestMsg().Text, func() {
@@ -102,7 +101,6 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 
 func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 	return func() {
-		veleroCfg := VeleroCfg
 		for k := range tests {
 			Expect(tests[k].Init()).To(Succeed(), fmt.Sprintf("Failed to instantiate test %s case", tests[k].GetTestMsg().Desc))
 			defer tests[k].GetTestCase().CtxCancel()
@@ -110,8 +108,8 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 
 		BeforeEach(func() {
 			flag.Parse()
-			if veleroCfg.InstallVelero {
-				Expect(PrepareVelero(context.Background(), tests[0].GetTestCase().CaseBaseName)).To(Succeed())
+			if InstallVelero {
+				Expect(PrepareVelero(context.Background(), tests[0].GetTestCase().CaseBaseName, tests[0].GetTestCase().VeleroCfg)).To(Succeed())
 			}
 		})
 

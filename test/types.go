@@ -27,7 +27,9 @@ import (
 
 const StorageClassName = "e2e-storage-class"
 const StorageClassName2 = "e2e-storage-class-2"
+const FeatureCSI = "EnableCSI"
 
+var InstallVelero bool
 var UUIDgen uuid.UUID
 
 var VeleroCfg VeleroConfig
@@ -41,7 +43,7 @@ var ReportData *Report
 
 type VeleroConfig struct {
 	VeleroCfgInPerf
-	*install.Options
+	install.Options
 	VeleroCLI                         string
 	VeleroImage                       string
 	VeleroVersion                     string
@@ -66,7 +68,6 @@ type VeleroConfig struct {
 	MigrateFromVeleroCLI              string
 	Plugins                           string
 	AddBSLPlugins                     string
-	InstallVelero                     bool
 	KibishiiDirectory                 string
 	Debug                             bool
 	GCFrequency                       string
@@ -83,6 +84,7 @@ type VeleroConfig struct {
 	StandbyClusterPlugins             string
 	StandbyClusterOjbectStoreProvider string
 	DebugVeleroPodRestart             bool
+	IsUpgradeTest                     bool
 }
 
 type VeleroCfgInPerf struct {

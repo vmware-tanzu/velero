@@ -71,7 +71,7 @@ func APIExtensionsVersionsTest() {
 			By("Clean backups after test", func() {
 				DeleteAllBackups(context.Background(), *veleroCfg.DefaultClient)
 			})
-			if veleroCfg.InstallVelero {
+			if InstallVelero {
 				By("Uninstall Velero and delete CRD ", func() {
 					ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 					defer ctxCancel()

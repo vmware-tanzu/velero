@@ -32,7 +32,6 @@ import (
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
-
 	. "github.com/vmware-tanzu/velero/test/util/kibishii"
 	. "github.com/vmware-tanzu/velero/test/util/providers"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
@@ -66,7 +65,7 @@ func TTLTest() {
 	BeforeEach(func() {
 		flag.Parse()
 		veleroCfg = VeleroCfg
-		if veleroCfg.InstallVelero {
+		if InstallVelero {
 			// Make sure GCFrequency is shorter than backup TTL
 			veleroCfg.GCFrequency = "4m0s"
 			veleroCfg.UseVolumeSnapshots = useVolumeSnapshots
@@ -82,7 +81,7 @@ func TTLTest() {
 			})
 			ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer ctxCancel()
-			if veleroCfg.InstallVelero {
+			if InstallVelero {
 				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
 			}
 			Expect(DeleteNamespace(ctx, client, test.testNS, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.testNS))

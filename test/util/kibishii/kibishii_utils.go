@@ -151,7 +151,7 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		} else {
 			// wait for a period to confirm no snapshots exist for the backup
 			time.Sleep(5 * time.Minute)
-			if strings.EqualFold(veleroFeatures, "EnableCSI") {
+			if strings.EqualFold(veleroFeatures, FeatureCSI) {
 				_, err = GetSnapshotCheckPoint(*veleroCfg.ClientToInstallVelero, veleroCfg, 0,
 					kibishiiNamespace, backupName, KibishiiPVCNameList)
 				if err != nil {
@@ -245,11 +245,11 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 func installKibishii(ctx context.Context, namespace string, cloudPlatform, veleroFeatures,
 	kibishiiDirectory string, useVolumeSnapshots bool, workerReplicas int) error {
 	if strings.EqualFold(cloudPlatform, "azure") &&
-		strings.EqualFold(veleroFeatures, "EnableCSI") {
+		strings.EqualFold(veleroFeatures, FeatureCSI) {
 		cloudPlatform = "azure-csi"
 	}
 	if strings.EqualFold(cloudPlatform, "aws") &&
-		strings.EqualFold(veleroFeatures, "EnableCSI") {
+		strings.EqualFold(veleroFeatures, FeatureCSI) {
 		cloudPlatform = "aws-csi"
 	}
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
