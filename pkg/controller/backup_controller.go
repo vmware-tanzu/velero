@@ -252,8 +252,6 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err := kubeutil.PatchResource(original, request.Backup, b.kbClient); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "error updating Backup status to %s", request.Status.Phase)
 	}
-	// store ref to just-updated item for creating patch
-	original = request.Backup.DeepCopy()
 
 	backupScheduleName := request.GetLabels()[velerov1api.ScheduleNameLabel]
 
@@ -264,6 +262,9 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 		return ctrl.Result{}, nil
 	}
+
+	// store ref to just-updated item for creating patch
+	original = request.Backup.DeepCopy()
 
 	b.backupTracker.Add(request.Namespace, request.Name)
 	defer func() {
