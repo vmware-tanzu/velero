@@ -316,34 +316,26 @@ func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.Group
 			for _, s := range r.backupRequest.Spec.OrLabelSelectors {
 				orLabelSelectors = append(orLabelSelectors, metav1.FormatLabelSelector(s))
 			}
-		} else {
-			orLabelSelectors = []string{}
 		}
 
 		log.Info("Listing items")
 		unstructuredItems := make([]unstructured.Unstructured, 0)
 
 		// Listing items for orLabelSelectors
-		errListingForNS := false
 		for _, label := range orLabelSelectors {
 			unstructuredItems, err = r.listItemsForLabel(unstructuredItems, gr, label, resourceClient)
 			if err != nil {
-				errListingForNS = true
+				log.WithError(err).Error("Error listing items")
+				break
 			}
-		}
-
-		if errListingForNS {
-			log.WithError(err).Error("Error listing items")
-			continue
-		}
-
-		var labelSelector string
-		if selector := r.backupRequest.Spec.LabelSelector; selector != nil {
-			labelSelector = metav1.FormatLabelSelector(selector)
 		}
 
 		// Listing items for labelSelector (singular)
 		if len(orLabelSelectors) == 0 {
+			var labelSelector string
+			if selector := r.backupRequest.Spec.LabelSelector; selector != nil {
+				labelSelector = metav1.FormatLabelSelector(selector)
+			}
 			unstructuredItems, err = r.listItemsForLabel(unstructuredItems, gr, labelSelector, resourceClient)
 			if err != nil {
 				log.WithError(err).Error("Error listing items")
