@@ -41,15 +41,36 @@ const (
 	waitInternal = 2 * time.Second
 )
 
-// DeletePVCIfAny deletes a PVC by name if it exists, and log an error when the deletion fails
-func DeletePVCIfAny(ctx context.Context, pvcGetter corev1client.CoreV1Interface, pvcName string, pvcNamespace string, log logrus.FieldLogger) {
-	err := pvcGetter.PersistentVolumeClaims(pvcNamespace).Delete(ctx, pvcName, metav1.DeleteOptions{})
+// DeletePVAndPVCIfAny deletes PVC and delete the bound PV if it exists and log an error when the deletion fails
+// We first set the reclaim policy of the PV to Delete, then PV will be deleted automatically when PVC is deleted.
+func DeletePVAndPVCIfAny(ctx context.Context, client corev1client.CoreV1Interface, pvcName, pvcNamespace string, log logrus.FieldLogger) {
+	pvcObj, err := client.PersistentVolumeClaims(pvcNamespace).Get(ctx, pvcName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			log.WithError(err).Debugf("Abort deleting PVC, it doesn't exist, %s/%s", pvcNamespace, pvcName)
+			log.WithError(err).Debugf("Abort deleting PV and PVC, for related PVC doesn't exist, %s/%s", pvcNamespace, pvcName)
+			return
 		} else {
-			log.WithError(err).Errorf("Failed to delete pvc %s/%s", pvcNamespace, pvcName)
+			log.Warnf("failed to get pvc %s/%s with err %v", pvcNamespace, pvcName, err)
+			return
 		}
+	}
+
+	if pvcObj.Spec.VolumeName == "" {
+		log.Warnf("failed to delete PV, for related PVC %s/%s has no bind volume name", pvcNamespace, pvcName)
+	} else {
+		pvObj, err := client.PersistentVolumes().Get(ctx, pvcObj.Spec.VolumeName, metav1.GetOptions{})
+		if err != nil {
+			log.Warnf("failed to delete PV %s with err %v", pvcObj.Spec.VolumeName, err)
+		} else {
+			_, err = SetPVReclaimPolicy(ctx, client, pvObj, corev1api.PersistentVolumeReclaimDelete)
+			if err != nil {
+				log.Warnf("failed to set reclaim policy of PV %s to delete with err %v", pvObj.Name, err)
+			}
+		}
+	}
+
+	if err := client.PersistentVolumeClaims(pvcNamespace).Delete(ctx, pvcName, metav1.DeleteOptions{}); err != nil {
+		log.Warnf("failed to delete pvc %s/%s with err %v", pvcNamespace, pvcName, err)
 	}
 }
 
