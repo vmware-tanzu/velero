@@ -241,10 +241,10 @@ func TestGetPodSpec(t *testing.T) {
 }
 
 func TestGetConfigs(t *testing.T) {
-	cm := builder.ForConfigMap("fake-ns", "node-agent-configs").Result()
-	cmWithInvalidDataFormat := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("fake-key", "wrong").Result()
-	cmWithoutCocurrentData := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("fake-key", "{\"someothers\":{\"someother\": 10}}").Result()
-	cmWithValidData := builder.ForConfigMap("fake-ns", "node-agent-configs").Data("fake-key", "{\"loadConcurrency\":{\"globalConfig\": 5}}").Result()
+	cm := builder.ForConfigMap("fake-ns", "node-agent-config").Result()
+	cmWithInvalidDataFormat := builder.ForConfigMap("fake-ns", "node-agent-config").Data("fake-key", "wrong").Result()
+	cmWithoutCocurrentData := builder.ForConfigMap("fake-ns", "node-agent-config").Data("fake-key", "{\"someothers\":{\"someother\": 10}}").Result()
+	cmWithValidData := builder.ForConfigMap("fake-ns", "node-agent-config").Data("fake-key", "{\"loadConcurrency\":{\"globalConfig\": 5}}").Result()
 
 	tests := []struct {
 		name          string
@@ -270,7 +270,7 @@ func TestGetConfigs(t *testing.T) {
 					},
 				},
 			},
-			expectErr: "error to get node agent configs node-agent-configs: fake-get-error",
+			expectErr: "error to get node agent configs node-agent-config: fake-get-error",
 		},
 		{
 			name:      "cm's data is nil",
@@ -278,7 +278,7 @@ func TestGetConfigs(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				cm,
 			},
-			expectErr: "data is not available in config map node-agent-configs",
+			expectErr: "data is not available in config map node-agent-config",
 		},
 		{
 			name:      "cm's data is with invalid format",
@@ -286,7 +286,7 @@ func TestGetConfigs(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				cmWithInvalidDataFormat,
 			},
-			expectErr: "error to unmarshall configs from node-agent-configs: invalid character 'w' looking for beginning of value",
+			expectErr: "error to unmarshall configs from node-agent-config: invalid character 'w' looking for beginning of value",
 		},
 		{
 			name:      "concurrency configs are not found",
