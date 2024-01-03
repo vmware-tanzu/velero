@@ -251,7 +251,7 @@ func TestPutBackup(t *testing.T) {
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"backups/backup-1/backup-1-itemoperations.json.gz",
 				"backups/backup-1/backup-1-resource-list.json.gz",
-				"backups/backup-1/backup-1-volumeinfos.json.gz",
+				"backups/backup-1/backup-1-volumeinfo.json.gz",
 			},
 		},
 		{
@@ -274,7 +274,7 @@ func TestPutBackup(t *testing.T) {
 				"prefix-1/backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"prefix-1/backups/backup-1/backup-1-itemoperations.json.gz",
 				"prefix-1/backups/backup-1/backup-1-resource-list.json.gz",
-				"prefix-1/backups/backup-1/backup-1-volumeinfos.json.gz",
+				"prefix-1/backups/backup-1/backup-1-volumeinfo.json.gz",
 			},
 		},
 		{
@@ -320,7 +320,7 @@ func TestPutBackup(t *testing.T) {
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"backups/backup-1/backup-1-itemoperations.json.gz",
 				"backups/backup-1/backup-1-resource-list.json.gz",
-				"backups/backup-1/backup-1-volumeinfos.json.gz",
+				"backups/backup-1/backup-1-volumeinfo.json.gz",
 			},
 		},
 		{
@@ -339,7 +339,7 @@ func TestPutBackup(t *testing.T) {
 				"backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"backups/backup-1/backup-1-resource-list.json.gz",
-				"backups/backup-1/backup-1-volumeinfos.json.gz",
+				"backups/backup-1/backup-1-volumeinfo.json.gz",
 			},
 		},
 	}
@@ -773,7 +773,7 @@ func TestGetDownloadURL(t *testing.T) {
 			name:       "",
 			targetName: "my-backup",
 			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
-				velerov1api.DownloadTargetKindBackupVolumeInfos: "backups/my-backup/my-backup-volumeinfos.json.gz",
+				velerov1api.DownloadTargetKindBackupVolumeInfos: "backups/my-backup/my-backup-volumeinfo.json.gz",
 			},
 		},
 	}
@@ -1116,7 +1116,7 @@ func TestGetBackupVolumeInfos(t *testing.T) {
 
 				require.NoError(t, json.NewEncoder(gzw).Encode(tc.volumeInfo))
 				require.NoError(t, gzw.Close())
-				harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-volumeinfos.json.gz", obj)
+				harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-volumeinfo.json.gz", obj)
 			}
 
 			if tc.volumeInfoStr != "" {
@@ -1126,7 +1126,7 @@ func TestGetBackupVolumeInfos(t *testing.T) {
 				require.NoError(t, err)
 
 				require.NoError(t, gzw.Close())
-				harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-volumeinfos.json.gz", obj)
+				harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-volumeinfo.json.gz", obj)
 			}
 
 			result, err := harness.GetBackupVolumeInfos("test-backup")
