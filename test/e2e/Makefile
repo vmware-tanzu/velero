@@ -104,7 +104,7 @@ UPLOADER_TYPE ?=
 
 SNAPSHOT_MOVE_DATA ?= false
 DATA_MOVER_PLUGIN ?=
-DISABLE_INFORMER_CACHE ?= false
+ENABLE_INFORMER_CACHE ?= true
 
 
 .PHONY:ginkgo
@@ -157,7 +157,7 @@ run: ginkgo
 		-standby-cluster-plugins=$(STANDBY_CLUSTER_PLUGINS) \
 		-standby-cluster-object-store-provider=$(STANDBY_CLUSTER_OBJECT_STORE_PROVIDER) \
 		-debug-velero-pod-restart=$(DEBUG_VELERO_POD_RESTART) \
-		-disable-informer-cache=$(DISABLE_INFORMER_CACHE)
+		-enable-informer-cache=$(ENABLE_INFORMER_CACHE)
 		
 
 build: ginkgo

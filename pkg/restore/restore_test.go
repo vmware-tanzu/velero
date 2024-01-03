@@ -1059,7 +1059,7 @@ func TestRestoreItems(t *testing.T) {
 		tarball              io.Reader
 		want                 []*test.APIResource
 		expectedRestoreItems map[itemKey]restoredItemStatus
-		disableInformer      bool
+		enableInformer       bool
 	}{
 		{
 			name:    "metadata uid/resourceVersion/etc. gets removed",
@@ -1216,7 +1216,7 @@ func TestRestoreItems(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.Secrets(builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"foo": []byte("bar")}).Result()),
 			},
-			disableInformer: true,
+			enableInformer: false,
 			want: []*test.APIResource{
 				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
 			},
@@ -1235,7 +1235,7 @@ func TestRestoreItems(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.Secrets(builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"foo": []byte("bar")}).Result()),
 			},
-			disableInformer: false,
+			enableInformer: true,
 			want: []*test.APIResource{
 				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
 			},
@@ -1394,14 +1394,14 @@ func TestRestoreItems(t *testing.T) {
 			}
 
 			data := &Request{
-				Log:                  h.log,
-				Restore:              tc.restore,
-				Backup:               tc.backup,
-				PodVolumeBackups:     nil,
-				VolumeSnapshots:      nil,
-				BackupReader:         tc.tarball,
-				RestoredItems:        map[itemKey]restoredItemStatus{},
-				DisableInformerCache: tc.disableInformer,
+				Log:                 h.log,
+				Restore:             tc.restore,
+				Backup:              tc.backup,
+				PodVolumeBackups:    nil,
+				VolumeSnapshots:     nil,
+				BackupReader:        tc.tarball,
+				RestoredItems:       map[itemKey]restoredItemStatus{},
+				EnableInformerCache: tc.enableInformer,
 			}
 			warnings, errs := h.restorer.Restore(
 				data,

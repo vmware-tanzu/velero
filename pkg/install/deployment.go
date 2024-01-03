@@ -49,7 +49,7 @@ type podTemplateConfig struct {
 	uploaderType                    string
 	defaultSnapshotMoveData         bool
 	privilegedNodeAgent             bool
-	disableInformerCache            bool
+	enableInformerCache             bool
 	scheduleSkipImmediately         bool
 }
 
@@ -153,9 +153,9 @@ func WithDefaultSnapshotMoveData() podTemplateOption {
 	}
 }
 
-func WithDisableInformerCache() podTemplateOption {
+func WithEnableInformerCache() podTemplateOption {
 	return func(c *podTemplateConfig) {
-		c.disableInformerCache = true
+		c.enableInformerCache = true
 	}
 }
 
@@ -206,8 +206,8 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 		args = append(args, "--default-snapshot-move-data=true")
 	}
 
-	if c.disableInformerCache {
-		args = append(args, "--disable-informer-cache=true")
+	if c.enableInformerCache {
+		args = append(args, "--enable-informer-cache=true")
 	}
 
 	if c.scheduleSkipImmediately {

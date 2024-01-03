@@ -147,8 +147,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				}
 				//TODO: Remove this setting when upgrade path is from 1.13 to higher
 				//TODO: version, or self version 1.12 and older versions have no this parameter.
-				tmpCfgForOldVeleroInstall.WithoutDisableInformerCacheParam = true
-				tmpCfgForOldVeleroInstall.DisableInformerCache = false
+				tmpCfgForOldVeleroInstall.WithoutEnableInformerCacheParam = true
 
 				Expect(VeleroInstall(context.Background(), &tmpCfgForOldVeleroInstall, false)).To(Succeed())
 				Expect(CheckVeleroVersion(context.Background(), tmpCfgForOldVeleroInstall.VeleroCLI,

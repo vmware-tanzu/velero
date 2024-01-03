@@ -50,10 +50,10 @@ const (
 // we provide more install options other than the standard install.InstallOptions in E2E test
 type installOptions struct {
 	*install.Options
-	RegistryCredentialFile           string
-	RestoreHelperImage               string
-	VeleroServerDebugMode            bool
-	WithoutDisableInformerCacheParam bool
+	RegistryCredentialFile          string
+	RestoreHelperImage              string
+	VeleroServerDebugMode           bool
+	WithoutEnableInformerCacheParam bool
 }
 
 func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluster bool) error {
@@ -131,13 +131,14 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 	veleroInstallOptions.VeleroPodCPURequest = veleroCfg.VeleroPodCPURequest
 	veleroInstallOptions.VeleroPodMemLimit = veleroCfg.VeleroPodMemLimit
 	veleroInstallOptions.VeleroPodMemRequest = veleroCfg.VeleroPodMemRequest
-	veleroInstallOptions.DisableInformerCache = veleroCfg.DisableInformerCache
+	veleroInstallOptions.EnableInformerCache = veleroCfg.EnableInformerCache
 
 	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, veleroCfg.CloudProvider, &installOptions{
-		Options:                veleroInstallOptions,
-		RegistryCredentialFile: veleroCfg.RegistryCredentialFile,
-		RestoreHelperImage:     veleroCfg.RestoreHelperImage,
-		VeleroServerDebugMode:  veleroCfg.VeleroServerDebugMode,
+		Options:                         veleroInstallOptions,
+		RegistryCredentialFile:          veleroCfg.RegistryCredentialFile,
+		RestoreHelperImage:              veleroCfg.RestoreHelperImage,
+		VeleroServerDebugMode:           veleroCfg.VeleroServerDebugMode,
+		WithoutEnableInformerCacheParam: veleroCfg.WithoutEnableInformerCacheParam,
 	})
 
 	if err != nil {
@@ -248,11 +249,11 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 		args = append(args, "--plugins", options.Plugins.String())
 	}
 
-	if !options.WithoutDisableInformerCacheParam {
-		if options.DisableInformerCache {
-			args = append(args, "--disable-informer-cache=true")
+	if !options.WithoutEnableInformerCacheParam {
+		if options.EnableInformerCache {
+			args = append(args, "--enable-informer-cache=true")
 		} else {
-			args = append(args, "--disable-informer-cache=false")
+			args = append(args, "--enable-informer-cache=false")
 		}
 	}
 

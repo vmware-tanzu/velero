@@ -167,8 +167,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					OriginVeleroCfg.Plugins = ""
 					//TODO: Remove this setting when migration path is from 1.13 to higher version
 					//TODO: or self, because version 1.12 and older versions have no this parameter.
-					OriginVeleroCfg.WithoutDisableInformerCacheParam = true
-					OriginVeleroCfg.DisableInformerCache = false
+					OriginVeleroCfg.WithoutEnableInformerCacheParam = true
 				}
 				Expect(VeleroInstall(context.Background(), &OriginVeleroCfg, false)).To(Succeed())
 				if veleroCLI2Version.VeleroVersion != "self" {

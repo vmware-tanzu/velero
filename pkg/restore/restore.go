@@ -324,7 +324,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		kbClient:                       kr.kbClient,
 		itemOperationsList:             req.GetItemOperationsList(),
 		resourceModifiers:              req.ResourceModifiers,
-		disableInformerCache:           req.DisableInformerCache,
+		enableInformerCache:            req.EnableInformerCache,
 		featureVerifier:                kr.featureVerifier,
 		hookTracker:                    hook.NewHookTracker(),
 		volumeInfoMap:                  req.VolumeInfoMap,
@@ -378,7 +378,7 @@ type restoreContext struct {
 	kbClient                       crclient.Client
 	itemOperationsList             *[]*itemoperation.RestoreOperation
 	resourceModifiers              *resourcemodifiers.ResourceModifiers
-	disableInformerCache           bool
+	enableInformerCache            bool
 	featureVerifier                features.Verifier
 	hookTracker                    *hook.HookTracker
 	volumeInfoMap                  map[string]internalVolume.VolumeInfo
@@ -446,7 +446,7 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 	}()
 
 	// Need to stop all informers if enabled
-	if !ctx.disableInformerCache {
+	if ctx.enableInformerCache {
 		defer func() {
 			// Call the cancel func to close the channel for each started informer
 			for _, factory := range ctx.dynamicInformerFactories {
@@ -578,7 +578,7 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 	errs.Merge(&e)
 
 	// initialize informer caches for selected resources if enabled
-	if !ctx.disableInformerCache {
+	if ctx.enableInformerCache {
 		// CRD informer will have already been initialized if any CRDs were created,
 		// but already-initialized informers aren't re-initialized because getGenericInformer
 		// looks for an existing one first.
@@ -1537,7 +1537,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	// only attempt Get before Create if using informer cache, otherwise this will slow down restore into
 	// new namespace
-	if !ctx.disableInformerCache {
+	if ctx.enableInformerCache {
 		ctx.log.Debugf("Checking for existence %s: %v", obj.GroupVersionKind().Kind, name)
 		fromCluster, err = ctx.getResource(groupResource, obj, namespace, name)
 	}
@@ -1561,7 +1561,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		// check for the existence of the object that failed creation due to alreadyExist in cluster, if no error then it implies that object exists.
 		// and if err then itemExists remains false as we were not able to confirm the existence of the object via Get call or creation call.
 		// We return the get error as a warning to notify the user that the object could exist in cluster and we were not able to confirm it.
-		if !ctx.disableInformerCache {
+		if ctx.enableInformerCache {
 			fromCluster, err = ctx.getResource(groupResource, obj, namespace, name)
 		} else {
 			fromCluster, err = resourceClient.Get(name, metav1.GetOptions{})
