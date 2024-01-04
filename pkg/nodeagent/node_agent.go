@@ -35,7 +35,7 @@ import (
 const (
 	// daemonSet is the name of the Velero node agent daemonset.
 	daemonSet  = "node-agent"
-	configName = "node-agent-configs"
+	configName = "node-agent-config"
 )
 
 var (
