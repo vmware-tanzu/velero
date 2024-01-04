@@ -67,6 +67,7 @@ MIGRATE_FROM_VELERO_CLI ?=
 
 VELERO_NAMESPACE ?= velero
 CREDS_FILE ?=
+SERVICE_ACCOUNT_NAME ?=
 BSL_BUCKET ?=
 BSL_PREFIX ?=
 BSL_CONFIG ?=
@@ -105,6 +106,10 @@ UPLOADER_TYPE ?=
 SNAPSHOT_MOVE_DATA ?= false
 DATA_MOVER_PLUGIN ?=
 DISABLE_INFORMER_CACHE ?= false
+
+DEFAULT_CLUSTER_NAME ?=
+STANDBY_CLUSTER_NAME ?=
+EKS_POLICY_ARN ?=
 
 
 .PHONY:ginkgo
@@ -157,8 +162,11 @@ run: ginkgo
 		-standby-cluster-plugins=$(STANDBY_CLUSTER_PLUGINS) \
 		-standby-cluster-object-store-provider=$(STANDBY_CLUSTER_OBJECT_STORE_PROVIDER) \
 		-debug-velero-pod-restart=$(DEBUG_VELERO_POD_RESTART) \
-		-disable-informer-cache=$(DISABLE_INFORMER_CACHE)
-		
+		-disable-informer-cache=$(DISABLE_INFORMER_CACHE) \
+		-default-cluster-name=$(DEFAULT_CLUSTER_NAME) \
+		-standby-cluster-name=$(STANDBY_CLUSTER_NAME) \
+		-eks-policy-arn=$(EKS_POLICY_ARN) \
+		-service-account-name=$(SERVICE_ACCOUNT_NAME)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

@@ -47,6 +47,10 @@ func ObjectsShouldNotBeInBucket(cloudProvider, cloudCredentialsFile, bslBucket, 
 	var err error
 	var exist bool
 	fmt.Printf("|| VERIFICATION || - %s %s should not exist in object store %s\n", subPrefix, backupName, bslPrefix)
+	if cloudCredentialsFile == "" {
+		fmt.Printf("|| SKIPPED || - Skipping object storebackup checkpoint %s\n", backupName)
+		return nil
+	}
 	for i := 0; i < retryTimes; i++ {
 		exist, err = IsObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix)
 		if err != nil {
@@ -98,6 +102,10 @@ func IsObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix
 func DeleteObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string) error {
 	bslPrefix = getFullPrefix(bslPrefix, subPrefix)
 	fmt.Printf("|| VERIFICATION || - Delete backup %s in storage %s\n", backupName, bslPrefix)
+	if cloudCredentialsFile == "" {
+		fmt.Printf("|| SKIPPED || - Skipping snapshots checkpoint %s\n", backupName)
+		return nil
+	}
 	s, err := getProvider(cloudProvider)
 	if err != nil {
 		return errors.Wrapf(err, fmt.Sprintf("Cloud provider %s is not valid", cloudProvider))
@@ -111,6 +119,10 @@ func DeleteObjectsInBucket(cloudProvider, cloudCredentialsFile, bslBucket, bslPr
 
 func SnapshotsShouldNotExistInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheckPoint SnapshotCheckPoint) error {
 	fmt.Printf("|| VERIFICATION || - Snapshots should not exist in cloud, backup %s\n", backupName)
+	if cloudCredentialsFile == "" {
+		fmt.Printf("|| SKIPPED || - Skipping snapshots checkpoint %s\n", backupName)
+		return nil
+	}
 	snapshotCheckPoint.ExpectCount = 0
 	err := IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName, snapshotCheckPoint)
 	if err != nil {
@@ -122,6 +134,10 @@ func SnapshotsShouldNotExistInCloud(cloudProvider, cloudCredentialsFile, bslBuck
 
 func SnapshotsShouldBeCreatedInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheckPoint SnapshotCheckPoint) error {
 	fmt.Printf("|| VERIFICATION || - Snapshots should exist in cloud, backup %s\n", backupName)
+	if cloudCredentialsFile == "" {
+		fmt.Printf("|| SKIPPED || - Skipping snapshots checkpoint %s\n", backupName)
+		return nil
+	}
 	err := IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName, snapshotCheckPoint)
 	if err != nil {
 		return errors.Wrapf(err, fmt.Sprintf("|| UNEXPECTED ||Snapshots %s do not exist in cloud after backup as expected", backupName))

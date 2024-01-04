@@ -64,7 +64,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			Skip("Volume snapshots not supported on kind")
 		}
 
-		if veleroCfg.DefaultCluster == "" && veleroCfg.StandbyCluster == "" {
+		if veleroCfg.DefaultClusterContext == "" && veleroCfg.StandbyClusterContext == "" {
 			Skip("Migration test needs 2 clusters")
 		}
 		// need to uninstall Velero first in case of the affection of the existing global velero installation
@@ -79,19 +79,19 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 	})
 	AfterEach(func() {
 		if !veleroCfg.Debug {
-			By(fmt.Sprintf("Uninstall Velero on cluster %s", veleroCfg.DefaultCluster), func() {
+			By(fmt.Sprintf("Uninstall Velero on cluster %s", veleroCfg.DefaultClusterContext), func() {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
-				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultCluster)).To(Succeed())
+				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
 				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
 					veleroCfg.VeleroNamespace)).To(Succeed())
 				DeleteNamespace(context.Background(), *veleroCfg.DefaultClient, migrationNamespace, true)
 			})
 
-			By(fmt.Sprintf("Uninstall Velero on cluster %s", veleroCfg.StandbyCluster), func() {
+			By(fmt.Sprintf("Uninstall Velero on cluster %s", veleroCfg.StandbyClusterContext), func() {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
-				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyCluster)).To(Succeed())
+				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyClusterContext)).To(Succeed())
 				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
 					veleroCfg.VeleroNamespace)).To(Succeed())
 				DeleteNamespace(context.Background(), *veleroCfg.StandbyClient, migrationNamespace, true)
@@ -102,9 +102,10 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					DeleteNamespace(context.Background(), *veleroCfg.StandbyClient, migrationNamespace, true)
 				})
 			}
-			By(fmt.Sprintf("Switch to default kubeconfig context %s", veleroCfg.DefaultCluster), func() {
-				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultCluster)).To(Succeed())
+			By(fmt.Sprintf("Switch to default kubeconfig context %s", veleroCfg.DefaultClusterContext), func() {
+				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
 				veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
+				veleroCfg.ClusterToInstallVelero = veleroCfg.DefaultClusterName
 			})
 		}
 
@@ -142,11 +143,12 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				})
 			}
 			OriginVeleroCfg := veleroCfg
-			By(fmt.Sprintf("Install Velero in cluster-A (%s) to backup workload", veleroCfg.DefaultCluster), func() {
-				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultCluster)).To(Succeed())
+			By(fmt.Sprintf("Install Velero in cluster-A (%s) to backup workload", veleroCfg.DefaultClusterContext), func() {
+				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
 				OriginVeleroCfg.MigrateFromVeleroVersion = veleroCLI2Version.VeleroVersion
 				OriginVeleroCfg.VeleroCLI = veleroCLI2Version.VeleroCLI
 				OriginVeleroCfg.ClientToInstallVelero = OriginVeleroCfg.DefaultClient
+				OriginVeleroCfg.ClusterToInstallVelero = veleroCfg.DefaultClusterName
 				OriginVeleroCfg.UseVolumeSnapshots = useVolumeSnapshots
 				OriginVeleroCfg.UseNodeAgent = !useVolumeSnapshots
 
@@ -272,20 +274,21 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				time.Sleep(5 * time.Minute)
 			}
 
-			By(fmt.Sprintf("Install Velero in cluster-B (%s) to restore workload", veleroCfg.StandbyCluster), func() {
+			By(fmt.Sprintf("Install Velero in cluster-B (%s) to restore workload", veleroCfg.StandbyClusterContext), func() {
 				//Ensure workload of "migrationNamespace" existed in cluster-A
 				ns, err := GetNamespace(context.Background(), *veleroCfg.DefaultClient, migrationNamespace)
 				Expect(ns.Name).To(Equal(migrationNamespace))
 				Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("get namespace in cluster-B err: %v", err))
 
 				//Ensure cluster-B is the target cluster
-				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyCluster)).To(Succeed())
+				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyClusterContext)).To(Succeed())
 				_, err = GetNamespace(context.Background(), *veleroCfg.StandbyClient, migrationNamespace)
 				Expect(err).To(HaveOccurred())
 				strings.Contains(fmt.Sprint(err), "namespaces \""+migrationNamespace+"\" not found")
 				fmt.Println(err)
 
 				veleroCfg.ClientToInstallVelero = veleroCfg.StandbyClient
+				veleroCfg.ClusterToInstallVelero = veleroCfg.StandbyClusterName
 				veleroCfg.UseNodeAgent = !useVolumeSnapshots
 				veleroCfg.UseRestic = false
 				if veleroCfg.SnapshotMoveData {
@@ -299,7 +302,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				Expect(VeleroInstall(context.Background(), &veleroCfg, true)).To(Succeed())
 			})
 
-			By(fmt.Sprintf("Waiting for backups sync to Velero in cluster-B (%s)", veleroCfg.StandbyCluster), func() {
+			By(fmt.Sprintf("Waiting for backups sync to Velero in cluster-B (%s)", veleroCfg.StandbyClusterContext), func() {
 				Expect(WaitForBackupToBeCreated(context.Background(), veleroCfg.VeleroCLI, backupName, 5*time.Minute)).To(Succeed())
 				Expect(WaitForBackupToBeCreated(context.Background(), veleroCfg.VeleroCLI, backupScName, 5*time.Minute)).To(Succeed())
 			})

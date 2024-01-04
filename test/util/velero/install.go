@@ -39,6 +39,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	velerexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	. "github.com/vmware-tanzu/velero/test"
+	. "github.com/vmware-tanzu/velero/test/util/eks"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -75,7 +76,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 		veleroCfg.CloudProvider = veleroCfg.StandbyClusterCloudProvider
 	}
 	if veleroCfg.CloudProvider != "kind" {
-		fmt.Printf("For cloud platforms, object store plugin provider will be set as cloud provider")
+		fmt.Printf("For cloud platforms, object store plugin provider will be set as cloud provider\n")
 		// If ObjectStoreProvider is not provided, then using the value same as CloudProvider
 		if veleroCfg.ObjectStoreProvider == "" {
 			veleroCfg.ObjectStoreProvider = veleroCfg.CloudProvider
@@ -112,27 +113,35 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", veleroCfg.ObjectStoreProvider)
 	}
-	veleroInstallOptions.UseVolumeSnapshots = veleroCfg.UseVolumeSnapshots
-	if !veleroCfg.UseRestic {
-		veleroInstallOptions.UseNodeAgent = veleroCfg.UseNodeAgent
-	}
-	veleroInstallOptions.UseRestic = veleroCfg.UseRestic
-	veleroInstallOptions.Image = veleroCfg.VeleroImage
-	veleroInstallOptions.Namespace = veleroCfg.VeleroNamespace
-	veleroInstallOptions.UploaderType = veleroCfg.UploaderType
-	GCFrequency, _ := time.ParseDuration(veleroCfg.GCFrequency)
-	veleroInstallOptions.GarbageCollectionFrequency = GCFrequency
-	veleroInstallOptions.PodVolumeOperationTimeout = veleroCfg.PodVolumeOperationTimeout
-	veleroInstallOptions.NodeAgentPodCPULimit = veleroCfg.NodeAgentPodCPULimit
-	veleroInstallOptions.NodeAgentPodCPURequest = veleroCfg.NodeAgentPodCPURequest
-	veleroInstallOptions.NodeAgentPodMemLimit = veleroCfg.NodeAgentPodMemLimit
-	veleroInstallOptions.NodeAgentPodMemRequest = veleroCfg.NodeAgentPodMemRequest
-	veleroInstallOptions.VeleroPodCPULimit = veleroCfg.VeleroPodCPULimit
-	veleroInstallOptions.VeleroPodCPURequest = veleroCfg.VeleroPodCPURequest
-	veleroInstallOptions.VeleroPodMemLimit = veleroCfg.VeleroPodMemLimit
-	veleroInstallOptions.VeleroPodMemRequest = veleroCfg.VeleroPodMemRequest
-	veleroInstallOptions.DisableInformerCache = veleroCfg.DisableInformerCache
 
+	if veleroCfg.CloudProvider == "aws" && veleroInstallOptions.ServiceAccountName != "" {
+		_, err = GetNamespace(ctx, *veleroCfg.ClientToInstallVelero, veleroCfg.VeleroNamespace)
+		if !apierrors.IsNotFound(err) {
+			if err := VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace); err != nil {
+				return errors.Wrapf(err, "Failed to uninstall velero %s", veleroCfg.VeleroNamespace)
+			}
+		}
+		if err := KubectlCreateNamespace(ctx, veleroCfg.VeleroNamespace); err != nil {
+			return errors.Wrapf(err, "Failed to create namespace %s to install Velero", veleroCfg.VeleroNamespace)
+		}
+		if err := KubectlDeleteClusterRoleBinding(ctx, "velero-cluster-role"); err != nil {
+			fmt.Println(err)
+			return errors.Wrapf(err, "Failed to delete clusterrolebinding %s to %s namesapce", "velero-cluster-role", veleroCfg.VeleroNamespace)
+		}
+		if err := KubectlCreateClusterRoleBinding(ctx, "velero-cluster-role", "cluster-admin", veleroCfg.VeleroNamespace, veleroInstallOptions.ServiceAccountName); err != nil {
+			fmt.Println(err)
+			return errors.Wrapf(err, "Failed to create clusterrolebinding %s to %s namesapce", "velero-cluster-role", veleroCfg.VeleroNamespace)
+		}
+		if err := KubectlDeleteIAMServiceAcount(ctx, veleroCfg.ServiceAccountName, veleroCfg.VeleroNamespace, veleroCfg.ClusterToInstallVelero); err != nil {
+			fmt.Println(err)
+			return errors.Wrapf(err, "Failed to delete service account %s to %s namesapce", veleroCfg.ServiceAccountName, veleroCfg.VeleroNamespace)
+		}
+		time.Sleep(10 * time.Second)
+		if err := KubectlCreateIAMServiceAcount(ctx, veleroCfg.ServiceAccountName, veleroCfg.VeleroNamespace, veleroCfg.EKSPolicyARN, veleroCfg.ClusterToInstallVelero); err != nil {
+			fmt.Println(err)
+			return errors.Wrapf(err, "Failed to create service account %s to %s namesapce", veleroCfg.ServiceAccountName, veleroCfg.VeleroNamespace)
+		}
+	}
 	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, veleroCfg.CloudProvider, &installOptions{
 		Options:                          veleroInstallOptions,
 		RegistryCredentialFile:           veleroCfg.RegistryCredentialFile,
@@ -239,8 +248,16 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 	if len(options.Prefix) > 0 {
 		args = append(args, "--prefix", options.Prefix)
 	}
-	if len(options.SecretFile) > 0 {
-		args = append(args, "--secret-file", options.SecretFile)
+	//Treat ServiceAccountName priority higher than SecretFile
+	if len(options.ServiceAccountName) > 0 {
+		args = append(args, "--service-account-name", options.ServiceAccountName)
+	} else {
+		if len(options.SecretFile) > 0 {
+			args = append(args, "--secret-file", options.SecretFile)
+		}
+	}
+	if options.NoSecret {
+		args = append(args, "--no-secret")
 	}
 	if len(options.VolumeSnapshotConfig.Data()) > 0 {
 		args = append(args, "--snapshot-location-config", options.VolumeSnapshotConfig.String())
@@ -257,11 +274,11 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 		}
 	}
 
-	fmt.Println("Start to install Azure VolumeSnapshotClass ...")
 	if len(options.Features) > 0 {
 		args = append(args, "--features", options.Features)
 		if strings.EqualFold(options.Features, FeatureCSI) && options.UseVolumeSnapshots {
 			if strings.EqualFold(cloudProvider, "azure") {
+				fmt.Println("Start to install Azure VolumeSnapshotClass ...")
 				if err := KubectlApplyByFile(ctx, "../util/csi/AzureVolumeSnapshotClass.yaml"); err != nil {
 					return err
 				}

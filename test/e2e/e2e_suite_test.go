@@ -84,8 +84,8 @@ func init() {
 	flag.StringVar(&VeleroCfg.Features, "features", "", "comma-separated list of features to enable for this Velero process.")
 	flag.BoolVar(&VeleroCfg.Debug, "debug-e2e-test", false, "A Switch for enable or disable test data cleaning action.")
 	flag.StringVar(&VeleroCfg.GCFrequency, "garbage-collection-frequency", "", "frequency of garbage collection.")
-	flag.StringVar(&VeleroCfg.DefaultCluster, "default-cluster", "", "default cluster's kube config context, it's for migration test.")
-	flag.StringVar(&VeleroCfg.StandbyCluster, "standby-cluster", "", "standby cluster's kube config context, it's for migration test.")
+	flag.StringVar(&VeleroCfg.DefaultClusterContext, "default-cluster", "", "default cluster's kube config context, it's for migration test.")
+	flag.StringVar(&VeleroCfg.StandbyClusterContext, "standby-cluster", "", "standby cluster's kube config context, it's for migration test.")
 	flag.StringVar(&VeleroCfg.UploaderType, "uploader-type", "", "type of uploader for persistent volume backup.")
 	flag.BoolVar(&VeleroCfg.VeleroServerDebugMode, "velero-server-debug-mode", false, "a switch for enable or disable having debug log of Velero server.")
 	flag.BoolVar(&VeleroCfg.SnapshotMoveData, "snapshot-move-data", false, "a Switch for taking backup with Velero's data mover, if data-mover-plugin is not provided, using built-in plugin")
@@ -95,6 +95,11 @@ func init() {
 	flag.StringVar(&VeleroCfg.StandbyClusterOjbectStoreProvider, "standby-cluster-object-store-provider", "", "object store provider for standby cluster.")
 	flag.BoolVar(&VeleroCfg.DebugVeleroPodRestart, "debug-velero-pod-restart", false, "a switch for debugging velero pod restart.")
 	flag.BoolVar(&VeleroCfg.DisableInformerCache, "disable-informer-cache", false, "a switch for disable informer cache.")
+	flag.StringVar(&VeleroCfg.DefaultClusterName, "default-cluster-name", "", "default cluster's name in kube config file, it's for EKS IRSA test.")
+	flag.StringVar(&VeleroCfg.StandbyClusterName, "standby-cluster-name", "", "standby cluster's name in kube config file, it's for EKS IRSA test.")
+	flag.StringVar(&VeleroCfg.EKSPolicyARN, "eks-policy-arn", "", "EKS plicy ARN for creating AWS IAM service account.")
+	flag.StringVar(&VeleroCfg.ServiceAccountName, "service-account-name", "", "service account name.")
+
 }
 
 var _ = Describe("[APIGroup][APIVersion] Velero tests with various CRD API group versions", APIGropuVersionsTest)
@@ -164,20 +169,21 @@ var _ = Describe("[Basic][SelectedNode] Node selectors of persistent volume clai
 func GetKubeconfigContext() error {
 	var err error
 	var tcDefault, tcStandby TestClient
-	tcDefault, err = NewTestClient(VeleroCfg.DefaultCluster)
+	tcDefault, err = NewTestClient(VeleroCfg.DefaultClusterContext)
 	VeleroCfg.DefaultClient = &tcDefault
 	VeleroCfg.ClientToInstallVelero = VeleroCfg.DefaultClient
+	VeleroCfg.ClusterToInstallVelero = VeleroCfg.DefaultClusterName
 	if err != nil {
 		return err
 	}
 
-	if VeleroCfg.DefaultCluster != "" {
-		err = KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)
+	if VeleroCfg.DefaultClusterContext != "" {
+		err = KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultClusterContext)
 		if err != nil {
 			return err
 		}
-		if VeleroCfg.StandbyCluster != "" {
-			tcStandby, err = NewTestClient(VeleroCfg.StandbyCluster)
+		if VeleroCfg.StandbyClusterContext != "" {
+			tcStandby, err = NewTestClient(VeleroCfg.StandbyClusterContext)
 			VeleroCfg.StandbyClient = &tcStandby
 			if err != nil {
 				return err

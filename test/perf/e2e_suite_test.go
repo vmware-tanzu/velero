@@ -69,7 +69,7 @@ func init() {
 	flag.DurationVar(&VeleroCfg.PodVolumeOperationTimeout, "pod-volume-operation-timeout", 360*time.Minute, "Timeout for pod volume operations. Optional.")
 	//vmware-tanzu-experiments
 	flag.StringVar(&VeleroCfg.Features, "features", "", "Comma-separated list of features to enable for this Velero process.")
-	flag.StringVar(&VeleroCfg.DefaultCluster, "default-cluster-context", "", "Default cluster context for migration test.")
+	flag.StringVar(&VeleroCfg.DefaultClusterContext, "default-cluster-context", "", "Default cluster context for migration test.")
 	flag.BoolVar(&VeleroCfg.Debug, "debug-e2e-test", true, "Switch to control namespace cleaning.")
 	flag.StringVar(&VeleroCfg.UploaderType, "uploader-type", "kopia", "Identify persistent volume backup uploader.")
 	flag.BoolVar(&VeleroCfg.VeleroServerDebugMode, "velero-server-debug-mode", false, "Identify persistent volume backup uploader.")
