@@ -289,10 +289,44 @@ func TestWaitPVCConsumed(t *testing.T) {
 }
 
 func TestDeletePVCIfAny(t *testing.T) {
+	pvObject := &corev1api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-pv",
+			Annotations: map[string]string{
+				KubeAnnBoundByController: "true",
+			},
+		},
+		Spec: corev1api.PersistentVolumeSpec{
+			ClaimRef: &corev1api.ObjectReference{
+				Kind:      "fake-kind",
+				Namespace: "fake-ns",
+				Name:      "fake-pvc",
+			},
+		},
+	}
+
+	pvcObject := &corev1api.PersistentVolumeClaim{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "fake-kind-1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc",
+			Annotations: map[string]string{
+				KubeAnnBindCompleted:     "true",
+				KubeAnnBoundByController: "true",
+			},
+		},
+	}
+
+	pvcWithVolume := pvcObject.DeepCopy()
+	pvcWithVolume.Spec.VolumeName = "fake-pv"
+
 	tests := []struct {
 		name          string
 		pvcName       string
 		pvcNamespace  string
+		pvName        string
 		kubeClientObj []runtime.Object
 		kubeReactors  []reactor
 		logMessage    string
@@ -300,17 +334,69 @@ func TestDeletePVCIfAny(t *testing.T) {
 		logError      string
 	}{
 		{
-			name:         "get fail",
+			name:         "pvc not found",
 			pvcName:      "fake-pvc",
 			pvcNamespace: "fake-namespace",
-			logMessage:   "Abort deleting PVC, it doesn't exist, fake-namespace/fake-pvc",
+			logMessage:   "Abort deleting PV and PVC, for related PVC doesn't exist, fake-namespace/fake-pvc",
 			logLevel:     "level=debug",
 		},
 		{
-			name:         "delete fail",
+			name:         "failed to get pvc",
 			pvcName:      "fake-pvc",
 			pvcNamespace: "fake-namespace",
 			kubeReactors: []reactor{
+				{
+					verb:     "get",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-get-error")
+					},
+				},
+			},
+			logMessage: "failed to get pvc fake-namespace/fake-pvc with err fake-get-error",
+			logLevel:   "level=warning",
+		},
+		{
+			name:         "pvc has no volume name",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-namespace",
+			pvName:       "fake-pv",
+			kubeReactors: []reactor{
+				{
+					verb:     "get",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvcObject, nil
+					},
+				},
+				{
+					verb:     "delete",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, nil
+					},
+				},
+			},
+			kubeClientObj: []runtime.Object{
+				pvcObject,
+				pvObject,
+			},
+			logMessage: "failed to delete PV, for related PVC fake-namespace/fake-pvc has no bind volume name",
+			logLevel:   "level=warning",
+		},
+		{
+			name:         "failed to delete pvc",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-namespace",
+			pvName:       "fake-pv",
+			kubeReactors: []reactor{
+				{
+					verb:     "get",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvcObject, nil
+					},
+				},
 				{
 					verb:     "delete",
 					resource: "persistentvolumeclaims",
@@ -319,9 +405,116 @@ func TestDeletePVCIfAny(t *testing.T) {
 					},
 				},
 			},
-			logMessage: "Failed to delete pvc fake-namespace/fake-pvc",
-			logLevel:   "level=error",
-			logError:   "error=fake-delete-error",
+			kubeClientObj: []runtime.Object{
+				pvcObject,
+				pvObject,
+			},
+			logMessage: "failed to delete pvc fake-namespace/fake-pvc with err fake-delete-error",
+			logLevel:   "level=warning",
+		},
+		{
+			name:         "failed to get pv",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-namespace",
+			pvName:       "fake-pv",
+			kubeReactors: []reactor{
+				{
+					verb:     "get",
+					resource: "persistentvolumes",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-get-error")
+					},
+				},
+				{
+					verb:     "get",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvcWithVolume, nil
+					},
+				},
+			},
+			kubeClientObj: []runtime.Object{
+				pvcWithVolume,
+				pvObject,
+			},
+			logMessage: "failed to delete PV fake-pv with err fake-get-error",
+			logLevel:   "level=warning",
+		},
+		{
+			name:         "set reclaim policy fail",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-namespace",
+			pvName:       "fake-pv",
+			kubeClientObj: []runtime.Object{
+				pvcWithVolume,
+				pvObject,
+			},
+			kubeReactors: []reactor{
+				{
+					verb:     "get",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvcWithVolume, nil
+					},
+				},
+				{
+					verb:     "get",
+					resource: "persistentvolumes",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvObject, nil
+					},
+				},
+				{
+					verb:     "patch",
+					resource: "persistentvolumes",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvObject, errors.New("fake-patch-error")
+					},
+				},
+			},
+			logMessage: "failed to set reclaim policy of PV fake-pv to delete with err error patching PV: fake-patch-error",
+			logLevel:   "level=warning",
+			logError:   "fake-patch-error",
+		},
+		{
+			name:         "delete pv pvc success",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-namespace",
+			pvName:       "fake-pv",
+			kubeClientObj: []runtime.Object{
+				pvcWithVolume,
+				pvObject,
+			},
+			kubeReactors: []reactor{
+				{
+					verb:     "get",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvcWithVolume, nil
+					},
+				},
+				{
+					verb:     "get",
+					resource: "persistentvolumes",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvObject, nil
+					},
+				},
+				{
+					verb:     "patch",
+					resource: "persistentvolumes",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvObject, nil
+					},
+				},
+				{
+					verb:     "delete",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvcWithVolume, nil
+					},
+				},
+			},
 		},
 	}
 
@@ -336,7 +529,7 @@ func TestDeletePVCIfAny(t *testing.T) {
 			var kubeClient kubernetes.Interface = fakeKubeClient
 
 			logMessage := ""
-			DeletePVCIfAny(context.Background(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, velerotest.NewSingleLogger(&logMessage))
+			DeletePVAndPVCIfAny(context.Background(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, velerotest.NewSingleLogger(&logMessage))
 
 			if len(test.logMessage) > 0 {
 				assert.Contains(t, logMessage, test.logMessage)
