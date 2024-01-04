@@ -85,6 +85,8 @@ type VeleroConfig struct {
 	StandbyClusterOjbectStoreProvider string
 	DebugVeleroPodRestart             bool
 	IsUpgradeTest                     bool
+	WithoutDisableInformerCacheParam  bool
+	DisableInformerCache              bool
 }
 
 type VeleroCfgInPerf struct {
