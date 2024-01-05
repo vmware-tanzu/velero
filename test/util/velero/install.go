@@ -50,9 +50,10 @@ const (
 // we provide more install options other than the standard install.InstallOptions in E2E test
 type installOptions struct {
 	*install.Options
-	RegistryCredentialFile string
-	RestoreHelperImage     string
-	VeleroServerDebugMode  bool
+	RegistryCredentialFile           string
+	RestoreHelperImage               string
+	VeleroServerDebugMode            bool
+	WithoutDisableInformerCacheParam bool
 }
 
 func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluster bool) error {
@@ -130,6 +131,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 	veleroInstallOptions.VeleroPodCPURequest = veleroCfg.VeleroPodCPURequest
 	veleroInstallOptions.VeleroPodMemLimit = veleroCfg.VeleroPodMemLimit
 	veleroInstallOptions.VeleroPodMemRequest = veleroCfg.VeleroPodMemRequest
+	veleroInstallOptions.DisableInformerCache = veleroCfg.DisableInformerCache
 
 	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, veleroCfg.CloudProvider, &installOptions{
 		Options:                veleroInstallOptions,
@@ -245,6 +247,15 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 	if len(options.Plugins) > 0 {
 		args = append(args, "--plugins", options.Plugins.String())
 	}
+
+	if !options.WithoutDisableInformerCacheParam {
+		if options.DisableInformerCache {
+			args = append(args, "--disable-informer-cache=true")
+		} else {
+			args = append(args, "--disable-informer-cache=false")
+		}
+	}
+
 	fmt.Println("Start to install Azure VolumeSnapshotClass ...")
 	if len(options.Features) > 0 {
 		args = append(args, "--features", options.Features)

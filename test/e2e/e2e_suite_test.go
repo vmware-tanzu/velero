@@ -94,6 +94,7 @@ func init() {
 	flag.StringVar(&VeleroCfg.StandbyClusterPlugins, "standby-cluster-plugins", "", "plugins provider for standby cluster.")
 	flag.StringVar(&VeleroCfg.StandbyClusterOjbectStoreProvider, "standby-cluster-object-store-provider", "", "object store provider for standby cluster.")
 	flag.BoolVar(&VeleroCfg.DebugVeleroPodRestart, "debug-velero-pod-restart", false, "a switch for debugging velero pod restart.")
+	flag.BoolVar(&VeleroCfg.DisableInformerCache, "disable-informer-cache", false, "a switch for disable informer cache.")
 }
 
 var _ = Describe("[APIGroup][APIVersion] Velero tests with various CRD API group versions", APIGropuVersionsTest)
