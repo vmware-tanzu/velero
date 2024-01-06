@@ -345,41 +345,61 @@ func (s AWSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObj
 		fmt.Printf("Fail to create session with profile %s and config %s", cloudCredentialsFile, bslConfig)
 		return errors.Wrapf(err, "Fail to create session with profile %s and config %s", cloudCredentialsFile, bslConfig)
 	}
+
 	svc := ec2.New(sess)
 	params := &ec2.DescribeSnapshotsInput{
 		OwnerIds: []*string{aws.String("self")},
-		Filters: []*ec2.Filter{
-			{
-				Name: aws.String("tag:velero.io/backup"),
-				Values: []*string{
-					aws.String(backupObject),
+	}
+
+	if !snapshotCheck.EnableCSI {
+		params = &ec2.DescribeSnapshotsInput{
+			OwnerIds: []*string{aws.String("self")},
+			Filters: []*ec2.Filter{
+				{
+					Name: aws.String("tag:velero.io/backup"),
+					Values: []*string{
+						aws.String(backupObject),
+					},
 				},
 			},
-		},
+		}
 	}
 
 	result, err := svc.DescribeSnapshots(params)
 	if err != nil {
 		fmt.Println(err)
 	}
-
-	for _, n := range result.Snapshots {
-		fmt.Println(n.SnapshotId)
-		if n.SnapshotId != nil {
-			fmt.Println(*n.SnapshotId)
+	var actualCount int
+	if snapshotCheck.EnableCSI {
+		for _, snapshotId := range snapshotCheck.SnapshotIDList {
+			for _, n := range result.Snapshots {
+				if n.SnapshotId != nil && (*n.SnapshotId == snapshotId) {
+					actualCount++
+					fmt.Printf("SnapshotId: %v, Tags: %v \n", *n.SnapshotId, n.Tags)
+					if n.VolumeId != nil {
+						fmt.Printf("VolumeId: %v \n", *n.VolumeId)
+					}
+				}
+			}
 		}
-		fmt.Println(n.Tags)
-		fmt.Println(n.VolumeId)
-		if n.VolumeId != nil {
-			fmt.Println(*n.VolumeId)
-		}
-	}
-	if len(result.Snapshots) != snapshotCheck.ExpectCount {
-		return errors.New(fmt.Sprintf("Snapshot count is not as expected %d", snapshotCheck.ExpectCount))
 	} else {
-		fmt.Printf("Snapshot count %d is as expected %d\n", len(result.Snapshots), snapshotCheck.ExpectCount)
+		for _, n := range result.Snapshots {
+			if n.SnapshotId != nil {
+				fmt.Printf("SnapshotId: %v, Tags: %v \n", *n.SnapshotId, n.Tags)
+				if n.VolumeId != nil {
+					fmt.Printf("VolumeId: %v \n", *n.VolumeId)
+				}
+			}
+		}
+		actualCount = len(result.Snapshots)
+	}
+	if actualCount != snapshotCheck.ExpectCount {
+		return errors.New(fmt.Sprintf("Snapshot count %d is not as expected %d", actualCount, snapshotCheck.ExpectCount))
+	} else {
+		fmt.Printf("Snapshot count %d is as expected %d\n", actualCount, snapshotCheck.ExpectCount)
 		return nil
 	}
+
 }
 
 func (s AWSStorage) GetMinioBucketSize(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig string) (int64, error) {

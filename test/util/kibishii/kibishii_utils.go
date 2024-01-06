@@ -117,6 +117,7 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 			}
 		}
 		snapshotCheckPoint, err := GetSnapshotCheckPoint(client, veleroCfg, 2, kibishiiNamespace, backupName, KibishiiPVCNameList)
+
 		if err != nil {
 			return errors.Wrap(err, "Fail to get snapshot checkpoint")
 		}

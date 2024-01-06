@@ -178,6 +178,11 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
 	}
+
+	// Hit issue: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/errors-overview.html#:~:text=SnapshotCreationPerVolumeRateExceeded
+	// Sleep for more than 15 seconds to avoid this issue.
+	time.Sleep(1 * time.Minute)
+
 	backupName = "backup-1-" + UUIDgen.String()
 	BackupCfg.BackupName = backupName
 
