@@ -1,0 +1,1 @@
+Fix issue #6928, remove snapshot deletion timeout for PVB
