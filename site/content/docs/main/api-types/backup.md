@@ -35,8 +35,8 @@ spec:
   csiSnapshotTimeout: 10m
   # ItemOperationTimeout specifies the time used to wait for
   # asynchronous BackupItemAction operations
-  # The default value is 1 hour.
-  itemOperationTimeout: 1h
+  # The default value is 4 hour.
+  itemOperationTimeout: 4h
   # resourcePolicy specifies the referenced resource policies that backup should follow
   # optional
   resourcePolicy:
