@@ -59,7 +59,6 @@ import (
 )
 
 const (
-	snapshotDeleteTimeout     = time.Minute
 	deleteBackupRequestMaxAge = 24 * time.Hour
 )
 
@@ -513,12 +512,9 @@ func (r *backupDeletionReconciler) deletePodVolumeSnapshots(ctx context.Context,
 		return []error{err}
 	}
 
-	ctx2, cancelFunc := context.WithTimeout(ctx, snapshotDeleteTimeout)
-	defer cancelFunc()
-
 	var errs []error
 	for _, snapshot := range snapshots {
-		if err := r.repoMgr.Forget(ctx2, snapshot); err != nil {
+		if err := r.repoMgr.Forget(ctx, snapshot); err != nil {
 			errs = append(errs, err)
 		}
 	}
