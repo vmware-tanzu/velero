@@ -96,6 +96,13 @@ var pluginsMatrix = map[string]map[string][]string{
 		"gcp":     {"velero/velero-plugin-for-gcp:v1.8.0"},
 		"csi":     {"velero/velero-plugin-for-csi:v0.6.0"},
 	},
+	"v1.13": {
+		"aws":     {"velero/velero-plugin-for-aws:v1.9.0"},
+		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.9.0"},
+		"vsphere": {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":     {"velero/velero-plugin-for-gcp:v1.9.0"},
+		"csi":     {"velero/velero-plugin-for-csi:v0.7.0"},
+	},
 	"main": {
 		"aws":       {"velero/velero-plugin-for-aws:main"},
 		"azure":     {"velero/velero-plugin-for-microsoft-azure:main"},
