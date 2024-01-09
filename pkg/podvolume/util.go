@@ -122,19 +122,30 @@ func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, 
 }
 
 // GetSnapshotIdentifier returns the snapshots represented by SnapshotIdentifier for the given PVBs
-func GetSnapshotIdentifier(podVolumeBackups *velerov1api.PodVolumeBackupList) []repository.SnapshotIdentifier {
-	var res []repository.SnapshotIdentifier
+func GetSnapshotIdentifier(podVolumeBackups *velerov1api.PodVolumeBackupList) map[string][]repository.SnapshotIdentifier {
+	res := map[string][]repository.SnapshotIdentifier{}
 	for _, item := range podVolumeBackups.Items {
 		if item.Status.SnapshotID == "" {
 			continue
 		}
 
-		res = append(res, repository.SnapshotIdentifier{
+		if res[item.Spec.Pod.Namespace] == nil {
+			res[item.Spec.Pod.Namespace] = []repository.SnapshotIdentifier{}
+		}
+
+		snapshots := res[item.Spec.Pod.Namespace]
+
+		snapshots = append(snapshots, repository.SnapshotIdentifier{
 			VolumeNamespace:       item.Spec.Pod.Namespace,
 			BackupStorageLocation: item.Spec.BackupStorageLocation,
 			SnapshotID:            item.Status.SnapshotID,
 			RepositoryType:        getRepositoryType(item.Spec.UploaderType),
+			UploaderType:          item.Spec.UploaderType,
+			Source:                item.Status.Path,
+			RepoIdentifier:        item.Spec.RepoIdentifier,
 		})
+
+		res[item.Spec.Pod.Namespace] = snapshots
 	}
 
 	return res

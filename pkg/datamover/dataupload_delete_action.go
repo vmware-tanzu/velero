@@ -57,6 +57,8 @@ func genConfigmap(bak *velerov1.Backup, du velerov2alpha1.DataUpload) *corev1api
 		BackupStorageLocation: bak.Spec.StorageLocation,
 		SnapshotID:            du.Status.SnapshotID,
 		RepositoryType:        GetUploaderType(du.Spec.DataMover),
+		UploaderType:          GetUploaderType(du.Spec.DataMover),
+		Source:                GetRealSource(du.Spec.SourceNamespace, du.Spec.SourcePVC),
 	}
 	b, err := json.Marshal(snapshot)
 	if err != nil {

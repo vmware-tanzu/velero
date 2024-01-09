@@ -48,6 +48,16 @@ type SnapshotIdentifier struct {
 	// RepositoryType is the type of the repository where the
 	// snapshot is stored
 	RepositoryType string `json:"repositoryType"`
+
+	// Source is the source of the data saved in the repo by the snapshot
+	Source string `json:"source"`
+
+	// UploaderType is the type of uploader which saved the snapshot data
+	UploaderType string `json:"uploaderType"`
+
+	// RepoIdentifier is the identifier of the repository where the
+	// snapshot is stored
+	RepoIdentifier string `json:"repoIdentifier"`
 }
 
 // Manager manages backup repositories.
@@ -71,7 +81,12 @@ type Manager interface {
 
 	// Forget removes a snapshot from the list of
 	// available snapshots in a repo.
-	Forget(context.Context, SnapshotIdentifier) error
+	Forget(context.Context, *velerov1api.BackupRepository, string) error
+
+	// BatchForget removes a list of snapshots from the list of
+	// available snapshots in a repo.
+	BatchForget(context.Context, *velerov1api.BackupRepository, []string) []error
+
 	// DefaultMaintenanceFrequency returns the default maintenance frequency from the specific repo
 	DefaultMaintenanceFrequency(repo *velerov1api.BackupRepository) (time.Duration, error)
 }
@@ -195,12 +210,7 @@ func (m *manager) UnlockRepo(repo *velerov1api.BackupRepository) error {
 	return prd.EnsureUnlockRepo(context.Background(), param)
 }
 
-func (m *manager) Forget(ctx context.Context, snapshot SnapshotIdentifier) error {
-	repo, err := m.repoEnsurer.EnsureRepo(ctx, m.namespace, snapshot.VolumeNamespace, snapshot.BackupStorageLocation, snapshot.RepositoryType)
-	if err != nil {
-		return err
-	}
-
+func (m *manager) Forget(ctx context.Context, repo *velerov1api.BackupRepository, snapshot string) error {
 	m.repoLocker.LockExclusive(repo.Name)
 	defer m.repoLocker.UnlockExclusive(repo.Name)
 
@@ -217,7 +227,27 @@ func (m *manager) Forget(ctx context.Context, snapshot SnapshotIdentifier) error
 		return errors.WithStack(err)
 	}
 
-	return prd.Forget(context.Background(), snapshot.SnapshotID, param)
+	return prd.Forget(context.Background(), snapshot, param)
+}
+
+func (m *manager) BatchForget(ctx context.Context, repo *velerov1api.BackupRepository, snapshots []string) []error {
+	m.repoLocker.LockExclusive(repo.Name)
+	defer m.repoLocker.UnlockExclusive(repo.Name)
+
+	prd, err := m.getRepositoryProvider(repo)
+	if err != nil {
+		return []error{errors.WithStack(err)}
+	}
+	param, err := m.assembleRepoParam(repo)
+	if err != nil {
+		return []error{errors.WithStack(err)}
+	}
+
+	if err := prd.BoostRepoConnect(context.Background(), param); err != nil {
+		return []error{errors.WithStack(err)}
+	}
+
+	return prd.BatchForget(context.Background(), snapshots, param)
 }
 
 func (m *manager) DefaultMaintenanceFrequency(repo *velerov1api.BackupRepository) (time.Duration, error) {

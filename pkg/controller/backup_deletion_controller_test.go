@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"sort"
+	"reflect"
 	"time"
 
 	"context"
@@ -95,6 +95,7 @@ func setupBackupDeletionControllerTest(t *testing.T, req *velerov1api.DeleteBack
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			NewFakeSingleObjectBackupStoreGetter(backupStore),
 			velerotest.NewFakeCredentialsFileStore("", nil),
+			nil,
 		),
 		req: ctrl.Request{NamespacedName: types.NamespacedName{Namespace: req.Namespace, Name: req.Name}},
 	}
@@ -695,13 +696,13 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 	tests := []struct {
 		name                  string
 		podVolumeBackups      []velerov1api.PodVolumeBackup
-		expected              []repository.SnapshotIdentifier
+		expected              map[string][]repository.SnapshotIdentifier
 		longBackupNameEnabled bool
 	}{
 		{
 			name:             "no pod volume backups",
 			podVolumeBackups: nil,
-			expected:         nil,
+			expected:         map[string][]repository.SnapshotIdentifier{},
 		},
 		{
 			name: "no pod volume backups with matching label",
@@ -721,7 +722,7 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-2"},
 				},
 			},
-			expected: nil,
+			expected: map[string][]repository.SnapshotIdentifier{},
 		},
 		{
 			name: "some pod volume backups with matching label",
@@ -762,16 +763,18 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: ""},
 				},
 			},
-			expected: []repository.SnapshotIdentifier{
-				{
-					VolumeNamespace: "ns-1",
-					SnapshotID:      "snap-3",
-					RepositoryType:  "restic",
-				},
-				{
-					VolumeNamespace: "ns-1",
-					SnapshotID:      "snap-4",
-					RepositoryType:  "restic",
+			expected: map[string][]repository.SnapshotIdentifier{
+				"ns-1": {
+					{
+						VolumeNamespace: "ns-1",
+						SnapshotID:      "snap-3",
+						RepositoryType:  "restic",
+					},
+					{
+						VolumeNamespace: "ns-1",
+						SnapshotID:      "snap-4",
+						RepositoryType:  "restic",
+					},
 				},
 			},
 		},
@@ -815,11 +818,13 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: ""},
 				},
 			},
-			expected: []repository.SnapshotIdentifier{
-				{
-					VolumeNamespace: "ns-1",
-					SnapshotID:      "snap-3",
-					RepositoryType:  "restic",
+			expected: map[string][]repository.SnapshotIdentifier{
+				"ns-1": {
+					{
+						VolumeNamespace: "ns-1",
+						SnapshotID:      "snap-3",
+						RepositoryType:  "restic",
+					},
 				},
 			},
 		},
@@ -844,21 +849,27 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			res, err := getSnapshotsInBackup(context.TODO(), veleroBackup, clientBuilder.Build())
 			assert.NoError(t, err)
 
-			// sort to ensure good compare of slices
-			less := func(snapshots []repository.SnapshotIdentifier) func(i, j int) bool {
-				return func(i, j int) bool {
-					if snapshots[i].VolumeNamespace == snapshots[j].VolumeNamespace {
-						return snapshots[i].SnapshotID < snapshots[j].SnapshotID
-					}
-					return snapshots[i].VolumeNamespace < snapshots[j].VolumeNamespace
-				}
+			assert.True(t, reflect.DeepEqual(res, test.expected))
 
-			}
+			// for k, v := range res {
 
-			sort.Slice(test.expected, less(test.expected))
-			sort.Slice(res, less(res))
+			// }
 
-			assert.Equal(t, test.expected, res)
+			// // sort to ensure good compare of slices
+			// less := func(snapshots []repository.SnapshotIdentifier) func(i, j int) bool {
+			// 	return func(i, j int) bool {
+			// 		if snapshots[i].VolumeNamespace == snapshots[j].VolumeNamespace {
+			// 			return snapshots[i].SnapshotID < snapshots[j].SnapshotID
+			// 		}
+			// 		return snapshots[i].VolumeNamespace < snapshots[j].VolumeNamespace
+			// 	}
+
+			// }
+
+			// sort.Slice(test.expected, less(test.expected))
+			// sort.Slice(res, less(res))
+
+			// assert.Equal(t, test.expected, res)
 		})
 	}
 }
