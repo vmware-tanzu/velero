@@ -1,2 +1,0 @@
-Update CSIVolumeSnapshotsCompleted in backup's status and the metric 
-during backup finalize stage according to async operations content.
