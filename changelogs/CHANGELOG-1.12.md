@@ -1,3 +1,25 @@
+## v1.12.3
+### 2024-01-09
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.12.3
+
+### Container Image
+`velero/velero:v1.12.3`
+
+### Documentation
+https://velero.io/docs/v1.12/
+
+### Upgrading
+https://velero.io/docs/v1.12/upgrade-to-1.12/
+
+### All changes
+* Fix issue #7244. By the end of the upload, check the outstanding incomplete snapshots and delete them by calling ApplyRetentionPolicy (#7247, @Lyndon-Li)
+* Fix issue #7189, data mover generic restore - don't assume the first volume as the restore volume (#7203, @Lyndon-Li)
+* Update CSIVolumeSnapshotsCompleted in backup's status and the metric
+during backup finalize stage according to async operations content. (#7202, @blackpiglet)
+* Node agent restart enhancement (#7130, @qiuming-best)
+
 ## v1.12.2
 ### 2023-11-20
 
