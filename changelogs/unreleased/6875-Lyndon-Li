@@ -1,1 +1,0 @@
-Fix issue #6859, move plugin depending podvolume functions to util pkg, so as to remove the dependencies to unnecessary repository packages like kopia, azure, etc.
