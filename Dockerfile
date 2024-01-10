@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Velero binary build section
-FROM --platform=$BUILDPLATFORM golang:1.21-bookworm as velero-builder
+FROM --platform=$BUILDPLATFORM golang:1.21.6-bookworm as velero-builder
 
 ARG GOPROXY
 ARG BIN
@@ -47,7 +47,7 @@ RUN mkdir -p /output/usr/bin && \
     go clean -modcache -cache
 
 # Restic binary build section
-FROM --platform=$BUILDPLATFORM golang:1.21-bookworm as restic-builder
+FROM --platform=$BUILDPLATFORM golang:1.21.6-bookworm as restic-builder
 
 ARG BIN
 ARG TARGETOS
@@ -70,7 +70,7 @@ RUN mkdir -p /output/usr/bin && \
     go clean -modcache -cache
 
 # Velero image packing section
-FROM paketobuildpacks/run-jammy-tiny:latest
+FROM paketobuildpacks/run-jammy-tiny:0.2.19
 
 LABEL maintainer="Xun Jiang <jxun@vmware.com>"
 
