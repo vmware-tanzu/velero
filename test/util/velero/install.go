@@ -134,10 +134,11 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 	veleroInstallOptions.DisableInformerCache = veleroCfg.DisableInformerCache
 
 	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, veleroCfg.CloudProvider, &installOptions{
-		Options:                veleroInstallOptions,
-		RegistryCredentialFile: veleroCfg.RegistryCredentialFile,
-		RestoreHelperImage:     veleroCfg.RestoreHelperImage,
-		VeleroServerDebugMode:  veleroCfg.VeleroServerDebugMode,
+		Options:                          veleroInstallOptions,
+		RegistryCredentialFile:           veleroCfg.RegistryCredentialFile,
+		RestoreHelperImage:               veleroCfg.RestoreHelperImage,
+		VeleroServerDebugMode:            veleroCfg.VeleroServerDebugMode,
+		WithoutDisableInformerCacheParam: veleroCfg.WithoutDisableInformerCacheParam,
 	})
 
 	if err != nil {
