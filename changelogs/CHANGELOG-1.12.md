@@ -19,6 +19,7 @@ https://velero.io/docs/v1.12/upgrade-to-1.12/
 * Update CSIVolumeSnapshotsCompleted in backup's status and the metric
 during backup finalize stage according to async operations content. (#7202, @blackpiglet)
 * Node agent restart enhancement (#7130, @qiuming-best)
+* Fix issue #6928, remove snapshot deletion timeout for PVB (#7283, @Lyndon-Li)
 
 ## v1.12.2
 ### 2023-11-20
