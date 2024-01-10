@@ -1,1 +1,0 @@
-Fix issue #7244. By the end of the upload, check the outstanding incomplete snapshots and delete them by calling ApplyRetentionPolicy

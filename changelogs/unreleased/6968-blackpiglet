@@ -1,1 +1,0 @@
-Check whether the action is a CSI action and whether CSI feature is enabled, before executing the action.

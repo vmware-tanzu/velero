@@ -1,1 +1,0 @@
-Fix #6857. Added check for matching Owner References when synchronizing backups, removing references that are not found/have mismatched uid.
