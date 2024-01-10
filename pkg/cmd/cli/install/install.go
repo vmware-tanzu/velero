@@ -151,7 +151,7 @@ func NewInstallOptions() *Options {
 		DefaultVolumesToFsBackup: false,
 		UploaderType:             uploader.KopiaType,
 		DefaultSnapshotMoveData:  false,
-		DisableInformerCache:     true,
+		DisableInformerCache:     false,
 	}
 }
 
