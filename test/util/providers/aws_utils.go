@@ -410,7 +410,7 @@ func (s AWSStorage) GetMinioBucketSize(cloudCredentialsFile, bslBucket, bslPrefi
 			return 0, errors.Wrapf(err, "failed to list objects in bucket %s", bslBucket)
 		}
 		for _, obj := range page.Contents {
-			totalSize += obj.Size
+			totalSize += *obj.Size
 		}
 	}
 	return totalSize, nil
