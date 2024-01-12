@@ -88,8 +88,8 @@ const (
 	defaultResourceTerminatingTimeout = 10 * time.Minute
 
 	// server's client default qps and burst
-	defaultClientQPS      float32 = 20.0
-	defaultClientBurst    int     = 30
+	defaultClientQPS      float32 = 100.0
+	defaultClientBurst    int     = 100
 	defaultClientPageSize int     = 500
 
 	defaultProfilerAddress = "localhost:6060"
