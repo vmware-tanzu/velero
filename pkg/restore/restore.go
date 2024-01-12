@@ -1757,7 +1757,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	if groupResource == kuberesource.CustomResourceDefinitions {
 		available, err := ctx.crdAvailable(name, resourceClient)
 		if err != nil {
-			errs.Add(namespace, errors.Wrapf(err, "error verifying custom resource definition is ready to use"))
+			errs.Add(namespace, errors.Wrapf(err, "error verifying the CRD %s is ready to use", name))
 		} else if !available {
 			errs.Add(namespace, fmt.Errorf("the CRD %s is not available to use for custom resources", name))
 		}
