@@ -1478,6 +1478,22 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 	}
 
+	// Check if cluster has GVK required to restore resource, otherwise return err.
+	// Placed here because the object apiVersion might get modified by a RestorePlugin
+	// So we check for the GVK after the RestorePlugin has run.
+	_, _, err = ctx.discoveryHelper.KindFor(schema.GroupVersionKind{
+		Group:   groupResource.Group,
+		Version: obj.GetAPIVersion(),
+		Kind:    groupResource.Resource,
+	})
+	clusterHasKind := err == nil
+	if !clusterHasKind {
+		ctx.log.Errorf("Cannot restore %s because GVK doesn't exist in the cluster", groupResource)
+		// Adding to errs should cause restore to partially fail
+		errs.Add(namespace, fmt.Errorf("cannot restore %s because gvk doesn't exist in the cluster", groupResource))
+		return warnings, errs, itemExists
+	}
+
 	// Necessary because we may have remapped the namespace if the namespace is
 	// blank, don't create the key.
 	originalNamespace := obj.GetNamespace()
