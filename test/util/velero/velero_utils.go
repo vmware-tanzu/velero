@@ -35,11 +35,9 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
-	"k8s.io/apimachinery/pkg/util/wait"
-
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
-
 	ver "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
@@ -1201,7 +1199,8 @@ func GetSnapshotCheckPoint(client TestClient, VeleroCfg VeleroConfig, expectCoun
 	snapshotCheckPoint.ExpectCount = expectCount
 	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
 	snapshotCheckPoint.PodName = KibishiiPVCNameList
-	if VeleroCfg.CloudProvider == "azure" && strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
+
+	if (VeleroCfg.CloudProvider == "azure" || VeleroCfg.CloudProvider == "aws") && strings.EqualFold(VeleroCfg.Features, "EnableCSI") {
 		snapshotCheckPoint.EnableCSI = true
 		resourceName := "snapshot.storage.k8s.io"
 
