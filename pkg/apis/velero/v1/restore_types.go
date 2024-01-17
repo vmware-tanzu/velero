@@ -115,7 +115,7 @@ type RestoreSpec struct {
 	ExistingResourcePolicy PolicyType `json:"existingResourcePolicy,omitempty"`
 
 	// ItemOperationTimeout specifies the time used to wait for RestoreItemAction operations
-	// The default value is 1 hour.
+	// The default value is 4 hour.
 	// +optional
 	ItemOperationTimeout metav1.Duration `json:"itemOperationTimeout,omitempty"`
 
