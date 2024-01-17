@@ -78,10 +78,12 @@ type helper struct {
 	logger          logrus.FieldLogger
 
 	// lock guards mapper, resources and resourcesMap
-	lock          sync.RWMutex
-	mapper        meta.RESTMapper
-	resources     []*metav1.APIResourceList
-	resourcesMap  map[schema.GroupVersionResource]metav1.APIResource
+	lock         sync.RWMutex
+	mapper       meta.RESTMapper
+	resources    []*metav1.APIResourceList
+	resourcesMap map[schema.GroupVersionResource]metav1.APIResource
+	// kindMap stores APIResources keyed by GroupVersionKind used by KindFor()
+	// Group and Kind are case insensitive so we will store as lowercase so hits are consistent
 	kindMap       map[schema.GroupVersionKind]metav1.APIResource
 	apiGroups     []metav1.APIGroup
 	serverVersion *version.Info
@@ -117,6 +119,7 @@ func (h *helper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVer
 	return gvr, apiResource, nil
 }
 
+// KindFor expects input where kind is lowercased to hit the map
 func (h *helper) KindFor(input schema.GroupVersionKind) (schema.GroupVersionResource, metav1.APIResource, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
@@ -193,7 +196,8 @@ func (h *helper) Refresh() error {
 
 		for _, resource := range resourceGroup.APIResources {
 			gvr := gv.WithResource(resource.Name)
-			gvk := gv.WithKind(resource.Kind)
+			// gvk kind is lowercased for consistency of hits in KindFor()
+			gvk := gv.WithKind(strings.ToLower(resource.Kind))
 			h.resourcesMap[gvr] = resource
 			h.kindMap[gvk] = resource
 		}

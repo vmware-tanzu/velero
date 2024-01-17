@@ -1059,6 +1059,19 @@ func (ctx *restoreContext) getResourceClient(groupResource schema.GroupResource,
 }
 
 func (ctx *restoreContext) getResourceLister(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace string) cache.GenericNamespaceLister {
+	_, _, err := ctx.discoveryHelper.KindFor(schema.GroupVersionKind{
+		Group:   obj.GroupVersionKind().Group,
+		Version: obj.GetAPIVersion(),
+		// we want singular name (Serviceaccount), not plural (serviceaccounts)
+		// obj.GetKind() returns ServiceAccount, not Serviceaccount and was causing issues
+		// so we lowercase it here and in the KindMap that is used in discovery
+		Kind: strings.ToLower(obj.GetKind()),
+	})
+	clusterHasKind := err == nil
+	if !clusterHasKind {
+		ctx.log.Errorf("Cannot get resource lister %s because GVK doesn't exist in the cluster", groupResource)
+		return nil
+	}
 	informer := ctx.dynamicInformerFactory.factory.ForResource(groupResource.WithVersion(obj.GroupVersionKind().Version))
 	// if the restore contains CRDs or the RIA returns new resources, need to make sure the corresponding informers are synced
 	if !informer.Informer().HasSynced() {
@@ -1084,6 +1097,10 @@ func getResourceID(groupResource schema.GroupResource, namespace, name string) s
 
 func (ctx *restoreContext) getResource(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace, name string) (*unstructured.Unstructured, error) {
 	lister := ctx.getResourceLister(groupResource, obj, namespace)
+	if lister == nil {
+		// getResourceLister logs the error, this func returns error to the caller to trigger partiallyFailed.
+		return nil, errors.Errorf("Error getting lister for %s because no informer for GVK found", getResourceID(groupResource, namespace, name))
+	}
 	clusterObj, err := lister.Get(name)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting resource from lister for %s, %s/%s", groupResource, namespace, name)
@@ -1476,22 +1493,6 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				errs.Add(namespace, err)
 			}
 		}
-	}
-
-	// Check if cluster has GVK required to restore resource, otherwise return err.
-	// Placed here because the object apiVersion might get modified by a RestorePlugin
-	// So we check for the GVK after the RestorePlugin has run.
-	_, _, err = ctx.discoveryHelper.KindFor(schema.GroupVersionKind{
-		Group:   groupResource.Group,
-		Version: obj.GetAPIVersion(),
-		Kind:    groupResource.Resource,
-	})
-	clusterHasKind := err == nil
-	if !clusterHasKind {
-		ctx.log.Errorf("Cannot restore %s because GVK doesn't exist in the cluster", groupResource)
-		// Adding to errs should cause restore to partially fail
-		errs.Add(namespace, fmt.Errorf("cannot restore %s because gvk doesn't exist in the cluster", groupResource))
-		return warnings, errs, itemExists
 	}
 
 	// Necessary because we may have remapped the namespace if the namespace is
