@@ -225,7 +225,7 @@ func GetAPIVersions(client *TestClient, name string) ([]string, error) {
 		fmt.Println(group.Name)
 		if group.Name == name {
 			for _, v := range group.Versions {
-				fmt.Println(v.Version)
+				fmt.Printf("group: %s version:%s", group.Name, v.Version)
 				version = append(version, v.Version)
 			}
 			return version, nil

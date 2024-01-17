@@ -21,13 +21,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -124,7 +122,7 @@ func GetCsiSnapshotHandleV1(client TestClient, backupName string) ([]string, err
 	}
 
 	if len(snapshotHandleList) == 0 {
-		fmt.Printf("No VolumeSnapshotContent from backup %s", backupName)
+		fmt.Printf("No VolumeSnapshotContent from backup %s\n", backupName)
 	}
 	return snapshotHandleList, nil
 }
@@ -170,11 +168,11 @@ func CheckVolumeSnapshotCR(client TestClient, backupName string, expectedCount i
 	var snapshotContentNameList []string
 	if apiVersion == "v1beta1" {
 		if snapshotContentNameList, err = GetCsiSnapshotHandle(client, backupName); err != nil {
-			return nil, errors.Wrap(err, "Fail to get Azure CSI snapshot content")
+			return nil, errors.Wrap(err, "Fail to get Azure CSI snapshot content for v1beta1")
 		}
 	} else if apiVersion == "v1" {
 		if snapshotContentNameList, err = GetCsiSnapshotHandleV1(client, backupName); err != nil {
-			return nil, errors.Wrap(err, "Fail to get Azure CSI snapshot content")
+			return nil, errors.Wrap(err, "Fail to get Azure CSI snapshot content for v1")
 		}
 	} else {
 		return nil, errors.New("API version is invalid")

@@ -140,7 +140,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// to help clear up resources instead of clear them directly in case of some conflict with Expose action
 		if err := UpdateDataDownloadWithRetry(ctx, r.client, req.NamespacedName, log, func(dataDownload *velerov2alpha1api.DataDownload) {
 			dataDownload.Spec.Cancel = true
-			dataDownload.Status.Message = fmt.Sprintf("found a dataupload %s/%s is being deleted, mark it as cancel", dd.Namespace, dd.Name)
+			dataDownload.Status.Message = fmt.Sprintf("found a datadownload %s/%s is being deleted, mark it as cancel", dd.Namespace, dd.Name)
 		}); err != nil {
 			log.Errorf("failed to set cancel flag with error %s for %s/%s", err.Error(), dd.Namespace, dd.Name)
 			return ctrl.Result{}, err
@@ -192,7 +192,6 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return r.errorOut(ctx, dd, err, "error to expose snapshot", log)
 			}
 		}
-
 		log.Info("Restore is exposed")
 
 		// we need to get CR again for it may canceled by datadownload controller on other
@@ -205,7 +204,6 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 			return ctrl.Result{}, errors.Wrap(err, "getting datadownload")
 		}
-
 		// we need to clean up resources as resources created in Expose it may later than cancel action or prepare time
 		// and need to clean up resources again
 		if isDataDownloadInFinalState(dd) {
@@ -267,7 +265,6 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				return r.errorOut(ctx, dd, err, "error to create data path", log)
 			}
 		}
-
 		// Update status to InProgress
 		original := dd.DeepCopy()
 		dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseInProgress
@@ -576,6 +573,51 @@ func (r *DataDownloadReconciler) FindDataDownloads(ctx context.Context, cli clie
 	return dataDownloads, nil
 }
 
+func (r *DataDownloadReconciler) findAcceptDataDownloadsByNodeLabel(ctx context.Context, cli client.Client, ns string) ([]velerov2alpha1api.DataDownload, error) {
+	dataDownloads := &velerov2alpha1api.DataDownloadList{}
+	if err := cli.List(ctx, dataDownloads, &client.ListOptions{Namespace: ns}); err != nil {
+		r.logger.WithError(errors.WithStack(err)).Error("failed to list datauploads")
+		return nil, errors.Wrapf(err, "failed to list datauploads")
+	}
+
+	var result []velerov2alpha1api.DataDownload
+	for _, dd := range dataDownloads.Items {
+		if dd.Status.Phase != velerov2alpha1api.DataDownloadPhaseAccepted {
+			continue
+		}
+		if dd.Labels[acceptNodeLabelKey] == r.nodeName {
+			result = append(result, dd)
+		}
+	}
+	return result, nil
+}
+
+// CancelAcceptedDataDownload will cancel the accepted data download
+func (r *DataDownloadReconciler) CancelAcceptedDataDownload(ctx context.Context, cli client.Client, ns string) {
+	r.logger.Infof("Canceling accepted data for node %s", r.nodeName)
+	dataDownloads, err := r.findAcceptDataDownloadsByNodeLabel(ctx, cli, ns)
+	if err != nil {
+		r.logger.WithError(err).Error("failed to find data downloads")
+		return
+	}
+
+	for _, dd := range dataDownloads {
+		if dd.Spec.Cancel {
+			continue
+		}
+		err = UpdateDataDownloadWithRetry(ctx, cli, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name},
+			r.logger.WithField("dataupload", dd.Name), func(dataDownload *velerov2alpha1api.DataDownload) {
+				dataDownload.Spec.Cancel = true
+				dataDownload.Status.Message = fmt.Sprintf("found a datadownload with status %q during the node-agent starting, mark it as cancel", dd.Status.Phase)
+			})
+
+		r.logger.Warn(dd.Status.Message)
+		if err != nil {
+			r.logger.WithError(err).Errorf("failed to set cancel flag with error %s", err.Error())
+		}
+	}
+}
+
 func (r *DataDownloadReconciler) prepareDataDownload(ssb *velerov2alpha1api.DataDownload) {
 	ssb.Status.Phase = velerov2alpha1api.DataDownloadPhasePrepared
 	ssb.Status.Node = r.nodeName
@@ -748,4 +790,36 @@ func UpdateDataDownloadWithRetry(ctx context.Context, client client.Client, name
 
 		return true, nil
 	})
+}
+
+func (r *DataDownloadReconciler) AttemptDataDownloadResume(ctx context.Context, cli client.Client, logger *logrus.Entry, ns string) error {
+	if dataDownloads, err := r.FindDataDownloads(ctx, cli, ns); err != nil {
+		return errors.Wrapf(err, "failed to find data downloads")
+	} else {
+		for i := range dataDownloads {
+			dd := dataDownloads[i]
+			if dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared {
+				// keep doing nothing let controller re-download the data
+				// the Prepared CR could be still handled by datadownload controller after node-agent restart
+				logger.WithField("datadownload", dd.GetName()).Debug("find a datadownload with status prepared")
+			} else if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
+				err = UpdateDataDownloadWithRetry(ctx, cli, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, logger.WithField("datadownload", dd.Name),
+					func(dataDownload *velerov2alpha1api.DataDownload) {
+						dataDownload.Spec.Cancel = true
+						dataDownload.Status.Message = fmt.Sprintf("found a datadownload with status %q during the node-agent starting, mark it as cancel", dd.Status.Phase)
+					})
+
+				if err != nil {
+					logger.WithError(errors.WithStack(err)).Errorf("failed to mark datadownload %q into canceled", dd.GetName())
+					continue
+				}
+				logger.WithField("datadownload", dd.GetName()).Debug("mark datadownload into canceled")
+			}
+		}
+	}
+
+	//If the data download is in Accepted status, the expoded PVC may be not created
+	// so we need to mark the data download as canceled for it may not be recoverable
+	r.CancelAcceptedDataDownload(ctx, cli, ns)
+	return nil
 }

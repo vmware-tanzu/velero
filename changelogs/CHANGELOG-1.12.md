@@ -1,3 +1,56 @@
+## v1.12.3
+### 2024-01-09
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.12.3
+
+### Container Image
+`velero/velero:v1.12.3`
+
+### Documentation
+https://velero.io/docs/v1.12/
+
+### Upgrading
+https://velero.io/docs/v1.12/upgrade-to-1.12/
+
+### All changes
+* Fix issue #7244. By the end of the upload, check the outstanding incomplete snapshots and delete them by calling ApplyRetentionPolicy (#7247, @Lyndon-Li)
+* Fix issue #7189, data mover generic restore - don't assume the first volume as the restore volume (#7203, @Lyndon-Li)
+* Update CSIVolumeSnapshotsCompleted in backup's status and the metric
+during backup finalize stage according to async operations content. (#7202, @blackpiglet)
+* Node agent restart enhancement (#7130, @qiuming-best)
+* Fix issue #6928, remove snapshot deletion timeout for PVB (#7283, @Lyndon-Li)
+
+## v1.12.2
+### 2023-11-20
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.12.2
+
+### Container Image
+`velero/velero:v1.12.2`
+
+### Documentation
+https://velero.io/docs/v1.12/
+
+### Upgrading
+https://velero.io/docs/v1.12/upgrade-to-1.12/
+
+### All changes
+* Fix issue #7068, due to a behavior of CSI external snapshotter, manipulations of VS and VSC may not be handled in the same order inside external snapshotter as the API is called. So add a protection finalizer to ensure the order (#7114, @Lyndon-Li)
+* Update Backup.Status.CSIVolumeSnapshotsCompleted during finalize (#7111, @kaovilai)
+* Cherry-pick #6917 - Support JSON Merge Patch and Strategic Merge Patch in Resource Modifiers (#7049, @27149chen)
+* Bump up Velero base image to latest patch release (#7110, @allenxu404)
+* Fix the node-agent missing metrics-address defines. (#7098, @yanggangtony)
+* Fix issue #7094, fallback to full backup if previous snapshot is not found (#7097, @Lyndon-Li)
+* Add DataUpload Result and CSI VolumeSnapshot check for restore PV. (#7087, @blackpiglet)
+* Fix issue #7027, data mover backup exposer should not assume the first volume as the backup volume in backup pod (#7060, @Lyndon-Li)
+* Truncate the credential file to avoid the change of secret content messing it up (#7058, @ywk253100)
+* restore: Use warning when Create IsAlreadyExist and Get error (#7054, @kaovilai)
+* Read information from the credential specified by BSL (#7033, @ywk253100)
+* Fix issue 6913: Velero Built-in Datamover: Backup stucks in phase WaitingForPluginOperations when Node Agent pod gets restarted (#7025, @shubham-pampattiwar)
+* Fix unified repository (kopia) s3 credentials profile selection (#6997, @kaovilai)
+
 ## v1.12.1
 ### 2023-10-20
 

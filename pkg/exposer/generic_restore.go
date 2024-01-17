@@ -104,7 +104,7 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1.O
 
 	defer func() {
 		if err != nil {
-			kube.DeletePVCIfAny(ctx, e.kubeClient.CoreV1(), restorePVC.Name, restorePVC.Namespace, curLog)
+			kube.DeletePVAndPVCIfAny(ctx, e.kubeClient.CoreV1(), restorePVC.Name, restorePVC.Namespace, curLog)
 		}
 	}()
 
@@ -114,6 +114,7 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1.O
 func (e *genericRestoreExposer) GetExposed(ctx context.Context, ownerObject corev1.ObjectReference, nodeClient client.Client, nodeName string, timeout time.Duration) (*ExposeResult, error) {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
+	volumeName := string(ownerObject.UID)
 
 	curLog := e.log.WithFields(logrus.Fields{
 		"owner": ownerObject.Name,
@@ -127,10 +128,10 @@ func (e *genericRestoreExposer) GetExposed(ctx context.Context, ownerObject core
 	}, pod)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			curLog.WithField("backup pod", restorePodName).Debug("Backup pod is not running in the current node")
+			curLog.WithField("restore pod", restorePodName).Debug("Restore pod is not running in the current node")
 			return nil, nil
 		} else {
-			return nil, errors.Wrapf(err, "error to get backup pod %s", restorePodName)
+			return nil, errors.Wrapf(err, "error to get restore pod %s", restorePodName)
 		}
 	}
 
@@ -143,7 +144,20 @@ func (e *genericRestoreExposer) GetExposed(ctx context.Context, ownerObject core
 
 	curLog.WithField("restore pvc", restorePVCName).Info("Restore PVC is bound")
 
-	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, VolumeName: pod.Spec.Volumes[0].Name}}, nil
+	i := 0
+	for i = 0; i < len(pod.Spec.Volumes); i++ {
+		if pod.Spec.Volumes[i].Name == volumeName {
+			break
+		}
+	}
+
+	if i == len(pod.Spec.Volumes) {
+		return nil, errors.Errorf("restore pod %s doesn't have the expected restore volume", pod.Name)
+	}
+
+	curLog.WithField("pod", pod.Name).Infof("Restore volume is found in pod at index %v", i)
+
+	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, VolumeName: volumeName}}, nil
 }
 
 func (e *genericRestoreExposer) CleanUp(ctx context.Context, ownerObject corev1.ObjectReference) {
@@ -151,7 +165,7 @@ func (e *genericRestoreExposer) CleanUp(ctx context.Context, ownerObject corev1.
 	restorePVCName := ownerObject.Name
 
 	kube.DeletePodIfAny(ctx, e.kubeClient.CoreV1(), restorePodName, ownerObject.Namespace, e.log)
-	kube.DeletePVCIfAny(ctx, e.kubeClient.CoreV1(), restorePVCName, ownerObject.Namespace, e.log)
+	kube.DeletePVAndPVCIfAny(ctx, e.kubeClient.CoreV1(), restorePVCName, ownerObject.Namespace, e.log)
 }
 
 func (e *genericRestoreExposer) RebindVolume(ctx context.Context, ownerObject corev1.ObjectReference, targetPVCName string, sourceNamespace string, timeout time.Duration) error {

@@ -44,6 +44,7 @@ import (
 )
 
 // All function mainly used to make testing more convenient
+var applyRetentionPolicyFunc = policy.ApplyRetentionPolicy
 var treeForSourceFunc = policy.TreeForSource
 var setPolicyFunc = policy.SetPolicy
 var saveSnapshotFunc = snapshot.SaveSnapshot
@@ -236,10 +237,10 @@ func SnapshotSource(
 
 			mani, err := loadSnapshotFunc(ctx, rep, manifest.ID(parentSnapshot))
 			if err != nil {
-				return "", 0, errors.Wrapf(err, "Failed to load previous snapshot %v from kopia", parentSnapshot)
+				log.WithError(err).Warnf("Failed to load previous snapshot %v from kopia, fallback to full backup", parentSnapshot)
+			} else {
+				previous = append(previous, mani)
 			}
-
-			previous = append(previous, mani)
 		} else {
 			log.Infof("Searching for parent snapshot")
 
@@ -275,6 +276,11 @@ func SnapshotSource(
 
 	if _, err = saveSnapshotFunc(ctx, rep, manifest); err != nil {
 		return "", 0, errors.Wrapf(err, "Failed to save kopia manifest %v", manifest.ID)
+	}
+
+	_, err = applyRetentionPolicyFunc(ctx, rep, sourceInfo, true)
+	if err != nil {
+		return "", 0, errors.Wrapf(err, "Failed to apply kopia retention policy for si %v", sourceInfo)
 	}
 
 	if err = rep.Flush(ctx); err != nil {
