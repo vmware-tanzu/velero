@@ -38,8 +38,8 @@ func (df *FakeDynamicFactory) ClientForGroupVersionResource(gv schema.GroupVersi
 	return args.Get(0).(client.Dynamic), args.Error(1)
 }
 
-func (df *FakeDynamicFactory) DynamicSharedInformerFactoryForNamespace(namespace string) dynamicinformer.DynamicSharedInformerFactory {
-	args := df.Called(namespace)
+func (df *FakeDynamicFactory) DynamicSharedInformerFactory() dynamicinformer.DynamicSharedInformerFactory {
+	args := df.Called()
 	return args.Get(0).(dynamicinformer.DynamicSharedInformerFactory)
 }
 
