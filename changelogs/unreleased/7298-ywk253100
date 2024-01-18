@@ -1,0 +1,1 @@
+Make "disable-informer-cache" option false(enabled) by default to keep it consistent with the help message
