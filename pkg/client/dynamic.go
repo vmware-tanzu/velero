@@ -35,8 +35,8 @@ type DynamicFactory interface {
 	// ClientForGroupVersionResource returns a Dynamic client for the given group/version
 	// and resource for the given namespace.
 	ClientForGroupVersionResource(gv schema.GroupVersion, resource metav1.APIResource, namespace string) (Dynamic, error)
-	// DynamicSharedInformerFactoryForNamespace returns a DynamicSharedInformerFactory for the given namespace.
-	DynamicSharedInformerFactoryForNamespace(namespace string) dynamicinformer.DynamicSharedInformerFactory
+	// DynamicSharedInformerFactory returns a DynamicSharedInformerFactory.
+	DynamicSharedInformerFactory() dynamicinformer.DynamicSharedInformerFactory
 }
 
 // dynamicFactory implements DynamicFactory.
@@ -55,8 +55,8 @@ func (f *dynamicFactory) ClientForGroupVersionResource(gv schema.GroupVersion, r
 	}, nil
 }
 
-func (f *dynamicFactory) DynamicSharedInformerFactoryForNamespace(namespace string) dynamicinformer.DynamicSharedInformerFactory {
-	return dynamicinformer.NewFilteredDynamicSharedInformerFactory(f.dynamicClient, time.Minute, namespace, nil)
+func (f *dynamicFactory) DynamicSharedInformerFactory() dynamicinformer.DynamicSharedInformerFactory {
+	return dynamicinformer.NewDynamicSharedInformerFactory(f.dynamicClient, time.Minute)
 }
 
 // Creator creates an object.
