@@ -28,6 +28,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	volume "github.com/vmware-tanzu/velero/pkg/volume"
+	"github.com/vmware-tanzu/velero/pkg/util/results"
+
 
 )
 
@@ -323,6 +325,29 @@ func (_m *BackupStore) GetBackupVolumeInfos(name string) ([]*internalVolume.Volu
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*internalVolume.VolumeInfo)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetRestoreResults provides a mock function with given fields: name
+func (_m *BackupStore) GetRestoreResults(name string) (map[string]results.Result, error) {
+	ret := _m.Called(name)
+
+	r0 := make(map[string]results.Result)
+	if rf, ok := ret.Get(0).(func(string) map[string]results.Result); ok {
+		r0 = rf(name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]results.Result)
 		}
 	}
 

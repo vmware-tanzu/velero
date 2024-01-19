@@ -36,6 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/util"
+	"github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
@@ -75,6 +76,7 @@ type BackupStore interface {
 	GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1api.VolumeSnapshotContent, error)
 	GetCSIVolumeSnapshotClasses(name string) ([]*snapshotv1api.VolumeSnapshotClass, error)
 	GetBackupVolumeInfos(name string) ([]*internalVolume.VolumeInfo, error)
+	GetRestoreResults(name string) (map[string]results.Result, error)
 
 	// BackupExists checks if the backup metadata file exists in object storage.
 	BackupExists(bucket, backupName string) (bool, error)
@@ -512,6 +514,25 @@ func (s *objectBackupStore) GetBackupVolumeInfos(name string) ([]*internalVolume
 	}
 
 	return volumeInfos, nil
+}
+
+func (s *objectBackupStore) GetRestoreResults(name string) (map[string]results.Result, error) {
+	results := make(map[string]results.Result)
+
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getRestoreResultsKey(name))
+	if err != nil {
+		return results, err
+	}
+	if res == nil {
+		return results, nil
+	}
+	defer res.Close()
+
+	if err := decode(res, &results); err != nil {
+		return results, err
+	}
+
+	return results, nil
 }
 
 func (s *objectBackupStore) GetBackupContents(name string) (io.ReadCloser, error) {

@@ -249,7 +249,7 @@ type InitRestoreHook struct {
 
 // RestorePhase is a string representation of the lifecycle phase
 // of a Velero restore
-// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Completed;PartiallyFailed;Failed
+// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Completed;PartiallyFailed;Failed;Finalizing;FinalizingPartiallyFailed
 type RestorePhase string
 
 const (
@@ -276,6 +276,19 @@ const (
 	// PartiallyFailed) and other plugin operations are still
 	// ongoing.  The restore is not complete yet.
 	RestorePhaseWaitingForPluginOperationsPartiallyFailed RestorePhase = "WaitingForPluginOperationsPartiallyFailed"
+
+	// RestorePhaseFinalizing means the restore of
+	// Kubernetes resources and other async plugin operations were successful and
+	// other plugin operations are now complete, but the restore is awaiting
+	// the completion of wrap-up tasks before the restore process enters terminal phase.
+	RestorePhaseFinalizing RestorePhase = "Finalizing"
+
+	// RestorePhaseFinalizingPartiallyFailed means the restore of
+	// Kubernetes resources and other async plugin operations were successful and
+	// other plugin operations are now complete, but one or more errors
+	// occurred during restore or async operation processing. The restore is awaiting
+	// the completion of wrap-up tasks before the restore process enters terminal phase.
+	RestorePhaseFinalizingPartiallyFailed RestorePhase = "FinalizingPartiallyFailed"
 
 	// RestorePhaseCompleted means the restore has run successfully
 	// without errors.

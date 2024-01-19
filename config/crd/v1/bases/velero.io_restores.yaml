@@ -477,6 +477,8 @@ spec:
                 - Completed
                 - PartiallyFailed
                 - Failed
+                - Finalizing
+                - FinalizingPartiallyFailed
                 type: string
               progress:
                 description: Progress contains information about the restore's execution

@@ -43,6 +43,7 @@ import (
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
+	"github.com/vmware-tanzu/velero/pkg/util/results"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
@@ -1145,6 +1146,35 @@ func TestGetBackupVolumeInfos(t *testing.T) {
 
 		})
 	}
+}
+func TestGetRestoreResults(t *testing.T) {
+	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+
+	// file not found should not error
+	_, err := harness.GetRestoreResults("test-restore")
+	assert.NoError(t, err)
+
+	// file containing invalid data should error
+	harness.objectStore.PutObject(harness.bucket, "restores/test-restore/restore-test-restore-results.gz", newStringReadSeeker("foo"))
+	_, err = harness.GetRestoreResults("test-restore")
+	assert.NotNil(t, err)
+
+	// file containing gzipped json data should return correctly
+	contents := map[string]results.Result{
+		"warnings": {Cluster: []string{"cluster warning"}},
+		"errors":   {Namespaces: map[string][]string{"test-ns": {"namespace error"}}},
+	}
+	obj := new(bytes.Buffer)
+	gzw := gzip.NewWriter(obj)
+
+	require.NoError(t, json.NewEncoder(gzw).Encode(contents))
+	require.NoError(t, gzw.Close())
+	require.NoError(t, harness.objectStore.PutObject(harness.bucket, "restores/test-restore/restore-test-restore-results.gz", obj))
+	res, err := harness.GetRestoreResults("test-restore")
+
+	assert.NoError(t, err)
+	assert.EqualValues(t, contents["warnings"], res["warnings"])
+	assert.EqualValues(t, contents["errors"], res["errors"])
 }
 
 func encodeToBytes(obj runtime.Object) []byte {
