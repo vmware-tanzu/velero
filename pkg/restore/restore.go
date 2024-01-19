@@ -1062,10 +1062,7 @@ func (ctx *restoreContext) getResourceLister(groupResource schema.GroupResource,
 	_, _, err := ctx.discoveryHelper.KindFor(schema.GroupVersionKind{
 		Group:   obj.GroupVersionKind().Group,
 		Version: obj.GetAPIVersion(),
-		// we want singular name (Serviceaccount), not plural (serviceaccounts)
-		// obj.GetKind() returns ServiceAccount, not Serviceaccount and was causing issues
-		// so we lowercase it here and in the KindMap that is used in discovery
-		Kind: strings.ToLower(obj.GetKind()),
+		Kind:    obj.GetKind(),
 	})
 	clusterHasKind := err == nil
 	if !clusterHasKind {

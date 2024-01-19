@@ -51,6 +51,7 @@ func Pods(items ...metav1.Object) *APIResource {
 		ShortName:  "po",
 		Namespaced: true,
 		Items:      items,
+		Kind:       "Pod",
 	}
 }
 
