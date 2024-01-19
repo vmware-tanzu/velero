@@ -27,6 +27,7 @@ type APIResource struct {
 	Group      string
 	Version    string
 	Name       string
+	Kind       string
 	ShortName  string
 	Namespaced bool
 	Items      []metav1.Object
@@ -59,6 +60,7 @@ func PVCs(items ...metav1.Object) *APIResource {
 		Version:    "v1",
 		Name:       "persistentvolumeclaims",
 		ShortName:  "pvc",
+		Kind:       "PersistentVolumeClaim",
 		Namespaced: true,
 		Items:      items,
 	}
@@ -70,6 +72,7 @@ func PVs(items ...metav1.Object) *APIResource {
 		Version:    "v1",
 		Name:       "persistentvolumes",
 		ShortName:  "pv",
+		Kind:       "PersistentVolume",
 		Namespaced: false,
 		Items:      items,
 	}
@@ -81,6 +84,7 @@ func Secrets(items ...metav1.Object) *APIResource {
 		Version:    "v1",
 		Name:       "secrets",
 		ShortName:  "secrets",
+		Kind:       "Secret",
 		Namespaced: true,
 		Items:      items,
 	}
@@ -92,6 +96,7 @@ func Deployments(items ...metav1.Object) *APIResource {
 		Version:    "v1",
 		Name:       "deployments",
 		ShortName:  "deploy",
+		Kind:       "Deployment",
 		Namespaced: true,
 		Items:      items,
 	}
@@ -103,6 +108,7 @@ func ExtensionsDeployments(items ...metav1.Object) *APIResource {
 		Version:    "v1",
 		Name:       "deployments",
 		ShortName:  "deploy",
+		Kind:       "Deployment",
 		Namespaced: true,
 		Items:      items,
 	}
@@ -115,6 +121,7 @@ func VeleroDeployments(items ...metav1.Object) *APIResource {
 		Version:    "v1",
 		Name:       "deployments",
 		ShortName:  "deploy",
+		Kind:       "Deployment",
 		Namespaced: true,
 		Items:      items,
 	}
@@ -126,6 +133,7 @@ func Namespaces(items ...metav1.Object) *APIResource {
 		Version:    "v1",
 		Name:       "namespaces",
 		ShortName:  "ns",
+		Kind:       "Namespace",
 		Namespaced: false,
 		Items:      items,
 	}
@@ -137,6 +145,7 @@ func ServiceAccounts(items ...metav1.Object) *APIResource {
 		Version:    "v1",
 		Name:       "serviceaccounts",
 		ShortName:  "sa",
+		Kind:       "ServiceAccount",
 		Namespaced: true,
 		Items:      items,
 	}
@@ -148,6 +157,7 @@ func ConfigMaps(items ...metav1.Object) *APIResource {
 		Version:    "v1",
 		Name:       "configmaps",
 		ShortName:  "cm",
+		Kind:       "ConfigMap",
 		Namespaced: true,
 		Items:      items,
 	}
@@ -159,6 +169,7 @@ func CRDs(items ...metav1.Object) *APIResource {
 		Version:    "v1beta1",
 		Name:       "customresourcedefinitions",
 		ShortName:  "crd",
+		Kind:       "CustomResourceDefinition",
 		Namespaced: false,
 		Items:      items,
 	}
@@ -169,6 +180,7 @@ func VSLs(items ...metav1.Object) *APIResource {
 		Group:      "velero.io",
 		Version:    "v1",
 		Name:       "volumesnapshotlocations",
+		Kind:       "VolumeSnapshotLocation",
 		Namespaced: true,
 		Items:      items,
 	}
@@ -179,6 +191,7 @@ func Backups(items ...metav1.Object) *APIResource {
 		Group:      "velero.io",
 		Version:    "v1",
 		Name:       "backups",
+		Kind:       "Backup",
 		Namespaced: true,
 		Items:      items,
 	}
@@ -190,6 +203,7 @@ func Services(items ...metav1.Object) *APIResource {
 		Version:    "v1",
 		Name:       "services",
 		ShortName:  "svc",
+		Kind:       "Service",
 		Namespaced: true,
 		Items:      items,
 	}
@@ -200,6 +214,7 @@ func DataUploads(items ...metav1.Object) *APIResource {
 		Group:      "velero.io",
 		Version:    "v2alpha1",
 		Name:       "datauploads",
+		Kind:       "DataUpload",
 		Namespaced: true,
 		Items:      items,
 	}
