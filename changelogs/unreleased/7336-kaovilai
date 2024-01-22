@@ -1,0 +1,1 @@
+Check resource Group Version and Kind is available in cluster before attempting restore to prevent being stuck.
