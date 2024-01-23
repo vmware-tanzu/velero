@@ -1017,16 +1017,14 @@ func (ctx *restoreContext) getResourceClient(groupResource schema.GroupResource,
 	return client, nil
 }
 
-func (ctx *restoreContext) getResourceLister(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace string) cache.GenericNamespaceLister {
+func (ctx *restoreContext) getResourceLister(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace string) (cache.GenericNamespaceLister, error) {
 	_, _, err := ctx.discoveryHelper.KindFor(schema.GroupVersionKind{
 		Group:   obj.GroupVersionKind().Group,
 		Version: obj.GetAPIVersion(),
 		Kind:    obj.GetKind(),
 	})
-	clusterHasKind := err == nil
-	if !clusterHasKind {
-		ctx.log.Errorf("Cannot get resource lister %s because GVK doesn't exist in the cluster", groupResource)
-		return nil
+	if err != nil {
+		return nil, err
 	}
 	informer := ctx.dynamicInformerFactory.factory.ForResource(groupResource.WithVersion(obj.GroupVersionKind().Version))
 	// if the restore contains CRDs or the RIA returns new resources, need to make sure the corresponding informers are synced
@@ -1037,10 +1035,9 @@ func (ctx *restoreContext) getResourceLister(groupResource schema.GroupResource,
 	}
 
 	if namespace == "" {
-		return informer.Lister()
-	} else {
-		return informer.Lister().ByNamespace(namespace)
+		return informer.Lister(), nil
 	}
+	return informer.Lister().ByNamespace(namespace), nil
 }
 
 func getResourceID(groupResource schema.GroupResource, namespace, name string) string {
@@ -1052,10 +1049,9 @@ func getResourceID(groupResource schema.GroupResource, namespace, name string) s
 }
 
 func (ctx *restoreContext) getResource(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace, name string) (*unstructured.Unstructured, error) {
-	lister := ctx.getResourceLister(groupResource, obj, namespace)
-	if lister == nil {
-		// getResourceLister logs the error, this func returns error to the caller to trigger partiallyFailed.
-		return nil, errors.Errorf("Error getting lister for %s because no informer for GVK found", getResourceID(groupResource, namespace, name))
+	lister, err := ctx.getResourceLister(groupResource, obj, namespace)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error getting lister for %s", getResourceID(groupResource, namespace, name))
 	}
 	clusterObj, err := lister.Get(name)
 	if err != nil {
