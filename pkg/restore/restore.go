@@ -593,6 +593,11 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 				break
 			}
 			gvr := schema.ParseGroupResource(informerResource.resource).WithVersion(version)
+			_, _, err := ctx.discoveryHelper.ResourceFor(gvr)
+			if err != nil {
+				ctx.log.Infof("failed to create informer for %s", gvr)
+				continue
+			}
 			ctx.dynamicInformerFactory.factory.ForResource(gvr)
 		}
 		ctx.dynamicInformerFactory.factory.Start(ctx.dynamicInformerFactory.context.Done())
@@ -1059,11 +1064,7 @@ func (ctx *restoreContext) getResourceClient(groupResource schema.GroupResource,
 }
 
 func (ctx *restoreContext) getResourceLister(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace string) (cache.GenericNamespaceLister, error) {
-	_, _, err := ctx.discoveryHelper.KindFor(schema.GroupVersionKind{
-		Group:   obj.GroupVersionKind().Group,
-		Version: obj.GetAPIVersion(),
-		Kind:    obj.GetKind(),
-	})
+	_, _, err := ctx.discoveryHelper.KindFor(obj.GroupVersionKind())
 	if err != nil {
 		return nil, err
 	}
