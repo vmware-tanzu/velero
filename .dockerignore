@@ -1,3 +1,9 @@
 .go/
 .go.std/
 site/
+.github/
+_output/
+changelogs/
+*.md
+Dockerfile
+hack/build-image/Dockerfile
