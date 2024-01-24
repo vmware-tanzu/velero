@@ -41,8 +41,10 @@ help:  ## Display this help
 
 TOOLS_DIR := $(REPO_ROOT)/hack/tools
 BIN_DIR := bin
+# Try to not modify PATH if possible
+GOBIN := $(REPO_ROOT)/.go/bin
 TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
-GINKGO := $(GOPATH)/bin/ginkgo
+GINKGO := $(GOBIN)/ginkgo
 KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
 OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 GINKGO_FOCUS ?=
@@ -88,9 +90,13 @@ VELERO_POD_CPU_REQUEST ?= 2
 VELERO_POD_MEM_REQUEST ?= 2Gi
 POD_VOLUME_OPERATION_TIMEOUT ?= 6h
 
+# Make sure ginkgo is in $GOBIN
 .PHONY:ginkgo
-ginkgo: # Make sure ginkgo is in $GOPATH/bin
-	go install github.com/onsi/ginkgo/ginkgo@v1.16.5
+ginkgo: ${GOBIN}/ginkgo
+
+# This target does not run if ginkgo is already in $GOBIN
+${GOBIN}/ginkgo:
+	GOBIN=${GOBIN} go install github.com/onsi/ginkgo/ginkgo@v1.16.5
 
 .PHONY: run
 run: ginkgo

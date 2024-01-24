@@ -75,6 +75,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 	if isStandbyCluster {
 		veleroCfg.CloudProvider = veleroCfg.StandbyClusterCloudProvider
 	}
+
 	if veleroCfg.CloudProvider != "kind" {
 		fmt.Println("For cloud platforms, object store plugin provider will be set as cloud provider")
 		// If ObjectStoreProvider is not provided, then using the value same as CloudProvider
@@ -278,14 +279,11 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 
 	if len(options.Features) > 0 {
 		args = append(args, "--features", options.Features)
-		if strings.EqualFold(options.Features, FeatureCSI) && options.UseVolumeSnapshots {
-			if strings.EqualFold(cloudProvider, "azure") {
-				fmt.Println("Start to install Azure VolumeSnapshotClass ...")
-				if err := KubectlApplyByFile(ctx, "../util/csi/AzureVolumeSnapshotClass.yaml"); err != nil {
-					return err
-				}
+		if strings.EqualFold(cloudProvider, "azure") && strings.EqualFold(options.Features, FeatureCSI) && options.UseVolumeSnapshots {
+			fmt.Println("Start to install Azure VolumeSnapshotClass ...")
+			if err := KubectlApplyByFile(ctx, "../util/csi/AzureVolumeSnapshotClass.yaml"); err != nil {
+				return err
 			}
-
 		}
 	}
 	if options.GarbageCollectionFrequency > 0 {

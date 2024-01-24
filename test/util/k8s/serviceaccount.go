@@ -47,8 +47,16 @@ func WaitUntilServiceAccountCreated(ctx context.Context, client TestClient, name
 }
 
 func PatchServiceAccountWithImagePullSecret(ctx context.Context, client TestClient, namespace, serviceAccount, dockerCredentialFile string) error {
+	if dockerCredentialFile == "" {
+		// use the default docker credential file in the home directory
+		dockerCredentialFile = os.Getenv("HOME") + "/.docker/config.json"
+	}
+	// if file do not exist, do not patch the service account, just return
 	credential, err := os.ReadFile(dockerCredentialFile)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return errors.Wrapf(err, "failed to read the docker credential file %q", dockerCredentialFile)
 	}
 	secretName := "image-pull-secret"

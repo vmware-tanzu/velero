@@ -108,6 +108,7 @@ platform_temp = $(subst -, ,$(ARCH))
 GOOS = $(word 1, $(platform_temp))
 GOARCH = $(word 2, $(platform_temp))
 GOPROXY ?= https://proxy.golang.org
+GOBIN=$$(pwd)/.go/bin
 
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-containers' rule.
@@ -129,6 +130,7 @@ local: build-dirs
 # Add DEBUG=1 to enable debug locally
 	GOOS=$(GOOS) \
 	GOARCH=$(GOARCH) \
+	GOBIN=$(GOBIN) \
 	VERSION=$(VERSION) \
 	REGISTRY=$(REGISTRY) \
 	PKG=$(PKG) \
@@ -145,6 +147,7 @@ _output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
 	$(MAKE) shell CMD="-c '\
 		GOOS=$(GOOS) \
 		GOARCH=$(GOARCH) \
+		GOBIN=$(GOBIN) \
 		VERSION=$(VERSION) \
 		REGISTRY=$(REGISTRY) \
 		PKG=$(PKG) \

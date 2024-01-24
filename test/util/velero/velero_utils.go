@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -184,6 +185,14 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	io.ProviderName = veleroCfg.ObjectStoreProvider
 
 	if veleroCfg.CloudCredentialsFile != "" {
+		// Expand home directory if it is specified. https://stackoverflow.com/a/17617721
+		if strings.HasPrefix(veleroCfg.CloudCredentialsFile, "~/") {
+			usr, _ := user.Current()
+			dir := usr.HomeDir
+			// Use strings.HasPrefix so we don't match paths like
+			// "/something/~/something/"
+			veleroCfg.CloudCredentialsFile = filepath.Join(dir, veleroCfg.CloudCredentialsFile[2:])
+		}
 		realPath, err := filepath.Abs(veleroCfg.CloudCredentialsFile)
 		if err != nil {
 			return nil, err
@@ -927,7 +936,7 @@ func getVeleroCliTarball(cliTarballUrl string) (*os.File, error) {
 }
 
 func DeleteBackupResource(ctx context.Context, veleroCLI string, backupName string) error {
-	args := []string{"backup", "delete", backupName, "--confirm"}
+	args := []string{"--namespace", VeleroCfg.VeleroNamespace, "backup", "delete", backupName, "--confirm"}
 
 	cmd := exec.CommandContext(ctx, veleroCLI, args...)
 	fmt.Println("Delete backup Command:" + cmd.String())
@@ -939,7 +948,7 @@ func DeleteBackupResource(ctx context.Context, veleroCLI string, backupName stri
 	output := strings.Replace(stdout, "\n", " ", -1)
 	fmt.Println("Backup delete command output:" + output)
 
-	args = []string{"backup", "get", backupName}
+	args = []string{"--namespace", VeleroCfg.VeleroNamespace, "backup", "get", backupName}
 
 	retryTimes := 5
 	for i := 1; i < retryTimes+1; i++ {
@@ -958,13 +967,13 @@ func DeleteBackupResource(ctx context.Context, veleroCLI string, backupName stri
 	return nil
 }
 
-func GetBackup(ctx context.Context, veleroCLI string, backupName string) (string, string, error) {
-	args := []string{"backup", "get", backupName}
+func GetBackup(ctx context.Context, veleroCLI, backupName string) (string, string, error) {
+	args := []string{"--namespace", VeleroCfg.VeleroNamespace, "backup", "get", backupName}
 	cmd := exec.CommandContext(ctx, veleroCLI, args...)
 	return veleroexec.RunCommand(cmd)
 }
 
-func IsBackupExist(ctx context.Context, veleroCLI string, backupName string) (bool, error) {
+func IsBackupExist(ctx context.Context, veleroCLI, backupName string) (bool, error) {
 	out, outerr, err := GetBackup(ctx, veleroCLI, backupName)
 	if err != nil {
 		if strings.Contains(outerr, "not found") {
@@ -977,7 +986,7 @@ func IsBackupExist(ctx context.Context, veleroCLI string, backupName string) (bo
 	return true, nil
 }
 
-func WaitBackupDeleted(ctx context.Context, veleroCLI string, backupName string, timeout time.Duration) error {
+func WaitBackupDeleted(ctx context.Context, veleroCLI, backupName string, timeout time.Duration) error {
 	return wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		if exist, err := IsBackupExist(ctx, veleroCLI, backupName); err != nil {
 			return false, err
@@ -992,7 +1001,7 @@ func WaitBackupDeleted(ctx context.Context, veleroCLI string, backupName string,
 	})
 }
 
-func WaitForExpectedStateOfBackup(ctx context.Context, veleroCLI string, backupName string,
+func WaitForExpectedStateOfBackup(ctx context.Context, veleroCLI, backupName string,
 	timeout time.Duration, existing bool) error {
 	return wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		if exist, err := IsBackupExist(ctx, veleroCLI, backupName); err != nil {
@@ -1013,7 +1022,7 @@ func WaitForExpectedStateOfBackup(ctx context.Context, veleroCLI string, backupN
 	})
 }
 
-func WaitForBackupToBeCreated(ctx context.Context, veleroCLI string, backupName string, timeout time.Duration) error {
+func WaitForBackupToBeCreated(ctx context.Context, veleroCLI, backupName string, timeout time.Duration) error {
 	return WaitForExpectedStateOfBackup(ctx, veleroCLI, backupName, timeout, true)
 }
 

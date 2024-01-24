@@ -298,7 +298,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					// For SnapshotMoveData pipelines, we should use standby clustr setting for Velero installation
 					// In nightly CI, StandbyClusterPlugins is set properly if pipeline is for SnapshotMoveData.
 					veleroCfg.Plugins = veleroCfg.StandbyClusterPlugins
-					veleroCfg.ObjectStoreProvider = veleroCfg.StandbyClusterOjbectStoreProvider
+					veleroCfg.ObjectStoreProvider = veleroCfg.StandbyClusterObjectStoreProvider
 				}
 
 				Expect(VeleroInstall(context.Background(), &veleroCfg, true)).To(Succeed())
