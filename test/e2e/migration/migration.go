@@ -149,6 +149,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				OriginVeleroCfg.VeleroCLI = veleroCLI2Version.VeleroCLI
 				OriginVeleroCfg.ClientToInstallVelero = OriginVeleroCfg.DefaultClient
 				OriginVeleroCfg.ClusterToInstallVelero = veleroCfg.DefaultClusterName
+				OriginVeleroCfg.ServiceAccountNameToInstall = veleroCfg.DefaultCLSServiceAccountName
 				OriginVeleroCfg.UseVolumeSnapshots = useVolumeSnapshots
 				OriginVeleroCfg.UseNodeAgent = !useVolumeSnapshots
 
@@ -289,6 +290,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 
 				veleroCfg.ClientToInstallVelero = veleroCfg.StandbyClient
 				veleroCfg.ClusterToInstallVelero = veleroCfg.StandbyClusterName
+				veleroCfg.ServiceAccountNameToInstall = veleroCfg.StandbyCLSServiceAccountName
 				veleroCfg.UseNodeAgent = !useVolumeSnapshots
 				veleroCfg.UseRestic = false
 				if veleroCfg.SnapshotMoveData {

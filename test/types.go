@@ -91,7 +91,9 @@ type VeleroConfig struct {
 	WithoutDisableInformerCacheParam  bool
 	DisableInformerCache              bool
 	CreateClusterRoleBinding          bool
-	ServiceAccountName                string
+	DefaultCLSServiceAccountName      string
+	StandbyCLSServiceAccountName      string
+	ServiceAccountNameToInstall       string
 	EKSPolicyARN                      string
 }
 

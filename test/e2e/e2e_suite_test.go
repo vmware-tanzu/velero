@@ -84,8 +84,8 @@ func init() {
 	flag.StringVar(&VeleroCfg.Features, "features", "", "comma-separated list of features to enable for this Velero process.")
 	flag.BoolVar(&VeleroCfg.Debug, "debug-e2e-test", false, "A Switch for enable or disable test data cleaning action.")
 	flag.StringVar(&VeleroCfg.GCFrequency, "garbage-collection-frequency", "", "frequency of garbage collection.")
-	flag.StringVar(&VeleroCfg.DefaultClusterContext, "default-cluster", "", "default cluster's kube config context, it's for migration test.")
-	flag.StringVar(&VeleroCfg.StandbyClusterContext, "standby-cluster", "", "standby cluster's kube config context, it's for migration test.")
+	flag.StringVar(&VeleroCfg.DefaultClusterContext, "default-cluster-context", "", "default cluster's kube config context, it's for migration test.")
+	flag.StringVar(&VeleroCfg.StandbyClusterContext, "standby-cluster-context", "", "standby cluster's kube config context, it's for migration test.")
 	flag.StringVar(&VeleroCfg.UploaderType, "uploader-type", "", "type of uploader for persistent volume backup.")
 	flag.BoolVar(&VeleroCfg.VeleroServerDebugMode, "velero-server-debug-mode", false, "a switch for enable or disable having debug log of Velero server.")
 	flag.BoolVar(&VeleroCfg.SnapshotMoveData, "snapshot-move-data", false, "a Switch for taking backup with Velero's data mover, if data-mover-plugin is not provided, using built-in plugin")
@@ -98,7 +98,8 @@ func init() {
 	flag.StringVar(&VeleroCfg.DefaultClusterName, "default-cluster-name", "", "default cluster's name in kube config file, it's for EKS IRSA test.")
 	flag.StringVar(&VeleroCfg.StandbyClusterName, "standby-cluster-name", "", "standby cluster's name in kube config file, it's for EKS IRSA test.")
 	flag.StringVar(&VeleroCfg.EKSPolicyARN, "eks-policy-arn", "", "EKS plicy ARN for creating AWS IAM service account.")
-	flag.StringVar(&VeleroCfg.ServiceAccountName, "service-account-name", "", "service account name.")
+	flag.StringVar(&VeleroCfg.DefaultCLSServiceAccountName, "default-cls-service-account-name", "", "default cluster service account name.")
+	flag.StringVar(&VeleroCfg.StandbyCLSServiceAccountName, "standby-cls-service-account-name", "", "standby cluster service account name.")
 
 }
 
@@ -173,6 +174,7 @@ func GetKubeconfigContext() error {
 	VeleroCfg.DefaultClient = &tcDefault
 	VeleroCfg.ClientToInstallVelero = VeleroCfg.DefaultClient
 	VeleroCfg.ClusterToInstallVelero = VeleroCfg.DefaultClusterName
+	VeleroCfg.ServiceAccountNameToInstall = VeleroCfg.DefaultCLSServiceAccountName
 	if err != nil {
 		return err
 	}

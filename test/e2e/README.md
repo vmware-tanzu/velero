@@ -69,8 +69,8 @@ the object-store-provider to be specified.
 1. `-debug-e2e-test`: A Switch for enable or disable test data cleaning action.
 1. `-garbage-collection-frequency`: frequency of garbage collection. It is a parameter for Velero installation. Optional.
 1. `-velero-server-debug-mode`: A switch for enable or disable having debug log of Velero server.
-1. `-default-cluster`: Default (source) cluster's kube config context, it's for migration test.
-1. `-standby-cluster`: Standby (destination) cluster's kube config context, it's for migration test.
+1. `-default-cluster-context`: Default (source) cluster's kube config context, it's for migration test.
+1. `-standby-cluster-context`: Standby (destination) cluster's kube config context, it's for migration test.
 1. `-uploader-type`: Type of uploader for persistent volume backup.
 1. `-snapshot-move-data`: A Switch for taking backup with Velero's data mover, if data-mover-plugin is not provided, using built-in plugin.
 1. `-data-mover-plugin`: Customized plugin for data mover.
@@ -118,8 +118,8 @@ Below is a mapping between `make` variables to E2E configuration flags.
 1. `KIBISHII_DIRECTORY`: `-kibishii-directory`. Optional.
 1. `DEBUG_E2E_TEST`: `-debug-e2e-test`. Optional.
 1. `VELERO_SERVER_DEBUG_MODE`: `-velero-server-debug-mode`. Optional.
-1. `DEFAULT_CLUSTER`: `-default-cluster`. Optional.
-1. `STANDBY_CLUSTER`: `-standby-cluster`. Optional.
+1. `DEFAULT_CLUSTER`: `-default-cluster-context`. Optional.
+1. `STANDBY_CLUSTER`: `-standby-cluster-context`. Optional.
 1. `UPLOADER_TYPE`: `-uploader-type`. Optional.
 1. `SNAPSHOT_MOVE_DATA`: `-snapshot-move-data`. Optional.
 1. `DATA_MOVER_plugin`: `-data-mover-plugin`. Optional.

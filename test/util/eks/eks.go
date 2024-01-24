@@ -40,11 +40,10 @@ func KubectlDeleteIAMServiceAcount(ctx context.Context, name, namespace, cluster
 	if strings.Contains(stderr, "NotFound") {
 		err = nil
 	}
-	fmt.Printf("err: %v\n", err)
 	return err
 }
 
-func KubectlCreateIAMServiceAcount(ctx context.Context, name, namespace, policyARN, cluster string) error {
+func EksctlCreateIAMServiceAcount(ctx context.Context, name, namespace, policyARN, cluster string) error {
 	args := []string{"create", "iamserviceaccount", name,
 		"--namespace", namespace, "--cluster", cluster, "--attach-policy-arn", policyARN,
 		"--approve", "--override-existing-serviceaccounts"}
@@ -55,9 +54,8 @@ func KubectlCreateIAMServiceAcount(ctx context.Context, name, namespace, policyA
 		cmd := exec.CommandContext(ctx, "eksctl", args...)
 		fmt.Println(cmd)
 		stdout, stderr, err := veleroexec.RunCommand(cmd)
-		fmt.Printf("Output: %v|%v|%v\n", stdout, stderr, err)
 		if err != nil {
-			fmt.Printf("err: %v|%v|%v\n", stdout, stderr, err)
+			fmt.Printf("eksctl return stdout: %v, stderr: %v, err: %v\n", stdout, stderr, err)
 			return false, nil
 		}
 		return true, nil

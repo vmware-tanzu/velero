@@ -32,7 +32,6 @@ func KubectlDeleteClusterRoleBinding(ctx context.Context, name string) error {
 	cmd := exec.CommandContext(ctx, "kubectl", args...)
 	fmt.Println(cmd)
 	_, stderr, err := veleroexec.RunCommand(cmd)
-	fmt.Printf("Ignore error: %v\n", stderr)
 	if strings.Contains(stderr, "NotFound") {
 		fmt.Printf("Ignore error: %v\n", stderr)
 		err = nil

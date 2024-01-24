@@ -76,7 +76,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 		veleroCfg.CloudProvider = veleroCfg.StandbyClusterCloudProvider
 	}
 	if veleroCfg.CloudProvider != "kind" {
-		fmt.Printf("For cloud platforms, object store plugin provider will be set as cloud provider\n")
+		fmt.Println("For cloud platforms, object store plugin provider will be set as cloud provider")
 		// If ObjectStoreProvider is not provided, then using the value same as CloudProvider
 		if veleroCfg.ObjectStoreProvider == "" {
 			veleroCfg.ObjectStoreProvider = veleroCfg.CloudProvider
@@ -114,32 +114,34 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", veleroCfg.ObjectStoreProvider)
 	}
 
+	// For AWS IRSA credential test, AWS IAM service account is required, so if ServiceAccountName and EKSPolicyARN
+	// are both provided, we assume IRSA test is running, otherwise skip this IAM service account creation part.
 	if veleroCfg.CloudProvider == "aws" && veleroInstallOptions.ServiceAccountName != "" {
+		if veleroCfg.EKSPolicyARN == "" {
+			return errors.New("Please provide EKSPolicyARN for IRSA test.")
+		}
 		_, err = GetNamespace(ctx, *veleroCfg.ClientToInstallVelero, veleroCfg.VeleroNamespace)
+		// We should uninstall Velero for a new service account creation.
 		if !apierrors.IsNotFound(err) {
 			if err := VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace); err != nil {
 				return errors.Wrapf(err, "Failed to uninstall velero %s", veleroCfg.VeleroNamespace)
 			}
 		}
+		// If velero namespace does not exist, we should create it for service account creation
 		if err := KubectlCreateNamespace(ctx, veleroCfg.VeleroNamespace); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s to install Velero", veleroCfg.VeleroNamespace)
 		}
 		if err := KubectlDeleteClusterRoleBinding(ctx, "velero-cluster-role"); err != nil {
-			fmt.Println(err)
-			return errors.Wrapf(err, "Failed to delete clusterrolebinding %s to %s namesapce", "velero-cluster-role", veleroCfg.VeleroNamespace)
+			return errors.Wrapf(err, "Failed to delete clusterrolebinding %s to %s namespace", "velero-cluster-role", veleroCfg.VeleroNamespace)
 		}
 		if err := KubectlCreateClusterRoleBinding(ctx, "velero-cluster-role", "cluster-admin", veleroCfg.VeleroNamespace, veleroInstallOptions.ServiceAccountName); err != nil {
-			fmt.Println(err)
-			return errors.Wrapf(err, "Failed to create clusterrolebinding %s to %s namesapce", "velero-cluster-role", veleroCfg.VeleroNamespace)
+			return errors.Wrapf(err, "Failed to create clusterrolebinding %s to %s namespace", "velero-cluster-role", veleroCfg.VeleroNamespace)
 		}
-		if err := KubectlDeleteIAMServiceAcount(ctx, veleroCfg.ServiceAccountName, veleroCfg.VeleroNamespace, veleroCfg.ClusterToInstallVelero); err != nil {
-			fmt.Println(err)
-			return errors.Wrapf(err, "Failed to delete service account %s to %s namesapce", veleroCfg.ServiceAccountName, veleroCfg.VeleroNamespace)
+		if err := KubectlDeleteIAMServiceAcount(ctx, veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace, veleroCfg.ClusterToInstallVelero); err != nil {
+			return errors.Wrapf(err, "Failed to delete service account %s to %s namespace", veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace)
 		}
-		time.Sleep(10 * time.Second)
-		if err := KubectlCreateIAMServiceAcount(ctx, veleroCfg.ServiceAccountName, veleroCfg.VeleroNamespace, veleroCfg.EKSPolicyARN, veleroCfg.ClusterToInstallVelero); err != nil {
-			fmt.Println(err)
-			return errors.Wrapf(err, "Failed to create service account %s to %s namesapce", veleroCfg.ServiceAccountName, veleroCfg.VeleroNamespace)
+		if err := EksctlCreateIAMServiceAcount(ctx, veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace, veleroCfg.EKSPolicyARN, veleroCfg.ClusterToInstallVelero); err != nil {
+			return errors.Wrapf(err, "Failed to create service account %s to %s namespace", veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace)
 		}
 	}
 	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, veleroCfg.CloudProvider, &installOptions{
