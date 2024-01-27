@@ -46,6 +46,7 @@ type Options struct {
 	Image                     string
 	BucketName                string
 	Prefix                    string
+	BackupFilePrefix          string
 	ProviderName              string
 	PodAnnotations            flag.Map
 	PodLabels                 flag.Map
@@ -95,6 +96,7 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.NoDefaultBackupLocation, "no-default-backup-location", o.NoDefaultBackupLocation, "Flag indicating if a default backup location should be created. Must be used as confirmation if --bucket or --provider are not provided. Optional.")
 	flags.StringVar(&o.Image, "image", o.Image, "Image to use for the Velero and node agent pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
+	flags.StringVar(&o.BackupFilePrefix, "backup-file-prefix", o.BackupFilePrefix, "Prefix of tarball under backup within the bucket. If empty, will use the backup name as the prefix. Optional.")
 	flags.Var(&o.PodAnnotations, "pod-annotations", "Annotations to add to the Velero and node agent pods. Optional. Format is key1=value1,key2=value2")
 	flags.Var(&o.PodLabels, "pod-labels", "Labels to add to the Velero and node agent pods. Optional. Format is key1=value1,key2=value2")
 	flags.Var(&o.ServiceAccountAnnotations, "sa-annotations", "Annotations to add to the Velero ServiceAccount. Add iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_NAME].iam.gserviceaccount.com for workload identity. Optional. Format is key1=value1,key2=value2")
@@ -199,6 +201,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		ProviderName:                    o.ProviderName,
 		Bucket:                          o.BucketName,
 		Prefix:                          o.Prefix,
+		BackupFilePrefix:                o.BackupFilePrefix,
 		PodAnnotations:                  o.PodAnnotations.Data(),
 		PodLabels:                       o.PodLabels.Data(),
 		ServiceAccountAnnotations:       o.ServiceAccountAnnotations.Data(),
@@ -379,6 +382,10 @@ func (o *Options) Validate(c *cobra.Command, args []string, f client.Factory) er
 
 		if o.Prefix != "" {
 			return errors.New("Cannot use both --prefix and --no-default-backup-location at the same time")
+		}
+
+		if o.BackupFilePrefix != "" {
+			return errors.New("Cannot use both --backup-file-prefix and --no-default-backup-location at the same time")
 		}
 
 		if o.BackupStorageConfig.String() != "" {

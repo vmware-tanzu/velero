@@ -134,6 +134,7 @@ func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocatio
 	// trim off any leading/trailing slashes
 	bucket := strings.Trim(location.Spec.ObjectStorage.Bucket, "/")
 	prefix := strings.Trim(location.Spec.ObjectStorage.Prefix, "/")
+	backupFilePrefix := strings.TrimSpace(location.Spec.ObjectStorage.BackupFilePrefix)
 
 	// if there are any slashes in the middle of 'bucket', the user
 	// probably put <bucket>/<prefix> in the bucket field, which we
@@ -191,7 +192,7 @@ func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocatio
 	return &objectBackupStore{
 		objectStore: objectStore,
 		bucket:      bucket,
-		layout:      NewObjectStoreLayout(prefix),
+		layout:      NewObjectStoreLayout(prefix, backupFilePrefix),
 		logger:      log,
 	}, nil
 }

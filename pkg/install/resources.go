@@ -162,7 +162,7 @@ func Namespace(namespace string) *corev1.Namespace {
 	return ns
 }
 
-func BackupStorageLocation(namespace, provider, bucket, prefix string, config map[string]string, caCert []byte) *velerov1api.BackupStorageLocation {
+func BackupStorageLocation(namespace, provider, bucket, prefix, backupFilePrefix string, config map[string]string, caCert []byte) *velerov1api.BackupStorageLocation {
 	return &velerov1api.BackupStorageLocation{
 		ObjectMeta: objectMeta(namespace, "default"),
 		TypeMeta: metav1.TypeMeta{
@@ -173,9 +173,10 @@ func BackupStorageLocation(namespace, provider, bucket, prefix string, config ma
 			Provider: provider,
 			StorageType: velerov1api.StorageType{
 				ObjectStorage: &velerov1api.ObjectStorageLocation{
-					Bucket: bucket,
-					Prefix: prefix,
-					CACert: caCert,
+					Bucket:           bucket,
+					Prefix:           prefix,
+					BackupFilePrefix: backupFilePrefix,
+					CACert:           caCert,
 				},
 			},
 			Config:  config,
@@ -231,6 +232,7 @@ type VeleroOptions struct {
 	ProviderName                    string
 	Bucket                          string
 	Prefix                          string
+	BackupFilePrefix                string
 	PodAnnotations                  map[string]string
 	PodLabels                       map[string]string
 	ServiceAccountAnnotations       map[string]string
@@ -312,7 +314,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 	}
 
 	if !o.NoDefaultBackupLocation {
-		bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig, o.CACertData)
+		bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BackupFilePrefix, o.BSLConfig, o.CACertData)
 		if err := appendUnstructured(resources, bsl); err != nil {
 			fmt.Printf("error appending BackupStorageLocation %s: %s\n", bsl.GetName(), err.Error())
 		}

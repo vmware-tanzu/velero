@@ -114,6 +114,7 @@ func TestCreateCommand_Run(t *testing.T) {
 
 	defaultBackupStorageLocation := true
 	prefix := "builds"
+	backupFilePrefix := "bak"
 	backupSyncPeriod := "1m30s"
 	validationFrequency := "128h1m6s"
 	bslConfig := veleroflag.NewMap()
@@ -133,6 +134,7 @@ func TestCreateCommand_Run(t *testing.T) {
 	flags.Parse([]string{"--credential", credential.String()})
 	flags.Parse([]string{"--default"})
 	flags.Parse([]string{"--prefix", prefix})
+	flags.Parse([]string{"--backup-file-prefix", backupFilePrefix})
 	flags.Parse([]string{"--backup-sync-period", backupSyncPeriod})
 	flags.Parse([]string{"--validation-frequency", validationFrequency})
 	flags.Parse([]string{"--config", bslConfigStr})
@@ -160,6 +162,7 @@ func TestCreateCommand_Run(t *testing.T) {
 	assert.Equal(t, true, reflect.DeepEqual(credential, o.Credential))
 	assert.Equal(t, defaultBackupStorageLocation, o.DefaultBackupStorageLocation)
 	assert.Equal(t, prefix, o.Prefix)
+	assert.Equal(t, backupFilePrefix, o.BackupFilePrefix)
 	assert.Equal(t, backupSyncPeriod, o.BackupSyncPeriod.String())
 	assert.Equal(t, validationFrequency, o.ValidationFrequency.String())
 	assert.Equal(t, true, reflect.DeepEqual(bslConfig, o.Config))

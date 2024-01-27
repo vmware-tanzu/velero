@@ -31,6 +31,7 @@ var (
 		{Name: "Name", Type: "string", Format: "name"},
 		{Name: "Provider"},
 		{Name: "Bucket/Prefix"},
+		{Name: "Backup File Prefix"},
 		{Name: "Phase"},
 		{Name: "Last Validated"},
 		{Name: "Access Mode"},
@@ -62,6 +63,8 @@ func printBackupStorageLocation(location *velerov1api.BackupStorageLocation) []m
 		bucketAndPrefix += "/" + location.Spec.ObjectStorage.Prefix
 	}
 
+	backupFilePrefix := location.Spec.ObjectStorage.BackupFilePrefix
+
 	accessMode := location.Spec.AccessMode
 	if accessMode == "" {
 		accessMode = velerov1api.BackupStorageLocationAccessModeReadWrite
@@ -82,6 +85,7 @@ func printBackupStorageLocation(location *velerov1api.BackupStorageLocation) []m
 		location.Name,
 		location.Spec.Provider,
 		bucketAndPrefix,
+		backupFilePrefix,
 		status,
 		LastValidatedStr,
 		accessMode,

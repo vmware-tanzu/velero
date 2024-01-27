@@ -68,6 +68,7 @@ type CreateOptions struct {
 	Credential                            flag.Map
 	DefaultBackupStorageLocation          bool
 	Prefix                                string
+	BackupFilePrefix                      string
 	BackupSyncPeriod, ValidationFrequency time.Duration
 	Config                                flag.Map
 	Labels                                flag.Map
@@ -94,6 +95,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.Credential, "credential", "The credential to be used by this location as a key-value pair, where the key is the Kubernetes Secret name, and the value is the data key name within the Secret. Optional, one value only.")
 	flags.BoolVar(&o.DefaultBackupStorageLocation, "default", o.DefaultBackupStorageLocation, "Sets this new location to be the new default backup storage location. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
+	flags.StringVar(&o.BackupFilePrefix, "backup-file-prefix", o.BackupFilePrefix, "Prefix of tarball under backup within the bucket. If empty, will use the backup name as the prefix. Optional.")
 	flags.DurationVar(&o.BackupSyncPeriod, "backup-sync-period", o.BackupSyncPeriod, "How often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. Optional. Set this to `0s` to disable sync. Default: 1 minute.")
 	flags.DurationVar(&o.ValidationFrequency, "validation-frequency", o.ValidationFrequency, "How often to verify if the backup storage location is valid. Optional. Set this to `0s` to disable sync. Default 1 minute.")
 	flags.Var(&o.Config, "config", "Configuration key-value pairs.")
@@ -158,9 +160,10 @@ func (o *CreateOptions) BuildBackupStorageLocation(namespace string, setBackupSy
 			Provider: o.Provider,
 			StorageType: velerov1api.StorageType{
 				ObjectStorage: &velerov1api.ObjectStorageLocation{
-					Bucket: o.Bucket,
-					Prefix: o.Prefix,
-					CACert: caCertData,
+					Bucket:           o.Bucket,
+					Prefix:           o.Prefix,
+					BackupFilePrefix: o.BackupFilePrefix,
+					CACert:           caCertData,
 				},
 			},
 			Config:     o.Config.Data(),

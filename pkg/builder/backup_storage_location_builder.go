@@ -84,6 +84,15 @@ func (b *BackupStorageLocationBuilder) Prefix(val string) *BackupStorageLocation
 	return b
 }
 
+// BackupFilePrefix sets the BackupStorageLocation's object storage file prefix.
+func (b *BackupStorageLocationBuilder) BackupFilePrefix(val string) *BackupStorageLocationBuilder {
+	if b.object.Spec.StorageType.ObjectStorage == nil {
+		b.object.Spec.StorageType.ObjectStorage = new(velerov1api.ObjectStorageLocation)
+	}
+	b.object.Spec.ObjectStorage.BackupFilePrefix = val
+	return b
+}
+
 // CACert sets the BackupStorageLocation's object storage CACert.
 func (b *BackupStorageLocationBuilder) CACert(val []byte) *BackupStorageLocationBuilder {
 	if b.object.Spec.StorageType.ObjectStorage == nil {

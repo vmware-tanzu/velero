@@ -54,14 +54,14 @@ type objectBackupStoreTestHarness struct {
 	bucket, prefix string
 }
 
-func newObjectBackupStoreTestHarness(bucket, prefix string) *objectBackupStoreTestHarness {
+func newObjectBackupStoreTestHarness(bucket, prefix, backupFilePrefix string) *objectBackupStoreTestHarness {
 	objectStore := newInMemoryObjectStore(bucket)
 
 	return &objectBackupStoreTestHarness{
 		objectBackupStore: &objectBackupStore{
 			objectStore: objectStore,
 			bucket:      bucket,
-			layout:      NewObjectStoreLayout(prefix),
+			layout:      NewObjectStoreLayout(prefix, backupFilePrefix),
 			logger:      velerotest.NewLogger(),
 		},
 		objectStore: objectStore,
@@ -154,7 +154,7 @@ func TestIsValid(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
+			harness := newObjectBackupStoreTestHarness("foo", tc.prefix, "")
 
 			for key, obj := range tc.storageData {
 				require.NoError(t, harness.objectStore.PutObject(harness.bucket, key, bytes.NewReader(obj)))
@@ -199,7 +199,7 @@ func TestListBackups(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
+			harness := newObjectBackupStoreTestHarness("foo", tc.prefix, "")
 
 			for key, obj := range tc.storageData {
 				require.NoError(t, harness.objectStore.PutObject(harness.bucket, key, bytes.NewReader(obj)))
@@ -221,6 +221,7 @@ func TestPutBackup(t *testing.T) {
 	tests := []struct {
 		name                 string
 		prefix               string
+		backupFilePrefix     string
 		metadata             io.Reader
 		contents             io.Reader
 		log                  io.Reader
@@ -342,11 +343,34 @@ func TestPutBackup(t *testing.T) {
 				"backups/backup-1/backup-1-volumeinfo.json.gz",
 			},
 		},
+		{
+			name:                 "normal case with backup file prefix",
+			backupFilePrefix:     "bak",
+			metadata:             newStringReadSeeker("metadata"),
+			contents:             newStringReadSeeker("contents"),
+			log:                  newStringReadSeeker("log"),
+			podVolumeBackup:      newStringReadSeeker("podVolumeBackup"),
+			snapshots:            newStringReadSeeker("snapshots"),
+			backupItemOperations: newStringReadSeeker("backupItemOperations"),
+			resourceList:         newStringReadSeeker("resourceList"),
+			backupVolumeInfo:     newStringReadSeeker("backupVolumeInfo"),
+			expectedErr:          "",
+			expectedKeys: []string{
+				"backups/backup-1/velero-backup.json",
+				"backups/backup-1/bak.tar.gz",
+				"backups/backup-1/bak-logs.gz",
+				"backups/backup-1/bak-podvolumebackups.json.gz",
+				"backups/backup-1/bak-volumesnapshots.json.gz",
+				"backups/backup-1/bak-itemoperations.json.gz",
+				"backups/backup-1/bak-resource-list.json.gz",
+				"backups/backup-1/bak-volumeinfo.json.gz",
+			},
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
+			harness := newObjectBackupStoreTestHarness("foo", tc.prefix, tc.backupFilePrefix)
 
 			backupInfo := BackupInfo{
 				Name:                 "backup-1",
@@ -393,7 +417,7 @@ func TestGetBackupMetadata(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			harness := newObjectBackupStoreTestHarness("test-bucket", "")
+			harness := newObjectBackupStoreTestHarness("test-bucket", "", "")
 
 			if tc.obj != nil {
 				jsonBytes, err := json.Marshal(tc.obj)
@@ -416,7 +440,7 @@ func TestGetBackupMetadata(t *testing.T) {
 }
 
 func TestGetBackupVolumeSnapshots(t *testing.T) {
-	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+	harness := newObjectBackupStoreTestHarness("test-bucket", "", "")
 
 	// volumesnapshots file not found should not error
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/velero-backup.json", newStringReadSeeker("foo"))
@@ -458,7 +482,7 @@ func TestGetBackupVolumeSnapshots(t *testing.T) {
 }
 
 func TestGetBackupItemOperations(t *testing.T) {
-	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+	harness := newObjectBackupStoreTestHarness("test-bucket", "", "")
 
 	// itemoperations file not found should not error
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/velero-backup.json", newStringReadSeeker("foo"))
@@ -508,7 +532,7 @@ func TestGetBackupItemOperations(t *testing.T) {
 }
 
 func TestGetRestoreItemOperations(t *testing.T) {
-	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+	harness := newObjectBackupStoreTestHarness("test-bucket", "", "")
 
 	// itemoperations file not found should not error
 	res, err := harness.GetRestoreItemOperations("test-restore")
@@ -557,7 +581,7 @@ func TestGetRestoreItemOperations(t *testing.T) {
 }
 
 func TestGetBackupContents(t *testing.T) {
-	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+	harness := newObjectBackupStoreTestHarness("test-bucket", "", "")
 
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup.tar.gz", newStringReadSeeker("foo"))
 
@@ -574,6 +598,7 @@ func TestDeleteBackup(t *testing.T) {
 	tests := []struct {
 		name             string
 		prefix           string
+		backupFilePrefix string
 		listObjectsError error
 		deleteErrors     []error
 		expectedErr      string
@@ -598,7 +623,7 @@ func TestDeleteBackup(t *testing.T) {
 			backupStore := &objectBackupStore{
 				objectStore: objectStore,
 				bucket:      "test-bucket",
-				layout:      NewObjectStoreLayout(test.prefix),
+				layout:      NewObjectStoreLayout(test.prefix, test.backupFilePrefix),
 				logger:      velerotest.NewLogger(),
 			}
 			defer objectStore.AssertExpectations(t)
@@ -650,7 +675,7 @@ func TestDeleteRestore(t *testing.T) {
 			backupStore := &objectBackupStore{
 				objectStore: objectStore,
 				bucket:      "test-bucket",
-				layout:      NewObjectStoreLayout(test.prefix),
+				layout:      NewObjectStoreLayout(test.prefix, ""),
 				logger:      velerotest.NewLogger(),
 			}
 			defer objectStore.AssertExpectations(t)
@@ -680,6 +705,7 @@ func TestGetDownloadURL(t *testing.T) {
 		targetName        string
 		expectedKeyByKind map[velerov1api.DownloadTargetKind]string
 		prefix            string
+		backupFilePrefix  string
 	}{
 		{
 			name:       "backup",
@@ -776,11 +802,35 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindBackupVolumeInfos: "backups/my-backup/my-backup-volumeinfo.json.gz",
 			},
 		},
+		{
+			name:             "backup with backupFilePrefix",
+			targetName:       "my-backup",
+			backupFilePrefix: "bak",
+			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
+				velerov1api.DownloadTargetKindBackupContents:        "backups/my-backup/bak.tar.gz",
+				velerov1api.DownloadTargetKindBackupLog:             "backups/my-backup/bak-logs.gz",
+				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "backups/my-backup/bak-volumesnapshots.json.gz",
+				velerov1api.DownloadTargetKindBackupItemOperations:  "backups/my-backup/bak-itemoperations.json.gz",
+				velerov1api.DownloadTargetKindBackupResourceList:    "backups/my-backup/bak-resource-list.json.gz",
+			},
+		},
+		{
+			name:             "scheduled backup with backupFilePrefix",
+			targetName:       "my-backup-20170913154901",
+			backupFilePrefix: "bak",
+			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
+				velerov1api.DownloadTargetKindBackupContents:        "backups/my-backup-20170913154901/bak.tar.gz",
+				velerov1api.DownloadTargetKindBackupLog:             "backups/my-backup-20170913154901/bak-logs.gz",
+				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "backups/my-backup-20170913154901/bak-volumesnapshots.json.gz",
+				velerov1api.DownloadTargetKindBackupItemOperations:  "backups/my-backup-20170913154901/bak-itemoperations.json.gz",
+				velerov1api.DownloadTargetKindBackupResourceList:    "backups/my-backup-20170913154901/bak-resource-list.json.gz",
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			harness := newObjectBackupStoreTestHarness("test-bucket", test.prefix)
+			harness := newObjectBackupStoreTestHarness("test-bucket", test.prefix, test.backupFilePrefix)
 
 			for kind, expectedKey := range test.expectedKeyByKind {
 				t.Run(string(kind), func(t *testing.T) {
@@ -796,7 +846,7 @@ func TestGetDownloadURL(t *testing.T) {
 }
 
 func TestGetCSIVolumeSnapshotClasses(t *testing.T) {
-	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+	harness := newObjectBackupStoreTestHarness("test-bucket", "", "")
 
 	// file not found should not error
 	res, err := harness.GetCSIVolumeSnapshotClasses("test-backup")
@@ -828,7 +878,7 @@ func TestGetCSIVolumeSnapshotClasses(t *testing.T) {
 }
 
 func TestGetCSIVolumeSnapshots(t *testing.T) {
-	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+	harness := newObjectBackupStoreTestHarness("test-bucket", "", "")
 
 	// file not found should not error
 	res, err := harness.GetCSIVolumeSnapshots("test-backup")
@@ -864,7 +914,7 @@ func TestGetCSIVolumeSnapshots(t *testing.T) {
 }
 
 func TestGetCSIVolumeSnapshotContents(t *testing.T) {
-	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+	harness := newObjectBackupStoreTestHarness("test-bucket", "", "")
 
 	// file not found should not error
 	res, err := harness.GetCSIVolumeSnapshotContents("test-backup")
@@ -1106,7 +1156,7 @@ func TestGetBackupVolumeInfos(t *testing.T) {
 		},
 	}
 
-	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+	harness := newObjectBackupStoreTestHarness("test-bucket", "", "")
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

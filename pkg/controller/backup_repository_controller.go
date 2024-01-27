@@ -141,6 +141,15 @@ func (r *BackupRepoReconciler) needInvalidBackupRepo(oldObj client.Object, newOb
 		return true
 	}
 
+	if oldStorage.BackupFilePrefix != newStorage.BackupFilePrefix {
+		logger.WithFields(logrus.Fields{
+			"old backupFilePrefix": oldStorage.BackupFilePrefix,
+			"new backupFilePrefix": newStorage.BackupFilePrefix,
+		}).Info("BSL's backupFilePrefix has changed, invalid backup repositories")
+
+		return true
+	}
+
 	if !bytes.Equal(oldStorage.CACert, newStorage.CACert) {
 		logger.Info("BSL's CACert has changed, invalid backup repositories")
 		return true

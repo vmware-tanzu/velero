@@ -99,6 +99,10 @@ spec:
                 description: ObjectStorageLocation specifies the settings necessary
                   to connect to a provider's object storage.
                 properties:
+                  backupFilePrefix:
+                    description: BackupFilePrefix is the prefix of backup tarballs
+                      inside a bucket to use for Velero storage. Optional.
+                    type: string
                   bucket:
                     description: Bucket is the bucket to use for object storage.
                     type: string

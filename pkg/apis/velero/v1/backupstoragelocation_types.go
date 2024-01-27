@@ -145,6 +145,10 @@ type ObjectStorageLocation struct {
 	// +optional
 	Prefix string `json:"prefix,omitempty"`
 
+	// BackupFilePrefix is the prefix of backup tarballs inside a bucket to use for Velero storage. Optional.
+	// +optional
+	BackupFilePrefix string `json:"backupFilePrefix,omitempty"`
+
 	// CACert defines a CA bundle to use when verifying TLS connections to the provider.
 	// +optional
 	CACert []byte `json:"caCert,omitempty"`

@@ -364,6 +364,28 @@ func TestNeedInvalidBackupRepo(t *testing.T) {
 			},
 			expect: true,
 		},
+		{
+			name: "backupFilePrefix change",
+			oldBSL: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							BackupFilePrefix: "old-backupFilePrefix",
+						},
+					},
+				},
+			},
+			newBSL: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							BackupFilePrefix: "new-backupFilePrefix",
+						},
+					},
+				},
+			},
+			expect: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -239,6 +239,9 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 	if len(options.Prefix) > 0 {
 		args = append(args, "--prefix", options.Prefix)
 	}
+	if len(options.BackupFilePrefix) > 0 {
+		args = append(args, "--backup-file-prefix", options.BackupFilePrefix)
+	}
 	if len(options.SecretFile) > 0 {
 		args = append(args, "--secret-file", options.SecretFile)
 	}

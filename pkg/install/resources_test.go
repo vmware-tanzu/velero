@@ -25,7 +25,7 @@ import (
 )
 
 func TestResources(t *testing.T) {
-	bsl := BackupStorageLocation(DefaultVeleroNamespace, "test", "test", "", make(map[string]string), []byte("test"))
+	bsl := BackupStorageLocation(DefaultVeleroNamespace, "test", "test", "", "", make(map[string]string), []byte("test"))
 
 	assert.Equal(t, "velero", bsl.ObjectMeta.Namespace)
 	assert.Equal(t, "test", bsl.Spec.Provider)
