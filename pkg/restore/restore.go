@@ -1258,6 +1258,10 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			case internalVolume.PodVolumeBackup:
 				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
 				ctx.pvsToProvision.Insert(name)
+				// add restore warning if user is trying to restore from snapshots but the backup uses fs backup  as default option
+				if boolptr.IsSetToTrue(ctx.backup.Spec.DefaultVolumesToFsBackup) && boolptr.IsSetToTrue(ctx.restore.Spec.RestorePVs) {
+					warnings.Add(namespace, errors.Errorf("restorePVs should not be set as true when backup consists of defaultVolumesToFSbackup as true and all volumes are using FS Backup method. RestorePVs specifies whether to restore all included PVs from snapshot"))
+				}
 
 				// Return early because we don't want to restore the PV itself, we
 				// want to dynamically re-provision it.
@@ -1312,6 +1316,11 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			case hasPodVolumeBackup(obj, ctx):
 				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
 				ctx.pvsToProvision.Insert(name)
+				
+				// add restore warning if user is trying to restore from snapshots but the backup uses fs backup  as default option
+				if boolptr.IsSetToTrue(ctx.backup.Spec.DefaultVolumesToFsBackup) && boolptr.IsSetToTrue(ctx.restore.Spec.RestorePVs) {
+					warnings.Add(namespace, errors.Errorf("restorePVs should not be set as true when backup consists of defaultVolumesToFSbackup as true and all volumes are using FS Backup method. RestorePVs specifies whether to restore all included PVs from snapshot"))
+				}
 
 				// Return early because we don't want to restore the PV itself, we
 				// want to dynamically re-provision it.
