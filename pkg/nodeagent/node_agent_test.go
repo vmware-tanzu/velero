@@ -294,7 +294,7 @@ func TestGetConfigs(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				cmWithoutCocurrentData,
 			},
-			expectResult: &Configs{nil},
+			expectResult: &Configs{},
 		},
 		{
 			name:      "success",

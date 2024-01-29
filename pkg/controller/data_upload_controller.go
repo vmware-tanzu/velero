@@ -49,6 +49,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -75,12 +76,13 @@ type DataUploadReconciler struct {
 	logger              logrus.FieldLogger
 	snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
 	dataPathMgr         *datapath.Manager
+	loadAffinity        *nodeagent.LoadAffinity
 	preparingTimeout    time.Duration
 	metrics             *metrics.ServerMetrics
 }
 
 func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interface, csiSnapshotClient snapshotter.SnapshotV1Interface,
-	dataPathMgr *datapath.Manager, repoEnsurer *repository.Ensurer, clock clocks.WithTickerAndDelayedExecution,
+	dataPathMgr *datapath.Manager, loadAffinity *nodeagent.LoadAffinity, repoEnsurer *repository.Ensurer, clock clocks.WithTickerAndDelayedExecution,
 	cred *credentials.CredentialGetter, nodeName string, fs filesystem.Interface, preparingTimeout time.Duration, log logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:              client,
@@ -94,6 +96,7 @@ func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interfa
 		repoEnsurer:         repoEnsurer,
 		snapshotExposerList: map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(kubeClient, csiSnapshotClient, log)},
 		dataPathMgr:         dataPathMgr,
+		loadAffinity:        loadAffinity,
 		preparingTimeout:    preparingTimeout,
 		metrics:             metrics,
 	}
@@ -826,6 +829,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			OperationTimeout: du.Spec.OperationTimeout.Duration,
 			ExposeTimeout:    r.preparingTimeout,
 			VolumeSize:       pvc.Spec.Resources.Requests[corev1.ResourceStorage],
+			Affinity:         r.loadAffinity,
 		}, nil
 	}
 	return nil, nil
