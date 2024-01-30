@@ -66,10 +66,10 @@ func done() bool {
 		doneFile := filepath.Join("/restores", child.Name(), ".velero", os.Args[1])
 
 		if _, err := os.Stat(doneFile); os.IsNotExist(err) {
-			fmt.Printf("Not found: %s\n", doneFile)
+			fmt.Printf("The filesystem restore done file %s is not found yet. Retry later.\n", doneFile)
 			return false
 		} else if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR looking for %s: %s\n", doneFile, err)
+			fmt.Fprintf(os.Stderr, "ERROR looking filesystem restore done file %s: %s\n", doneFile, err)
 			return false
 		}
 
