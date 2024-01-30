@@ -33,6 +33,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -467,7 +468,12 @@ func setDefaultBackupLocation(ctx context.Context, client ctrlclient.Client, nam
 
 	backupLocation := &velerov1api.BackupStorageLocation{}
 	if err := client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: defaultBackupLocation}, backupLocation); err != nil {
-		return errors.WithStack(err)
+		if apierrors.IsNotFound(err) {
+			logger.WithField("backupStorageLocation", defaultBackupLocation).WithError(err).Warn("Failed to set default backup storage location at server start")
+			return nil
+		} else {
+			return errors.WithStack(err)
+		}
 	}
 
 	if !backupLocation.Spec.Default {

@@ -409,4 +409,13 @@ func Test_setDefaultBackupLocation(t *testing.T) {
 	nonDefaultLocation := &velerov1api.BackupStorageLocation{}
 	require.Nil(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "non-default"}, nonDefaultLocation))
 	assert.False(t, nonDefaultLocation.Spec.Default)
+
+	// no default location specified
+	c = fake.NewClientBuilder().WithScheme(scheme).Build()
+	err := setDefaultBackupLocation(context.Background(), c, "velero", "", logrus.New())
+	assert.NoError(t, err)
+
+	// no default location created
+	err = setDefaultBackupLocation(context.Background(), c, "velero", "default", logrus.New())
+	assert.NoError(t, err)
 }
