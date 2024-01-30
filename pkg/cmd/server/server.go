@@ -32,6 +32,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1api "k8s.io/api/batch/v1"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -136,6 +138,7 @@ type serverConfig struct {
 	defaultSnapshotMoveData                                                 bool
 	disableInformerCache                                                    bool
 	scheduleSkipImmediately                                                 bool
+	maintenanceCfg                                                          repository.MaintenanceConfig
 }
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -167,6 +170,9 @@ func NewCommand(f client.Factory) *cobra.Command {
 			defaultSnapshotMoveData:        false,
 			disableInformerCache:           defaultDisableInformerCache,
 			scheduleSkipImmediately:        false,
+			maintenanceCfg: repository.MaintenanceConfig{
+				KeepLatestMaitenanceJobs: repository.DefaultKeepLatestMaitenanceJobs,
+			},
 		}
 	)
 
@@ -240,7 +246,15 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().BoolVar(&config.defaultSnapshotMoveData, "default-snapshot-move-data", config.defaultSnapshotMoveData, "Move data by default for all snapshots supporting data movement.")
 	command.Flags().BoolVar(&config.disableInformerCache, "disable-informer-cache", config.disableInformerCache, "Disable informer cache for Get calls on restore. With this enabled, it will speed up restore in cases where there are backup resources which already exist in the cluster, but for very large clusters this will increase velero memory usage. Default is false (don't disable).")
 	command.Flags().BoolVar(&config.scheduleSkipImmediately, "schedule-skip-immediately", config.scheduleSkipImmediately, "Skip the first scheduled backup immediately after creating a schedule. Default is false (don't skip).")
+	command.Flags().IntVar(&config.maintenanceCfg.KeepLatestMaitenanceJobs, "keep-latest-maintenance-jobs", config.maintenanceCfg.KeepLatestMaitenanceJobs, "Number of latest maintenance jobs to keep each repository. Optional.")
+	command.Flags().StringVar(&config.maintenanceCfg.CPURequest, "maintenance-job-cpu-request", config.maintenanceCfg.CPURequest, "CPU request for maintenance job. Default is no limit.")
+	command.Flags().StringVar(&config.maintenanceCfg.MemRequest, "maintenance-job-mem-request", config.maintenanceCfg.MemRequest, "Memory request for maintenance job. Default is no limit.")
+	command.Flags().StringVar(&config.maintenanceCfg.CPULimit, "maintenance-job-cpu-limit", config.maintenanceCfg.CPULimit, "CPU limit for maintenance job. Default is no limit.")
+	command.Flags().StringVar(&config.maintenanceCfg.MemLimit, "maintenance-job-mem-limit", config.maintenanceCfg.MemLimit, "Memory limit for maintenance job. Default is no limit.")
 
+	// maintenance job log setting inherited from velero server
+	config.maintenanceCfg.FormatFlag = config.formatFlag
+	config.maintenanceCfg.LogLevelFlag = logLevelFlag
 	return command
 }
 
@@ -344,6 +358,14 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 	if err := snapshotv1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := batchv1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
 		cancelFunc()
 		return nil, err
 	}
@@ -647,7 +669,7 @@ func (s *server) initRepoManager() error {
 	s.repoLocker = repository.NewRepoLocker()
 	s.repoEnsurer = repository.NewEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
 
-	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.credentialSecretStore, s.logger)
+	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.credentialSecretStore, s.config.maintenanceCfg, s.logger)
 
 	return nil
 }

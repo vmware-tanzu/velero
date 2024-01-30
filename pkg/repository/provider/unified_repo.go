@@ -29,6 +29,7 @@ import (
 	"github.com/kopia/kopia/repo"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -43,6 +44,7 @@ type unifiedRepoProvider struct {
 	workPath         string
 	repoService      udmrepo.BackupRepoService
 	repoBackend      string
+	cli              client.Client
 	log              logrus.FieldLogger
 }
 
@@ -73,11 +75,13 @@ const (
 func NewUnifiedRepoProvider(
 	credentialGetter credentials.CredentialGetter,
 	repoBackend string,
+	cli client.Client,
 	log logrus.FieldLogger,
 ) Provider {
 	repo := unifiedRepoProvider{
 		credentialGetter: credentialGetter,
 		repoBackend:      repoBackend,
+		cli:              cli,
 		log:              log,
 	}
 
