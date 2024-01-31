@@ -36,6 +36,10 @@ Even if the object store is accessible from the client side, today things like c
 ## High-Level Design
 One to two paragraphs that describe the high level changes that will be made to implement this proposal.
 
+### Potential approaches:
+One will be chosen before design is merged. The other will be moved to Alternatives Considered.
+
+#### Approach 1: [configure a Kubernetes API Aggregation Layer](https://kubernetes.io/docs/tasks/extend-kubernetes/configure-aggregation-layer/)
 We will [configure a Kubernetes API Aggregation Layer](https://kubernetes.io/docs/tasks/extend-kubernetes/configure-aggregation-layer/) to communicate with a new Velero extension apiserver in order to authenticate and authorize requests to download data from the Velero server.
 
 Velero extension apiserver will be a new component that will be deployed as part of the Velero server.
@@ -43,6 +47,30 @@ It will be a thin layer that will authenticate and authorize requests to downloa
 It will also be responsible for downloading data from the object store and streaming it back to the client.
 
 The Velero CLI will be updated to connect to the Velero extension apiserver to download data from the Velero server.
+
+#### Approach 2: Adding Ingress to Velero
+
+Ingress will be added to a Velero server that will accept requests to download data from storage locations.
+
+The current DownloadRequest CR status `downloadURL` will be updated to use the Ingress URL instead of the object store URL where available.
+
+Velero will be updated to download data from the object store and stream it back to the client.
+
+The Velero CLI will be updated to connect to the Ingress URL to download data serving from the Velero server.
+
+#### Comparison
+| Wanted Features | 1. API Aggregation Layer | 2. Ingress |
+| --- | --- | --- |
+| Support Multiple Velero in one cluster | ❌ | ✅ |
+| Support multiple storage locations | ✅ | ✅ |
+| K8S Style API | ✅ | ❌ |
+| Authentication Built-in| ✅ | ❌ has to parse [TokenReview](https://dev-k8sref-io.web.app/docs/authentication/tokenreview-v1/) and [SubjectAccessReview](https://dev-k8sref-io.web.app/docs/authorization/subjectaccessreview-v1/)|
+| Client works without resolvable DNS/IP if kubectl works | ✅ | ❌ could avoid with `kubectl port-forward`-like approach?|
+| Does not require ingress controller | ✅ | ❌ |
+| Does not require NodePort, ClusterIP, LoadBalancer | ✅ | ❌ |
+| Does not require apiserver [specific flags](https://kubernetes.io/docs/tasks/extend-kubernetes/configure-aggregation-layer/#enable-kubernetes-apiserver-flags) | ❌ | ✅ |
+
+
 
 ## Detailed Design
 <!-- A detailed design describing how the changes to the product should be made.
