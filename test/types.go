@@ -29,6 +29,18 @@ const StorageClassName = "e2e-storage-class"
 const StorageClassName2 = "e2e-storage-class-2"
 const CSIStorageClassName = "e2e-csi-storage-class"
 const FeatureCSI = "EnableCSI"
+const VanillaZFS = "vanilla-zfs"
+const Kind = "kind"
+const Azure = "azure"
+const AzureCSI = "azure-csi"
+const AwsCSI = "aws-csi"
+const Aws = "aws"
+const Gcp = "gcp"
+const Vsphere = "vsphere"
+
+var PublicCloudProviders = []string{Aws, Azure, Gcp, Vsphere}
+var LocalCloudProviders = []string{Kind, VanillaZFS}
+var CloudProviders = append(PublicCloudProviders, LocalCloudProviders...)
 
 var InstallVelero bool
 var UUIDgen uuid.UUID

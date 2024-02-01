@@ -74,18 +74,19 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 		veleroCfg.KibishiiDirectory = veleroCfg.KibishiiDirectory + backupRestoreTestConfig.kibishiiPatchSubDir
 		veleroCfg.UseVolumeSnapshots = useVolumeSnapshots
 		veleroCfg.UseNodeAgent = !useVolumeSnapshots
-		if veleroCfg.CloudProvider == "kind" {
+		if veleroCfg.CloudProvider == Kind {
 			Skip("Volume snapshots plugin and File System Backups are not supported on kind")
 			// on kind cluster snapshots are not supported since there is no velero snapshot plugin for kind volumes.
 			// and PodVolumeBackups are not supported because PVB creation gets skipped for hostpath volumes, which are the only
 			// volumes created on kind clusters using the default storage class and provisioner (provisioner: rancher.io/local-path)
 			// This test suite checks for volume snapshots and PVBs generated from FileSystemBackups, so skip it on kind clusters
 		}
+
 		// [SKIP]: Static provisioning for vSphere CSI driver works differently from other drivers.
 		//         For vSphere CSI, after you create a PV specifying an existing volume handle, CSI
 		//         syncer will need to register it with CNS. For other CSI drivers, static provisioning
 		//         usually does not go through storage system at all.  That's probably why it took longer
-		if backupRestoreTestConfig.isRetainPVTest && veleroCfg.CloudProvider == "vsphere" {
+		if backupRestoreTestConfig.isRetainPVTest && veleroCfg.CloudProvider == Vsphere {
 			Skip("Skip due to vSphere CSI driver long time issue of Static provisioning")
 		}
 		var err error

@@ -85,21 +85,30 @@ func DeleteNamespace(ctx context.Context, client TestClient, namespace string, w
 
 	var zero int64 = 0
 	policy := metav1.DeletePropagationForeground
-	if err := client.ClientGo.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{
-		GracePeriodSeconds: &zero,
-		PropagationPolicy:  &policy,
-	}); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
-	}
-	if !wait {
-		return nil
-	}
+
 	return waitutil.PollImmediateInfinite(5*time.Second,
 		func() (bool, error) {
-			if _, err := client.ClientGo.CoreV1().Namespaces().Get(tenMinuteTimeout, namespace, metav1.GetOptions{}); err != nil {
+			// Retry namespace deletion, see issue: https://github.com/kubernetes/kubernetes/issues/60807
+			if err := client.ClientGo.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{
+				GracePeriodSeconds: &zero,
+				PropagationPolicy:  &policy,
+			}); err != nil {
 				if apierrors.IsNotFound(err) {
 					return true, nil
+				} else {
+					fmt.Printf("Delete namespace %s err: %v", namespace, err)
+					return false, errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
 				}
+			}
+			if !wait {
+				return true, nil
+			}
+			ns, err := KubectlGetNS(tenMinuteTimeout, namespace)
+			if err != nil {
+				if len(ns) == 0 {
+					return true, nil
+				}
+				fmt.Printf("Get namespace %s err: %v", namespace, err)
 				return false, err
 			}
 			fmt.Printf("namespace %q is still being deleted...\n", namespace)

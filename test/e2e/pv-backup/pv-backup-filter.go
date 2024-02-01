@@ -12,6 +12,7 @@ import (
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -122,7 +123,7 @@ func (p *PVBackupFiltering) CreateResources() error {
 				for i, pod := range p.podsList[index] {
 					for j := range p.volumesList[i] {
 						Expect(CreateFileToPod(p.Ctx, ns, pod, pod, p.volumesList[i][j],
-							FILE_NAME, fileContent(ns, pod, p.volumesList[i][j]))).To(Succeed())
+							FILE_NAME, CreateFileContent(ns, pod, p.volumesList[i][j]))).To(Succeed())
 					}
 				}
 			})
@@ -173,9 +174,6 @@ func (p *PVBackupFiltering) Verify() error {
 
 	return nil
 }
-func fileContent(namespace, podName, volume string) string {
-	return fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, podName, volume)
-}
 
 func fileExist(ctx context.Context, namespace, podName, volume string) error {
 	c, _, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME)
@@ -184,7 +182,7 @@ func fileExist(ctx context.Context, namespace, podName, volume string) error {
 			FILE_NAME, volume, podName, namespace))
 	}
 	c = strings.Replace(c, "\n", "", -1)
-	origin_content := strings.Replace(fileContent(namespace, podName, volume), "\n", "", -1)
+	origin_content := strings.Replace(CreateFileContent(namespace, podName, volume), "\n", "", -1)
 	if c == origin_content {
 		return nil
 	} else {

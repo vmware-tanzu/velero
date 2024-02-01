@@ -34,8 +34,7 @@ func (p *PVCBuilder) Result() *corev1.PersistentVolumeClaim {
 }
 
 func NewPVC(ns, name string) *PVCBuilder {
-	oMeta := metav1.ObjectMeta{}
-	oMeta = metav1.ObjectMeta{Name: name, Namespace: ns}
+	oMeta := metav1.ObjectMeta{Name: name, Namespace: ns}
 	return &PVCBuilder{
 		&corev1.PersistentVolumeClaim{
 			ObjectMeta: oMeta,

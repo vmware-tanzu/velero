@@ -86,7 +86,7 @@ func TestFunc(test VeleroBackupRestoreTest) func() {
 			// TODO: Skip nodeport test until issue https://github.com/kubernetes/kubernetes/issues/114384 fixed
 			// TODO: Although this issue is closed, but it's not fixed.
 			// TODO: After bump up k8s version in AWS pipeline, this issue also apply for AWS pipeline.
-			if (veleroCfg.CloudProvider == "azure" || veleroCfg.CloudProvider == "aws") && strings.Contains(test.GetTestCase().CaseBaseName, "nodeport") {
+			if (veleroCfg.CloudProvider == Azure || veleroCfg.CloudProvider == Aws) && strings.Contains(test.GetTestCase().CaseBaseName, "nodeport") {
 				Skip("Skip due to issue https://github.com/kubernetes/kubernetes/issues/114384 on AKS")
 			}
 			if InstallVelero {
@@ -164,7 +164,7 @@ func (t *TestCase) Restore() error {
 	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
 	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
-	if t.UseVolumeSnapshots && veleroCfg.CloudProvider != "vsphere" {
+	if t.UseVolumeSnapshots && veleroCfg.CloudProvider != Vsphere {
 		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
 		time.Sleep(5 * time.Minute)
 	}

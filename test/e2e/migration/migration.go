@@ -60,8 +60,8 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 		veleroCfg = VeleroCfg
 		UUIDgen, err = uuid.NewRandom()
 		migrationNamespace = "migration-" + UUIDgen.String()
-		if useVolumeSnapshots && veleroCfg.CloudProvider == "kind" {
-			Skip("Volume snapshots not supported on kind")
+		if useVolumeSnapshots && veleroCfg.CloudProvider == Kind {
+			Skip(fmt.Sprintf("Volume snapshots not supported on %s", Kind))
 		}
 
 		if veleroCfg.DefaultClusterContext == "" && veleroCfg.StandbyClusterContext == "" {
@@ -235,7 +235,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			})
 
 			if useVolumeSnapshots {
-				if veleroCfg.CloudProvider == "vsphere" {
+				if veleroCfg.CloudProvider == Vsphere {
 					// TODO - remove after upload progress monitoring is implemented
 					By("Waiting for vSphere uploads to complete", func() {
 						Expect(WaitForVSphereUploadCompletion(context.Background(), time.Hour,
@@ -260,7 +260,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				}
 			}
 
-			if useVolumeSnapshots && veleroCfg.CloudProvider == "azure" &&
+			if useVolumeSnapshots && veleroCfg.CloudProvider == Azure &&
 				strings.EqualFold(veleroCfg.Features, FeatureCSI) &&
 				!OriginVeleroCfg.SnapshotMoveData {
 				By("Sleep 5 minutes to avoid snapshot recreated by unknown reason ", func() {
@@ -270,7 +270,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 			// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
 			// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
-			if veleroCfg.CloudProvider == "aws" && useVolumeSnapshots && !OriginVeleroCfg.SnapshotMoveData {
+			if veleroCfg.CloudProvider == Aws && useVolumeSnapshots && !OriginVeleroCfg.SnapshotMoveData {
 				fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
 				time.Sleep(5 * time.Minute)
 			}

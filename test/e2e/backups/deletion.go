@@ -54,8 +54,8 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 	veleroCfg.UseNodeAgent = !useVolumeSnapshots
 
 	BeforeEach(func() {
-		if useVolumeSnapshots && veleroCfg.CloudProvider == "kind" {
-			Skip("Volume snapshots not supported on kind")
+		if useVolumeSnapshots && veleroCfg.CloudProvider == Kind {
+			Skip(fmt.Sprintf("Volume snapshots not supported on %s", Kind))
 		}
 		var err error
 		flag.Parse()
@@ -134,7 +134,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 		})
 	})
 
-	if providerName == "vsphere" && useVolumeSnapshots {
+	if providerName == Vsphere && useVolumeSnapshots {
 		// Wait for uploads started by the Velero Plugin for vSphere to complete
 		// TODO - remove after upload progress monitoring is implemented
 		fmt.Println("Waiting for vSphere uploads to complete")

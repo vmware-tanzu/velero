@@ -176,6 +176,23 @@ func GetCRD(ctx context.Context, name string) ([]string, error) {
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
+func KubectlGetNS(ctx context.Context, name string) ([]string, error) {
+	cmds := []*common.OsCommandLine{}
+	cmd := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: []string{"get", "ns"},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "grep",
+		Args: []string{name},
+	}
+	cmds = append(cmds, cmd)
+
+	return common.GetListByCmdPipes(ctx, cmds)
+}
+
 func AddLabelToPv(ctx context.Context, pv, label string) error {
 	return exec.CommandContext(ctx, "kubectl", "label", "pv", pv, label).Run()
 }

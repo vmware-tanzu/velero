@@ -26,9 +26,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -45,12 +47,12 @@ func (v *BackupVolumeInfo) Init() error {
 	v.TestCase.Init()
 
 	BeforeEach(func() {
-		if v.VeleroCfg.CloudProvider == "vsphere" && (!strings.Contains(v.CaseBaseName, "fs-upload") && !strings.Contains(v.CaseBaseName, "skipped")) {
+		if v.VeleroCfg.CloudProvider == Vsphere && (!strings.Contains(v.CaseBaseName, "fs-upload") && !strings.Contains(v.CaseBaseName, "skipped")) {
 			fmt.Printf("Skip snapshot case %s for vsphere environment.\n", v.CaseBaseName)
 			Skip("Skip snapshot case due to vsphere environment doesn't cover the CSI test, and it doesn't have a Velero native snapshot plugin.")
 		}
 
-		if strings.Contains(v.VeleroCfg.Features, "EnableCSI") {
+		if strings.Contains(v.VeleroCfg.Features, FeatureCSI) {
 			if strings.Contains(v.CaseBaseName, "native-snapshot") {
 				fmt.Printf("Skip native snapshot case %s when the CSI feature is enabled.\n", v.CaseBaseName)
 				Skip("Skip native snapshot case due to CSI feature is enabled.")
@@ -111,20 +113,41 @@ func (v *BackupVolumeInfo) CreateResources() error {
 		// Install StorageClass
 		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s-csi.yaml", v.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install StorageClass")
 
-		pvc, err := CreatePVC(v.Client, createNSName, "volume-info", CSIStorageClassName, nil)
-		Expect(err).To(Succeed())
-		vols := CreateVolumes(pvc.Name, []string{"volume-info"})
-
-		//Create deployment
+		// Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", createNSName)
+		// Make sure PVC count is great than 3 to allow both empty volumes and file populated volumes exist per pod
+		pvcCount := 4
+		Expect(pvcCount > 3).To(Equal(true))
+
+		var vols []*v1.Volume
+		for i := 0; i <= pvcCount-1; i++ {
+			pvcName := fmt.Sprintf("volume-info-pvc-%d", i)
+			pvc, err := CreatePVC(v.Client, createNSName, pvcName, CSIStorageClassName, nil)
+			Expect(err).To(Succeed())
+			volumeName := fmt.Sprintf("volume-info-pv-%d", i)
+			vols = append(vols, CreateVolumes(pvc.Name, []string{volumeName})...)
+		}
 		deployment := NewDeployment(v.CaseBaseName, createNSName, 1, labels, nil).WithVolume(vols).Result()
-		deployment, err = CreateDeployment(v.Client.ClientGo, createNSName, deployment)
+		deployment, err := CreateDeployment(v.Client.ClientGo, createNSName, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", createNSName))
 		}
 		err = WaitForReadyDeployment(v.Client.ClientGo, createNSName, deployment.Name)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", createNSName))
+		}
+		podList, err := ListPods(v.Ctx, v.Client, createNSName)
+		Expect(err).To(Succeed(), fmt.Sprintf("failed to list pods in namespace: %q with error %v", createNSName, err))
+
+		for _, pod := range podList.Items {
+			for i := 0; i <= pvcCount-1; i++ {
+				// Hitting issue https://github.com/vmware-tanzu/velero/issues/7388
+				// So populate data only to some of pods, leave other pods empty to verify empty PV datamover
+				if i%2 == 0 {
+					Expect(CreateFileToPod(v.Ctx, createNSName, pod.Name, DefaultContainerName, vols[i].Name,
+						fmt.Sprintf("file-%s", pod.Name), CreateFileContent(createNSName, pod.Name, vols[i].Name))).To(Succeed())
+				}
+			}
 		}
 	}
 	return nil

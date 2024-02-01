@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/exp/slices"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -76,8 +77,8 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 		veleroCfg.CloudProvider = veleroCfg.StandbyClusterCloudProvider
 	}
 
-	if veleroCfg.CloudProvider != "kind" {
-		fmt.Println("For cloud platforms, object store plugin provider will be set as cloud provider")
+	if slices.Contains(PublicCloudProviders, veleroCfg.CloudProvider) {
+		fmt.Println("For public cloud platforms, object store plugin provider will be set as cloud provider")
 		// If ObjectStoreProvider is not provided, then using the value same as CloudProvider
 		if veleroCfg.ObjectStoreProvider == "" {
 			veleroCfg.ObjectStoreProvider = veleroCfg.CloudProvider
@@ -98,12 +99,12 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 	}
 
 	// TODO - handle this better
-	if veleroCfg.CloudProvider == "vsphere" {
+	if veleroCfg.CloudProvider == Vsphere {
 		// We overrider the ObjectStoreProvider here for vSphere because we want to use the aws plugin for the
 		// backup, but needed to pick up the provider plugins earlier.  vSphere plugin no longer needs a Volume
 		// Snapshot location specified
 		if veleroCfg.ObjectStoreProvider == "" {
-			veleroCfg.ObjectStoreProvider = "aws"
+			veleroCfg.ObjectStoreProvider = Aws
 		}
 		if err := configvSpherePlugin(veleroCfg); err != nil {
 			return errors.WithMessagef(err, "Failed to config vsphere plugin")
@@ -117,7 +118,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 
 	// For AWS IRSA credential test, AWS IAM service account is required, so if ServiceAccountName and EKSPolicyARN
 	// are both provided, we assume IRSA test is running, otherwise skip this IAM service account creation part.
-	if veleroCfg.CloudProvider == "aws" && veleroInstallOptions.ServiceAccountName != "" {
+	if veleroCfg.CloudProvider == Aws && veleroInstallOptions.ServiceAccountName != "" {
 		if veleroCfg.EKSPolicyARN == "" {
 			return errors.New("Please provide EKSPolicyARN for IRSA test.")
 		}
@@ -280,14 +281,16 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 
 	if len(options.Features) > 0 {
 		args = append(args, "--features", options.Features)
-		if !strings.EqualFold(cloudProvider, "vsphere") && strings.EqualFold(options.Features, FeatureCSI) && options.UseVolumeSnapshots {
-			fmt.Println("Start to install Azure VolumeSnapshotClass ...")
+		if !strings.EqualFold(cloudProvider, Vsphere) && strings.EqualFold(options.Features, FeatureCSI) && options.UseVolumeSnapshots {
+			// https://github.com/openebs/zfs-localpv/blob/develop/docs/snapshot.md
+			fmt.Printf("Start to install %s VolumeSnapshotClass ... \n", cloudProvider)
 			if err := KubectlApplyByFile(ctx, fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", cloudProvider)); err != nil {
 				fmt.Println("Fail to install VolumeSnapshotClass when CSI feature is enabled: ", err)
 				return err
 			}
 		}
 	}
+
 	if options.GarbageCollectionFrequency > 0 {
 		args = append(args, fmt.Sprintf("--garbage-collection-frequency=%v", options.GarbageCollectionFrequency))
 	}

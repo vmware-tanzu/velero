@@ -70,18 +70,18 @@ func ObjectsShouldNotBeInBucket(objectStoreProvider, cloudCredentialsFile, bslBu
 }
 
 // This function returns a storage interface based on the cloud provider for querying objects and snapshots
-// When cloudProvider is kind, pass in object storage provider instead. For example, "aws".
+// When cloudProvider is kind, pass in object storage provider instead. For example, AWS
 // Snapshots are not supported on kind.
 func getProvider(cloudProvider string) (ObjectsInStorage, error) {
 	var s ObjectsInStorage
 	switch cloudProvider {
-	case "aws", "vsphere":
+	case Aws, Vsphere:
 		aws := AWSStorage("")
 		s = &aws
-	case "gcp":
+	case Gcp:
 		gcs := GCSStorage("")
 		s = &gcs
-	case "azure":
+	case Azure:
 		az := AzureStorage("")
 		s = &az
 	default:
@@ -110,6 +110,7 @@ func IsObjectsInBucket(objectStoreProvider, cloudCredentialsFile, bslBucket, bsl
 func DeleteObjectsInBucket(objectStoreProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string) error {
 	bslPrefix = getFullPrefix(bslPrefix, subPrefix)
 	fmt.Printf("|| VERIFICATION || - Delete backup %s in storage %s\n", backupName, bslPrefix)
+
 	if cloudCredentialsFile == "" {
 		return errors.New(fmt.Sprintf("|| ERROR || - Please provide credential file of cloud %s \n", objectStoreProvider))
 	}
@@ -126,9 +127,15 @@ func DeleteObjectsInBucket(objectStoreProvider, cloudCredentialsFile, bslBucket,
 
 func SnapshotsShouldNotExistInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheckPoint SnapshotCheckPoint) error {
 	fmt.Printf("|| VERIFICATION || - Snapshots should not exist in cloud, backup %s\n", backupName)
+
+	if cloudProvider == VanillaZFS {
+		fmt.Printf("Skip snapshot check for cloud provider %s", cloudProvider)
+		return nil
+	}
 	if cloudCredentialsFile == "" {
 		return errors.New(fmt.Sprintf("|| ERROR || - Please provide credential file of cloud %s \n", cloudProvider))
 	}
+
 	snapshotCheckPoint.ExpectCount = 0
 	err := IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName, snapshotCheckPoint)
 	if err != nil {
@@ -140,24 +147,29 @@ func SnapshotsShouldNotExistInCloud(cloudProvider, cloudCredentialsFile, bslBuck
 
 func SnapshotsShouldBeCreatedInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheckPoint SnapshotCheckPoint) error {
 	fmt.Printf("|| VERIFICATION || - Snapshots should exist in cloud, backup %s\n", backupName)
+
+	if cloudProvider == VanillaZFS {
+		fmt.Printf("Skip snapshot check for cloud provider %s", cloudProvider)
+		return nil
+	}
 	if cloudCredentialsFile == "" {
 		return errors.New(fmt.Sprintf("|| ERROR || - Please provide credential file of cloud %s \n", cloudProvider))
 	}
+
 	err := IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName, snapshotCheckPoint)
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("|| UNEXPECTED ||Snapshots %s do not exist in cloud after backup as expected", backupName))
+		return errors.Wrapf(err, fmt.Sprintf("|| UNEXPECTED || - Snapshots %s do not exist in cloud after backup as expected", backupName))
 	}
-	fmt.Printf("|| EXPECTED || - Snapshots exist in cloud, backup %s\n", backupName)
+	fmt.Printf("|| EXPECTED || - Snapshots of backup %s exist in cloud %s\n", backupName, cloudProvider)
 	return nil
 }
 
 func IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheck SnapshotCheckPoint) error {
-
 	s, err := getProvider(cloudProvider)
 	if err != nil {
 		return errors.Wrapf(err, fmt.Sprintf("Cloud provider %s is not valid", cloudProvider))
 	}
-	if cloudProvider == "vsphere" {
+	if cloudProvider == Vsphere {
 		var retSnapshotIDs []string
 		ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*2)
 		defer ctxCancel()

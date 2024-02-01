@@ -33,8 +33,9 @@ import (
 const (
 	JobSelectorKey = "job"
 	// Poll is how often to Poll pods, nodes and claims.
-	PollInterval = 2 * time.Second
-	PollTimeout  = 15 * time.Minute
+	PollInterval         = 2 * time.Second
+	PollTimeout          = 15 * time.Minute
+	DefaultContainerName = "container-busybox"
 )
 
 // DeploymentBuilder builds Deployment objects.
@@ -51,7 +52,7 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string, co
 	if containers == nil {
 		containers = []v1.Container{
 			{
-				Name:    "container-busybox",
+				Name:    DefaultContainerName,
 				Image:   "gcr.io/velero-gcp/busybox:latest",
 				Command: []string{"sleep", "1000000"},
 				// Make pod obeys the restricted pod security standards.
