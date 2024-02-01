@@ -39,15 +39,15 @@ RUN go install golang.org/x/tools/cmd/goimports@11e9d9cc0042e6bd10337d4d2c3e5d92
 # get protoc compiler and golang plugin
 WORKDIR /root
 RUN apt-get update && apt-get install -y unzip
-RUN wget --quiet https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protoc-3.14.0-linux-x86_64.zip && \
-    unzip protoc-3.14.0-linux-x86_64.zip && \
+RUN wget --quiet https://github.com/protocolbuffers/protobuf/releases/download/v25.2/protoc-25.2-linux-x86_64.zip && \
+    unzip protoc-25.2-linux-x86_64.zip && \
     mv bin/protoc /usr/bin/protoc && \
     mv include/google /usr/include && \
     chmod a+x  /usr/include/google && \
     chmod a+x  /usr/include/google/protobuf && \
     chmod a+r -R /usr/include/google && \
     chmod +x /usr/bin/protoc
-RUN go install github.com/golang/protobuf/protoc-gen-go@v1.4.3
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.32.0
 
 # get goreleaser
 RUN wget --quiet https://github.com/goreleaser/goreleaser/releases/download/v1.15.2/goreleaser_Linux_x86_64.tar.gz && \
