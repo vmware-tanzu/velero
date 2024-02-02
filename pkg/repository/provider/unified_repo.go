@@ -505,7 +505,7 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 			}
 
 			s3URL = url.Host
-			disableTLS = (url.Scheme == "http")
+			disableTLS = url.Scheme == "http"
 		}
 
 		result[udmrepo.StoreOptionS3Endpoint] = strings.Trim(s3URL, "/")
