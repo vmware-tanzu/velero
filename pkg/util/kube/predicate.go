@@ -93,6 +93,25 @@ func NewUpdateEventPredicate(f func(client.Object, client.Object) bool) predicat
 	}
 }
 
+// NewCreateOrUpdateEventPredicate creates a new Predicate that checks the create or update events with the provided func
+// and ignore others
+func NewCreateOrUpdateEventPredicate(f func(client.Object, client.Object) bool) predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(event event.UpdateEvent) bool {
+			return f(event.ObjectOld, event.ObjectNew)
+		},
+		CreateFunc: func(event event.CreateEvent) bool {
+			return f(nil, event.Object)
+		},
+		DeleteFunc: func(event event.DeleteEvent) bool {
+			return false
+		},
+		GenericFunc: func(event event.GenericEvent) bool {
+			return false
+		},
+	}
+}
+
 // FalsePredicate always returns false for all kinds of events
 type FalsePredicate struct{}
 

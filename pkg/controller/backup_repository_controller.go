@@ -76,7 +76,7 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&velerov1api.BackupRepository{}).
 		Watches(s, nil).
 		Watches(&source.Kind{Type: &velerov1api.BackupStorageLocation{}}, kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
-			builder.WithPredicates(kube.NewUpdateEventPredicate(r.needInvalidBackupRepo))).
+			builder.WithPredicates(kube.NewCreateOrUpdateEventPredicate(r.needInvalidBackupRepo))).
 		Complete(r)
 }
 
@@ -90,13 +90,13 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(bslObj client.Object)
 		}).AsSelector(),
 	}
 	if err := r.List(context.TODO(), list, options); err != nil {
-		r.logger.WithField("BSL", bsl.Name).WithError(err).Error("unable to list BackupRepositorys")
+		r.logger.WithField("BSL", bsl.Name).WithError(err).Error("unable to list BackupRepositories")
 		return []reconcile.Request{}
 	}
 
 	for i := range list.Items {
 		r.logger.WithField("BSL", bsl.Name).Infof("Invalidating Backup Repository %s", list.Items[i].Name)
-		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change")); err != nil {
+		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change or create")); err != nil {
 			r.logger.WithField("BSL", bsl.Name).WithError(err).Errorf("fail to patch BackupRepository %s", list.Items[i].Name)
 		}
 	}
@@ -104,7 +104,16 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(bslObj client.Object)
 	return []reconcile.Request{}
 }
 
+// needInvalidBackupRepo returns true if the BSL's storage type, bucket, prefix, CACert, or config has changed or if BSL was created.
 func (r *BackupRepoReconciler) needInvalidBackupRepo(oldObj client.Object, newObj client.Object) bool {
+	if oldObj == nil {
+		// BSL was created because oldBSL is nil
+		// Return true so invalidateBackupReposForBSL is triggered
+		// BSL creationTimestamp should be newer than the BackupRepository's creationTimestamp if any.
+		// BSL was created after the BackupRepository, so we need to re-establish the BackupRepository on BSL creation.
+		return true
+	}
+
 	oldBSL := oldObj.(*velerov1api.BackupStorageLocation)
 	newBSL := newObj.(*velerov1api.BackupStorageLocation)
 
