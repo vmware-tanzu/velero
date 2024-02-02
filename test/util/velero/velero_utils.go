@@ -174,20 +174,27 @@ func getPluginsByVersion(version, cloudProvider, objectStoreProvider, feature st
 func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	plugins []string) (*cliinstall.Options, error) {
 
-	if veleroCfg.CloudCredentialsFile == "" {
+	if veleroCfg.CloudCredentialsFile == "" && veleroCfg.ServiceAccountNameToInstall == "" {
 		return nil, errors.Errorf("No credentials were supplied to use for E2E tests")
-	}
-
-	realPath, err := filepath.Abs(veleroCfg.CloudCredentialsFile)
-	if err != nil {
-		return nil, err
 	}
 
 	io := cliinstall.NewInstallOptions()
 	// always wait for velero and restic pods to be running.
 	io.Wait = true
 	io.ProviderName = veleroCfg.ObjectStoreProvider
-	io.SecretFile = veleroCfg.CloudCredentialsFile
+
+	if veleroCfg.CloudCredentialsFile != "" {
+		realPath, err := filepath.Abs(veleroCfg.CloudCredentialsFile)
+		if err != nil {
+			return nil, err
+		}
+		io.SecretFile = realPath
+	}
+
+	if veleroCfg.ServiceAccountNameToInstall != "" {
+		io.ServiceAccountName = veleroCfg.ServiceAccountNameToInstall
+		io.NoSecret = true
+	}
 
 	io.BucketName = veleroCfg.BSLBucket
 	io.Prefix = veleroCfg.BSLPrefix
@@ -197,11 +204,31 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	io.VolumeSnapshotConfig = flag.NewMap()
 	io.VolumeSnapshotConfig.Set(veleroCfg.VSLConfig)
 
-	io.SecretFile = realPath
 	io.Plugins = flag.NewStringArray(plugins...)
 	io.Features = veleroCfg.Features
 	io.DefaultVolumesToFsBackup = veleroCfg.DefaultVolumesToFsBackup
 	io.UseVolumeSnapshots = veleroCfg.UseVolumeSnapshots
+
+	if !veleroCfg.UseRestic {
+		io.UseNodeAgent = veleroCfg.UseNodeAgent
+	}
+	io.UseRestic = veleroCfg.UseRestic
+	io.Image = veleroCfg.VeleroImage
+	io.Namespace = veleroCfg.VeleroNamespace
+	io.UploaderType = veleroCfg.UploaderType
+	GCFrequency, _ := time.ParseDuration(veleroCfg.GCFrequency)
+	io.GarbageCollectionFrequency = GCFrequency
+	io.PodVolumeOperationTimeout = veleroCfg.PodVolumeOperationTimeout
+	io.NodeAgentPodCPULimit = veleroCfg.NodeAgentPodCPULimit
+	io.NodeAgentPodCPURequest = veleroCfg.NodeAgentPodCPURequest
+	io.NodeAgentPodMemLimit = veleroCfg.NodeAgentPodMemLimit
+	io.NodeAgentPodMemRequest = veleroCfg.NodeAgentPodMemRequest
+	io.VeleroPodCPULimit = veleroCfg.VeleroPodCPULimit
+	io.VeleroPodCPURequest = veleroCfg.VeleroPodCPURequest
+	io.VeleroPodMemLimit = veleroCfg.VeleroPodMemLimit
+	io.VeleroPodMemRequest = veleroCfg.VeleroPodMemRequest
+	io.DisableInformerCache = veleroCfg.DisableInformerCache
+
 	return io, nil
 }
 

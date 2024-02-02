@@ -71,11 +71,14 @@ type VeleroConfig struct {
 	KibishiiDirectory                 string
 	Debug                             bool
 	GCFrequency                       string
-	DefaultCluster                    string
-	StandbyCluster                    string
+	DefaultClusterContext             string
+	StandbyClusterContext             string
 	ClientToInstallVelero             *TestClient
 	DefaultClient                     *TestClient
 	StandbyClient                     *TestClient
+	ClusterToInstallVelero            string
+	DefaultClusterName                string
+	StandbyClusterName                string
 	ProvideSnapshotsVolumeParam       bool
 	VeleroServerDebugMode             bool
 	SnapshotMoveData                  bool
@@ -87,6 +90,11 @@ type VeleroConfig struct {
 	IsUpgradeTest                     bool
 	WithoutDisableInformerCacheParam  bool
 	DisableInformerCache              bool
+	CreateClusterRoleBinding          bool
+	DefaultCLSServiceAccountName      string
+	StandbyCLSServiceAccountName      string
+	ServiceAccountNameToInstall       string
+	EKSPolicyARN                      string
 }
 
 type VeleroCfgInPerf struct {
