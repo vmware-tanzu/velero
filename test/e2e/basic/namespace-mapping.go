@@ -70,7 +70,7 @@ func (n *NamespaceMapping) Init() error {
 		"create", "--namespace", n.VeleroCfg.VeleroNamespace, "backup", n.BackupName,
 		"--include-namespaces", strings.Join(*n.NSIncluded, ","), "--wait",
 	}
-	if VeleroCfg.CloudProvider == "kind" {
+	if n.VeleroCfg.CloudProvider == "kind" {
 		// don't test volume snapshotter or file system backup on kind
 		n.BackupArgs = append(n.BackupArgs, "--snapshot-volumes=false")
 		n.UseVolumeSnapshots = false

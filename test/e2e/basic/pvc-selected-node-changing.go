@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
@@ -55,12 +54,12 @@ func (p *PVCSelectedNodeChanging) Init() error {
 	p.pvcName = "pvc-1"
 	p.ann = "volume.kubernetes.io/selected-node"
 	p.BackupArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", p.BackupName,
+		"create", "--namespace", p.VeleroCfg.VeleroNamespace, "backup", p.BackupName,
 		"--include-namespaces", p.namespace,
 		"--snapshot-volumes=false", "--wait",
 	}
 	p.RestoreArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", p.RestoreName,
+		"create", "--namespace", p.VeleroCfg.VeleroNamespace, "restore", p.RestoreName,
 		"--from-backup", p.BackupName, "--namespace-mappings", fmt.Sprintf("%s:%s", p.namespace, p.mappedNS), "--wait",
 	}
 	return nil
@@ -78,7 +77,7 @@ func (p *PVCSelectedNodeChanging) CreateResources() error {
 	})
 
 	By(fmt.Sprintf("Create a storage class %s.", StorageClassName), func() {
-		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
+		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", p.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
 	})
 
 	By(fmt.Sprintf("Create pod %s in namespace %s", p.podName, p.namespace), func() {

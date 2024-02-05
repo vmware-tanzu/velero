@@ -23,11 +23,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	"github.com/pkg/errors"
-
-	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -64,13 +62,13 @@ func (e *ExcludeFromBackup) Init() error {
 	e.labelSelector = "velero.io/exclude-from-backup"
 
 	e.BackupArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
+		"create", "--namespace", e.VeleroCfg.VeleroNamespace, "backup", e.BackupName,
 		"--include-namespaces", e.CaseBaseName,
 		"--default-volumes-to-fs-backup", "--wait",
 	}
 
 	e.RestoreArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", e.RestoreName,
+		"create", "--namespace", e.VeleroCfg.VeleroNamespace, "restore", e.RestoreName,
 		"--from-backup", e.BackupName, "--wait",
 	}
 	return nil

@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -71,13 +70,13 @@ func (i *IncludeNamespaces) Init() error {
 			Text:      fmt.Sprintf("should backup %d namespaces of %d", i.namespacesIncluded, i.NamespacesTotal),
 		}
 		i.BackupArgs = []string{
-			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
+			"create", "--namespace", i.VeleroCfg.VeleroNamespace, "backup", i.BackupName,
 			"--include-namespaces", strings.Join(*i.NSIncluded, ","),
 			"--default-volumes-to-fs-backup", "--wait",
 		}
 
 		i.RestoreArgs = []string{
-			"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", i.RestoreName,
+			"create", "--namespace", i.VeleroCfg.VeleroNamespace, "restore", i.RestoreName,
 			"--from-backup", i.BackupName, "--wait",
 		}
 
@@ -90,13 +89,13 @@ func (i *IncludeNamespaces) Init() error {
 			Text:      fmt.Sprintf("should restore %d namespaces of %d", i.namespacesIncluded, i.NamespacesTotal),
 		}
 		i.BackupArgs = []string{
-			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
+			"create", "--namespace", i.VeleroCfg.VeleroNamespace, "backup", i.BackupName,
 			"--include-namespaces", strings.Join(*i.allTestNamespaces, ","),
 			"--default-volumes-to-fs-backup", "--wait",
 		}
 
 		i.RestoreArgs = []string{
-			"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", i.RestoreName,
+			"create", "--namespace", i.VeleroCfg.VeleroNamespace, "restore", i.RestoreName,
 			"--include-namespaces", strings.Join(*i.NSIncluded, ","),
 			"--from-backup", i.BackupName, "--wait",
 		}

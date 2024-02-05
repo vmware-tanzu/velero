@@ -105,7 +105,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 		if veleroCfg.ObjectStoreProvider == "" {
 			veleroCfg.ObjectStoreProvider = "aws"
 		}
-		if err := configvSpherePlugin(*veleroCfg.ClientToInstallVelero); err != nil {
+		if err := configvSpherePlugin(veleroCfg); err != nil {
 			return errors.WithMessagef(err, "Failed to config vsphere plugin")
 		}
 	}
@@ -162,34 +162,35 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 }
 
 // configvSpherePlugin refers to https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
-func configvSpherePlugin(cli TestClient) error {
+func configvSpherePlugin(veleroCfg *VeleroConfig) error {
+	cli := veleroCfg.ClientToInstallVelero
 	var err error
 	vsphereSecret := "velero-vsphere-config-secret"
 	configmaptName := "velero-vsphere-plugin-config"
-	if err := clearupvSpherePluginConfig(cli.ClientGo, VeleroCfg.VeleroNamespace, vsphereSecret, configmaptName); err != nil {
-		return errors.WithMessagef(err, "Failed to clear up vsphere plugin config %s namespace", VeleroCfg.VeleroNamespace)
+	if err := clearupvSpherePluginConfig(cli.ClientGo, veleroCfg.VeleroNamespace, vsphereSecret, configmaptName); err != nil {
+		return errors.WithMessagef(err, "Failed to clear up vsphere plugin config %s namespace", veleroCfg.VeleroNamespace)
 	}
-	if err := CreateNamespace(context.Background(), cli, VeleroCfg.VeleroNamespace); err != nil {
-		return errors.WithMessagef(err, "Failed to create Velero %s namespace", VeleroCfg.VeleroNamespace)
+	if err := CreateNamespace(context.Background(), *cli, veleroCfg.VeleroNamespace); err != nil {
+		return errors.WithMessagef(err, "Failed to create Velero %s namespace", veleroCfg.VeleroNamespace)
 	}
-	if err := createVCCredentialSecret(cli.ClientGo, VeleroCfg.VeleroNamespace); err != nil {
-		return errors.WithMessagef(err, "Failed to create virtual center credential secret in %s namespace", VeleroCfg.VeleroNamespace)
+	if err := createVCCredentialSecret(cli.ClientGo, veleroCfg.VeleroNamespace); err != nil {
+		return errors.WithMessagef(err, "Failed to create virtual center credential secret in %s namespace", veleroCfg.VeleroNamespace)
 	}
-	if err := WaitForSecretsComplete(cli.ClientGo, VeleroCfg.VeleroNamespace, vsphereSecret); err != nil {
+	if err := WaitForSecretsComplete(cli.ClientGo, veleroCfg.VeleroNamespace, vsphereSecret); err != nil {
 		return errors.Wrap(err, "Failed to ensure velero-vsphere-config-secret secret completion in namespace kube-system")
 	}
-	_, err = CreateConfigMap(cli.ClientGo, VeleroCfg.VeleroNamespace, configmaptName, map[string]string{
+	_, err = CreateConfigMap(cli.ClientGo, veleroCfg.VeleroNamespace, configmaptName, map[string]string{
 		"cluster_flavor":           "VANILLA",
 		"vsphere_secret_name":      vsphereSecret,
-		"vsphere_secret_namespace": VeleroCfg.VeleroNamespace,
+		"vsphere_secret_namespace": veleroCfg.VeleroNamespace,
 	}, nil)
 	if err != nil {
-		return errors.WithMessagef(err, "Failed to create velero-vsphere-plugin-config configmap in %s namespace", VeleroCfg.VeleroNamespace)
+		return errors.WithMessagef(err, "Failed to create velero-vsphere-plugin-config configmap in %s namespace", veleroCfg.VeleroNamespace)
 	}
-	fmt.Println("configvSpherePlugin: WaitForConfigMapComplete")
-	err = WaitForConfigMapComplete(cli.ClientGo, VeleroCfg.VeleroNamespace, configmaptName)
+
+	err = WaitForConfigMapComplete(cli.ClientGo, veleroCfg.VeleroNamespace, configmaptName)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Failed to ensure configmap %s completion in namespace: %s", configmaptName, VeleroCfg.VeleroNamespace))
+		return errors.Wrap(err, fmt.Sprintf("Failed to ensure configmap %s completion in namespace: %s", configmaptName, veleroCfg.VeleroNamespace))
 	}
 	return nil
 }
@@ -559,7 +560,9 @@ func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) e
 	return nil
 }
 
-func IsVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) (bool, error) {
+func IsVeleroReady(ctx context.Context, veleroCfg *VeleroConfig) (bool, error) {
+	namespace := veleroCfg.VeleroNamespace
+	useNodeAgent := veleroCfg.UseNodeAgent
 	if useNodeAgent {
 		stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "daemonset/node-agent",
 			"-o", "json", "-n", namespace))
@@ -594,14 +597,14 @@ func IsVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) (bo
 	stdout, stderr, err = velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "bsl", "default",
 		"-o", "json", "-n", namespace))
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to get bsl %s stdout=%s, stderr=%s", VeleroCfg.BSLBucket, stdout, stderr)
+		return false, errors.Wrapf(err, "failed to get bsl %s stdout=%s, stderr=%s", veleroCfg.BSLBucket, stdout, stderr)
 	} else {
 		bsl := &velerov1api.BackupStorageLocation{}
 		if err = json.Unmarshal([]byte(stdout), bsl); err != nil {
 			return false, errors.Wrapf(err, "failed to unmarshal the velero bsl")
 		}
 		if bsl.Status.Phase != velerov1api.BackupStorageLocationPhaseAvailable {
-			return false, fmt.Errorf("current bsl %s is not available", VeleroCfg.BSLBucket)
+			return false, fmt.Errorf("current bsl %s is not available", veleroCfg.BSLBucket)
 		}
 	}
 
@@ -609,7 +612,7 @@ func IsVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) (bo
 }
 
 func PrepareVelero(ctx context.Context, caseName string, veleroCfg VeleroConfig) error {
-	ready, err := IsVeleroReady(context.Background(), veleroCfg.VeleroNamespace, veleroCfg.UseNodeAgent)
+	ready, err := IsVeleroReady(context.Background(), &veleroCfg)
 	if err != nil {
 		fmt.Printf("error in checking velero status with %v", err)
 		ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)

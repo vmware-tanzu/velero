@@ -69,7 +69,7 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 	AfterEach(func() {
 		if !veleroCfg.Debug {
 			By("Clean backups after test", func() {
-				DeleteAllBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
+				DeleteAllBackups(context.Background(), &veleroCfg)
 			})
 		}
 	})
@@ -157,7 +157,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
 	}
-	err = DeleteBackupResource(context.Background(), veleroCLI, backupName)
+	err = DeleteBackupResource(context.Background(), backupName, &veleroCfg)
 	if err != nil {
 		return err
 	}
@@ -207,7 +207,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 		return err
 	}
 
-	err = DeleteBackupResource(context.Background(), veleroCLI, backupName)
+	err = DeleteBackupResource(context.Background(), backupName, &veleroCfg)
 	if err != nil {
 		return errors.Wrapf(err, "|| UNEXPECTED || - Failed to delete backup %q", backupName)
 	} else {

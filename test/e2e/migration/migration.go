@@ -305,8 +305,8 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			})
 
 			By(fmt.Sprintf("Waiting for backups sync to Velero in cluster-B (%s)", veleroCfg.StandbyClusterContext), func() {
-				Expect(WaitForBackupToBeCreated(context.Background(), veleroCfg.VeleroCLI, backupName, 5*time.Minute)).To(Succeed())
-				Expect(WaitForBackupToBeCreated(context.Background(), veleroCfg.VeleroCLI, backupScName, 5*time.Minute)).To(Succeed())
+				Expect(WaitForBackupToBeCreated(context.Background(), backupName, 5*time.Minute, &veleroCfg)).To(Succeed())
+				Expect(WaitForBackupToBeCreated(context.Background(), backupScName, 5*time.Minute, &veleroCfg)).To(Succeed())
 			})
 
 			By(fmt.Sprintf("Restore %s", migrationNamespace), func() {
@@ -346,7 +346,8 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 
 			// TODO: delete backup created by case self, not all
 			By("Clean backups after test", func() {
-				DeleteBackups(context.Background(), *veleroCfg.DefaultClient, backupNames)
+				veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
+				DeleteBackups(context.Background(), backupNames, &veleroCfg)
 			})
 		})
 	})

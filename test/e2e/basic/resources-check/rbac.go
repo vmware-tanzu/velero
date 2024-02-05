@@ -56,6 +56,9 @@ func (r *RBACCase) Init() error {
 	r.RestoreName = "restore-" + r.CaseBaseName
 	r.NamespacesTotal = 1
 	r.NSIncluded = &[]string{}
+	r.VeleroCfg = VeleroCfg
+	r.Client = *r.VeleroCfg.ClientToInstallVelero
+
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
 		*r.NSIncluded = append(*r.NSIncluded, createNSName)
@@ -66,17 +69,15 @@ func (r *RBACCase) Init() error {
 		FailedMSG: "Failed to successfully backup and restore RBAC",
 	}
 	r.BackupArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", r.BackupName,
+		"create", "--namespace", r.VeleroCfg.VeleroNamespace, "backup", r.BackupName,
 		"--include-namespaces", strings.Join(*r.NSIncluded, ","),
 		"--default-volumes-to-fs-backup", "--wait",
 	}
-
 	r.RestoreArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", r.RestoreName,
+		"create", "--namespace", r.VeleroCfg.VeleroNamespace, "restore", r.RestoreName,
 		"--from-backup", r.BackupName, "--wait",
 	}
-	r.VeleroCfg = VeleroCfg
-	r.Client = *r.VeleroCfg.ClientToInstallVelero
+
 	return nil
 }
 

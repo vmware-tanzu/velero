@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -81,27 +80,27 @@ func (e *ExcludeNamespaces) Init() error {
 	}
 	if e.IsTestInBackup {
 		e.BackupArgs = []string{
-			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
+			"create", "--namespace", e.VeleroCfg.VeleroNamespace, "backup", e.BackupName,
 			"--exclude-namespaces", strings.Join(*e.nsExcluded, ","),
 			"--include-namespaces", strings.Join(*e.NSIncluded, ","),
 			"--default-volumes-to-fs-backup", "--wait",
 		}
 
 		e.RestoreArgs = []string{
-			"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", e.RestoreName,
+			"create", "--namespace", e.VeleroCfg.VeleroNamespace, "restore", e.RestoreName,
 			"--from-backup", e.BackupName, "--wait",
 		}
 
 	} else {
 		*e.NSIncluded = append(*e.NSIncluded, *e.nsExcluded...)
 		e.BackupArgs = []string{
-			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", e.BackupName,
+			"create", "--namespace", e.VeleroCfg.VeleroNamespace, "backup", e.BackupName,
 			"--include-namespaces", strings.Join(*e.NSIncluded, ","),
 			"--default-volumes-to-fs-backup", "--wait",
 		}
 
 		e.RestoreArgs = []string{
-			"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", e.RestoreName,
+			"create", "--namespace", e.VeleroCfg.VeleroNamespace, "restore", e.RestoreName,
 			"--exclude-namespaces", strings.Join(*e.nsExcluded, ","),
 			"--from-backup", e.BackupName, "--wait",
 		}

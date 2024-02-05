@@ -26,7 +26,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -62,14 +61,14 @@ func (l *LabelSelector) Init() error {
 	}
 	l.labelSelector = "resourcefiltering"
 	l.BackupArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", l.BackupName,
+		"create", "--namespace", l.VeleroCfg.VeleroNamespace, "backup", l.BackupName,
 		"--selector", "resourcefiltering=true",
 		"--include-namespaces", strings.Join(*l.NSIncluded, ","),
 		"--default-volumes-to-fs-backup", "--wait",
 	}
 
 	l.RestoreArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", l.RestoreName,
+		"create", "--namespace", l.VeleroCfg.VeleroNamespace, "restore", l.RestoreName,
 		"--from-backup", l.BackupName, "--wait",
 	}
 	return nil

@@ -91,8 +91,8 @@ func (n *ScheduleBackupCreation) Backup() error {
 			now := time.Now().Minute()
 			triggerNow := now % n.Period
 			if triggerNow == 0 {
-				Expect(VeleroScheduleCreate(n.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, n.ScheduleName, n.ScheduleArgs)).To(Succeed(), func() string {
-					RunDebug(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, "", "")
+				Expect(VeleroScheduleCreate(n.Ctx, n.VeleroCfg.VeleroCLI, n.VeleroCfg.VeleroNamespace, n.ScheduleName, n.ScheduleArgs)).To(Succeed(), func() string {
+					RunDebug(context.Background(), n.VeleroCfg.VeleroCLI, n.VeleroCfg.VeleroNamespace, "", "")
 					return "Fail to create schedule"
 				})
 				break
@@ -110,7 +110,7 @@ func (n *ScheduleBackupCreation) Backup() error {
 			mi, _ := time.ParseDuration("60s")
 			time.Sleep(n.podSleepDuration + mi)
 			bMap := make(map[string]string)
-			backupsInfo, err := GetScheduledBackupsCreationTime(n.Ctx, VeleroCfg.VeleroCLI, "default", n.ScheduleName)
+			backupsInfo, err := GetScheduledBackupsCreationTime(n.Ctx, n.VeleroCfg.VeleroCLI, "default", n.ScheduleName)
 			Expect(err).To(Succeed())
 			Expect(len(backupsInfo) == i).To(Equal(true))
 			for index, bi := range backupsInfo {
