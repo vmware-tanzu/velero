@@ -252,6 +252,7 @@ func dataUploadBuilder() *builder.DataUploadBuilder {
 type fakeSnapshotExposer struct {
 	kubeClient kbclient.Client
 	clock      clock.WithTickerAndDelayedExecution
+	peekErr    error
 }
 
 func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param interface{}) error {
@@ -281,6 +282,10 @@ func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1.ObjectRe
 		return nil, err
 	}
 	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, VolumeName: dataUploadName}}, nil
+}
+
+func (f *fakeSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1.ObjectReference) error {
+	return f.peekErr
 }
 
 func (f *fakeSnapshotExposer) CleanUp(context.Context, corev1.ObjectReference, string, string) {
@@ -330,6 +335,7 @@ func TestReconcile(t *testing.T) {
 		expectedRequeue     ctrl.Result
 		expectedErrMsg      string
 		needErrs            []bool
+		peekErr             error
 	}{
 		{
 			name:              "Dataupload is not initialized",
@@ -421,6 +427,13 @@ func TestReconcile(t *testing.T) {
 			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
 		},
 		{
+			name:              "peek error",
+			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).Result(),
+			peekErr:           errors.New("fake-peek-error"),
+			expectedProcessed: true,
+			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseCanceled).Result(),
+		},
+		{
 			name: "Dataupload with enabled cancel",
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
 			du: func() *velerov2alpha1api.DataUpload {
@@ -486,7 +499,7 @@ func TestReconcile(t *testing.T) {
 			}
 
 			if test.du.Spec.SnapshotType == fakeSnapshotType {
-				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{fakeSnapshotType: &fakeSnapshotExposer{r.client, r.Clock}}
+				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{fakeSnapshotType: &fakeSnapshotExposer{r.client, r.Clock, test.peekErr}}
 			} else if test.du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
 				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
 			}
@@ -866,7 +879,7 @@ func TestTryCancelDataUpload(t *testing.T) {
 		err = r.client.Create(ctx, test.dd)
 		require.NoError(t, err)
 
-		r.TryCancelDataUpload(ctx, test.dd)
+		r.TryCancelDataUpload(ctx, test.dd, "")
 
 		if test.expectedErr == "" {
 			assert.NoError(t, err)

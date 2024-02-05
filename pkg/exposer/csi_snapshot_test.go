@@ -621,3 +621,100 @@ func TestGetExpose(t *testing.T) {
 		})
 	}
 }
+
+func TestPeekExpose(t *testing.T) {
+	backup := &velerov1.Backup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: velerov1.SchemeGroupVersion.String(),
+			Kind:       "Backup",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			UID:       "fake-uid",
+		},
+	}
+
+	backupPodUrecoverable := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: backup.Namespace,
+			Name:      backup.Name,
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:    corev1.PodScheduled,
+					Reason:  "Unschedulable",
+					Message: "unrecoverable",
+				},
+			},
+		},
+	}
+
+	backupPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: backup.Namespace,
+			Name:      backup.Name,
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	corev1.AddToScheme(scheme)
+
+	tests := []struct {
+		name          string
+		kubeClientObj []runtime.Object
+		ownerBackup   *velerov1.Backup
+		err           string
+	}{
+		{
+			name:        "backup pod is not found",
+			ownerBackup: backup,
+		},
+		{
+			name:        "pod is unrecoverable",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				backupPodUrecoverable,
+			},
+			err: "Pod is unschedulable: unrecoverable",
+		},
+		{
+			name:        "succeed",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				backupPod,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			exposer := csiSnapshotExposer{
+				kubeClient: fakeKubeClient,
+				log:        velerotest.NewLogger(),
+			}
+
+			var ownerObject corev1.ObjectReference
+			if test.ownerBackup != nil {
+				ownerObject = corev1.ObjectReference{
+					Kind:       test.ownerBackup.Kind,
+					Namespace:  test.ownerBackup.Namespace,
+					Name:       test.ownerBackup.Name,
+					UID:        test.ownerBackup.UID,
+					APIVersion: test.ownerBackup.APIVersion,
+				}
+			}
+
+			err := exposer.PeekExposed(context.Background(), ownerObject)
+			if test.err == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, test.err)
+			}
+		})
+	}
+}

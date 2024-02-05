@@ -259,6 +259,30 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.
 	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, VolumeName: volumeName}}, nil
 }
 
+func (e *csiSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1.ObjectReference) error {
+	backupPodName := ownerObject.Name
+
+	curLog := e.log.WithFields(logrus.Fields{
+		"owner": ownerObject.Name,
+	})
+
+	pod, err := e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(ctx, backupPodName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+
+	if err != nil {
+		curLog.WithError(err).Warnf("error to peek backup pod %s", backupPodName)
+		return nil
+	}
+
+	if podFailed, message := kube.IsPodUnrecoverable(pod, curLog); podFailed {
+		return errors.New(message)
+	}
+
+	return nil
+}
+
 func (e *csiSnapshotExposer) CleanUp(ctx context.Context, ownerObject corev1.ObjectReference, vsName string, sourceNamespace string) {
 	backupPodName := ownerObject.Name
 	backupPVCName := ownerObject.Name

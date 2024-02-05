@@ -228,7 +228,10 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			// we don't want to update CR into cancel status forcely as it may conflict with CR update in Expose action
 			// we could retry when the CR requeue in periodcally
 			log.Debugf("Data upload is been canceled %s in Phase %s", du.GetName(), du.Status.Phase)
-			r.TryCancelDataUpload(ctx, du)
+			r.TryCancelDataUpload(ctx, du, "")
+		} else if peekErr := ep.PeekExposed(ctx, getOwnerObject(du)); peekErr != nil {
+			r.TryCancelDataUpload(ctx, du, fmt.Sprintf("found a dataupload %s/%s with expose error: %s. mark it as cancel", du.Namespace, du.Name, peekErr))
+			log.Errorf("Cancel du %s/%s because of expose error %s", du.Namespace, du.Name, peekErr)
 		} else if du.Status.StartTimestamp != nil {
 			if time.Since(du.Status.StartTimestamp.Time) >= r.preparingTimeout {
 				r.onPrepareTimeout(ctx, du)
@@ -444,7 +447,7 @@ func (r *DataUploadReconciler) OnDataUploadCancelled(ctx context.Context, namesp
 }
 
 // TryCancelDataUpload clear up resources only when update success
-func (r *DataUploadReconciler) TryCancelDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload) {
+func (r *DataUploadReconciler) TryCancelDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload, message string) {
 	log := r.logger.WithField("dataupload", du.Name)
 	log.Warn("Async fs backup data path canceled")
 	succeeded, err := r.exclusiveUpdateDataUpload(ctx, du, func(dataUpload *velerov2alpha1api.DataUpload) {
@@ -453,6 +456,7 @@ func (r *DataUploadReconciler) TryCancelDataUpload(ctx context.Context, du *vele
 			dataUpload.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		}
 		dataUpload.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
+		dataUpload.Status.Message = message
 	})
 
 	if err != nil {
