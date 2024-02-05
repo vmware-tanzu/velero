@@ -69,7 +69,7 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 	AfterEach(func() {
 		if !veleroCfg.Debug {
 			By("Clean backups after test", func() {
-				DeleteAllBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
+				DeleteAllBackups(context.Background(), &veleroCfg)
 			})
 		}
 	})
@@ -86,6 +86,9 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 // runUpgradeTests runs upgrade test on the provider by kibishii.
 func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupName, backupLocation string,
 	useVolumeSnapshots bool, kibishiiDirectory string) error {
+	if useVolumeSnapshots && veleroCfg.CloudProvider == "kind" {
+		Skip("Volume snapshots not supported on kind")
+	}
 	oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
 	defer ctxCancel()
 	veleroCLI := veleroCfg.VeleroCLI
@@ -111,7 +114,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 		registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", deletionTest)
 	}
-	err := ObjectsShouldNotBeInBucket(veleroCfg.CloudProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLPrefix, veleroCfg.BSLConfig, backupName, BackupObjectsPrefix, 1)
+	err := ObjectsShouldNotBeInBucket(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLPrefix, veleroCfg.BSLConfig, backupName, BackupObjectsPrefix, 1)
 	if err != nil {
 		return err
 	}
@@ -139,7 +142,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 			return errors.Wrapf(err, "Error waiting for uploads to complete")
 		}
 	}
-	err = ObjectsShouldBeInBucket(veleroCfg.CloudProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix)
+	err = ObjectsShouldBeInBucket(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix)
 	if err != nil {
 		return err
 	}
@@ -154,7 +157,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
 	}
-	err = DeleteBackupResource(context.Background(), veleroCLI, backupName)
+	err = DeleteBackupResource(context.Background(), backupName, &veleroCfg)
 	if err != nil {
 		return err
 	}
@@ -167,7 +170,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 		}
 	}
 
-	err = ObjectsShouldNotBeInBucket(veleroCfg.CloudProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix, 5)
+	err = ObjectsShouldNotBeInBucket(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix, 5)
 	if err != nil {
 		return err
 	}
@@ -194,17 +197,17 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 		})
 	})
 
-	err = DeleteObjectsInBucket(veleroCfg.CloudProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix)
+	err = DeleteObjectsInBucket(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix)
 	if err != nil {
 		return err
 	}
 
-	err = ObjectsShouldNotBeInBucket(veleroCfg.CloudProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix, 1)
+	err = ObjectsShouldNotBeInBucket(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix, 1)
 	if err != nil {
 		return err
 	}
 
-	err = DeleteBackupResource(context.Background(), veleroCLI, backupName)
+	err = DeleteBackupResource(context.Background(), backupName, &veleroCfg)
 	if err != nil {
 		return errors.Wrapf(err, "|| UNEXPECTED || - Failed to delete backup %q", backupName)
 	} else {

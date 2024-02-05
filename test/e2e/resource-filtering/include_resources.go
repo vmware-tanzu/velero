@@ -24,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -60,13 +59,13 @@ func (i *IncludeResources) Init() error {
 		i.BackupName = "backup-" + i.CaseBaseName
 		i.RestoreName = "restore-" + i.UUIDgen
 		i.BackupArgs = []string{
-			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
+			"create", "--namespace", i.VeleroCfg.VeleroNamespace, "backup", i.BackupName,
 			"--include-resources", "deployments,configmaps",
 			"--default-volumes-to-fs-backup", "--wait",
 		}
 
 		i.RestoreArgs = []string{
-			"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", i.RestoreName,
+			"create", "--namespace", i.VeleroCfg.VeleroNamespace, "restore", i.RestoreName,
 			"--from-backup", i.BackupName, "--wait",
 		}
 	} else { // testing case restore with include-resources option
@@ -78,12 +77,12 @@ func (i *IncludeResources) Init() error {
 		i.BackupName = "backup-" + i.UUIDgen
 		i.RestoreName = "restore-" + i.CaseBaseName
 		i.BackupArgs = []string{
-			"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", i.BackupName,
+			"create", "--namespace", i.VeleroCfg.VeleroNamespace, "backup", i.BackupName,
 			"--include-namespaces", strings.Join(*i.NSIncluded, ","),
 			"--default-volumes-to-fs-backup", "--wait",
 		}
 		i.RestoreArgs = []string{
-			"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", i.RestoreName,
+			"create", "--namespace", i.VeleroCfg.VeleroNamespace, "restore", i.RestoreName,
 			"--include-resources", "deployments,configmaps",
 			"--from-backup", i.BackupName, "--wait",
 		}

@@ -53,13 +53,13 @@ func (n *NSAnnotationCase) Init() error {
 		FailedMSG: "Failed to successfully backup and restore multiple namespaces",
 	}
 	n.BackupArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", n.BackupName,
+		"create", "--namespace", n.VeleroCfg.VeleroNamespace, "backup", n.BackupName,
 		"--include-namespaces", strings.Join(*n.NSIncluded, ","),
 		"--default-volumes-to-fs-backup", "--wait",
 	}
 
 	n.RestoreArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", n.RestoreName,
+		"create", "--namespace", n.VeleroCfg.VeleroNamespace, "restore", n.RestoreName,
 		"--from-backup", n.BackupName, "--wait",
 	}
 	return nil

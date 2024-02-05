@@ -74,8 +74,12 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 		veleroCfg.KibishiiDirectory = veleroCfg.KibishiiDirectory + backupRestoreTestConfig.kibishiiPatchSubDir
 		veleroCfg.UseVolumeSnapshots = useVolumeSnapshots
 		veleroCfg.UseNodeAgent = !useVolumeSnapshots
-		if useVolumeSnapshots && veleroCfg.CloudProvider == "kind" {
-			Skip("Volume snapshots not supported on kind")
+		if veleroCfg.CloudProvider == "kind" {
+			Skip("Volume snapshots plugin and File System Backups are not supported on kind")
+			// on kind cluster snapshots are not supported since there is no velero snapshot plugin for kind volumes.
+			// and PodVolumeBackups are not supported because PVB creation gets skipped for hostpath volumes, which are the only
+			// volumes created on kind clusters using the default storage class and provisioner (provisioner: rancher.io/local-path)
+			// This test suite checks for volume snapshots and PVBs generated from FileSystemBackups, so skip it on kind clusters
 		}
 		// [SKIP]: Static provisioning for vSphere CSI driver works differently from other drivers.
 		//         For vSphere CSI, after you create a PV specifying an existing volume handle, CSI
@@ -95,7 +99,7 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 	AfterEach(func() {
 		if !veleroCfg.Debug {
 			By("Clean backups after test", func() {
-				DeleteAllBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
+				DeleteAllBackups(context.Background(), &veleroCfg)
 				if backupRestoreTestConfig.isRetainPVTest {
 					CleanAllRetainedPV(context.Background(), *veleroCfg.ClientToInstallVelero)
 				}

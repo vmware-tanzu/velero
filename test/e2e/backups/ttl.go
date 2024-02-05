@@ -77,7 +77,7 @@ func TTLTest() {
 		veleroCfg.GCFrequency = ""
 		if !veleroCfg.Debug {
 			By("Clean backups after test", func() {
-				DeleteAllBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
+				DeleteAllBackups(context.Background(), &veleroCfg)
 			})
 			ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer ctxCancel()
@@ -155,7 +155,7 @@ func TTLTest() {
 		})
 
 		By("Associated Restores should be created", func() {
-			Expect(ObjectsShouldBeInBucket(veleroCfg.CloudProvider,
+			Expect(ObjectsShouldBeInBucket(veleroCfg.ObjectStoreProvider,
 				veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
 				veleroCfg.BSLPrefix, veleroCfg.BSLConfig, test.restoreName,
 				RestoreObjectsPrefix)).NotTo(HaveOccurred(), "Fail to get restore object")
@@ -175,11 +175,11 @@ func TTLTest() {
 		})
 
 		By("Check if backups are deleted by GC", func() {
-			Expect(WaitBackupDeleted(ctx, veleroCfg.VeleroCLI, test.backupName, time.Minute*10)).To(Succeed(), fmt.Sprintf("Backup %s was not deleted by GC", test.backupName))
+			Expect(WaitBackupDeleted(ctx, test.backupName, time.Minute*10, &veleroCfg)).To(Succeed(), fmt.Sprintf("Backup %s was not deleted by GC", test.backupName))
 		})
 
 		By("Backup file from cloud object storage should be deleted", func() {
-			Expect(ObjectsShouldNotBeInBucket(veleroCfg.CloudProvider,
+			Expect(ObjectsShouldNotBeInBucket(veleroCfg.ObjectStoreProvider,
 				veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
 				veleroCfg.BSLPrefix, veleroCfg.BSLConfig, test.backupName,
 				BackupObjectsPrefix, 5)).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
@@ -194,7 +194,7 @@ func TTLTest() {
 		})
 
 		By("Associated Restores should be deleted", func() {
-			Expect(ObjectsShouldNotBeInBucket(veleroCfg.CloudProvider,
+			Expect(ObjectsShouldNotBeInBucket(veleroCfg.ObjectStoreProvider,
 				veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
 				veleroCfg.BSLPrefix, veleroCfg.BSLConfig, test.restoreName,
 				RestoreObjectsPrefix, 5)).NotTo(HaveOccurred(), "Fail to get restore object")
