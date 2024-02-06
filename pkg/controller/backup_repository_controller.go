@@ -76,7 +76,11 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&velerov1api.BackupRepository{}).
 		Watches(s, nil).
 		Watches(&source.Kind{Type: &velerov1api.BackupStorageLocation{}}, kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
-			builder.WithPredicates(kube.NewCreateOrUpdateEventPredicate(r.needInvalidBackupRepo))).
+			builder.WithPredicates(
+				// When BSL updates, check if the backup repositories need to be invalidated
+				kube.NewUpdateEventPredicate(r.needInvalidBackupRepo),
+				// When BSL is created, invalidate any backup repositories that reference it
+				kube.NewCreateEventPredicate(func(client.Object) bool { return true }))).
 		Complete(r)
 }
 
@@ -104,16 +108,8 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(bslObj client.Object)
 	return []reconcile.Request{}
 }
 
-// needInvalidBackupRepo returns true if the BSL's storage type, bucket, prefix, CACert, or config has changed or if BSL was created.
+// needInvalidBackupRepo returns true if the BSL's storage type, bucket, prefix, CACert, or config has changed
 func (r *BackupRepoReconciler) needInvalidBackupRepo(oldObj client.Object, newObj client.Object) bool {
-	if oldObj == nil {
-		// BSL was created because oldBSL is nil
-		// Return true so invalidateBackupReposForBSL is triggered
-		// BSL creationTimestamp should be newer than the BackupRepository's creationTimestamp if any.
-		// BSL was created after the BackupRepository, so we need to re-establish the BackupRepository on BSL creation.
-		return true
-	}
-
 	oldBSL := oldObj.(*velerov1api.BackupStorageLocation)
 	newBSL := newObj.(*velerov1api.BackupStorageLocation)
 
