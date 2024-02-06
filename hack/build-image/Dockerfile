@@ -53,6 +53,8 @@ RUN ARCH=$(go env GOARCH) && \
         ARCH="s390_64"; \
     elif [ "$ARCH" = "arm64" ] ; then \
         ARCH="aarch_64"; \
+    elif [ "$ARCH" = "ppc64le" ] ; then \
+        ARCH="ppcle_64"; \
     elif [ "$ARCH" = "ppc64" ] ; then \
         ARCH="ppcle_64"; \
     else \
@@ -82,6 +84,8 @@ RUN ARCH=$(go env GOARCH) && \
         ARCH="x86_64"; \
     elif [ "$ARCH" = "386" ] ; then \
         ARCH="i386"; \
+    elif [ "$ARCH" = "ppc64le" ] ; then \
+        ARCH="ppc64"; \
     fi && \
     wget --quiet "https://github.com/goreleaser/goreleaser/releases/download/v1.15.2/goreleaser_Linux_$ARCH.tar.gz" && \
     tar xvf goreleaser_Linux_$ARCH.tar.gz; \
