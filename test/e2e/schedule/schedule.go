@@ -10,7 +10,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
@@ -33,8 +32,6 @@ func (n *ScheduleBackup) Init() error {
 	n.NSIncluded = &[]string{n.CaseBaseName}
 	n.ScheduleName = "schedule-" + n.CaseBaseName
 	n.RestoreName = "restore-" + n.CaseBaseName
-	n.VeleroCfg = VeleroCfg
-	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	n.Period = 3      // Unit is minute
 	n.verifyTimes = 5 // More larger verify times more confidence we have
 	n.TestMsg = &TestMSG{

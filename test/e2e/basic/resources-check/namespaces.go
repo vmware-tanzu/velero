@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -42,9 +41,6 @@ func (m *MultiNSBackup) Init() error {
 	m.CaseBaseName = "nstest-" + m.UUIDgen
 	m.BackupName = "backup-" + m.CaseBaseName
 	m.RestoreName = "restore-" + m.CaseBaseName
-
-	m.VeleroCfg = VeleroCfg
-	m.Client = *m.VeleroCfg.ClientToInstallVelero
 	m.NSExcluded = &[]string{}
 
 	if m.IsScalTest {

@@ -30,7 +30,6 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
@@ -51,8 +50,6 @@ func (o *OrderedResources) Init() error {
 	o.CaseBaseName = "ordered-resources-" + o.UUIDgen
 	o.ScheduleName = "schedule-" + o.CaseBaseName
 	o.Namespace = o.CaseBaseName + "-" + o.UUIDgen
-	o.VeleroCfg = VeleroCfg
-	o.Client = *o.VeleroCfg.ClientToInstallVelero
 	o.OrderMap = map[string]string{
 		"deployments": fmt.Sprintf("deploy-%s", o.CaseBaseName),
 		"secrets":     fmt.Sprintf("secret-%s", o.CaseBaseName),

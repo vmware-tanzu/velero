@@ -10,7 +10,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
@@ -37,9 +36,7 @@ func (n *ScheduleBackupCreation) Init() error {
 	n.TestCase.Init()
 	n.CaseBaseName = "schedule-backup-creation-test" + n.UUIDgen
 	n.ScheduleName = "schedule-" + n.CaseBaseName
-	n.namespace = n.CaseBaseName
-	n.VeleroCfg = VeleroCfg
-	n.Client = *n.VeleroCfg.ClientToInstallVelero
+	n.namespace = n.GetTestCase().CaseBaseName
 	n.Period = 3      // Unit is minute
 	n.verifyTimes = 5 // More larger verify times more confidence we have
 	podSleepDurationStr := "300s"

@@ -35,8 +35,6 @@ func (p *PVBackupFiltering) Init() error {
 	p.CaseBaseName = "pv-filter-" + p.UUIDgen
 	p.BackupName = "backup-" + p.CaseBaseName + p.id
 	p.RestoreName = "restore-" + p.CaseBaseName + p.id
-	p.VeleroCfg = VeleroCfg
-	p.Client = *p.VeleroCfg.ClientToInstallVelero
 	p.VeleroCfg.UseVolumeSnapshots = false
 	p.VeleroCfg.UseNodeAgent = true
 	p.NSIncluded = &[]string{fmt.Sprintf("%s-%s-%d", p.CaseBaseName, p.id, 1), fmt.Sprintf("%s-%s-%d", p.CaseBaseName, p.id, 2)}

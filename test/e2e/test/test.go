@@ -125,6 +125,8 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 func (t *TestCase) Init() error {
 	t.Ctx, t.CtxCancel = context.WithTimeout(context.Background(), 1*time.Hour)
 	t.UUIDgen = t.GenerateUUID()
+	t.VeleroCfg = VeleroCfg
+	t.Client = *t.VeleroCfg.ClientToInstallVelero
 	return nil
 }
 

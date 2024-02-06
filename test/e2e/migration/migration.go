@@ -295,7 +295,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				veleroCfg.UseRestic = false
 				if veleroCfg.SnapshotMoveData {
 					veleroCfg.UseNodeAgent = true
-					// For SnapshotMoveData pipelines, we should use standby clustr setting for Velero installation
+					// For SnapshotMoveData pipelines, we should use standby cluster setting for Velero installation
 					// In nightly CI, StandbyClusterPlugins is set properly if pipeline is for SnapshotMoveData.
 					veleroCfg.Plugins = veleroCfg.StandbyClusterPlugins
 					veleroCfg.ObjectStoreProvider = veleroCfg.StandbyClusterObjectStoreProvider

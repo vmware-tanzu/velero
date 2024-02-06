@@ -37,8 +37,6 @@ func (p *PVCSelectedNodeChanging) Init() error {
 	p.CaseBaseName = "psnc-" + p.UUIDgen
 	p.namespace = p.CaseBaseName
 	p.mappedNS = p.namespace + "-mapped"
-	p.VeleroCfg = VeleroCfg
-	p.Client = *p.VeleroCfg.ClientToInstallVelero
 	p.TestMsg = &TestMSG{
 		Desc:      "Changing PVC node selector",
 		FailedMSG: "Failed to changing PVC node selector",

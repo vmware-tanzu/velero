@@ -41,8 +41,6 @@ func (s *StorageClasssChanging) Init() error {
 	s.BackupName = "backup-" + s.CaseBaseName
 	s.RestoreName = "restore-" + s.CaseBaseName
 	s.mappedNS = s.namespace + "-mapped"
-	s.VeleroCfg = VeleroCfg
-	s.Client = *s.VeleroCfg.ClientToInstallVelero
 	s.TestMsg = &TestMSG{
 		Desc:      "Changing PV/PVC Storage Classes",
 		FailedMSG: "Failed to changing PV/PVC Storage Classes",

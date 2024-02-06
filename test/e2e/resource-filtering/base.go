@@ -24,7 +24,6 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -46,8 +45,6 @@ func (f *FilteringCase) Init() error {
 	f.replica = int32(2)
 	f.labels = map[string]string{"resourcefiltering": "true"}
 	f.labelSelector = "resourcefiltering"
-	f.VeleroCfg = VeleroCfg
-	f.Client = *f.VeleroCfg.ClientToInstallVelero
 	f.NamespacesTotal = 3
 	f.BackupArgs = []string{
 		"create", "--namespace", f.VeleroCfg.VeleroNamespace, "backup", f.BackupName,
