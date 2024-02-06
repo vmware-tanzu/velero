@@ -39,13 +39,27 @@ RUN go install golang.org/x/tools/cmd/goimports@11e9d9cc0042e6bd10337d4d2c3e5d92
 # get protoc compiler and golang plugin
 WORKDIR /root
 RUN apt-get update && apt-get install -y unzip
-RUN if [ "$(go env GOARCH)" = "arm64" ] ; then \
-        wget --quiet https://github.com/protocolbuffers/protobuf/releases/download/v25.2/protoc-25.2-linux-aarch_64.zip && \
-        unzip protoc-25.2-linux-aarch_64.zip; \
+# protobuf uses bazel cpunames except following
+#   if cpu == "systemz":
+#   cpu = "s390_64"
+#   elif cpu == "aarch64":
+#   cpu = "aarch_64"
+#   elif cpu == "ppc64":
+#   cpu = "ppcle_64"
+# snippet from: https://github.com/protocolbuffers/protobuf/blob/d445953603e66eb8992a39b4e10fcafec8501f24/protobuf_release.bzl#L18-L24
+# cpu names: https://github.com/bazelbuild/platforms/blob/main/cpu/BUILD
+RUN ARCH=$(go env GOARCH) && \
+    if [ "$ARCH" = "s390x" ] ; then \
+        ARCH="s390_64"; \
+    elif [ "$ARCH" = "arm64" ] ; then \
+        ARCH="aarch_64"; \
+    elif [ "$ARCH" = "ppc64" ] ; then \
+        ARCH="ppcle_64"; \
     else \
-        wget --quiet https://github.com/protocolbuffers/protobuf/releases/download/v25.2/protoc-25.2-linux-x86_64.zip && \
-        unzip protoc-25.2-linux-x86_64.zip; \
-    fi && \
+        ARCH=$(uname -m); \
+    fi && echo "ARCH=$ARCH" && \
+    wget --quiet https://github.com/protocolbuffers/protobuf/releases/download/v25.2/protoc-25.2-linux-$ARCH.zip && \
+    unzip protoc-25.2-linux-$ARCH.zip; \
     rm *.zip && \
     mv bin/protoc /usr/bin/protoc && \
     mv include/google /usr/include && \
@@ -56,13 +70,21 @@ RUN if [ "$(go env GOARCH)" = "arm64" ] ; then \
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.32.0
 
 # get goreleaser
-RUN if [ "$(go env GOARCH)" = "arm64" ] ; then \
-        wget --quiet "https://github.com/goreleaser/goreleaser/releases/download/v1.15.2/goreleaser_Linux_arm64.tar.gz" && \
-        tar xvf goreleaser_Linux_arm64.tar.gz; \
-    else \
-        wget --quiet "https://github.com/goreleaser/goreleaser/releases/download/v1.15.2/goreleaser_Linux_x86_64.tar.gz" && \
-        tar xvf goreleaser_Linux_x86_64.tar.gz; \
+# goreleaser name template per arch is basically goarch except for amd64 and 386 https://github.com/goreleaser/goreleaser/blob/ec8819a95c5527fae65e5cb41673f5bbc3245fda/.goreleaser.yaml#L167C1-L173C42
+#   {{- .ProjectName }}_
+#   {{- title .Os }}_
+#   {{- if eq .Arch "amd64" }}x86_64
+#   {{- else if eq .Arch "386" }}i386
+#   {{- else }}{{ .Arch }}{{ end }}
+#   {{- if .Arm }}v{{ .Arm }}{{ end -}}
+RUN ARCH=$(go env GOARCH) && \
+    if [ "$ARCH" = "amd64" ] ; then \
+        ARCH="x86_64"; \
+    elif [ "$ARCH" = "386" ] ; then \
+        ARCH="i386"; \
     fi && \
+    wget --quiet "https://github.com/goreleaser/goreleaser/releases/download/v1.15.2/goreleaser_Linux_$ARCH.tar.gz" && \
+    tar xvf goreleaser_Linux_$ARCH.tar.gz; \
     mv goreleaser /usr/bin/goreleaser && \
     chmod +x /usr/bin/goreleaser
 
