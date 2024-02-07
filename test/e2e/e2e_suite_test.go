@@ -92,7 +92,7 @@ func init() {
 	flag.StringVar(&VeleroCfg.DataMoverPlugin, "data-mover-plugin", "", "customized plugin for data mover.")
 	flag.StringVar(&VeleroCfg.StandbyClusterCloudProvider, "standby-cluster-cloud-provider", "", "cloud provider for standby cluster.")
 	flag.StringVar(&VeleroCfg.StandbyClusterPlugins, "standby-cluster-plugins", "", "plugins provider for standby cluster.")
-	flag.StringVar(&VeleroCfg.StandbyClusterOjbectStoreProvider, "standby-cluster-object-store-provider", "", "object store provider for standby cluster.")
+	flag.StringVar(&VeleroCfg.StandbyClusterObjectStoreProvider, "standby-cluster-object-store-provider", "", "object store provider for standby cluster.")
 	flag.BoolVar(&VeleroCfg.DebugVeleroPodRestart, "debug-velero-pod-restart", false, "a switch for debugging velero pod restart.")
 	flag.BoolVar(&VeleroCfg.DisableInformerCache, "disable-informer-cache", false, "a switch for disable informer cache.")
 	flag.StringVar(&VeleroCfg.DefaultClusterName, "default-cluster-name", "", "default cluster's name in kube config file, it's for EKS IRSA test.")
@@ -103,8 +103,8 @@ func init() {
 
 }
 
-var _ = Describe("[APIGroup][APIVersion] Velero tests with various CRD API group versions", APIGropuVersionsTest)
-var _ = Describe("[APIGroup][APIExtensions] CRD of apiextentions v1beta1 should be B/R successfully from cluster(k8s version < 1.22) to cluster(k8s version >= 1.22)", APIExtensionsVersionsTest)
+var _ = Describe("[APIGroup][APIVersion][SKIP_KIND] Velero tests with various CRD API group versions", APIGropuVersionsTest)
+var _ = Describe("[APIGroup][APIExtensions][SKIP_KIND] CRD of apiextentions v1beta1 should be B/R successfully from cluster(k8s version < 1.22) to cluster(k8s version >= 1.22)", APIExtensionsVersionsTest)
 
 // Test backup and restore of Kibishi using restic
 var _ = Describe("[Basic][Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupRestoreWithRestic)
@@ -134,18 +134,18 @@ var _ = Describe("[ResourceFiltering][IncludeNamespaces][Restore] Velero test on
 var _ = Describe("[ResourceFiltering][IncludeResources][Backup] Velero test on include resources from the cluster backup", BackupWithIncludeResources)
 var _ = Describe("[ResourceFiltering][IncludeResources][Restore] Velero test on include resources from the cluster restore", RestoreWithIncludeResources)
 var _ = Describe("[ResourceFiltering][LabelSelector] Velero test on backup include resources matching the label selector", BackupWithLabelSelector)
-var _ = Describe("[ResourceFiltering][ResourcePolicies] Velero test on skip backup of volume by resource policies", ResourcePoliciesTest)
+var _ = Describe("[ResourceFiltering][ResourcePolicies][Restic] Velero test on skip backup of volume by resource policies", ResourcePoliciesTest)
 
 var _ = Describe("[ResourceModifier][Restore] Velero test on resource modifiers from the cluster restore", ResourceModifiersTest)
 
 var _ = Describe("[Backups][Deletion][Restic] Velero tests of Restic backup deletion", BackupDeletionWithRestic)
 var _ = Describe("[Backups][Deletion][Snapshot] Velero tests of snapshot backup deletion", BackupDeletionWithSnapshots)
-var _ = Describe("[Backups][TTL][LongTime] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", TTLTest)
+var _ = Describe("[Backups][TTL][LongTime][Snapshot] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", TTLTest)
 var _ = Describe("[Backups][BackupsSync] Backups in object storage are synced to a new Velero and deleted backups in object storage are synced to be deleted in Velero", BackupsSyncTest)
 
 var _ = Describe("[Schedule][BR][Pause][LongTime] Backup will be created periodly by schedule defined by a Cron expression", ScheduleBackupTest)
-var _ = Describe("[Schedule][OrederedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
-var _ = Describe("[Schedule][BackupCreation] Schedule controller wouldn't create a new backup when it still has pending or InProgress backup", ScheduleBackupCreationTest)
+var _ = Describe("[Schedule][OrderedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
+var _ = Describe("[Schedule][BackupCreation][SKIP_KIND] Schedule controller wouldn't create a new backup when it still has pending or InProgress backup", ScheduleBackupCreationTest)
 
 var _ = Describe("[PrivilegesMgmt][SSR] Velero test on ssr object when controller namespace mix-ups", SSRTest)
 
@@ -165,7 +165,7 @@ var _ = Describe("[pv-backup][Opt-Out] Backup resources should follow the specif
 
 var _ = Describe("[Basic][Nodeport] Service nodeport reservation during restore is configurable", NodePortTest)
 var _ = Describe("[Basic][StorageClass] Storage class of persistent volumes and persistent volume claims can be changed during restores", StorageClasssChangingTest)
-var _ = Describe("[Basic][SelectedNode] Node selectors of persistent volume claims can be changed during restores", PVCSelectedNodeChangingTest)
+var _ = Describe("[Basic][SelectedNode][SKIP_KIND] Node selectors of persistent volume claims can be changed during restores", PVCSelectedNodeChangingTest)
 
 func GetKubeconfigContext() error {
 	var err error
@@ -204,6 +204,18 @@ func TestE2e(t *testing.T) {
 	// 2. E2E tests require a Kubernetes cluster to install and run velero which further requires more configuration. See above referenced command line flags.
 	if testing.Short() {
 		t.Skip("Skipping E2E tests")
+	}
+
+	if VeleroCfg.CloudProvider != "kind" {
+		fmt.Println("For cloud platforms, object store plugin provider will be set as cloud provider")
+		// If ObjectStoreProvider is not provided, then using the value same as CloudProvider
+		if VeleroCfg.ObjectStoreProvider == "" {
+			VeleroCfg.ObjectStoreProvider = VeleroCfg.CloudProvider
+		}
+	} else {
+		if VeleroCfg.ObjectStoreProvider == "" {
+			t.Error(errors.New("No object store provider specified - must be specified when using kind as the cloud provider")) // Must have an object store provider
+		}
 	}
 
 	var err error

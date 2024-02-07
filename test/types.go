@@ -85,7 +85,7 @@ type VeleroConfig struct {
 	DataMoverPlugin                   string
 	StandbyClusterCloudProvider       string
 	StandbyClusterPlugins             string
-	StandbyClusterOjbectStoreProvider string
+	StandbyClusterObjectStoreProvider string
 	DebugVeleroPodRestart             bool
 	IsUpgradeTest                     bool
 	WithoutDisableInformerCacheParam  bool
