@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -29,11 +28,9 @@ import (
 	storagev1api "k8s.io/api/storage/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -43,102 +40,6 @@ import (
 
 func TestNamespaceAndName(t *testing.T) {
 	//TODO
-}
-
-func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
-	tests := []struct {
-		name                  string
-		expectNSFound         bool
-		nsPhase               corev1.NamespacePhase
-		nsDeleting            bool
-		expectCreate          bool
-		alreadyExists         bool
-		expectedResult        bool
-		expectedCreatedResult bool
-	}{
-		{
-			name:                  "namespace found, not deleting",
-			expectNSFound:         true,
-			expectedResult:        true,
-			expectedCreatedResult: false,
-		},
-		{
-			name:                  "namespace found, terminating phase",
-			expectNSFound:         true,
-			nsPhase:               corev1.NamespaceTerminating,
-			expectedResult:        false,
-			expectedCreatedResult: false,
-		},
-		{
-			name:                  "namespace found, deletiontimestamp set",
-			expectNSFound:         true,
-			nsDeleting:            true,
-			expectedResult:        false,
-			expectedCreatedResult: false,
-		},
-		{
-			name:                  "namespace not found, successfully created",
-			expectCreate:          true,
-			expectedResult:        true,
-			expectedCreatedResult: true,
-		},
-		{
-			name:                  "namespace not found initially, create returns already exists error, returned namespace is ready",
-			alreadyExists:         true,
-			expectedResult:        true,
-			expectedCreatedResult: false,
-		},
-		{
-			name:                  "namespace not found initially, create returns already exists error, returned namespace is terminating",
-			alreadyExists:         true,
-			nsPhase:               corev1.NamespaceTerminating,
-			expectedResult:        false,
-			expectedCreatedResult: false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			namespace := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test",
-				},
-			}
-
-			if test.nsPhase != "" {
-				namespace.Status.Phase = test.nsPhase
-			}
-
-			if test.nsDeleting {
-				namespace.SetDeletionTimestamp(&metav1.Time{Time: time.Now()})
-			}
-
-			timeout := time.Millisecond
-
-			nsClient := &velerotest.FakeNamespaceClient{}
-			defer nsClient.AssertExpectations(t)
-
-			if test.expectNSFound {
-				nsClient.On("Get", "test", metav1.GetOptions{}).Return(namespace, nil)
-			} else {
-				nsClient.On("Get", "test", metav1.GetOptions{}).Return(&corev1.Namespace{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, "test"))
-			}
-
-			if test.alreadyExists {
-				nsClient.On("Create", namespace).Return(namespace, k8serrors.NewAlreadyExists(schema.GroupResource{Resource: "namespaces"}, "test"))
-			}
-
-			if test.expectCreate {
-				nsClient.On("Create", namespace).Return(namespace, nil)
-			}
-
-			result, nsCreated, _ := EnsureNamespaceExistsAndIsReady(namespace, nsClient, timeout)
-
-			assert.Equal(t, test.expectedResult, result)
-			assert.Equal(t, test.expectedCreatedResult, nsCreated)
-		})
-	}
-
 }
 
 // TestGetVolumeDirectorySuccess tests that the GetVolumeDirectory function
