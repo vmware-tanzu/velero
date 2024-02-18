@@ -159,7 +159,7 @@ type BackupSpec struct {
 	CSISnapshotTimeout metav1.Duration `json:"csiSnapshotTimeout,omitempty"`
 
 	// ItemOperationTimeout specifies the time used to wait for asynchronous BackupItemAction operations
-	// The default value is 1 hour.
+	// The default value is 4 hour.
 	// +optional
 	ItemOperationTimeout metav1.Duration `json:"itemOperationTimeout,omitempty"`
 	// ResourcePolicy specifies the referenced resource policies that backup should follow

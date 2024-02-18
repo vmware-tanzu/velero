@@ -66,11 +66,11 @@ the object-store-provider to be specified.
 1. `-features`: Comma-separated list of features to enable for this Velero process.
 1. `-registry-credential-file`: File containing credential for the image registry, follows the same format rules as the ~/.docker/config.json file. This credential will be loaded in Velero server pod to help on Docker Hub rate limit issue.
 1. `-kibishii-directory`: The file directory or URL path to install Kibishii. It's configurable in case the default path is not accessible for your own test environment.
-1. `-debug-e2e-test`: A Switch for enable or disable test data cleaning action.
+1. `-debug-e2e-test`: <true/false> A Switch for enable or disable test data cleaning action.
 1. `-garbage-collection-frequency`: frequency of garbage collection. It is a parameter for Velero installation. Optional.
 1. `-velero-server-debug-mode`: A switch for enable or disable having debug log of Velero server.
-1. `-default-cluster`: Default (source) cluster's kube config context, it's for migration test.
-1. `-standby-cluster`: Standby (destination) cluster's kube config context, it's for migration test.
+1. `-default-cluster-context`: Default (source) cluster's kube config context, it's for migration test.
+1. `-standby-cluster-context`: Standby (destination) cluster's kube config context, it's for migration test.
 1. `-uploader-type`: Type of uploader for persistent volume backup.
 1. `-snapshot-move-data`: A Switch for taking backup with Velero's data mover, if data-mover-plugin is not provided, using built-in plugin.
 1. `-data-mover-plugin`: Customized plugin for data mover.
@@ -101,7 +101,7 @@ Below is a mapping between `make` variables to E2E configuration flags.
 1. `VELERO_NAMESPACE `: the `-velero-namespace`. Optional.
 1. `PLUGINS `: the `-plugins`. Optional.
 1. `BSL_PREFIX`: `-prefix`. Optional.
-1. `BSL_CONFIG`: `-bsl-config`. Optional.
+1. `BSL_CONFIG`: `-bsl-config`. Optional. Example: BSL_CONFIG="region=us-east-1". May be required for some object store provider
 1. `VSL_CONFIG`: `-vsl-config`. Optional.
 1. `UPGRADE_FROM_VELERO_CLI `: `-upgrade-from-velero-cli`. Optional.
 1. `UPGRADE_FROM_VELERO_VERSION `: `-upgrade-from-velero-version`. Optional.
@@ -118,8 +118,8 @@ Below is a mapping between `make` variables to E2E configuration flags.
 1. `KIBISHII_DIRECTORY`: `-kibishii-directory`. Optional.
 1. `DEBUG_E2E_TEST`: `-debug-e2e-test`. Optional.
 1. `VELERO_SERVER_DEBUG_MODE`: `-velero-server-debug-mode`. Optional.
-1. `DEFAULT_CLUSTER`: `-default-cluster`. Optional.
-1. `STANDBY_CLUSTER`: `-standby-cluster`. Optional.
+1. `DEFAULT_CLUSTER`: `-default-cluster-context`. Optional.
+1. `STANDBY_CLUSTER`: `-standby-cluster-context`. Optional.
 1. `UPLOADER_TYPE`: `-uploader-type`. Optional.
 1. `SNAPSHOT_MOVE_DATA`: `-snapshot-move-data`. Optional.
 1. `DATA_MOVER_plugin`: `-data-mover-plugin`. Optional.
@@ -136,8 +136,17 @@ Below is a mapping between `make` variables to E2E configuration flags.
 Basic examples:
 
 1. Run Velero tests in a kind cluster with AWS (or Minio) as the storage provider:
+    
+    Start kind cluster
+    ```bash
+    kind create cluster
+    ```
     ```bash
     BSL_PREFIX=<PREFIX_UNDER_BUCKET> BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> CREDS_FILE=/path/to/aws-creds CLOUD_PROVIDER=kind OBJECT_STORE_PROVIDER=aws make test-e2e
+    ```
+    Stop kind cluster
+    ```bash
+    kind delete cluster
     ```
 1. Run Velero tests in an AWS cluster:
     ```bash
@@ -304,3 +313,7 @@ It will reduce the frequency of velero installation by installing and checking V
 
 ### Tips
 Look for the ⛵ emoji printed at the end of each install and uninstall log. There should not be two install/unintall in a row, and there should be tests between an install and an uninstall. 
+
+#### Troubleshooting
+
+If velero log shows `level=error msg="Failed to get bucket region, bucket: xbucket, error: operation error S3: HeadBucket, failed to resolve service endpoint, endpoint rule error, A region must be set when sending requests to S3." backup-storage-location=velero/default cmd=/plugins/velero-plugin-for-aws controller=backup-storage-location logSource="/go/src/velero-plugin-for-aws/velero-plugin-for-aws/object_store.go:136" pluginName=velero-plugin-for-aws`, it means you need to set `BSL_CONFIG` to include `region=<region>`.

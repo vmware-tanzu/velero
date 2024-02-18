@@ -148,13 +148,13 @@ func BackupsSyncTest() {
 		})
 
 		By(fmt.Sprintf("Delete %s backup files in object store", test.backupName), func() {
-			err = DeleteObjectsInBucket(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
+			err = DeleteObjectsInBucket(VeleroCfg.ObjectStoreProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
 				VeleroCfg.BSLPrefix, VeleroCfg.BSLConfig, test.backupName, BackupObjectsPrefix)
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to delete object in bucket %s with err %v", test.backupName, err))
 		})
 
 		By(fmt.Sprintf("Check %s backup files in object store is deleted", test.backupName), func() {
-			err = ObjectsShouldNotBeInBucket(VeleroCfg.CloudProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
+			err = ObjectsShouldNotBeInBucket(VeleroCfg.ObjectStoreProvider, VeleroCfg.CloudCredentialsFile, VeleroCfg.BSLBucket,
 				VeleroCfg.BSLPrefix, VeleroCfg.BSLConfig, test.backupName, BackupObjectsPrefix, 1)
 			Expect(err).To(Succeed(), fmt.Sprintf("Failed to delete object in bucket %s with err %v", test.backupName, err))
 		})

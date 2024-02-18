@@ -1,1 +1,0 @@
-Fix issue #6693, partially fail restore if CSI snapshot is involved but CSI feature is not ready, i.e., CSI feature gate is not enabled or CSI plugin is not installed.

@@ -45,7 +45,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic/dynamicinformer"
-	"k8s.io/client-go/informers"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -309,8 +308,6 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		resourceTerminatingTimeout:     kr.resourceTerminatingTimeout,
 		resourceTimeout:                kr.resourceTimeout,
 		resourceClients:                make(map[resourceClientKey]client.Dynamic),
-		dynamicInformerFactories:       make(map[string]*informerFactoryWithContext),
-		resourceInformers:              make(map[resourceClientKey]informers.GenericInformer),
 		restoredItems:                  req.RestoredItems,
 		renamedPVs:                     make(map[string]string),
 		pvRenamer:                      kr.pvRenamer,
@@ -362,8 +359,7 @@ type restoreContext struct {
 	resourceTerminatingTimeout     time.Duration
 	resourceTimeout                time.Duration
 	resourceClients                map[resourceClientKey]client.Dynamic
-	dynamicInformerFactories       map[string]*informerFactoryWithContext
-	resourceInformers              map[resourceClientKey]informers.GenericInformer
+	dynamicInformerFactory         *informerFactoryWithContext
 	restoredItems                  map[itemKey]restoredItemStatus
 	renamedPVs                     map[string]string
 	pvRenamer                      func(string) (string, error)
@@ -447,11 +443,16 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 
 	// Need to stop all informers if enabled
 	if !ctx.disableInformerCache {
+		context, cancel := signal.NotifyContext(go_context.Background(), os.Interrupt)
+		ctx.dynamicInformerFactory = &informerFactoryWithContext{
+			factory: ctx.dynamicFactory.DynamicSharedInformerFactory(),
+			context: context,
+			cancel:  cancel,
+		}
+
 		defer func() {
 			// Call the cancel func to close the channel for each started informer
-			for _, factory := range ctx.dynamicInformerFactories {
-				factory.cancel()
-			}
+			ctx.dynamicInformerFactory.cancel()
 			// After upgrading to client-go 0.27 or newer, also call Shutdown for each informer factory
 		}()
 	}
@@ -579,28 +580,29 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 
 	// initialize informer caches for selected resources if enabled
 	if !ctx.disableInformerCache {
-		// CRD informer will have already been initialized if any CRDs were created,
-		// but already-initialized informers aren't re-initialized because getGenericInformer
-		// looks for an existing one first.
-		factoriesToStart := make(map[string]*informerFactoryWithContext)
 		for _, informerResource := range selectedResourceCollection {
-			gr := schema.ParseGroupResource(informerResource.resource)
+			if informerResource.totalItems == 0 {
+				continue
+			}
+			version := ""
 			for _, items := range informerResource.selectedItemsByNamespace {
-				// don't use ns key since it represents original ns, not mapped ns
 				if len(items) == 0 {
 					continue
 				}
-				// use the first item in the list to initialize the informer. The rest of the list
-				// should share the same gvr and namespace
-				_, factory := ctx.getGenericInformerInternal(gr, items[0].version, items[0].targetNamespace)
-				if factory != nil {
-					factoriesToStart[items[0].targetNamespace] = factory
-				}
+				version = items[0].version
+				break
 			}
+			gvr := schema.ParseGroupResource(informerResource.resource).WithVersion(version)
+			_, _, err := ctx.discoveryHelper.ResourceFor(gvr)
+			if err != nil {
+				ctx.log.Infof("failed to create informer for %s: %v", gvr, err)
+				continue
+			}
+			ctx.dynamicInformerFactory.factory.ForResource(gvr)
 		}
-		for _, factoryWithContext := range factoriesToStart {
-			factoryWithContext.factory.WaitForCacheSync(factoryWithContext.context.Done())
-		}
+		ctx.dynamicInformerFactory.factory.Start(ctx.dynamicInformerFactory.context.Done())
+		ctx.log.Info("waiting informer cache sync ...")
+		ctx.dynamicInformerFactory.factory.WaitForCacheSync(ctx.dynamicInformerFactory.context.Done())
 	}
 
 	// reset processedItems and totalItems before processing full resource list
@@ -1061,47 +1063,23 @@ func (ctx *restoreContext) getResourceClient(groupResource schema.GroupResource,
 	return client, nil
 }
 
-// if new informer is created, non-nil factory is returned
-func (ctx *restoreContext) getGenericInformerInternal(groupResource schema.GroupResource, version, namespace string) (informers.GenericInformer, *informerFactoryWithContext) {
-	var returnFactory *informerFactoryWithContext
+func (ctx *restoreContext) getResourceLister(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace string) (cache.GenericNamespaceLister, error) {
+	_, _, err := ctx.discoveryHelper.KindFor(obj.GroupVersionKind())
+	if err != nil {
+		return nil, err
+	}
+	informer := ctx.dynamicInformerFactory.factory.ForResource(groupResource.WithVersion(obj.GroupVersionKind().Version))
+	// if the restore contains CRDs or the RIA returns new resources, need to make sure the corresponding informers are synced
+	if !informer.Informer().HasSynced() {
+		ctx.dynamicInformerFactory.factory.Start(ctx.dynamicInformerFactory.context.Done())
+		ctx.log.Infof("waiting informer cache sync for %s, %s/%s ...", groupResource, namespace, obj.GetName())
+		ctx.dynamicInformerFactory.factory.WaitForCacheSync(ctx.dynamicInformerFactory.context.Done())
+	}
 
-	key := getResourceClientKey(groupResource, version, namespace)
-	factoryWithContext, ok := ctx.dynamicInformerFactories[key.namespace]
-	if !ok {
-		factory := ctx.dynamicFactory.DynamicSharedInformerFactoryForNamespace(namespace)
-		informerContext, informerCancel := signal.NotifyContext(go_context.Background(), os.Interrupt)
-		factoryWithContext = &informerFactoryWithContext{
-			factory: factory,
-			context: informerContext,
-			cancel:  informerCancel,
-		}
-		ctx.dynamicInformerFactories[key.namespace] = factoryWithContext
-	}
-	informer, ok := ctx.resourceInformers[key]
-	if !ok {
-		ctx.log.Infof("[debug] Creating factory for %s in namespace %s", key.resource, key.namespace)
-		informer = factoryWithContext.factory.ForResource(key.resource)
-		factoryWithContext.factory.Start(factoryWithContext.context.Done())
-		ctx.resourceInformers[key] = informer
-		returnFactory = factoryWithContext
-	}
-	return informer, returnFactory
-}
-
-func (ctx *restoreContext) getGenericInformer(groupResource schema.GroupResource, version, namespace string) informers.GenericInformer {
-	informer, factoryWithContext := ctx.getGenericInformerInternal(groupResource, version, namespace)
-	if factoryWithContext != nil {
-		factoryWithContext.factory.WaitForCacheSync(factoryWithContext.context.Done())
-	}
-	return informer
-}
-func (ctx *restoreContext) getResourceLister(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace string) cache.GenericNamespaceLister {
-	informer := ctx.getGenericInformer(groupResource, obj.GroupVersionKind().Version, namespace)
 	if namespace == "" {
-		return informer.Lister()
-	} else {
-		return informer.Lister().ByNamespace(namespace)
+		return informer.Lister(), nil
 	}
+	return informer.Lister().ByNamespace(namespace), nil
 }
 
 func getResourceID(groupResource schema.GroupResource, namespace, name string) string {
@@ -1113,7 +1091,10 @@ func getResourceID(groupResource schema.GroupResource, namespace, name string) s
 }
 
 func (ctx *restoreContext) getResource(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace, name string) (*unstructured.Unstructured, error) {
-	lister := ctx.getResourceLister(groupResource, obj, namespace)
+	lister, err := ctx.getResourceLister(groupResource, obj, namespace)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error getting lister for %s", getResourceID(groupResource, namespace, name))
+	}
 	clusterObj, err := lister.Get(name)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting resource from lister for %s, %s/%s", groupResource, namespace, name)
@@ -1123,6 +1104,7 @@ func (ctx *restoreContext) getResource(groupResource schema.GroupResource, obj *
 		ctx.log.WithError(errors.WithStack(fmt.Errorf("expected *unstructured.Unstructured but got %T", u))).Error("unable to understand entry returned from client")
 		return nil, fmt.Errorf("expected *unstructured.Unstructured but got %T", u)
 	}
+	ctx.log.Debugf("get %s, %s/%s from informer cache", groupResource, namespace, name)
 	return u, nil
 }
 
@@ -1757,7 +1739,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	if groupResource == kuberesource.CustomResourceDefinitions {
 		available, err := ctx.crdAvailable(name, resourceClient)
 		if err != nil {
-			errs.Add(namespace, errors.Wrapf(err, "error verifying custom resource definition is ready to use"))
+			errs.Add(namespace, errors.Wrapf(err, "error verifying the CRD %s is ready to use", name))
 		} else if !available {
 			errs.Add(namespace, fmt.Errorf("the CRD %s is not available to use for custom resources", name))
 		}

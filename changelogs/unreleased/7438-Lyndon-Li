@@ -1,0 +1,1 @@
+Fix issue #7281, batch delete snapshots in the same repo

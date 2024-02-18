@@ -41,8 +41,10 @@ help:  ## Display this help
 
 TOOLS_DIR := $(REPO_ROOT)/hack/tools
 BIN_DIR := bin
+# Try to not modify PATH if possible
+GOBIN := $(REPO_ROOT)/.go/bin
 TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
-GINKGO := $(shell go env GOPATH)/bin/ginkgo
+GINKGO := $(GOBIN)/ginkgo
 KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
 OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 GINKGO_FOCUS ?=
@@ -67,6 +69,8 @@ MIGRATE_FROM_VELERO_CLI ?=
 
 VELERO_NAMESPACE ?= velero
 CREDS_FILE ?=
+DEFAULT_CLS_SERVICE_ACCOUNT_NAME ?=
+STANDBY_CLS_SERVICE_ACCOUNT_NAME ?=
 BSL_BUCKET ?=
 BSL_PREFIX ?=
 BSL_CONFIG ?=
@@ -106,10 +110,18 @@ SNAPSHOT_MOVE_DATA ?= false
 DATA_MOVER_PLUGIN ?=
 DISABLE_INFORMER_CACHE ?= false
 
+DEFAULT_CLUSTER_NAME ?=
+STANDBY_CLUSTER_NAME ?=
+EKS_POLICY_ARN ?=
 
+
+# Make sure ginkgo is in $GOBIN
 .PHONY:ginkgo
-ginkgo: # Make sure ginkgo is in $GOPATH/bin
-	go install github.com/onsi/ginkgo/ginkgo@v1.16.5
+ginkgo: ${GOBIN}/ginkgo
+
+# This target does not run if ginkgo is already in $GOBIN
+${GOBIN}/ginkgo:
+	GOBIN=${GOBIN} go install github.com/onsi/ginkgo/ginkgo@v1.16.5
 
 .PHONY: run
 run: ginkgo
@@ -148,8 +160,8 @@ run: ginkgo
 		-kibishii-directory=$(KIBISHII_DIRECTORY) \
 		-debug-e2e-test=$(DEBUG_E2E_TEST) \
 		-velero-server-debug-mode=$(VELERO_SERVER_DEBUG_MODE) \
-		-default-cluster=$(DEFAULT_CLUSTER) \
-		-standby-cluster=$(STANDBY_CLUSTER) \
+		-default-cluster-context=$(DEFAULT_CLUSTER) \
+		-standby-cluster-context=$(STANDBY_CLUSTER) \
 		-uploader-type=$(UPLOADER_TYPE) \
 		-snapshot-move-data=$(SNAPSHOT_MOVE_DATA) \
 		-data-mover-plugin=$(DATA_MOVER_PLUGIN) \
@@ -157,8 +169,12 @@ run: ginkgo
 		-standby-cluster-plugins=$(STANDBY_CLUSTER_PLUGINS) \
 		-standby-cluster-object-store-provider=$(STANDBY_CLUSTER_OBJECT_STORE_PROVIDER) \
 		-debug-velero-pod-restart=$(DEBUG_VELERO_POD_RESTART) \
-		-disable-informer-cache=$(DISABLE_INFORMER_CACHE)
-		
+		-disable-informer-cache=$(DISABLE_INFORMER_CACHE) \
+		-default-cluster-name=$(DEFAULT_CLUSTER_NAME) \
+		-standby-cluster-name=$(STANDBY_CLUSTER_NAME) \
+		-eks-policy-arn=$(EKS_POLICY_ARN) \
+		-default-cls-service-account-name=$(DEFAULT_CLS_SERVICE_ACCOUNT_NAME) \
+		-standby-cls-service-account-name=$(STANDBY_CLS_SERVICE_ACCOUNT_NAME)
 
 build: ginkgo
 	mkdir -p $(OUTPUT_DIR)

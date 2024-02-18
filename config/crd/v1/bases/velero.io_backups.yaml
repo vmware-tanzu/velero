@@ -315,7 +315,7 @@ spec:
               itemOperationTimeout:
                 description: ItemOperationTimeout specifies the time used to wait
                   for asynchronous BackupItemAction operations The default value is
-                  1 hour.
+                  4 hour.
                 type: string
               labelSelector:
                 description: LabelSelector is a metav1.LabelSelector to filter with

@@ -32,6 +32,10 @@ if [[ -z "${GOOS}" ]]; then
     echo "GOOS must be set"
     exit 1
 fi
+if [[ -z "${GOBIN}" ]]; then
+    echo "GOBIN must be set"
+    exit 1
+fi
 if [[ -z "${GOARCH}" ]]; then
     echo "GOARCH must be set"
     exit 1

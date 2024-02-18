@@ -76,7 +76,11 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&velerov1api.BackupRepository{}).
 		Watches(s, nil).
 		Watches(&source.Kind{Type: &velerov1api.BackupStorageLocation{}}, kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
-			builder.WithPredicates(kube.NewUpdateEventPredicate(r.needInvalidBackupRepo))).
+			builder.WithPredicates(
+				// When BSL updates, check if the backup repositories need to be invalidated
+				kube.NewUpdateEventPredicate(r.needInvalidBackupRepo),
+				// When BSL is created, invalidate any backup repositories that reference it
+				kube.NewCreateEventPredicate(func(client.Object) bool { return true }))).
 		Complete(r)
 }
 
@@ -90,13 +94,13 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(bslObj client.Object)
 		}).AsSelector(),
 	}
 	if err := r.List(context.TODO(), list, options); err != nil {
-		r.logger.WithField("BSL", bsl.Name).WithError(err).Error("unable to list BackupRepositorys")
+		r.logger.WithField("BSL", bsl.Name).WithError(err).Error("unable to list BackupRepositories")
 		return []reconcile.Request{}
 	}
 
 	for i := range list.Items {
 		r.logger.WithField("BSL", bsl.Name).Infof("Invalidating Backup Repository %s", list.Items[i].Name)
-		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change")); err != nil {
+		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change or create")); err != nil {
 			r.logger.WithField("BSL", bsl.Name).WithError(err).Errorf("fail to patch BackupRepository %s", list.Items[i].Name)
 		}
 	}
@@ -104,6 +108,7 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(bslObj client.Object)
 	return []reconcile.Request{}
 }
 
+// needInvalidBackupRepo returns true if the BSL's storage type, bucket, prefix, CACert, or config has changed
 func (r *BackupRepoReconciler) needInvalidBackupRepo(oldObj client.Object, newObj client.Object) bool {
 	oldBSL := oldObj.(*velerov1api.BackupStorageLocation)
 	newBSL := newObj.(*velerov1api.BackupStorageLocation)
@@ -260,7 +265,7 @@ func (r *BackupRepoReconciler) getRepositoryMaintenanceFrequency(req *velerov1ap
 		r.logger.WithError(err).WithField("returned frequency", frequency).Warn("Failed to get maitanance frequency, use the default one")
 		frequency = defaultMaintainFrequency
 	} else {
-		r.logger.WithField("frequency", frequency).Info("Set matainenance according to repository suggestion")
+		r.logger.WithField("frequency", frequency).Info("Set maintenance according to repository suggestion")
 	}
 
 	return frequency

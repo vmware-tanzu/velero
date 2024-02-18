@@ -37,8 +37,8 @@ spec:
   scheduleName: my-scheduled-backup-name
   # ItemOperationTimeout specifies the time used to wait for
   # asynchronous BackupItemAction operations
-  # The default value is 1 hour.
-  itemOperationTimeout: 1h
+  # The default value is 4 hour.
+  itemOperationTimeout: 4h
   # UploaderConfig specifies the configuration for the restore.
   uploaderConfig:
     # WriteSparseFiles is a flag to indicate whether write files sparsely or not

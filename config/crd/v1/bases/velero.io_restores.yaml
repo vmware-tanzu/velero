@@ -246,7 +246,7 @@ spec:
                 type: array
               itemOperationTimeout:
                 description: ItemOperationTimeout specifies the time used to wait
-                  for RestoreItemAction operations The default value is 1 hour.
+                  for RestoreItemAction operations The default value is 4 hour.
                 type: string
               labelSelector:
                 description: LabelSelector is a metav1.LabelSelector to filter with

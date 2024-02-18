@@ -1,1 +1,0 @@
-Fix #6964. Don't use csiSnapshotTimeout (10 min) for waiting snapshot to readyToUse for data mover, so as to make the behavior complied with CSI snapshot backup

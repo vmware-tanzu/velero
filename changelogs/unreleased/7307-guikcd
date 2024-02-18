@@ -1,0 +1,1 @@
+Bump up aws-sdk to latest version to leverage Pod Identity credentials.

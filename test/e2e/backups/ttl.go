@@ -155,7 +155,7 @@ func TTLTest() {
 		})
 
 		By("Associated Restores should be created", func() {
-			Expect(ObjectsShouldBeInBucket(veleroCfg.CloudProvider,
+			Expect(ObjectsShouldBeInBucket(veleroCfg.ObjectStoreProvider,
 				veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
 				veleroCfg.BSLPrefix, veleroCfg.BSLConfig, test.restoreName,
 				RestoreObjectsPrefix)).NotTo(HaveOccurred(), "Fail to get restore object")
@@ -179,7 +179,7 @@ func TTLTest() {
 		})
 
 		By("Backup file from cloud object storage should be deleted", func() {
-			Expect(ObjectsShouldNotBeInBucket(veleroCfg.CloudProvider,
+			Expect(ObjectsShouldNotBeInBucket(veleroCfg.ObjectStoreProvider,
 				veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
 				veleroCfg.BSLPrefix, veleroCfg.BSLConfig, test.backupName,
 				BackupObjectsPrefix, 5)).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
@@ -194,7 +194,7 @@ func TTLTest() {
 		})
 
 		By("Associated Restores should be deleted", func() {
-			Expect(ObjectsShouldNotBeInBucket(veleroCfg.CloudProvider,
+			Expect(ObjectsShouldNotBeInBucket(veleroCfg.ObjectStoreProvider,
 				veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
 				veleroCfg.BSLPrefix, veleroCfg.BSLConfig, test.restoreName,
 				RestoreObjectsPrefix, 5)).NotTo(HaveOccurred(), "Fail to get restore object")
