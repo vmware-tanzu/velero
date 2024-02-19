@@ -18,6 +18,8 @@ package controller
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -54,6 +56,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	"github.com/vmware-tanzu/velero/pkg/repository"
+	repomocks "github.com/vmware-tanzu/velero/pkg/repository/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -850,26 +853,178 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.True(t, reflect.DeepEqual(res, test.expected))
+		})
+	}
+}
 
-			// for k, v := range res {
+func batchDeleteSucceed(ctx context.Context, repoEnsurer *repository.Ensurer, repoMgr repository.Manager, directSnapshots map[string][]repository.SnapshotIdentifier, backup *velerov1api.Backup, logger logrus.FieldLogger) []error {
+	return nil
+}
 
-			// }
+func batchDeleteFail(ctx context.Context, repoEnsurer *repository.Ensurer, repoMgr repository.Manager, directSnapshots map[string][]repository.SnapshotIdentifier, backup *velerov1api.Backup, logger logrus.FieldLogger) []error {
+	return []error{
+		errors.New("fake-delete-1"),
+		errors.New("fake-delete-2"),
+	}
+}
 
-			// // sort to ensure good compare of slices
-			// less := func(snapshots []repository.SnapshotIdentifier) func(i, j int) bool {
-			// 	return func(i, j int) bool {
-			// 		if snapshots[i].VolumeNamespace == snapshots[j].VolumeNamespace {
-			// 			return snapshots[i].SnapshotID < snapshots[j].SnapshotID
-			// 		}
-			// 		return snapshots[i].VolumeNamespace < snapshots[j].VolumeNamespace
-			// 	}
+func generateSnapshotData(snapshot *repository.SnapshotIdentifier) (map[string]string, error) {
+	if snapshot == nil {
+		return nil, nil
+	}
 
-			// }
+	b, err := json.Marshal(snapshot)
+	if err != nil {
+		return nil, err
+	}
 
-			// sort.Slice(test.expected, less(test.expected))
-			// sort.Slice(res, less(res))
+	data := make(map[string]string)
+	if err := json.Unmarshal(b, &data); err != nil {
+		return nil, err
+	}
 
-			// assert.Equal(t, test.expected, res)
+	return data, nil
+}
+
+func TestDeleteMovedSnapshots(t *testing.T) {
+	tests := []struct {
+		name               string
+		repoMgr            repository.Manager
+		batchDeleteSucceed bool
+		backupName         string
+		snapshots          []*repository.SnapshotIdentifier
+		expected           []string
+	}{
+		{
+			name: "repoMgr is nil",
+		},
+		{
+			name:    "no cm",
+			repoMgr: repomocks.NewManager(t),
+		},
+		{
+			name:       "bad cm info",
+			repoMgr:    repomocks.NewManager(t),
+			backupName: "backup-01",
+			snapshots:  []*repository.SnapshotIdentifier{nil},
+			expected:   []string{"no snapshot info in config"},
+		},
+		{
+			name:       "invalid snapshots",
+			repoMgr:    repomocks.NewManager(t),
+			backupName: "backup-01",
+			snapshots: []*repository.SnapshotIdentifier{
+				{
+					RepositoryType:  "repo-1",
+					VolumeNamespace: "ns-1",
+				},
+				{
+					SnapshotID:      "snapshot-1",
+					VolumeNamespace: "ns-1",
+				},
+				{
+					SnapshotID:     "snapshot-1",
+					RepositoryType: "repo-1",
+				},
+			},
+			batchDeleteSucceed: true,
+			expected: []string{
+				"invalid snapshot, ID , namespace ns-1, repository repo-1",
+				"invalid snapshot, ID snapshot-1, namespace ns-1, repository ",
+				"invalid snapshot, ID snapshot-1, namespace , repository repo-1",
+			},
+		},
+		{
+			name:       "batch delete succeed",
+			repoMgr:    repomocks.NewManager(t),
+			backupName: "backup-01",
+			snapshots: []*repository.SnapshotIdentifier{
+
+				{
+					SnapshotID:      "snapshot-1",
+					RepositoryType:  "repo-1",
+					VolumeNamespace: "ns-1",
+				},
+			},
+			batchDeleteSucceed: true,
+			expected:           []string{},
+		},
+		{
+			name:       "batch delete fail",
+			repoMgr:    repomocks.NewManager(t),
+			backupName: "backup-01",
+			snapshots: []*repository.SnapshotIdentifier{
+				{
+					RepositoryType:  "repo-1",
+					VolumeNamespace: "ns-1",
+				},
+				{
+					SnapshotID:      "snapshot-1",
+					RepositoryType:  "repo-1",
+					VolumeNamespace: "ns-1",
+				},
+			},
+			expected: []string{"invalid snapshot, ID , namespace ns-1, repository repo-1", "fake-delete-1", "fake-delete-2"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			objs := []runtime.Object{}
+			for i, snapshot := range test.snapshots {
+				snapshotData, err := generateSnapshotData(snapshot)
+				require.NoError(t, err)
+
+				cm := corev1api.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: corev1api.SchemeGroupVersion.String(),
+						Kind:       "ConfigMap",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "velero",
+						Name:      fmt.Sprintf("du-info-%d", i),
+						Labels: map[string]string{
+							velerov1api.BackupNameLabel:             test.backupName,
+							velerov1api.DataUploadSnapshotInfoLabel: "true",
+						},
+					},
+					Data: snapshotData,
+				}
+
+				objs = append(objs, &cm)
+			}
+
+			veleroBackup := &velerov1api.Backup{}
+			controller := NewBackupDeletionReconciler(
+				velerotest.NewLogger(),
+				velerotest.NewFakeControllerRuntimeClient(t, objs...),
+				NewBackupTracker(),
+				test.repoMgr,
+				metrics.NewServerMetrics(),
+				nil, // discovery helper
+				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+				NewFakeSingleObjectBackupStoreGetter(backupStore),
+				velerotest.NewFakeCredentialsFileStore("", nil),
+				nil,
+			)
+
+			veleroBackup.Name = test.backupName
+
+			if test.batchDeleteSucceed {
+				batchDeleteSnapshotFunc = batchDeleteSucceed
+			} else {
+				batchDeleteSnapshotFunc = batchDeleteFail
+			}
+
+			errs := controller.deleteMovedSnapshots(context.Background(), veleroBackup)
+			if test.expected == nil {
+				assert.Nil(t, errs)
+			} else {
+				assert.Equal(t, len(test.expected), len(errs))
+				for i := range test.expected {
+					assert.EqualError(t, errs[i], test.expected[i])
+				}
+			}
 		})
 	}
 }

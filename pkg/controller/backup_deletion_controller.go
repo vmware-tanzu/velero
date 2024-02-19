@@ -510,8 +510,10 @@ func (r *backupDeletionReconciler) deletePodVolumeSnapshots(ctx context.Context,
 		return []error{err}
 	}
 
-	return r.batchDeleteSnapshots(ctx, directSnapshots, backup)
+	return batchDeleteSnapshots(ctx, r.repoEnsurer, r.repoMgr, directSnapshots, backup, r.logger)
 }
+
+var batchDeleteSnapshotFunc = batchDeleteSnapshots
 
 func (r *backupDeletionReconciler) deleteMovedSnapshots(ctx context.Context, backup *velerov1api.Backup) []error {
 	if r.repoMgr == nil {
@@ -532,14 +534,25 @@ func (r *backupDeletionReconciler) deleteMovedSnapshots(ctx context.Context, bac
 	directSnapshots := map[string][]repository.SnapshotIdentifier{}
 	for i := range list.Items {
 		cm := list.Items[i]
-		snapshot := repository.SnapshotIdentifier{}
+		if cm.Data == nil || len(cm.Data) == 0 {
+			errs = append(errs, errors.New("no snapshot info in config"))
+			continue
+		}
+
 		b, err := json.Marshal(cm.Data)
 		if err != nil {
 			errs = append(errs, errors.Wrapf(err, "fail to marshal the snapshot info into JSON"))
 			continue
 		}
+
+		snapshot := repository.SnapshotIdentifier{}
 		if err := json.Unmarshal(b, &snapshot); err != nil {
 			errs = append(errs, errors.Wrapf(err, "failed to unmarshal snapshot info"))
+			continue
+		}
+
+		if snapshot.SnapshotID == "" || snapshot.VolumeNamespace == "" || snapshot.RepositoryType == "" {
+			errs = append(errs, errors.Errorf("invalid snapshot, ID %s, namespace %s, repository %s", snapshot.SnapshotID, snapshot.VolumeNamespace, snapshot.RepositoryType))
 			continue
 		}
 
@@ -549,17 +562,22 @@ func (r *backupDeletionReconciler) deleteMovedSnapshots(ctx context.Context, bac
 
 		directSnapshots[snapshot.VolumeNamespace] = append(directSnapshots[snapshot.VolumeNamespace], snapshot)
 
-		r.logger.Infof("Deleted snapshot %s, namespace: %s, repo type: %s", snapshot.SnapshotID, snapshot.VolumeNamespace, snapshot.RepositoryType)
+		r.logger.Infof("Deleting snapshot %s, namespace: %s, repo type: %s", snapshot.SnapshotID, snapshot.VolumeNamespace, snapshot.RepositoryType)
+	}
+
+	for i := range list.Items {
+		cm := list.Items[i]
 		if err := r.Client.Delete(ctx, &cm); err != nil {
 			r.logger.Warnf("Failed to delete snapshot info configmap %s/%s: %v", cm.Namespace, cm.Name, err)
 		}
 	}
 
-	if len(errs) > 0 {
-		return errs
+	if len(directSnapshots) > 0 {
+		deleteErrs := batchDeleteSnapshotFunc(ctx, r.repoEnsurer, r.repoMgr, directSnapshots, backup, r.logger)
+		errs = append(errs, deleteErrs...)
 	}
 
-	return r.batchDeleteSnapshots(ctx, directSnapshots, backup)
+	return errs
 }
 
 func (r *backupDeletionReconciler) patchDeleteBackupRequest(ctx context.Context, req *velerov1api.DeleteBackupRequest, mutate func(*velerov1api.DeleteBackupRequest)) (*velerov1api.DeleteBackupRequest, error) {
@@ -615,7 +633,8 @@ func getSnapshotsInBackup(ctx context.Context, backup *velerov1api.Backup, kbCli
 	return podvolume.GetSnapshotIdentifier(podVolumeBackups), nil
 }
 
-func (r *backupDeletionReconciler) batchDeleteSnapshots(ctx context.Context, directSnapshots map[string][]repository.SnapshotIdentifier, backup *velerov1api.Backup) []error {
+func batchDeleteSnapshots(ctx context.Context, repoEnsurer *repository.Ensurer, repoMgr repository.Manager,
+	directSnapshots map[string][]repository.SnapshotIdentifier, backup *velerov1api.Backup, logger logrus.FieldLogger) []error {
 	var errs []error
 	for volumeNamespace, snapshots := range directSnapshots {
 		batchForget := []string{}
@@ -624,18 +643,19 @@ func (r *backupDeletionReconciler) batchDeleteSnapshots(ctx context.Context, dir
 		}
 
 		// For volumes in one backup, the BSL and repositoryType should always be the same
-		repo, err := r.repoEnsurer.EnsureRepo(ctx, backup.Namespace, volumeNamespace, backup.Spec.StorageLocation, snapshots[0].RepositoryType)
+		repoType := snapshots[0].RepositoryType
+		repo, err := repoEnsurer.EnsureRepo(ctx, backup.Namespace, volumeNamespace, backup.Spec.StorageLocation, repoType)
 		if err != nil {
-			errs = append(errs, errors.Wrapf(err, "error to ensure repo %s-%s-%s, skip deleting PVB snapshots %v", backup.Spec.StorageLocation, volumeNamespace, snapshots[0].RepositoryType, batchForget))
+			errs = append(errs, errors.Wrapf(err, "error to ensure repo %s-%s-%s, skip deleting PVB snapshots %v", backup.Spec.StorageLocation, volumeNamespace, repoType, batchForget))
 			continue
 		}
 
-		if forgetErrs := r.repoMgr.BatchForget(ctx, repo, batchForget); len(forgetErrs) > 0 {
+		if forgetErrs := repoMgr.BatchForget(ctx, repo, batchForget); len(forgetErrs) > 0 {
 			errs = append(errs, forgetErrs...)
 			continue
 		}
 
-		r.logger.Infof("Batch deleted snapshots %v", batchForget)
+		logger.Infof("Batch deleted snapshots %v", batchForget)
 	}
 
 	return errs

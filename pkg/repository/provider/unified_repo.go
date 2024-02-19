@@ -350,7 +350,7 @@ func (urp *unifiedRepoProvider) BatchForget(ctx context.Context, snapshotIDs []s
 	for _, snapshotID := range snapshotIDs {
 		err = bkRepo.DeleteManifest(ctx, udmrepo.ID(snapshotID))
 		if err != nil {
-			errs = append(errs, errors.Wrap(err, "error to delete manifest"))
+			errs = append(errs, errors.Wrapf(err, "error to delete manifest %s", snapshotID))
 		}
 	}
 
@@ -361,7 +361,7 @@ func (urp *unifiedRepoProvider) BatchForget(ctx context.Context, snapshotIDs []s
 
 	log.Debug("Forget snapshot complete")
 
-	return nil
+	return errs
 }
 
 func (urp *unifiedRepoProvider) DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration {
