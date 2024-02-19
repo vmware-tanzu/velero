@@ -43,9 +43,8 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			crClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
-			var repos *api.BackupRepositoryList
+			repos := new(api.BackupRepositoryList)
 			if len(args) > 0 {
-				repos = new(api.BackupRepositoryList)
 				for _, name := range args {
 					repo := new(api.BackupRepository)
 					err := crClient.Get(context.TODO(), ctrlclient.ObjectKey{Namespace: f.Namespace(), Name: name}, repo)
