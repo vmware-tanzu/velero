@@ -125,6 +125,8 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 func (t *TestCase) Init() error {
 	t.Ctx, t.CtxCancel = context.WithTimeout(context.Background(), 1*time.Hour)
 	t.UUIDgen = t.GenerateUUID()
+	t.VeleroCfg = VeleroCfg
+	t.Client = *t.VeleroCfg.ClientToInstallVelero
 	return nil
 }
 
@@ -190,7 +192,8 @@ func (t *TestCase) Clean() error {
 			CleanupNamespaces(t.Ctx, t.Client, t.CaseBaseName)
 		})
 		By("Clean backups after test", func() {
-			DeleteAllBackups(t.Ctx, t.Client)
+			veleroCfg.ClientToInstallVelero = &t.Client
+			DeleteAllBackups(t.Ctx, &veleroCfg)
 		})
 	}
 	return nil

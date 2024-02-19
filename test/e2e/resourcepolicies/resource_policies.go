@@ -76,14 +76,12 @@ func (r *ResourcePoliciesCase) Init() error {
 
 	// assign values to the inner variable for specific case
 	r.yamlConfig = yamlData
-	r.VeleroCfg = VeleroCfg
-	r.Client = *r.VeleroCfg.ClientToInstallVelero
 	r.VeleroCfg.UseVolumeSnapshots = false
 	r.VeleroCfg.UseNodeAgent = true
 
 	// NEED explicitly specify the value of the variables for snapshot-volumes or default-volumes-to-fs-backup
 	r.BackupArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", r.BackupName,
+		"create", "--namespace", r.VeleroCfg.VeleroNamespace, "backup", r.BackupName,
 		"--resource-policies-configmap", r.cmName,
 		"--include-namespaces", strings.Join(*r.NSIncluded, ","),
 		"--default-volumes-to-fs-backup",
@@ -91,7 +89,7 @@ func (r *ResourcePoliciesCase) Init() error {
 	}
 
 	r.RestoreArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", r.RestoreName,
+		"create", "--namespace", r.VeleroCfg.VeleroNamespace, "restore", r.RestoreName,
 		"--from-backup", r.BackupName, "--wait",
 	}
 
@@ -109,7 +107,7 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 
 	By(("Installing storage class..."), func() {
-		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
+		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", r.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
 	})
 
 	By(fmt.Sprintf("Create configmap %s in namespaces %s for workload\n", r.cmName, r.VeleroCfg.VeleroNamespace), func() {

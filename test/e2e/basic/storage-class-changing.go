@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
@@ -42,8 +41,6 @@ func (s *StorageClasssChanging) Init() error {
 	s.BackupName = "backup-" + s.CaseBaseName
 	s.RestoreName = "restore-" + s.CaseBaseName
 	s.mappedNS = s.namespace + "-mapped"
-	s.VeleroCfg = VeleroCfg
-	s.Client = *s.VeleroCfg.ClientToInstallVelero
 	s.TestMsg = &TestMSG{
 		Desc:      "Changing PV/PVC Storage Classes",
 		FailedMSG: "Failed to changing PV/PVC Storage Classes",
@@ -60,12 +57,12 @@ func (s *StorageClasssChanging) Init() error {
 	s.pvcName = fmt.Sprintf("pvc-%s", s.volume)
 	s.podName = "pod-1"
 	s.BackupArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", s.BackupName,
+		"create", "--namespace", s.VeleroCfg.VeleroNamespace, "backup", s.BackupName,
 		"--include-namespaces", s.namespace,
 		"--snapshot-volumes=false", "--wait",
 	}
 	s.RestoreArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", s.RestoreName,
+		"create", "--namespace", s.VeleroCfg.VeleroNamespace, "restore", s.RestoreName,
 		"--from-backup", s.BackupName, "--namespace-mappings", fmt.Sprintf("%s:%s", s.namespace, s.mappedNS), "--wait",
 	}
 	return nil

@@ -935,8 +935,9 @@ func getVeleroCliTarball(cliTarballUrl string) (*os.File, error) {
 	return tmpfile, nil
 }
 
-func DeleteBackupResource(ctx context.Context, veleroCLI string, backupName string) error {
-	args := []string{"--namespace", VeleroCfg.VeleroNamespace, "backup", "delete", backupName, "--confirm"}
+func DeleteBackupResource(ctx context.Context, backupName string, velerocfg *VeleroConfig) error {
+	veleroCLI := velerocfg.VeleroCLI
+	args := []string{"--namespace", velerocfg.VeleroNamespace, "backup", "delete", backupName, "--confirm"}
 
 	cmd := exec.CommandContext(ctx, veleroCLI, args...)
 	fmt.Println("Delete backup Command:" + cmd.String())
@@ -948,7 +949,7 @@ func DeleteBackupResource(ctx context.Context, veleroCLI string, backupName stri
 	output := strings.Replace(stdout, "\n", " ", -1)
 	fmt.Println("Backup delete command output:" + output)
 
-	args = []string{"--namespace", VeleroCfg.VeleroNamespace, "backup", "get", backupName}
+	args = []string{"--namespace", velerocfg.VeleroNamespace, "backup", "get", backupName}
 
 	retryTimes := 5
 	for i := 1; i < retryTimes+1; i++ {
@@ -967,14 +968,15 @@ func DeleteBackupResource(ctx context.Context, veleroCLI string, backupName stri
 	return nil
 }
 
-func GetBackup(ctx context.Context, veleroCLI, backupName string) (string, string, error) {
-	args := []string{"--namespace", VeleroCfg.VeleroNamespace, "backup", "get", backupName}
+func GetBackup(ctx context.Context, backupName string, veleroCfg *VeleroConfig) (string, string, error) {
+	veleroCLI := veleroCfg.VeleroCLI
+	args := []string{"--namespace", veleroCfg.VeleroNamespace, "backup", "get", backupName}
 	cmd := exec.CommandContext(ctx, veleroCLI, args...)
 	return veleroexec.RunCommand(cmd)
 }
 
-func IsBackupExist(ctx context.Context, veleroCLI, backupName string) (bool, error) {
-	out, outerr, err := GetBackup(ctx, veleroCLI, backupName)
+func IsBackupExist(ctx context.Context, backupName string, veleroCfg *VeleroConfig) (bool, error) {
+	out, outerr, err := GetBackup(ctx, backupName, veleroCfg)
 	if err != nil {
 		if strings.Contains(outerr, "not found") {
 			fmt.Printf("Backup CR %s was not found\n", backupName)
@@ -986,9 +988,9 @@ func IsBackupExist(ctx context.Context, veleroCLI, backupName string) (bool, err
 	return true, nil
 }
 
-func WaitBackupDeleted(ctx context.Context, veleroCLI, backupName string, timeout time.Duration) error {
+func WaitBackupDeleted(ctx context.Context, backupName string, timeout time.Duration, veleroCfg *VeleroConfig) error {
 	return wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
-		if exist, err := IsBackupExist(ctx, veleroCLI, backupName); err != nil {
+		if exist, err := IsBackupExist(ctx, backupName, veleroCfg); err != nil {
 			return false, err
 		} else {
 			if exist {
@@ -1001,10 +1003,10 @@ func WaitBackupDeleted(ctx context.Context, veleroCLI, backupName string, timeou
 	})
 }
 
-func WaitForExpectedStateOfBackup(ctx context.Context, veleroCLI, backupName string,
-	timeout time.Duration, existing bool) error {
+func WaitForExpectedStateOfBackup(ctx context.Context, backupName string,
+	timeout time.Duration, existing bool, veleroCfg *VeleroConfig) error {
 	return wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
-		if exist, err := IsBackupExist(ctx, veleroCLI, backupName); err != nil {
+		if exist, err := IsBackupExist(ctx, backupName, veleroCfg); err != nil {
 			return false, err
 		} else {
 			msg := "does not exist as expect"
@@ -1022,19 +1024,19 @@ func WaitForExpectedStateOfBackup(ctx context.Context, veleroCLI, backupName str
 	})
 }
 
-func WaitForBackupToBeCreated(ctx context.Context, veleroCLI, backupName string, timeout time.Duration) error {
-	return WaitForExpectedStateOfBackup(ctx, veleroCLI, backupName, timeout, true)
+func WaitForBackupToBeCreated(ctx context.Context, backupName string, timeout time.Duration, veleroCfg *VeleroConfig) error {
+	return WaitForExpectedStateOfBackup(ctx, backupName, timeout, true, veleroCfg)
 }
 
-func WaitForBackupToBeDeleted(ctx context.Context, veleroCLI string, backupName string, timeout time.Duration) error {
-	return WaitForExpectedStateOfBackup(ctx, veleroCLI, backupName, timeout, false)
+func WaitForBackupToBeDeleted(ctx context.Context, backupName string, timeout time.Duration, veleroCfg *VeleroConfig) error {
+	return WaitForExpectedStateOfBackup(ctx, backupName, timeout, false, veleroCfg)
 }
 
-func WaitForBackupsToBeDeleted(ctx context.Context, veleroCLI string, backups []string, timeout time.Duration) error {
+func WaitForBackupsToBeDeleted(ctx context.Context, backups []string, timeout time.Duration, veleroCfg *VeleroConfig) error {
 	var err error
 	for _, backupName := range backups {
 		fmt.Println("Waiting for deletion of backup <" + backupName + ">")
-		err = WaitForExpectedStateOfBackup(ctx, veleroCLI, backupName, timeout, false)
+		err = WaitForExpectedStateOfBackup(ctx, backupName, timeout, false, veleroCfg)
 		if err != nil {
 			return err
 		}
@@ -1236,17 +1238,17 @@ func GetRepositories(ctx context.Context, veleroNamespace, targetNamespace strin
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
-func GetSnapshotCheckPoint(client TestClient, VeleroCfg VeleroConfig, expectCount int, namespaceBackedUp, backupName string, KibishiiPVCNameList []string) (SnapshotCheckPoint, error) {
+func GetSnapshotCheckPoint(client TestClient, veleroCfg VeleroConfig, expectCount int, namespaceBackedUp, backupName string, KibishiiPVCNameList []string) (SnapshotCheckPoint, error) {
 	var snapshotCheckPoint SnapshotCheckPoint
 
 	snapshotCheckPoint.ExpectCount = expectCount
 	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
 	snapshotCheckPoint.PodName = KibishiiPVCNameList
-	if (VeleroCfg.CloudProvider == "azure" || VeleroCfg.CloudProvider == "aws") && strings.EqualFold(VeleroCfg.Features, FeatureCSI) {
+	if (veleroCfg.CloudProvider == "azure" || veleroCfg.CloudProvider == "aws") && strings.EqualFold(veleroCfg.Features, FeatureCSI) {
 		snapshotCheckPoint.EnableCSI = true
 		resourceName := "snapshot.storage.k8s.io"
 
-		srcVersions, err := GetAPIVersions(VeleroCfg.DefaultClient, resourceName)
+		srcVersions, err := GetAPIVersions(veleroCfg.DefaultClient, resourceName)
 
 		if err != nil {
 			return snapshotCheckPoint, err
@@ -1292,47 +1294,35 @@ func GetVersionList(veleroCli, veleroVersion string) []VeleroCLI2Version {
 	}
 	return veleroCLI2VersionList
 }
-func DeleteAllBackups(ctx context.Context, client TestClient) error {
+func DeleteAllBackups(ctx context.Context, veleroCfg *VeleroConfig) error {
+	client := veleroCfg.ClientToInstallVelero
 	backupList := new(velerov1api.BackupList)
-	if err := client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: VeleroCfg.VeleroNamespace}); err != nil {
-		return fmt.Errorf("failed to list backup object in %s namespace with err %v", VeleroCfg.VeleroNamespace, err)
+	if err := client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
+		return fmt.Errorf("failed to list backup object in %s namespace with err %v", veleroCfg.VeleroNamespace, err)
 	}
 	for _, backup := range backupList.Items {
 		fmt.Printf("Backup %s is going to be deleted...\n", backup.Name)
-		if err := VeleroBackupDelete(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup.Name); err != nil {
+		if err := VeleroBackupDelete(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, backup.Name); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func DeleteBackups(ctx context.Context, client TestClient, backupNames []string) error {
+func DeleteBackups(ctx context.Context, backupNames []string, veleroCfg *VeleroConfig) error {
+	client := veleroCfg.ClientToInstallVelero
 	backupList := new(velerov1api.BackupList)
-	if err := client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: VeleroCfg.VeleroNamespace}); err != nil {
-		return fmt.Errorf("failed to list backup object in %s namespace with err %v", VeleroCfg.VeleroNamespace, err)
+	if err := client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
+		return fmt.Errorf("failed to list backup object in %s namespace with err %v", veleroCfg.VeleroNamespace, err)
 	}
 	for _, backup := range backupList.Items {
 		for _, bn := range backupNames {
 			if backup.Name == bn {
 				fmt.Printf("Backup %s is going to be deleted...\n", backup.Name)
-				if err := VeleroBackupDelete(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, backup.Name); err != nil {
+				if err := VeleroBackupDelete(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, backup.Name); err != nil {
 					return err
 				}
 			}
-		}
-	}
-	return nil
-}
-
-func DeleteRestores(ctx context.Context, client TestClient) error {
-	restoreList := new(velerov1api.RestoreList)
-	if err := client.Kubebuilder.List(ctx, restoreList, &kbclient.ListOptions{Namespace: VeleroCfg.VeleroNamespace}); err != nil {
-		return fmt.Errorf("failed to list restore object in %s namespace with err %v", VeleroCfg.VeleroNamespace, err)
-	}
-	for _, restore := range restoreList.Items {
-		fmt.Printf("Restore %s is going to be deleted...\n", restore.Name)
-		if err := VeleroRestoreDelete(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, restore.Name); err != nil {
-			return err
 		}
 	}
 	return nil

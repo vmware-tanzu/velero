@@ -77,7 +77,7 @@ func TTLTest() {
 		veleroCfg.GCFrequency = ""
 		if !veleroCfg.Debug {
 			By("Clean backups after test", func() {
-				DeleteAllBackups(context.Background(), *veleroCfg.ClientToInstallVelero)
+				DeleteAllBackups(context.Background(), &veleroCfg)
 			})
 			ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer ctxCancel()
@@ -175,7 +175,7 @@ func TTLTest() {
 		})
 
 		By("Check if backups are deleted by GC", func() {
-			Expect(WaitBackupDeleted(ctx, veleroCfg.VeleroCLI, test.backupName, time.Minute*10)).To(Succeed(), fmt.Sprintf("Backup %s was not deleted by GC", test.backupName))
+			Expect(WaitBackupDeleted(ctx, test.backupName, time.Minute*10, &veleroCfg)).To(Succeed(), fmt.Sprintf("Backup %s was not deleted by GC", test.backupName))
 		})
 
 		By("Backup file from cloud object storage should be deleted", func() {

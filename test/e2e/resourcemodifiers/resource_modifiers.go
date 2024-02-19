@@ -24,10 +24,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
 	"github.com/pkg/errors"
 
-	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -74,19 +72,17 @@ func (r *ResourceModifiersCase) Init() error {
 
 	// assign values to the inner variable for specific case
 	r.yamlConfig = yamlData
-	r.VeleroCfg = VeleroCfg
-	r.Client = *r.VeleroCfg.ClientToInstallVelero
 	r.VeleroCfg.UseVolumeSnapshots = false
 	r.VeleroCfg.UseNodeAgent = false
 
 	r.BackupArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", r.BackupName,
+		"create", "--namespace", r.VeleroCfg.VeleroNamespace, "backup", r.BackupName,
 		"--include-namespaces", strings.Join(*r.NSIncluded, ","),
 		"--snapshot-volumes=false", "--wait",
 	}
 
 	r.RestoreArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", r.RestoreName,
+		"create", "--namespace", r.VeleroCfg.VeleroNamespace, "restore", r.RestoreName,
 		"--resource-modifier-configmap", r.cmName,
 		"--from-backup", r.BackupName, "--wait",
 	}

@@ -24,7 +24,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -41,8 +40,6 @@ func (n *NSAnnotationCase) Init() error {
 
 	n.NamespacesTotal = 1
 	n.NSIncluded = &[]string{}
-	n.VeleroCfg = VeleroCfg
-	n.Client = *n.VeleroCfg.ClientToInstallVelero
 	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", n.CaseBaseName, nsNum)
 		*n.NSIncluded = append(*n.NSIncluded, createNSName)
@@ -53,13 +50,13 @@ func (n *NSAnnotationCase) Init() error {
 		FailedMSG: "Failed to successfully backup and restore multiple namespaces",
 	}
 	n.BackupArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "backup", n.BackupName,
+		"create", "--namespace", n.VeleroCfg.VeleroNamespace, "backup", n.BackupName,
 		"--include-namespaces", strings.Join(*n.NSIncluded, ","),
 		"--default-volumes-to-fs-backup", "--wait",
 	}
 
 	n.RestoreArgs = []string{
-		"create", "--namespace", VeleroCfg.VeleroNamespace, "restore", n.RestoreName,
+		"create", "--namespace", n.VeleroCfg.VeleroNamespace, "restore", n.RestoreName,
 		"--from-backup", n.BackupName, "--wait",
 	}
 	return nil

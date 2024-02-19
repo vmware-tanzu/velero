@@ -69,7 +69,7 @@ func APIExtensionsVersionsTest() {
 	AfterEach(func() {
 		if !veleroCfg.Debug {
 			By("Clean backups after test", func() {
-				DeleteAllBackups(context.Background(), *veleroCfg.DefaultClient)
+				DeleteAllBackups(context.Background(), &veleroCfg)
 			})
 			if InstallVelero {
 				By("Uninstall Velero and delete CRD ", func() {
@@ -135,7 +135,7 @@ func APIExtensionsVersionsTest() {
 			})
 
 			By(fmt.Sprintf("Waiting for backups sync to Velero in cluster-B (%s)", veleroCfg.StandbyClusterContext), func() {
-				Expect(WaitForBackupToBeCreated(context.Background(), veleroCfg.VeleroCLI, backupName, 5*time.Minute)).To(Succeed())
+				Expect(WaitForBackupToBeCreated(context.Background(), backupName, 5*time.Minute, &veleroCfg)).To(Succeed())
 			})
 
 			By(fmt.Sprintf("CRD %s should not exist in cluster-B (%s)", crdName, veleroCfg.StandbyClusterContext), func() {
