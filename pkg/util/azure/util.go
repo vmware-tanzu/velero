@@ -62,6 +62,10 @@ func LoadCredentials(config map[string]string) (map[string]string, error) {
 		credFile = config[credentialFile]
 	}
 
+	if len(credFile) == 0 {
+		return map[string]string{}, nil
+	}
+
 	// put the credential file content into a map
 	creds, err := godotenv.Read(credFile)
 	if err != nil {
