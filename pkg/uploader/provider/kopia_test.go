@@ -62,8 +62,12 @@ type FakeRestoreProgressUpdater struct {
 func (f *FakeRestoreProgressUpdater) UpdateProgress(p *uploader.Progress) {}
 
 func TestRunBackup(t *testing.T) {
+	mockBRepo := udmrepomocks.NewBackupRepo(t)
+	mockBRepo.On("GetAdvancedFeatures").Return(udmrepo.AdvancedFeatureInfo{})
+
 	var kp kopiaProvider
 	kp.log = logrus.New()
+	kp.bkRepo = mockBRepo
 	updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
 
 	testCases := []struct {

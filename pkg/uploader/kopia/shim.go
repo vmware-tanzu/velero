@@ -238,7 +238,21 @@ func (sr *shimRepository) Flush(ctx context.Context) error {
 }
 
 func (sr *shimRepository) ConcatenateObjects(ctx context.Context, objectIDs []object.ID) (object.ID, error) {
-	return object.ID{}, errors.New("ConcatenateObjects is not supported")
+	if len(objectIDs) == 0 {
+		return object.EmptyID, errors.New("object list is empty")
+	}
+
+	ids := []udmrepo.ID{}
+	for _, id := range objectIDs {
+		ids = append(ids, udmrepo.ID(id.String()))
+	}
+
+	id, err := sr.udmRepo.ConcatenateObjects(ctx, ids)
+	if err != nil {
+		return object.EmptyID, err
+	}
+
+	return object.ParseID(string(id))
 }
 
 func (sr *shimRepository) OnSuccessfulFlush(callback repo.RepositoryWriterCallback) {

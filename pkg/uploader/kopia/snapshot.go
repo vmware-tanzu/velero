@@ -54,6 +54,8 @@ var listSnapshotsFunc = snapshot.ListSnapshots
 var filesystemEntryFunc = snapshotfs.FilesystemEntryFromIDWithPath
 var restoreEntryFunc = restore.Entry
 
+const UploaderConfigMultipartKey = "uploader-multipart"
+
 // SnapshotUploader which mainly used for UT test that could overwrite Upload interface
 type SnapshotUploader interface {
 	Upload(
@@ -118,6 +120,10 @@ func setupPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snap
 		if parallelUpload > 0 {
 			curPolicy.UploadPolicy.MaxParallelFileReads = newOptionalInt(parallelUpload)
 		}
+	}
+
+	if _, ok := uploaderCfg[UploaderConfigMultipartKey]; ok {
+		curPolicy.UploadPolicy.ParallelUploadAboveSize = newOptionalInt64(2 << 30)
 	}
 
 	err := setPolicyFunc(ctx, rep, sourceInfo, curPolicy)

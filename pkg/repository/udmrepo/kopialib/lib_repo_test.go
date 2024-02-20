@@ -716,6 +716,78 @@ func TestFlush(t *testing.T) {
 	}
 }
 
+func TestConcatenateObjects(t *testing.T) {
+	testCases := []struct {
+		name            string
+		setWriter       bool
+		rawWriter       *repomocks.DirectRepositoryWriter
+		rawWriterRetErr error
+		objectIDs       []udmrepo.ID
+		expectedErr     string
+	}{
+		{
+			name:        "writer is nil",
+			expectedErr: "repo writer is closed or not open",
+		},
+		{
+			name:        "empty object list",
+			setWriter:   true,
+			expectedErr: "object list is empty",
+		},
+		{
+			name: "invalid object id",
+			objectIDs: []udmrepo.ID{
+				"I123456",
+				"fake-id",
+				"I678901",
+			},
+			setWriter:   true,
+			expectedErr: "error to parse object ID from fake-id: malformed content ID: \"fake-id\": invalid content prefix",
+		},
+		{
+			name:            "concatenate error",
+			rawWriter:       repomocks.NewDirectRepositoryWriter(t),
+			rawWriterRetErr: errors.New("fake-concatenate-error"),
+			objectIDs: []udmrepo.ID{
+				"I123456",
+			},
+			setWriter:   true,
+			expectedErr: "error to concatenate objects: fake-concatenate-error",
+		},
+		{
+			name:      "succeed",
+			rawWriter: repomocks.NewDirectRepositoryWriter(t),
+			objectIDs: []udmrepo.ID{
+				"I123456",
+			},
+			setWriter: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := &kopiaRepository{}
+
+			if tc.rawWriter != nil {
+				require.NotNil(t, tc.rawWriter)
+				tc.rawWriter.On("ConcatenateObjects", mock.Anything, mock.Anything).Return(object.ID{}, tc.rawWriterRetErr)
+			}
+
+			if tc.setWriter {
+				kr.rawWriter = tc.rawWriter
+			}
+
+			_, err := kr.ConcatenateObjects(context.Background(), tc.objectIDs)
+
+			if tc.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+}
+
 func TestNewObjectWriter(t *testing.T) {
 	rawObjWriter := repomocks.NewWriter(t)
 	testCases := []struct {
