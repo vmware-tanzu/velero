@@ -26,10 +26,8 @@ import (
 
 type MapUpdateFunc func(client.Object) []reconcile.Request
 
-// EnqueueRequestsFromMapUpdateFunc is for the same purpose with EnqueueRequestsFromMapFunc.
-// Merely, it is more friendly to updating the mapped objects in the MapUpdateFunc, because
-// on Update event, MapUpdateFunc is called for only once with the new object, so if MapUpdateFunc
-// does some update to the mapped objects, the update is done for once
+// EnqueueRequestsFromMapUpdateFunc has the same purpose with handler.EnqueueRequestsFromMapFunc.
+// MapUpdateFunc is simpler on Update event because mapAndEnqueue is called once with the new object. EnqueueRequestsFromMapFunc is called twice with the old and new object.
 func EnqueueRequestsFromMapUpdateFunc(fn MapUpdateFunc) handler.EventHandler {
 	return &enqueueRequestsFromMapFunc{
 		toRequests: fn,
