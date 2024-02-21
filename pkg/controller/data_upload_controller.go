@@ -269,7 +269,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if err != nil {
 			if err == datapath.ConcurrentLimitExceed {
 				log.Info("Data path instance is concurrent limited requeue later")
-				return ctrl.Result{Requeue: true, RequeueAfter: time.Minute}, nil
+				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 			} else {
 				return r.errorOut(ctx, du, err, "error to create data path", log)
 			}

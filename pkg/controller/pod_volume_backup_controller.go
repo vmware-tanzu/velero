@@ -126,7 +126,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	fsBackup, err := r.dataPathMgr.CreateFileSystemBR(pvb.Name, pVBRRequestor, ctx, r.Client, pvb.Namespace, callbacks, log)
 	if err != nil {
 		if err == datapath.ConcurrentLimitExceed {
-			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute}, nil
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 		} else {
 			return r.errorOut(ctx, &pvb, err, "error to create data path", log)
 		}
