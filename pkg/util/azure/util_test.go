@@ -28,8 +28,9 @@ import (
 
 func TestLoadCredentials(t *testing.T) {
 	// no credential file
-	_, err := LoadCredentials(nil)
-	require.NotNil(t, err)
+	credentials, err := LoadCredentials(nil)
+	require.Nil(t, err)
+	assert.NotNil(t, credentials)
 
 	// specified credential file in the config
 	name := filepath.Join(os.TempDir(), "credential")
@@ -43,7 +44,7 @@ func TestLoadCredentials(t *testing.T) {
 	config := map[string]string{
 		"credentialsFile": name,
 	}
-	credentials, err := LoadCredentials(config)
+	credentials, err = LoadCredentials(config)
 	require.Nil(t, err)
 	assert.Equal(t, "value", credentials["key"])
 
