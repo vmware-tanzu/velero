@@ -219,7 +219,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 			dataMgr:        datapath.NewManager(0),
 			notNilExpose:   true,
 			notMockCleanUp: true,
-			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Minute},
+			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
 		},
 		{
 			name:              "Error getting volume directory name for pvc in pod",
@@ -416,8 +416,8 @@ func TestDataDownloadReconcile(t *testing.T) {
 			require.NotNil(t, actualResult)
 
 			if test.expectedResult != nil {
-				assert.Equal(t, test.expectedResult.Requeue, test.expectedResult.Requeue)
-				assert.Equal(t, test.expectedResult.RequeueAfter, test.expectedResult.RequeueAfter)
+				assert.Equal(t, test.expectedResult.Requeue, actualResult.Requeue)
+				assert.Equal(t, test.expectedResult.RequeueAfter, actualResult.RequeueAfter)
 			}
 
 			dd := velerov2alpha1api.DataDownload{}
