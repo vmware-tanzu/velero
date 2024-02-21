@@ -280,9 +280,10 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 
 	if len(options.Features) > 0 {
 		args = append(args, "--features", options.Features)
-		if strings.EqualFold(cloudProvider, "azure") && strings.EqualFold(options.Features, FeatureCSI) && options.UseVolumeSnapshots {
+		if !strings.EqualFold(cloudProvider, "vsphere") && strings.EqualFold(options.Features, FeatureCSI) && options.UseVolumeSnapshots {
 			fmt.Println("Start to install Azure VolumeSnapshotClass ...")
-			if err := KubectlApplyByFile(ctx, "../util/csi/AzureVolumeSnapshotClass.yaml"); err != nil {
+			if err := KubectlApplyByFile(ctx, fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", cloudProvider)); err != nil {
+				fmt.Println("Fail to install VolumeSnapshotClass when CSI feature is enabled: ", err)
 				return err
 			}
 		}
@@ -634,6 +635,7 @@ func VeleroUninstall(ctx context.Context, cli, namespace string) error {
 		return errors.Wrapf(err, "failed to uninstall velero, stdout=%s, stderr=%s", stdout, stderr)
 	}
 	fmt.Println("Velero uninstalled ⛵")
+
 	return nil
 }
 

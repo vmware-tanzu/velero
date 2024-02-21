@@ -196,7 +196,7 @@ func IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig
 }
 
 func GetVolumeInfoMetadataContent(
-	cloudProvider,
+	objectStoreProvider,
 	cloudCredentialsFile,
 	bslBucket,
 	bslPrefix,
@@ -207,16 +207,16 @@ func GetVolumeInfoMetadataContent(
 	bslPrefix = strings.Trim(getFullPrefix(bslPrefix, subPrefix), "/")
 	volumeFileName := backupName + "-volumeinfo.json.gz"
 	fmt.Printf("|| VERIFICATION || - Get backup %s volumeinfo file in storage %s\n", backupName, bslPrefix)
-	s, err := getProvider(cloudProvider)
+	s, err := getProvider(objectStoreProvider)
 	if err != nil {
-		return nil, errors.Wrapf(err, fmt.Sprintf("Cloud provider %s is not valid", cloudProvider))
+		return nil, errors.Wrapf(err, fmt.Sprintf("Cloud provider %s is not valid", objectStoreProvider))
 	}
 
 	return s.GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, volumeFileName)
 }
 
 func GetVolumeInfo(
-	cloudProvider,
+	objectStoreProvider,
 	cloudCredentialsFile,
 	bslBucket,
 	bslPrefix,
@@ -224,7 +224,7 @@ func GetVolumeInfo(
 	backupName,
 	subPrefix string,
 ) ([]*volume.VolumeInfo, error) {
-	readCloser, err := GetVolumeInfoMetadataContent(cloudProvider,
+	readCloser, err := GetVolumeInfoMetadataContent(objectStoreProvider,
 		cloudCredentialsFile,
 		bslBucket,
 		bslPrefix,

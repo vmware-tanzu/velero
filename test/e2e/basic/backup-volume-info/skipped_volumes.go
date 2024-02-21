@@ -31,6 +31,10 @@ var SkippedVolumeInfoTest func() = TestFunc(&SkippedVolumeInfo{
 		SnapshotVolumes: false,
 		TestCase: TestCase{
 			CaseBaseName: "skipped-volumes-volumeinfo",
+			TestMsg: &TestMSG{
+				Desc: "Test backup's VolumeInfo metadata content for volume-skipped case.",
+				Text: "The VolumeInfo should be generated, and the Skipped parameter should be true.",
+			},
 		},
 	},
 })
@@ -41,7 +45,7 @@ type SkippedVolumeInfo struct {
 
 func (s *SkippedVolumeInfo) Verify() error {
 	volumeInfo, err := GetVolumeInfo(
-		s.VeleroCfg.CloudProvider,
+		s.VeleroCfg.ObjectStoreProvider,
 		s.VeleroCfg.CloudCredentialsFile,
 		s.VeleroCfg.BSLBucket,
 		s.VeleroCfg.BSLPrefix,
@@ -51,6 +55,8 @@ func (s *SkippedVolumeInfo) Verify() error {
 	)
 
 	Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("Fail to get VolumeInfo metadata in the Backup Repository."))
+
+	fmt.Printf("The VolumeInfo metadata content: %+v\n", *volumeInfo[0])
 	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
 	Expect(volumeInfo[0].Skipped == true).To(BeIdenticalTo(true))
 

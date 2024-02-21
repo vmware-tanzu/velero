@@ -45,15 +45,20 @@ func (v *BackupVolumeInfo) Init() error {
 	v.TestCase.Init()
 
 	BeforeEach(func() {
+		if v.VeleroCfg.CloudProvider == "vsphere" && (!strings.Contains(v.CaseBaseName, "fs-upload") && !strings.Contains(v.CaseBaseName, "skipped")) {
+			fmt.Printf("Skip snapshot case %s for vsphere environment.\n", v.CaseBaseName)
+			Skip("Skip snapshot case due to vsphere environment doesn't cover the CSI test, and it doesn't have a Velero native snapshot plugin.")
+		}
+
 		if strings.Contains(v.VeleroCfg.Features, "EnableCSI") {
 			if strings.Contains(v.CaseBaseName, "native-snapshot") {
 				fmt.Printf("Skip native snapshot case %s when the CSI feature is enabled.\n", v.CaseBaseName)
-				Skip("Skip due to vSphere CSI driver long time issue of Static provisioning")
+				Skip("Skip native snapshot case due to CSI feature is enabled.")
 			}
 		} else {
 			if strings.Contains(v.CaseBaseName, "csi") {
 				fmt.Printf("Skip CSI related case %s when the CSI feature is not enabled.\n", v.CaseBaseName)
-				Skip("Skip due to vSphere CSI driver long time issue of Static provisioning")
+				Skip("Skip CSI cases due to CSI feature is not enabled.")
 			}
 		}
 	})
@@ -103,10 +108,8 @@ func (v *BackupVolumeInfo) CreateResources() error {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 
+		// Install StorageClass
 		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s-csi.yaml", v.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install StorageClass")
-
-		// Install VolumeSnapshotClass
-		Expect(KubectlApplyByFile(v.Ctx, fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", v.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install VolumeSnapshotClass")
 
 		pvc, err := CreatePVC(v.Client, createNSName, "volume-info", CSIStorageClassName, nil)
 		Expect(err).To(Succeed())
@@ -141,8 +144,5 @@ func (v *BackupVolumeInfo) cleanResource() error {
 		return errors.Wrap(err, "fail to delete the StorageClass")
 	}
 
-	if err := KubectlDeleteByFile(v.Ctx, fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", v.VeleroCfg.CloudProvider)); err != nil {
-		return errors.Wrap(err, "fail to delete the VolumeSnapshotClass")
-	}
 	return nil
 }

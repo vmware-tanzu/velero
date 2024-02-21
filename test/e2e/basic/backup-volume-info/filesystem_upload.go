@@ -31,6 +31,10 @@ var FilesystemUploadVolumeInfoTest func() = TestFunc(&FilesystemUploadVolumeInfo
 		DefaultVolumesToFSBackup: true,
 		TestCase: TestCase{
 			CaseBaseName: "fs-upload-volumeinfo",
+			TestMsg: &TestMSG{
+				Desc: "Test backup's VolumeInfo metadata content for filesystem upload case.",
+				Text: "The VolumeInfo should be generated, and the PVBInfo structure should not be nil.",
+			},
 		},
 	},
 })
@@ -41,7 +45,7 @@ type FilesystemUploadVolumeInfo struct {
 
 func (f *FilesystemUploadVolumeInfo) Verify() error {
 	volumeInfo, err := GetVolumeInfo(
-		f.VeleroCfg.CloudProvider,
+		f.VeleroCfg.ObjectStoreProvider,
 		f.VeleroCfg.CloudCredentialsFile,
 		f.VeleroCfg.BSLBucket,
 		f.VeleroCfg.BSLPrefix,
@@ -51,6 +55,8 @@ func (f *FilesystemUploadVolumeInfo) Verify() error {
 	)
 
 	Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("Fail to get VolumeInfo metadata in the Backup Repository."))
+
+	fmt.Printf("The VolumeInfo metadata content: %+v\n", *volumeInfo[0])
 	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
 	Expect(volumeInfo[0].PVBInfo).NotTo(BeNil())
 

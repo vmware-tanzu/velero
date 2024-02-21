@@ -31,6 +31,10 @@ var CSISnapshotVolumeInfoTest func() = TestFunc(&CSISnapshotVolumeInfo{
 		SnapshotVolumes: true,
 		TestCase: TestCase{
 			CaseBaseName: "csi-snapshot-volumeinfo",
+			TestMsg: &TestMSG{
+				Desc: "Test backup's VolumeInfo metadata content for CSI snapshot case.",
+				Text: "The VolumeInfo should be generated, and the CSISnapshotInfo structure should not be nil.",
+			},
 		},
 	},
 })
@@ -41,7 +45,7 @@ type CSISnapshotVolumeInfo struct {
 
 func (c *CSISnapshotVolumeInfo) Verify() error {
 	volumeInfo, err := GetVolumeInfo(
-		c.VeleroCfg.CloudProvider,
+		c.VeleroCfg.ObjectStoreProvider,
 		c.VeleroCfg.CloudCredentialsFile,
 		c.VeleroCfg.BSLBucket,
 		c.VeleroCfg.BSLPrefix,
@@ -51,6 +55,8 @@ func (c *CSISnapshotVolumeInfo) Verify() error {
 	)
 
 	Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("Fail to get VolumeInfo metadata in the Backup Repository."))
+
+	fmt.Printf("The VolumeInfo metadata content: %+v\n", *volumeInfo[0])
 	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
 	Expect(volumeInfo[0].CSISnapshotInfo).NotTo(BeNil())
 

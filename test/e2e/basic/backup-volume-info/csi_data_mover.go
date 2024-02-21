@@ -32,6 +32,10 @@ var CSIDataMoverVolumeInfoTest func() = TestFunc(&CSIDataMoverVolumeInfo{
 		SnapshotVolumes:  true,
 		TestCase: TestCase{
 			CaseBaseName: "csi-data-mover-volumeinfo",
+			TestMsg: &TestMSG{
+				Desc: "Test backup's VolumeInfo metadata content for CSI data mover case.",
+				Text: "The VolumeInfo should be generated, and the SnapshotDataMovementInfo structure should not be nil.",
+			},
 		},
 	},
 })
@@ -42,7 +46,7 @@ type CSIDataMoverVolumeInfo struct {
 
 func (c *CSIDataMoverVolumeInfo) Verify() error {
 	volumeInfo, err := GetVolumeInfo(
-		c.VeleroCfg.CloudProvider,
+		c.VeleroCfg.ObjectStoreProvider,
 		c.VeleroCfg.CloudCredentialsFile,
 		c.VeleroCfg.BSLBucket,
 		c.VeleroCfg.BSLPrefix,
@@ -52,6 +56,8 @@ func (c *CSIDataMoverVolumeInfo) Verify() error {
 	)
 
 	Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("Fail to get VolumeInfo metadata in the Backup Repository."))
+
+	fmt.Printf("The VolumeInfo metadata content: %+v\n", *volumeInfo[0])
 	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
 	Expect(volumeInfo[0].SnapshotDataMovementInfo).NotTo(BeNil())
 

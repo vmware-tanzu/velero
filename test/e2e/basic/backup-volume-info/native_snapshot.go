@@ -31,6 +31,10 @@ var NativeSnapshotVolumeInfoTest func() = TestFunc(&NativeSnapshotVolumeInfo{
 		SnapshotVolumes: true,
 		TestCase: TestCase{
 			CaseBaseName: "native-snapshot-volumeinfo",
+			TestMsg: &TestMSG{
+				Desc: "Test backup's VolumeInfo metadata content for native snapshot case.",
+				Text: "The VolumeInfo should be generated, and the NativeSnapshotInfo structure should not be nil.",
+			},
 		},
 	},
 })
@@ -41,7 +45,7 @@ type NativeSnapshotVolumeInfo struct {
 
 func (n *NativeSnapshotVolumeInfo) Verify() error {
 	volumeInfo, err := GetVolumeInfo(
-		n.VeleroCfg.CloudProvider,
+		n.VeleroCfg.ObjectStoreProvider,
 		n.VeleroCfg.CloudCredentialsFile,
 		n.VeleroCfg.BSLBucket,
 		n.VeleroCfg.BSLPrefix,
@@ -51,6 +55,8 @@ func (n *NativeSnapshotVolumeInfo) Verify() error {
 	)
 
 	Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("Fail to get VolumeInfo metadata in the Backup Repository."))
+
+	fmt.Printf("The VolumeInfo metadata content: %+v\n", *volumeInfo[0])
 	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
 	Expect(volumeInfo[0].NativeSnapshotInfo).NotTo(BeNil())
 
