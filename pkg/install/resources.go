@@ -39,15 +39,20 @@ const (
 )
 
 var (
-	DefaultVeleroPodCPURequest    = "500m"
-	DefaultVeleroPodMemRequest    = "128Mi"
-	DefaultVeleroPodCPULimit      = "1000m"
-	DefaultVeleroPodMemLimit      = "512Mi"
-	DefaultNodeAgentPodCPURequest = "500m"
-	DefaultNodeAgentPodMemRequest = "512Mi"
-	DefaultNodeAgentPodCPULimit   = "1000m"
-	DefaultNodeAgentPodMemLimit   = "1Gi"
-	DefaultVeleroNamespace        = "velero"
+	// default values for Velero server pod resource request/limit
+	DefaultVeleroPodCPURequest = "500m"
+	DefaultVeleroPodMemRequest = "128Mi"
+	DefaultVeleroPodCPULimit   = "1000m"
+	DefaultVeleroPodMemLimit   = "512Mi"
+
+	// default values for node-agent pod resource request/limit,
+	// "0" means no request/limit is set, so as to make the QoS as BestEffort
+	DefaultNodeAgentPodCPURequest = "0"
+	DefaultNodeAgentPodMemRequest = "0"
+	DefaultNodeAgentPodCPULimit   = "0"
+	DefaultNodeAgentPodMemLimit   = "0"
+
+	DefaultVeleroNamespace = "velero"
 )
 
 func Labels() map[string]string {
