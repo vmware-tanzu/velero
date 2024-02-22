@@ -383,7 +383,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 			expected: builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb-1").
 				Phase("").
 				Result(),
-			expectedRequeue: ctrl.Result{Requeue: true, RequeueAfter: time.Minute},
+			expectedRequeue: ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
 		}),
 	)
 })
