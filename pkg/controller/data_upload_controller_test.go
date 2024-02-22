@@ -413,7 +413,7 @@ func TestReconcile(t *testing.T) {
 			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
 			expectedProcessed: false,
 			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).Result(),
-			expectedRequeue:   ctrl.Result{Requeue: true, RequeueAfter: time.Minute},
+			expectedRequeue:   ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
 		},
 		{
 			name:     "prepare timeout",
