@@ -34,6 +34,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/backups"
 	. "github.com/vmware-tanzu/velero/test/e2e/basic"
 	. "github.com/vmware-tanzu/velero/test/e2e/basic/api-group"
+	. "github.com/vmware-tanzu/velero/test/e2e/basic/backup-volume-info"
 	. "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
 	. "github.com/vmware-tanzu/velero/test/e2e/bsl-mgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/migration"
@@ -135,6 +136,13 @@ var _ = Describe("[ResourceFiltering][IncludeResources][Backup] Velero test on i
 var _ = Describe("[ResourceFiltering][IncludeResources][Restore] Velero test on include resources from the cluster restore", RestoreWithIncludeResources)
 var _ = Describe("[ResourceFiltering][LabelSelector] Velero test on backup include resources matching the label selector", BackupWithLabelSelector)
 var _ = Describe("[ResourceFiltering][ResourcePolicies][Restic] Velero test on skip backup of volume by resource policies", ResourcePoliciesTest)
+
+// backup VolumeInfo test
+var _ = Describe("[BackupVolumeInfo][SkippedVolume]", SkippedVolumeInfoTest)
+var _ = Describe("[BackupVolumeInfo][FilesystemUpload]", FilesystemUploadVolumeInfoTest)
+var _ = Describe("[BackupVolumeInfo][CSIDataMover]", CSIDataMoverVolumeInfoTest)
+var _ = Describe("[BackupVolumeInfo][CSISnapshot]", CSISnapshotVolumeInfoTest)
+var _ = Describe("[BackupVolumeInfo][NativeSnapshot]", NativeSnapshotVolumeInfoTest)
 
 var _ = Describe("[ResourceModifier][Restore] Velero test on resource modifiers from the cluster restore", ResourceModifiersTest)
 
