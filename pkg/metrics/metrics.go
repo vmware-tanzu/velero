@@ -468,7 +468,7 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[backupLastStatus].(*prometheus.GaugeVec); ok {
-		c.WithLabelValues(scheduleName).Add(1)
+		c.WithLabelValues(scheduleName).Set(float64(1))
 	}
 	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Add(0)
