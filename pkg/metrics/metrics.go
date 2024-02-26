@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ const (
 	//Velero metrics
 	backupTarballSizeBytesGauge   = "backup_tarball_size_bytes"
 	backupTotal                   = "backup_total"
+	backupActiveTotal             = "backup_active_total"
 	backupAttemptTotal            = "backup_attempt_total"
 	backupSuccessTotal            = "backup_success_total"
 	backupPartialFailureTotal     = "backup_partial_failure_total"
@@ -111,6 +112,13 @@ func NewServerMetrics() *ServerMetrics {
 					Namespace: metricNamespace,
 					Name:      backupTotal,
 					Help:      "Current number of existent backups",
+				},
+			),
+			backupActiveTotal: prometheus.NewGauge(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      backupActiveTotal,
+					Help:      "Number of backups currently in progress",
 				},
 			),
 			backupAttemptTotal: prometheus.NewCounterVec(
@@ -703,6 +711,20 @@ func (m *ServerMetrics) SetBackupLastSuccessfulTimestamp(backupSchedule string, 
 func (m *ServerMetrics) SetBackupTotal(numberOfBackups int64) {
 	if g, ok := m.metrics[backupTotal].(prometheus.Gauge); ok {
 		g.Set(float64(numberOfBackups))
+	}
+}
+
+// IncrementActiveBackupTotal increments the number of in-progress backups
+func (m *ServerMetrics) IncrementActiveBackupTotal() {
+	if g, ok := m.metrics[backupActiveTotal].(prometheus.Gauge); ok {
+		g.Inc()
+	}
+}
+
+// DecrementActiveBackupTotal decrements the number of in-progress backups
+func (m *ServerMetrics) DecrementActiveBackupTotal() {
+	if g, ok := m.metrics[backupActiveTotal].(prometheus.Gauge); ok {
+		g.Dec()
 	}
 }
 
