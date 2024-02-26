@@ -74,7 +74,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 				podVolumeRestoreList := new(velerov1api.PodVolumeRestoreList)
 				err = kbClient.List(context.TODO(), podVolumeRestoreList, &controllerclient.ListOptions{
 					Namespace:     f.Namespace(),
-					LabelSelector: labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: label.GetValidName(restore.Name)}),
+					LabelSelector: labels.SelectorFromSet(map[string]string{velerov1api.RestoreNameLabel: label.GetValidName(restore.Name)}),
 				})
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeRestores for restore %s: %v\n", restore.Name, err)
