@@ -54,7 +54,7 @@ VELERO_IMAGE ?= velero/velero:main
 PLUGINS ?=
 RESTORE_HELPER_IMAGE ?=
 #Released version only
-UPGRADE_FROM_VELERO_VERSION ?= v1.10.2,v1.11.0
+UPGRADE_FROM_VELERO_VERSION ?= v1.11.0,v1.12.3
 # UPGRADE_FROM_VELERO_CLI can has the same format(a list divided by comma) with UPGRADE_FROM_VELERO_VERSION
 # Upgrade tests will be executed sequently according to the list by UPGRADE_FROM_VELERO_VERSION
 # So although length of UPGRADE_FROM_VELERO_CLI list is not equal with UPGRADE_FROM_VELERO_VERSION
@@ -62,7 +62,7 @@ UPGRADE_FROM_VELERO_VERSION ?= v1.10.2,v1.11.0
 # to the end, nil string will be set if UPGRADE_FROM_VELERO_CLI is shorter than UPGRADE_FROM_VELERO_VERSION
 UPGRADE_FROM_VELERO_CLI ?=
 
-MIGRATE_FROM_VELERO_VERSION ?= v1.11.0,self
+MIGRATE_FROM_VELERO_VERSION ?= v1.12.3,self
 MIGRATE_FROM_VELERO_CLI ?=
 
 VELERO_NAMESPACE ?= velero
