@@ -110,3 +110,6 @@ func WriteToFile(content, fileName string) error {
 	}
 	return nil
 }
+func CreateFileContent(namespace, podName, volume string) string {
+	return fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, podName, volume)
+}

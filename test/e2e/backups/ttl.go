@@ -120,7 +120,7 @@ func TTLTest() {
 
 		var snapshotCheckPoint SnapshotCheckPoint
 		if useVolumeSnapshots {
-			if veleroCfg.CloudProvider == "vsphere" {
+			if veleroCfg.CloudProvider == Vsphere {
 				// TODO - remove after upload progress monitoring is implemented
 				By("Waiting for vSphere uploads to complete", func() {
 					Expect(WaitForVSphereUploadCompletion(ctx, time.Hour,
@@ -140,7 +140,7 @@ func TTLTest() {
 				fmt.Sprintf("Failed to delete namespace %s", BackupCfg.BackupName))
 		})
 
-		if veleroCfg.CloudProvider == "aws" && useVolumeSnapshots {
+		if veleroCfg.CloudProvider == Aws && useVolumeSnapshots {
 			fmt.Println("Waiting 7 minutes to make sure the snapshots are ready...")
 			time.Sleep(7 * time.Minute)
 		}

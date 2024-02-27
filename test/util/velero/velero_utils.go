@@ -107,7 +107,7 @@ var pluginsMatrix = map[string]map[string][]string{
 	"main": {
 		"aws":       {"velero/velero-plugin-for-aws:main"},
 		"azure":     {"velero/velero-plugin-for-microsoft-azure:main"},
-		"vsphere":   {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.1"},
+		"vsphere":   {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
 		"gcp":       {"velero/velero-plugin-for-gcp:main"},
 		"csi":       {"velero/velero-plugin-for-csi:main"},
 		"datamover": {"velero/velero-plugin-for-aws:main"},
@@ -128,12 +128,19 @@ func getPluginsByVersion(version, cloudProvider, objectStoreProvider, feature st
 	}
 	var pluginsForFeature []string
 
-	if cloudProvider == "kind" {
-		plugins, ok := cloudMap["aws"]
+	if slices.Contains(LocalCloudProviders, cloudProvider) {
+		var pluginsCSI []string
+		plugins, ok := cloudMap[Aws]
 		if !ok {
 			return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, cloudProvider)
 		}
-		return plugins, nil
+		if cloudProvider == VanillaZFS {
+			pluginsCSI, ok = cloudMap["csi"]
+			if !ok {
+				return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, cloudProvider)
+			}
+		}
+		return append(plugins, pluginsCSI...), nil
 	}
 
 	plugins, ok := cloudMap[cloudProvider]
@@ -1244,7 +1251,7 @@ func GetSnapshotCheckPoint(client TestClient, veleroCfg VeleroConfig, expectCoun
 	snapshotCheckPoint.ExpectCount = expectCount
 	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
 	snapshotCheckPoint.PodName = KibishiiPVCNameList
-	if (veleroCfg.CloudProvider == "azure" || veleroCfg.CloudProvider == "aws") && strings.EqualFold(veleroCfg.Features, FeatureCSI) {
+	if (veleroCfg.CloudProvider == Azure || veleroCfg.CloudProvider == Aws) && strings.EqualFold(veleroCfg.Features, FeatureCSI) {
 		snapshotCheckPoint.EnableCSI = true
 		resourceName := "snapshot.storage.k8s.io"
 

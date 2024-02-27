@@ -104,13 +104,20 @@ func init() {
 
 }
 
+// Add label [SkipVanillaZfs]:
+//   We found issue - https://github.com/openebs/zfs-localpv/issues/123 when using OpenEBS ZFS CSI Driver
+//   When PVC using storage class with reclaim policy as 'Delete', once PVC is deleted, snapshot associated will be deleted
+//   along with PVC deletion, after restoring workload, restored PVC is in pending status, due to failure of provision PV
+//   caused by no expected snapshot found. If we use retain as reclaim policy, then this label can be ignored, all test
+//   cases can be executed as expected successful result.
+
 var _ = Describe("[APIGroup][APIVersion][SKIP_KIND] Velero tests with various CRD API group versions", APIGropuVersionsTest)
 var _ = Describe("[APIGroup][APIExtensions][SKIP_KIND] CRD of apiextentions v1beta1 should be B/R successfully from cluster(k8s version < 1.22) to cluster(k8s version >= 1.22)", APIExtensionsVersionsTest)
 
 // Test backup and restore of Kibishi using restic
 var _ = Describe("[Basic][Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupRestoreWithRestic)
 
-var _ = Describe("[Basic][Snapshot] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreWithSnapshots)
+var _ = Describe("[Basic][Snapshot][SkipVanillaZfs] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreWithSnapshots)
 
 var _ = Describe("[Basic][Snapshot][RetainPV] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreRetainedPVWithSnapshots)
 
@@ -122,7 +129,7 @@ var _ = Describe("[Scale][LongTime] Backup/restore of 2500 namespaces", MultiNSB
 
 // Upgrade test by Kibishi using restic
 var _ = Describe("[Upgrade][Restic] Velero upgrade tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupUpgradeRestoreWithRestic)
-var _ = Describe("[Upgrade][Snapshot] Velero upgrade tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupUpgradeRestoreWithSnapshots)
+var _ = Describe("[Upgrade][Snapshot][SkipVanillaZfs] Velero upgrade tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupUpgradeRestoreWithSnapshots)
 
 // test filter objects by namespace, type, or labels when backup or restore.
 var _ = Describe("[ResourceFiltering][ExcludeFromBackup] Resources with the label velero.io/exclude-from-backup=true are not included in backup", ExcludeFromBackupTest)
@@ -147,8 +154,8 @@ var _ = Describe("[BackupVolumeInfo][NativeSnapshot]", NativeSnapshotVolumeInfoT
 var _ = Describe("[ResourceModifier][Restore] Velero test on resource modifiers from the cluster restore", ResourceModifiersTest)
 
 var _ = Describe("[Backups][Deletion][Restic] Velero tests of Restic backup deletion", BackupDeletionWithRestic)
-var _ = Describe("[Backups][Deletion][Snapshot] Velero tests of snapshot backup deletion", BackupDeletionWithSnapshots)
-var _ = Describe("[Backups][TTL][LongTime][Snapshot] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", TTLTest)
+var _ = Describe("[Backups][Deletion][Snapshot][SkipVanillaZfs] Velero tests of snapshot backup deletion", BackupDeletionWithSnapshots)
+var _ = Describe("[Backups][TTL][LongTime][Snapshot][SkipVanillaZfs] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", TTLTest)
 var _ = Describe("[Backups][BackupsSync] Backups in object storage are synced to a new Velero and deleted backups in object storage are synced to be deleted in Velero", BackupsSyncTest)
 
 var _ = Describe("[Schedule][BR][Pause][LongTime] Backup will be created periodly by schedule defined by a Cron expression", ScheduleBackupTest)
@@ -157,16 +164,16 @@ var _ = Describe("[Schedule][BackupCreation][SKIP_KIND] Schedule controller woul
 
 var _ = Describe("[PrivilegesMgmt][SSR] Velero test on ssr object when controller namespace mix-ups", SSRTest)
 
-var _ = Describe("[BSL][Deletion][Snapshot] Local backups will be deleted once the corresponding backup storage location is deleted", BslDeletionWithSnapshots)
+var _ = Describe("[BSL][Deletion][Snapshot][SkipVanillaZfs] Local backups will be deleted once the corresponding backup storage location is deleted", BslDeletionWithSnapshots)
 var _ = Describe("[BSL][Deletion][Restic] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", BslDeletionWithRestic)
 
 var _ = Describe("[Migration][Restic] Migrate resources between clusters by Restic", MigrationWithRestic)
-var _ = Describe("[Migration][Snapshot] Migrate resources between clusters by snapshot", MigrationWithSnapshots)
+var _ = Describe("[Migration][Snapshot][SkipVanillaZfs] Migrate resources between clusters by snapshot", MigrationWithSnapshots)
 
 var _ = Describe("[NamespaceMapping][Single][Restic] Backup resources should follow the specific order in schedule", OneNamespaceMappingResticTest)
 var _ = Describe("[NamespaceMapping][Multiple][Restic] Backup resources should follow the specific order in schedule", MultiNamespacesMappingResticTest)
-var _ = Describe("[NamespaceMapping][Single][Snapshot] Backup resources should follow the specific order in schedule", OneNamespaceMappingSnapshotTest)
-var _ = Describe("[NamespaceMapping][Multiple][Snapshot] Backup resources should follow the specific order in schedule", MultiNamespacesMappingSnapshotTest)
+var _ = Describe("[NamespaceMapping][Single][Snapshot][SkipVanillaZfs] Backup resources should follow the specific order in schedule", OneNamespaceMappingSnapshotTest)
+var _ = Describe("[NamespaceMapping][Multiple][Snapshot]SkipVanillaZfs] Backup resources should follow the specific order in schedule", MultiNamespacesMappingSnapshotTest)
 
 var _ = Describe("[pv-backup][Opt-In] Backup resources should follow the specific order in schedule", OptInPVBackupTest)
 var _ = Describe("[pv-backup][Opt-Out] Backup resources should follow the specific order in schedule", OptOutPVBackupTest)

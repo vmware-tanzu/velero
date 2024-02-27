@@ -27,17 +27,22 @@ func GetWorkerNodes(ctx context.Context) ([]string, error) {
 	}
 	var nodeNameList []string
 	for nodeIndex, node := range nodes.Items {
-		// := v1.Node{}
 		fmt.Println(nodeIndex)
 		fmt.Println(node.GetName())
 		anns := node.GetAnnotations()
+		lbls := node.GetLabels()
 		fmt.Println(anns)
-		fmt.Println(anns["cluster.x-k8s.io/owner-kind"])
-		//"MachineSet"
+		fmt.Println(lbls)
+		// For Kubeadm vanilla cluster control-plane node selection
+		if _, ok := lbls["node-role.kubernetes.io/control-plane"]; ok {
+			continue
+		}
+		// For public cloud provider cluster control-plane node selection
 		if anns["cluster.x-k8s.io/owner-kind"] == "KubeadmControlPlane" {
 			continue
 		}
 		nodeNameList = append(nodeNameList, node.GetName())
 	}
+	fmt.Println(nodeNameList)
 	return nodeNameList, nil
 }
