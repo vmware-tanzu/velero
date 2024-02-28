@@ -14,7 +14,7 @@ You can follow the work we do, see our milestones, and our backlog on our [GitHu
 * Follow us on Twitter at [@projectvelero](https://twitter.com/projectvelero)
 * Join our Kubernetes Slack channel and talk to over 800 other community members: [#velero-users](https://kubernetes.slack.com/messages/velero-users)
 * Join our [Google Group](https://groups.google.com/forum/#!forum/projectvelero) to get updates on the project and invites to community meetings.
-* Join the Velero community meetings  - [Zoom link](https://VMware.zoom.us/j/94501971662?pwd=aUxVbWVEWHZSbDh4ZGdGU1cxYUFoZz09)  
+* Join the Velero community meetings  - [Zoom link](https://broadcom.zoom.us/j/94416678753?pwd=YkptN1k4M2lrUTdGbitNTmorODcvUT09)  
 Bi-weekly  community meeting alternating every week between Beijing Friendly timezone and EST/Europe Friendly Timezone  
   * Beijing/US friendly - we start at 8am Beijing Time(bound to CST) / 8pm EDT(7pm EST) / 5pm PDT(4pm PST) / 2am CEST(1am CET) - [Convert to your time zone](https://dateful.com/convert/beijing-china?t=8am)  
   * US/Europe friendly - we start at 10am ET(bound to ET) / 7am PT / 3pm CET / 10pm(11pm) CST - [Convert to your time zone](https://dateful.com/convert/est-edt-eastern-time?t=10)  
