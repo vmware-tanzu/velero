@@ -645,18 +645,16 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 			r.logger.Debug("Restore WaitingForPluginOperationsPartiallyFailed")
 			restore.Status.Phase = api.RestorePhaseWaitingForPluginOperationsPartiallyFailed
 		} else {
-			r.logger.Debug("Restore partially failed")
-			restore.Status.Phase = api.RestorePhasePartiallyFailed
-			r.metrics.RegisterRestorePartialFailure(restore.Spec.ScheduleName)
+			r.logger.Debug("Restore FinalizingPartiallyFailed")
+			restore.Status.Phase = api.RestorePhaseFinalizingPartiallyFailed
 		}
 	} else {
 		if inProgressOperations {
 			r.logger.Debug("Restore WaitingForPluginOperations")
 			restore.Status.Phase = api.RestorePhaseWaitingForPluginOperations
 		} else {
-			r.logger.Debug("Restore completed")
-			restore.Status.Phase = api.RestorePhaseCompleted
-			r.metrics.RegisterRestoreSuccess(restore.Spec.ScheduleName)
+			r.logger.Debug("Restore Finalizing")
+			restore.Status.Phase = api.RestorePhaseFinalizing
 		}
 	}
 	return nil

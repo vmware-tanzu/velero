@@ -694,6 +694,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		controller.RestoreOperations:   {},
 		controller.Schedule:            {},
 		controller.ServerStatusRequest: {},
+		controller.RestoreFinalizer:    {},
 	}
 
 	if s.config.restoreOnly {
@@ -980,6 +981,19 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.ServerStatusRequest)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[controller.RestoreFinalizer]; ok {
+		if err := controller.NewRestoreFinalizerReconciler(
+			s.logger,
+			s.namespace,
+			s.mgr.GetClient(),
+			newPluginManager,
+			backupStoreGetter,
+			s.metrics,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", controller.RestoreFinalizer)
 		}
 	}
 

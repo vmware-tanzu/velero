@@ -94,7 +94,7 @@ func TestRestoreOperationsReconcile(t *testing.T) {
 			backup:            defaultBackup().StorageLocation("default").Result(),
 			backupLocation:    defaultBackupLocation,
 			operationComplete: true,
-			expectPhase:       velerov1api.RestorePhaseCompleted,
+			expectPhase:       velerov1api.RestorePhaseFinalizing,
 			restoreOperations: []*itemoperation.RestoreOperation{
 				{
 					Spec: itemoperation.RestoreOperationSpec{
@@ -157,7 +157,7 @@ func TestRestoreOperationsReconcile(t *testing.T) {
 			backupLocation:    defaultBackupLocation,
 			operationComplete: true,
 			operationErr:      "failed",
-			expectPhase:       velerov1api.RestorePhasePartiallyFailed,
+			expectPhase:       velerov1api.RestorePhaseFinalizingPartiallyFailed,
 			restoreOperations: []*itemoperation.RestoreOperation{
 				{
 					Spec: itemoperation.RestoreOperationSpec{
@@ -188,7 +188,7 @@ func TestRestoreOperationsReconcile(t *testing.T) {
 			backup:            defaultBackup().StorageLocation("default").Result(),
 			backupLocation:    defaultBackupLocation,
 			operationComplete: true,
-			expectPhase:       velerov1api.RestorePhasePartiallyFailed,
+			expectPhase:       velerov1api.RestorePhaseFinalizingPartiallyFailed,
 			restoreOperations: []*itemoperation.RestoreOperation{
 				{
 					Spec: itemoperation.RestoreOperationSpec{
@@ -251,7 +251,7 @@ func TestRestoreOperationsReconcile(t *testing.T) {
 			backupLocation:    defaultBackupLocation,
 			operationComplete: true,
 			operationErr:      "failed",
-			expectPhase:       velerov1api.RestorePhasePartiallyFailed,
+			expectPhase:       velerov1api.RestorePhaseFinalizingPartiallyFailed,
 			restoreOperations: []*itemoperation.RestoreOperation{
 				{
 					Spec: itemoperation.RestoreOperationSpec{

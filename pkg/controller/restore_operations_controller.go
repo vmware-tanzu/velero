@@ -128,10 +128,8 @@ func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	info, err := r.fetchBackupInfo(restore.Spec.BackupName)
 	if err != nil {
-		log.Warnf("Cannot check progress on Restore operations because backup info is unavailable %s; marking restore PartiallyFailed", err.Error())
-		restore.Status.Phase = velerov1api.RestorePhasePartiallyFailed
-		restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
-		r.metrics.RegisterRestorePartialFailure(restore.Spec.ScheduleName)
+		log.Warnf("Cannot check progress on Restore operations because backup info is unavailable %s; marking restore FinalizingPartiallyFailed", err.Error())
+		restore.Status.Phase = velerov1api.RestorePhaseFinalizingPartiallyFailed
 		err2 := r.updateRestoreAndOperationsJSON(ctx, original, restore, nil, &itemoperationmap.OperationsForRestore{ErrsSinceUpdate: []string{err.Error()}}, false, false)
 		if err2 != nil {
 			log.WithError(err2).Error("error updating Restore")
@@ -178,15 +176,11 @@ func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// If the only changes are incremental progress, then no write is necessary, progress can remain in memory
 	if !stillInProgress {
 		if restore.Status.Phase == velerov1api.RestorePhaseWaitingForPluginOperations {
-			log.Infof("Marking restore %s completed", restore.Name)
-			restore.Status.Phase = velerov1api.RestorePhaseCompleted
-			restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
-			r.metrics.RegisterRestoreSuccess(restore.Spec.ScheduleName)
+			log.Infof("Marking restore %s Finalizing", restore.Name)
+			restore.Status.Phase = velerov1api.RestorePhaseFinalizing
 		} else {
 			log.Infof("Marking restore %s FinalizingPartiallyFailed", restore.Name)
-			restore.Status.Phase = velerov1api.RestorePhasePartiallyFailed
-			restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
-			r.metrics.RegisterRestorePartialFailure(restore.Spec.ScheduleName)
+			restore.Status.Phase = velerov1api.RestorePhaseFinalizingPartiallyFailed
 		}
 	}
 	err = r.updateRestoreAndOperationsJSON(ctx, original, restore, backupStore, operations, changes, completionChanges)
@@ -216,8 +210,8 @@ func (r *restoreOperationsReconciler) updateRestoreAndOperationsJSON(
 	removeIfComplete := true
 	defer func() {
 		// remove local operations list if complete
-		if removeIfComplete && (restore.Status.Phase == velerov1api.RestorePhaseCompleted ||
-			restore.Status.Phase == velerov1api.RestorePhasePartiallyFailed) {
+		if removeIfComplete && (restore.Status.Phase == velerov1api.RestorePhaseFinalizing ||
+			restore.Status.Phase == velerov1api.RestorePhaseFinalizingPartiallyFailed) {
 			r.itemOperationsMap.DeleteOperationsForRestore(restore.Name)
 		} else if changes {
 			r.itemOperationsMap.PutOperationsForRestore(operations, restore.Name)
@@ -226,8 +220,8 @@ func (r *restoreOperationsReconciler) updateRestoreAndOperationsJSON(
 
 	// update restore and upload progress if errs or complete
 	if len(operations.ErrsSinceUpdate) > 0 ||
-		restore.Status.Phase == velerov1api.RestorePhaseCompleted ||
-		restore.Status.Phase == velerov1api.RestorePhasePartiallyFailed {
+		restore.Status.Phase == velerov1api.RestorePhaseFinalizing ||
+		restore.Status.Phase == velerov1api.RestorePhaseFinalizingPartiallyFailed {
 		// update file store
 		if backupStore != nil {
 			if err := r.itemOperationsMap.UploadProgressAndPutOperationsForRestore(backupStore, operations, restore.Name); err != nil {
