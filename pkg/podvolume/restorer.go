@@ -88,7 +88,7 @@ func newRestorer(
 		log:     log,
 	}
 
-	pvrInformer.AddEventHandler(
+	_, _ = pvrInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(_, obj interface{}) {
 				pvr := obj.(*velerov1api.PodVolumeRestore)
@@ -205,8 +205,8 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 			return true, nil
 		}
 
-		err := wait.PollWithContext(checkCtx, time.Millisecond*500, time.Minute*10, checkFunc)
-		if err == wait.ErrWaitTimeout {
+		err := wait.PollUntilContextTimeout(checkCtx, time.Millisecond*500, time.Minute*10, true, checkFunc)
+		if wait.Interrupted(err) {
 			r.log.WithError(err).Error("Restoring pod is not scheduled until timeout or cancel, disengage")
 		} else if err != nil {
 			r.log.WithError(err).Error("Failed to check node-agent pod status, disengage")

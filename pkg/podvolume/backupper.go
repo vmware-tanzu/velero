@@ -117,7 +117,7 @@ func newBackupper(
 		results: make(map[string]chan *velerov1api.PodVolumeBackup),
 	}
 
-	pvbInformer.AddEventHandler(
+	_, _ = pvbInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(_, obj interface{}) {
 				pvb := obj.(*velerov1api.PodVolumeBackup)
@@ -225,8 +225,8 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 
 	var (
 		podVolumeBackups   []*velerov1api.PodVolumeBackup
-		mountedPodVolumes  = sets.String{}
-		attachedPodDevices = sets.String{}
+		mountedPodVolumes  = sets.Set[string]{}
+		attachedPodDevices = sets.Set[string]{}
 	)
 
 	for _, container := range pod.Spec.Containers {

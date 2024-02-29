@@ -52,8 +52,8 @@ func CustomResources() map[string]typeInfo {
 }
 
 // CustomResourceKinds returns a list of all custom resources kinds within the Velero
-func CustomResourceKinds() sets.String {
-	kinds := sets.NewString()
+func CustomResourceKinds() sets.Set[string] {
+	kinds := sets.New[string]()
 
 	resources := CustomResources()
 	for kind := range resources {

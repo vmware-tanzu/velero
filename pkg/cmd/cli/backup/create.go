@@ -252,7 +252,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			ObjectList: new(velerov1api.BackupList),
 		}
 		backupInformer := cache.NewSharedInformer(&lw, &velerov1api.Backup{}, time.Second)
-		backupInformer.AddEventHandler(
+		_, _ = backupInformer.AddEventHandler(
 			cache.FilteringResourceEventHandler{
 				FilterFunc: func(obj interface{}) bool {
 					backup, ok := obj.(*velerov1api.Backup)

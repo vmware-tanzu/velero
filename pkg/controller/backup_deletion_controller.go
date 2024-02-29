@@ -101,7 +101,7 @@ func (r *backupDeletionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	s := kube.NewPeriodicalEnqueueSource(r.logger, mgr.GetClient(), &velerov1api.DeleteBackupRequestList{}, time.Hour, kube.PeriodicalEnqueueSourceOption{})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.DeleteBackupRequest{}).
-		Watches(s, nil).
+		WatchesRawSource(s, nil).
 		Complete(r)
 }
 
@@ -375,7 +375,7 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		// Wait for the deletion of restores within certain amount of time.
 		// Notice that there could be potential errors during the finalization process, which may result in the failure to delete the restore.
 		// Therefore, it is advisable to set a timeout period for waiting.
-		err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 			restoreList := &velerov1api.RestoreList{}
 			if err := r.List(ctx, restoreList, &client.ListOptions{Namespace: backup.Namespace, LabelSelector: selector}); err != nil {
 				return false, err

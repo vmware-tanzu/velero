@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -108,7 +108,7 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		log.WithError(err).Error("Error listing backups in backup store")
 		return ctrl.Result{}, nil
 	}
-	backupStoreBackups := sets.NewString(res...)
+	backupStoreBackups := sets.New[string](res...)
 	log.WithField("backupCount", len(backupStoreBackups)).Debug("Got backups from backup store")
 
 	// get a list of all the backups that exist as custom resources in the cluster
@@ -126,7 +126,7 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// get a list of backups that *are* in the backup storage location and *aren't* in the cluster
-	clusterBackupsSet := sets.NewString()
+	clusterBackupsSet := sets.New[string]()
 	for _, b := range clusterBackupList.Items {
 		clusterBackupsSet.Insert(b.Name)
 	}
@@ -349,13 +349,13 @@ func (b *backupSyncReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		// Filter all BSL events, because this controller is supposed to run periodically, not by event.
 		For(&velerov1api.BackupStorageLocation{}, builder.WithPredicates(kube.FalsePredicate{})).
-		Watches(backupSyncSource, nil, builder.WithPredicates(gp)).
+		WatchesRawSource(backupSyncSource, nil, builder.WithPredicates(gp)).
 		Complete(b)
 }
 
 // deleteOrphanedBackups deletes backup objects (CRDs) from Kubernetes that have the specified location
 // and a phase of Completed, but no corresponding backup in object storage.
-func (b *backupSyncReconciler) deleteOrphanedBackups(ctx context.Context, locationName string, backupStoreBackups sets.String, log logrus.FieldLogger) {
+func (b *backupSyncReconciler) deleteOrphanedBackups(ctx context.Context, locationName string, backupStoreBackups sets.Set[string], log logrus.FieldLogger) {
 	var backupList velerov1api.BackupList
 	listOption := client.ListOptions{
 		LabelSelector: labels.Set(map[string]string{

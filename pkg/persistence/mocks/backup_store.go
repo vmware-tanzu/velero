@@ -21,7 +21,7 @@ import (
 	io "io"
 
 	mock "github.com/stretchr/testify/mock"
-	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 
 	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	itemoperation "github.com/vmware-tanzu/velero/pkg/itemoperation"
