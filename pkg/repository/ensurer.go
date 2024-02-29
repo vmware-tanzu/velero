@@ -129,7 +129,7 @@ func (r *Ensurer) waitBackupRepository(ctx context.Context, namespace string, ba
 		}
 	}
 
-	err := wait.PollWithContext(ctx, time.Millisecond*500, r.resourceTimeout, checkFunc)
+	err := wait.PollUntilContextTimeout(ctx, time.Millisecond*500, r.resourceTimeout, true, checkFunc)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wait BackupRepository")
 	}

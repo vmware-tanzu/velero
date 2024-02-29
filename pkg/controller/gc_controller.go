@@ -88,7 +88,7 @@ func (c *gcReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return false
 			},
 		})).
-		Watches(s, nil).
+		WatchesRawSource(s, nil).
 		Complete(c)
 }
 

@@ -229,6 +229,6 @@ func (r *downloadRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.DownloadRequest{}).
-		Watches(downloadRequestSource, nil, builder.WithPredicates(downloadRequestPredicates)).
+		WatchesRawSource(downloadRequestSource, nil, builder.WithPredicates(downloadRequestPredicates)).
 		Complete(r)
 }

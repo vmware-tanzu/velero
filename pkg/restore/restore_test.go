@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -2238,7 +2238,7 @@ func TestShouldRestore(t *testing.T) {
 				),
 			},
 			want:    false,
-			wantErr: errors.New("timed out waiting for the condition"),
+			wantErr: errors.New("context deadline exceeded"),
 		},
 		{
 			name:   "when PV is found, has associated PVC that's not deleting, has associated NS that is terminating, result is false + timeout error",
@@ -2253,7 +2253,7 @@ func TestShouldRestore(t *testing.T) {
 				builder.ForNamespace("ns-1").Phase(corev1api.NamespaceTerminating).Result(),
 			},
 			want:    false,
-			wantErr: errors.New("timed out waiting for the condition"),
+			wantErr: errors.New("context deadline exceeded"),
 		},
 		{
 			name:   "when PV is found, has associated PVC that's not deleting, has associated NS that has deletion timestamp, result is false + timeout error",
@@ -2268,7 +2268,7 @@ func TestShouldRestore(t *testing.T) {
 				builder.ForNamespace("ns-1").ObjectMeta(builder.WithDeletionTimestamp(time.Now())).Result(),
 			},
 			want:    false,
-			wantErr: errors.New("timed out waiting for the condition"),
+			wantErr: errors.New("context deadline exceeded"),
 		},
 		{
 			name:   "when PV is found, associated PVC is not found, result is false + timeout error",
@@ -2279,7 +2279,7 @@ func TestShouldRestore(t *testing.T) {
 				),
 			},
 			want:    false,
-			wantErr: errors.New("timed out waiting for the condition"),
+			wantErr: errors.New("context deadline exceeded"),
 		},
 		{
 			name:   "when PV is found, has associated PVC, associated namespace not found, result is false + timeout error",
@@ -2291,7 +2291,7 @@ func TestShouldRestore(t *testing.T) {
 				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
 			},
 			want:    false,
-			wantErr: errors.New("timed out waiting for the condition"),
+			wantErr: errors.New("context deadline exceeded"),
 		},
 	}
 

@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	veleroapishared "github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
@@ -207,11 +206,11 @@ func (c *PodVolumeRestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// By watching the pods, we can trigger the PVR reconciliation again once the pod is finally scheduled on the node.
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.PodVolumeRestore{}).
-		Watches(&source.Kind{Type: &corev1api.Pod{}}, handler.EnqueueRequestsFromMapFunc(c.findVolumeRestoresForPod)).
+		Watches(&corev1api.Pod{}, handler.EnqueueRequestsFromMapFunc(c.findVolumeRestoresForPod)).
 		Complete(c)
 }
 
-func (c *PodVolumeRestoreReconciler) findVolumeRestoresForPod(pod client.Object) []reconcile.Request {
+func (c *PodVolumeRestoreReconciler) findVolumeRestoresForPod(ctx context.Context, pod client.Object) []reconcile.Request {
 	list := &velerov1api.PodVolumeRestoreList{}
 	options := &client.ListOptions{
 		LabelSelector: labels.Set(map[string]string{

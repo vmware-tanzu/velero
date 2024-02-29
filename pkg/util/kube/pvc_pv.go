@@ -78,7 +78,7 @@ func DeletePVAndPVCIfAny(ctx context.Context, client corev1client.CoreV1Interfac
 func WaitPVCBound(ctx context.Context, pvcGetter corev1client.CoreV1Interface,
 	pvGetter corev1client.CoreV1Interface, pvc string, namespace string, timeout time.Duration) (*corev1api.PersistentVolume, error) {
 	var updated *corev1api.PersistentVolumeClaim
-	err := wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
 		tmpPVC, err := pvcGetter.PersistentVolumeClaims(namespace).Get(ctx, pvc, metav1.GetOptions{})
 		if err != nil {
 			return false, errors.Wrapf(err, fmt.Sprintf("error to get pvc %s/%s", namespace, pvc))
@@ -124,7 +124,7 @@ func EnsureDeletePVC(ctx context.Context, pvcGetter corev1client.CoreV1Interface
 		return errors.Wrapf(err, "error to delete pvc %s", pvc)
 	}
 
-	err = wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := pvcGetter.PersistentVolumeClaims(namespace).Get(ctx, pvc, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -262,7 +262,8 @@ func WaitPVCConsumed(ctx context.Context, pvcGetter corev1client.CoreV1Interface
 	selectedNode := ""
 	var updated *corev1api.PersistentVolumeClaim
 	var storageClass *storagev1api.StorageClass
-	err := wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
+
+	err := wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
 		tmpPVC, err := pvcGetter.PersistentVolumeClaims(namespace).Get(ctx, pvc, metav1.GetOptions{})
 		if err != nil {
 			return false, errors.Wrapf(err, "error to get pvc %s/%s", namespace, pvc)
@@ -299,7 +300,7 @@ func WaitPVCConsumed(ctx context.Context, pvcGetter corev1client.CoreV1Interface
 // WaitPVBound wait for binding of a PV specified by name and returns the bound PV object
 func WaitPVBound(ctx context.Context, pvGetter corev1client.CoreV1Interface, pvName string, pvcName string, pvcNamespace string, timeout time.Duration) (*corev1api.PersistentVolume, error) {
 	var updated *corev1api.PersistentVolume
-	err := wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
 		tmpPV, err := pvGetter.PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 		if err != nil {
 			return false, errors.Wrapf(err, fmt.Sprintf("failed to get pv %s", pvName))

@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
@@ -476,8 +475,8 @@ func (r *DataDownloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov2alpha1api.DataDownload{}).
-		Watches(s, nil, builder.WithPredicates(gp)).
-		Watches(&source.Kind{Type: &v1.Pod{}}, kube.EnqueueRequestsFromMapUpdateFunc(r.findSnapshotRestoreForPod),
+		WatchesRawSource(s, nil, builder.WithPredicates(gp)).
+		Watches(&v1.Pod{}, kube.EnqueueRequestsFromMapUpdateFunc(r.findSnapshotRestoreForPod),
 			builder.WithPredicates(predicate.Funcs{
 				UpdateFunc: func(ue event.UpdateEvent) bool {
 					newObj := ue.ObjectNew.(*v1.Pod)
@@ -505,7 +504,7 @@ func (r *DataDownloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *DataDownloadReconciler) findSnapshotRestoreForPod(podObj client.Object) []reconcile.Request {
+func (r *DataDownloadReconciler) findSnapshotRestoreForPod(ctx context.Context, podObj client.Object) []reconcile.Request {
 	pod := podObj.(*v1.Pod)
 	dd, err := findDataDownloadByPod(r.client, *pod)
 
@@ -780,7 +779,7 @@ func isDataDownloadInFinalState(dd *velerov2alpha1api.DataDownload) bool {
 }
 
 func UpdateDataDownloadWithRetry(ctx context.Context, client client.Client, namespacedName types.NamespacedName, log *logrus.Entry, updateFunc func(dataDownload *velerov2alpha1api.DataDownload)) error {
-	return wait.PollUntilWithContext(ctx, time.Second, func(ctx context.Context) (done bool, err error) {
+	return wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (done bool, err error) {
 		dd := &velerov2alpha1api.DataDownload{}
 		if err := client.Get(ctx, namespacedName, dd); err != nil {
 			return false, errors.Wrap(err, "getting DataDownload")

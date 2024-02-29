@@ -30,7 +30,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -288,7 +288,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		resourceIncludesExcludes:       resourceIncludesExcludes,
 		resourceStatusIncludesExcludes: restoreStatusIncludesExcludes,
 		namespaceIncludesExcludes:      namespaceIncludesExcludes,
-		resourceMustHave:               sets.NewString(resourceMustHave...),
+		resourceMustHave:               sets.New[string](resourceMustHave...),
 		chosenGrpVersToRestore:         make(map[string]ChosenGroupVersion),
 		selector:                       selector,
 		OrSelectors:                    OrSelectors,
@@ -300,7 +300,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		volumeSnapshotterGetter:        volumeSnapshotterGetter,
 		podVolumeRestorer:              podVolumeRestorer,
 		podVolumeErrs:                  make(chan error),
-		pvsToProvision:                 sets.NewString(),
+		pvsToProvision:                 sets.New[string](),
 		pvRestorer:                     pvRestorer,
 		volumeSnapshots:                req.VolumeSnapshots,
 		csiVolumeSnapshots:             req.CSIVolumeSnapshots,
@@ -338,7 +338,7 @@ type restoreContext struct {
 	resourceIncludesExcludes       *collections.IncludesExcludes
 	resourceStatusIncludesExcludes *collections.IncludesExcludes
 	namespaceIncludesExcludes      *collections.IncludesExcludes
-	resourceMustHave               sets.String
+	resourceMustHave               sets.Set[string]
 	chosenGrpVersToRestore         map[string]ChosenGroupVersion
 	selector                       labels.Selector
 	OrSelectors                    []labels.Selector
@@ -351,7 +351,7 @@ type restoreContext struct {
 	podVolumeRestorer              podvolume.Restorer
 	podVolumeWaitGroup             sync.WaitGroup
 	podVolumeErrs                  chan error
-	pvsToProvision                 sets.String
+	pvsToProvision                 sets.Set[string]
 	pvRestorer                     PVRestorer
 	volumeSnapshots                []*volume.Snapshot
 	csiVolumeSnapshots             []*snapshotv1api.VolumeSnapshot
@@ -516,7 +516,7 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 	}()
 
 	// totalItems: previously discovered items, i: iteration counter.
-	totalItems, processedItems, existingNamespaces := 0, 0, sets.NewString()
+	totalItems, processedItems, existingNamespaces := 0, 0, sets.New[string]()
 
 	// First restore CRDs. This is needed so that they are available in the cluster
 	// when getOrderedResourceCollection is called again on the whole backup and
@@ -524,7 +524,7 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 	crdResourceCollection, processedResources, w, e := ctx.getOrderedResourceCollection(
 		backupResources,
 		make([]restoreableResource, 0),
-		sets.NewString(),
+		sets.New[string](),
 		Priorities{HighPriorities: []string{"customresourcedefinitions"}},
 		false,
 	)
@@ -710,7 +710,7 @@ func (ctx *restoreContext) processSelectedResource(
 	selectedResource restoreableResource,
 	totalItems int,
 	processedItems int,
-	existingNamespaces sets.String,
+	existingNamespaces sets.Set[string],
 	update chan progressUpdate,
 ) (int, results.Result, results.Result) {
 	warnings, errs := results.Result{}, results.Result{}
@@ -873,7 +873,7 @@ func (ctx *restoreContext) shouldRestore(name string, pvClient client.Dynamic) (
 	pvLogger := ctx.log.WithField("pvName", name)
 
 	var shouldRestore bool
-	err := wait.PollImmediate(time.Second, ctx.resourceTerminatingTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(go_context.Background(), time.Second, ctx.resourceTerminatingTimeout, true, func(go_context.Context) (bool, error) {
 		unstructuredPV, err := pvClient.Get(name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			pvLogger.Debug("PV not found, safe to restore")
@@ -956,7 +956,7 @@ func (ctx *restoreContext) shouldRestore(name string, pvClient client.Dynamic) (
 		return true, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		pvLogger.Warn("timeout reached waiting for persistent volume to delete")
 	}
 
@@ -970,7 +970,7 @@ func (ctx *restoreContext) crdAvailable(name string, crdClient client.Dynamic) (
 
 	var available bool
 
-	err := wait.PollImmediate(time.Second, ctx.resourceTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(go_context.Background(), time.Second, ctx.resourceTimeout, true, func(ctx go_context.Context) (bool, error) {
 		unstructuredCRD, err := crdClient.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return true, err
@@ -989,7 +989,7 @@ func (ctx *restoreContext) crdAvailable(name string, crdClient client.Dynamic) (
 		return available, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		crdLogger.Debug("timeout reached waiting for custom resource definition to be ready")
 	}
 
@@ -1008,7 +1008,7 @@ func (ctx *restoreContext) itemsAvailable(action framework.RestoreItemResolvedAc
 		timeout = restoreItemOut.AdditionalItemsReadyTimeout
 	}
 
-	err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(go_context.Background(), time.Second, timeout, true, func(go_context.Context) (bool, error) {
 		var err error
 		available, err = action.AreAdditionalItemsReady(restoreItemOut.AdditionalItems, ctx.restore)
 
@@ -1025,7 +1025,7 @@ func (ctx *restoreContext) itemsAvailable(action framework.RestoreItemResolvedAc
 		return available, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		ctx.log.Debug("timeout reached waiting for AdditionalItems to be ready")
 	}
 
@@ -2153,10 +2153,10 @@ type restoreableItem struct {
 func (ctx *restoreContext) getOrderedResourceCollection(
 	backupResources map[string]*archive.ResourceItems,
 	restoreResourceCollection []restoreableResource,
-	processedResources sets.String,
+	processedResources sets.Set[string],
 	resourcePriorities Priorities,
 	includeAllResources bool,
-) ([]restoreableResource, sets.String, results.Result, results.Result) {
+) ([]restoreableResource, sets.Set[string], results.Result, results.Result) {
 	var warnings, errs results.Result
 	// Iterate through an ordered list of resources to restore, checking each
 	// one to see if it should be restored. Note that resources *may* be in this

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -57,7 +57,7 @@ func GetCsiSnapshotHandle(client TestClient, backupName string) ([]string, error
 	if err != nil {
 		return nil, err
 	}
-	vscList, err1 := snapshotClient.SnapshotV1beta1().VolumeSnapshotContents().List(context.TODO(), metav1.ListOptions{})
+	vscList, err1 := snapshotClient.SnapshotV1().VolumeSnapshotContents().List(context.TODO(), metav1.ListOptions{})
 	if err1 != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func GetVolumeSnapshotContentNameByPod(client TestClient, podName, namespace, ba
 	if err != nil {
 		return "", err
 	}
-	vsList, err := snapshotClient.SnapshotV1beta1().VolumeSnapshots(namespace).List(context.TODO(), metav1.ListOptions{})
+	vsList, err := snapshotClient.SnapshotV1().VolumeSnapshots(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return "", err
 	}

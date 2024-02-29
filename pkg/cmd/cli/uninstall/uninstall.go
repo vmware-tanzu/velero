@@ -273,11 +273,11 @@ func deleteResources(ctx context.Context, kbClient kbclient.Client, namespace st
 	// First attempt to gracefully delete all the resources within a specified time frame, If the process exceeds the timeout limit,
 	// it is likely that there may be errors during the finalization of restores. In such cases, we should proceed with forcefully deleting the restores.
 	err = gracefullyDeleteResources(ctx, kbClient, namespace)
-	if err != nil && err != wait.ErrWaitTimeout {
+	if err != nil && !wait.Interrupted(err) {
 		return errors.Wrap(err, "Error deleting resources")
 	}
 
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = forcedlyDeleteResources(ctx, kbClient, namespace)
 		if err != nil {
 			return errors.Wrap(err, "Error deleting resources forcedly")
@@ -351,7 +351,7 @@ func gracefullyDeleteResource(ctx context.Context, kbClient kbclient.Client, nam
 
 func waitDeletingResources(ctx context.Context, kbClient kbclient.Client, namespace string) error {
 	// Wait for the deletion of all the restores within a specified time frame
-	err := wait.PollImmediate(time.Second, gracefulDeletionMaximumDuration, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, time.Second, gracefulDeletionMaximumDuration, true, func(ctx context.Context) (bool, error) {
 		itemsCount := 0
 		for i := range resToDelete {
 			if errList := kbClient.List(ctx, resToDelete[i], &kbclient.ListOptions{Namespace: namespace}); errList != nil {
