@@ -19,9 +19,9 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 
 ## Instructions
 
-**Caution:** From Velero v1.10, except for using restic to do file-system level backup and restore, kopia is also been integrated, it could be upgraded from v1.10 or higher to v1.13 directly, but it would be a little bit of difference when upgrading to v1.13 from a version lower than v1.10.0. 
+**Caution:** Starting in Velero v1.10, kopia has replaced restic as the default uploader. It is now possible to upgrade from a version >= v1.10 directly. However, the procedure for upgrading to v1.13 from a Velero release lower than v1.10 is different.
 
-### Upgrade from version lower than v1.10.0
+### Upgrade from v1.10 or higher
 1. Install the Velero v1.13 command-line interface (CLI) by following the [instructions here][0].
 
     Verify that you've properly installed it by running:
@@ -46,6 +46,41 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 
     **NOTE:** Since velero v1.10.0 only v1 CRD will be supported during installation, therefore, the v1.10.0 will only work on Kubernetes version >= v1.16
 
+3. Update the container image used by the Velero deployment, plugin and (optionally) the node agent daemon set:
+    ```bash
+   # set the container and image of the init container for plugin accordingly,
+   # if you are using other plugin
+    kubectl set image deployment/velero \
+        velero=velero/velero:v1.13.0 \
+        velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.9.0 \
+        --namespace velero
+
+    # optional, if using the node agent daemonset
+    kubectl set image daemonset/node-agent \
+        node-agent=velero/velero:v1.13.0 \
+        --namespace velero
+    ```
+4. Confirm that the deployment is up and running with the correct version by running:
+
+    ```bash
+    velero version
+    ```
+
+    You should see the following output:
+
+    ```bash
+    Client:
+        Version: v1.13.0
+        Git commit: <git SHA>
+
+    Server:
+        Version: v1.13.0
+    ```
+
+
+### Upgrade from version lower than v1.10.0
+The procedure for upgrading from a version lower than v1.10.0 is identical to the procedure above, except for step 3 as shown below.
+
 3. Update the container image and objects fields used by the Velero deployment and, optionally, the restic daemon set:
 
     ```bash
@@ -67,43 +102,8 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
     kubectl delete ds -n velero restic --force --grace-period 0
     ```
 
-4. Confirm that the deployment is up and running with the correct version by running:
-
-    ```bash
-    velero version
-    ```
-
-    You should see the following output:
-
-    ```bash
-    Client:
-        Version: v1.13.0
-        Git commit: <git SHA>
-
-    Server:
-        Version: v1.13.0
-    ```
-
-### Upgrade from v1.10 or higher
-If it's directly upgraded from v1.10 or higher, the other steps remain the same only except for step 3 above. The details as below:
-
-1. Update the container image used by the Velero deployment, plugin and, optionally, the node agent daemon set:
-    ```bash
-   # set the container and image of the init container for plugin accordingly,
-   # if you are using other plugin
-    kubectl set image deployment/velero \
-        velero=velero/velero:v1.13.0 \
-        velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.9.0 \
-        --namespace velero
-
-    # optional, if using the node agent daemonset
-    kubectl set image daemonset/node-agent \
-        node-agent=velero/velero:v1.13.0 \
-        --namespace velero
-    ```
-
 ## Notes
-If upgraded from v1.9.x, there still remains some resources left over in the cluster and never used in v1.13.x, which could be deleted through kubectl and it is based on your desire:
+If upgrading from Velero v1.9.x or lower, there will likely remain some unused resources leftover in the cluster.These can be deleted manually (e.g. using kubectl) at your own discretion:
 
     - resticrepository CRD and related CRs
     - velero-restic-credentials secret in velero install namespace
