@@ -80,6 +80,7 @@ func TestGetVolumesByPod(t *testing.T) {
 			optedOut []string
 		}
 		defaultVolumesToFsBackup bool
+		backupExcludePVC         bool
 	}{
 		{
 			name:                     "should get PVs from VolumesToBackupAnnotation when defaultVolumesToFsBackup is false",
@@ -329,11 +330,43 @@ func TestGetVolumesByPod(t *testing.T) {
 				optedOut: []string{},
 			},
 		},
+		{
+			name:                     "should exclude PVC volume when backup excludes PVC resource",
+			defaultVolumesToFsBackup: true,
+			backupExcludePVC:         true,
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						velerov1api.VolumesToExcludeAnnotation: "nonPvbPV1,nonPvbPV2,nonPvbPV3",
+					},
+				},
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						{Name: "pvbPV1"}, {Name: "pvbPV2"}, {Name: "pvbPV3"},
+						{
+							Name: "downwardAPI",
+							VolumeSource: corev1api.VolumeSource{
+								PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+									ClaimName: "testPVC",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: struct {
+				included []string
+				optedOut []string
+			}{
+				included: []string{"pvbPV1", "pvbPV2", "pvbPV3"},
+				optedOut: []string{},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualIncluded, actualOptedOut := GetVolumesByPod(tc.pod, tc.defaultVolumesToFsBackup)
+			actualIncluded, actualOptedOut := GetVolumesByPod(tc.pod, tc.defaultVolumesToFsBackup, tc.backupExcludePVC)
 
 			sort.Strings(tc.expected.included)
 			sort.Strings(actualIncluded)
