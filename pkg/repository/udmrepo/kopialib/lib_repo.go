@@ -366,6 +366,39 @@ func (kr *kopiaRepository) Flush(ctx context.Context) error {
 	return nil
 }
 
+func (kr *kopiaRepository) GetAdvancedFeatures() udmrepo.AdvancedFeatureInfo {
+	return udmrepo.AdvancedFeatureInfo{
+		MultiPartBackup: true,
+	}
+}
+
+func (kr *kopiaRepository) ConcatenateObjects(ctx context.Context, objectIDs []udmrepo.ID) (udmrepo.ID, error) {
+	if kr.rawWriter == nil {
+		return "", errors.New("repo writer is closed or not open")
+	}
+
+	if len(objectIDs) == 0 {
+		return udmrepo.ID(""), errors.New("object list is empty")
+	}
+
+	rawIDs := []object.ID{}
+	for _, id := range objectIDs {
+		rawID, err := object.ParseID(string(id))
+		if err != nil {
+			return udmrepo.ID(""), errors.Wrapf(err, "error to parse object ID from %v", id)
+		}
+
+		rawIDs = append(rawIDs, rawID)
+	}
+
+	result, err := kr.rawWriter.ConcatenateObjects(ctx, rawIDs)
+	if err != nil {
+		return udmrepo.ID(""), errors.Wrap(err, "error to concatenate objects")
+	}
+
+	return udmrepo.ID(result.String()), nil
+}
+
 // updateProgress is called when the repository writes a piece of blob data to the storage during data write
 func (kr *kopiaRepository) updateProgress(uploaded int64) {
 	total := atomic.AddInt64(&kr.uploaded, uploaded)

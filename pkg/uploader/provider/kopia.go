@@ -159,6 +159,14 @@ func (kp *kopiaProvider) RunBackup(
 		realSource = fmt.Sprintf("%s/%s/%s", kp.requestorType, uploader.KopiaType, realSource)
 	}
 
+	if kp.bkRepo.GetAdvancedFeatures().MultiPartBackup {
+		if uploaderCfg == nil {
+			uploaderCfg = make(map[string]string)
+		}
+
+		uploaderCfg[kopia.UploaderConfigMultipartKey] = "true"
+	}
+
 	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, realSource, forceFull, parentSnapshot, volMode, uploaderCfg, tags, log)
 	if err != nil {
 		if kpUploader.IsCanceled() {

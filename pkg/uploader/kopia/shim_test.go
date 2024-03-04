@@ -65,10 +65,6 @@ func TestShimRepo(t *testing.T) {
 	backupRepo.On("Flush", mock.Anything).Return(nil)
 	NewShimRepo(backupRepo).Flush(ctx)
 
-	var objID object.ID
-	backupRepo.On("ConcatenateObjects", mock.Anything, mock.Anything).Return(objID)
-	NewShimRepo(backupRepo).ConcatenateObjects(ctx, []object.ID{})
-
 	backupRepo.On("NewObjectWriter", mock.Anything, mock.Anything).Return(nil)
 	NewShimRepo(backupRepo).NewObjectWriter(ctx, object.WriterOptions{})
 }
@@ -287,6 +283,67 @@ func TestReplaceManifests(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.expectedID, id)
+		})
+	}
+}
+
+func TestConcatenateObjects(t *testing.T) {
+	tests := []struct {
+		name          string
+		backupRepo    *mocks.BackupRepo
+		objectIDs     []object.ID
+		expectedError string
+	}{
+		{
+			name:          "empty object list",
+			expectedError: "object list is empty",
+		},
+		{
+			name: "concatenate error",
+			backupRepo: func() *mocks.BackupRepo {
+				backupRepo := &mocks.BackupRepo{}
+				backupRepo.On("ConcatenateObjects", mock.Anything, mock.Anything).Return(udmrepo.ID(""), errors.New("fake-concatenate-error"))
+				return backupRepo
+			}(),
+			objectIDs: []object.ID{
+				{},
+			},
+			expectedError: "fake-concatenate-error",
+		},
+		{
+			name: "parse error",
+			backupRepo: func() *mocks.BackupRepo {
+				backupRepo := &mocks.BackupRepo{}
+				backupRepo.On("ConcatenateObjects", mock.Anything, mock.Anything).Return(udmrepo.ID("fake-id"), nil)
+				return backupRepo
+			}(),
+			objectIDs: []object.ID{
+				{},
+			},
+			expectedError: "malformed content ID: \"fake-id\": invalid content prefix",
+		},
+		{
+			name: "success",
+			backupRepo: func() *mocks.BackupRepo {
+				backupRepo := &mocks.BackupRepo{}
+				backupRepo.On("ConcatenateObjects", mock.Anything, mock.Anything).Return(udmrepo.ID("I123456"), nil)
+				return backupRepo
+			}(),
+			objectIDs: []object.ID{
+				{},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			_, err := NewShimRepo(tc.backupRepo).ConcatenateObjects(ctx, tc.objectIDs)
+
+			if tc.expectedError != "" {
+				assert.EqualError(t, err, tc.expectedError)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }
