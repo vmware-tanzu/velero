@@ -259,6 +259,17 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			}
 		}
 
+		if resPolicies != nil {
+			if action, err := b.getMatchAction(resPolicies, pvc, &volume); err != nil {
+				errs = append(errs, errors.Wrapf(err, "error getting pv for pvc %s", pvc.Spec.VolumeName))
+				continue
+			} else if action != nil && action.Type == resourcepolicies.Skip {
+				log.Infof("skip backup of volume %s for the matched resource policies", volumeName)
+				pvcSummary.addSkipped(volumeName, "matched action is 'skip' in chosen resource policies")
+				continue
+			}
+		}
+
 		// hostPath volumes are not supported because they're not mounted into /var/lib/kubelet/pods, so our
 		// daemonset pod has no way to access their data.
 		isHostPath, err := isHostPathVolume(&volume, pvc, b.crClient)
@@ -287,17 +298,6 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			log.Warn(msg)
 			pvcSummary.addSkipped(volumeName, msg)
 			continue
-		}
-
-		if resPolicies != nil {
-			if action, err := b.getMatchAction(resPolicies, pvc, &volume); err != nil {
-				errs = append(errs, errors.Wrapf(err, "error getting pv for pvc %s", pvc.Spec.VolumeName))
-				continue
-			} else if action != nil && action.Type == resourcepolicies.Skip {
-				log.Infof("skip backup of volume %s for the matched resource policies", volumeName)
-				pvcSummary.addSkipped(volumeName, "matched action is 'skip' in chosen resource policies")
-				continue
-			}
 		}
 
 		volumeBackup := newPodVolumeBackup(backup, pod, volume, repoIdentifier, b.uploaderType, pvc)
