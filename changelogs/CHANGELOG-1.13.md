@@ -1,3 +1,24 @@
+## v1.13.1
+### 2024-03-13
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.13.1
+
+### Container Image
+`velero/velero:v1.13.1`
+
+### Documentation
+https://velero.io/docs/v1.13/
+
+### Upgrading
+https://velero.io/docs/v1.13/upgrade-to-1.13/
+
+### All changes
+* Fix issue #7308, change the data path requeue time to 5 second for data mover backup/restore, PVB and PVR. (#7459, @Lyndon-Li)
+* BackupRepositories associated with a BSL are invalidated when BSL is (re-)created. (#7399, @kaovilai)
+* Adjust the logic for the backup_last_status metrics to stop incorrectly incrementing over time (#7445, @allenxu404)
+
+
 ## v1.13
 ### 2024-01-10
 
