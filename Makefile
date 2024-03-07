@@ -88,7 +88,7 @@ endef
 # The version of restic binary to be downloaded
 RESTIC_VERSION ?= 0.15.0
 
-CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le
+CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le linux-s390x
 BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
 BUILDX_OUTPUT_TYPE ?= docker
 
