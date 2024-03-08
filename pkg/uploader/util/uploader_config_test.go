@@ -78,6 +78,16 @@ func TestStoreRestoreConfig(t *testing.T) {
 				WriteSparseFiles: "false", // Assuming default value is false for nil case
 			},
 		},
+		{
+			name: "Parallel is set",
+			config: &velerov1api.UploaderConfigForRestore{
+				ParallelFilesDownload: 5,
+			},
+			expectedData: map[string]string{
+				RestoreConcurrency: "5",
+				WriteSparseFiles:   "false",
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -176,6 +186,56 @@ func TestGetWriteSparseFiles(t *testing.T) {
 
 			if (err == nil && test.expectedError != nil) || (err != nil && test.expectedError == nil) || (err != nil && test.expectedError != nil && err.Error() != test.expectedError.Error()) {
 				t.Errorf("Expected error '%v', but got '%v'", test.expectedError, err)
+			}
+		})
+	}
+}
+
+func TestGetRestoreConcurrency(t *testing.T) {
+	testCases := []struct {
+		Name             string
+		UploaderCfg      map[string]string
+		ExpectedResult   int
+		ExpectedError    bool
+		ExpectedErrorMsg string
+	}{
+		{
+			Name:           "Valid Configuration",
+			UploaderCfg:    map[string]string{RestoreConcurrency: "10"},
+			ExpectedResult: 10,
+			ExpectedError:  false,
+		},
+		{
+			Name:           "Missing Configuration",
+			UploaderCfg:    map[string]string{},
+			ExpectedResult: 0,
+			ExpectedError:  false,
+		},
+		{
+			Name:             "Invalid Configuration",
+			UploaderCfg:      map[string]string{RestoreConcurrency: "not_an_integer"},
+			ExpectedResult:   0,
+			ExpectedError:    true,
+			ExpectedErrorMsg: "failed to parse RestoreConcurrency config: strconv.Atoi: parsing \"not_an_integer\": invalid syntax",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			result, err := GetRestoreConcurrency(tc.UploaderCfg)
+
+			if tc.ExpectedError {
+				if err.Error() != tc.ExpectedErrorMsg {
+					t.Errorf("Expected error message %s, but got %s", tc.ExpectedErrorMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error, but got %v", err)
+				}
+			}
+
+			if result != tc.ExpectedResult {
+				t.Errorf("Expected result %d, but got %d", tc.ExpectedResult, result)
 			}
 		})
 	}

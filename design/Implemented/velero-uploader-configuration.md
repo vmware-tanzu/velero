@@ -177,5 +177,54 @@ Roughly, the process is as follows:
 4. Each respective controller within the CRs calls the uploader, and the WriteSparseFiles from map in CRs is passed to the uploader.
 5. When the uploader subsequently calls the Kopia API, it can use the WriteSparseFiles to set the WriteSparseFiles parameter, and if the uploader calls the Restic command it would append `--sparse` flag within the restore command.
 
+### Parallel Restore
+Setting the parallelism of restore operations can improve the efficiency and speed of the restore process, especially when dealing with large amounts of data.
+
+### Velero CLI
+The Velero CLI will support a --parallel-files-download flag, allowing users to set the parallelism value when creating restores. when no value specified, the value of it would be the number of CPUs for the node that the node agent pod is running.
+```bash
+	velero restore create --parallel-files-download $num
+```
+
+### UploaderConfig
+below the sub-option parallel is added into UploaderConfig:
+
+```go
+	type UploaderConfigForRestore struct {
+		// ParallelFilesDownload is the number of parallel for restore.
+		// +optional
+		ParallelFilesDownload int `json:"parallelFilesDownload,omitempty"`
+	}
+```
+
+#### Kopia Parallel Restore Policy
+
+Velero Uploader can set restore policies when calling Kopia APIs. In the Kopia codebase, the structure for restore policies is defined as follows:
+
+```go
+	// first get concurrrency from uploader config
+	restoreConcurrency, _ := uploaderutil.GetRestoreConcurrency(uploaderCfg)
+	// set restore concurrency into restore options
+	restoreOpt := restore.Options{
+		Parallel:               restoreConcurrency,
+	}
+	// do restore with restore option
+	restore.Entry(..., restoreOpt)
+```
+
+#### Restic Parallel Restore Policy
+
+Configurable parallel restore is not supported by restic, so we would return one error if the option is configured.
+```go
+	restoreConcurrency, err := uploaderutil.GetRestoreConcurrency(uploaderCfg)
+	if err != nil {
+		return extraFlags, errors.Wrap(err, "failed to get uploader config")
+	}
+	
+	if restoreConcurrency > 0 {
+		return extraFlags, errors.New("restic does not support parallel restore")
+	}
+```
+
 ## Alternatives Considered
 To enhance extensibility further, the option of storing `UploaderConfig` in a Kubernetes ConfigMap can be explored, this approach would allow the addition and modification of configuration options without the need to modify the CRD.

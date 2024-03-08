@@ -411,6 +411,8 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 		IgnorePermissionErrors: true,
 	}
 
+	restoreConcurrency := runtime.NumCPU()
+
 	if len(uploaderCfg) > 0 {
 		writeSparseFiles, err := uploaderutil.GetWriteSparseFiles(uploaderCfg)
 		if err != nil {
@@ -419,9 +421,17 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 		if writeSparseFiles {
 			fsOutput.WriteSparseFiles = true
 		}
+
+		concurrency, err := uploaderutil.GetRestoreConcurrency(uploaderCfg)
+		if err != nil {
+			return 0, 0, errors.Wrap(err, "failed to get parallel restore uploader config")
+		}
+		if concurrency > 0 {
+			restoreConcurrency = concurrency
+		}
 	}
 
-	log.Debugf("Restore filesystem output %v", fsOutput)
+	log.Debugf("Restore filesystem output %v, concurrency %d", fsOutput, restoreConcurrency)
 
 	err = fsOutput.Init(ctx)
 	if err != nil {
@@ -436,7 +446,7 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 	}
 
 	stat, err := restoreEntryFunc(kopiaCtx, rep, output, rootEntry, restore.Options{
-		Parallel:               runtime.NumCPU(),
+		Parallel:               restoreConcurrency,
 		RestoreDirEntryAtDepth: math.MaxInt32,
 		Cancel:                 cancleCh,
 		ProgressCallback: func(ctx context.Context, stats restore.Stats) {

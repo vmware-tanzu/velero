@@ -85,7 +85,7 @@ func TestCreateCommand(t *testing.T) {
 		allowPartiallyFailed := "true"
 		itemOperationTimeout := "10m0s"
 		writeSparseFiles := "true"
-
+		parallel := 2
 		flags := new(pflag.FlagSet)
 		o := NewCreateOptions()
 		o.BindFlags(flags)
@@ -108,6 +108,7 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--allow-partially-failed", allowPartiallyFailed})
 		flags.Parse([]string{"--item-operation-timeout", itemOperationTimeout})
 		flags.Parse([]string{"--write-sparse-files", writeSparseFiles})
+		flags.Parse([]string{"--parallel-files-download", "2"})
 		client := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
 		f.On("Namespace").Return(mock.Anything)
@@ -144,6 +145,7 @@ func TestCreateCommand(t *testing.T) {
 		require.Equal(t, allowPartiallyFailed, o.AllowPartiallyFailed.String())
 		require.Equal(t, itemOperationTimeout, o.ItemOperationTimeout.String())
 		require.Equal(t, writeSparseFiles, o.WriteSparseFiles.String())
+		require.Equal(t, parallel, o.ParallelFilesDownload)
 	})
 
 	t.Run("create a restore from schedule", func(t *testing.T) {

@@ -178,10 +178,7 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		d.Println()
 		d.Printf("Preserve Service NodePorts:\t%s\n", BoolPointerString(restore.Spec.PreserveNodePorts, "false", "true", "auto"))
 
-		if restore.Spec.UploaderConfig != nil && boolptr.IsSetToTrue(restore.Spec.UploaderConfig.WriteSparseFiles) {
-			d.Println()
-			DescribeUploaderConfigForRestore(d, restore.Spec)
-		}
+		describeUploaderConfigForRestore(d, restore.Spec)
 
 		d.Println()
 		describeRestoreItemOperations(ctx, kbClient, d, restore, details, insecureSkipTLSVerify, caCertFile)
@@ -199,10 +196,18 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 	})
 }
 
-// DescribeUploaderConfigForRestore describes uploader config in human-readable format
-func DescribeUploaderConfigForRestore(d *Describer, spec velerov1api.RestoreSpec) {
-	d.Printf("Uploader config:\n")
-	d.Printf("\tWrite Sparse Files:\t%T\n", boolptr.IsSetToTrue(spec.UploaderConfig.WriteSparseFiles))
+// describeUploaderConfigForRestore describes uploader config in human-readable format
+func describeUploaderConfigForRestore(d *Describer, spec velerov1api.RestoreSpec) {
+	if spec.UploaderConfig != nil {
+		d.Println()
+		d.Printf("Uploader config:\n")
+		if boolptr.IsSetToTrue(spec.UploaderConfig.WriteSparseFiles) {
+			d.Printf("\tWrite Sparse Files:\t%v\n", boolptr.IsSetToTrue(spec.UploaderConfig.WriteSparseFiles))
+		}
+		if spec.UploaderConfig.ParallelFilesDownload > 0 {
+			d.Printf("\tParallel Restore:\t%d\n", spec.UploaderConfig.ParallelFilesDownload)
+		}
+	}
 }
 
 func describeRestoreItemOperations(ctx context.Context, kbClient kbclient.Client, d *Describer, restore *velerov1api.Restore, details bool, insecureSkipTLSVerify bool, caCertPath string) {

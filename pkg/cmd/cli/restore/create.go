@@ -99,6 +99,7 @@ type CreateOptions struct {
 	ItemOperationTimeout      time.Duration
 	ResourceModifierConfigMap string
 	WriteSparseFiles          flag.OptionalBool
+	ParallelFilesDownload     int
 	client                    kbclient.WithWatch
 }
 
@@ -151,6 +152,8 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 
 	f = flags.VarPF(&o.WriteSparseFiles, "write-sparse-files", "", "Whether to write sparse files during restoring volumes")
 	f.NoOptDefVal = cmd.TRUE
+
+	flags.IntVar(&o.ParallelFilesDownload, "parallel-files-download", 0, "The number of restore operations to run in parallel. If set to 0, the default parallelism will be the number of CPUs for the node that node agent pod is running.")
 }
 
 func (o *CreateOptions) Complete(args []string, f client.Factory) error {
@@ -198,6 +201,10 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	if len(o.ExistingResourcePolicy) > 0 && !isResourcePolicyValid(o.ExistingResourcePolicy) {
 		return errors.New("existing-resource-policy has invalid value, it accepts only none, update as value")
+	}
+
+	if o.ParallelFilesDownload < 0 {
+		return errors.New("parallel-files-download cannot be negative")
 	}
 
 	switch {
@@ -324,7 +331,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				Duration: o.ItemOperationTimeout,
 			},
 			UploaderConfig: &api.UploaderConfigForRestore{
-				WriteSparseFiles: o.WriteSparseFiles.Value,
+				WriteSparseFiles:      o.WriteSparseFiles.Value,
+				ParallelFilesDownload: o.ParallelFilesDownload,
 			},
 		},
 	}

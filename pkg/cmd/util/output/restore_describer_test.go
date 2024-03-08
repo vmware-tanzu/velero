@@ -12,6 +12,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
@@ -178,6 +179,61 @@ func TestDescribePodVolumeRestores(t *testing.T) {
 			describePodVolumeRestores(d, tc.inputPVRList, tc.inputDetails)
 			d.out.Flush()
 			assert.Equal(tt, tc.expect, d.buf.String())
+		})
+	}
+}
+func TestDescribeUploaderConfigForRestore(t *testing.T) {
+	cases := []struct {
+		name     string
+		spec     velerov1api.RestoreSpec
+		expected string
+	}{
+		{
+			name:     "UploaderConfigNil",
+			spec:     velerov1api.RestoreSpec{}, // Create a RestoreSpec with nil UploaderConfig
+			expected: "",
+		},
+		{
+			name: "test",
+			spec: velerov1api.RestoreSpec{
+				UploaderConfig: &velerov1api.UploaderConfigForRestore{
+					WriteSparseFiles:      boolptr.True(),
+					ParallelFilesDownload: 4,
+				},
+			},
+			expected: "\nUploader config:\n  Write Sparse Files:  true\n  Parallel Restore:    4\n",
+		},
+		{
+			name: "WriteSparseFiles test",
+			spec: velerov1api.RestoreSpec{
+				UploaderConfig: &velerov1api.UploaderConfigForRestore{
+					WriteSparseFiles: boolptr.True(),
+				},
+			},
+			expected: "\nUploader config:\n  Write Sparse Files:  true\n",
+		},
+		{
+			name: "ParallelFilesDownload test",
+			spec: velerov1api.RestoreSpec{
+				UploaderConfig: &velerov1api.UploaderConfigForRestore{
+					ParallelFilesDownload: 4,
+				},
+			},
+			expected: "\nUploader config:\n  Parallel Restore:  4\n",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			d := &Describer{
+				Prefix: "",
+				out:    &tabwriter.Writer{},
+				buf:    &bytes.Buffer{},
+			}
+			d.out.Init(d.buf, 0, 8, 2, ' ', 0)
+			describeUploaderConfigForRestore(d, tc.spec)
+			d.out.Flush()
+			assert.Equal(t, tc.expected, d.buf.String(), "Output should match expected")
 		})
 	}
 }
