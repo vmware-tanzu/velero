@@ -72,8 +72,8 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 	// required for keeping track of number of restored items
 	var nsCreated bool
 	var ready bool
-	err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
-		clusterNS, err := client.Get(context.TODO(), namespace.Name, metav1.GetOptions{})
+	err := wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, true, func(ctx context.Context) (bool, error) {
+		clusterNS, err := client.Get(ctx, namespace.Name, metav1.GetOptions{})
 
 		if apierrors.IsNotFound(err) {
 			// Namespace isn't in cluster, we're good to create.

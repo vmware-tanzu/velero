@@ -670,7 +670,7 @@ func TestFindDataDownloadForPod(t *testing.T) {
 		assert.NoError(t, r.client.Create(ctx, test.pod))
 		assert.NoError(t, r.client.Create(ctx, test.du))
 		// Call the findSnapshotRestoreForPod function
-		requests := r.findSnapshotRestoreForPod(test.pod)
+		requests := r.findSnapshotRestoreForPod(context.Background(), test.pod)
 		test.checkFunc(test.du, requests)
 		r.client.Delete(ctx, test.du, &kbclient.DeleteOptions{})
 		if test.pod != nil {

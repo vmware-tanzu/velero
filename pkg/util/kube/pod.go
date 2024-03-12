@@ -92,7 +92,7 @@ func EnsureDeletePod(ctx context.Context, podGetter corev1client.CoreV1Interface
 		return errors.Wrapf(err, "error to delete pod %s", pod)
 	}
 
-	err = wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := podGetter.Pods(namespace).Get(ctx, pod, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {

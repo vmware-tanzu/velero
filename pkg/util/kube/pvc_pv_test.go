@@ -88,7 +88,7 @@ func TestWaitPVCBound(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				pvcObject,
 			},
-			err: "error to wait for rediness of PVC: timed out waiting for the condition",
+			err: "error to wait for rediness of PVC: context deadline exceeded",
 		},
 		{
 			name:         "get pv fail",
@@ -249,7 +249,7 @@ func TestWaitPVCConsumed(t *testing.T) {
 				pvcObjectWithSC,
 				scObjWaitBind,
 			},
-			err: "error to wait for PVC: timed out waiting for the condition",
+			err: "error to wait for PVC: context deadline exceeded",
 		},
 		{
 			name:         "success on sc without wait binding mode",
@@ -955,7 +955,7 @@ func TestWaitPVBound(t *testing.T) {
 					},
 				},
 			},
-			err: "error to wait for bound of PV: timed out waiting for the condition",
+			err: "error to wait for bound of PV: context deadline exceeded",
 		},
 		{
 			name:   "pvc status not bound",
@@ -967,7 +967,7 @@ func TestWaitPVBound(t *testing.T) {
 					},
 				},
 			},
-			err: "error to wait for bound of PV: timed out waiting for the condition",
+			err: "error to wait for bound of PV: context deadline exceeded",
 		},
 		{
 			name:         "pvc claimRef pvc name mismatch",

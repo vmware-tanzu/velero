@@ -33,8 +33,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/stringptr"
 	"github.com/vmware-tanzu/velero/pkg/util/stringslice"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/typed/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -52,7 +52,7 @@ func WaitVolumeSnapshotReady(ctx context.Context, snapshotClient snapshotter.Sna
 	var updated *snapshotv1api.VolumeSnapshot
 	errMessage := sets.NewString()
 
-	err := wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
 		tmpVS, err := snapshotClient.VolumeSnapshots(volumeSnapshotNS).Get(ctx, volumeSnapshot, metav1.GetOptions{})
 		if err != nil {
 			return false, errors.Wrapf(err, fmt.Sprintf("error to get volumesnapshot %s/%s", volumeSnapshotNS, volumeSnapshot))
@@ -74,7 +74,7 @@ func WaitVolumeSnapshotReady(ctx context.Context, snapshotClient snapshotter.Sna
 		return true, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = errors.Errorf("volume snapshot is not ready until timeout, errors: %v", errMessage.List())
 	}
 
@@ -132,7 +132,7 @@ func EnsureDeleteVS(ctx context.Context, snapshotClient snapshotter.SnapshotV1In
 		return errors.Wrap(err, "error to delete volume snapshot")
 	}
 
-	err = wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := snapshotClient.VolumeSnapshots(vsNamespace).Get(ctx, vsName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -153,7 +153,7 @@ func EnsureDeleteVS(ctx context.Context, snapshotClient snapshotter.SnapshotV1In
 }
 
 func RemoveVSCProtect(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface, vscName string, timeout time.Duration) error {
-	err := wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
 		vsc, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vscName, metav1.GetOptions{})
 		if err != nil {
 			return false, errors.Wrapf(err, "error to get VolumeSnapshotContent %s", vscName)
@@ -183,8 +183,7 @@ func EnsureDeleteVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1I
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrap(err, "error to delete volume snapshot content")
 	}
-
-	err = wait.PollImmediate(waitInternal, timeout, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vscName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {

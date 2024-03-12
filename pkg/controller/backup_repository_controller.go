@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
@@ -74,8 +73,8 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.BackupRepository{}).
-		Watches(s, nil).
-		Watches(&source.Kind{Type: &velerov1api.BackupStorageLocation{}}, kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
+		WatchesRawSource(s, nil).
+		Watches(&velerov1api.BackupStorageLocation{}, kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
 			builder.WithPredicates(
 				// When BSL updates, check if the backup repositories need to be invalidated
 				kube.NewUpdateEventPredicate(r.needInvalidBackupRepo),
@@ -84,7 +83,7 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *BackupRepoReconciler) invalidateBackupReposForBSL(bslObj client.Object) []reconcile.Request {
+func (r *BackupRepoReconciler) invalidateBackupReposForBSL(ctx context.Context, bslObj client.Object) []reconcile.Request {
 	bsl := bslObj.(*velerov1api.BackupStorageLocation)
 
 	list := &velerov1api.BackupRepositoryList{}
