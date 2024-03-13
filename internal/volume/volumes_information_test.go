@@ -31,6 +31,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -605,6 +606,8 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 }
 
 func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
+	features.Enable(velerov1api.CSIFeatureFlag)
+	defer features.Disable(velerov1api.CSIFeatureFlag)
 	now := metav1.Now()
 	tests := []struct {
 		name                string
