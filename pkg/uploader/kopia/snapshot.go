@@ -156,16 +156,6 @@ func Backup(ctx context.Context, fsUploader SnapshotUploader, repoWriter repo.Re
 		return nil, false, errors.Wrapf(err, "Invalid source path '%s'", sourcePath)
 	}
 
-	if volMode == uploader.PersistentVolumeFilesystem {
-		// to be consistent with restic when backup empty dir returns one error for upper logic handle
-		dirs, err := os.ReadDir(source)
-		if err != nil {
-			return nil, false, errors.Wrapf(err, "Unable to read dir in path %s", source)
-		} else if len(dirs) == 0 {
-			return nil, true, nil
-		}
-	}
-
 	source = filepath.Clean(source)
 
 	sourceInfo := snapshot.SourceInfo{

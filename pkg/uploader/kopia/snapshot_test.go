@@ -610,7 +610,7 @@ func TestBackup(t *testing.T) {
 			name:          "Unable to read directory",
 			sourcePath:    "/invalid/path",
 			tags:          nil,
-			expectedError: errors.New("Unable to read dir"),
+			expectedError: errors.New("no such file or directory"),
 		},
 		{
 			name:          "Source path is not a block device",
