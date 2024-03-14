@@ -28,6 +28,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -462,6 +463,11 @@ func (v *VolumesInformation) generateVolumeInfoFromPVB() {
 
 // generateVolumeInfoFromDataUpload generate VolumeInfo for DataUpload.
 func (v *VolumesInformation) generateVolumeInfoFromDataUpload() {
+	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
+		v.logger.Debug("Skip generating VolumeInfo when the CSI feature is disabled.")
+		return
+	}
+
 	tmpVolumeInfos := make([]*VolumeInfo, 0)
 	vsClassList := new(snapshotv1api.VolumeSnapshotClassList)
 	if err := v.crClient.List(context.TODO(), vsClassList); err != nil {
