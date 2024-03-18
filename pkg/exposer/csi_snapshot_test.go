@@ -18,6 +18,7 @@ package exposer
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 
@@ -715,6 +717,117 @@ func TestPeekExpose(t *testing.T) {
 			} else {
 				assert.EqualError(t, err, test.err)
 			}
+		})
+	}
+}
+
+func TestToSystemAffinity(t *testing.T) {
+	tests := []struct {
+		name         string
+		loadAffinity *nodeagent.LoadAffinity
+		expected     *corev1.Affinity
+	}{
+		{
+			name: "loadAffinity is nil",
+		},
+		{
+			name:         "loadAffinity is empty",
+			loadAffinity: &nodeagent.LoadAffinity{},
+		},
+		{
+			name: "with match label",
+			loadAffinity: &nodeagent.LoadAffinity{
+				NodeSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"key-1": "value-1",
+						"key-2": "value-2",
+					},
+				},
+			},
+			expected: &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "key-1",
+										Values:   []string{"value-1"},
+										Operator: corev1.NodeSelectorOpIn,
+									},
+									{
+										Key:      "key-2",
+										Values:   []string{"value-2"},
+										Operator: corev1.NodeSelectorOpIn,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "with match expression",
+			loadAffinity: &nodeagent.LoadAffinity{
+				NodeSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"key-1": "value-1",
+						"key-2": "value-2",
+					},
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key-3",
+							Values:   []string{"value-3-1", "value-3-2"},
+							Operator: metav1.LabelSelectorOpNotIn,
+						},
+						{
+							Key:      "key-4",
+							Values:   []string{"value-4-1", "value-4-2", "value-4-3"},
+							Operator: metav1.LabelSelectorOpDoesNotExist,
+						},
+					},
+				},
+			},
+			expected: &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "key-1",
+										Values:   []string{"value-1"},
+										Operator: corev1.NodeSelectorOpIn,
+									},
+									{
+										Key:      "key-2",
+										Values:   []string{"value-2"},
+										Operator: corev1.NodeSelectorOpIn,
+									},
+									{
+										Key:      "key-3",
+										Values:   []string{"value-3-1", "value-3-2"},
+										Operator: corev1.NodeSelectorOpNotIn,
+									},
+									{
+										Key:      "key-4",
+										Values:   []string{"value-4-1", "value-4-2", "value-4-3"},
+										Operator: corev1.NodeSelectorOpDoesNotExist,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			affinity := toSystemAffinity(test.loadAffinity)
+			assert.Equal(t, true, reflect.DeepEqual(affinity, test.expected))
 		})
 	}
 }

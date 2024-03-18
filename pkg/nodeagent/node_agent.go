@@ -68,7 +68,7 @@ type Configs struct {
 	LoadConcurrency *LoadConcurrency `json:"loadConcurrency,omitempty"`
 
 	// LoadAffinity is the config for data path load affinity.
-	LoadAffinity *LoadAffinity `json:"loadAffinity,omitempty"`
+	LoadAffinity []*LoadAffinity `json:"loadAffinity,omitempty"`
 }
 
 // IsRunning checks if the node agent daemonset is running properly. If not, return the error found

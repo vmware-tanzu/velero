@@ -286,8 +286,8 @@ func (s *nodeAgentServer) run() {
 	}
 
 	var loadAffinity *nodeagent.LoadAffinity
-	if s.dataPathConfigs != nil {
-		loadAffinity = s.dataPathConfigs.LoadAffinity
+	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
+		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
 	}
 	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, loadAffinity, repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	s.attemptDataUploadResume(dataUploadReconciler)
