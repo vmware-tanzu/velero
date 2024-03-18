@@ -552,7 +552,7 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 
 	var createdOrUpdatedCRDs bool
 	for _, restoredItem := range ctx.restoredItems {
-		if restoredItem.action == itemRestoreResultCreated || restoredItem.action == itemRestoreResultUpdated {
+		if restoredItem.action == ItemRestoreResultCreated || restoredItem.action == ItemRestoreResultUpdated {
 			createdOrUpdatedCRDs = true
 			break
 		}
@@ -757,7 +757,7 @@ func (ctx *restoreContext) processSelectedResource(
 						namespace: ns.Namespace,
 						name:      ns.Name,
 					}
-					ctx.restoredItems[itemKey] = restoredItemStatus{action: itemRestoreResultCreated, itemExists: true}
+					ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: true}
 				}
 
 				// Keep track of namespaces that we know exist so we don't
@@ -1156,7 +1156,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				namespace: nsToEnsure.Namespace,
 				name:      nsToEnsure.Name,
 			}
-			ctx.restoredItems[itemKey] = restoredItemStatus{action: itemRestoreResultCreated, itemExists: true}
+			ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: true}
 		}
 	} else {
 		if boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
@@ -1201,12 +1201,12 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 		// no action specified, and no warnings and errors
 		if errs.IsEmpty() && warnings.IsEmpty() {
-			itemStatus.action = itemRestoreResultSkipped
+			itemStatus.action = ItemRestoreResultSkipped
 			ctx.restoredItems[itemKey] = itemStatus
 			return
 		}
 		// others are all failed
-		itemStatus.action = itemRestoreResultFailed
+		itemStatus.action = ItemRestoreResultFailed
 		ctx.restoredItems[itemKey] = itemStatus
 	}()
 
@@ -1529,7 +1529,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		createdObj, restoreErr = resourceClient.Create(obj)
 		if restoreErr == nil {
 			itemExists = true
-			ctx.restoredItems[itemKey] = restoredItemStatus{action: itemRestoreResultCreated, itemExists: itemExists}
+			ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: itemExists}
 		}
 	}
 
@@ -1610,7 +1610,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 						errs.Merge(&errsFromUpdate)
 					}
 				} else {
-					itemStatus.action = itemRestoreResultUpdated
+					itemStatus.action = ItemRestoreResultUpdated
 					ctx.restoredItems[itemKey] = itemStatus
 					ctx.log.Infof("ServiceAccount %s successfully updated", kube.NamespaceAndName(obj))
 				}
@@ -1630,7 +1630,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 						// processing update as existingResourcePolicy
 						warningsFromUpdateRP, errsFromUpdateRP := ctx.processUpdateResourcePolicy(fromCluster, fromClusterWithLabels, obj, namespace, resourceClient)
 						if warningsFromUpdateRP.IsEmpty() && errsFromUpdateRP.IsEmpty() {
-							itemStatus.action = itemRestoreResultUpdated
+							itemStatus.action = ItemRestoreResultUpdated
 							ctx.restoredItems[itemKey] = itemStatus
 						}
 						warnings.Merge(&warningsFromUpdateRP)

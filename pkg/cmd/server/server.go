@@ -997,6 +997,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			newPluginManager,
 			backupStoreGetter,
 			s.metrics,
+			s.crClient,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.RestoreFinalizer)
 		}

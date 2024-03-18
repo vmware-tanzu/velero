@@ -361,6 +361,29 @@ func (_m *BackupStore) GetRestoreResults(name string) (map[string]results.Result
 	return r0, r1
 }
 
+// GetRestoredResourceList provides a mock function with given fields: name
+func (_m *BackupStore) GetRestoredResourceList(name string) (map[string][]string, error) {
+	ret := _m.Called(name)
+
+	r0 := make(map[string][]string)
+	if rf, ok := ret.Get(0).(func(string) map[string][]string); ok {
+		r0 = rf(name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string][]string)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // IsValid provides a mock function with given fields:
 func (_m *BackupStore) IsValid() error {
 	ret := _m.Called()

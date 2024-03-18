@@ -89,6 +89,7 @@ type BackupStore interface {
 	PutRestoreItemOperations(restore string, restoreItemOperations io.Reader) error
 	GetRestoreItemOperations(name string) ([]*itemoperation.RestoreOperation, error)
 	DeleteRestore(name string) error
+	GetRestoredResourceList(name string) (map[string][]string, error)
 
 	GetDownloadURL(target velerov1api.DownloadTarget) (string, error)
 }
@@ -636,6 +637,25 @@ func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (s
 	default:
 		return "", errors.Errorf("unsupported download target kind %q", target.Kind)
 	}
+}
+
+func (s *objectBackupStore) GetRestoredResourceList(name string) (map[string][]string, error) {
+	list := make(map[string][]string)
+
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getRestoreResourceListKey(name))
+	if err != nil {
+		return list, err
+	}
+	if res == nil {
+		return list, nil
+	}
+	defer res.Close()
+
+	if err := decode(res, &list); err != nil {
+		return list, err
+	}
+
+	return list, nil
 }
 
 func seekToBeginning(r io.Reader) error {
