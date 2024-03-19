@@ -21,6 +21,13 @@ Velero consists of:
 
 Please use the version selector at the top of the site to ensure you are using the appropriate documentation for your version of Velero.
 
+#### v1.2.0 Build with Apple M1, M2 or M3 processor for Digital Ocean.
+
+```
+make build darwin-arm64
+```
+
+
 ## Troubleshooting
 
 If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [#velero channel][25] on the Kubernetes Slack server.
