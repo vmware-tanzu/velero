@@ -19,7 +19,6 @@ package kube
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -27,12 +26,9 @@ import (
 	storagev1api "k8s.io/api/storage/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/uploader"
@@ -59,66 +55,6 @@ func NamespaceAndName(objMeta metav1.Object) string {
 		return objMeta.GetName()
 	}
 	return fmt.Sprintf("%s/%s", objMeta.GetNamespace(), objMeta.GetName())
-}
-
-// EnsureNamespaceExistsAndIsReady attempts to create the provided Kubernetes namespace.
-// It returns three values: a bool indicating whether or not the namespace is ready,
-// a bool indicating whether or not the namespace was created and an error if the creation failed
-// for a reason other than that the namespace already exists. Note that in the case where the
-// namespace already exists and is not ready, this function will return (false, false, nil).
-// If the namespace exists and is marked for deletion, this function will wait up to the timeout for it to fully delete.
-func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client corev1client.NamespaceInterface, timeout time.Duration) (bool, bool, error) {
-	// nsCreated tells whether the namespace was created by this method
-	// required for keeping track of number of restored items
-	var nsCreated bool
-	var ready bool
-	err := wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, true, func(ctx context.Context) (bool, error) {
-		clusterNS, err := client.Get(ctx, namespace.Name, metav1.GetOptions{})
-
-		if apierrors.IsNotFound(err) {
-			// Namespace isn't in cluster, we're good to create.
-			return true, nil
-		}
-
-		if err != nil {
-			// Return the err and exit the loop.
-			return true, err
-		}
-
-		if clusterNS != nil && (clusterNS.GetDeletionTimestamp() != nil || clusterNS.Status.Phase == corev1api.NamespaceTerminating) {
-			// Marked for deletion, keep waiting
-			return false, nil
-		}
-
-		// clusterNS found, is not nil, and not marked for deletion, therefore we shouldn't create it.
-		ready = true
-		return true, nil
-	})
-
-	// err will be set if we timed out or encountered issues retrieving the namespace,
-	if err != nil {
-		return false, nsCreated, errors.Wrapf(err, "error getting namespace %s", namespace.Name)
-	}
-
-	// In the case the namespace already exists and isn't marked for deletion, assume it's ready for use.
-	if ready {
-		return true, nsCreated, nil
-	}
-
-	clusterNS, err := client.Create(context.TODO(), namespace, metav1.CreateOptions{})
-	if apierrors.IsAlreadyExists(err) {
-		if clusterNS != nil && (clusterNS.GetDeletionTimestamp() != nil || clusterNS.Status.Phase == corev1api.NamespaceTerminating) {
-			// Somehow created after all our polling and marked for deletion, return an error
-			return false, nsCreated, errors.Errorf("namespace %s created and marked for termination after timeout", namespace.Name)
-		}
-	} else if err != nil {
-		return false, nsCreated, errors.Wrapf(err, "error creating namespace %s", namespace.Name)
-	} else {
-		nsCreated = true
-	}
-
-	// The namespace created successfully
-	return true, nsCreated, nil
 }
 
 // GetVolumeDirectory gets the name of the directory on the host, under /var/lib/kubelet/pods/<podUID>/volumes/,
