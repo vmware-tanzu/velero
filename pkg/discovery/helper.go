@@ -194,6 +194,8 @@ func (h *helper) Refresh() error {
 		for _, resource := range resourceGroup.APIResources {
 			gvr := gv.WithResource(resource.Name)
 			gvk := gv.WithKind(resource.Kind)
+			resource.Group = gv.Group
+			resource.Version = gv.Version
 			h.resourcesMap[gvr] = resource
 			h.kindMap[gvk] = resource
 		}
