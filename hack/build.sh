@@ -65,4 +65,5 @@ go build \
     -o ${OUTPUT} \
     -installsuffix "static" \
     -ldflags "${LDFLAGS}" \
+    -buildvcs=false \
     ${PKG}/cmd/${BIN}
