@@ -1177,6 +1177,34 @@ func TestGetRestoreResults(t *testing.T) {
 	assert.EqualValues(t, contents["errors"], res["errors"])
 }
 
+func TestGetRestoredResourceList(t *testing.T) {
+	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+
+	// file not found should not error
+	_, err := harness.GetRestoredResourceList("test-restore")
+	assert.NoError(t, err)
+
+	// file containing invalid data should error
+	harness.objectStore.PutObject(harness.bucket, "restores/test-restore/restore-test-restore-resource-list.json.gz", newStringReadSeeker("foo"))
+	_, err = harness.GetRestoredResourceList("test-restore")
+	assert.NotNil(t, err)
+
+	// file containing gzipped json data should return correctly
+	list := map[string][]string{
+		"pod": {"test-ns/pod1(created)", "test-ns/pod2(skipped)"},
+	}
+	obj := new(bytes.Buffer)
+	gzw := gzip.NewWriter(obj)
+
+	require.NoError(t, json.NewEncoder(gzw).Encode(list))
+	require.NoError(t, gzw.Close())
+	require.NoError(t, harness.objectStore.PutObject(harness.bucket, "restores/test-restore/restore-test-restore-resource-list.json.gz", obj))
+	res, err := harness.GetRestoredResourceList("test-restore")
+
+	assert.NoError(t, err)
+	assert.EqualValues(t, list["pod"], res["pod"])
+}
+
 func encodeToBytes(obj runtime.Object) []byte {
 	res, err := encode.Encode(obj, "json")
 	if err != nil {

@@ -108,3 +108,9 @@ func (b *PersistentVolumeBuilder) NodeAffinityRequired(req *corev1api.NodeSelect
 	}
 	return b
 }
+
+// Phase sets the PersistentVolume's phase.
+func (b *PersistentVolumeBuilder) Phase(phase corev1api.PersistentVolumePhase) *PersistentVolumeBuilder {
+	b.object.Status.Phase = phase
+	return b
+}

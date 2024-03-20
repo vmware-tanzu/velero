@@ -33,10 +33,10 @@ import (
 )
 
 const (
-	itemRestoreResultCreated = "created"
-	itemRestoreResultUpdated = "updated"
-	itemRestoreResultFailed  = "failed"
-	itemRestoreResultSkipped = "skipped"
+	ItemRestoreResultCreated = "created"
+	ItemRestoreResultUpdated = "updated"
+	ItemRestoreResultFailed  = "failed"
+	ItemRestoreResultSkipped = "skipped"
 )
 
 type itemKey struct {
