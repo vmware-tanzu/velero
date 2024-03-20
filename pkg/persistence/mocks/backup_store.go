@@ -23,11 +23,10 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 
-	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
 	itemoperation "github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	volume "github.com/vmware-tanzu/velero/pkg/volume"
+	"github.com/vmware-tanzu/velero/internal/volume"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 
 
@@ -316,15 +315,15 @@ func (_m *BackupStore) GetRestoreItemOperations(name string) ([]*itemoperation.R
 }
 
 // GetRestoreItemOperations provides a mock function with given fields: name
-func (_m *BackupStore) GetBackupVolumeInfos(name string) ([]*internalVolume.VolumeInfo, error) {
+func (_m *BackupStore) GetBackupVolumeInfos(name string) ([]*volume.VolumeInfo, error) {
 	ret := _m.Called(name)
 
-	var r0 []*internalVolume.VolumeInfo
-	if rf, ok := ret.Get(0).(func(string) []*internalVolume.VolumeInfo); ok {
+	var r0 []*volume.VolumeInfo
+	if rf, ok := ret.Get(0).(func(string) []*volume.VolumeInfo); ok {
 		r0 = rf(name)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*internalVolume.VolumeInfo)
+			r0 = ret.Get(0).([]*volume.VolumeInfo)
 		}
 	}
 

@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
-	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
@@ -44,7 +44,6 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type objectBackupStoreTestHarness struct {
@@ -1069,17 +1068,17 @@ func TestNewObjectBackupStoreGetterConfig(t *testing.T) {
 func TestGetBackupVolumeInfos(t *testing.T) {
 	tests := []struct {
 		name           string
-		volumeInfo     []*internalVolume.VolumeInfo
+		volumeInfo     []*volume.VolumeInfo
 		volumeInfoStr  string
 		expectedErr    string
-		expectedResult []*internalVolume.VolumeInfo
+		expectedResult []*volume.VolumeInfo
 	}{
 		{
 			name: "No VolumeInfos, expect no error.",
 		},
 		{
 			name: "Valid VolumeInfo, should pass.",
-			volumeInfo: []*internalVolume.VolumeInfo{
+			volumeInfo: []*volume.VolumeInfo{
 				{
 					PVCName:           "pvcName",
 					PVName:            "pvName",
@@ -1087,7 +1086,7 @@ func TestGetBackupVolumeInfos(t *testing.T) {
 					SnapshotDataMoved: false,
 				},
 			},
-			expectedResult: []*internalVolume.VolumeInfo{
+			expectedResult: []*volume.VolumeInfo{
 				{
 					PVCName:           "pvcName",
 					PVName:            "pvName",
@@ -1099,7 +1098,7 @@ func TestGetBackupVolumeInfos(t *testing.T) {
 		{
 			name:          "Invalid VolumeInfo string, should also pass.",
 			volumeInfoStr: `[{"abc": "123", "def": "456", "pvcName": "pvcName"}]`,
-			expectedResult: []*internalVolume.VolumeInfo{
+			expectedResult: []*volume.VolumeInfo{
 				{
 					PVCName: "pvcName",
 				},

@@ -37,7 +37,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/delete"
-	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -456,7 +456,7 @@ func (r *backupDeletionReconciler) volumeSnapshottersForVSL(
 	}
 
 	// add credential to config
-	err := internalVolume.UpdateVolumeSnapshotLocationWithCredentialConfig(vsl, r.credentialStore)
+	err := volume.UpdateVolumeSnapshotLocationWithCredentialConfig(vsl, r.credentialStore)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

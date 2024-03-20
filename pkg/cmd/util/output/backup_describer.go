@@ -43,7 +43,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
-	nativesnap "github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 // DescribeBackup describes a backup in human-readable format.
@@ -502,7 +501,7 @@ func retrieveNativeSnapshotLegacy(ctx context.Context, kbClient kbclient.Client,
 		return nativeSnapshots, errors.Wrapf(err, "error to download native snapshot info")
 	}
 
-	var snapshots []*nativesnap.Snapshot
+	var snapshots []*volume.Snapshot
 	if err := json.NewDecoder(buf).Decode(&snapshots); err != nil {
 		return nativeSnapshots, errors.Wrapf(err, "error to decode native snapshot info")
 	}
