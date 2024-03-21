@@ -26,10 +26,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
-	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/internal/volume"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type PVRestorer interface {
@@ -133,7 +132,7 @@ func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volum
 	}
 
 	// add credential to config
-	err = internalVolume.UpdateVolumeSnapshotLocationWithCredentialConfig(snapshotLocation, credentialStore)
+	err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(snapshotLocation, credentialStore)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

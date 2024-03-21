@@ -36,7 +36,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 func TestGenerateVolumeInfoForSkippedPV(t *testing.T) {
@@ -142,14 +141,14 @@ func TestGenerateVolumeInfoForSkippedPV(t *testing.T) {
 func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 	tests := []struct {
 		name                string
-		nativeSnapshot      volume.Snapshot
+		nativeSnapshot      Snapshot
 		pvMap               map[string]pvcPvInfo
 		expectedVolumeInfos []*VolumeInfo
 	}{
 		{
 			name: "Native snapshot's IPOS pointer is nil",
-			nativeSnapshot: volume.Snapshot{
-				Spec: volume.SnapshotSpec{
+			nativeSnapshot: Snapshot{
+				Spec: SnapshotSpec{
 					PersistentVolumeName: "testPV",
 					VolumeIOPS:           nil,
 				},
@@ -158,8 +157,8 @@ func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 		},
 		{
 			name: "Cannot find info for the PV",
-			nativeSnapshot: volume.Snapshot{
-				Spec: volume.SnapshotSpec{
+			nativeSnapshot: Snapshot{
+				Spec: SnapshotSpec{
 					PersistentVolumeName: "testPV",
 					VolumeIOPS:           int64Ptr(100),
 				},
@@ -183,14 +182,14 @@ func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 					},
 				},
 			},
-			nativeSnapshot: volume.Snapshot{
-				Spec: volume.SnapshotSpec{
+			nativeSnapshot: Snapshot{
+				Spec: SnapshotSpec{
 					PersistentVolumeName: "testPV",
 					VolumeIOPS:           int64Ptr(100),
 					VolumeType:           "ssd",
 					VolumeAZ:             "us-central1-a",
 				},
-				Status: volume.SnapshotStatus{
+				Status: SnapshotStatus{
 					ProviderSnapshotID: "pvc-b31e3386-4bbb-4937-95d-7934cd62-b0a1-494b-95d7-0687440e8d0c",
 				},
 			},
@@ -213,14 +212,14 @@ func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 					},
 				},
 			},
-			nativeSnapshot: volume.Snapshot{
-				Spec: volume.SnapshotSpec{
+			nativeSnapshot: Snapshot{
+				Spec: SnapshotSpec{
 					PersistentVolumeName: "testPV",
 					VolumeIOPS:           int64Ptr(100),
 					VolumeType:           "ssd",
 					VolumeAZ:             "us-central1-a",
 				},
-				Status: volume.SnapshotStatus{
+				Status: SnapshotStatus{
 					ProviderSnapshotID: "pvc-b31e3386-4bbb-4937-95d-7934cd62-b0a1-494b-95d7-0687440e8d0c",
 				},
 			},

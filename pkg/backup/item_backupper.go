@@ -41,6 +41,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -54,7 +55,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	csiutil "github.com/vmware-tanzu/velero/pkg/util/csi"
 	pdvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 const (

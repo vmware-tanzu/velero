@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -55,7 +56,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 func TestBackedUpItemsMatchesTarballContents(t *testing.T) {

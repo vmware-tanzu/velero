@@ -34,7 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/clock"
 
-	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -238,7 +238,7 @@ type finalizerContext struct {
 	logger          logrus.FieldLogger
 	restore         *velerov1api.Restore
 	crClient        client.Client
-	volumeInfo      []*internalVolume.VolumeInfo
+	volumeInfo      []*volume.VolumeInfo
 	restoredPVCList map[string]struct{}
 }
 
@@ -263,7 +263,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 	semaphore := make(chan struct{}, maxConcurrency)
 
 	for _, volumeItem := range ctx.volumeInfo {
-		if (volumeItem.BackupMethod == internalVolume.PodVolumeBackup || volumeItem.BackupMethod == internalVolume.CSISnapshot) && volumeItem.PVInfo != nil {
+		if (volumeItem.BackupMethod == volume.PodVolumeBackup || volumeItem.BackupMethod == volume.CSISnapshot) && volumeItem.PVInfo != nil {
 			// Determine restored PVC namespace
 			restoredNamespace := volumeItem.PVCNamespace
 			if remapped, ok := ctx.restore.Spec.NamespaceMapping[restoredNamespace]; ok {
@@ -277,7 +277,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 			}
 
 			pvWaitGroup.Add(1)
-			go func(volInfo internalVolume.VolumeInfo, restoredNamespace string) {
+			go func(volInfo volume.VolumeInfo, restoredNamespace string) {
 				defer pvWaitGroup.Done()
 
 				semaphore <- struct{}{}
@@ -375,7 +375,7 @@ func getRestoredPVCFromRestoredResourceList(restoredResourceList map[string][]st
 	return pvcList
 }
 
-func needPatch(newPV *v1.PersistentVolume, pvInfo *internalVolume.PVInfo) bool {
+func needPatch(newPV *v1.PersistentVolume, pvInfo *volume.PVInfo) bool {
 	if newPV.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimPolicy(pvInfo.ReclaimPolicy) {
 		return true
 	}

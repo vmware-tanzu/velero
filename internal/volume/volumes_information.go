@@ -32,7 +32,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type VolumeBackupMethod string
@@ -188,7 +187,7 @@ type VolumesInformation struct {
 	volumeSnapshotContents []snapshotv1api.VolumeSnapshotContent
 	volumeSnapshotClasses  []snapshotv1api.VolumeSnapshotClass
 	SkippedPVs             map[string]string
-	NativeSnapshots        []*volume.Snapshot
+	NativeSnapshots        []*Snapshot
 	PodVolumeBackups       []*velerov1api.PodVolumeBackup
 	BackupOperations       []*itemoperation.BackupOperation
 	BackupName             string

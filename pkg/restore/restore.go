@@ -52,7 +52,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
-	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -73,7 +73,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 var resourceMustHave = []string{
@@ -377,7 +376,7 @@ type restoreContext struct {
 	disableInformerCache           bool
 	featureVerifier                features.Verifier
 	hookTracker                    *hook.HookTracker
-	volumeInfoMap                  map[string]internalVolume.VolumeInfo
+	volumeInfoMap                  map[string]volume.VolumeInfo
 }
 
 type resourceClientKey struct {
@@ -1228,7 +1227,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			ctx.log.Infof("Find VolumeInfo for PV %s.", obj.GetName())
 
 			switch volumeInfo.BackupMethod {
-			case internalVolume.NativeSnapshot:
+			case volume.NativeSnapshot:
 				obj, err = ctx.handlePVHasNativeSnapshot(obj, resourceClient)
 				if err != nil {
 					errs.Add(namespace, err)
@@ -1237,7 +1236,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 				name = obj.GetName()
 
-			case internalVolume.PodVolumeBackup:
+			case volume.PodVolumeBackup:
 				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a pod volume backup to be restored.")
 				ctx.pvsToProvision.Insert(name)
 
@@ -1245,7 +1244,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				// want to dynamically re-provision it.
 				return warnings, errs, itemExists
 
-			case internalVolume.CSISnapshot:
+			case volume.CSISnapshot:
 				restoreLogger.Infof("Dynamically re-provisioning persistent volume because it has a CSI VolumeSnapshot or a related snapshot DataUpload.")
 				ctx.pvsToProvision.Insert(name)
 
