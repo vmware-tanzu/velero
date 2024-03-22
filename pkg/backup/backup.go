@@ -32,15 +32,16 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
-
-	"github.com/vmware-tanzu/velero/internal/hook"
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/client"
-
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/hook"
+	"github.com/vmware-tanzu/velero/internal/volume"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
@@ -66,11 +67,31 @@ const BackupFormatVersion = "1.1.0"
 type Backupper interface {
 	// Backup takes a backup using the specification in the velerov1api.Backup and writes backup and log data
 	// to the given writers.
-	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []biav2.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error
-	BackupWithResolvers(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, backupItemActionResolver framework.BackupItemActionResolverV2, volumeSnapshotterGetter VolumeSnapshotterGetter) error
-	FinalizeBackup(log logrus.FieldLogger, backupRequest *Request, inBackupFile io.Reader, outBackupFile io.Writer,
+	Backup(
+		logger logrus.FieldLogger,
+		backup *Request,
+		backupFile io.Writer,
+		actions []biav2.BackupItemAction,
+		volumeSnapshotterGetter VolumeSnapshotterGetter,
+	) error
+
+	BackupWithResolvers(
+		log logrus.FieldLogger,
+		backupRequest *Request,
+		backupFile io.Writer,
 		backupItemActionResolver framework.BackupItemActionResolverV2,
-		asyncBIAOperations []*itemoperation.BackupOperation) error
+		volumeSnapshotterGetter VolumeSnapshotterGetter,
+	) error
+
+	FinalizeBackup(
+		log logrus.FieldLogger,
+		backupRequest *Request,
+		inBackupFile io.Reader,
+		outBackupFile io.Writer,
+		backupItemActionResolver framework.BackupItemActionResolverV2,
+		asyncBIAOperations []*itemoperation.BackupOperation,
+		volumeInfos []*volume.VolumeInfo,
+	) error
 }
 
 // kubernetesBackupper implements Backupper.
@@ -183,11 +204,13 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	return kb.BackupWithResolvers(log, backupRequest, backupFile, backupItemActions, volumeSnapshotterGetter)
 }
 
-func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
+func (kb *kubernetesBackupper) BackupWithResolvers(
+	log logrus.FieldLogger,
 	backupRequest *Request,
 	backupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
-	volumeSnapshotterGetter VolumeSnapshotterGetter) error {
+	volumeSnapshotterGetter VolumeSnapshotterGetter,
+) error {
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 
@@ -470,7 +493,13 @@ func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.Grou
 	return backedUpItem
 }
 
-func (kb *kubernetesBackupper) finalizeItem(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper, unstructured *unstructured.Unstructured, preferredGVR schema.GroupVersionResource) (bool, []FileForArchive) {
+func (kb *kubernetesBackupper) finalizeItem(
+	log logrus.FieldLogger,
+	gr schema.GroupResource,
+	itemBackupper *itemBackupper,
+	unstructured *unstructured.Unstructured,
+	preferredGVR schema.GroupVersionResource,
+) (bool, []FileForArchive) {
 	backedUpItem, updateFiles, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR, true, true)
 	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
 		log.WithField("name", unstructured.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
@@ -548,12 +577,15 @@ func (kb *kubernetesBackupper) writeBackupVersion(tw *tar.Writer) error {
 	return nil
 }
 
-func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
+func (kb *kubernetesBackupper) FinalizeBackup(
+	log logrus.FieldLogger,
 	backupRequest *Request,
 	inBackupFile io.Reader,
 	outBackupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
-	asyncBIAOperations []*itemoperation.BackupOperation) error {
+	asyncBIAOperations []*itemoperation.BackupOperation,
+	volumeInfos []*volume.VolumeInfo,
+) error {
 	gzw := gzip.NewWriter(outBackupFile)
 	defer gzw.Close()
 	tw := tar.NewWriter(gzw)
@@ -642,6 +674,8 @@ func (kb *kubernetesBackupper) FinalizeBackup(log logrus.FieldLogger,
 				return
 			}
 
+			updateVolumeInfos(volumeInfos, unstructured, item.groupResource, log)
+
 			backedUp, itemFiles := kb.finalizeItem(log, item.groupResource, itemBackupper, &unstructured, item.preferredGVR)
 			if backedUp {
 				backedUpGroupResources[item.groupResource] = true
@@ -729,4 +763,33 @@ type tarWriter interface {
 	io.Closer
 	Write([]byte) (int, error)
 	WriteHeader(*tar.Header) error
+}
+
+func updateVolumeInfos(
+	volumeInfos []*volume.VolumeInfo,
+	unstructured unstructured.Unstructured,
+	groupResource schema.GroupResource,
+	log logrus.FieldLogger,
+) {
+	switch groupResource.String() {
+	case kuberesource.DataUploads.String():
+		var dataUpload velerov2alpha1.DataUpload
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured.UnstructuredContent(), &dataUpload)
+		if err != nil {
+			log.WithError(err).Errorf("fail to convert DataUpload: %s/%s",
+				unstructured.GetNamespace(), unstructured.GetName())
+		}
+
+		for index := range volumeInfos {
+			if volumeInfos[index].PVCName == dataUpload.Spec.SourcePVC &&
+				volumeInfos[index].PVCNamespace == dataUpload.Spec.SourceNamespace {
+				if dataUpload.Status.CompletionTimestamp != nil {
+					volumeInfos[index].CompletionTimestamp = dataUpload.Status.CompletionTimestamp
+				}
+				volumeInfos[index].SnapshotDataMovementInfo.SnapshotHandle = dataUpload.Status.SnapshotID
+				volumeInfos[index].SnapshotDataMovementInfo.RetainedSnapshot = dataUpload.Spec.CSISnapshot.VolumeSnapshot
+				volumeInfos[index].SnapshotDataMovementInfo.Size = dataUpload.Status.Progress.TotalBytes
+			}
+		}
+	}
 }

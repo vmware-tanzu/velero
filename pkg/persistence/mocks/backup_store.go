@@ -314,7 +314,7 @@ func (_m *BackupStore) GetRestoreItemOperations(name string) ([]*itemoperation.R
 	return r0, r1
 }
 
-// GetRestoreItemOperations provides a mock function with given fields: name
+// GetBackupVolumeInfos provides a mock function with given fields: name
 func (_m *BackupStore) GetBackupVolumeInfos(name string) ([]*volume.VolumeInfo, error) {
 	ret := _m.Called(name)
 
@@ -335,6 +335,20 @@ func (_m *BackupStore) GetBackupVolumeInfos(name string) ([]*volume.VolumeInfo, 
 	}
 
 	return r0, r1
+}
+
+// PutBackupVolumeInfos provides a mock function with given fields: name, volumeInfo
+func (_m *BackupStore) PutBackupVolumeInfos(name string, volumeInfo io.Reader) error {
+	ret := _m.Called(name, volumeInfo)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, io.Reader) error); ok {
+		r0 = rf(name, volumeInfo)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // GetRestoreResults provides a mock function with given fields: name

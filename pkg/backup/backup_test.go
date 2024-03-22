@@ -43,7 +43,9 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -4431,5 +4433,61 @@ func TestBackupNamespaces(t *testing.T) {
 
 			assertTarballContents(t, backupFile, append(tc.want, "metadata/version")...)
 		})
+	}
+}
+
+func TestUpdateVolumeInfos(t *testing.T) {
+	logger := logrus.StandardLogger()
+	// The unstructured conversion will loose the time precision to second
+	// level. To make test pass. Set the now precision at second at the
+	// beginning.
+	now := metav1.Now().Rfc3339Copy()
+	volumeInfos := []*volume.VolumeInfo{
+		{
+			PVCName:                  "pvc1",
+			PVCNamespace:             "ns1",
+			SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{},
+		},
+	}
+	dataUpload := velerov2alpha1.DataUpload{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "du1",
+			Namespace: "velero",
+		},
+		Spec: velerov2alpha1.DataUploadSpec{
+			SourcePVC:       "pvc1",
+			SourceNamespace: "ns1",
+			CSISnapshot: &velerov2alpha1.CSISnapshotSpec{
+				VolumeSnapshot: "vs1",
+			},
+		},
+		Status: velerov2alpha1.DataUploadStatus{
+			CompletionTimestamp: &now,
+			SnapshotID:          "snapshot1",
+			Progress: shared.DataMoveOperationProgress{
+				TotalBytes: 10000,
+			},
+		},
+	}
+	duMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&dataUpload)
+	require.NoError(t, err)
+
+	expectedVolumeInfos := []*volume.VolumeInfo{
+		{
+			PVCName:             "pvc1",
+			PVCNamespace:        "ns1",
+			CompletionTimestamp: &now,
+			SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
+				SnapshotHandle:   "snapshot1",
+				Size:             10000,
+				RetainedSnapshot: "vs1",
+			},
+		},
+	}
+
+	updateVolumeInfos(volumeInfos, unstructured.Unstructured{Object: duMap}, kuberesource.DataUploads, logger)
+
+	if len(expectedVolumeInfos) > 0 {
+		require.Equal(t, expectedVolumeInfos[0].SnapshotDataMovementInfo, volumeInfos[0].SnapshotDataMovementInfo)
 	}
 }

@@ -44,6 +44,7 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	fakeClient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -78,9 +79,15 @@ func (b *fakeBackupper) BackupWithResolvers(logger logrus.FieldLogger, backup *p
 	return args.Error(0)
 }
 
-func (b *fakeBackupper) FinalizeBackup(logger logrus.FieldLogger, backup *pkgbackup.Request, inBackupFile io.Reader, outBackupFile io.Writer,
+func (b *fakeBackupper) FinalizeBackup(
+	logger logrus.FieldLogger,
+	backup *pkgbackup.Request,
+	inBackupFile io.Reader,
+	outBackupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
-	asyncBIAOperations []*itemoperation.BackupOperation) error {
+	asyncBIAOperations []*itemoperation.BackupOperation,
+	volumeInfos []*volume.VolumeInfo,
+) error {
 	args := b.Called(logger, backup, inBackupFile, outBackupFile, backupItemActionResolver, asyncBIAOperations)
 	return args.Error(0)
 }

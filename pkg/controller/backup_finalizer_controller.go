@@ -18,7 +18,9 @@ package controller
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"os"
 
 	"github.com/pkg/errors"
@@ -29,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
@@ -111,7 +114,11 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	original := backup.DeepCopy()
 	defer func() {
 		switch backup.Status.Phase {
-		case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed, velerov1api.BackupPhaseFailedValidation:
+		case
+			velerov1api.BackupPhaseCompleted,
+			velerov1api.BackupPhasePartiallyFailed,
+			velerov1api.BackupPhaseFailed,
+			velerov1api.BackupPhaseFailedValidation:
 			r.backupTracker.Delete(backup.Namespace, backup.Name)
 		}
 		// Always attempt to Patch the backup object and status after each reconciliation.
@@ -150,8 +157,14 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		SkippedPVTracker: pkgbackup.NewSkipPVTracker(),
 	}
 	var outBackupFile *os.File
+	var volumeInfos []*volume.VolumeInfo
 	if len(operations) > 0 {
-		// Call itemBackupper.BackupItem for the list of items updated by async operations
+		volumeInfos, err = backupStore.GetBackupVolumeInfos(backup.Name)
+		if err != nil {
+			log.WithError(err).Error("error getting backup VolumeInfos")
+			return ctrl.Result{}, errors.WithStack(err)
+		}
+
 		log.Info("Setting up finalized backup temp file")
 		inBackupFile, err := downloadToTempFile(backup.Name, backupStore, log)
 		if err != nil {
@@ -172,7 +185,17 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, errors.WithStack(err)
 		}
 		backupItemActionsResolver := framework.NewBackupItemActionResolverV2(actions)
-		err = r.backupper.FinalizeBackup(log, backupRequest, inBackupFile, outBackupFile, backupItemActionsResolver, operations)
+
+		// Call itemBackupper.BackupItem for the list of items updated by async operations
+		err = r.backupper.FinalizeBackup(
+			log,
+			backupRequest,
+			inBackupFile,
+			outBackupFile,
+			backupItemActionsResolver,
+			operations,
+			volumeInfos,
+		)
 		if err != nil {
 			log.WithError(err).Error("error finalizing Backup")
 			return ctrl.Result{}, errors.WithStack(err)
@@ -208,6 +231,24 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		err = backupStore.PutBackupContents(backup.Name, outBackupFile)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "error uploading backup final contents")
+		}
+
+		// Update the backup's VolumeInfos
+		backupVolumeInfoBuf := new(bytes.Buffer)
+		gzw := gzip.NewWriter(backupVolumeInfoBuf)
+		defer gzw.Close()
+
+		if err := json.NewEncoder(gzw).Encode(volumeInfos); err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "error encoding restore results to JSON")
+		}
+
+		if err := gzw.Close(); err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "error closing gzip writer")
+		}
+
+		err = backupStore.PutBackupVolumeInfos(backup.Name, backupVolumeInfoBuf)
+		if err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "fail to upload backup VolumeInfos")
 		}
 	}
 	return ctrl.Result{}, nil
