@@ -642,22 +642,22 @@ func TestPVCBackupSummary(t *testing.T) {
 
 	// it won't be added if the volme is not in the pvc map.
 	pbs.addSkipped("vol-3", "whatever reason")
-	assert.Equal(t, 0, len(pbs.Skipped))
+	assert.Empty(t, pbs.Skipped)
 	pbs.addBackedup("vol-3")
-	assert.Equal(t, 0, len(pbs.Backedup))
+	assert.Empty(t, pbs.Backedup)
 
 	// only can be added as skipped when it's not in backedup set
 	pbs.addBackedup("vol-1")
-	assert.Equal(t, 1, len(pbs.Backedup))
+	assert.Len(t, pbs.Backedup, 1)
 	assert.Equal(t, "pvc-1", pbs.Backedup["vol-1"].Name)
 	pbs.addSkipped("vol-1", "whatever reason")
-	assert.Equal(t, 0, len(pbs.Skipped))
+	assert.Empty(t, pbs.Skipped)
 	pbs.addSkipped("vol-2", "vol-2 has to be skipped")
-	assert.Equal(t, 1, len(pbs.Skipped))
+	assert.Len(t, pbs.Skipped, 1)
 	assert.Equal(t, "pvc-2", pbs.Skipped["vol-2"].PVC.Name)
 
 	// adding a vol as backedup removes it from skipped set
 	pbs.addBackedup("vol-2")
-	assert.Equal(t, 0, len(pbs.Skipped))
-	assert.Equal(t, 2, len(pbs.Backedup))
+	assert.Empty(t, pbs.Skipped)
+	assert.Len(t, pbs.Backedup, 2)
 }

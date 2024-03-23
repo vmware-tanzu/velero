@@ -138,7 +138,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		require.NoError(t, err)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
-		assert.Equal(t, 1, len(res.Status.Errors))
+		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "spec.backupName is required", res.Status.Errors[0])
 	})
 
@@ -206,7 +206,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		require.NoError(t, err)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
-		assert.Equal(t, 1, len(res.Status.Errors))
+		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "backup is still in progress", res.Status.Errors[0])
 	})
 
@@ -221,7 +221,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		require.NoError(t, err)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
-		assert.Equal(t, 1, len(res.Status.Errors))
+		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "backup not found", res.Status.Errors[0])
 	})
 	t.Run("unable to find backup storage location", func(t *testing.T) {
@@ -236,7 +236,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		require.NoError(t, err)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
-		assert.Equal(t, 1, len(res.Status.Errors))
+		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "backup storage location default not found", res.Status.Errors[0])
 	})
 
@@ -253,7 +253,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		require.NoError(t, err)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
-		assert.Equal(t, 1, len(res.Status.Errors))
+		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "cannot delete backup because backup storage location default is currently in read-only mode", res.Status.Errors[0])
 	})
 	t.Run("full delete, no errors", func(t *testing.T) {
@@ -684,7 +684,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		require.NoError(t, err)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
-		assert.Equal(t, 1, len(res.Status.Errors))
+		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "backup not found", res.Status.Errors[0])
 
 	})

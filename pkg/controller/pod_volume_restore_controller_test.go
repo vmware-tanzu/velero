@@ -492,7 +492,7 @@ func TestFindVolumeRestoresForPod(t *testing.T) {
 		logger: logrus.New(),
 	}
 	requests := reconciler.findVolumeRestoresForPod(context.Background(), pod)
-	assert.Len(t, requests, 0)
+	assert.Empty(t, requests)
 
 	// contain one matching PVR
 	reconciler.Client = clientBuilder.WithLists(&velerov1api.PodVolumeRestoreList{

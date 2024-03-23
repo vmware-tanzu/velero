@@ -89,13 +89,13 @@ func TestDeleteFunctions(t *testing.T) {
 	bkrepoList := velerov1api.BackupRepositoryList{}
 	t.Run("findAssociatedBackups", func(t *testing.T) {
 		bkList, e := findAssociatedBackups(kbclient, "bk-loc-1", "ns1")
-		assert.Equal(t, 0, len(bkList.Items))
+		assert.Empty(t, bkList.Items)
 		assert.NoError(t, e)
 	})
 
 	t.Run("findAssociatedBackupRepos", func(t *testing.T) {
 		bkrepoList, e := findAssociatedBackupRepos(kbclient, "bk-loc-1", "ns1")
-		assert.Equal(t, 0, len(bkrepoList.Items))
+		assert.Empty(t, bkrepoList.Items)
 		assert.NoError(t, e)
 	})
 
@@ -104,7 +104,7 @@ func TestDeleteFunctions(t *testing.T) {
 		bk.Name = "bk-name-last"
 		bkList.Items = append(bkList.Items, bk)
 		errList := deleteBackups(kbclient, bkList)
-		assert.Equal(t, 1, len(errList))
+		assert.Len(t, errList, 1)
 		assert.Contains(t, errList[0].Error(), fmt.Sprintf("delete backup \"%s\" associated with deleted BSL: backups.velero.io \"%s\" not found", bk.Name, bk.Name))
 	})
 	t.Run("deleteBackupRepos", func(t *testing.T) {
@@ -112,7 +112,7 @@ func TestDeleteFunctions(t *testing.T) {
 		bkrepo.Name = "bk-repo-name-last"
 		bkrepoList.Items = append(bkrepoList.Items, bkrepo)
 		errList := deleteBackupRepos(kbclient, bkrepoList)
-		assert.Equal(t, 1, len(errList))
+		assert.Len(t, errList, 1)
 		assert.Contains(t, errList[0].Error(), fmt.Sprintf("delete backup repository \"%s\" associated with deleted BSL: backuprepositories.velero.io \"%s\" not found", bkrepo.Name, bkrepo.Name))
 	})
 }

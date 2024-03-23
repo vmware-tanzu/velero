@@ -2474,7 +2474,7 @@ func TestRestoreHookTrackerAdd(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _ = GroupRestoreExecHooks(tc.resourceRestoreHooks, tc.pod, velerotest.NewLogger(), tc.hookTracker)
 			tracker := tc.hookTracker.GetTracker()
-			assert.Equal(t, tc.expectedCnt, len(tracker))
+			assert.Len(t, tracker, tc.expectedCnt)
 		})
 	}
 }

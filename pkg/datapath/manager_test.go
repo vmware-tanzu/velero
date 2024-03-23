@@ -42,10 +42,10 @@ func TestManager(t *testing.T) {
 	assert.Equal(t, async_job_1, ret)
 
 	m.RemoveAsyncBR("job-0")
-	assert.Equal(t, 2, len(m.tracker))
+	assert.Len(t, m.tracker, 2)
 
 	m.RemoveAsyncBR("job-1")
-	assert.Equal(t, 1, len(m.tracker))
+	assert.Len(t, m.tracker, 1)
 
 	ret = m.GetAsyncBR("job-1")
 	assert.Equal(t, nil, ret)
