@@ -246,5 +246,9 @@ func (rp *resticProvider) parseRestoreExtraFlags(uploaderCfg map[string]string) 
 		extraFlags = append(extraFlags, "--sparse")
 	}
 
+	if restoreConcurrency, err := uploaderutil.GetRestoreConcurrency(uploaderCfg); err == nil && restoreConcurrency > 0 {
+		return extraFlags, errors.New("restic does not support parallel restore")
+	}
+
 	return extraFlags, nil
 }

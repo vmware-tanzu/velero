@@ -422,6 +422,10 @@ spec:
                 description: UploaderConfig specifies the configuration for the restore.
                 nullable: true
                 properties:
+                  parallelFilesDownload:
+                    description: ParallelFilesDownload is the concurrency number setting
+                      for restore.
+                    type: integer
                   writeSparseFiles:
                     description: WriteSparseFiles is a flag to indicate whether write
                       files sparsely or not.

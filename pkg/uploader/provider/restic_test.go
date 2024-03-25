@@ -434,6 +434,13 @@ func TestParseUploaderConfig(t *testing.T) {
 			},
 			expectedFlags: []string{},
 		},
+		{
+			name: "RestoreConcorrency",
+			uploaderConfig: map[string]string{
+				"Parallel": "5",
+			},
+			expectedFlags: []string{},
+		},
 	}
 
 	for _, testCase := range testCases {

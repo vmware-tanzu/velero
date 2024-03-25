@@ -136,6 +136,9 @@ type UploaderConfigForRestore struct {
 	// +optional
 	// +nullable
 	WriteSparseFiles *bool `json:"writeSparseFiles,omitempty"`
+	// ParallelFilesDownload is the concurrency number setting for restore.
+	// +optional
+	ParallelFilesDownload int `json:"parallelFilesDownload,omitempty"`
 }
 
 // RestoreHooks contains custom behaviors that should be executed during or post restore.
