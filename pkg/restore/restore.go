@@ -1122,7 +1122,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// Check if group/resource should be restored. We need to do this here since
 	// this method may be getting called for an additional item which is a group/resource
 	// that's excluded.
-	if !ctx.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
+	if !ctx.resourceIncludesExcludes.ShouldInclude(groupResource.String()) && !ctx.resourceMustHave.Has(groupResource.String()) {
 		restoreLogger.Info("Not restoring item because resource is excluded")
 		return warnings, errs, itemExists
 	}
