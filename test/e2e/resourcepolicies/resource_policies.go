@@ -171,7 +171,7 @@ func (r *ResourcePoliciesCase) Verify() error {
 						content = strings.Replace(content, "\n", "", -1)
 						originContent := strings.Replace(fmt.Sprintf("ns-%s pod-%s volume-%s", ns, pod.Name, vol.Name), "\n", "", -1)
 
-						Expect(content == originContent).To(BeTrue(), fmt.Sprintf("File %s does not exist in volume %s of pod %s in namespace %s",
+						Expect(content).To(Equal(originContent), fmt.Sprintf("File %s does not exist in volume %s of pod %s in namespace %s",
 							FileName, vol.Name, pod.Name, ns))
 					}
 				}

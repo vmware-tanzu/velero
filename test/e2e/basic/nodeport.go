@@ -70,7 +70,7 @@ func (n *NodePort) CreateResources() error {
 			Expect(createServiceWithNodeport(n.Ctx, n.Client, ns, n.serviceName, n.labels, 0)).To(Succeed(), fmt.Sprintf("Failed to create service %s", n.serviceName))
 			service, err := GetService(n.Ctx, n.Client, ns, n.serviceName)
 			Expect(err).To(Succeed())
-			Expect(len(service.Spec.Ports)).To(Equal(1))
+			Expect(service.Spec.Ports).To(HaveLen(1))
 			n.nodePort = service.Spec.Ports[0].NodePort
 			_, err = GetAllService(n.Ctx)
 			Expect(err).To(Succeed(), "fail to get service")
@@ -135,7 +135,7 @@ func (n *NodePort) Restore() error {
 		By(fmt.Sprintf("Delete service %s by deleting namespace %s", n.serviceName, ns), func() {
 			service, err := GetService(n.Ctx, n.Client, ns, n.serviceName)
 			Expect(err).To(Succeed())
-			Expect(len(service.Spec.Ports)).To(Equal(1))
+			Expect(service.Spec.Ports).To(HaveLen(1))
 			fmt.Println(service.Spec.Ports)
 			Expect(DeleteNamespace(n.Ctx, n.Client, ns, true)).To(Succeed())
 		})
@@ -159,7 +159,7 @@ func (n *NodePort) Restore() error {
 		By(fmt.Sprintf("Verify service %s was restore successfully with the origin nodeport.", ns), func() {
 			service, err := GetService(n.Ctx, n.Client, ns, n.serviceName)
 			Expect(err).To(Succeed())
-			Expect(len(service.Spec.Ports)).To(Equal(1))
+			Expect(service.Spec.Ports).To(HaveLen(1))
 			Expect(service.Spec.Ports[0].NodePort).To(Equal(n.nodePort))
 		})
 	}

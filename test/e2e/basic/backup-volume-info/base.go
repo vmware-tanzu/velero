@@ -117,7 +117,7 @@ func (v *BackupVolumeInfo) CreateResources() error {
 		fmt.Printf("Creating deployment in namespaces ...%s\n", createNSName)
 		// Make sure PVC count is great than 3 to allow both empty volumes and file populated volumes exist per pod
 		pvcCount := 4
-		Expect(pvcCount > 3).To(Equal(true))
+		Expect(pvcCount).To(BeNumerically(">", 3))
 
 		var vols []*v1.Volume
 		for i := 0; i <= pvcCount-1; i++ {

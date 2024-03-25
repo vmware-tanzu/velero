@@ -118,7 +118,7 @@ func TestDeleteOldMaintenanceJobs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// We expect the number of jobs to be equal to 'keep'
-	assert.Equal(t, keep, len(jobList.Items))
+	assert.Len(t, jobList.Items, keep)
 
 	// We expect that the oldest jobs were deleted
 	// Job3 should not be present in the remaining list

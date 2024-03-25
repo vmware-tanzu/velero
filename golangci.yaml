@@ -356,7 +356,6 @@ issues:
       linters:
         - dupword
         - errcheck
-        - ginkgolinter
         - goconst
         - gosec
         - govet
@@ -373,7 +372,6 @@ issues:
         - goconst
         - gosec
         - gosimple
-        - ginkgolinter
         - nilerr
         - noctx
         - staticcheck
