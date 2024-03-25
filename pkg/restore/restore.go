@@ -1505,6 +1505,9 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// The object apiVersion might get modified by a RestorePlugin so we need to
 	// get a new client to reflect updated resource path.
 	newGR := schema.GroupResource{Group: obj.GroupVersionKind().Group, Resource: groupResource.Resource}
+	// obj kind might change within a special RIA which is used to convert objects,
+	// like from Openshift DeploymentConfig to native Deployment.
+	// we should re-get the newGR.Resource again in such a case
 	if obj.GetKind() != resourceKind {
 		ctx.log.Infof("Resource kind changed from %s to %s", resourceKind, obj.GetKind())
 		gvr, _, err := ctx.discoveryHelper.KindFor(obj.GroupVersionKind())
@@ -2198,6 +2201,8 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 		// try to resolve the resource via discovery to a complete group/version/resource
 		gvr, _, err := ctx.discoveryHelper.ResourceFor(groupResource.WithVersion(""))
 		if err != nil {
+			// don't skip if we can't resolve the resource via discovery, log it
+			// the gv of this resource may be changed in a RIA, we can try to get it after that
 			ctx.log.WithField("resource", resource).Infof("resource cannot be resolved via discovery")
 		} else {
 			groupResource = gvr.GroupResource()
