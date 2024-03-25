@@ -29,6 +29,7 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	clientTesting "k8s.io/client-go/testing"
@@ -307,15 +308,8 @@ func TestBackupPodVolumes(t *testing.T) {
 	velerov1api.AddToScheme(scheme)
 	corev1api.AddToScheme(scheme)
 
-	ctxWithCancel, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	failedPVB := createPVBObj(true, false, 1, "")
-	completedPVB := createPVBObj(false, false, 1, "")
-
 	tests := []struct {
 		name            string
-		ctx             context.Context
 		bsl             string
 		uploaderType    string
 		volumes         []string
@@ -325,7 +319,6 @@ func TestBackupPodVolumes(t *testing.T) {
 		veleroClientObj []runtime.Object
 		veleroReactors  []reactor
 		runtimeScheme   *runtime.Scheme
-		retPVBs         []*velerov1api.PodVolumeBackup
 		pvbs            []*velerov1api.PodVolumeBackup
 		errs            []string
 	}{
@@ -493,87 +486,11 @@ func TestBackupPodVolumes(t *testing.T) {
 			uploaderType:  "kopia",
 			bsl:           "fake-bsl",
 		},
-		{
-			name: "context canceled",
-			ctx:  ctxWithCancel,
-			volumes: []string{
-				"fake-volume-1",
-			},
-			sourcePod: createPodObj(true, true, true, 1),
-			kubeClientObj: []runtime.Object{
-				createNodeAgentPodObj(true),
-				createPVCObj(1),
-				createPVObj(1, false),
-			},
-			ctlClientObj: []runtime.Object{
-				createBackupRepoObj(),
-			},
-			runtimeScheme: scheme,
-			uploaderType:  "kopia",
-			bsl:           "fake-bsl",
-			errs: []string{
-				"timed out waiting for all PodVolumeBackups to complete",
-			},
-		},
-		{
-			name: "return failed pvbs",
-			volumes: []string{
-				"fake-volume-1",
-			},
-			sourcePod: createPodObj(true, true, true, 1),
-			kubeClientObj: []runtime.Object{
-				createNodeAgentPodObj(true),
-				createPVCObj(1),
-				createPVObj(1, false),
-			},
-			ctlClientObj: []runtime.Object{
-				createBackupRepoObj(),
-			},
-			runtimeScheme: scheme,
-			uploaderType:  "kopia",
-			bsl:           "fake-bsl",
-			retPVBs: []*velerov1api.PodVolumeBackup{
-				failedPVB,
-			},
-			pvbs: []*velerov1api.PodVolumeBackup{
-				failedPVB,
-			},
-			errs: []string{
-				"pod volume backup failed: fake-message",
-			},
-		},
-		{
-			name: "return completed pvbs",
-			volumes: []string{
-				"fake-volume-1",
-			},
-			sourcePod: createPodObj(true, true, true, 1),
-			kubeClientObj: []runtime.Object{
-				createNodeAgentPodObj(true),
-				createPVCObj(1),
-				createPVObj(1, false),
-			},
-			ctlClientObj: []runtime.Object{
-				createBackupRepoObj(),
-			},
-			runtimeScheme: scheme,
-			uploaderType:  "kopia",
-			bsl:           "fake-bsl",
-			retPVBs: []*velerov1api.PodVolumeBackup{
-				completedPVB,
-			},
-			pvbs: []*velerov1api.PodVolumeBackup{
-				completedPVB,
-			},
-		},
 	}
 	// TODO add more verification around PVCBackupSummary returned by "BackupPodVolumes"
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
-			if test.ctx != nil {
-				ctx = test.ctx
-			}
 
 			fakeClientBuilder := ctrlfake.NewClientBuilder()
 			if test.runtimeScheme != nil {
@@ -606,18 +523,6 @@ func TestBackupPodVolumes(t *testing.T) {
 
 			require.NoError(t, err)
 
-			go func() {
-				if test.ctx != nil {
-					time.Sleep(time.Second)
-					cancel()
-				} else if test.retPVBs != nil {
-					time.Sleep(time.Second)
-					for _, pvb := range test.retPVBs {
-						bp.(*backupper).results[resultsKey(test.sourcePod.Namespace, test.sourcePod.Name)] <- pvb
-					}
-				}
-			}()
-
 			pvbs, _, errs := bp.BackupPodVolumes(backupObj, test.sourcePod, test.volumes, nil, velerotest.NewLogger())
 
 			if errs == nil {
@@ -630,6 +535,101 @@ func TestBackupPodVolumes(t *testing.T) {
 
 			assert.Equal(t, test.pvbs, pvbs)
 		})
+	}
+}
+
+type logHook struct {
+	entry *logrus.Entry
+}
+
+func (l *logHook) Levels() []logrus.Level {
+	return []logrus.Level{logrus.ErrorLevel}
+}
+func (l *logHook) Fire(entry *logrus.Entry) error {
+	l.entry = entry
+	return nil
+}
+
+func TestWaitAllPodVolumesProcessed(t *testing.T) {
+	timeoutCtx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	cases := []struct {
+		name              string
+		ctx               context.Context
+		statusToBeUpdated *velerov1api.PodVolumeBackupStatus
+		expectedErr       string
+		expectedPVBPhase  velerov1api.PodVolumeBackupPhase
+	}{
+		{
+			name:        "context canceled",
+			ctx:         timeoutCtx,
+			expectedErr: "timed out waiting for all PodVolumeBackups to complete",
+		},
+		{
+			name: "failed pvbs",
+			ctx:  context.Background(),
+			statusToBeUpdated: &velerov1api.PodVolumeBackupStatus{
+				Phase:   velerov1api.PodVolumeBackupPhaseFailed,
+				Message: "failed",
+			},
+			expectedPVBPhase: velerov1api.PodVolumeBackupPhaseFailed,
+			expectedErr:      "pod volume backup failed: failed",
+		},
+		{
+			name: "completed pvbs",
+			ctx:  context.Background(),
+			statusToBeUpdated: &velerov1api.PodVolumeBackupStatus{
+				Phase:   velerov1api.PodVolumeBackupPhaseCompleted,
+				Message: "completed",
+			},
+			expectedPVBPhase: velerov1api.PodVolumeBackupPhaseCompleted,
+		},
+	}
+
+	for _, c := range cases {
+		newPVB := builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb").Result()
+		scheme := runtime.NewScheme()
+		velerov1api.AddToScheme(scheme)
+		client := ctrlfake.NewClientBuilder().WithScheme(scheme).WithObjects(newPVB).Build()
+
+		lw := kube.InternalLW{
+			Client:     client,
+			Namespace:  velerov1api.DefaultNamespace,
+			ObjectList: new(velerov1api.PodVolumeBackupList),
+		}
+
+		informer := cache.NewSharedIndexInformer(&lw, &velerov1api.PodVolumeBackup{}, 0, cache.Indexers{})
+
+		ctx := context.Background()
+		go informer.Run(ctx.Done())
+		require.True(t, cache.WaitForCacheSync(ctx.Done(), informer.HasSynced))
+
+		logger := logrus.New()
+		logHook := &logHook{}
+		logger.Hooks.Add(logHook)
+
+		backuper := newBackupper(c.ctx, nil, nil, informer, nil, "", &velerov1api.Backup{})
+		backuper.wg.Add(1)
+
+		if c.statusToBeUpdated != nil {
+			pvb := &velerov1api.PodVolumeBackup{}
+			err := client.Get(context.Background(), ctrlclient.ObjectKey{Namespace: newPVB.Namespace, Name: newPVB.Name}, pvb)
+			require.Nil(t, err)
+
+			pvb.Status = *c.statusToBeUpdated
+			err = client.Update(context.Background(), pvb)
+			require.Nil(t, err)
+		}
+
+		pvbs := backuper.WaitAllPodVolumesProcessed(logger)
+
+		if c.expectedErr != "" {
+			assert.Equal(t, c.expectedErr, logHook.entry.Message)
+		}
+
+		if c.expectedPVBPhase != "" {
+			require.Len(t, pvbs, 1)
+			assert.Equal(t, c.expectedPVBPhase, pvbs[0].Status.Phase)
+		}
 	}
 }
 
