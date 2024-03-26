@@ -19,6 +19,7 @@ package builder
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 )
 
@@ -129,5 +130,10 @@ func (d *DataUploadBuilder) CompletionTimestamp(completionTimestamp *metav1.Time
 // Labels sets the DataUpload's Labels.
 func (d *DataUploadBuilder) Labels(labels map[string]string) *DataUploadBuilder {
 	d.object.Labels = labels
+	return d
+}
+
+func (d *DataUploadBuilder) Progress(progress shared.DataMoveOperationProgress) *DataUploadBuilder {
+	d.object.Status.Progress = progress
 	return d
 }
