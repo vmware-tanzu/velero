@@ -18,6 +18,7 @@ package backup
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -45,6 +46,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
+	"github.com/vmware-tanzu/velero/pkg/persistence"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
@@ -90,7 +93,6 @@ type Backupper interface {
 		outBackupFile io.Writer,
 		backupItemActionResolver framework.BackupItemActionResolverV2,
 		asyncBIAOperations []*itemoperation.BackupOperation,
-		volumeInfos []*volume.VolumeInfo,
 	) error
 }
 
@@ -105,6 +107,8 @@ type kubernetesBackupper struct {
 	defaultVolumesToFsBackup  bool
 	clientPageSize            int
 	uploaderType              string
+	pluginManager             func(logrus.FieldLogger) clientmgmt.Manager
+	backupStoreGetter         persistence.ObjectBackupStoreGetter
 }
 
 func (i *itemKey) String() string {
@@ -132,6 +136,8 @@ func NewKubernetesBackupper(
 	defaultVolumesToFsBackup bool,
 	clientPageSize int,
 	uploaderType string,
+	pluginManager func(logrus.FieldLogger) clientmgmt.Manager,
+	backupStoreGetter persistence.ObjectBackupStoreGetter,
 ) (Backupper, error) {
 	return &kubernetesBackupper{
 		kbClient:                  kbClient,
@@ -143,6 +149,8 @@ func NewKubernetesBackupper(
 		defaultVolumesToFsBackup:  defaultVolumesToFsBackup,
 		clientPageSize:            clientPageSize,
 		uploaderType:              uploaderType,
+		pluginManager:             pluginManager,
+		backupStoreGetter:         backupStoreGetter,
 	}, nil
 }
 
@@ -584,7 +592,6 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 	outBackupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
 	asyncBIAOperations []*itemoperation.BackupOperation,
-	volumeInfos []*volume.VolumeInfo,
 ) error {
 	gzw := gzip.NewWriter(outBackupFile)
 	defer gzw.Close()
@@ -648,6 +655,8 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 	updateFiles := make(map[string]FileForArchive)
 	backedUpGroupResources := map[schema.GroupResource]bool{}
 
+	unstructuredDataUploads := make([]unstructured.Unstructured, 0)
+
 	for i, item := range items {
 		log.WithFields(map[string]interface{}{
 			"progress":  "",
@@ -674,7 +683,9 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 				return
 			}
 
-			updateVolumeInfos(volumeInfos, unstructured, item.groupResource, log)
+			if item.groupResource == kuberesource.DataUploads {
+				unstructuredDataUploads = append(unstructuredDataUploads, unstructured)
+			}
 
 			backedUp, itemFiles := kb.finalizeItem(log, item.groupResource, itemBackupper, &unstructured, item.preferredGVR)
 			if backedUp {
@@ -695,6 +706,22 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 			"namespace": item.namespace,
 			"name":      item.name,
 		}).Infof("Updated %d items out of an estimated total of %d (estimate will change throughout the backup finalizer)", len(backupRequest.BackedUpItems), totalItems)
+	}
+
+	backupStore, volumeInfos, err := kb.getVolumeInfos(*backupRequest.Backup, log)
+	if err != nil {
+		log.WithError(err).Errorf("fail to get the backup VolumeInfos for backup %s", backupRequest.Name)
+		return err
+	}
+
+	if err := updateVolumeInfos(volumeInfos, unstructuredDataUploads, asyncBIAOperations, log); err != nil {
+		log.WithError(err).Errorf("fail to update VolumeInfos for backup %s", backupRequest.Name)
+		return err
+	}
+
+	if err := putVolumeInfos(backupRequest.Name, volumeInfos, backupStore); err != nil {
+		log.WithError(err).Errorf("fail to put the VolumeInfos for backup %s", backupRequest.Name)
+		return err
 	}
 
 	// write new tar archive replacing files in original with content updateFiles for matches
@@ -765,19 +792,48 @@ type tarWriter interface {
 	WriteHeader(*tar.Header) error
 }
 
+func (kb *kubernetesBackupper) getVolumeInfos(
+	backup velerov1api.Backup,
+	log logrus.FieldLogger,
+) (persistence.BackupStore, []*volume.VolumeInfo, error) {
+	location := &velerov1api.BackupStorageLocation{}
+	if err := kb.kbClient.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: backup.Namespace,
+		Name:      backup.Spec.StorageLocation,
+	}, location); err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	pluginManager := kb.pluginManager(log)
+	defer pluginManager.CleanupClients()
+
+	backupStore, storeErr := kb.backupStoreGetter.Get(location, pluginManager, log)
+	if storeErr != nil {
+		return nil, nil, storeErr
+	}
+
+	volumeInfos, err := backupStore.GetBackupVolumeInfos(backup.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return backupStore, volumeInfos, nil
+}
+
+// updateVolumeInfos update the VolumeInfos according to the AsyncOperations
 func updateVolumeInfos(
 	volumeInfos []*volume.VolumeInfo,
-	unstructured unstructured.Unstructured,
-	groupResource schema.GroupResource,
+	unstructuredItems []unstructured.Unstructured,
+	operations []*itemoperation.BackupOperation,
 	log logrus.FieldLogger,
-) {
-	switch groupResource.String() {
-	case kuberesource.DataUploads.String():
+) error {
+	for _, unstructured := range unstructuredItems {
 		var dataUpload velerov2alpha1.DataUpload
 		err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured.UnstructuredContent(), &dataUpload)
 		if err != nil {
 			log.WithError(err).Errorf("fail to convert DataUpload: %s/%s",
 				unstructured.GetNamespace(), unstructured.GetName())
+			return err
 		}
 
 		for index := range volumeInfos {
@@ -792,4 +848,43 @@ func updateVolumeInfos(
 			}
 		}
 	}
+
+	// Update CSI snapshot VolumeInfo's CompletionTimestamp by the operation update time.
+	for volumeIndex := range volumeInfos {
+		if volumeInfos[volumeIndex].BackupMethod == volume.CSISnapshot &&
+			volumeInfos[volumeIndex].CSISnapshotInfo != nil {
+			for opIndex := range operations {
+				if volumeInfos[volumeIndex].CSISnapshotInfo.OperationID == operations[opIndex].Spec.OperationID {
+					// The VolumeSnapshot and VolumeSnapshotContent don't have a completion timestamp,
+					// so use the operation.Status.Updated as the alternative. It is not the exact time
+					// when the snapshot turns ready, but the operation controller periodically watch the
+					// VSC and VS status. When the controller finds they reach to the ReadyToUse state,
+					// The operation.Status.Updated is set as the found time.
+					volumeInfos[volumeIndex].CompletionTimestamp = operations[opIndex].Status.Updated
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func putVolumeInfos(
+	backupName string,
+	volumeInfos []*volume.VolumeInfo,
+	backupStore persistence.BackupStore,
+) error {
+	backupVolumeInfoBuf := new(bytes.Buffer)
+	gzw := gzip.NewWriter(backupVolumeInfoBuf)
+	defer gzw.Close()
+
+	if err := json.NewEncoder(gzw).Encode(volumeInfos); err != nil {
+		return errors.Wrap(err, "error encoding restore results to JSON")
+	}
+
+	if err := gzw.Close(); err != nil {
+		return errors.Wrap(err, "error closing gzip writer")
+	}
+
+	return backupStore.PutBackupVolumeInfos(backupName, backupVolumeInfoBuf)
 }

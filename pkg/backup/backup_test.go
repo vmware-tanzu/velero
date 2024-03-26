@@ -52,6 +52,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
+	"github.com/vmware-tanzu/velero/pkg/persistence"
+	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
@@ -4436,58 +4440,143 @@ func TestBackupNamespaces(t *testing.T) {
 	}
 }
 
-func TestUpdateVolumeInfos(t *testing.T) {
-	logger := logrus.StandardLogger()
-	// The unstructured conversion will loose the time precision to second
-	// level. To make test pass. Set the now precision at second at the
-	// beginning.
-	now := metav1.Now().Rfc3339Copy()
-	volumeInfos := []*volume.VolumeInfo{
-		{
-			PVCName:                  "pvc1",
-			PVCNamespace:             "ns1",
-			SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{},
-		},
-	}
-	dataUpload := velerov2alpha1.DataUpload{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "du1",
-			Namespace: "velero",
-		},
-		Spec: velerov2alpha1.DataUploadSpec{
-			SourcePVC:       "pvc1",
-			SourceNamespace: "ns1",
-			CSISnapshot: &velerov2alpha1.CSISnapshotSpec{
-				VolumeSnapshot: "vs1",
-			},
-		},
-		Status: velerov2alpha1.DataUploadStatus{
-			CompletionTimestamp: &now,
-			SnapshotID:          "snapshot1",
-			Progress: shared.DataMoveOperationProgress{
-				TotalBytes: 10000,
-			},
-		},
-	}
-	duMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&dataUpload)
+func TestGetVolumeInfos(t *testing.T) {
+	h := newHarness(t)
+	pluginManager := new(pluginmocks.Manager)
+	backupStore := new(persistencemocks.BackupStore)
+	h.backupper.pluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
+	h.backupper.backupStoreGetter = NewFakeSingleObjectBackupStoreGetter(backupStore)
+	backupStore.On("GetBackupVolumeInfos", "backup-01").Return([]*volume.VolumeInfo{}, nil)
+	pluginManager.On("CleanupClients").Return()
+
+	backup := builder.ForBackup("velero", "backup-01").StorageLocation("default").Result()
+	bsl := builder.ForBackupStorageLocation("velero", "default").Result()
+	require.NoError(t, h.backupper.kbClient.Create(context.Background(), bsl))
+
+	_, _, err := h.backupper.getVolumeInfos(*backup, h.log)
 	require.NoError(t, err)
+}
 
-	expectedVolumeInfos := []*volume.VolumeInfo{
+func TestUpdateVolumeInfos(t *testing.T) {
+	timeExample := time.Date(2014, 6, 5, 11, 56, 45, 0, time.Local)
+	now := metav1.NewTime(timeExample)
+	logger := logrus.StandardLogger()
+
+	tests := []struct {
+		name                string
+		operations          []*itemoperation.BackupOperation
+		dataUpload          *velerov2alpha1.DataUpload
+		volumeInfos         []*volume.VolumeInfo
+		expectedVolumeInfos []*volume.VolumeInfo
+	}{
 		{
-			PVCName:             "pvc1",
-			PVCNamespace:        "ns1",
-			CompletionTimestamp: &now,
-			SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
-				SnapshotHandle:   "snapshot1",
-				Size:             10000,
-				RetainedSnapshot: "vs1",
+			name: "CSISnapshot VolumeInfo update",
+			operations: []*itemoperation.BackupOperation{
+				{
+					Spec: itemoperation.BackupOperationSpec{
+						OperationID: "test-operation",
+					},
+					Status: itemoperation.OperationStatus{
+						Updated: &now,
+					},
+				},
+			},
+			volumeInfos: []*volume.VolumeInfo{
+				{
+					BackupMethod:        volume.CSISnapshot,
+					CompletionTimestamp: &metav1.Time{},
+					CSISnapshotInfo: &volume.CSISnapshotInfo{
+						OperationID: "test-operation",
+					},
+				},
+			},
+			expectedVolumeInfos: []*volume.VolumeInfo{
+				{
+					BackupMethod:        volume.CSISnapshot,
+					CompletionTimestamp: &now,
+					CSISnapshotInfo: &volume.CSISnapshotInfo{
+						OperationID: "test-operation",
+					},
+				},
+			},
+		},
+		{
+			name:       "DataUpload VolumeInfo update",
+			operations: []*itemoperation.BackupOperation{},
+			dataUpload: builder.ForDataUpload("velero", "du-1").
+				CompletionTimestamp(&now).
+				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{VolumeSnapshot: "vs-1"}).
+				SnapshotID("snapshot-id").
+				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000}).
+				SourceNamespace("ns-1").
+				SourcePVC("pvc-1").
+				Result(),
+			volumeInfos: []*volume.VolumeInfo{
+				{
+					PVCName:             "pvc-1",
+					PVCNamespace:        "ns-1",
+					CompletionTimestamp: &metav1.Time{},
+					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
+						DataMover: "velero",
+					},
+				},
+			},
+			expectedVolumeInfos: []*volume.VolumeInfo{
+				{
+					PVCName:             "pvc-1",
+					PVCNamespace:        "ns-1",
+					CompletionTimestamp: &now,
+					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
+						DataMover:        "velero",
+						RetainedSnapshot: "vs-1",
+						SnapshotHandle:   "snapshot-id",
+						Size:             1000,
+					},
+				},
 			},
 		},
 	}
 
-	updateVolumeInfos(volumeInfos, unstructured.Unstructured{Object: duMap}, kuberesource.DataUploads, logger)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			unstructures := []unstructured.Unstructured{}
+			if tc.dataUpload != nil {
+				duMap, error := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.dataUpload)
+				require.NoError(t, error)
+				unstructures = append(unstructures,
+					unstructured.Unstructured{
+						Object: duMap,
+					},
+				)
+			}
 
-	if len(expectedVolumeInfos) > 0 {
-		require.Equal(t, expectedVolumeInfos[0].SnapshotDataMovementInfo, volumeInfos[0].SnapshotDataMovementInfo)
+			require.NoError(t, updateVolumeInfos(tc.volumeInfos, unstructures, tc.operations, logger))
+			require.Equal(t, tc.expectedVolumeInfos[0].CompletionTimestamp, tc.volumeInfos[0].CompletionTimestamp)
+			require.Equal(t, tc.expectedVolumeInfos[0].SnapshotDataMovementInfo, tc.volumeInfos[0].SnapshotDataMovementInfo)
+		})
 	}
+}
+
+func TestPutVolumeInfos(t *testing.T) {
+	backupName := "backup-01"
+
+	backupStore := new(persistencemocks.BackupStore)
+
+	backupStore.On("PutBackupVolumeInfos", mock.Anything, mock.Anything).Return(nil)
+
+	require.NoError(t, putVolumeInfos(backupName, []*volume.VolumeInfo{}, backupStore))
+}
+
+type fakeSingleObjectBackupStoreGetter struct {
+	store persistence.BackupStore
+}
+
+func (f *fakeSingleObjectBackupStoreGetter) Get(*velerov1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+	return f.store, nil
+}
+
+// NewFakeSingleObjectBackupStoreGetter returns an ObjectBackupStoreGetter
+// that will return only the given BackupStore.
+func NewFakeSingleObjectBackupStoreGetter(store persistence.BackupStore) persistence.ObjectBackupStoreGetter {
+	return &fakeSingleObjectBackupStoreGetter{store: store}
 }
