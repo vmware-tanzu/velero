@@ -1650,6 +1650,35 @@ func TestResourceModifiers_conditional_patches(t *testing.T) {
 			wantErr:       false,
 			wantObj:       cmWithLabelAToB.DeepCopy(),
 		},
+		{
+			name: "missing condition path and skip patches",
+			rm: &ResourceModifiers{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupResource: "*",
+							Namespaces:    []string{"fake"},
+							Matches: []MatchRule{
+								{
+									Path:  "/metadata/labels/a/b",
+									Value: "c",
+								},
+							},
+						},
+						MergePatches: []JSONMergePatch{
+							{
+								PatchData: `{"metadata":{"labels":{"a":"c"}}}`,
+							},
+						},
+					},
+				},
+			},
+			obj:           cmWithLabelAToB.DeepCopy(),
+			groupResource: "configmaps",
+			wantErr:       false,
+			wantObj:       cmWithLabelAToB.DeepCopy(),
+		},
 	}
 
 	for _, tt := range tests {

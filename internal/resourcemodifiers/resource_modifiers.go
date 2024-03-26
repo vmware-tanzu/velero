@@ -172,7 +172,7 @@ func matchConditions(u *unstructured.Unstructured, rules []MatchRule, _ logrus.F
 	p := &JSONPatcher{patches: fixed}
 	_, err := p.applyPatch(u)
 	if err != nil {
-		if errors.Is(err, jsonpatch.ErrTestFailed) {
+		if errors.Is(err, jsonpatch.ErrTestFailed) || errors.Is(err, jsonpatch.ErrMissing) {
 			return false, nil
 		}
 		return false, err
