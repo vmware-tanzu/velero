@@ -6,7 +6,7 @@
 The reader should be able to tell by the title, and the opening paragraph, if this document is relevant to them. -->
 Velero data is stored in an object store.
 When CLI users want to download data from the object store, it connects to the specific object store directly to download data.
-This assumes the target storing the data is always accessible from the client side. This is not always true, especially in the on-premise environments.
+This assumes the target storing the data is always accessible from the client side. This is not always true, especially in the on premise environments.
 Velero may also save the data in non object stores in the future so an object store may not be available for the CLI to download from.
 
 This design proposes to add a new endpoint on the Velero server that CLI users can connect to and download data from without having to connect to an object store directly.
@@ -22,19 +22,13 @@ velero backup logs
 We want them to work even when the object store is not accessible from the client side.
 Even if the object store is accessible from the client side, today things like cacert and insecure-skip-tls-verify flags are specified manually from the client even though the Velero server already has the information. This work eliminates the client from having to know about the object store configuration and certificates.
 ## Goals
-- A short list of things which will be accomplished by implementing this proposal.
-- Two things is ok.
-- Three is pushing it.
-- More than three goals suggests that the proposal's scope is too large.
+- Enable Velero CLI users to download data from the Velero server without having to connect to the object store directly for scenarios where the object store is not accessible from the client side.
 
 ## Non Goals
-- A short list of items which are:
-- a. out of scope
-- b. follow on items which are deliberately excluded from this proposal.
-
+- Making the download server the default way to download data from object store.
 
 ## High-Level Design
-One to two paragraphs that describe the high level changes that will be made to implement this proposal.
+Create an endpoint on the Velero server that CLI users can connect to and download data from without having to connect to the object store directly.
 
 ### Potential approaches:
 One will be chosen before design is merged. The other will be moved to Alternatives Considered.
@@ -48,9 +42,13 @@ It will also be responsible for downloading data from the object store and strea
 
 The Velero CLI will be updated to connect to the Velero extension apiserver to download data from the Velero server.
 
+Downside: if an aggregate API server 404 or unresponsive, [namespace could be stuck in deletion](https://github.com/kubernetes/kubernetes/issues/119662#issuecomment-1863523115)
+
 #### Approach 2: Adding Ingress to Velero
 
-Ingress will be added to a Velero server that will accept requests to download data from storage locations.
+Ingresses will be added per BSL to a Velero server that will accept requests to download data from those storage locations.
+
+Creating Ingress per BSL creation uncouple velero helm chart from defining ingress which should allow for multiple velero instances support.
 
 The current DownloadRequest CR status `downloadURL` will be updated to use the Ingress URL instead of the object store URL where available.
 
@@ -61,7 +59,7 @@ The Velero CLI will be updated to connect to the Ingress URL to download data se
 #### Comparison
 | Wanted Features | 1. API Aggregation Layer | 2. Ingress |
 | --- | --- | --- |
-| Support Multiple Velero in one cluster | ❌ | ✅ |
+| Support Multiple Velero in one cluster | ✅ | ✅ |
 | Support multiple storage locations | ✅ | ✅ |
 | K8S Style API | ✅ | ❌ |
 | Authentication Built-in| ✅ | ❌ has to parse [TokenReview](https://dev-k8sref-io.web.app/docs/authentication/tokenreview-v1/) and [SubjectAccessReview](https://dev-k8sref-io.web.app/docs/authorization/subjectaccessreview-v1/)|
@@ -69,6 +67,7 @@ The Velero CLI will be updated to connect to the Ingress URL to download data se
 | Does not require ingress controller | ✅ | ❌ |
 | Does not require NodePort, ClusterIP, LoadBalancer | ✅ | ❌ |
 | Does not require apiserver [specific flags](https://kubernetes.io/docs/tasks/extend-kubernetes/configure-aggregation-layer/#enable-kubernetes-apiserver-flags) | ❌ | ✅ |
+| Does not [block namespace deletion](https://github.com/kubernetes/kubernetes/issues/119662#issuecomment-1863523115) | ❌ | ✅ |
 
 
 
