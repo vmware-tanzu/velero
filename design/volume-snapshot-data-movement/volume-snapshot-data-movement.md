@@ -37,7 +37,7 @@ Moreover, we would like to create a general workflow to variations during the da
 
 ## Architecture of Volume Snapshot Data Movement
 
-## Workflows  
+### Workflows  
 
 Here are the diagrams that illustrate components and workflows for backup and restore respectively.  
 For backup, we intend to create an extensive architecture for various snapshot types, snapshot accesses and various data accesses. For example, the snapshot specific operations are isolated in Data Mover Plugin and Exposer. In this way, we only need to change the two modules for variations. Likely, the data access details are isolated into uploaders, so different uploaders could be plugged into the workflow seamlessly.  
@@ -52,7 +52,7 @@ Below is the backup workflow:
 Below is the restore workflow:  
 ![restore-workflow.png](restore-workflow.png)  
 
-## Components
+### Components
 Below are the generic components in the data movement workflow:  
 
 **Velero**: Velero controls the backup/restore workflow, it calls BIA/RIA V2 to backup/restore an object that involves data movement, specifically, a PVC or a PV.  
@@ -69,13 +69,13 @@ DMs take the responsibility to handle DUCR/DDCRs, Velero provides a built-in DM 
 **Velero Generic Data Path (VGDP)**: VGDP is the collective of modules that is introduced in [Unified Repository design][1]. Velero uses these modules to finish data transmission for various purposes. In includes uploaders and the backup repository.  
 **Uploader**: Uploader is the module in VGDP that reads data from the source and writes to backup repository for backup; while read data from backup repository and write to the restore target for restore. At present, only file system uploader is supported. In future, the block level uploader will be added. For file system and basic block uploader, only Kopia uploader will be used, Restic will not be integrated with VBDM.   
 
-## Replacement
+### Replacement
 3rd parties could integrate their own data movement into Velero by replacing VBDM with their own DMs. The DMs should process DUCR/DDCRs appropriately and finally put them into one of the terminal states as shown in the DataUpload CRD and DataDownload CRD sections.  
 Theoretically, replacing the DMP is also allowed. In this way, the entire workflow is customized, so this is out of the scope of this design.  
 
-# Detailed Design
+## Detailed Design
 
-## Backup Sequence
+### Backup Sequence
 Below are the data movement actions and sequences during backup:  
 ![backup-sequence.png](backup-sequence.png) 
 
@@ -150,7 +150,7 @@ We keep VGDP reused for VBDM, so everything inside VGDP are kept as is. For deta
 When VGDP completes backup, it returns an ID that represent the root object saved into the backup repository for this backup, through the root object, we will be able to enumerate the entire backup data.  
 This Repo Snapshot ID will be saved along with the DUCR.  
 
-## DataUpload CRD
+### DataUpload CRD
 Below are the essential fields of DataUpload CRD. The CRD covers below information:
 - The information to manipulate the specified snapshot
 - The information to manipulate the specified data mover
@@ -351,7 +351,7 @@ spec:
 
 ```
 
-## Restore Sequence
+### Restore Sequence
 
 Below are the data movement actions sequences during restore:  
 ![restore-sequence.png](restore-sequence.png) 
@@ -387,7 +387,7 @@ This also means that Velero should not restore the PV if a data movement restore
 
 For restore, VBDM doesn’t need to persist anything.  
 
-## DataDownload CRD
+### DataDownload CRD
 Below are the essential fields of DataDownload CRD. The CRD covers below information:
 - The information to manipulate the target volume
 - The information to manipulate the specified data mover
