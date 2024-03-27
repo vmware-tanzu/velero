@@ -314,6 +314,56 @@ func (urp *unifiedRepoProvider) Forget(ctx context.Context, snapshotID string, p
 	return nil
 }
 
+func (urp *unifiedRepoProvider) BatchForget(ctx context.Context, snapshotIDs []string, param RepoParam) []error {
+	log := urp.log.WithFields(logrus.Fields{
+		"BSL name":    param.BackupLocation.Name,
+		"repo name":   param.BackupRepo.Name,
+		"repo UID":    param.BackupRepo.UID,
+		"snapshotIDs": snapshotIDs,
+	})
+
+	log.Debug("Start to batch forget snapshot")
+
+	repoOption, err := udmrepo.NewRepoOptions(
+		udmrepo.WithPassword(urp, param),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupRepo.UID)),
+		udmrepo.WithDescription(repoOpDescForget),
+	)
+
+	if err != nil {
+		return []error{errors.Wrap(err, "error to get repo options")}
+	}
+
+	bkRepo, err := urp.repoService.Open(ctx, *repoOption)
+	if err != nil {
+		return []error{errors.Wrap(err, "error to open backup repo")}
+	}
+
+	defer func() {
+		c := bkRepo.Close(ctx)
+		if c != nil {
+			log.WithError(c).Error("Failed to close repo")
+		}
+	}()
+
+	errs := []error{}
+	for _, snapshotID := range snapshotIDs {
+		err = bkRepo.DeleteManifest(ctx, udmrepo.ID(snapshotID))
+		if err != nil {
+			errs = append(errs, errors.Wrapf(err, "error to delete manifest %s", snapshotID))
+		}
+	}
+
+	err = bkRepo.Flush(ctx)
+	if err != nil {
+		return []error{errors.Wrap(err, "error to flush repo")}
+	}
+
+	log.Debug("Forget snapshot complete")
+
+	return errs
+}
+
 func (urp *unifiedRepoProvider) DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration {
 	return urp.repoService.DefaultMaintenanceFrequency()
 }
