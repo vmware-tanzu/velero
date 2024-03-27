@@ -586,6 +586,47 @@ Velero does not provide a mechanism to detect persistent volume claims that are 
 
 To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watcher][7]
 
+## Support ReadOnlyRootFilesystem setting on Velero server pod
+### Kopia
+When the Velero server pod's SecurityContext sets the `ReadOnlyRootFileSystem` parameter to true, the Velero server pod's filesystem is running in read-only mode.
+If the user creates a backup with Kopia as the uploader, or a backup enabling snapshot data mover function, the backup will fail, because the Kopia needs to write some cache and configuration data into the pod filesystem.
+
+```
+Errors: Velero:    name: /mongodb-0 message: /Error backing up item error: /failed to wait BackupRepository: backup repository is not ready: error to connect to backup repo: error to connect repo with storage: error to connect to repository: unable to write config file: unable to create config directory: mkdir /home/cnb/udmrepo: read-only file system name: /mongodb-1 message: /Error backing up item error: /failed to wait BackupRepository: backup repository is not ready: error to connect to backup repo: error to connect repo with storage: error to connect to repository: unable to write config file: unable to create config directory: mkdir /home/cnb/udmrepo: read-only file system name: /mongodb-2 message: /Error backing up item error: /failed to wait BackupRepository: backup repository is not ready: error to connect to backup repo: error to connect repo with storage: error to connect to repository: unable to write config file: unable to create config directory: mkdir /home/cnb/udmrepo: read-only file system Cluster:    <none>
+```
+
+The workaround is making those directories as ephemeral k8s volumes, then those directories are not counted as pod's root filesystem.
+The `user-name` is the Velero pod's running user name. The default value is `cnb`.
+
+``` yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: velero
+  namespace: velero
+spec:
+  template:
+    spec:
+      containers:
+      - name: velero
+        ......
+        volumeMounts:
+          ......
+          - mountPath: /home/<user-name>/udmrepo
+            name: udmrepo
+          - mountPath: /home/<user-name>/.cache
+            name: cache
+          ......
+      volumes:
+        ......
+        - emptyDir: {}
+          name: udmrepo
+        - emptyDir: {}
+          name: cache
+        ......
+```
+
+
 [1]: https://github.com/restic/restic
 [2]: https://github.com/kopia/kopia
 [3]: customize-installation.md#enable-restic-integration
