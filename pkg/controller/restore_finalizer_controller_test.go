@@ -442,7 +442,7 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 
 		errs := ctx.patchDynamicPVWithVolumeInfo()
 		if tc.expectedErrNum > 0 {
-			assert.Equal(t, tc.expectedErrNum, len(errs.Namespaces))
+			assert.Len(t, errs.Namespaces, tc.expectedErrNum)
 		}
 
 		for pvName, expectedPVInfo := range tc.expectedPatch {

@@ -592,7 +592,7 @@ func TestRestoreReconcile(t *testing.T) {
 				return
 			}
 			if !test.addValidFinalizer {
-				assert.Equal(t, 1, len(restorer.Calls))
+				assert.Len(t, restorer.Calls, 1)
 			}
 
 			// validate Patch call 2 (setting phase)

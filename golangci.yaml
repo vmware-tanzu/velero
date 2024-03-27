@@ -255,6 +255,23 @@ linters-settings:
   rowserrcheck:
     packages:
       - github.com/jmoiron/sqlx
+  testifylint:
+      # TODO: enable them all
+      disable:
+        - bool-compare
+        - compares
+        - error-is-as
+        - error-nil
+        - expected-actual
+        - go-require
+        - float-compare
+        - require-error
+        - suite-dont-use-pkg
+        - suite-extra-assert-call
+        - suite-thelper
+      enable:
+        - empty
+        - len
   testpackage:
     # regexp pattern to skip files
     skip-regexp: (export|internal)_test\.go
@@ -302,8 +319,10 @@ linters:
     - bodyclose
     - dogsled
     - durationcheck
+    - dupword
     - errcheck
     - exportloopref
+    - errchkjson
     - goconst
     - gofmt
     - goheader
@@ -312,26 +331,25 @@ linters:
     - gosec
     - gosimple
     - govet
+    - ginkgolinter
     - importas
     - ineffassign
     - misspell
     - nakedret
     - nosprintfhostport
+    - nilerr
+    - noctx
+    - nolintlint
+    - revive
     - staticcheck
     - stylecheck
-    - revive
+    - testifylint
     - typecheck
     - unconvert
     - unparam
     - unused
     - usestdlibvars
     - whitespace
-    - dupword
-    - errchkjson
-    - ginkgolinter
-    - nilerr
-    - noctx
-    - nolintlint
   fast: false
 
 

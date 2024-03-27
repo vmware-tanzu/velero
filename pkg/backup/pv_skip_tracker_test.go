@@ -60,5 +60,5 @@ func TestTrackUntrack(t *testing.T) {
 	tracker.Track("pv3", podVolumeApproach, "it's set to opt-out")
 	tracker.Untrack("pv3")
 	tracker.Track("pv3", csiSnapshotApproach, "not applicable for CSI ")
-	assert.Equal(t, 0, len(tracker.Summary()))
+	assert.Empty(t, tracker.Summary())
 }

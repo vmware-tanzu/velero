@@ -30,7 +30,7 @@ func mustHaveString(key string, flags map[string]string) (string, error) {
 	if value, exist := flags[key]; exist {
 		return value, nil
 	}
-	return "", errors.New("key " + key + " not found")
+	return "", errors.Errorf("key %s not found", key)
 }
 
 func optionalHaveString(key string, flags map[string]string) string {

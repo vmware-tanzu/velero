@@ -91,7 +91,7 @@ func TestConfigOperations(t *testing.T) {
 
 	// Test Features
 	feature := savedConfig.Features()
-	assert.Equal(t, 1, len(feature))
+	assert.Len(t, feature, 1)
 	assert.Equal(t, expectedFeature, feature[0])
 
 	// Test Colorized
