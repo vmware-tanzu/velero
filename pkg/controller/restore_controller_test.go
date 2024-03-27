@@ -53,7 +53,6 @@ import (
 )
 
 func TestFetchBackupInfo(t *testing.T) {
-
 	tests := []struct {
 		name              string
 		backupName        string
@@ -206,7 +205,6 @@ func TestProcessQueueItemSkips(t *testing.T) {
 }
 
 func TestRestoreReconcile(t *testing.T) {
-
 	defaultStorageLocation := builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()
 
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)

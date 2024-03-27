@@ -138,7 +138,6 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 			assert.Equal(t, test.expectedCreatedResult, nsCreated)
 		})
 	}
-
 }
 
 // TestGetVolumeDirectorySuccess tests that the GetVolumeDirectory function

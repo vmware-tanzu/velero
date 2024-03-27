@@ -409,7 +409,6 @@ func TestRestorePodVolumes(t *testing.T) {
 					for _, pvr := range test.retPVRs {
 						rs.(*restorer).results[resultsKey(test.restoredPod.Namespace, test.restoredPod.Name)] <- pvr
 					}
-
 				}
 			}()
 

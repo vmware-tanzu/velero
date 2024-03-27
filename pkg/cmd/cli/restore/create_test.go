@@ -59,7 +59,6 @@ func TestCreateCommand(t *testing.T) {
 	args := []string{name}
 
 	t.Run("create a backup create command with full options except fromSchedule and wait, then run by create option", func(t *testing.T) {
-
 		// create a factory
 		f := &factorymocks.Factory{}
 

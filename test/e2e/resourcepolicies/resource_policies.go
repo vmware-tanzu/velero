@@ -177,7 +177,6 @@ func (r *ResourcePoliciesCase) Verify() error {
 				}
 			}
 		})
-
 	}
 	return nil
 }

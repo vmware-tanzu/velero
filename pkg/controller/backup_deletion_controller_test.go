@@ -75,7 +75,6 @@ func defaultTestDbr() *velerov1api.DeleteBackupRequest {
 }
 
 func setupBackupDeletionControllerTest(t *testing.T, req *velerov1api.DeleteBackupRequest, objects ...runtime.Object) *backupDeletionControllerTestData {
-
 	var (
 		fakeClient        = velerotest.NewFakeControllerRuntimeClient(t, append(objects, req)...)
 		volumeSnapshotter = &velerotest.FakeVolumeSnapshotter{SnapshotsTaken: sets.NewString()}
@@ -215,7 +214,6 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 	})
 
 	t.Run("unable to find backup", func(t *testing.T) {
-
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr())
 
 		_, err := td.controller.Reconcile(context.TODO(), td.req)
@@ -261,7 +259,6 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.Equal(t, "cannot delete backup because backup storage location default is currently in read-only mode", res.Status.Errors[0])
 	})
 	t.Run("full delete, no errors", func(t *testing.T) {
-
 		input := defaultTestDbr()
 
 		// Clear out resource labels to make sure the controller adds them and does not
@@ -668,7 +665,6 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 		td.backupStore.AssertNotCalled(t, "DeleteBackup", mock.Anything)
-
 	})
 
 	t.Run("Expired request will not be deleted if the status is not processed", func(t *testing.T) {
@@ -690,7 +686,6 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.Equal(t, "Processed", string(res.Status.Phase))
 		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "backup not found", res.Status.Errors[0])
-
 	})
 }
 

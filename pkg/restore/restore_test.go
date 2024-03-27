@@ -1859,7 +1859,6 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 				UpdatedItem: obj,
 				OperationID: obj.GetName() + "-1",
 			}, nil
-
 		},
 		progressFunc: func(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
 			return velero.OperationProgress{
@@ -1881,7 +1880,6 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 				UpdatedItem: obj,
 				OperationID: obj.GetName() + "-1",
 			}, nil
-
 		},
 		progressFunc: func(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
 			return velero.OperationProgress{
@@ -1902,7 +1900,6 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 			return &velero.RestoreItemActionExecuteOutput{
 				UpdatedItem: obj,
 			}, nil
-
 		},
 	}
 

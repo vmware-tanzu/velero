@@ -51,7 +51,6 @@ func (b *TTL) Init() {
 	b.backupName = "backup-ttl-test-" + UUIDgen.String()
 	b.restoreName = "restore-ttl-test-" + UUIDgen.String()
 	b.ttl = 10 * time.Minute
-
 }
 
 func TTLTest() {
@@ -159,7 +158,6 @@ func TTLTest() {
 				veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
 				veleroCfg.BSLPrefix, veleroCfg.BSLConfig, test.restoreName,
 				RestoreObjectsPrefix)).NotTo(HaveOccurred(), "Fail to get restore object")
-
 		})
 
 		By("Check TTL was set correctly", func() {
@@ -198,7 +196,6 @@ func TTLTest() {
 				veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
 				veleroCfg.BSLPrefix, veleroCfg.BSLConfig, test.restoreName,
 				RestoreObjectsPrefix, 5)).NotTo(HaveOccurred(), "Fail to get restore object")
-
 		})
 	})
 }

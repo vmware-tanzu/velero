@@ -710,7 +710,6 @@ func TestWaitExecHandleHooks(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			source := fcache.NewFakeControllerSource()
 			go func() {
 				// This is the state of the pod that will be seen by the AddFunc handler.
@@ -1251,7 +1250,6 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 
 	for _, test := range tests1 {
 		t.Run(test.name, func(t *testing.T) {
-
 			source := fcache.NewFakeControllerSource()
 			go func() {
 				// This is the state of the pod that will be seen by the AddFunc handler.

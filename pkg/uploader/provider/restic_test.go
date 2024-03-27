@@ -232,7 +232,6 @@ func TestResticRunRestore(t *testing.T) {
 			require.Equal(t, true, tc.errorHandleFunc(err))
 		})
 	}
-
 }
 
 func TestClose(t *testing.T) {

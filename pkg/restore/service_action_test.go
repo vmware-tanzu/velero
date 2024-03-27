@@ -65,7 +65,6 @@ func svcJSONFromUnstructured(ports ...map[string]interface{}) string {
 }
 
 func TestServiceActionExecute(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		obj         corev1api.Service

@@ -73,7 +73,6 @@ func BackupsSyncTest() {
 				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
 			}
 		}
-
 	})
 
 	It("Backups in object storage should be synced to a new Velero successfully", func() {

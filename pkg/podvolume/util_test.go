@@ -298,6 +298,5 @@ func TestVolumeHasNonRestorableSource(t *testing.T) {
 			actual := volumeHasNonRestorableSource(tc.volumeName, tc.podVolumes)
 			assert.Equal(t, tc.expected, actual)
 		})
-
 	}
 }

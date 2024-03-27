@@ -1000,7 +1000,7 @@ func TestBatchForget(t *testing.T) {
 			})
 
 			if tc.expectedErr == nil {
-				assert.Equal(t, 0, len(errs))
+				assert.Empty(t, errs)
 			} else {
 				assert.Equal(t, len(tc.expectedErr), len(errs))
 

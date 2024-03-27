@@ -729,7 +729,6 @@ func TestGetScopedResourceIncludesExcludes(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			logger := logrus.StandardLogger()
 			nsIncludeExclude := NewIncludesExcludes()
 			resources := GetScopeResourceIncludesExcludes(setupDiscoveryClientWithResources(tc.apiResources), logger, tc.namespaceScopedIncludes, tc.namespaceScopedExcludes, tc.clusterScopedIncludes, tc.clusterScopedExcludes, *nsIncludeExclude)

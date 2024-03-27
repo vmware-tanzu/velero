@@ -154,8 +154,8 @@ func TestBackupProgressIsUpdated(t *testing.T) {
 	h.backupper.Backup(h.log, req, backupFile, nil, nil)
 
 	require.NotNil(t, req.Status.Progress)
-	assert.Equal(t, len(req.BackedUpItems), req.Status.Progress.TotalItems)
-	assert.Equal(t, len(req.BackedUpItems), req.Status.Progress.ItemsBackedUp)
+	assert.Len(t, req.BackedUpItems, req.Status.Progress.TotalItems)
+	assert.Len(t, req.BackedUpItems, req.Status.Progress.ItemsBackedUp)
 }
 
 // TestBackupResourceFiltering runs backups with different combinations

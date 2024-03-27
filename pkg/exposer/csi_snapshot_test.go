@@ -440,7 +440,6 @@ func TestExpose(t *testing.T) {
 			} else {
 				assert.EqualError(t, err, test.err)
 			}
-
 		})
 	}
 }

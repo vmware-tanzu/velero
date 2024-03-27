@@ -400,7 +400,6 @@ func TestServiceAccountActionExecute(t *testing.T) {
 			assert.Equal(t, test.expectedAdditionalItems, additional)
 		})
 	}
-
 }
 
 func TestServiceAccountActionExecuteOnBeta1(t *testing.T) {
@@ -608,5 +607,4 @@ func TestServiceAccountActionExecuteOnBeta1(t *testing.T) {
 			assert.Equal(t, test.expectedAdditionalItems, additional)
 		})
 	}
-
 }

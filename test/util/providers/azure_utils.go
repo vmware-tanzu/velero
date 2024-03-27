@@ -270,7 +270,6 @@ func (s AzureStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bsl
 
 		marker = listBlob.NextMarker
 		for _, blobInfo := range listBlob.Segment.BlobItems {
-
 			if strings.Contains(blobInfo.Name, bslPrefix+backupObject+"/") {
 				deleteBlob(p, accountName, containerName, blobInfo.Name)
 				if err != nil {
@@ -284,7 +283,6 @@ func (s AzureStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bsl
 }
 
 func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupName string, snapshotCheck SnapshotCheckPoint) error {
-
 	ctx := context.Background()
 
 	if err := loadCredentialsIntoEnv(cloudCredentialsFile); err != nil {

@@ -47,7 +47,6 @@ func TestNewCredential(t *testing.T) {
 	}
 	_, err = NewCredential(creds, options)
 	require.Nil(t, err)
-
 }
 
 func Test_newConfigCredential(t *testing.T) {
