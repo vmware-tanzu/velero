@@ -20,7 +20,7 @@ import (
 	"context"
 	"encoding/json"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
