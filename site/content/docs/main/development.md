@@ -30,6 +30,13 @@ You can run `make lint-fix` to fix fixable issues found by `make lint`.
 
 The linters, and their settings, are defined in the `.golangci.yaml` file.
 
+Linting is enforced by the project CI through `.github/workflows/pr-linter-check.yml` job.
+
+To update `golangci-lint` used by the project, update:
+- `with.version` of golangci/golangci-lint-action in `.github/workflows/pr-linter-check.yml:21`
+- `golangci-lint` version installed in build-image in `hack/build-image/Dockerfile:96`
+- documentation reference comment in `.golangci.yaml:1`
+
 ## Test
 
 To run unit tests, use `make test`.
