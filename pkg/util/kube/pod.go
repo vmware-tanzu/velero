@@ -121,6 +121,15 @@ func IsPodUnrecoverable(pod *corev1api.Pod, log logrus.FieldLogger) (bool, strin
 		return true, fmt.Sprintf("Pod is in abnormal state %s", pod.Status.Phase)
 	}
 
+	if pod.Status.Phase == corev1api.PodPending && len(pod.Status.Conditions) > 0 {
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1api.PodScheduled && condition.Reason == "Unschedulable" {
+				log.Warnf("Pod is unschedulable %s", condition.Message)
+				return true, fmt.Sprintf("Pod is unschedulable: %s", condition.Message)
+			}
+		}
+	}
+
 	// Check the Status field
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		// If the container's image state is ImagePullBackOff, it indicates an image pull failure

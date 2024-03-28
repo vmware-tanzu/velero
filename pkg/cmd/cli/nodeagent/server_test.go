@@ -114,6 +114,64 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 	}
 }
 
+func Test_getDataPathConfigs(t *testing.T) {
+	configs := &nodeagent.Configs{
+		LoadConcurrency: &nodeagent.LoadConcurrency{
+			GlobalConfig: -1,
+		},
+	}
+
+	tests := []struct {
+		name          string
+		getFunc       func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error)
+		expectConfigs *nodeagent.Configs
+		expectLog     string
+	}{
+		{
+			name: "failed to get configs",
+			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
+				return nil, errors.New("fake-get-error")
+			},
+			expectLog: "Failed to get node agent configs",
+		},
+		{
+			name: "configs cm not found",
+			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
+				return nil, nil
+			},
+			expectLog: "Node agent configs are not found",
+		},
+
+		{
+			name: "succeed",
+			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
+				return configs, nil
+			},
+			expectConfigs: configs,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logBuffer := ""
+
+			s := &nodeAgentServer{
+				logger: testutil.NewSingleLogger(&logBuffer),
+			}
+
+			getConfigsFunc = test.getFunc
+
+			s.getDataPathConfigs()
+			assert.Equal(t, test.expectConfigs, s.dataPathConfigs)
+			if test.expectLog == "" {
+				assert.Equal(t, "", logBuffer)
+			} else {
+				assert.True(t, strings.Contains(logBuffer, test.expectLog))
+			}
+		})
+	}
+}
+
 func Test_getDataPathConcurrentNum(t *testing.T) {
 	defaultNum := 100001
 	globalNum := 6
@@ -142,72 +200,47 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		getFunc       func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error)
+		configs       nodeagent.Configs
 		setKubeClient bool
 		kubeClientObj []runtime.Object
 		expectNum     int
 		expectLog     string
 	}{
 		{
-			name: "failed to get configs",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return nil, errors.New("fake-get-error")
-			},
-			expectLog: "Failed to get node agent configs",
-			expectNum: defaultNum,
-		},
-		{
-			name: "configs cm not found",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return nil, nil
-			},
-			expectLog: fmt.Sprintf("Concurrency configs are not found, use the default number %v", defaultNum),
-			expectNum: defaultNum,
-		},
-		{
-			name: "configs cm's data path concurrency is nil",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return &nodeagent.Configs{}, nil
-			},
+			name:      "configs cm's data path concurrency is nil",
 			expectLog: fmt.Sprintf("Concurrency configs are not found, use the default number %v", defaultNum),
 			expectNum: defaultNum,
 		},
 		{
 			name: "global number is invalid",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return &nodeagent.Configs{
-					LoadConcurrency: &nodeagent.LoadConcurrency{
-						GlobalConfig: -1,
-					},
-				}, nil
+			configs: nodeagent.Configs{
+				LoadConcurrency: &nodeagent.LoadConcurrency{
+					GlobalConfig: -1,
+				},
 			},
 			expectLog: fmt.Sprintf("Global number %v is invalid, use the default value %v", -1, defaultNum),
 			expectNum: defaultNum,
 		},
 		{
 			name: "global number is valid",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return &nodeagent.Configs{
-					LoadConcurrency: &nodeagent.LoadConcurrency{
-						GlobalConfig: globalNum,
-					},
-				}, nil
+			configs: nodeagent.Configs{
+				LoadConcurrency: &nodeagent.LoadConcurrency{
+					GlobalConfig: globalNum,
+				},
 			},
 			expectNum: globalNum,
 		},
 		{
 			name: "node is not found",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return &nodeagent.Configs{
-					LoadConcurrency: &nodeagent.LoadConcurrency{
-						GlobalConfig: globalNum,
-						PerNodeConfig: []nodeagent.RuledConfigs{
-							{
-								Number: 100,
-							},
+			configs: nodeagent.Configs{
+				LoadConcurrency: &nodeagent.LoadConcurrency{
+					GlobalConfig: globalNum,
+					PerNodeConfig: []nodeagent.RuledConfigs{
+						{
+							Number: 100,
 						},
 					},
-				}, nil
+				},
 			},
 			setKubeClient: true,
 			expectLog:     fmt.Sprintf("Failed to get node info for %s, use the global number %v", nodeName, globalNum),
@@ -215,18 +248,16 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "failed to get selector",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return &nodeagent.Configs{
-					LoadConcurrency: &nodeagent.LoadConcurrency{
-						GlobalConfig: globalNum,
-						PerNodeConfig: []nodeagent.RuledConfigs{
-							{
-								NodeSelector: invalidLabelSelector,
-								Number:       100,
-							},
+			configs: nodeagent.Configs{
+				LoadConcurrency: &nodeagent.LoadConcurrency{
+					GlobalConfig: globalNum,
+					PerNodeConfig: []nodeagent.RuledConfigs{
+						{
+							NodeSelector: invalidLabelSelector,
+							Number:       100,
 						},
 					},
-				}, nil
+				},
 			},
 			setKubeClient: true,
 			kubeClientObj: []runtime.Object{node1},
@@ -235,18 +266,16 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "rule number is invalid",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return &nodeagent.Configs{
-					LoadConcurrency: &nodeagent.LoadConcurrency{
-						GlobalConfig: globalNum,
-						PerNodeConfig: []nodeagent.RuledConfigs{
-							{
-								NodeSelector: validLabelSelector1,
-								Number:       -1,
-							},
+			configs: nodeagent.Configs{
+				LoadConcurrency: &nodeagent.LoadConcurrency{
+					GlobalConfig: globalNum,
+					PerNodeConfig: []nodeagent.RuledConfigs{
+						{
+							NodeSelector: validLabelSelector1,
+							Number:       -1,
 						},
 					},
-				}, nil
+				},
 			},
 			setKubeClient: true,
 			kubeClientObj: []runtime.Object{node1},
@@ -255,18 +284,16 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "label doesn't match",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return &nodeagent.Configs{
-					LoadConcurrency: &nodeagent.LoadConcurrency{
-						GlobalConfig: globalNum,
-						PerNodeConfig: []nodeagent.RuledConfigs{
-							{
-								NodeSelector: validLabelSelector1,
-								Number:       -1,
-							},
+			configs: nodeagent.Configs{
+				LoadConcurrency: &nodeagent.LoadConcurrency{
+					GlobalConfig: globalNum,
+					PerNodeConfig: []nodeagent.RuledConfigs{
+						{
+							NodeSelector: validLabelSelector1,
+							Number:       -1,
 						},
 					},
-				}, nil
+				},
 			},
 			setKubeClient: true,
 			kubeClientObj: []runtime.Object{node1},
@@ -275,18 +302,16 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "match one rule",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return &nodeagent.Configs{
-					LoadConcurrency: &nodeagent.LoadConcurrency{
-						GlobalConfig: globalNum,
-						PerNodeConfig: []nodeagent.RuledConfigs{
-							{
-								NodeSelector: validLabelSelector1,
-								Number:       66,
-							},
+			configs: nodeagent.Configs{
+				LoadConcurrency: &nodeagent.LoadConcurrency{
+					GlobalConfig: globalNum,
+					PerNodeConfig: []nodeagent.RuledConfigs{
+						{
+							NodeSelector: validLabelSelector1,
+							Number:       66,
 						},
 					},
-				}, nil
+				},
 			},
 			setKubeClient: true,
 			kubeClientObj: []runtime.Object{node2},
@@ -295,22 +320,20 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "match multiple rules",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return &nodeagent.Configs{
-					LoadConcurrency: &nodeagent.LoadConcurrency{
-						GlobalConfig: globalNum,
-						PerNodeConfig: []nodeagent.RuledConfigs{
-							{
-								NodeSelector: validLabelSelector1,
-								Number:       66,
-							},
-							{
-								NodeSelector: validLabelSelector2,
-								Number:       36,
-							},
+			configs: nodeagent.Configs{
+				LoadConcurrency: &nodeagent.LoadConcurrency{
+					GlobalConfig: globalNum,
+					PerNodeConfig: []nodeagent.RuledConfigs{
+						{
+							NodeSelector: validLabelSelector1,
+							Number:       66,
+						},
+						{
+							NodeSelector: validLabelSelector2,
+							Number:       36,
 						},
 					},
-				}, nil
+				},
 			},
 			setKubeClient: true,
 			kubeClientObj: []runtime.Object{node2},
@@ -319,22 +342,20 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "match multiple rules 2",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return &nodeagent.Configs{
-					LoadConcurrency: &nodeagent.LoadConcurrency{
-						GlobalConfig: globalNum,
-						PerNodeConfig: []nodeagent.RuledConfigs{
-							{
-								NodeSelector: validLabelSelector1,
-								Number:       36,
-							},
-							{
-								NodeSelector: validLabelSelector2,
-								Number:       66,
-							},
+			configs: nodeagent.Configs{
+				LoadConcurrency: &nodeagent.LoadConcurrency{
+					GlobalConfig: globalNum,
+					PerNodeConfig: []nodeagent.RuledConfigs{
+						{
+							NodeSelector: validLabelSelector1,
+							Number:       36,
+						},
+						{
+							NodeSelector: validLabelSelector2,
+							Number:       66,
 						},
 					},
-				}, nil
+				},
 			},
 			setKubeClient: true,
 			kubeClientObj: []runtime.Object{node2},
@@ -349,15 +370,14 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			logBuffer := ""
 
 			s := &nodeAgentServer{
-				nodeName: nodeName,
-				logger:   testutil.NewSingleLogger(&logBuffer),
+				nodeName:        nodeName,
+				dataPathConfigs: &test.configs,
+				logger:          testutil.NewSingleLogger(&logBuffer),
 			}
 
 			if test.setKubeClient {
 				s.kubeClient = fakeKubeClient
 			}
-
-			getConfigsFunc = test.getFunc
 
 			num := s.getDataPathConcurrentNum(defaultNum)
 			assert.Equal(t, test.expectNum, num)

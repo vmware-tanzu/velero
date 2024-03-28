@@ -44,6 +44,11 @@ type GenericRestoreExposer interface {
 	// Otherwise, it returns nil as the expose result without an error.
 	GetExposed(context.Context, corev1.ObjectReference, client.Client, string, time.Duration) (*ExposeResult, error)
 
+	// PeekExposed tests the status of the expose.
+	// If the expose is incomplete but not recoverable, it returns an error.
+	// Otherwise, it returns nil immediately.
+	PeekExposed(context.Context, corev1.ObjectReference) error
+
 	// RebindVolume unexposes the restored PV and rebind it to the target PVC
 	RebindVolume(context.Context, corev1.ObjectReference, string, string, time.Duration) error
 
@@ -158,6 +163,30 @@ func (e *genericRestoreExposer) GetExposed(ctx context.Context, ownerObject core
 	curLog.WithField("pod", pod.Name).Infof("Restore volume is found in pod at index %v", i)
 
 	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, VolumeName: volumeName}}, nil
+}
+
+func (e *genericRestoreExposer) PeekExposed(ctx context.Context, ownerObject corev1.ObjectReference) error {
+	restorePodName := ownerObject.Name
+
+	curLog := e.log.WithFields(logrus.Fields{
+		"owner": ownerObject.Name,
+	})
+
+	pod, err := e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(ctx, restorePodName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+
+	if err != nil {
+		curLog.WithError(err).Warnf("error to peek restore pod %s", restorePodName)
+		return nil
+	}
+
+	if podFailed, message := kube.IsPodUnrecoverable(pod, curLog); podFailed {
+		return errors.New(message)
+	}
+
+	return nil
 }
 
 func (e *genericRestoreExposer) CleanUp(ctx context.Context, ownerObject corev1.ObjectReference) {

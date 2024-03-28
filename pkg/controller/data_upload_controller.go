@@ -48,6 +48,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -74,12 +75,13 @@ type DataUploadReconciler struct {
 	logger              logrus.FieldLogger
 	snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
 	dataPathMgr         *datapath.Manager
+	loadAffinity        *nodeagent.LoadAffinity
 	preparingTimeout    time.Duration
 	metrics             *metrics.ServerMetrics
 }
 
 func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interface, csiSnapshotClient snapshotter.SnapshotV1Interface,
-	dataPathMgr *datapath.Manager, repoEnsurer *repository.Ensurer, clock clocks.WithTickerAndDelayedExecution,
+	dataPathMgr *datapath.Manager, loadAffinity *nodeagent.LoadAffinity, repoEnsurer *repository.Ensurer, clock clocks.WithTickerAndDelayedExecution,
 	cred *credentials.CredentialGetter, nodeName string, fs filesystem.Interface, preparingTimeout time.Duration, log logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:              client,
@@ -93,6 +95,7 @@ func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interfa
 		repoEnsurer:         repoEnsurer,
 		snapshotExposerList: map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(kubeClient, csiSnapshotClient, log)},
 		dataPathMgr:         dataPathMgr,
+		loadAffinity:        loadAffinity,
 		preparingTimeout:    preparingTimeout,
 		metrics:             metrics,
 	}
@@ -224,7 +227,10 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			// we don't want to update CR into cancel status forcely as it may conflict with CR update in Expose action
 			// we could retry when the CR requeue in periodcally
 			log.Debugf("Data upload is been canceled %s in Phase %s", du.GetName(), du.Status.Phase)
-			r.TryCancelDataUpload(ctx, du)
+			r.TryCancelDataUpload(ctx, du, "")
+		} else if peekErr := ep.PeekExposed(ctx, getOwnerObject(du)); peekErr != nil {
+			r.TryCancelDataUpload(ctx, du, fmt.Sprintf("found a dataupload %s/%s with expose error: %s. mark it as cancel", du.Namespace, du.Name, peekErr))
+			log.Errorf("Cancel du %s/%s because of expose error %s", du.Namespace, du.Name, peekErr)
 		} else if du.Status.StartTimestamp != nil {
 			if time.Since(du.Status.StartTimestamp.Time) >= r.preparingTimeout {
 				r.onPrepareTimeout(ctx, du)
@@ -440,7 +446,7 @@ func (r *DataUploadReconciler) OnDataUploadCancelled(ctx context.Context, namesp
 }
 
 // TryCancelDataUpload clear up resources only when update success
-func (r *DataUploadReconciler) TryCancelDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload) {
+func (r *DataUploadReconciler) TryCancelDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload, message string) {
 	log := r.logger.WithField("dataupload", du.Name)
 	log.Warn("Async fs backup data path canceled")
 	succeeded, err := r.exclusiveUpdateDataUpload(ctx, du, func(dataUpload *velerov2alpha1api.DataUpload) {
@@ -449,6 +455,7 @@ func (r *DataUploadReconciler) TryCancelDataUpload(ctx context.Context, du *vele
 			dataUpload.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		}
 		dataUpload.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
+		dataUpload.Status.Message = message
 	})
 
 	if err != nil {
@@ -825,6 +832,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			OperationTimeout: du.Spec.OperationTimeout.Duration,
 			ExposeTimeout:    r.preparingTimeout,
 			VolumeSize:       pvc.Spec.Resources.Requests[corev1.ResourceStorage],
+			Affinity:         r.loadAffinity,
 		}, nil
 	}
 	return nil, nil
