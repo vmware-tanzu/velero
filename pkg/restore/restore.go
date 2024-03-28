@@ -2198,7 +2198,7 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 
 		// Check if the resource should be restored according to the resource
 		// includes/excludes.
-		if !ctx.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
+		if !ctx.resourceIncludesExcludes.ShouldInclude(groupResource.String()) && !ctx.resourceMustHave.Has(groupResource.String()) {
 			ctx.log.WithField("resource", groupResource.String()).Infof("Skipping restore of resource because the restore spec excludes it")
 			continue
 		}
