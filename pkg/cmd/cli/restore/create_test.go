@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	kubeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -107,7 +107,7 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--item-operation-timeout", itemOperationTimeout})
 		flags.Parse([]string{"--write-sparse-files", writeSparseFiles})
 		flags.Parse([]string{"--parallel-files-download", "2"})
-		client := velerotest.NewFakeControllerRuntimeClient(t).(kubeclient.WithWatch)
+		client := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
 		f.On("Namespace").Return(mock.Anything)
 		f.On("KubebuilderWatchClient").Return(client, nil)
@@ -157,14 +157,14 @@ func TestCreateCommand(t *testing.T) {
 		fromSchedule := "schedule-name-1"
 		flags.Parse([]string{"--from-schedule", fromSchedule})
 
-		kbclient := velerotest.NewFakeControllerRuntimeClient(t).(kubeclient.WithWatch)
+		kubeclient := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 		schedule := builder.ForSchedule(cmdtest.VeleroNameSpace, fromSchedule).Result()
-		require.NoError(t, kbclient.Create(context.Background(), schedule, &kubeclient.CreateOptions{}))
+		require.NoError(t, kubeclient.Create(context.Background(), schedule, &kbclient.CreateOptions{}))
 		backup := builder.ForBackup(cmdtest.VeleroNameSpace, "test-backup").FromSchedule(schedule).Phase(velerov1api.BackupPhaseCompleted).Result()
-		require.NoError(t, kbclient.Create(context.Background(), backup, &kubeclient.CreateOptions{}))
+		require.NoError(t, kubeclient.Create(context.Background(), backup, &kbclient.CreateOptions{}))
 
 		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
-		f.On("KubebuilderWatchClient").Return(kbclient, nil)
+		f.On("KubebuilderWatchClient").Return(kubeclient, nil)
 
 		require.NoError(t, o.Complete(args, f))
 		require.NoError(t, o.Validate(c, []string{}, f))
@@ -183,10 +183,10 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--wait", "true"})
 		flags.Parse([]string{"--from-backup", nonExistedBackupName})
 
-		kbclient := velerotest.NewFakeControllerRuntimeClient(t).(kubeclient.WithWatch)
+		kubeclient := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
 		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
-		f.On("KubebuilderWatchClient").Return(kbclient, nil)
+		f.On("KubebuilderWatchClient").Return(kubeclient, nil)
 
 		require.NoError(t, o.Complete(nil, f))
 		err := o.Validate(c, []string{}, f)

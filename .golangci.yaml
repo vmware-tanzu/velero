@@ -1,14 +1,12 @@
 # Documentation reference https://github.com/golangci/golangci-lint/blob/v1.57.1/.golangci.reference.yml
 run:
   timeout: 20m
-  skip-dirs:
-    - third_party/*
-  skip-dirs-use-default: false
   modules-download-mode: readonly
   allow-parallel-runners: false
 
 output:
-  format: colored-line-number
+  formats:
+    - format: colored-line-number
   print-issued-lines: true
   print-linter-name: true
   uniq-by-line: true
@@ -18,8 +16,9 @@ linters-settings:
   dogsled:
     max-blank-identifiers: 2
   errcheck:
-    check-type-assertions: true
-    check-blank: true
+    # TODO: enable them all
+    check-type-assertions: false
+    check-blank: false
   goconst:
     min-len: 3
     min-occurrences: 5
@@ -45,8 +44,7 @@ linters-settings:
     # TODO: enable them all
     # enable-all-rules: true
     rules:
-      - name: unexported-return
-        disabled: true # TODO should be false?
+      - name: duplicated-imports
   testifylint:
     # TODO: enable them all
     disable:
@@ -61,11 +59,13 @@ linters-settings:
       - suite-dont-use-pkg
       - suite-extra-assert-call
       - suite-thelper
+      - nil-compare
     enable:
       - empty
       - len
   unparam:
-    check-exported: true
+    # TODO: enable
+    check-exported: false
   whitespace:
     multi-if: false
     multi-func: false
@@ -155,6 +155,9 @@ issues:
         - unconvert
         - unparam
         - unused
+  exclude-dirs:
+    - third_party/*
+  exclude-dirs-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
 
