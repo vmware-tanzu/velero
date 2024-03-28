@@ -21,12 +21,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 func TestGetRepositoryProvider(t *testing.T) {
-	mgr := NewManager("", nil, nil, nil, nil, nil, nil).(*manager)
+	var fakeClient kbclient.Client
+	mgr := NewManager("", fakeClient, nil, nil, nil, nil, MaintenanceConfig{}, nil).(*manager)
 	repo := &velerov1.BackupRepository{}
 
 	// empty repository type

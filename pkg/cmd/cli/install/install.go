@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 
 	"github.com/pkg/errors"
@@ -84,6 +85,7 @@ type Options struct {
 	DefaultSnapshotMoveData         bool
 	DisableInformerCache            bool
 	ScheduleSkipImmediately         bool
+	MaintenanceCfg                  repository.MaintenanceConfig
 }
 
 // BindFlags adds command line values to the options struct.
@@ -128,6 +130,11 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.DefaultSnapshotMoveData, "default-snapshot-move-data", o.DefaultSnapshotMoveData, "Bool flag to configure Velero server to move data by default for all snapshots supporting data movement. Optional.")
 	flags.BoolVar(&o.DisableInformerCache, "disable-informer-cache", o.DisableInformerCache, "Disable informer cache for Get calls on restore. With this enabled, it will speed up restore in cases where there are backup resources which already exist in the cluster, but for very large clusters this will increase velero memory usage. Default is false (don't disable). Optional.")
 	flags.BoolVar(&o.ScheduleSkipImmediately, "schedule-skip-immediately", o.ScheduleSkipImmediately, "Skip the first scheduled backup immediately after creating a schedule. Default is false (don't skip).")
+	flags.IntVar(&o.MaintenanceCfg.KeepLatestMaitenanceJobs, "keep-latest-maintenance-jobs", o.MaintenanceCfg.KeepLatestMaitenanceJobs, "Number of latest maintenance jobs to keep each repository. Optional.")
+	flags.StringVar(&o.MaintenanceCfg.CPURequest, "maintenance-job-cpu-request", o.MaintenanceCfg.CPURequest, "CPU request for maintenance jobs. Default is no limit.")
+	flags.StringVar(&o.MaintenanceCfg.MemRequest, "maintenance-job-mem-request", o.MaintenanceCfg.MemRequest, "Memory request for maintenance jobs. Default is no limit.")
+	flags.StringVar(&o.MaintenanceCfg.CPULimit, "maintenance-job-cpu-limit", o.MaintenanceCfg.CPULimit, "CPU limit for maintenance jobs. Default is no limit.")
+	flags.StringVar(&o.MaintenanceCfg.MemLimit, "maintenance-job-mem-limit", o.MaintenanceCfg.MemLimit, "Memory limit for maintenance jobs. Default is no limit.")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -157,6 +164,9 @@ func NewInstallOptions() *Options {
 		DefaultSnapshotMoveData:  false,
 		DisableInformerCache:     false,
 		ScheduleSkipImmediately:  false,
+		MaintenanceCfg: repository.MaintenanceConfig{
+			KeepLatestMaitenanceJobs: repository.DefaultKeepLatestMaitenanceJobs,
+		},
 	}
 }
 
@@ -224,6 +234,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		DefaultSnapshotMoveData:         o.DefaultSnapshotMoveData,
 		DisableInformerCache:            o.DisableInformerCache,
 		ScheduleSkipImmediately:         o.ScheduleSkipImmediately,
+		MaintenanceCfg:                  o.MaintenanceCfg,
 	}, nil
 }
 
