@@ -47,11 +47,13 @@ func GetListByCmdPipes(ctx context.Context, cmdlines []*OsCommandLine) ([]string
 
 	scanner := bufio.NewScanner(&buf)
 	var ret []string
+	fmt.Println("Before ret ...")
 	for scanner.Scan() {
 		fmt.Printf("line: %s\n", scanner.Text())
 		ret = append(ret, scanner.Text())
 	}
-
+	fmt.Println(ret)
+	fmt.Println("end ret ...")
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}

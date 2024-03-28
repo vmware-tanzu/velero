@@ -190,6 +190,12 @@ func KubectlGetNS(ctx context.Context, name string) ([]string, error) {
 	}
 	cmds = append(cmds, cmd)
 
+	cmd = &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+	cmds = append(cmds, cmd)
+
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
