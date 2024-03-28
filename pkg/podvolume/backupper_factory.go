@@ -60,7 +60,7 @@ type backupperFactory struct {
 }
 
 func (bf *backupperFactory) NewBackupper(ctx context.Context, backup *velerov1api.Backup, uploaderType string) (Backupper, error) {
-	b := newBackupper(ctx, bf.repoLocker, bf.repoEnsurer, bf.pvbInformer, bf.crClient, uploaderType, backup, bf.log)
+	b := newBackupper(ctx, bf.repoLocker, bf.repoEnsurer, bf.pvbInformer, bf.crClient, uploaderType, backup)
 
 	if !cache.WaitForCacheSync(ctx.Done(), bf.pvbInformer.HasSynced) {
 		return nil, errors.New("timed out waiting for caches to sync")
