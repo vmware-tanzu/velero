@@ -107,6 +107,10 @@ Lazy consensus does _not_ apply to the process of:
 
 * Removal of maintainers from Velero
 
+## Release Process
+Please check the [RELEASE.md](https://github.com/vmware-tanzu/RELEASES.md)
+
 ## Updating Governance
 
 All substantive changes in Governance require a supermajority agreement by all maintainers.
+
