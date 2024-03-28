@@ -58,7 +58,7 @@ func (n *ScheduleBackupCreation) Init() error {
 		"--include-namespaces", n.namespace,
 		"--schedule=*/" + fmt.Sprintf("%v", n.Period) + " * * * *",
 	}
-	Expect(n.Period < 30).To(Equal(true))
+	Expect(n.Period).To(BeNumerically("<", 30))
 	return nil
 }
 
@@ -109,7 +109,7 @@ func (n *ScheduleBackupCreation) Backup() error {
 			bMap := make(map[string]string)
 			backupsInfo, err := GetScheduledBackupsCreationTime(n.Ctx, n.VeleroCfg.VeleroCLI, "default", n.ScheduleName)
 			Expect(err).To(Succeed())
-			Expect(len(backupsInfo) == i).To(Equal(true))
+			Expect(backupsInfo).To(HaveLen(i))
 			for index, bi := range backupsInfo {
 				bList := strings.Split(bi, ",")
 				fmt.Printf("Backup %d: %v\n", index, bList)

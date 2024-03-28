@@ -100,12 +100,12 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 				NamespacedName: types.NamespacedName{Namespace: location.Namespace, Name: location.Name},
 			})
 			Expect(actualResult).To(BeEquivalentTo(ctrl.Result{}))
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
 			instance := &velerov1api.BackupStorageLocation{}
 			err = r.client.Get(ctx, key, instance)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(instance.Spec.Default).To(BeIdenticalTo(tests[i].expectedIsDefault))
 			Expect(instance.Status.Phase).To(BeIdenticalTo(tests[i].expectedPhase))
 		}
@@ -165,12 +165,12 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 				NamespacedName: types.NamespacedName{Namespace: location.Namespace, Name: location.Name},
 			})
 			Expect(actualResult).To(BeEquivalentTo(ctrl.Result{}))
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
 			instance := &velerov1api.BackupStorageLocation{}
 			err = r.client.Get(ctx, key, instance)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(instance.Spec.Default).To(BeIdenticalTo(tests[i].expectedIsDefault))
 		}
 	})

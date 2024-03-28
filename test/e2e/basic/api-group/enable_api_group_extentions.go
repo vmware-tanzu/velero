@@ -61,7 +61,7 @@ func APIExtensionsVersionsTest() {
 			Skip("CRD with apiextension versions dstVersions should have v1")
 			return ""
 		})
-		Expect(len(srcVersions) > 1 && len(dstVersions) == 1).Should(Equal(true), func() string {
+		Expect(len(srcVersions) > 1 && len(dstVersions) == 1).Should(BeTrue(), func() string {
 			Skip("Source cluster should support apiextension v1 and v1beta1, destination cluster should only support apiextension v1")
 			return ""
 		})

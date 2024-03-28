@@ -62,7 +62,7 @@ var _ = Describe("Download Request Reconciler", func() {
 			// now will be used to set the fake clock's time; capture
 			// it here so it can be referenced in the test case defs.
 			now, err := time.Parse(time.RFC1123, time.RFC1123)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			now = now.Local()
 
 			rClock := testclocks.NewFakeClock(now)
@@ -86,22 +86,22 @@ var _ = Describe("Download Request Reconciler", func() {
 
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 			err = fakeClient.Create(context.TODO(), test.downloadRequest)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			if test.backup != nil {
 				err := fakeClient.Create(context.TODO(), test.backup)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			}
 
 			if test.backupLocation != nil {
 				err := fakeClient.Create(context.TODO(), test.backupLocation)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				backupStores[test.backupLocation.Name] = &persistencemocks.BackupStore{}
 			}
 
 			if test.restore != nil {
 				err := fakeClient.Create(context.TODO(), test.restore)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			}
 
 			// Setup reconciler
@@ -129,7 +129,7 @@ var _ = Describe("Download Request Reconciler", func() {
 
 			Expect(actualResult).To(BeEquivalentTo(test.expectedRequeue))
 			if test.expectedReconcileErr == "" {
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			} else {
 				Expect(err.Error()).To(Equal(test.expectedReconcileErr))
 			}
@@ -146,7 +146,7 @@ var _ = Describe("Download Request Reconciler", func() {
 				} else {
 					Expect(instance.Status).ToNot(Equal(test.downloadRequest.Status))
 				}
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			}
 
 			if test.expectGetsURL {

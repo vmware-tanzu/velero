@@ -134,7 +134,7 @@ func (e *ExcludeFromBackup) Verify() error {
 		//Check namespace
 		checkNS, err := GetNamespace(e.Ctx, e.Client, namespace)
 		Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("Could not retrieve test namespace %s", namespace))
-		Expect(checkNS.Name == namespace).To(Equal(true), fmt.Sprintf("Retrieved namespace for %s has name %s instead", namespace, checkNS.Name))
+		Expect(checkNS.Name).To(Equal(namespace), fmt.Sprintf("Retrieved namespace for %s has name %s instead", namespace, checkNS.Name))
 
 		//Check deployment: should be included
 		_, err = GetDeployment(e.Client.ClientGo, namespace, e.CaseBaseName)
@@ -143,7 +143,7 @@ func (e *ExcludeFromBackup) Verify() error {
 		//Check secrets: secrets should not be included
 		_, err = GetSecret(e.Client.ClientGo, namespace, e.CaseBaseName)
 		Expect(err).Should(HaveOccurred(), fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
-		Expect(apierrors.IsNotFound(err)).To(Equal(true))
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 
 		//Check configmap: should be included
 		_, err = GetConfigmap(e.Client.ClientGo, namespace, e.CaseBaseName)
