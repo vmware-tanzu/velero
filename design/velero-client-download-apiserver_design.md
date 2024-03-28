@@ -56,20 +56,25 @@ Velero will be updated to download data from the object store and stream it back
 
 The Velero CLI will be updated to connect to the Ingress URL to download data serving from the Velero server.
 
+#### Approach 3: Using Service LoadBalancer to Expose Download Server
+
+Upon enabling download server api, velero will create a service of type loadBalancer, which will expose the download server to the outside world. The download server will be able to download data from the object store and stream it back to the client using the loadBalancer IP dynamically assigned by the cloud provider.
+
+This approach will also [work on KinD clusters](https://kind.sigs.k8s.io/docs/user/loadbalancer/)
+
 #### Comparison
-| Wanted Features | 1. API Aggregation Layer | 2. Ingress |
-| --- | --- | --- |
-| Support Multiple Velero in one cluster | ✅ | ✅ |
-| Support multiple storage locations | ✅ | ✅ |
-| K8S Style API | ✅ | ❌ |
-| Authentication Built-in| ✅ | ❌ has to parse [TokenReview](https://dev-k8sref-io.web.app/docs/authentication/tokenreview-v1/) and [SubjectAccessReview](https://dev-k8sref-io.web.app/docs/authorization/subjectaccessreview-v1/)|
-| Client works without resolvable DNS/IP if kubectl works | ✅ | ❌ could avoid with `kubectl port-forward`-like approach?|
-| Does not require ingress controller | ✅ | ❌ |
-| Does not require NodePort, ClusterIP, LoadBalancer | ✅ | ❌ |
-| Does not require apiserver [specific flags](https://kubernetes.io/docs/tasks/extend-kubernetes/configure-aggregation-layer/#enable-kubernetes-apiserver-flags) | ❌ | ✅ |
-| Does not [block namespace deletion](https://github.com/kubernetes/kubernetes/issues/119662#issuecomment-1863523115) | ❌ | ✅ |
-
-
+| Wanted Features | 1. API Aggregation Layer | 2. Ingress | 3. Service LoadBalancer |
+| --- | --- | --- | --- |
+| Support Multiple Velero in one cluster | ✅ | ✅ | ✅ |
+| Support multiple storage locations | ✅ | ✅ | ✅ |
+| K8S Style API | ✅ | ❌ | ❌ |
+| Authentication Built-in| ✅ | ❌ has to parse [TokenReview](https://dev-k8sref-io.web.app/docs/authentication/tokenreview-v1/) and [SubjectAccessReview](https://dev-k8sref-io.web.app/docs/authorization/subjectaccessreview-v1/)| ❌ has to parse [TokenReview](https://dev-k8sref-io.web.app/docs/authentication/tokenreview-v1/) and [SubjectAccessReview](https://dev-k8sref-io.web.app/docs/authorization/subjectaccessreview-v1/)|
+| Client works without resolvable DNS/IP if kubectl works | ✅ | ❌ could avoid with `kubectl port-forward`-like approach?| ❌ |
+| URL is unique per velero instance | ✅ | ? | ✅ each velero namespace will have its own external ip from cloud provider |
+| Does not require ingress controller | ✅ | ❌ | ✅ |
+| Does not require NodePort, ClusterIP, LoadBalancer | ✅ | ❌ | ❌ |
+| Does not require apiserver [specific flags](https://kubernetes.io/docs/tasks/extend-kubernetes/configure-aggregation-layer/#enable-kubernetes-apiserver-flags) | ❌ | ✅ | ✅ |
+| Does not [block namespace deletion](https://github.com/kubernetes/kubernetes/issues/119662#issuecomment-1863523115) | ❌ | ✅ | ✅ |
 
 ## Detailed Design
 <!-- A detailed design describing how the changes to the product should be made.
