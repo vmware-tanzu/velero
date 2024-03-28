@@ -81,7 +81,7 @@ type configCredentialOptions struct {
 	AdditionallyAllowedTenants []string
 }
 
-// newConfigCredential works same as the azidentity.EnvironmentCredential but reads the credentials from a map
+// newConfigCredential works similar as the azidentity.EnvironmentCredential but reads the credentials from a map
 // rather than environment variables. This is required for Velero to run B/R concurrently
 // https://github.com/Azure/azure-sdk-for-go/blob/sdk/azidentity/v1.3.0/sdk/azidentity/environment_credential.go#L80
 func newConfigCredential(creds map[string]string, options configCredentialOptions) (azcore.TokenCredential, error) {
@@ -102,19 +102,24 @@ func newConfigCredential(creds map[string]string, options configCredentialOption
 		})
 	}
 
-	// certificate
-	if certPath := creds[CredentialKeyClientCertificatePath]; certPath != "" {
-		certData, err := os.ReadFile(certPath)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read certificate file %s", certPath)
+	// raw certificate or certificate file
+	if rawCerts, certsPath := []byte(creds[CredentialKeyClientCertificate]), creds[CredentialKeyClientCertificatePath]; len(rawCerts) > 0 || len(certsPath) > 0 {
+		var err error
+		// raw certificate isn't specified while certificate path is specified
+		if len(rawCerts) == 0 {
+			rawCerts, err = os.ReadFile(certsPath)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to read certificate file %s", certsPath)
+			}
 		}
+
 		var password []byte
 		if v := creds[CredentialKeyClientCertificatePassword]; v != "" {
 			password = []byte(v)
 		}
-		certs, key, err := azidentity.ParseCertificates(certData, password)
+		certs, key, err := azidentity.ParseCertificates(rawCerts, password)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to load certificate from %s", certPath)
+			return nil, errors.Wrap(err, "failed to parse certificate")
 		}
 		o := &azidentity.ClientCertificateCredentialOptions{
 			AdditionallyAllowedTenants: options.AdditionallyAllowedTenants,

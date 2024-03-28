@@ -43,6 +43,7 @@ const (
 	CredentialKeyTenantID                   = "AZURE_TENANT_ID"                     // #nosec
 	CredentialKeyClientID                   = "AZURE_CLIENT_ID"                     // #nosec
 	CredentialKeyClientSecret               = "AZURE_CLIENT_SECRET"                 // #nosec
+	CredentialKeyClientCertificate          = "AZURE_CLIENT_CERTIFICATE"            // #nosec
 	CredentialKeyClientCertificatePath      = "AZURE_CLIENT_CERTIFICATE_PATH"       // #nosec
 	CredentialKeyClientCertificatePassword  = "AZURE_CLIENT_CERTIFICATE_PASSWORD"   // #nosec
 	CredentialKeySendCertChain              = "AZURE_CLIENT_SEND_CERTIFICATE_CHAIN" // #nosec

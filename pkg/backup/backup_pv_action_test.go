@@ -50,14 +50,14 @@ func TestBackupPVAction(t *testing.T) {
 	// and no additional items
 	_, additional, err := a.Execute(pvc, backup)
 	assert.NoError(t, err)
-	assert.Len(t, additional, 0)
+	assert.Empty(t, additional)
 
 	// empty spec.volumeName should result in no error
 	// and no additional items
 	pvc.Object["spec"].(map[string]interface{})["volumeName"] = ""
 	_, additional, err = a.Execute(pvc, backup)
 	assert.NoError(t, err)
-	assert.Len(t, additional, 0)
+	assert.Empty(t, additional)
 
 	// Action should clean the spec.Selector when the StorageClassName is not set.
 	input := builder.ForPersistentVolumeClaim("abc", "abc").VolumeName("pv").Selector(&metav1.LabelSelector{MatchLabels: map[string]string{"abc": "abc"}}).Phase(corev1.ClaimBound).Result()
@@ -119,21 +119,21 @@ func TestBackupPVAction(t *testing.T) {
 	pvc.Object["spec"].(map[string]interface{})["volumeName"] = "myVolume"
 	_, additional, err = a.Execute(pvc, backup)
 	require.NoError(t, err)
-	require.Len(t, additional, 0)
+	require.Empty(t, additional)
 
 	// non-empty spec.volumeName when status.phase is 'Pending'
 	// should result in no error and no additional items
 	pvc.Object["status"].(map[string]interface{})["phase"] = corev1api.ClaimPending
 	_, additional, err = a.Execute(pvc, backup)
 	require.NoError(t, err)
-	require.Len(t, additional, 0)
+	require.Empty(t, additional)
 
 	// non-empty spec.volumeName when status.phase is 'Lost'
 	// should result in no error and no additional items
 	pvc.Object["status"].(map[string]interface{})["phase"] = corev1api.ClaimLost
 	_, additional, err = a.Execute(pvc, backup)
 	require.NoError(t, err)
-	require.Len(t, additional, 0)
+	require.Empty(t, additional)
 
 	// non-empty spec.volumeName when status.phase is 'Bound'
 	// should result in no error and one additional item for the PV
@@ -148,5 +148,5 @@ func TestBackupPVAction(t *testing.T) {
 	pvc.Object["spec"].(map[string]interface{})["volumeName"] = ""
 	_, additional, err = a.Execute(pvc, backup)
 	assert.NoError(t, err)
-	assert.Len(t, additional, 0)
+	assert.Empty(t, additional)
 }

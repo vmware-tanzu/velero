@@ -219,16 +219,16 @@ func TestReconcileOfSchedule(t *testing.T) {
 			// new backup shouldn't be submitted.
 			if test.backup != nil &&
 				(test.backup.Status.Phase == velerov1.BackupPhaseNew || test.backup.Status.Phase == velerov1.BackupPhaseInProgress) {
-				assert.Equal(t, 1, len(backups.Items))
+				assert.Len(t, backups.Items, 1)
 				require.Nil(t, client.Delete(ctx, test.backup))
 			}
 
 			require.Nil(t, client.List(ctx, backups))
 
 			if test.expectedBackupCreate == nil {
-				assert.Equal(t, 0, len(backups.Items))
+				assert.Empty(t, backups.Items)
 			} else {
-				assert.Equal(t, 1, len(backups.Items))
+				assert.Len(t, backups.Items, 1)
 			}
 		})
 	}

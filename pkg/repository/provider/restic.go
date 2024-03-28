@@ -78,6 +78,16 @@ func (r *resticRepositoryProvider) Forget(ctx context.Context, snapshotID string
 	return r.svc.Forget(param.BackupLocation, param.BackupRepo, snapshotID)
 }
 
+func (r *resticRepositoryProvider) BatchForget(ctx context.Context, snapshotIDs []string, param RepoParam) []error {
+	errs := []error{}
+	for _, snapshot := range snapshotIDs {
+		err := r.Forget(ctx, snapshot, param)
+		errs = append(errs, err)
+	}
+
+	return errs
+}
+
 func (r *resticRepositoryProvider) DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration {
 	return r.svc.DefaultMaintenanceFrequency()
 }
