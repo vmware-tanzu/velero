@@ -102,7 +102,7 @@ func TestEnsureRepo(t *testing.T) {
 				bkRepoObjNotReady,
 			},
 			runtimeScheme: scheme,
-			err:           "failed to wait BackupRepository: timed out waiting for the condition",
+			err:           "failed to wait BackupRepository: context deadline exceeded",
 		},
 		{
 			name:           "create fail",
@@ -110,7 +110,7 @@ func TestEnsureRepo(t *testing.T) {
 			bsl:            "fake-bsl",
 			repositoryType: "fake-repo-type",
 			runtimeScheme:  scheme,
-			err:            "failed to wait BackupRepository: timed out waiting for the condition",
+			err:            "failed to wait BackupRepository: context deadline exceeded",
 		},
 	}
 
@@ -183,7 +183,7 @@ func TestCreateBackupRepositoryAndWait(t *testing.T) {
 			bsl:            "fake-bsl",
 			repositoryType: "fake-repo-type",
 			runtimeScheme:  scheme,
-			err:            "failed to wait BackupRepository: timed out waiting for the condition",
+			err:            "failed to wait BackupRepository: context deadline exceeded",
 		},
 	}
 

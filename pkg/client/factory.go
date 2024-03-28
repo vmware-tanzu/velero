@@ -24,7 +24,7 @@ import (
 	k8scheme "k8s.io/client-go/kubernetes/scheme"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"

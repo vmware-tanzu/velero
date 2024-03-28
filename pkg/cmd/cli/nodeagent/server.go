@@ -45,7 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -172,7 +172,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 
 	// use a field selector to filter to only pods scheduled on this node.
 	cacheOption := cache.Options{
-		SelectorsByObject: cache.SelectorsByObject{
+		ByObject: map[ctrlclient.Object]cache.ByObject{
 			&v1.Pod{}: {
 				Field: fields.Set{"spec.nodeName": nodeName}.AsSelector(),
 			},
@@ -191,8 +191,8 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		},
 	}
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
-		Scheme:   scheme,
-		NewCache: cache.BuilderWithOptions(cacheOption),
+		Scheme: scheme,
+		Cache:  cacheOption,
 	})
 	if err != nil {
 		cancelFunc()

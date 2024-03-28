@@ -354,7 +354,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		}
 		restoreInformer := cache.NewSharedInformer(&lw, &api.Restore{}, time.Second)
 
-		restoreInformer.AddEventHandler(
+		_, _ = restoreInformer.AddEventHandler(
 			cache.FilteringResourceEventHandler{
 				FilterFunc: func(obj interface{}) bool {
 					restore, ok := obj.(*api.Restore)

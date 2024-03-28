@@ -491,7 +491,7 @@ func TestFindVolumeRestoresForPod(t *testing.T) {
 		Client: clientBuilder.Build(),
 		logger: logrus.New(),
 	}
-	requests := reconciler.findVolumeRestoresForPod(pod)
+	requests := reconciler.findVolumeRestoresForPod(context.Background(), pod)
 	assert.Len(t, requests, 0)
 
 	// contain one matching PVR
@@ -515,6 +515,6 @@ func TestFindVolumeRestoresForPod(t *testing.T) {
 			},
 		},
 	}).Build()
-	requests = reconciler.findVolumeRestoresForPod(pod)
+	requests = reconciler.findVolumeRestoresForPod(context.Background(), pod)
 	assert.Len(t, requests, 1)
 }

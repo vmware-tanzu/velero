@@ -134,12 +134,12 @@ func TestFactory(t *testing.T) {
 			assert.NotNil(t, dynamicClient)
 
 			kubebuilderClient, e := f.KubebuilderClient()
-			assert.Contains(t, e.Error(), fmt.Sprintf("Get \"%s/api?timeout=", test.expectedHost))
-			assert.Nil(t, kubebuilderClient)
+			assert.Nil(t, e)
+			assert.NotNil(t, kubebuilderClient)
 
 			kbClientWithWatch, e := f.KubebuilderWatchClient()
-			assert.Contains(t, e.Error(), fmt.Sprintf("Get \"%s/api?timeout=", test.expectedHost))
-			assert.Nil(t, kbClientWithWatch)
+			assert.Nil(t, e)
+			assert.NotNil(t, kbClientWithWatch)
 		})
 	}
 }
