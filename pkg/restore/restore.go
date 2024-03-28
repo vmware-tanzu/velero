@@ -1268,7 +1268,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 					// want to dynamically re-provision it.
 					return warnings, errs, itemExists
 				} else {
-					obj, err = ctx.handleSkippedPVHasRetainPolicy(obj, resourceID, restoreLogger)
+					obj, err = ctx.handleSkippedPVHasRetainPolicy(obj, restoreLogger)
 					if err != nil {
 						errs.Add(namespace, err)
 						return warnings, errs, itemExists
@@ -1322,7 +1322,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				return warnings, errs, itemExists
 
 			default:
-				obj, err = ctx.handleSkippedPVHasRetainPolicy(obj, resourceID, restoreLogger)
+				obj, err = ctx.handleSkippedPVHasRetainPolicy(obj, restoreLogger)
 				if err != nil {
 					errs.Add(namespace, err)
 					return warnings, errs, itemExists
@@ -2497,7 +2497,6 @@ func (ctx *restoreContext) handlePVHasNativeSnapshot(obj *unstructured.Unstructu
 
 func (ctx *restoreContext) handleSkippedPVHasRetainPolicy(
 	obj *unstructured.Unstructured,
-	resourceID string,
 	logger logrus.FieldLogger,
 ) (*unstructured.Unstructured, error) {
 	logger.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
@@ -2508,13 +2507,5 @@ func (ctx *restoreContext) handleSkippedPVHasRetainPolicy(
 	}
 
 	obj = resetVolumeBindingInfo(obj)
-
-	// We call the pvRestorer here to clear out the PV's claimRef.UID,
-	// so it can be re-claimed when its PVC is restored and gets a new UID.
-	updatedObj, err := ctx.pvRestorer.executePVAction(obj)
-	if err != nil {
-		return nil, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err)
-	}
-
-	return updatedObj, nil
+	return obj, nil
 }

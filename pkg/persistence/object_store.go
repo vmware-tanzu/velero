@@ -75,6 +75,7 @@ type BackupStore interface {
 	GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1api.VolumeSnapshotContent, error)
 	GetCSIVolumeSnapshotClasses(name string) ([]*snapshotv1api.VolumeSnapshotClass, error)
 	GetBackupVolumeInfos(name string) ([]*volume.VolumeInfo, error)
+	PutBackupVolumeInfos(name string, volumeInfo io.Reader) error
 	GetRestoreResults(name string) (map[string]results.Result, error)
 
 	// BackupExists checks if the backup metadata file exists in object storage.
@@ -514,6 +515,10 @@ func (s *objectBackupStore) GetBackupVolumeInfos(name string) ([]*volume.VolumeI
 	}
 
 	return volumeInfos, nil
+}
+
+func (s *objectBackupStore) PutBackupVolumeInfos(name string, volumeInfo io.Reader) error {
+	return s.objectStore.PutObject(s.bucket, s.layout.getBackupVolumeInfoKey(name), volumeInfo)
 }
 
 func (s *objectBackupStore) GetRestoreResults(name string) (map[string]results.Result, error) {

@@ -1203,6 +1203,51 @@ func TestGetRestoredResourceList(t *testing.T) {
 	assert.EqualValues(t, list["pod"], res["pod"])
 }
 
+func TestPutBackupVolumeInfos(t *testing.T) {
+	tests := []struct {
+		name         string
+		prefix       string
+		expectedErr  string
+		expectedKeys []string
+	}{
+		{
+			name:        "normal case",
+			expectedErr: "",
+			expectedKeys: []string{
+				"backups/backup-1/backup-1-volumeinfo.json.gz",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
+
+			volumeInfos := []*volume.VolumeInfo{
+				{
+					PVCName: "test",
+				},
+			}
+
+			buf := new(bytes.Buffer)
+			gzw := gzip.NewWriter(buf)
+			defer gzw.Close()
+
+			require.NoError(t, json.NewEncoder(gzw).Encode(volumeInfos))
+			bufferContent := buf.Bytes()
+
+			err := harness.PutBackupVolumeInfos("backup-1", buf)
+
+			velerotest.AssertErrorMatches(t, tc.expectedErr, err)
+			assert.Len(t, harness.objectStore.Data[harness.bucket], len(tc.expectedKeys))
+			for _, key := range tc.expectedKeys {
+				assert.Contains(t, harness.objectStore.Data[harness.bucket], key)
+				assert.Equal(t, harness.objectStore.Data[harness.bucket][key], bufferContent)
+			}
+		})
+	}
+}
+
 func encodeToBytes(obj runtime.Object) []byte {
 	res, err := encode.Encode(obj, "json")
 	if err != nil {

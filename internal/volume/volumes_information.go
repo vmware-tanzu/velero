@@ -76,6 +76,9 @@ type VolumeInfo struct {
 	// Snapshot starts timestamp.
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 
+	// Snapshot completes timestamp.
+	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+
 	CSISnapshotInfo          *CSISnapshotInfo          `json:"csiSnapshotInfo,omitempty"`
 	SnapshotDataMovementInfo *SnapshotDataMovementInfo `json:"snapshotDataMovementInfo,omitempty"`
 	NativeSnapshotInfo       *NativeSnapshotInfo       `json:"nativeSnapshotInfo,omitempty"`
@@ -119,6 +122,9 @@ type SnapshotDataMovementInfo struct {
 
 	// The Async Operation's ID.
 	OperationID string `json:"operationID"`
+
+	// Moved snapshot data size.
+	Size int64 `json:"size"`
 }
 
 // NativeSnapshotInfo is used for displaying the Velero native snapshot status.
@@ -379,7 +385,6 @@ func (v *VolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 				Skipped:               false,
 				SnapshotDataMoved:     false,
 				PreserveLocalSnapshot: true,
-				StartTimestamp:        &(volumeSnapshot.CreationTimestamp),
 				CSISnapshotInfo: &CSISnapshotInfo{
 					VSCName:        *volumeSnapshot.Status.BoundVolumeSnapshotContentName,
 					Size:           size,
@@ -391,6 +396,10 @@ func (v *VolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
 					Labels:        pvcPVInfo.PV.Labels,
 				},
+			}
+
+			if volumeSnapshot.Status.CreationTime != nil {
+				volumeInfo.StartTimestamp = volumeSnapshot.Status.CreationTime
 			}
 
 			tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
@@ -412,7 +421,6 @@ func (v *VolumesInformation) generateVolumeInfoFromPVB() {
 			BackupMethod:      PodVolumeBackup,
 			SnapshotDataMoved: false,
 			Skipped:           false,
-			StartTimestamp:    pvb.Status.StartTimestamp,
 			PVBInfo: &PodVolumeBackupInfo{
 				SnapshotHandle: pvb.Status.SnapshotID,
 				Size:           pvb.Status.Progress.TotalBytes,
@@ -422,6 +430,14 @@ func (v *VolumesInformation) generateVolumeInfoFromPVB() {
 				PodNamespace:   pvb.Spec.Pod.Namespace,
 				NodeName:       pvb.Spec.Node,
 			},
+		}
+
+		if pvb.Status.StartTimestamp != nil {
+			volumeInfo.StartTimestamp = pvb.Status.StartTimestamp
+		}
+
+		if pvb.Status.CompletionTimestamp != nil {
+			volumeInfo.CompletionTimestamp = pvb.Status.CompletionTimestamp
 		}
 
 		pod := new(corev1api.Pod)
@@ -522,7 +538,6 @@ func (v *VolumesInformation) generateVolumeInfoFromDataUpload() {
 					PVName:            pvcPVInfo.PV.Name,
 					SnapshotDataMoved: true,
 					Skipped:           false,
-					StartTimestamp:    operation.Status.Created,
 					CSISnapshotInfo: &CSISnapshotInfo{
 						SnapshotHandle: FieldValueIsUnknown,
 						VSCName:        FieldValueIsUnknown,
@@ -538,6 +553,10 @@ func (v *VolumesInformation) generateVolumeInfoFromDataUpload() {
 						ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
 						Labels:        pvcPVInfo.PV.Labels,
 					},
+				}
+
+				if dataUpload.Status.StartTimestamp != nil {
+					volumeInfo.StartTimestamp = dataUpload.Status.StartTimestamp
 				}
 
 				tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)

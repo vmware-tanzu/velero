@@ -80,6 +80,16 @@ func (b *PodVolumeBackupBuilder) SnapshotID(snapshotID string) *PodVolumeBackupB
 	return b
 }
 
+func (b *PodVolumeBackupBuilder) StartTimestamp(startTimestamp *metav1.Time) *PodVolumeBackupBuilder {
+	b.object.Status.StartTimestamp = startTimestamp
+	return b
+}
+
+func (b *PodVolumeBackupBuilder) CompletionTimestamp(completionTimestamp *metav1.Time) *PodVolumeBackupBuilder {
+	b.object.Status.CompletionTimestamp = completionTimestamp
+	return b
+}
+
 // PodName sets the name of the pod associated with this PodVolumeBackup.
 func (b *PodVolumeBackupBuilder) PodName(name string) *PodVolumeBackupBuilder {
 	b.object.Spec.Pod.Name = name

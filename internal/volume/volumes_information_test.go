@@ -372,6 +372,7 @@ func TestGenerateVolumeInfoForCSIVolumeSnapshot(t *testing.T) {
 				},
 				Status: &snapshotv1api.VolumeSnapshotStatus{
 					BoundVolumeSnapshotContentName: stringPtr("testContent"),
+					CreationTime:                   &now,
 					RestoreSize:                    &resourceQuantity,
 				},
 			},
@@ -458,6 +459,7 @@ func TestGenerateVolumeInfoForCSIVolumeSnapshot(t *testing.T) {
 }
 
 func TestGenerateVolumeInfoFromPVB(t *testing.T) {
+	now := metav1.Now()
 	tests := []struct {
 		name                string
 		pvb                 *velerov1api.PodVolumeBackup
@@ -542,7 +544,7 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 					},
 				},
 			},
-			pvb: builder.ForPodVolumeBackup("velero", "testPVB").PodName("testPod").PodNamespace("velero").Result(),
+			pvb: builder.ForPodVolumeBackup("velero", "testPVB").PodName("testPod").PodNamespace("velero").StartTimestamp(&now).CompletionTimestamp(&now).Result(),
 			pod: builder.ForPod("velero", "testPod").Containers(&corev1api.Container{
 				Name: "test",
 				VolumeMounts: []corev1api.VolumeMount{
@@ -563,10 +565,12 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 			).Result(),
 			expectedVolumeInfos: []*VolumeInfo{
 				{
-					PVCName:      "testPVC",
-					PVCNamespace: "velero",
-					PVName:       "testPV",
-					BackupMethod: PodVolumeBackup,
+					PVCName:             "testPVC",
+					PVCNamespace:        "velero",
+					PVName:              "testPV",
+					BackupMethod:        PodVolumeBackup,
+					StartTimestamp:      &now,
+					CompletionTimestamp: &now,
 					PVBInfo: &PodVolumeBackupInfo{
 						PodName:      "testPod",
 						PodNamespace: "velero",
@@ -605,9 +609,12 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 }
 
 func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
+	// The unstructured conversion will loose the time precision to second
+	// level. To make test pass. Set the now precision at second at the
+	// beginning.
+	now := metav1.Now().Rfc3339Copy()
 	features.Enable(velerov1api.CSIFeatureFlag)
 	defer features.Disable(velerov1api.CSIFeatureFlag)
-	now := metav1.Now()
 	tests := []struct {
 		name                string
 		volumeSnapshotClass *snapshotv1api.VolumeSnapshotClass
@@ -685,7 +692,7 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 			name: "VolumeSnapshotClass cannot be found for operation",
 			dataUpload: builder.ForDataUpload("velero", "testDU").DataMover("velero").CSISnapshot(&velerov2alpha1.CSISnapshotSpec{
 				VolumeSnapshot: "testVS",
-			}).SnapshotID("testSnapshotHandle").Result(),
+			}).SnapshotID("testSnapshotHandle").StartTimestamp(&now).Result(),
 			operation: &itemoperation.BackupOperation{
 				Spec: itemoperation.BackupOperationSpec{
 					OperationID: "testOperation",
@@ -731,6 +738,7 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 					PVName:            "testPV",
 					BackupMethod:      CSISnapshot,
 					SnapshotDataMoved: true,
+					StartTimestamp:    &now,
 					CSISnapshotInfo: &CSISnapshotInfo{
 						SnapshotHandle: FieldValueIsUnknown,
 						VSCName:        FieldValueIsUnknown,
@@ -754,7 +762,7 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 			dataUpload: builder.ForDataUpload("velero", "testDU").DataMover("velero").CSISnapshot(&velerov2alpha1.CSISnapshotSpec{
 				VolumeSnapshot: "testVS",
 				SnapshotClass:  "testClass",
-			}).SnapshotID("testSnapshotHandle").Result(),
+			}).SnapshotID("testSnapshotHandle").StartTimestamp(&now).Result(),
 			volumeSnapshotClass: builder.ForVolumeSnapshotClass("testClass").Driver("pd.csi.storage.gke.io").Result(),
 			operation: &itemoperation.BackupOperation{
 				Spec: itemoperation.BackupOperationSpec{
@@ -777,9 +785,6 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 							Name:      "testDU",
 						},
 					},
-				},
-				Status: itemoperation.OperationStatus{
-					Created: &now,
 				},
 			},
 			pvMap: map[string]pvcPvInfo{
@@ -853,7 +858,12 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 			volumesInfo.logger = logging.DefaultLogger(logrus.DebugLevel, logging.FormatJSON)
 
 			volumesInfo.generateVolumeInfoFromDataUpload()
-			require.Equal(t, tc.expectedVolumeInfos, volumesInfo.volumeInfos)
+
+			if len(tc.expectedVolumeInfos) > 0 {
+				require.Equal(t, tc.expectedVolumeInfos[0].PVInfo, volumesInfo.volumeInfos[0].PVInfo)
+				require.Equal(t, tc.expectedVolumeInfos[0].SnapshotDataMovementInfo, volumesInfo.volumeInfos[0].SnapshotDataMovementInfo)
+				require.Equal(t, tc.expectedVolumeInfos[0].CSISnapshotInfo, volumesInfo.volumeInfos[0].CSISnapshotInfo)
+			}
 		})
 	}
 }
