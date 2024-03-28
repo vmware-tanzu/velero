@@ -24,16 +24,18 @@ You can run `make verify` to ensure that all generated files (clientset, listers
 
 ## Linting
 
-You can run `make lint` which executes golangci-lint inside the build image, or `make local-lint` which executes outside of the build image.
-Both `make lint` and `make local-lint` will only run the linter against changes.
+You can run `make lint` (which executes [`golangci-lint`](https://github.com/golangci/golangci-lint)) to run linters against the entire Go code base.
 
-Use `lint-all` to run the linter against the entire code base.
+You can run `make lint-fix` to fix fixable issues found by `make lint`.
 
-The default linters are defined in the `Makefile` via the `LINTERS` variable.
+The linters, and their settings, are defined in the `.golangci.yaml` file.
 
-You can also override the default list of linters by  running the command
+Linting is enforced by the project CI through `.github/workflows/pr-linter-check.yml` job.
 
-`$ make lint LINTERS=gosec`
+To update `golangci-lint` used by the project, update:
+- `with.version` of golangci/golangci-lint-action in `.github/workflows/pr-linter-check.yml:21`
+- `golangci-lint` version installed in build-image in `hack/build-image/Dockerfile:96`
+- documentation reference comment in `.golangci.yaml:1`
 
 ## Test
 

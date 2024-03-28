@@ -27,7 +27,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	waitutil "k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -83,7 +82,7 @@ func WaitForConfigmapDelete(c clientset.Interface, ns, name string) error {
 		return err
 	}
 
-	return waitutil.PollImmediateInfinite(5*time.Second,
+	return wait.PollImmediateInfinite(5*time.Second,
 		func() (bool, error) {
 			if _, err := c.CoreV1().ConfigMaps(ns).Get(context.TODO(), ns, metav1.GetOptions{}); err != nil {
 				if apierrors.IsNotFound(err) {

@@ -29,7 +29,6 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -37,7 +36,6 @@ import (
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
 	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
 	"github.com/vmware-tanzu/velero/pkg/test"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestCreateOptions_BuildBackup(t *testing.T) {
@@ -88,7 +86,7 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 	scheme := runtime.NewScheme()
 	err := velerov1api.AddToScheme(scheme)
 	require.NoError(t, err)
-	o.client = velerotest.NewFakeControllerRuntimeClient(t).(controllerclient.WithWatch)
+	o.client = test.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
 	t.Run("inexistent schedule", func(t *testing.T) {
 		_, err := o.BuildBackup(cmdtest.VeleroNameSpace)
@@ -214,7 +212,7 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--parallel-files-upload", fmt.Sprintf("%d", parallelFilesUpload)})
 		//flags.Parse([]string{"--wait"})
 
-		client := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
+		client := test.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
 		f.On("Namespace").Return(mock.Anything)
 		f.On("KubebuilderWatchClient").Return(client, nil)
@@ -273,7 +271,7 @@ func TestCreateCommand(t *testing.T) {
 		// create a factory
 		f := &factorymocks.Factory{}
 		cmd := NewCreateCommand(f, "")
-		kbclient := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
+		kbclient := test.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
 		f.On("Namespace").Return(mock.Anything)
 		f.On("KubebuilderWatchClient").Return(kbclient, nil)
@@ -300,14 +298,14 @@ func TestCreateCommand(t *testing.T) {
 		// create a factory
 		f := &factorymocks.Factory{}
 		cmd := NewCreateCommand(f, "")
-		kbclient := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
+		kubeclient := test.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
 		vsl := builder.ForVolumeSnapshotLocation(cmdtest.VeleroNameSpace, vslName).Result()
 
-		kbclient.Create(cmd.Context(), vsl, &controllerclient.CreateOptions{})
+		kubeclient.Create(cmd.Context(), vsl, &kbclient.CreateOptions{})
 
 		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
-		f.On("KubebuilderWatchClient").Return(kbclient, nil)
+		f.On("KubebuilderWatchClient").Return(kubeclient, nil)
 
 		flags := new(flag.FlagSet)
 		o := NewCreateOptions()
@@ -338,13 +336,13 @@ func TestCreateCommand(t *testing.T) {
 		fromSchedule := "schedule-name-1"
 		flags.Parse([]string{"--from-schedule", fromSchedule})
 
-		kbclient := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
+		kubeclient := test.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
 		schedule := builder.ForSchedule(cmdtest.VeleroNameSpace, fromSchedule).Result()
-		kbclient.Create(context.Background(), schedule, &controllerclient.CreateOptions{})
+		kubeclient.Create(context.Background(), schedule, &kbclient.CreateOptions{})
 
 		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
-		f.On("KubebuilderWatchClient").Return(kbclient, nil)
+		f.On("KubebuilderWatchClient").Return(kubeclient, nil)
 
 		e := o.Complete(args, f)
 		assert.NoError(t, e)
