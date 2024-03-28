@@ -55,7 +55,6 @@ func (p *PVBackupFiltering) Init() error {
 	//   annotation will be ignored, so it's only set for opt-out test
 	if p.annotation == OPT_OUT_ANN {
 		p.BackupArgs = append(p.BackupArgs, "--default-volumes-to-fs-backup")
-
 	}
 	p.RestoreArgs = []string{
 		"create", "--namespace", p.VeleroCfg.VeleroNamespace, "restore", p.RestoreName,

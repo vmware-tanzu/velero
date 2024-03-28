@@ -197,7 +197,6 @@ func Test_backupper_BackupPodVolumes_log_test(t *testing.T) {
 			b.BackupPodVolumes(tt.args.backup, tt.args.pod, tt.args.volumesToBackup, tt.args.resPolicies, log)
 			fmt.Println(logOutput.String())
 			assert.Contains(t, logOutput.String(), tt.wantLog)
-
 		})
 	}
 }
@@ -495,7 +494,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			bsl:           "fake-bsl",
 		},
 		{
-			name: "context cancelled",
+			name: "context canceled",
 			ctx:  ctxWithCancel,
 			volumes: []string{
 				"fake-volume-1",
@@ -616,7 +615,6 @@ func TestBackupPodVolumes(t *testing.T) {
 					for _, pvb := range test.retPVBs {
 						bp.(*backupper).results[resultsKey(test.sourcePod.Namespace, test.sourcePod.Name)] <- pvb
 					}
-
 				}
 			}()
 

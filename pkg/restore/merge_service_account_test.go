@@ -361,7 +361,6 @@ func TestMergeMaps(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			result := mergeMaps(tc.destination, tc.source)
 
 			assert.Equal(t, tc.expected, result)

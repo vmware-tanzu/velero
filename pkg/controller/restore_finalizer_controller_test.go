@@ -178,7 +178,6 @@ func TestRestoreFinalizerReconcile(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestUpdateResult(t *testing.T) {
@@ -453,7 +452,6 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 			assert.Equal(t, expectedPVInfo.ReclaimPolicy, string(pv.Spec.PersistentVolumeReclaimPolicy))
 			assert.Equal(t, expectedPVInfo.Labels, pv.Labels)
 		}
-
 	}
 }
 
@@ -489,5 +487,4 @@ func TestGetRestoredPVCFromRestoredResourceList(t *testing.T) {
 	}
 	actual = getRestoredPVCFromRestoredResourceList(restoredResourceList)
 	assert.Equal(t, expected, actual)
-
 }

@@ -86,7 +86,6 @@ func TestCapacityIsInRange(t *testing.T) {
 			actual := test.capacity.isInRange(test.quantity)
 
 			assert.Equal(t, test.isInRange, actual)
-
 		})
 	}
 }
@@ -141,7 +140,6 @@ func TestStorageClassConditionMatch(t *testing.T) {
 }
 
 func TestNFSConditionMatch(t *testing.T) {
-
 	tests := []struct {
 		name          string
 		condition     *nfsCondition
@@ -196,7 +194,6 @@ func TestNFSConditionMatch(t *testing.T) {
 }
 
 func TestCSIConditionMatch(t *testing.T) {
-
 	tests := []struct {
 		name          string
 		condition     *csiCondition

@@ -526,7 +526,6 @@ func TestOnDataDownloadCompleted(t *testing.T) {
 				ep := exposermockes.NewGenericRestoreExposer(t)
 				if test.rebindVolumeErr {
 					ep.On("RebindVolume", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("Error to rebind volume"))
-
 				} else {
 					ep.On("RebindVolume", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				}
@@ -813,7 +812,6 @@ func TestTryCancelDataDownload(t *testing.T) {
 }
 
 func TestUpdateDataDownloadWithRetry(t *testing.T) {
-
 	namespacedName := types.NamespacedName{
 		Name:      dataDownloadName,
 		Namespace: "velero",
@@ -1026,7 +1024,7 @@ func TestAttemptDataDownloadResume(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 
-				// Verify DataDownload marked as Cancelled
+				// Verify DataDownload marked as Canceled
 				for _, duName := range test.cancelledDataDownloads {
 					dataUpload := &velerov2alpha1api.DataDownload{}
 					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)

@@ -435,7 +435,6 @@ func TestDefaultBackupTTL(t *testing.T) {
 		)
 
 		t.Run(test.name, func(t *testing.T) {
-
 			apiServer := velerotest.NewAPIServer(t)
 			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
 			require.NoError(t, err)
@@ -1735,6 +1734,5 @@ func TestPatchResourceWorksWithStatus(t *testing.T) {
 				t.Error(cmp.Diff(fromCluster, tt.args.updated))
 			}
 		})
-
 	}
 }

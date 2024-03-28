@@ -85,7 +85,6 @@ func TestNewUploaderProvider(t *testing.T) {
 				mockFileGetter := &mocks.FileStore{}
 				mockFileGetter.On("Path", &v1.SecretKeySelector{}).Return("", nil)
 				credGetter.FromFile = mockFileGetter
-
 			}
 			_, err := NewUploaderProvider(ctx, client, testCase.UploaderType, testCase.RequestorType, repoIdentifier, bsl, backupRepo, credGetter, repoKeySelector, log)
 			if testCase.ExpectedError == "" {

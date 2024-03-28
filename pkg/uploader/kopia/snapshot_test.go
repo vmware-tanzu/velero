@@ -79,7 +79,6 @@ func MockFuncs(s *snapshotMockes, args []mockArgs) {
 }
 
 func TestSnapshotSource(t *testing.T) {
-
 	ctx := context.TODO()
 	sourceInfo := snapshot.SourceInfo{
 		UserName: "testUserName",

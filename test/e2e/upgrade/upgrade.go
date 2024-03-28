@@ -123,7 +123,6 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			veleroCfg.GCFrequency = ""
 			By(fmt.Sprintf("Install the expected old version Velero (%s) for upgrade",
 				veleroCLI2Version.VeleroVersion), func() {
-
 				//Set VeleroImage and RestoreHelperImage to blank
 				//VeleroImage and RestoreHelperImage should be the default value in originalCli
 				tmpCfgForOldVeleroInstall := veleroCfg
@@ -230,7 +229,6 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			}
 
 			By(fmt.Sprintf("Upgrade Velero by CLI %s", tmpCfg.VeleroCLI), func() {
-
 				tmpCfg.GCFrequency = ""
 				tmpCfg.UseRestic = false
 				tmpCfg.UseNodeAgent = !useVolumeSnapshots

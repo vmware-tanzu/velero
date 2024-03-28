@@ -885,7 +885,6 @@ func TestTryCancelDataUpload(t *testing.T) {
 }
 
 func TestUpdateDataUploadWithRetry(t *testing.T) {
-
 	namespacedName := types.NamespacedName{
 		Name:      dataUploadName,
 		Namespace: "velero",
@@ -1097,7 +1096,7 @@ func TestAttemptDataUploadResume(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 
-				// Verify DataUploads marked as Cancelled
+				// Verify DataUploads marked as Canceled
 				for _, duName := range test.cancelledDataUploads {
 					dataUpload := &velerov2alpha1api.DataUpload{}
 					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)

@@ -1142,7 +1142,6 @@ func TestGetBackupVolumeInfos(t *testing.T) {
 			if len(tc.expectedResult) > 0 {
 				require.Equal(t, tc.expectedResult, result)
 			}
-
 		})
 	}
 }

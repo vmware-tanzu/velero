@@ -108,7 +108,6 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 				veleroCfg.ClusterToInstallVelero = veleroCfg.DefaultClusterName
 			})
 		}
-
 	})
 	When("kibishii is the sample workload", func() {
 		It("should be successfully backed up and restored to the default BackupStorageLocation", func() {

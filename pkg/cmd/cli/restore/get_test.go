@@ -76,6 +76,6 @@ func TestNewGetCommand(t *testing.T) {
 				i++
 			}
 		}
-		require.Equal(t, len(args), i)
+		require.Len(t, args, i)
 	}
 }

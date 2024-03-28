@@ -77,7 +77,7 @@ func TestNewGetCommand(t *testing.T) {
 				i++
 			}
 		}
-		assert.Equal(t, len(args), i)
+		assert.Len(t, args, i)
 	}
 
 	d := NewGetCommand(f, "velero backup get")
@@ -98,6 +98,6 @@ func TestNewGetCommand(t *testing.T) {
 				i++
 			}
 		}
-		assert.Equal(t, len(args), i)
+		assert.Len(t, args, i)
 	}
 }

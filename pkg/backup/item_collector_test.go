@@ -76,5 +76,4 @@ func TestSortOrderedResource(t *testing.T) {
 	}
 	sortedPvResources := sortResourcesByOrder(log, pvResources, pvOrder)
 	assert.Equal(t, sortedPvResources, expectedPvResources)
-
 }

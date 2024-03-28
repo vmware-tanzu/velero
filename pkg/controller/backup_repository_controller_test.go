@@ -57,7 +57,6 @@ func mockBackupRepositoryCR() *velerov1api.BackupRepository {
 			MaintenanceFrequency: metav1.Duration{Duration: testMaintenanceFrequency},
 		},
 	}
-
 }
 
 func TestPatchBackupRepository(t *testing.T) {

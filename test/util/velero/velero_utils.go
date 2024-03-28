@@ -173,7 +173,6 @@ func getPluginsByVersion(version, cloudProvider, objectStoreProvider, feature st
 				plugins = append(plugins, pluginsForDatamover...)
 			}
 		}
-
 	}
 	return plugins, nil
 }
@@ -181,7 +180,6 @@ func getPluginsByVersion(version, cloudProvider, objectStoreProvider, feature st
 // getProviderVeleroInstallOptions returns Velero InstallOptions for the provider.
 func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	plugins []string) (*cliinstall.Options, error) {
-
 	if veleroCfg.CloudCredentialsFile == "" && veleroCfg.ServiceAccountNameToInstall == "" {
 		return nil, errors.Errorf("No credentials were supplied to use for E2E tests")
 	}
@@ -1184,7 +1182,6 @@ func DeleteBslResource(ctx context.Context, veleroCLI string, bslName string) er
 }
 
 func SnapshotCRsCountShouldBe(ctx context.Context, namespace, backupName string, expectedCount int) error {
-
 	checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
 		"get", "-n", namespace, "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.metadata.labels.velero\\.io\\/backup-name}{\"\\n\"}{end}'")
 	fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
@@ -1603,7 +1600,6 @@ func InstallTestStorageClasses(path string) error {
 }
 
 func GetPvName(ctx context.Context, client TestClient, pvcName, namespace string) (string, error) {
-
 	pvcList, err := GetPvcByPVCName(context.Background(), namespace, pvcName)
 	if err != nil {
 		return "", err
@@ -1622,7 +1618,6 @@ func GetPvName(ctx context.Context, client TestClient, pvcName, namespace string
 	}
 
 	return pvList[0], nil
-
 }
 func DeletePVs(ctx context.Context, client TestClient, pvList []string) error {
 	for _, pv := range pvList {
@@ -1637,7 +1632,6 @@ func DeletePVs(ctx context.Context, client TestClient, pvList []string) error {
 }
 
 func CleanAllRetainedPV(ctx context.Context, client TestClient) {
-
 	pvNameList, err := GetAllPVNames(ctx, client)
 	if err != nil {
 		fmt.Println("fail to list PV")

@@ -618,5 +618,4 @@ func TestDescribeDeleteBackupRequestsInSF(t *testing.T) {
 			assert.True(tt, reflect.DeepEqual(sd.output, tc.expect))
 		})
 	}
-
 }

@@ -228,7 +228,7 @@ func TestCheckContext(t *testing.T) {
 			kp.CheckContext(ctx, tc.finishChan, tc.restoreChan, tc.uploader)
 
 			if tc.expectCancel && tc.uploader != nil {
-				t.Error("Expected the uploader to be cancelled")
+				t.Error("Expected the uploader to be canceled")
 			}
 
 			if tc.expectBackup && tc.uploader == nil && len(tc.restoreChan) > 0 {

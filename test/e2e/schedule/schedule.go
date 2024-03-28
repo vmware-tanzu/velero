@@ -200,7 +200,6 @@ func (n *ScheduleBackup) Verify() error {
 			fmt.Printf("Restored configmap is %v\n", configmap)
 			Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("failed to list configmap in namespace: %q\n", ns))
 		}
-
 	})
 	return nil
 }
