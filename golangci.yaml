@@ -348,9 +348,6 @@ issues:
       text: "github.com/golang/protobuf/proto" # grpc-go still uses github.com/golang/protobuf/proto.
     - linters:
         - staticcheck
-      text: "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage" # Kopia still depends on this.
-    - linters:
-        - staticcheck
       text: "DefaultVolumesToRestic" # No need to report deprecate for DefaultVolumesToRestic.
     - path: ".*_test.go$"
       linters:
@@ -366,7 +363,6 @@ issues:
         - unused
     - path: test/
       linters:
-        - bodyclose
         - dupword
         - errcheck
         - goconst

@@ -19,7 +19,7 @@ package v1
 import (
 	"testing"
 
-	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -211,7 +211,7 @@ func TestRestartableVolumeSnapshotterDelegatedFunctions(t *testing.T) {
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "CreateVolumeFromSnapshot",
-			Inputs:                  []interface{}{"snapshotID", "volumeID", "volumeAZ", to.Int64Ptr(10000)},
+			Inputs:                  []interface{}{"snapshotID", "volumeID", "volumeAZ", to.Ptr(int64(10000))},
 			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
 			ExpectedDelegateOutputs: []interface{}{"volumeID", errors.Errorf("delegate error")},
 		},
@@ -231,7 +231,7 @@ func TestRestartableVolumeSnapshotterDelegatedFunctions(t *testing.T) {
 			Function:                "GetVolumeInfo",
 			Inputs:                  []interface{}{"volumeID", "volumeAZ"},
 			ExpectedErrorOutputs:    []interface{}{"", (*int64)(nil), errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{"volumeType", to.Int64Ptr(10000), errors.Errorf("delegate error")},
+			ExpectedDelegateOutputs: []interface{}{"volumeType", to.Ptr(int64(10000)), errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "CreateSnapshot",
