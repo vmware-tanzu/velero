@@ -47,9 +47,7 @@ func (n *ScheduleBackup) Init() error {
 	Expect(n.Period).To(BeNumerically("<", 30))
 	return nil
 }
-
 func (n *ScheduleBackup) CreateResources() error {
-	n.Ctx, n.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 	for _, ns := range *n.NSIncluded {
 		By(fmt.Sprintf("Creating namespaces %s ......\n", ns), func() {
 			Expect(CreateNamespace(n.Ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))

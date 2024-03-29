@@ -75,7 +75,7 @@ func ObjectsShouldNotBeInBucket(objectStoreProvider, cloudCredentialsFile, bslBu
 func getProvider(cloudProvider string) (ObjectsInStorage, error) {
 	var s ObjectsInStorage
 	switch cloudProvider {
-	case Aws, Vsphere:
+	case AWS, Vsphere:
 		aws := AWSStorage("")
 		s = &aws
 	case Gcp:

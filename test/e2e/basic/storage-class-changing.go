@@ -3,7 +3,6 @@ package basic
 import (
 	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -67,11 +66,11 @@ func (s *StorageClasssChanging) Init() error {
 	}
 	return nil
 }
+
 func (s *StorageClasssChanging) CreateResources() error {
 	label := map[string]string{
 		"app": "test",
 	}
-	s.Ctx, s.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 
 	By(("Installing storage class..."), func() {
 		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", s.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")

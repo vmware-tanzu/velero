@@ -34,11 +34,11 @@ const Kind = "kind"
 const Azure = "azure"
 const AzureCSI = "azure-csi"
 const AwsCSI = "aws-csi"
-const Aws = "aws"
+const AWS = "aws"
 const Gcp = "gcp"
 const Vsphere = "vsphere"
 
-var PublicCloudProviders = []string{Aws, Azure, Gcp, Vsphere}
+var PublicCloudProviders = []string{AWS, Azure, Gcp, Vsphere}
 var LocalCloudProviders = []string{Kind, VanillaZFS}
 var CloudProviders = append(PublicCloudProviders, LocalCloudProviders...)
 

@@ -98,11 +98,12 @@ var pluginsMatrix = map[string]map[string][]string{
 		"csi":     {"velero/velero-plugin-for-csi:v0.6.0"},
 	},
 	"v1.13": {
-		"aws":     {"velero/velero-plugin-for-aws:v1.9.0"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.9.0"},
-		"vsphere": {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":     {"velero/velero-plugin-for-gcp:v1.9.0"},
-		"csi":     {"velero/velero-plugin-for-csi:v0.7.0"},
+		"aws":       {"velero/velero-plugin-for-aws:v1.9.0"},
+		"azure":     {"velero/velero-plugin-for-microsoft-azure:v1.9.0"},
+		"vsphere":   {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":       {"velero/velero-plugin-for-gcp:v1.9.0"},
+		"csi":       {"velero/velero-plugin-for-csi:v0.7.0"},
+		"datamover": {"velero/velero-plugin-for-aws:v1.9.0"},
 	},
 	"main": {
 		"aws":       {"velero/velero-plugin-for-aws:main"},
@@ -129,7 +130,7 @@ func getPluginsByVersion(version, cloudProvider, objectStoreProvider string, nee
 	var ok bool
 
 	if slices.Contains(LocalCloudProviders, cloudProvider) {
-		plugins, ok = cloudMap[Aws]
+		plugins, ok = cloudMap[AWS]
 		if !ok {
 			return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, cloudProvider)
 		}
@@ -1231,24 +1232,16 @@ func GetRepositories(ctx context.Context, veleroNamespace, targetNamespace strin
 }
 
 func GetSnapshotCheckPoint(client TestClient, veleroCfg VeleroConfig, expectCount int, namespaceBackedUp, backupName string, KibishiiPVCNameList []string) (SnapshotCheckPoint, error) {
+	var err error
 	var snapshotCheckPoint SnapshotCheckPoint
 
 	snapshotCheckPoint.ExpectCount = expectCount
 	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
 	snapshotCheckPoint.PodName = KibishiiPVCNameList
-	if (veleroCfg.CloudProvider == Azure || veleroCfg.CloudProvider == Aws) && strings.EqualFold(veleroCfg.Features, FeatureCSI) {
+	if (veleroCfg.CloudProvider == Azure || veleroCfg.CloudProvider == AWS) && strings.EqualFold(veleroCfg.Features, FeatureCSI) {
 		snapshotCheckPoint.EnableCSI = true
-		resourceName := "snapshot.storage.k8s.io"
 
-		srcVersions, err := GetAPIVersions(veleroCfg.DefaultClient, resourceName)
-
-		if err != nil {
-			return snapshotCheckPoint, err
-		}
-		if len(srcVersions) == 0 {
-			return snapshotCheckPoint, errors.New("Fail to get APIVersion")
-		}
-		if snapshotCheckPoint.SnapshotIDList, err = util.CheckVolumeSnapshotCR(client, backupName, expectCount, srcVersions[0]); err != nil {
+		if snapshotCheckPoint.SnapshotIDList, err = util.CheckVolumeSnapshotCR(client, map[string]string{"backupNameLabel": backupName}, expectCount); err != nil {
 			return snapshotCheckPoint, errors.Wrapf(err, "Fail to get Azure CSI snapshot content")
 		}
 	}

@@ -18,7 +18,6 @@ package test
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -48,6 +47,7 @@ type VeleroBackupRestoreTest interface {
 	Restore() error
 	Verify() error
 	Clean() error
+	Start() error
 	GetTestMsg() *TestMSG
 	GetTestCase() *TestCase
 }
@@ -78,52 +78,26 @@ type TestCase struct {
 
 func TestFunc(test VeleroBackupRestoreTest) func() {
 	return func() {
-		Expect(test.Init()).To(Succeed(), "Failed to instantiate test cases")
-		BeforeEach(func() {
-			flag.Parse()
-			// Using the global velero config which covered the installation for most common cases
-			veleroCfg := test.GetTestCase().VeleroCfg
-			// TODO: Skip nodeport test until issue https://github.com/kubernetes/kubernetes/issues/114384 fixed
-			// TODO: Although this issue is closed, but it's not fixed.
-			// TODO: After bump up k8s version in AWS pipeline, this issue also apply for AWS pipeline.
-			if (veleroCfg.CloudProvider == Azure || veleroCfg.CloudProvider == Aws) && strings.Contains(test.GetTestCase().CaseBaseName, "nodeport") {
-				Skip("Skip due to issue https://github.com/kubernetes/kubernetes/issues/114384 on AKS")
-			}
-			if InstallVelero {
-				Expect(PrepareVelero(context.Background(), test.GetTestCase().CaseBaseName, veleroCfg)).To(Succeed())
-			}
-		})
-		It(test.GetTestMsg().Text, func() {
-			Expect(RunTestCase(test)).To(Succeed(), test.GetTestMsg().FailedMSG)
-		})
+		TestIt(test)
 	}
 }
 
 func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 	return func() {
 		for k := range tests {
-			Expect(tests[k].Init()).To(Succeed(), fmt.Sprintf("Failed to instantiate test %s case", tests[k].GetTestMsg().Desc))
-			defer tests[k].GetTestCase().CtxCancel()
-		}
-
-		BeforeEach(func() {
-			flag.Parse()
-			if InstallVelero {
-				Expect(PrepareVelero(context.Background(), tests[0].GetTestCase().CaseBaseName, tests[0].GetTestCase().VeleroCfg)).To(Succeed())
-			}
-		})
-
-		for k := range tests {
-			curTest := tests[k]
-			It(curTest.GetTestMsg().Text, func() {
-				Expect(RunTestCase(curTest)).To(Succeed(), curTest.GetTestMsg().FailedMSG)
-			})
+			TestIt(tests[k])
 		}
 	}
 }
 
+func TestIt(test VeleroBackupRestoreTest) error {
+	test.Init()
+	It(test.GetTestMsg().Text, func() {
+		Expect(RunTestCase(test)).To(Succeed(), test.GetTestMsg().FailedMSG)
+	})
+	return nil
+}
 func (t *TestCase) Init() error {
-	t.Ctx, t.CtxCancel = context.WithTimeout(context.Background(), 1*time.Hour)
 	t.UUIDgen = t.GenerateUUID()
 	t.VeleroCfg = VeleroCfg
 	t.Client = *t.VeleroCfg.ClientToInstallVelero
@@ -141,18 +115,13 @@ func (t *TestCase) CreateResources() error {
 
 func (t *TestCase) Backup() error {
 	veleroCfg := t.GetTestCase().VeleroCfg
-	if err := VeleroBackupExec(t.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, t.BackupArgs); err != nil {
-		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, "")
-		return errors.Wrapf(err, "Failed to backup resources")
-	}
 
-	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
-	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
-	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
-	if t.UseVolumeSnapshots {
-		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
-		time.Sleep(5 * time.Minute)
-	}
+	By("Start to backup ......", func() {
+		Expect(VeleroBackupExec(t.Ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, t.BackupArgs)).To(Succeed(), func() string {
+			RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, "")
+			return "Failed to backup resources"
+		})
+	})
 
 	return nil
 }
@@ -170,13 +139,15 @@ func (t *TestCase) Restore() error {
 	}
 
 	veleroCfg := t.GetTestCase().VeleroCfg
+
 	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
 	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
-	if t.UseVolumeSnapshots && veleroCfg.CloudProvider != Vsphere {
-		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
-		time.Sleep(5 * time.Minute)
-	}
+	By("Waiting 5 minutes to make sure the snapshots are ready...", func() {
+		if t.UseVolumeSnapshots && veleroCfg.CloudProvider != Vsphere {
+			time.Sleep(5 * time.Minute)
+		}
+	})
 
 	By("Start to restore ......", func() {
 		if t.RestorePhaseExpect == "" {
@@ -191,6 +162,15 @@ func (t *TestCase) Restore() error {
 }
 
 func (t *TestCase) Verify() error {
+	return nil
+}
+
+func (t *TestCase) Start() error {
+	t.Ctx, t.CtxCancel = context.WithTimeout(context.Background(), 1*time.Hour)
+	veleroCfg := t.GetTestCase().VeleroCfg
+	if (veleroCfg.CloudProvider == Azure || veleroCfg.CloudProvider == AWS) && strings.Contains(t.GetTestCase().CaseBaseName, "nodeport") {
+		Skip("Skip due to issue https://github.com/kubernetes/kubernetes/issues/114384 on AKS")
+	}
 	return nil
 }
 
@@ -217,9 +197,16 @@ func (t *TestCase) GetTestCase() *TestCase {
 }
 
 func RunTestCase(test VeleroBackupRestoreTest) error {
-	fmt.Printf("Running test case %s %s\n", test.GetTestMsg().Desc, time.Now().Format("2006-01-02 15:04:05"))
 	if test == nil {
 		return errors.New("No case should be tested")
+	}
+	test.Start()
+	defer test.GetTestCase().CtxCancel()
+
+	fmt.Printf("Running test case %s %s\n", test.GetTestMsg().Desc, time.Now().Format("2006-01-02 15:04:05"))
+
+	if InstallVelero {
+		Expect(PrepareVelero(context.Background(), test.GetTestCase().CaseBaseName, test.GetTestCase().VeleroCfg)).To(Succeed())
 	}
 
 	defer test.Clean()

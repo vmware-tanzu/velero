@@ -42,7 +42,7 @@ func CreateNamespace(ctx context.Context, client TestClient, namespace string) e
 		"pod-security.kubernetes.io/enforce":         "baseline",
 		"pod-security.kubernetes.io/enforce-version": "latest",
 	}
-	_, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+	_, err := client.ClientGo.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		return nil
 	}
@@ -70,7 +70,7 @@ func CreateNamespaceWithAnnotation(ctx context.Context, client TestClient, names
 		"pod-security.kubernetes.io/enforce-version": "latest",
 	}
 	ns.ObjectMeta.Annotations = annotation
-	_, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+	_, err := client.ClientGo.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		return nil
 	}
@@ -169,6 +169,9 @@ func CleanupNamespacesFiterdByExcludes(ctx context.Context, client TestClient, e
 }
 
 func CleanupNamespaces(ctx context.Context, client TestClient, CaseBaseName string) error {
+	if ctx == nil {
+		fmt.Println("ctx is nil ....")
+	}
 	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")

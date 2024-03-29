@@ -63,7 +63,6 @@ func (n *ScheduleBackupCreation) Init() error {
 }
 
 func (p *ScheduleBackupCreation) CreateResources() error {
-	p.Ctx, p.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
 		Expect(CreateNamespace(p.Ctx, p.Client, p.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", p.namespace))

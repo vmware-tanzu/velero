@@ -18,7 +18,6 @@ limitations under the License.
 
 //the ordered resources test related to https://github.com/vmware-tanzu/velero/issues/4561
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -70,9 +69,7 @@ func (o *OrderedResources) Init() error {
 
 	return nil
 }
-
 func (o *OrderedResources) CreateResources() error {
-	o.Ctx, o.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	label := map[string]string{
 		"orderedresources": "true",
 	}

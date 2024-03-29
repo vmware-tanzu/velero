@@ -104,7 +104,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 		// backup, but needed to pick up the provider plugins earlier.  vSphere plugin no longer needs a Volume
 		// Snapshot location specified
 		if veleroCfg.ObjectStoreProvider == "" {
-			veleroCfg.ObjectStoreProvider = Aws
+			veleroCfg.ObjectStoreProvider = AWS
 		}
 		if err := configvSpherePlugin(veleroCfg); err != nil {
 			return errors.WithMessagef(err, "Failed to config vsphere plugin")
@@ -118,7 +118,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 
 	// For AWS IRSA credential test, AWS IAM service account is required, so if ServiceAccountName and EKSPolicyARN
 	// are both provided, we assume IRSA test is running, otherwise skip this IAM service account creation part.
-	if veleroCfg.CloudProvider == Aws && veleroInstallOptions.ServiceAccountName != "" {
+	if veleroCfg.CloudProvider == AWS && veleroInstallOptions.ServiceAccountName != "" {
 		if veleroCfg.EKSPolicyARN == "" {
 			return errors.New("Please provide EKSPolicyARN for IRSA test.")
 		}
@@ -155,6 +155,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 	})
 
 	if err != nil {
+		time.Sleep(9 * time.Hour)
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
