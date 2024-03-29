@@ -653,8 +653,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/posener/complete v1.1.1/go.mod h1:em0nMJCgc9GFtwrmVmEMR/ZL6WyhyjMBndrE9hABlRI=
 github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021/go.mod h1:prYjPmNq4d1NPVmpShWobRqXY3q7Vp+80DqgxxUrUIA=
-github.com/project-velero/kopia v0.0.0-20240325091347-b901e3bfe3fd h1:mjUqOG9msvzZwkoOVZxtSwFp2mISHA2g2u0T8KtzD6I=
-github.com/project-velero/kopia v0.0.0-20240325091347-b901e3bfe3fd/go.mod h1:ME65fdntswtj0aI+EGq53/869f7tP5ptVTVoQRDcbO4=
+github.com/project-velero/kopia v0.0.0-20240329071452-f17bf7020ce4 h1:MUWfEO+203Ddo76k7YMkniiVA+mGgg//DXn1PbBCi3U=
+github.com/project-velero/kopia v0.0.0-20240329071452-f17bf7020ce4/go.mod h1:ME65fdntswtj0aI+EGq53/869f7tP5ptVTVoQRDcbO4=
 github.com/prometheus/client_golang v0.9.1/go.mod h1:7SWBe2y4D6OKWSNQJUaRYU/AaXPKyh/dDVn+NZz0KFw=
 github.com/prometheus/client_golang v0.9.3/go.mod h1:/TN21ttK/J9q6uSwhBd54HahCDft0ttaMvbicHlPoso=
 github.com/prometheus/client_golang v1.0.0/go.mod h1:db9x61etRT2tGnBNRi70OPL5FsnadC4Ky3P0J6CfImo=

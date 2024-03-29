@@ -164,7 +164,7 @@ func (ks *kopiaRepoService) Maintain(ctx context.Context, repoOption udmrepo.Rep
 
 	ks.logger.Info("Start to open repo for maintenance, allow index write on load")
 
-	r, err := openKopiaRepo(repoCtx, repoConfig, repoOption.RepoPassword, &openOptions{allowIndexWriteOnLoad: true})
+	r, err := openKopiaRepo(repoCtx, repoConfig, repoOption.RepoPassword, nil)
 	if err != nil {
 		return err
 	}
