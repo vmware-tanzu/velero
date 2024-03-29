@@ -90,7 +90,7 @@ func (r *restoreOperationsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Restore{}, builder.WithPredicates(kube.FalsePredicate{})).
-		Watches(s, nil, builder.WithPredicates(gp)).
+		WatchesRawSource(s, nil, builder.WithPredicates(gp)).
 		Complete(r)
 }
 

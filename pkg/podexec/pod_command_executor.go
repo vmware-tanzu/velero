@@ -18,6 +18,7 @@ package podexec
 
 import (
 	"bytes"
+	"context"
 	"net/url"
 	"time"
 
@@ -159,7 +160,7 @@ func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, it
 	errCh := make(chan error)
 
 	go func() {
-		err = executor.Stream(streamOptions)
+		err = executor.StreamWithContext(context.Background(), streamOptions)
 		errCh <- err
 	}()
 

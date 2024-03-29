@@ -37,9 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/typed/volumesnapshot/v1"
+	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
@@ -512,8 +511,8 @@ func (r *DataUploadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov2alpha1api.DataUpload{}).
-		Watches(s, nil, builder.WithPredicates(gp)).
-		Watches(&source.Kind{Type: &corev1.Pod{}}, kube.EnqueueRequestsFromMapUpdateFunc(r.findDataUploadForPod),
+		WatchesRawSource(s, nil, builder.WithPredicates(gp)).
+		Watches(&corev1.Pod{}, kube.EnqueueRequestsFromMapUpdateFunc(r.findDataUploadForPod),
 			builder.WithPredicates(predicate.Funcs{
 				UpdateFunc: func(ue event.UpdateEvent) bool {
 					newObj := ue.ObjectNew.(*corev1.Pod)
@@ -541,7 +540,7 @@ func (r *DataUploadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *DataUploadReconciler) findDataUploadForPod(podObj client.Object) []reconcile.Request {
+func (r *DataUploadReconciler) findDataUploadForPod(ctx context.Context, podObj client.Object) []reconcile.Request {
 	pod := podObj.(*corev1.Pod)
 	du, err := findDataUploadByPod(r.client, *pod)
 	log := r.logger.WithFields(logrus.Fields{
@@ -874,7 +873,7 @@ func isDataUploadInFinalState(du *velerov2alpha1api.DataUpload) bool {
 }
 
 func UpdateDataUploadWithRetry(ctx context.Context, client client.Client, namespacedName types.NamespacedName, log *logrus.Entry, updateFunc func(dataUpload *velerov2alpha1api.DataUpload)) error {
-	return wait.PollUntilWithContext(ctx, time.Second, func(ctx context.Context) (done bool, err error) {
+	return wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (done bool, err error) {
 		du := &velerov2alpha1api.DataUpload{}
 		if err := client.Get(ctx, namespacedName, du); err != nil {
 			return false, errors.Wrap(err, "getting DataUpload")

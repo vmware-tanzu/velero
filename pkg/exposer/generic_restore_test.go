@@ -374,7 +374,7 @@ func TestRebindVolume(t *testing.T) {
 				restorePVObj,
 				restorePod,
 			},
-			err: "error to wait restore PV bound, restore PV fake-restore-pv: error to wait for bound of PV: timed out waiting for the condition",
+			err: "error to wait restore PV bound, restore PV fake-restore-pv: error to wait for bound of PV: context deadline exceeded",
 		},
 	}
 

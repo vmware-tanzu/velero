@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -473,7 +473,15 @@ func TestRestoreReconcile(t *testing.T) {
 			}
 
 			if test.restore != nil {
+				isDeletionTimestampSet := test.restore.DeletionTimestamp != nil
 				require.NoError(t, r.kbClient.Create(context.Background(), test.restore))
+				// because of the changes introduced by https://github.com/kubernetes-sigs/controller-runtime/commit/7a66d580c0c53504f5b509b45e9300cc18a1cc30
+				// the fake client ignores the DeletionTimestamp when calling the Create(),
+				// so call Delete() here
+				if isDeletionTimestampSet {
+					err = r.kbClient.Delete(ctx, test.restore)
+					require.NoError(t, err)
+				}
 			}
 
 			var warnings, errors results.Result

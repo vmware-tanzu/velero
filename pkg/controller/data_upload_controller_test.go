@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/fake"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/fake"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -71,7 +71,7 @@ type FakeClient struct {
 	listError      error
 }
 
-func (c *FakeClient) Get(ctx context.Context, key kbclient.ObjectKey, obj kbclient.Object) error {
+func (c *FakeClient) Get(ctx context.Context, key kbclient.ObjectKey, obj kbclient.Object, opts ...kbclient.GetOption) error {
 	if c.getError != nil {
 		return c.getError
 	}
@@ -465,8 +465,16 @@ func TestReconcile(t *testing.T) {
 			}()
 			ctx := context.Background()
 			if test.du.Namespace == velerov1api.DefaultNamespace {
+				isDeletionTimestampSet := test.du.DeletionTimestamp != nil
 				err = r.client.Create(ctx, test.du)
 				require.NoError(t, err)
+				// because of the changes introduced by https://github.com/kubernetes-sigs/controller-runtime/commit/7a66d580c0c53504f5b509b45e9300cc18a1cc30
+				// the fake client ignores the DeletionTimestamp when calling the Create(),
+				// so call Delete() here
+				if isDeletionTimestampSet {
+					err = r.client.Delete(ctx, test.du)
+					require.NoError(t, err)
+				}
 			}
 
 			if test.pod != nil {
@@ -720,7 +728,7 @@ func TestFindDataUploadForPod(t *testing.T) {
 		assert.NoError(t, r.client.Create(ctx, test.pod))
 		assert.NoError(t, r.client.Create(ctx, test.du))
 		// Call the findDataUploadForPod function
-		requests := r.findDataUploadForPod(test.pod)
+		requests := r.findDataUploadForPod(context.Background(), test.pod)
 		test.checkFunc(test.du, requests)
 		r.client.Delete(ctx, test.du, &kbclient.DeleteOptions{})
 		if test.pod != nil {
