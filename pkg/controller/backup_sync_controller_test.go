@@ -451,7 +451,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			})
 
 			Expect(actualResult).To(BeEquivalentTo(ctrl.Result{}))
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			// process the cloud backups
 			for _, cloudBackupData := range test.cloudBackups {
@@ -467,7 +467,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 						cloudBackupData.backup.Status.Expiration.After(fakeClock.Now())) {
 					Expect(apierrors.IsNotFound(err)).To(BeTrue())
 				} else {
-					Expect(err).To(BeNil())
+					Expect(err).ToNot(HaveOccurred())
 
 					// did this cloud backup already exist in the cluster?
 					var existing *velerov1api.Backup
@@ -496,7 +496,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 							locationName = label.GetValidName(locationName)
 						}
 						Expect(locationName).To(BeEquivalentTo(obj.Labels[velerov1api.StorageLocationLabel]))
-						Expect(len(obj.Labels[velerov1api.StorageLocationLabel]) <= validation.DNS1035LabelMaxLength).To(BeTrue())
+						Expect(len(obj.Labels[velerov1api.StorageLocationLabel])).To(BeNumerically("<=", validation.DNS1035LabelMaxLength))
 					}
 				}
 

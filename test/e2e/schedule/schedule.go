@@ -44,7 +44,7 @@ func (n *ScheduleBackup) Init() error {
 		"--schedule=*/" + fmt.Sprintf("%v", n.Period) + " * * * *",
 	}
 
-	Expect(n.Period < 30).To(Equal(true))
+	Expect(n.Period).To(BeNumerically("<", 30))
 	return nil
 }
 
@@ -92,7 +92,7 @@ func (n *ScheduleBackup) Backup() error {
 		fmt.Printf("Schedule %s created at %s\n", n.ScheduleName, creationTime)
 		now := time.Now()
 		diff := creationTime.Sub(now)
-		Expect(diff.Minutes() < 1).To(Equal(true))
+		Expect(diff.Minutes()).To(BeNumerically("<", 1))
 	})
 
 	By(fmt.Sprintf("No immediate backup is created by schedule %s\n", n.ScheduleName), func() {
@@ -104,7 +104,7 @@ func (n *ScheduleBackup) Backup() error {
 			if i != n.Period-1 {
 				backupsInfo, err := GetScheduledBackupsCreationTime(n.Ctx, n.VeleroCfg.VeleroCLI, "default", n.ScheduleName)
 				Expect(err).To(Succeed())
-				Expect(len(backupsInfo) == 0).To(Equal(true))
+				Expect(backupsInfo).To(BeEmpty())
 			}
 		}
 	})
@@ -120,7 +120,7 @@ func (n *ScheduleBackup) Backup() error {
 			bMap := make(map[string]string)
 			backupsInfo, err := GetScheduledBackupsCreationTime(n.Ctx, n.VeleroCfg.VeleroCLI, "default", n.ScheduleName)
 			Expect(err).To(Succeed())
-			Expect(len(backupsInfo) == i+2).To(Equal(true))
+			Expect(backupsInfo).To(HaveLen(i + 2))
 			for index, bi := range backupsInfo {
 				bList := strings.Split(bi, ",")
 				fmt.Printf("Backup %d: %v\n", index, bList)
@@ -168,7 +168,7 @@ func (n *ScheduleBackup) Backup() error {
 	fmt.Printf("After pause, backkups count is %d\n", backupCountPostPause)
 
 	By(fmt.Sprintf("Verify no new backups from %s ......\n", n.ScheduleName), func() {
-		Expect(backupCountPostPause == backupCount).To(Equal(true))
+		Expect(backupCountPostPause).To(Equal(backupCount))
 	})
 
 	By(fmt.Sprintf("Unpause schedule %s ......\n", n.ScheduleName), func() {
@@ -188,7 +188,7 @@ func (n *ScheduleBackup) Backup() error {
 	backupCountPostUnpause := len(backupsInfo)
 	fmt.Printf("After unpause, backkups count is %d\n", backupCountPostUnpause)
 	By(fmt.Sprintf("Verify no new backups by schedule %s ......\n", n.ScheduleName), func() {
-		Expect(backupCountPostUnpause-backupCount >= periodCount-1).To(Equal(true))
+		Expect(backupCountPostUnpause - backupCount).To(BeNumerically(">=", periodCount-1))
 	})
 	return nil
 }

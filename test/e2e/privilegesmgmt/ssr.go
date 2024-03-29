@@ -93,8 +93,7 @@ func SSRTest() {
 		By(fmt.Sprintf("Check ssr object in %s namespace", testNS))
 		Expect(veleroCfg.ClientToInstallVelero.Kubebuilder.List(ctx, ssrListResp, &kbclient.ListOptions{Namespace: testNS})).To(Succeed(),
 			fmt.Sprintf("Failed to list ssr object in %s namespace", testNS))
-		Expect(len(ssrListResp.Items)).To(BeNumerically("==", 1),
-			fmt.Sprintf("Count of ssr object in %s namespace is not 1 but %d", testNS, len(ssrListResp.Items)))
+		Expect(ssrListResp.Items).To(HaveLen(1), fmt.Sprintf("Count of ssr object in %s namespace is not 1 but %d", testNS, len(ssrListResp.Items)))
 		Expect(ssrListResp.Items[0].Status.Phase).To(BeEmpty(),
 			fmt.Sprintf("Status of ssr object in %s namespace should be empty", testNS))
 		Expect(ssrListResp.Items[0].Status.ServerVersion).To(BeEmpty(),

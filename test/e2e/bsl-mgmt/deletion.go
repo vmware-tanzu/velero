@@ -163,12 +163,12 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 				pvc, err := GetPvcByPVCName(context.Background(), bslDeletionTestNs, podName_1)
 				Expect(err).To(Succeed())
 				fmt.Println(pvc)
-				Expect(len(pvc)).To(Equal(1))
+				Expect(pvc).To(HaveLen(1))
 				pvc1 := pvc[0]
 				pvc, err = GetPvcByPVCName(context.Background(), bslDeletionTestNs, podName_2)
 				Expect(err).To(Succeed())
 				fmt.Println(pvc)
-				Expect(len(pvc)).To(Equal(1))
+				Expect(pvc).To(HaveLen(1))
 				pvc2 := pvc[0]
 				Expect(AddLabelToPvc(context.Background(), pvc1, bslDeletionTestNs, label_1)).To(Succeed())
 				Expect(AddLabelToPvc(context.Background(), pvc2, bslDeletionTestNs, label_2)).To(Succeed())
