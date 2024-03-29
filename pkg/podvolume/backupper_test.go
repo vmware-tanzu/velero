@@ -319,7 +319,7 @@ func TestBackupPodVolumes(t *testing.T) {
 		veleroClientObj []runtime.Object
 		veleroReactors  []reactor
 		runtimeScheme   *runtime.Scheme
-		pvbs            []*velerov1api.PodVolumeBackup
+		pvbs            int
 		errs            []string
 	}{
 		{
@@ -486,6 +486,25 @@ func TestBackupPodVolumes(t *testing.T) {
 			uploaderType:  "kopia",
 			bsl:           "fake-bsl",
 		},
+		{
+			name: "return completed pvbs",
+			volumes: []string{
+				"fake-volume-1",
+			},
+			sourcePod: createPodObj(true, true, true, 1),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+				createPVCObj(1),
+				createPVObj(1, false),
+			},
+			ctlClientObj: []runtime.Object{
+				createBackupRepoObj(),
+			},
+			runtimeScheme: scheme,
+			uploaderType:  "kopia",
+			bsl:           "fake-bsl",
+			pvbs:          1,
+		},
 	}
 	// TODO add more verification around PVCBackupSummary returned by "BackupPodVolumes"
 	for _, test := range tests {
@@ -533,7 +552,7 @@ func TestBackupPodVolumes(t *testing.T) {
 				}
 			}
 
-			assert.Equal(t, test.pvbs, pvbs)
+			assert.Len(t, pvbs, test.pvbs)
 		})
 	}
 }
