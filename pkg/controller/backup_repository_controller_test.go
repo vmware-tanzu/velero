@@ -57,7 +57,6 @@ func mockBackupRepositoryCR() *velerov1api.BackupRepository {
 			MaintenanceFrequency: metav1.Duration{Duration: testMaintenanceFrequency},
 		},
 	}
-
 }
 
 func TestPatchBackupRepository(t *testing.T) {
@@ -93,7 +92,7 @@ func TestCheckNotReadyRepo(t *testing.T) {
 
 	err = reconciler.Client.Create(context.TODO(), locations)
 	assert.NoError(t, err)
-	err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
+	_, err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
 	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
 	assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)

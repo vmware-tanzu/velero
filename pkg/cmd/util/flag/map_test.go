@@ -71,7 +71,6 @@ func TestSetOfMap(t *testing.T) {
 			assert.EqualValues(t, c.expected, m.Data())
 		})
 	}
-
 }
 
 func TestStringOfMap(t *testing.T) {

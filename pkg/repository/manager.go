@@ -92,13 +92,14 @@ type Manager interface {
 }
 
 type manager struct {
-	namespace   string
-	providers   map[string]provider.Provider
-	client      client.Client
-	repoLocker  *RepoLocker
-	repoEnsurer *Ensurer
-	fileSystem  filesystem.Interface
-	log         logrus.FieldLogger
+	namespace      string
+	providers      map[string]provider.Provider
+	client         client.Client
+	repoLocker     *RepoLocker
+	repoEnsurer    *Ensurer
+	fileSystem     filesystem.Interface
+	maintenanceCfg MaintenanceConfig
+	log            logrus.FieldLogger
 }
 
 // NewManager create a new repository manager.
@@ -109,23 +110,25 @@ func NewManager(
 	repoEnsurer *Ensurer,
 	credentialFileStore credentials.FileStore,
 	credentialSecretStore credentials.SecretStore,
+	maintenanceCfg MaintenanceConfig,
 	log logrus.FieldLogger,
 ) Manager {
 	mgr := &manager{
-		namespace:   namespace,
-		client:      client,
-		providers:   map[string]provider.Provider{},
-		repoLocker:  repoLocker,
-		repoEnsurer: repoEnsurer,
-		fileSystem:  filesystem.NewFileSystem(),
-		log:         log,
+		namespace:      namespace,
+		client:         client,
+		providers:      map[string]provider.Provider{},
+		repoLocker:     repoLocker,
+		repoEnsurer:    repoEnsurer,
+		fileSystem:     filesystem.NewFileSystem(),
+		maintenanceCfg: maintenanceCfg,
+		log:            log,
 	}
 
 	mgr.providers[velerov1api.BackupRepositoryTypeRestic] = provider.NewResticRepositoryProvider(credentialFileStore, mgr.fileSystem, mgr.log)
 	mgr.providers[velerov1api.BackupRepositoryTypeKopia] = provider.NewUnifiedRepoProvider(credentials.CredentialGetter{
 		FromFile:   credentialFileStore,
 		FromSecret: credentialSecretStore,
-	}, velerov1api.BackupRepositoryTypeKopia, mgr.log)
+	}, velerov1api.BackupRepositoryTypeKopia, client, mgr.log)
 
 	return mgr
 }
@@ -192,7 +195,55 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 		return errors.WithStack(err)
 	}
 
-	return prd.PruneRepo(context.Background(), param)
+	log := m.log.WithFields(logrus.Fields{
+		"BSL name":  param.BackupLocation.Name,
+		"repo type": param.BackupRepo.Spec.RepositoryType,
+		"repo name": param.BackupRepo.Name,
+		"repo UID":  param.BackupRepo.UID,
+	})
+
+	log.Info("Start to maintence repo")
+
+	maintenanceJob, err := buildMaintenanceJob(m.maintenanceCfg, param, m.client, m.namespace)
+	if err != nil {
+		return errors.Wrap(err, "error to build maintenance job")
+	}
+
+	log = log.WithField("job", fmt.Sprintf("%s/%s", maintenanceJob.Namespace, maintenanceJob.Name))
+
+	if err := m.client.Create(context.TODO(), maintenanceJob); err != nil {
+		return errors.Wrap(err, "error to create maintenance job")
+	}
+	log.Debug("Creating maintenance job")
+
+	defer func() {
+		if err := deleteOldMaintenanceJobs(m.client, param.BackupRepo.Name,
+			m.maintenanceCfg.KeepLatestMaitenanceJobs); err != nil {
+			log.WithError(err).Error("Failed to delete maintenance job")
+		}
+	}()
+
+	var jobErr error
+	if err := waitForJobComplete(context.TODO(), m.client, maintenanceJob); err != nil {
+		log.WithError(err).Error("Error to wait for maintenance job complete")
+		jobErr = err // we won't return here for job may failed by maintenance failure, we want return the actual error
+	}
+
+	result, err := getMaintenanceResultFromJob(m.client, maintenanceJob)
+	if err != nil {
+		return errors.Wrap(err, "error to get maintenance job result")
+	}
+
+	if result != "" {
+		return errors.New(fmt.Sprintf("Maintenance job %s failed: %s", maintenanceJob.Name, result))
+	}
+
+	if jobErr != nil {
+		return errors.Wrap(jobErr, "error to wait for maintenance job complete")
+	}
+
+	log.Info("Maintenance repo complete")
+	return nil
 }
 
 func (m *manager) UnlockRepo(repo *velerov1api.BackupRepository) error {

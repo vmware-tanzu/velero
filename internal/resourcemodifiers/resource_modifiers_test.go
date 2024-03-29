@@ -428,7 +428,6 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 }
 
 func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
-
 	pvcStandardSc := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "v1",

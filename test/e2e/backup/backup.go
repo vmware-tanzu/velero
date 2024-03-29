@@ -58,7 +58,6 @@ func BackupRestoreRetainedPVWithRestic() {
 }
 
 func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
-
 	var (
 		backupName, restoreName, kibishiiNamespace string
 		err                                        error

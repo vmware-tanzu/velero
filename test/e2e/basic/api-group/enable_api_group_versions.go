@@ -238,7 +238,6 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, grou
 				fmt.Println(errors.Wrapf(err, "failed to delete crd %q", crdName))
 			}
 		}(fmt.Sprintf("rockband%ds.music.example.io.%d", i, i))
-
 	}
 
 	time.Sleep(6 * time.Minute)
@@ -328,7 +327,6 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, grou
 				)
 				return errors.New(msg)
 			}
-
 		}
 	}
 
@@ -465,7 +463,6 @@ func resourceInfo(ctx context.Context, g, v, r string, index int) (map[string]ma
 // are found in the haystack argument values.
 func containsAll(haystack, needles map[string]string) bool {
 	for nkey, nval := range needles {
-
 		hval, ok := haystack[nkey]
 		if !ok {
 			return false

@@ -2351,14 +2351,12 @@ func TestBackupHookTracker(t *testing.T) {
 					}
 				}
 				h.HandleHooks(velerotest.NewLogger(), groupResource, pod.item, pod.hooks, test.phase, hookTracker)
-
 			}
 			actualAtemptted, actualFailed := hookTracker.Stat()
 			assert.Equal(t, test.expectedHookAttempted, actualAtemptted)
 			assert.Equal(t, test.expectedHookFailed, actualFailed)
 		})
 	}
-
 }
 
 func TestRestoreHookTrackerAdd(t *testing.T) {

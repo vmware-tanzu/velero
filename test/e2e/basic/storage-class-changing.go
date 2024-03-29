@@ -83,7 +83,6 @@ func (s *StorageClasssChanging) CreateResources() error {
 	})
 
 	By(fmt.Sprintf("Create a deployment in namespace %s", s.VeleroCfg.VeleroNamespace), func() {
-
 		pvc, err := CreatePVC(s.Client, s.namespace, s.pvcName, s.srcStorageClass, nil)
 		Expect(err).To(Succeed())
 		vols := CreateVolumes(pvc.Name, []string{s.volume})

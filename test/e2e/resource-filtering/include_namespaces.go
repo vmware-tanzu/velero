@@ -79,7 +79,6 @@ func (i *IncludeNamespaces) Init() error {
 			"create", "--namespace", i.VeleroCfg.VeleroNamespace, "restore", i.RestoreName,
 			"--from-backup", i.BackupName, "--wait",
 		}
-
 	} else {
 		i.BackupName = "backup-" + i.UUIDgen
 		i.RestoreName = "restore-" + i.CaseBaseName

@@ -91,7 +91,6 @@ func APIExtensionsVersionsTest() {
 				veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
 			})
 		}
-
 	})
 	Context("When EnableAPIGroupVersions flag is set", func() {
 		It("Enable API Group to B/R CRD APIExtensionsVersions", func() {

@@ -136,7 +136,6 @@ func TestRemapCRDVersionAction(t *testing.T) {
 		// set it back to the default one
 		a.discoveryHelper = fakeDiscoveryHelper()
 	})
-
 }
 
 // TestRemapCRDVersionActionData tests the RemapCRDVersionAction plugin against actual CRD to confirm that the v1beta1 version is returned when the v1 version is passed in to the plugin.
@@ -217,7 +216,6 @@ func TestRemapCRDVersionActionData(t *testing.T) {
 			betaClient.Delete(context.TODO(), crd.Name, metav1.DeleteOptions{})
 		})
 	}
-
 }
 
 func fakeDiscoveryHelper() velerodiscovery.Helper {

@@ -67,7 +67,6 @@ func TestHookTracker_Record(t *testing.T) {
 
 	err = tracker.Record("ns2", "pod2", "container1", HookSourceAnnotation, "h1", PhasePre, true)
 	assert.NotNil(t, err)
-
 }
 
 func TestHookTracker_Stat(t *testing.T) {
