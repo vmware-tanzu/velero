@@ -19,6 +19,7 @@ package kube
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -35,6 +36,8 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
@@ -302,4 +305,31 @@ func IsCRDReady(crd *unstructured.Unstructured) (bool, error) {
 	default:
 		return false, fmt.Errorf("unable to handle CRD with version %s", ver)
 	}
+}
+
+// AddAnnotations adds the supplied key-values to the annotations on the object
+func AddAnnotations(o *metav1.ObjectMeta, vals map[string]string) {
+	if o.Annotations == nil {
+		o.Annotations = make(map[string]string)
+	}
+	for k, v := range vals {
+		o.Annotations[k] = v
+	}
+}
+
+// AddLabels adds the supplied key-values to the labels on the object
+func AddLabels(o *metav1.ObjectMeta, vals map[string]string) {
+	if o.Labels == nil {
+		o.Labels = make(map[string]string)
+	}
+	for k, v := range vals {
+		o.Labels[k] = label.GetValidName(v)
+	}
+}
+
+func HasBackupLabel(o *metav1.ObjectMeta, backupName string) bool {
+	if o.Labels == nil || len(strings.TrimSpace(backupName)) == 0 {
+		return false
+	}
+	return o.Labels[velerov1api.BackupNameLabel] == label.GetValidName(backupName)
 }

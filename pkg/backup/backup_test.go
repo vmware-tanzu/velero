@@ -383,16 +383,16 @@ func TestBackupOldResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					builder.ForPod("foo", "bar").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "true")).Result(),
+					builder.ForPod("foo", "bar").ObjectMeta(builder.WithLabels(velerov1.ExcludeFromBackupLabel, "true")).Result(),
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("foo", "bar").Result(),
-					builder.ForDeployment("zoo", "raz").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "true")).Result(),
+					builder.ForDeployment("zoo", "raz").ObjectMeta(builder.WithLabels(velerov1.ExcludeFromBackupLabel, "true")).Result(),
 				),
 				test.PVs(
 					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
-					builder.ForPersistentVolume("baz").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "true")).Result(),
+					builder.ForPersistentVolume("baz").ObjectMeta(builder.WithLabels(velerov1.ExcludeFromBackupLabel, "true")).Result(),
 				),
 			},
 			want: []string{
@@ -411,16 +411,16 @@ func TestBackupOldResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					builder.ForPod("foo", "bar").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "true", "a", "b")).Result(),
+					builder.ForPod("foo", "bar").ObjectMeta(builder.WithLabels(velerov1.ExcludeFromBackupLabel, "true", "a", "b")).Result(),
 					builder.ForPod("zoo", "raz").ObjectMeta(builder.WithLabels("a", "b")).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("foo", "bar").Result(),
-					builder.ForDeployment("zoo", "raz").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "true", "a", "b")).Result(),
+					builder.ForDeployment("zoo", "raz").ObjectMeta(builder.WithLabels(velerov1.ExcludeFromBackupLabel, "true", "a", "b")).Result(),
 				),
 				test.PVs(
 					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
-					builder.ForPersistentVolume("baz").ObjectMeta(builder.WithLabels("a", "b", "velero.io/exclude-from-backup", "true")).Result(),
+					builder.ForPersistentVolume("baz").ObjectMeta(builder.WithLabels("a", "b", velerov1.ExcludeFromBackupLabel, "true")).Result(),
 				),
 			},
 			want: []string{
@@ -436,16 +436,16 @@ func TestBackupOldResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					builder.ForPod("foo", "bar").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "false")).Result(),
+					builder.ForPod("foo", "bar").ObjectMeta(builder.WithLabels(velerov1.ExcludeFromBackupLabel, "false")).Result(),
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("foo", "bar").Result(),
-					builder.ForDeployment("zoo", "raz").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "1")).Result(),
+					builder.ForDeployment("zoo", "raz").ObjectMeta(builder.WithLabels(velerov1.ExcludeFromBackupLabel, "1")).Result(),
 				),
 				test.PVs(
 					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
-					builder.ForPersistentVolume("baz").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "")).Result(),
+					builder.ForPersistentVolume("baz").ObjectMeta(builder.WithLabels(velerov1.ExcludeFromBackupLabel, "")).Result(),
 				),
 			},
 			want: []string{
@@ -1273,7 +1273,7 @@ func (a *recordResourcesAction) Execute(item runtime.Unstructured, backup *veler
 	a.backups = append(a.backups, *backup)
 	if a.skippedCSISnapshot {
 		u := &unstructured.Unstructured{Object: item.UnstructuredContent()}
-		u.SetAnnotations(map[string]string{skippedNoCSIPVAnnotation: "true"})
+		u.SetAnnotations(map[string]string{velerov1.SkippedNoCSIPVAnnotation: "true"})
 		item = u
 		a.additionalItems = nil
 	}
@@ -2028,7 +2028,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 					builder.ForPod("ns-1", "pod-1").Result(),
 				),
 				test.PVs(
-					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "true")).Result(),
+					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabels(velerov1.ExcludeFromBackupLabel, "true")).Result(),
 					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},

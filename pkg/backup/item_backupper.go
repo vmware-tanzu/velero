@@ -24,19 +24,17 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-
 	kbClient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
@@ -58,11 +56,8 @@ import (
 )
 
 const (
-	mustIncludeAdditionalItemAnnotation = "backup.velero.io/must-include-additional-items"
-	skippedNoCSIPVAnnotation            = "backup.velero.io/skipped-no-csi-pv"
-	excludeFromBackupLabel              = "velero.io/exclude-from-backup"
-	csiBIAPluginName                    = "velero.io/csi-pvc-backupper"
-	vsphereBIAPluginName                = "velero.io/vsphere-pvc-backupper"
+	csiBIAPluginName     = "velero.io/csi-pvc-backupper"
+	vsphereBIAPluginName = "velero.io/vsphere-pvc-backupper"
 )
 
 // itemBackupper can back up individual items to a tar writer.
@@ -129,9 +124,9 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	if mustInclude {
 		log.Infof("Skipping the exclusion checks for this resource")
 	} else {
-		if metadata.GetLabels()[excludeFromBackupLabel] == "true" {
-			log.Infof("Excluding item because it has label %s=true", excludeFromBackupLabel)
-			ib.trackSkippedPV(obj, groupResource, "", fmt.Sprintf("item has label %s=true", excludeFromBackupLabel), log)
+		if metadata.GetLabels()[velerov1api.ExcludeFromBackupLabel] == "true" {
+			log.Infof("Excluding item because it has label %s=true", velerov1api.ExcludeFromBackupLabel)
+			ib.trackSkippedPV(obj, groupResource, "", fmt.Sprintf("item has label %s=true", velerov1api.ExcludeFromBackupLabel), log)
 			return false, itemFiles, nil
 		}
 		// NOTE: we have to re-check namespace & resource includes/excludes because it's possible that
@@ -384,18 +379,18 @@ func (ib *itemBackupper) executeActions(
 			return nil, itemFiles, errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
 		}
 		u := &unstructured.Unstructured{Object: updatedItem.UnstructuredContent()}
-		if actionName == csiBIAPluginName && additionalItemIdentifiers == nil && u.GetAnnotations()[skippedNoCSIPVAnnotation] == "true" {
+		if actionName == csiBIAPluginName && additionalItemIdentifiers == nil && u.GetAnnotations()[velerov1api.SkippedNoCSIPVAnnotation] == "true" {
 			// snapshot was skipped by CSI plugin
 			ib.trackSkippedPV(obj, groupResource, csiSnapshotApproach, "skipped b/c it's not a CSI volume", log)
-			delete(u.GetAnnotations(), skippedNoCSIPVAnnotation)
+			delete(u.GetAnnotations(), velerov1api.SkippedNoCSIPVAnnotation)
 		} else if (actionName == csiBIAPluginName || actionName == vsphereBIAPluginName) && !boolptr.IsSetToFalse(ib.backupRequest.Backup.Spec.SnapshotVolumes) {
 			// the snapshot has been taken by the BIA plugin
 			ib.unTrackSkippedPV(obj, groupResource, log)
 		}
-		mustInclude := u.GetAnnotations()[mustIncludeAdditionalItemAnnotation] == "true" || finalize
+		mustInclude := u.GetAnnotations()[velerov1api.MustIncludeAdditionalItemAnnotation] == "true" || finalize
 		// remove the annotation as it's for communication between BIA and velero server,
 		// we don't want the resource be restored with this annotation.
-		delete(u.GetAnnotations(), mustIncludeAdditionalItemAnnotation)
+		delete(u.GetAnnotations(), velerov1api.MustIncludeAdditionalItemAnnotation)
 		obj = u
 
 		// If async plugin started async operation, add it to the ItemOperations list

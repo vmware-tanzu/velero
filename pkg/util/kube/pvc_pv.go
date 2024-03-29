@@ -27,11 +27,11 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	storagev1api "k8s.io/api/storage/v1"
 	storagev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
@@ -357,4 +357,32 @@ func MakePodPVCAttachment(volumeName string, volumeMode *corev1api.PersistentVol
 	}
 
 	return volumeMounts, volumeDevices
+}
+
+func GetPVForPVC(
+	pvc *corev1api.PersistentVolumeClaim,
+	crClient crclient.Client,
+) (*corev1api.PersistentVolume, error) {
+	if pvc.Spec.VolumeName == "" {
+		return nil, errors.Errorf("PVC %s/%s has no volume backing this claim",
+			pvc.Namespace, pvc.Name)
+	}
+	if pvc.Status.Phase != corev1api.ClaimBound {
+		// TODO: confirm if this PVC should be snapshotted if it has no PV bound
+		return nil,
+			errors.Errorf("PVC %s/%s is in phase %v and is not bound to a volume",
+				pvc.Namespace, pvc.Name, pvc.Status.Phase)
+	}
+
+	pv := &corev1api.PersistentVolume{}
+	err := crClient.Get(
+		context.TODO(),
+		crclient.ObjectKey{Name: pvc.Spec.VolumeName},
+		pv,
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get PV %s for PVC %s/%s",
+			pvc.Spec.VolumeName, pvc.Namespace, pvc.Name)
+	}
+	return pv, nil
 }
