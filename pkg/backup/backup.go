@@ -419,6 +419,9 @@ func (kb *kubernetesBackupper) BackupWithResolvers(log logrus.FieldLogger,
 		}
 	}
 
+	processedPVBs := itemBackupper.podVolumeBackupper.WaitAllPodVolumesProcessed(log)
+	backupRequest.PodVolumeBackups = append(backupRequest.PodVolumeBackups, processedPVBs...)
+
 	// do a final update on progress since we may have just added some CRDs and may not have updated
 	// for the last few processed items.
 	updated = backupRequest.Backup.DeepCopy()

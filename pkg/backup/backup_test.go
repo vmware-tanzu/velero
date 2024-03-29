@@ -3054,7 +3054,9 @@ func (f *fakePodVolumeBackupperFactory) NewBackupper(context.Context, *velerov1.
 	return &fakePodVolumeBackupper{}, nil
 }
 
-type fakePodVolumeBackupper struct{}
+type fakePodVolumeBackupper struct {
+	pvbs []*velerov1.PodVolumeBackup
+}
 
 // BackupPodVolumes returns one pod volume backup per entry in volumes, with namespace "velero"
 // and name "pvb-<pod-namespace>-<pod-name>-<volume-name>".
@@ -3072,7 +3074,13 @@ func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *
 		res = append(res, pvb)
 	}
 
+	b.pvbs = res
+
 	return res, pvcSummary, nil
+}
+
+func (b *fakePodVolumeBackupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velerov1.PodVolumeBackup {
+	return b.pvbs
 }
 
 // TestBackupWithPodVolume runs backups of pods that are annotated for PodVolume backup,
@@ -3289,7 +3297,7 @@ func newHarness(t *testing.T) *harness {
 
 			// unsupported
 			podCommandExecutor:        nil,
-			podVolumeBackupperFactory: nil,
+			podVolumeBackupperFactory: new(fakePodVolumeBackupperFactory),
 			podVolumeTimeout:          0,
 		},
 		log: log,
