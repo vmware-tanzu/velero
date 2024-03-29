@@ -6,17 +6,15 @@ jobs:
     name: Run Linter Check
     runs-on: ubuntu-latest
     steps:
-
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.22'
-
-    - name: Check out the code
-      uses: actions/checkout@v4
-
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        version: v1.57.2
-        args: --out-format=colored-line-number
+      - name: Check out the code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+        id: go
+      - name: Linter check
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.57.2
+          args: --verbose
