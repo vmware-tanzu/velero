@@ -18,6 +18,7 @@ package exposer
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 
@@ -617,6 +619,214 @@ func TestGetExpose(t *testing.T) {
 			} else {
 				assert.EqualError(t, err, test.err)
 			}
+		})
+	}
+}
+
+func TestPeekExpose(t *testing.T) {
+	backup := &velerov1.Backup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: velerov1.SchemeGroupVersion.String(),
+			Kind:       "Backup",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			UID:       "fake-uid",
+		},
+	}
+
+	backupPodUrecoverable := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: backup.Namespace,
+			Name:      backup.Name,
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:    corev1.PodScheduled,
+					Reason:  "Unschedulable",
+					Message: "unrecoverable",
+				},
+			},
+		},
+	}
+
+	backupPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: backup.Namespace,
+			Name:      backup.Name,
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	corev1.AddToScheme(scheme)
+
+	tests := []struct {
+		name          string
+		kubeClientObj []runtime.Object
+		ownerBackup   *velerov1.Backup
+		err           string
+	}{
+		{
+			name:        "backup pod is not found",
+			ownerBackup: backup,
+		},
+		{
+			name:        "pod is unrecoverable",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				backupPodUrecoverable,
+			},
+			err: "Pod is unschedulable: unrecoverable",
+		},
+		{
+			name:        "succeed",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				backupPod,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			exposer := csiSnapshotExposer{
+				kubeClient: fakeKubeClient,
+				log:        velerotest.NewLogger(),
+			}
+
+			var ownerObject corev1.ObjectReference
+			if test.ownerBackup != nil {
+				ownerObject = corev1.ObjectReference{
+					Kind:       test.ownerBackup.Kind,
+					Namespace:  test.ownerBackup.Namespace,
+					Name:       test.ownerBackup.Name,
+					UID:        test.ownerBackup.UID,
+					APIVersion: test.ownerBackup.APIVersion,
+				}
+			}
+
+			err := exposer.PeekExposed(context.Background(), ownerObject)
+			if test.err == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, test.err)
+			}
+		})
+	}
+}
+
+func TestToSystemAffinity(t *testing.T) {
+	tests := []struct {
+		name         string
+		loadAffinity *nodeagent.LoadAffinity
+		expected     *corev1.Affinity
+	}{
+		{
+			name: "loadAffinity is nil",
+		},
+		{
+			name:         "loadAffinity is empty",
+			loadAffinity: &nodeagent.LoadAffinity{},
+		},
+		{
+			name: "with match label",
+			loadAffinity: &nodeagent.LoadAffinity{
+				NodeSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"key-1": "value-1",
+						"key-2": "value-2",
+					},
+				},
+			},
+			expected: &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "key-1",
+										Values:   []string{"value-1"},
+										Operator: corev1.NodeSelectorOpIn,
+									},
+									{
+										Key:      "key-2",
+										Values:   []string{"value-2"},
+										Operator: corev1.NodeSelectorOpIn,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "with match expression",
+			loadAffinity: &nodeagent.LoadAffinity{
+				NodeSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"key-1": "value-1",
+						"key-2": "value-2",
+					},
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key-3",
+							Values:   []string{"value-3-1", "value-3-2"},
+							Operator: metav1.LabelSelectorOpNotIn,
+						},
+						{
+							Key:      "key-4",
+							Values:   []string{"value-4-1", "value-4-2", "value-4-3"},
+							Operator: metav1.LabelSelectorOpDoesNotExist,
+						},
+					},
+				},
+			},
+			expected: &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "key-1",
+										Values:   []string{"value-1"},
+										Operator: corev1.NodeSelectorOpIn,
+									},
+									{
+										Key:      "key-2",
+										Values:   []string{"value-2"},
+										Operator: corev1.NodeSelectorOpIn,
+									},
+									{
+										Key:      "key-3",
+										Values:   []string{"value-3-1", "value-3-2"},
+										Operator: corev1.NodeSelectorOpNotIn,
+									},
+									{
+										Key:      "key-4",
+										Values:   []string{"value-4-1", "value-4-2", "value-4-3"},
+										Operator: corev1.NodeSelectorOpDoesNotExist,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			affinity := toSystemAffinity(test.loadAffinity)
+			assert.Equal(t, true, reflect.DeepEqual(affinity, test.expected))
 		})
 	}
 }

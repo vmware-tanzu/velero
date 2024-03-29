@@ -32,6 +32,11 @@ type SnapshotExposer interface {
 	// Otherwise, it returns nil as the expose result without an error.
 	GetExposed(context.Context, corev1.ObjectReference, time.Duration, interface{}) (*ExposeResult, error)
 
+	// PeekExposed tests the status of the expose.
+	// If the expose is incomplete but not recoverable, it returns an error.
+	// Otherwise, it returns nil immediately.
+	PeekExposed(context.Context, corev1.ObjectReference) error
+
 	// CleanUp cleans up any objects generated during the snapshot expose
 	CleanUp(context.Context, corev1.ObjectReference, string, string)
 }

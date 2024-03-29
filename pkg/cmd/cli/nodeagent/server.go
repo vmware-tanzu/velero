@@ -138,6 +138,7 @@ type nodeAgentServer struct {
 	kubeClient        kubernetes.Interface
 	csiSnapshotClient *snapshotv1client.Clientset
 	dataPathMgr       *datapath.Manager
+	dataPathConfigs   *nodeagent.Configs
 }
 
 func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, config nodeAgentServerConfig) (*nodeAgentServer, error) {
@@ -226,8 +227,8 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		return nil, err
 	}
 
-	dataPathConcurrentNum := s.getDataPathConcurrentNum(defaultDataPathConcurrentNum)
-	s.dataPathMgr = datapath.NewManager(dataPathConcurrentNum)
+	s.getDataPathConfigs()
+	s.dataPathMgr = datapath.NewManager(s.getDataPathConcurrentNum(defaultDataPathConcurrentNum))
 
 	return s, nil
 }
@@ -284,7 +285,11 @@ func (s *nodeAgentServer) run() {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
 
-	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	var loadAffinity *nodeagent.LoadAffinity
+	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
+		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
+	}
+	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, loadAffinity, repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	s.attemptDataUploadResume(dataUploadReconciler)
 	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
@@ -454,12 +459,23 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 
 var getConfigsFunc = nodeagent.GetConfigs
 
-func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
+func (s *nodeAgentServer) getDataPathConfigs() {
 	configs, err := getConfigsFunc(s.ctx, s.namespace, s.kubeClient)
 	if err != nil {
 		s.logger.WithError(err).Warn("Failed to get node agent configs")
-		return defaultNum
+		return
 	}
+
+	if configs == nil {
+		s.logger.Infof("Node agent configs are not found")
+		return
+	}
+
+	s.dataPathConfigs = configs
+}
+
+func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
+	configs := s.dataPathConfigs
 
 	if configs == nil || configs.LoadConcurrency == nil {
 		s.logger.Infof("Concurrency configs are not found, use the default number %v", defaultNum)

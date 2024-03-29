@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -67,6 +68,9 @@ type CSISnapshotExposeParam struct {
 
 	// VolumeSize specifies the size of the source volume
 	VolumeSize resource.Quantity
+
+	// Affinity specifies the node affinity of the backup pod
+	Affinity *nodeagent.LoadAffinity
 }
 
 // CSISnapshotExposeWaitParam define the input param for WaitExposed of CSI snapshots
@@ -189,12 +193,12 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		}
 	}()
 
-	backupPod, err := e.createBackupPod(ctx, ownerObject, backupPVC, csiExposeParam.HostingPodLabels)
+	backupPod, err := e.createBackupPod(ctx, ownerObject, backupPVC, csiExposeParam.HostingPodLabels, csiExposeParam.Affinity)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
 	}
 
-	curLog.WithField("pod name", backupPod.Name).Info("Backup pod is created")
+	curLog.WithField("pod name", backupPod.Name).WithField("affinity", csiExposeParam.Affinity).Info("Backup pod is created")
 
 	defer func() {
 		if err != nil {
@@ -253,6 +257,30 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.
 	curLog.WithField("pod", pod.Name).Infof("Backup volume is found in pod at index %v", i)
 
 	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, VolumeName: volumeName}}, nil
+}
+
+func (e *csiSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1.ObjectReference) error {
+	backupPodName := ownerObject.Name
+
+	curLog := e.log.WithFields(logrus.Fields{
+		"owner": ownerObject.Name,
+	})
+
+	pod, err := e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(ctx, backupPodName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+
+	if err != nil {
+		curLog.WithError(err).Warnf("error to peek backup pod %s", backupPodName)
+		return nil
+	}
+
+	if podFailed, message := kube.IsPodUnrecoverable(pod, curLog); podFailed {
+		return errors.New(message)
+	}
+
+	return nil
 }
 
 func (e *csiSnapshotExposer) CleanUp(ctx context.Context, ownerObject corev1.ObjectReference, vsName string, sourceNamespace string) {
@@ -382,7 +410,8 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 	return created, err
 }
 
-func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject corev1.ObjectReference, backupPVC *corev1.PersistentVolumeClaim, label map[string]string) (*corev1.Pod, error) {
+func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject corev1.ObjectReference, backupPVC *corev1.PersistentVolumeClaim,
+	label map[string]string, affinity *nodeagent.LoadAffinity) (*corev1.Pod, error) {
 	podName := ownerObject.Name
 
 	volumeName := string(ownerObject.UID)
@@ -430,6 +459,7 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 					},
 				},
 			},
+			Affinity: toSystemAffinity(affinity),
 			Containers: []corev1.Container{
 				{
 					Name:            containerName,
@@ -454,4 +484,43 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 	}
 
 	return e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+}
+
+func toSystemAffinity(loadAffinity *nodeagent.LoadAffinity) *corev1.Affinity {
+	if loadAffinity == nil {
+		return nil
+	}
+
+	requirements := []corev1.NodeSelectorRequirement{}
+	for k, v := range loadAffinity.NodeSelector.MatchLabels {
+		requirements = append(requirements, corev1.NodeSelectorRequirement{
+			Key:      k,
+			Values:   []string{v},
+			Operator: corev1.NodeSelectorOpIn,
+		})
+	}
+
+	for _, exp := range loadAffinity.NodeSelector.MatchExpressions {
+		requirements = append(requirements, corev1.NodeSelectorRequirement{
+			Key:      exp.Key,
+			Values:   exp.Values,
+			Operator: corev1.NodeSelectorOperator(exp.Operator),
+		})
+	}
+
+	if len(requirements) == 0 {
+		return nil
+	}
+
+	return &corev1.Affinity{
+		NodeAffinity: &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: requirements,
+					},
+				},
+			},
+		},
+	}
 }

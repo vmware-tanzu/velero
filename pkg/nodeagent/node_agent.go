@@ -50,6 +50,11 @@ type LoadConcurrency struct {
 	PerNodeConfig []RuledConfigs `json:"perNodeConfig,omitempty"`
 }
 
+type LoadAffinity struct {
+	// NodeSelector specifies the label selector to match nodes
+	NodeSelector metav1.LabelSelector `json:"nodeSelector"`
+}
+
 type RuledConfigs struct {
 	// NodeSelector specifies the label selector to match nodes
 	NodeSelector metav1.LabelSelector `json:"nodeSelector"`
@@ -61,6 +66,9 @@ type RuledConfigs struct {
 type Configs struct {
 	// LoadConcurrency is the config for data path load concurrency per node.
 	LoadConcurrency *LoadConcurrency `json:"loadConcurrency,omitempty"`
+
+	// LoadAffinity is the config for data path load affinity.
+	LoadAffinity []*LoadAffinity `json:"loadAffinity,omitempty"`
 }
 
 // IsRunning checks if the node agent daemonset is running properly. If not, return the error found

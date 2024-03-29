@@ -174,6 +174,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 		needCreateFSBR    bool
 		isExposeErr       bool
 		isGetExposeErr    bool
+		isPeekExposeErr   bool
 		isNilExposer      bool
 		isFSBRInitErr     bool
 		isFSBRRestoreErr  bool
@@ -303,6 +304,12 @@ func TestDataDownloadReconcile(t *testing.T) {
 			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Result(),
 		},
 		{
+			name:            "peek error",
+			dd:              dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
+			isPeekExposeErr: true,
+			expected:        dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Result(),
+		},
+		{
 			name: "dataDownload with enabled cancel",
 			dd: func() *velerov2alpha1api.DataDownload {
 				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result()
@@ -369,7 +376,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 				return fsBR
 			}
 
-			if test.isExposeErr || test.isGetExposeErr || test.isNilExposer || test.notNilExpose {
+			if test.isExposeErr || test.isGetExposeErr || test.isPeekExposeErr || test.isNilExposer || test.notNilExpose {
 				if test.isNilExposer {
 					r.restoreExposer = nil
 				} else {
@@ -383,6 +390,8 @@ func TestDataDownloadReconcile(t *testing.T) {
 							ep.On("GetExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: hostingPod, VolumeName: "test-pvc"}}, nil)
 						} else if test.isGetExposeErr {
 							ep.On("GetExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("Error to get restore exposer"))
+						} else if test.isPeekExposeErr {
+							ep.On("PeekExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("fake-peek-error"))
 						}
 
 						if !test.notMockCleanUp {
@@ -801,7 +810,7 @@ func TestTryCancelDataDownload(t *testing.T) {
 		err = r.client.Create(ctx, test.dd)
 		require.NoError(t, err)
 
-		r.TryCancelDataDownload(ctx, test.dd)
+		r.TryCancelDataDownload(ctx, test.dd, "")
 
 		if test.expectedErr == "" {
 			assert.NoError(t, err)
