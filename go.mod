@@ -194,4 +194,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-replace github.com/kopia/kopia => github.com/project-velero/kopia v0.0.0-20240325091347-b901e3bfe3fd
+replace github.com/kopia/kopia => github.com/project-velero/kopia v0.0.0-20240329071452-f17bf7020ce4
