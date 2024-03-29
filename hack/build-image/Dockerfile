@@ -69,7 +69,8 @@ RUN ARCH=$(go env GOARCH) && \
     chmod a+x /usr/include/google/protobuf && \
     chmod a+r -R /usr/include/google && \
     chmod +x /usr/bin/protoc
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.32.0
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.33.0 \
+    && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 
 # get goreleaser
 # goreleaser name template per arch is basically goarch except for amd64 and 386 https://github.com/goreleaser/goreleaser/blob/ec8819a95c5527fae65e5cb41673f5bbc3245fda/.goreleaser.yaml#L167C1-L173C42

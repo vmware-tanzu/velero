@@ -335,9 +335,6 @@ issues:
   exclude-rules:
     - linters:
         - staticcheck
-      text: "github.com/golang/protobuf/proto" # grpc-go still uses github.com/golang/protobuf/proto.
-    - linters:
-        - staticcheck
       text: "DefaultVolumesToRestic" # No need to report deprecate for DefaultVolumesToRestic.
     - path: ".*_test.go$"
       linters:
