@@ -24,13 +24,13 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datamover"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/backup"
+	bia "github.com/vmware-tanzu/velero/pkg/backup/actions"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
-	"github.com/vmware-tanzu/velero/pkg/restore"
+	ria "github.com/vmware-tanzu/velero/pkg/restore/actions"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -76,11 +76,11 @@ func NewCommand(f client.Factory) *cobra.Command {
 }
 
 func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return backup.NewPVCAction(logger), nil
+	return bia.NewPVCAction(logger), nil
 }
 
 func newPodBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return backup.NewPodAction(logger), nil
+	return bia.NewPodAction(logger), nil
 }
 
 func newServiceAccountBackupItemAction(f client.Factory) plugincommon.HandlerInitializer {
@@ -96,9 +96,9 @@ func newServiceAccountBackupItemAction(f client.Factory) plugincommon.HandlerIni
 			return nil, err
 		}
 
-		action, err := backup.NewServiceAccountAction(
+		action, err := bia.NewServiceAccountAction(
 			logger,
-			backup.NewClusterRoleBindingListerMap(clientset),
+			bia.NewClusterRoleBindingListerMap(clientset),
 			discoveryHelper)
 		if err != nil {
 			return nil, err
@@ -129,20 +129,20 @@ func newRemapCRDVersionAction(f client.Factory) plugincommon.HandlerInitializer 
 			return nil, err
 		}
 
-		return backup.NewRemapCRDVersionAction(logger, client.ApiextensionsV1beta1().CustomResourceDefinitions(), discoveryHelper), nil
+		return bia.NewRemapCRDVersionAction(logger, client.ApiextensionsV1beta1().CustomResourceDefinitions(), discoveryHelper), nil
 	}
 }
 
 func newJobRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewJobAction(logger), nil
+	return ria.NewJobAction(logger), nil
 }
 
 func newPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewPodAction(logger), nil
+	return ria.NewPodAction(logger), nil
 }
 
 func newInitRestoreHookPodAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewInitRestoreHookPodAction(logger), nil
+	return ria.NewInitRestoreHookPodAction(logger), nil
 }
 
 func newPodVolumeRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
@@ -157,28 +157,28 @@ func newPodVolumeRestoreItemAction(f client.Factory) plugincommon.HandlerInitial
 			return nil, err
 		}
 
-		return restore.NewPodVolumeRestoreAction(logger, client.CoreV1().ConfigMaps(f.Namespace()), crClient), nil
+		return ria.NewPodVolumeRestoreAction(logger, client.CoreV1().ConfigMaps(f.Namespace()), crClient), nil
 	}
 }
 
 func newServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewServiceAction(logger), nil
+	return ria.NewServiceAction(logger), nil
 }
 
 func newServiceAccountRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewServiceAccountAction(logger), nil
+	return ria.NewServiceAccountAction(logger), nil
 }
 
 func newAddPVCFromPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewAddPVCFromPodAction(logger), nil
+	return ria.NewAddPVCFromPodAction(logger), nil
 }
 
 func newAddPVFromPVCRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewAddPVFromPVCAction(logger), nil
+	return ria.NewAddPVFromPVCAction(logger), nil
 }
 
 func newCRDV1PreserveUnknownFieldsItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewCRDV1PreserveUnknownFieldsAction(logger), nil
+	return ria.NewCRDV1PreserveUnknownFieldsAction(logger), nil
 }
 
 func newChangeStorageClassRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
@@ -188,7 +188,7 @@ func newChangeStorageClassRestoreItemAction(f client.Factory) plugincommon.Handl
 			return nil, err
 		}
 
-		return restore.NewChangeStorageClassAction(
+		return ria.NewChangeStorageClassAction(
 			logger,
 			client.CoreV1().ConfigMaps(f.Namespace()),
 			client.StorageV1().StorageClasses(),
@@ -203,18 +203,18 @@ func newChangeImageNameRestoreItemAction(f client.Factory) plugincommon.HandlerI
 			return nil, err
 		}
 
-		return restore.NewChangeImageNameAction(
+		return ria.NewChangeImageNameAction(
 			logger,
 			client.CoreV1().ConfigMaps(f.Namespace()),
 		), nil
 	}
 }
 func newRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewRoleBindingAction(logger), nil
+	return ria.NewRoleBindingAction(logger), nil
 }
 
 func newClusterRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewClusterRoleBindingAction(logger), nil
+	return ria.NewClusterRoleBindingAction(logger), nil
 }
 
 func newChangePVCNodeSelectorItemAction(f client.Factory) plugincommon.HandlerInitializer {
@@ -224,7 +224,7 @@ func newChangePVCNodeSelectorItemAction(f client.Factory) plugincommon.HandlerIn
 			return nil, err
 		}
 
-		return restore.NewChangePVCNodeSelectorAction(
+		return ria.NewChangePVCNodeSelectorAction(
 			logger,
 			client.CoreV1().ConfigMaps(f.Namespace()),
 			client.CoreV1().Nodes(),
@@ -233,11 +233,11 @@ func newChangePVCNodeSelectorItemAction(f client.Factory) plugincommon.HandlerIn
 }
 
 func newAPIServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewAPIServiceAction(logger), nil
+	return ria.NewAPIServiceAction(logger), nil
 }
 
 func newAdmissionWebhookConfigurationAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewAdmissionWebhookConfigurationAction(logger), nil
+	return ria.NewAdmissionWebhookConfigurationAction(logger), nil
 }
 
 func newSecretRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
@@ -246,7 +246,7 @@ func newSecretRestoreItemAction(f client.Factory) plugincommon.HandlerInitialize
 		if err != nil {
 			return nil, err
 		}
-		return restore.NewSecretAction(logger, client), nil
+		return ria.NewSecretAction(logger, client), nil
 	}
 }
 
@@ -257,7 +257,7 @@ func newDataUploadRetrieveAction(f client.Factory) plugincommon.HandlerInitializ
 			return nil, err
 		}
 
-		return restore.NewDataUploadRetrieveAction(logger, client), nil
+		return ria.NewDataUploadRetrieveAction(logger, client), nil
 	}
 }
 
