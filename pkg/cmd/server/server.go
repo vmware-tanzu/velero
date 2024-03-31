@@ -88,6 +88,7 @@ const (
 
 	defaultBackupSyncPeriod           = time.Minute
 	defaultStoreValidationFrequency   = time.Minute
+	defaultGarbageCollectionFrequency = time.Hour
 	defaultPodVolumeOperationTimeout  = 240 * time.Minute
 	defaultResourceTerminatingTimeout = 10 * time.Minute
 
@@ -158,6 +159,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 			storeValidationFrequency:       defaultStoreValidationFrequency,
 			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities:      defaultRestorePriorities,
+			restoreOnly:                    false,
+			garbageCollectionFrequency:     defaultGarbageCollectionFrequency,
 			clientQPS:                      defaultClientQPS,
 			clientBurst:                    defaultClientBurst,
 			clientPageSize:                 defaultClientPageSize,
