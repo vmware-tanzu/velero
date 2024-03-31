@@ -46,14 +46,18 @@ var getAWSBucketRegion = GetAWSBucketRegion
 
 // getRepoPrefix returns the prefix of the value of the --repo flag for
 // restic commands, i.e. everything except the "/<repo-name>".
-func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) {
+func getRepoPrefix(location *velerov1api.BackupStorageLocation, repositoryType string) (string, error) {
 	var bucket, prefix string
 
 	if location.Spec.ObjectStorage != nil {
 		layout := persistence.NewObjectStoreLayout(location.Spec.ObjectStorage.Prefix)
 
-		bucket = location.Spec.ObjectStorage.Bucket
-		prefix = layout.GetResticDir()
+		bucket = "buckets" + location.Spec.ObjectStorage.Bucket
+		if repositoryType == "kopia" {
+			prefix = layout.GetKopiaDir()
+		} else if repositoryType == "restic" {
+			prefix = layout.GetResticDir()
+		}
 	}
 
 	backendType := GetBackendType(location.Spec.Provider, location.Spec.Config)
@@ -114,8 +118,8 @@ func IsBackendTypeValid(backendType BackendType) bool {
 
 // GetRepoIdentifier returns the string to be used as the value of the --repo flag in
 // restic commands for the given repository.
-func GetRepoIdentifier(location *velerov1api.BackupStorageLocation, name string) (string, error) {
-	prefix, err := getRepoPrefix(location)
+func GetRepoIdentifier(location *velerov1api.BackupStorageLocation, name, repositoryType string) (string, error) {
+	prefix, err := getRepoPrefix(location, repositoryType)
 	if err != nil {
 		return "", err
 	}

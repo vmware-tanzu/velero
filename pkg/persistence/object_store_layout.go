@@ -56,6 +56,10 @@ func (l *ObjectStoreLayout) GetResticDir() string {
 	return l.subdirs["restic"]
 }
 
+func (l *ObjectStoreLayout) GetKopiaDir() string {
+	return l.subdirs["kopia"]
+}
+
 func (l *ObjectStoreLayout) isValidSubdir(name string) bool {
 	_, ok := l.subdirs[name]
 	return ok
