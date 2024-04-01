@@ -111,7 +111,11 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	original := backup.DeepCopy()
 	defer func() {
 		switch backup.Status.Phase {
-		case velerov1api.BackupPhaseCompleted, velerov1api.BackupPhasePartiallyFailed, velerov1api.BackupPhaseFailed, velerov1api.BackupPhaseFailedValidation:
+		case
+			velerov1api.BackupPhaseCompleted,
+			velerov1api.BackupPhasePartiallyFailed,
+			velerov1api.BackupPhaseFailed,
+			velerov1api.BackupPhaseFailedValidation:
 			r.backupTracker.Delete(backup.Namespace, backup.Name)
 		}
 		// Always attempt to Patch the backup object and status after each reconciliation.
@@ -151,7 +155,6 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 	var outBackupFile *os.File
 	if len(operations) > 0 {
-		// Call itemBackupper.BackupItem for the list of items updated by async operations
 		log.Info("Setting up finalized backup temp file")
 		inBackupFile, err := downloadToTempFile(backup.Name, backupStore, log)
 		if err != nil {
@@ -172,7 +175,16 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, errors.WithStack(err)
 		}
 		backupItemActionsResolver := framework.NewBackupItemActionResolverV2(actions)
-		err = r.backupper.FinalizeBackup(log, backupRequest, inBackupFile, outBackupFile, backupItemActionsResolver, operations)
+
+		// Call itemBackupper.BackupItem for the list of items updated by async operations
+		err = r.backupper.FinalizeBackup(
+			log,
+			backupRequest,
+			inBackupFile,
+			outBackupFile,
+			backupItemActionsResolver,
+			operations,
+		)
 		if err != nil {
 			log.WithError(err).Error("error finalizing Backup")
 			return ctrl.Result{}, errors.WithStack(err)

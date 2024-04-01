@@ -780,6 +780,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.defaultVolumesToFsBackup,
 			s.config.clientPageSize,
 			s.config.uploaderType,
+			newPluginManager,
+			backupStoreGetter,
 		)
 		cmd.CheckError(err)
 		if err := controller.NewBackupReconciler(
@@ -860,6 +862,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.defaultVolumesToFsBackup,
 			s.config.clientPageSize,
 			s.config.uploaderType,
+			newPluginManager,
+			backupStoreGetter,
 		)
 		cmd.CheckError(err)
 		r := controller.NewBackupFinalizerReconciler(
