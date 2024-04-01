@@ -739,7 +739,6 @@ func TestToSystemAffinity(t *testing.T) {
 				NodeSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"key-1": "value-1",
-						"key-2": "value-2",
 					},
 				},
 			},
@@ -754,11 +753,6 @@ func TestToSystemAffinity(t *testing.T) {
 										Values:   []string{"value-1"},
 										Operator: corev1.NodeSelectorOpIn,
 									},
-									{
-										Key:      "key-2",
-										Values:   []string{"value-2"},
-										Operator: corev1.NodeSelectorOpIn,
-									},
 								},
 							},
 						},
@@ -771,7 +765,6 @@ func TestToSystemAffinity(t *testing.T) {
 			loadAffinity: &nodeagent.LoadAffinity{
 				NodeSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
-						"key-1": "value-1",
 						"key-2": "value-2",
 					},
 					MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -794,11 +787,6 @@ func TestToSystemAffinity(t *testing.T) {
 						NodeSelectorTerms: []corev1.NodeSelectorTerm{
 							{
 								MatchExpressions: []corev1.NodeSelectorRequirement{
-									{
-										Key:      "key-1",
-										Values:   []string{"value-1"},
-										Operator: corev1.NodeSelectorOpIn,
-									},
 									{
 										Key:      "key-2",
 										Values:   []string{"value-2"},
