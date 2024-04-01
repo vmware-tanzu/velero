@@ -46,7 +46,7 @@ func (n *NodePort) Init() error {
 	n.NSIncluded = &[]string{}
 	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", n.CaseBaseName, nsNum)
-		n.namespaceToCollision = append(n.namespaceToCollision, createNSName+"tmp")
+		n.namespaceToCollision = append(n.namespaceToCollision, createNSName+"-tmp")
 		*n.NSIncluded = append(*n.NSIncluded, createNSName)
 	}
 
