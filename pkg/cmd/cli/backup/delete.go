@@ -32,6 +32,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/confirm"
 	"github.com/vmware-tanzu/velero/pkg/label"
 )
 
@@ -70,7 +71,7 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 
 // Run performs the delete backup operation.
 func Run(o *cli.DeleteOptions) error {
-	if !o.Confirm && !cli.GetConfirmation() {
+	if !o.Confirm && !confirm.GetConfirmation() {
 		// Don't do anything unless we get confirmation
 		return nil
 	}
