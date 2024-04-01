@@ -2,7 +2,7 @@ module github.com/vmware-tanzu/velero
 
 go 1.21
 
-toolchain go1.21.6
+toolchain go1.21.9
 
 require (
 	cloud.google.com/go/storage v1.33.0
@@ -52,7 +52,7 @@ require (
 	golang.org/x/text v0.14.0
 	google.golang.org/api v0.146.0
 	google.golang.org/grpc v1.58.3
-	google.golang.org/protobuf v1.31.0
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.29.0
 	k8s.io/apiextensions-apiserver v0.29.0
