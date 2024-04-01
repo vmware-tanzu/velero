@@ -346,9 +346,6 @@ to be defined by its pod.
 - Even though the backup data could be incrementally preserved, for a single file data, FSB leverages on deduplication 
 to find the difference to be saved. This means that large files (such as ones storing a database) will take a long time 
 to scan for data deduplication, even if the actual difference is small.
-- You may need to [customize the resource limits](customize-installation/#customize-resource-requests-and-limits) 
-to make sure backups complete successfully for massive small files or large backup size cases, for more details refer to 
-[Velero File System Backup Performance Guide](/docs/main/performance-guidance).
 - Velero's File System Backup reads/writes data from volumes by accessing the node's filesystem, on which the pod is running. 
 For this reason, FSB can only backup volumes that are mounted by a pod and not directly from the PVC. For orphan PVC/PV pairs 
 (without running pods), some Velero users overcame this limitation running a staging pod (i.e. a busybox or alpine container 
@@ -586,10 +583,10 @@ Velero does not provide a mechanism to detect persistent volume claims that are 
 
 To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watcher][7]
 
-## Support ReadOnlyRootFilesystem setting on Velero server pod
+## Support ReadOnlyRootFilesystem setting
 ### Kopia
-When the Velero server pod's SecurityContext sets the `ReadOnlyRootFileSystem` parameter to true, the Velero server pod's filesystem is running in read-only mode.
-If the user creates a backup with Kopia as the uploader, or a backup enabling snapshot data mover function, the backup will fail, because the Kopia needs to write some cache and configuration data into the pod filesystem.
+When the Velero server/node-agent pod's SecurityContext sets the `ReadOnlyRootFileSystem` parameter to true, the Velero server/node-agent pod's filesystem is running in read-only mode.
+If the user creates a backup with Kopia as the uploader, the backup will fail, because the Kopia needs to write some cache and configuration data into the pod filesystem.
 
 ```
 Errors: Velero:    name: /mongodb-0 message: /Error backing up item error: /failed to wait BackupRepository: backup repository is not ready: error to connect to backup repo: error to connect repo with storage: error to connect to repository: unable to write config file: unable to create config directory: mkdir /home/cnb/udmrepo: read-only file system name: /mongodb-1 message: /Error backing up item error: /failed to wait BackupRepository: backup repository is not ready: error to connect to backup repo: error to connect repo with storage: error to connect to repository: unable to write config file: unable to create config directory: mkdir /home/cnb/udmrepo: read-only file system name: /mongodb-2 message: /Error backing up item error: /failed to wait BackupRepository: backup repository is not ready: error to connect to backup repo: error to connect repo with storage: error to connect to repository: unable to write config file: unable to create config directory: mkdir /home/cnb/udmrepo: read-only file system Cluster:    <none>
@@ -624,7 +621,16 @@ spec:
         - emptyDir: {}
           name: cache
         ......
-```
+```  
+
+## Resource Consumption
+
+Both the uploader and repository consume remarkable CPU/memory during the backup/restore, especially for massive small files or large backup size cases.  
+Velero node-agent uses [BestEffort as the QoS][14] for node-agent pods (so no CPU/memory request/limit is set), so that backups/restores wouldn't fail due to resource throttling in any cases.  
+If you want to constraint the CPU/memory usage, you need to [customize the resource limits][15]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][16] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.   
+
+During the restore, the repository may also cache data/metadata so as to reduce the network footprint and speed up the restore. The repository uses its own policy to store and clean up the cache.  
+For Kopia repository, the cache is stored in the node-agent pod's root file system and the cleanup is triggered for the data/metadata that are older than 10 minutes (not configurable at present). So you should prepare enough disk space, otherwise, the node-agent pod may be evicted due to running out of the ephemeral storage.  
 
 
 [1]: https://github.com/restic/restic
@@ -640,3 +646,6 @@ spec:
 [11]: https://www.vcluster.com/
 [12]: csi.md
 [13]: csi-snapshot-data-movement.md
+[14]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
+[15]: customize-installation.md#customize-resource-requests-and-limits
+[16]: performance-guidance.md
