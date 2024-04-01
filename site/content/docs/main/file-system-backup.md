@@ -493,7 +493,7 @@ which is used to backup pod volume data
 the backup storage  
 
 For more details, refer to [kopia architecture](https://kopia.io/docs/advanced/architecture/) and 
-Velero's [Unified Repository design](https://github.com/vmware-tanzu/velero/pull/4926)
+Velero's [Unified Repository & Kopia Integration Design](https://github.com/vmware-tanzu/velero/blob/main/design/Implemented/unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md)
 
 ### Custom resource and controllers
 Velero has three custom resource definitions and associated controllers:
