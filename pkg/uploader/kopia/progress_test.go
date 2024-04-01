@@ -43,7 +43,7 @@ func TestThrottle_ShouldOutput(t *testing.T) {
 	for _, tc := range testCases {
 		// Setup
 		p.InitThrottle(tc.interval)
-		p.outputThrottle.throttle = int64(tc.throttle)
+		p.outputThrottle.throttle = tc.throttle
 		// Perform the test
 
 		output := p.outputThrottle.ShouldOutput()
@@ -71,8 +71,8 @@ func TestProgress(t *testing.T) {
 	for _, tc := range testCases {
 		// Setup
 		p.InitThrottle(tc.interval)
-		p.outputThrottle.throttle = int64(tc.throttle)
-		p.InitThrottle(time.Duration(time.Second))
+		p.outputThrottle.throttle = tc.throttle
+		p.InitThrottle(time.Second)
 		// All below calls put together for the implementation are empty or just very simple and just want to cover testing
 		// If wanting to write unit tests for some functions could remove it and with writing new function alone
 		p.UpdateProgress()
