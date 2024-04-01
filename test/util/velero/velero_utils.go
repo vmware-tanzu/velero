@@ -170,7 +170,7 @@ func getPluginsByVersion(version, cloudProvider, objectStoreProvider, feature st
 		}
 		for _, p := range pluginsForDatamover {
 			if !slices.Contains(plugins, p) {
-				plugins = append(plugins, pluginsForDatamover...)
+				plugins = append(plugins, p)
 			}
 		}
 	}
