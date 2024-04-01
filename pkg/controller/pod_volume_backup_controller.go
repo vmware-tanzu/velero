@@ -124,6 +124,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	fsBackup, err := r.dataPathMgr.CreateFileSystemBR(pvb.Name, pVBRRequestor, ctx, r.Client, pvb.Namespace, callbacks, log)
+
 	if err != nil {
 		if err == datapath.ConcurrentLimitExceed {
 			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
@@ -225,7 +226,7 @@ func (r *PodVolumeBackupReconciler) OnDataPathCompleted(ctx context.Context, nam
 	log.Info("PodVolumeBackup completed")
 }
 
-func (r *PodVolumeBackupReconciler) OnDataPathFailed(ctx context.Context, namespace string, pvbName string, err error) {
+func (r *PodVolumeBackupReconciler) OnDataPathFailed(ctx context.Context, namespace, pvbName string, err error) {
 	defer r.closeDataPath(ctx, pvbName)
 
 	log := r.logger.WithField("pvb", pvbName)
@@ -348,17 +349,19 @@ func (r *PodVolumeBackupReconciler) closeDataPath(ctx context.Context, pvbName s
 
 func (r *PodVolumeBackupReconciler) errorOut(ctx context.Context, pvb *velerov1api.PodVolumeBackup, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
 	r.closeDataPath(ctx, pvb.Name)
-	_ = UpdatePVBStatusToFailed(ctx, r.Client, pvb, errors.WithMessage(err, msg).Error(), r.clock.Now(), log)
+	_ = UpdatePVBStatusToFailed(ctx, r.Client, pvb, err, msg, r.clock.Now(), log)
 
 	return ctrl.Result{}, err
 }
 
-func UpdatePVBStatusToFailed(ctx context.Context, c client.Client, pvb *velerov1api.PodVolumeBackup, errString string, time time.Time, log logrus.FieldLogger) error {
+func UpdatePVBStatusToFailed(ctx context.Context, c client.Client, pvb *velerov1api.PodVolumeBackup, errOut error, msg string, time time.Time, log logrus.FieldLogger) error {
 	original := pvb.DeepCopy()
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
-	pvb.Status.Message = errString
 	pvb.Status.CompletionTimestamp = &metav1.Time{Time: time}
-
+	if dataPathError, ok := errOut.(datapath.DataPathError); ok {
+		pvb.Status.SnapshotID = dataPathError.GetSnapshotID()
+	}
+	pvb.Status.Message = errors.WithMessage(errOut, msg).Error()
 	err := c.Patch(ctx, pvb, client.MergeFrom(original))
 	if err != nil {
 		log.WithError(err).Error("error updating PodVolumeBackup status")

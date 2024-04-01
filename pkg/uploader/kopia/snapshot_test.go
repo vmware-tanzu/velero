@@ -227,8 +227,8 @@ func TestReportSnapshotStatus(t *testing.T) {
 		},
 		{
 			shouldError:    true,
-			expectedResult: "",
-			expectedSize:   0,
+			expectedResult: "sample-manifest-id",
+			expectedSize:   1024,
 			directorySummary: &fs.DirectorySummary{
 				FailedEntries: []*fs.EntryWithError{
 					{

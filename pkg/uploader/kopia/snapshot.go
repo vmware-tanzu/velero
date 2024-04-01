@@ -55,6 +55,7 @@ var filesystemEntryFunc = snapshotfs.FilesystemEntryFromIDWithPath
 var restoreEntryFunc = restore.Entry
 
 const UploaderConfigMultipartKey = "uploader-multipart"
+const MaxErrorReported = 10
 
 // SnapshotUploader which mainly used for UT test that could overwrite Upload interface
 type SnapshotUploader interface {
@@ -182,17 +183,14 @@ func Backup(ctx context.Context, fsUploader SnapshotUploader, repoWriter repo.Re
 	}
 
 	kopiaCtx := kopia.SetupKopiaLog(ctx, log)
-	snapID, snapshotSize, err := SnapshotSource(kopiaCtx, repoWriter, fsUploader, sourceInfo, sourceEntry, forceFull, parentSnapshot, tags, uploaderCfg, log, "Kopia Uploader")
-	if err != nil {
-		return nil, false, err
-	}
 
+	snapID, snapshotSize, err := SnapshotSource(kopiaCtx, repoWriter, fsUploader, sourceInfo, sourceEntry, forceFull, parentSnapshot, tags, uploaderCfg, log, "Kopia Uploader")
 	snapshotInfo := &uploader.SnapshotInfo{
 		ID:   snapID,
 		Size: snapshotSize,
 	}
 
-	return snapshotInfo, false, nil
+	return snapshotInfo, false, err
 }
 
 func getLocalFSEntry(path0 string) (fs.Entry, error) {
@@ -307,6 +305,10 @@ func reportSnapshotStatus(manifest *snapshot.Manifest, policyTree *policy.Tree) 
 	var errs []string
 	if ds := manifest.RootEntry.DirSummary; ds != nil {
 		for _, ent := range ds.FailedEntries {
+			if len(errs) > MaxErrorReported {
+				errs = append(errs, "too many errors, ignored...")
+				break
+			}
 			policy := policyTree.EffectivePolicy()
 			if !(policy != nil && bool(*policy.ErrorHandlingPolicy.IgnoreUnknownTypes) && strings.Contains(ent.Error, fs.ErrUnknown.Error())) {
 				errs = append(errs, fmt.Sprintf("Error when processing %v: %v", ent.EntryPath, ent.Error))
@@ -315,7 +317,7 @@ func reportSnapshotStatus(manifest *snapshot.Manifest, policyTree *policy.Tree) 
 	}
 
 	if len(errs) != 0 {
-		return "", 0, errors.New(strings.Join(errs, "\n"))
+		return string(manifestID), snapSize, errors.New(strings.Join(errs, "\n"))
 	}
 
 	return string(manifestID), snapSize, nil

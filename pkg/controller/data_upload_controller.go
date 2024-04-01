@@ -401,7 +401,7 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 	}
 }
 
-func (r *DataUploadReconciler) OnDataUploadFailed(ctx context.Context, namespace string, duName string, err error) {
+func (r *DataUploadReconciler) OnDataUploadFailed(ctx context.Context, namespace, duName string, err error) {
 	defer r.closeDataPath(ctx, duName)
 
 	log := r.logger.WithField("dataupload", duName)
@@ -698,6 +698,9 @@ func (r *DataUploadReconciler) updateStatusToFailed(ctx context.Context, du *vel
 		du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	}
 
+	if dataPathError, ok := err.(datapath.DataPathError); ok {
+		du.Status.SnapshotID = dataPathError.GetSnapshotID()
+	}
 	du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	if patchErr := r.client.Patch(ctx, du, client.MergeFrom(original)); patchErr != nil {
 		log.WithError(patchErr).Error("error updating DataUpload status")

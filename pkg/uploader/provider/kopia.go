@@ -141,6 +141,7 @@ func (kp *kopiaProvider) RunBackup(
 	progress.Updater = updater
 	progress.Log = log
 	kpUploader.Progress = progress
+	kpUploader.FailFast = true
 	quit := make(chan struct{})
 	log.Info("Starting backup")
 	go kp.CheckContext(ctx, quit, nil, kpUploader)
@@ -167,19 +168,20 @@ func (kp *kopiaProvider) RunBackup(
 		uploaderCfg[kopia.UploaderConfigMultipartKey] = "true"
 	}
 
-	snapshotInfo, isSnapshotEmpty, err := BackupFunc(ctx, kpUploader, repoWriter, path, realSource, forceFull, parentSnapshot, volMode, uploaderCfg, tags, log)
+	snapshotInfo, _, err := BackupFunc(ctx, kpUploader, repoWriter, path, realSource, forceFull, parentSnapshot, volMode, uploaderCfg, tags, log)
 	if err != nil {
-		if kpUploader.IsCanceled() {
-			log.Error("Kopia backup is canceled")
-			return "", false, ErrorCanceled
+		snapshotID := ""
+		if snapshotInfo != nil {
+			snapshotID = snapshotInfo.ID
 		} else {
-			return "", false, errors.Wrapf(err, "Failed to run kopia backup")
+			log.Infof("Kopia backup failed with %v and get empty snapshot ID", err)
 		}
-	} else if isSnapshotEmpty {
-		log.Debugf("Kopia backup got empty dir with path %s", path)
-		return "", true, nil
-	} else if snapshotInfo == nil {
-		return "", false, fmt.Errorf("failed to get kopia backup snapshot info for path %v", path)
+
+		if kpUploader.IsCanceled() {
+			log.Warn("Kopia backup is canceled")
+			return snapshotID, false, ErrorCanceled
+		}
+		return snapshotID, false, errors.Wrapf(err, "Failed to run kopia backup")
 	}
 
 	// which ensure that the statistic data of TotalBytes equal to BytesDone when finished
