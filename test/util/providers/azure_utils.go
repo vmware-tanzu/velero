@@ -20,11 +20,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/url"
 	"os"
 	"strings"
-
-	"github.com/Azure/azure-pipeline-go/pipeline"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
@@ -34,7 +31,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
-	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -190,11 +189,8 @@ func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resource
 }
 func handleErrors(err error) {
 	if err != nil {
-		if serr, ok := err.(azblob.StorageError); ok { // This error is a Service-specific
-			switch serr.ServiceCode() { // Compare serviceCode to ServiceCodeXxx constants
-			case azblob.ServiceCodeContainerAlreadyExists:
-				return
-			}
+		if bloberror.HasCode(err, bloberror.ContainerAlreadyExists) {
+			return
 		}
 		log.Fatal(err)
 	}
@@ -219,18 +215,12 @@ func getRequiredValues(getValue func(string) string, keys ...string) (map[string
 	return results, nil
 }
 
-func deleteBlob(p pipeline.Pipeline, accountName, containerName, blobName string) error {
-	ctx := context.Background()
-
-	URL_BLOB, err := url.Parse(fmt.Sprintf("https://%s.blob.core.windows.net/%s/%s", accountName, containerName, blobName))
-	if err != nil {
-		return errors.Wrapf(err, "Fail to url.Parse")
-	}
-	blobURL := azblob.NewBlobURL(*URL_BLOB, p)
-	_, err = blobURL.Delete(ctx, azblob.DeleteSnapshotsOptionNone, azblob.BlobAccessConditions{})
+func deleteBlob(client *azblob.Client, containerName, blobName string) error {
+	_, err := client.DeleteBlob(context.Background(), containerName, blobName, nil)
 	return err
 }
 func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName string) (bool, error) {
+	ctx := context.Background()
 	accountName, accountKey, err := getStorageCredential(cloudCredentialsFile, bslConfig)
 	if err != nil {
 		log.Fatal("Fail to get : accountName and accountKey, " + err.Error())
@@ -239,31 +229,29 @@ func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPref
 	if err != nil {
 		log.Fatal("Invalid credentials with error: " + err.Error())
 	}
-	p := azblob.NewPipeline(credential, azblob.PipelineOptions{})
 
 	containerName := bslBucket
 
-	URL, _ := url.Parse(
-		fmt.Sprintf("https://%s.blob.core.windows.net/%s", accountName, containerName))
+	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", accountName)
 
-	containerURL := azblob.NewContainerURL(*URL, p)
-
+	client, err := azblob.NewClientWithSharedKeyCredential(serviceURL, credential, nil)
+	if err != nil {
+		log.Fatal("Failed to get client with error: " + err.Error())
+	}
 	// Create the container, if container is already exist, then do nothing
-	ctx := context.Background()
-	_, err = containerURL.Create(ctx, azblob.Metadata{}, azblob.PublicAccessNone)
+	_, err = client.CreateContainer(ctx, containerName, &container.CreateOptions{})
 	handleErrors(err)
 
 	fmt.Printf("Finding backup %s blobs in Azure container/bucket %s\n", backupName, containerName)
-	for marker := (azblob.Marker{}); marker.NotDone(); {
-		listBlob, err := containerURL.ListBlobsFlatSegment(ctx, marker, azblob.ListBlobsSegmentOptions{})
+	pager := client.NewListBlobsFlatPager(containerName, nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return false, errors.Wrapf(err, "Fail to create gcloud client")
+			return false, errors.Wrapf(err, "Fail to list blobs client")
 		}
-		marker = listBlob.NextMarker
-
-		for _, blobInfo := range listBlob.Segment.BlobItems {
-			if strings.Contains(blobInfo.Name, backupName) {
-				fmt.Printf("Blob name: %s exist in %s\n", backupName, blobInfo.Name)
+		for _, blobInfo := range page.Segment.BlobItems {
+			if strings.Contains(*blobInfo.Name, backupName) {
+				fmt.Printf("Blob name: %s exist in %s\n", backupName, *blobInfo.Name)
 				return true, nil
 			}
 		}
@@ -282,32 +270,32 @@ func (s AzureStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bsl
 	if err != nil {
 		log.Fatal("Invalid credentials with error: " + err.Error())
 	}
-	p := azblob.NewPipeline(credential, azblob.PipelineOptions{})
 
 	containerName := bslBucket
 
-	URL, _ := url.Parse(
-		fmt.Sprintf("https://%s.blob.core.windows.net/%s", accountName, containerName))
+	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", accountName)
 
-	containerURL := azblob.NewContainerURL(*URL, p)
-	_, err = containerURL.Create(ctx, azblob.Metadata{}, azblob.PublicAccessNone)
+	client, err := azblob.NewClientWithSharedKeyCredential(serviceURL, credential, nil)
+	if err != nil {
+		log.Fatal("Failed to get client with error: " + err.Error())
+	}
+	_, err = client.CreateContainer(ctx, containerName, &container.CreateOptions{})
 	handleErrors(err)
 
 	fmt.Println("Listing the blobs in the container:")
-	for marker := (azblob.Marker{}); marker.NotDone(); {
-		listBlob, err := containerURL.ListBlobsFlatSegment(ctx, marker, azblob.ListBlobsSegmentOptions{})
+	pager := client.NewListBlobsFlatPager(containerName, nil)
+	for pager.More() {
+		page, err := pager.NextPage(context.TODO())
 		if err != nil {
 			return errors.Wrapf(err, "Fail to list blobs client")
 		}
-
-		marker = listBlob.NextMarker
-		for _, blobInfo := range listBlob.Segment.BlobItems {
-			if strings.Contains(blobInfo.Name, bslPrefix+backupObject+"/") {
-				deleteBlob(p, accountName, containerName, blobInfo.Name)
+		for _, blobInfo := range page.Segment.BlobItems {
+			if strings.Contains(*blobInfo.Name, bslPrefix+backupObject+"/") {
+				err := deleteBlob(client, containerName, *blobInfo.Name)
 				if err != nil {
 					log.Fatal("Invalid credentials with error: " + err.Error())
 				}
-				fmt.Printf("Deleted blob: %s according to backup resource %s\n", blobInfo.Name, bslPrefix+backupObject+"/")
+				fmt.Printf("Deleted blob: %s according to backup resource %s\n", *blobInfo.Name, bslPrefix+backupObject+"/")
 			}
 		}
 	}
@@ -404,20 +392,23 @@ func (s AzureStorage) GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslC
 	if err != nil {
 		log.Fatal("Invalid credentials with error: " + err.Error())
 	}
-	p := azblob.NewPipeline(credential, azblob.PipelineOptions{})
 
-	URL, _ := url.Parse(
-		fmt.Sprintf("https://%s.blob.core.windows.net/%s", accountName, bslBucket))
+	containerName := bslBucket
 
-	containerURL := azblob.NewContainerURL(*URL, p)
-	_, err = containerURL.Create(ctx, azblob.Metadata{}, azblob.PublicAccessNone)
+	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", accountName)
+
+	client, err := azblob.NewClientWithSharedKeyCredential(serviceURL, credential, nil)
+	if err != nil {
+		log.Fatal("Failed to get client with error: " + err.Error())
+	}
+	_, err = client.CreateContainer(ctx, containerName, &container.CreateOptions{})
 	handleErrors(err)
 
-	blobURL := containerURL.NewBlockBlobURL(strings.Join([]string{bslPrefix, objectKey}, "/"))
-	downloadResponse, err := blobURL.Download(ctx, 0, 0, azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
+	blobName := strings.Join([]string{bslPrefix, objectKey}, "/")
+	downloadResponse, err := client.DownloadStream(ctx, containerName, blobName, &azblob.DownloadStreamOptions{})
 	if err != nil {
 		handleErrors(err)
 	}
 
-	return downloadResponse.Body(azblob.RetryReaderOptions{}), nil
+	return downloadResponse.Body, nil
 }
