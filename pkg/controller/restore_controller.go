@@ -344,7 +344,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 
 	// if ScheduleName is specified, fill in BackupName with the most recent successful backup from
 	// the schedule
-	if restore.Spec.ScheduleName != "" {
+	if restore.Spec.ScheduleName != "" && restore.Spec.BackupName == "" {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{
 			api.ScheduleNameLabel: restore.Spec.ScheduleName,
 		}))
@@ -364,6 +364,8 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "No completed backups found for schedule")
 			return backupInfo{}, nil
 		}
+	} else if restore.Spec.ScheduleName != "" && restore.Spec.BackupName != "" {
+		r.logger.Warnf("Both scheduleName(%s) and backupName(%s) are specified for restore %s, ignore the scheduleName", restore.Spec.ScheduleName, restore.Spec.BackupName)
 	}
 
 	info, err := r.fetchBackupInfo(restore.Spec.BackupName)

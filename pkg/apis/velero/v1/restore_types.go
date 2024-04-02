@@ -26,7 +26,8 @@ import (
 type RestoreSpec struct {
 	// BackupName is the unique name of the Velero backup to restore
 	// from.
-	BackupName string `json:"backupName"`
+	// +optional
+	BackupName string `json:"backupName,omitempty"`
 
 	// ScheduleName is the unique name of the Velero schedule to restore
 	// from. If specified, and BackupName is empty, Velero will restore
