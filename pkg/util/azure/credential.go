@@ -17,6 +17,8 @@ limitations under the License.
 package azure
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"strings"
 
@@ -46,7 +48,9 @@ func NewCredential(creds map[string]string, options policy.ClientOptions) (azcor
 	if err == nil {
 		credential = append(credential, cfgCred)
 	} else {
-		errMsgs = append(errMsgs, err.Error())
+		credentialErr := &credentialError{credType: "ConfigCredential", err: err}
+		errMsgs = append(errMsgs, credentialErr.Error())
+		credential = append(credential, &credentialErrorReporter{err: credentialErr})
 	}
 
 	// workload identity credential
@@ -57,7 +61,9 @@ func NewCredential(creds map[string]string, options policy.ClientOptions) (azcor
 	if err == nil {
 		credential = append(credential, wic)
 	} else {
-		errMsgs = append(errMsgs, err.Error())
+		credentialErr := &credentialError{credType: "WorkloadIdentityCredential", err: err}
+		errMsgs = append(errMsgs, credentialErr.Error())
+		credential = append(credential, &credentialErrorReporter{err: credentialErr})
 	}
 
 	//managed identity credential
@@ -66,14 +72,16 @@ func NewCredential(creds map[string]string, options policy.ClientOptions) (azcor
 	if err == nil {
 		credential = append(credential, msi)
 	} else {
-		errMsgs = append(errMsgs, err.Error())
+		credentialErr := &credentialError{credType: "ManagedIdentityCredential", err: err}
+		errMsgs = append(errMsgs, credentialErr.Error())
+		credential = append(credential, &credentialErrorReporter{err: credentialErr})
 	}
 
 	if len(credential) == 0 {
 		return nil, errors.Errorf("failed to create Azure credential: %s", strings.Join(errMsgs, "\n\t"))
 	}
 
-	return azidentity.NewChainedTokenCredential(credential, nil)
+	return NewChainedTokenCredential(credential, nil)
 }
 
 type configCredentialOptions struct {
@@ -144,4 +152,25 @@ func newConfigCredential(creds map[string]string, options configCredentialOption
 	}
 
 	return nil, errors.New("incomplete credential configuration. Only AZURE_TENANT_ID and AZURE_CLIENT_ID are set")
+}
+
+type credentialError struct {
+	credType string
+	err      error
+}
+
+func (c *credentialError) Error() string {
+	return fmt.Sprintf("%s: %s", c.credType, c.err.Error())
+}
+
+// credentialErrorReporter is a substitute for credentials that couldn't be constructed.
+// Its GetToken method always returns an error having the same message as
+// the error that prevented constructing the credential. This ensures the message is present
+// in the error returned by ChainedTokenCredential.GetToken()
+type credentialErrorReporter struct {
+	err *credentialError
+}
+
+func (c *credentialErrorReporter) GetToken(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
+	return azcore.AccessToken{}, c.err
 }
