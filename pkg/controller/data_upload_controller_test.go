@@ -233,7 +233,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		return nil, err
 	}
 	return NewDataUploadReconciler(fakeClient, fakeKubeClient, fakeSnapshotClient.SnapshotV1(), dataPathMgr, nil, nil,
-		testclocks.NewFakeClock(now), &credentials.CredentialGetter{FromFile: credentialFileStore}, "test_node", fakeFS, time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
+		testclocks.NewFakeClock(now), &credentials.CredentialGetter{FromFile: credentialFileStore}, "test-node", fakeFS, time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
 }
 
 func dataUploadBuilder() *builder.DataUploadBuilder {
@@ -336,6 +336,7 @@ func TestReconcile(t *testing.T) {
 		expectedErrMsg      string
 		needErrs            []bool
 		peekErr             error
+		notCreateFSBR       bool
 	}{
 		{
 			name:              "Dataupload is not initialized",
@@ -411,6 +412,32 @@ func TestReconcile(t *testing.T) {
 			expectedProcessed: false,
 			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseCanceling).Result(),
 			expectedRequeue:   ctrl.Result{},
+		},
+		{
+			name: "Dataupload should be cancel with match node",
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			du: func() *velerov2alpha1api.DataUpload {
+				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).SnapshotType(fakeSnapshotType).Cancel(true).Result()
+				du.Status.Node = "test-node"
+				return du
+			}(),
+			expectedProcessed: true,
+			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseCanceled).Result(),
+			expectedRequeue:   ctrl.Result{},
+			notCreateFSBR:     true,
+		},
+		{
+			name: "Dataupload should not be cancel with dismatch node",
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			du: func() *velerov2alpha1api.DataUpload {
+				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).SnapshotType(fakeSnapshotType).Cancel(true).Result()
+				du.Status.Node = "different_node"
+				return du
+			}(),
+			expectedProcessed: false,
+			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
+			expectedRequeue:   ctrl.Result{},
+			notCreateFSBR:     true,
 		},
 		{
 			name:              "runCancelableDataUpload is concurrent limited",
@@ -511,16 +538,17 @@ func TestReconcile(t *testing.T) {
 			} else if test.du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
 				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
 			}
-
-			datapath.FSBRCreator = func(string, string, kbclient.Client, string, datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
-				return &fakeDataUploadFSBR{
-					du:         test.du,
-					kubeClient: r.client,
-					clock:      r.Clock,
+			if !test.notCreateFSBR {
+				datapath.FSBRCreator = func(string, string, kbclient.Client, string, datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
+					return &fakeDataUploadFSBR{
+						du:         test.du,
+						kubeClient: r.client,
+						clock:      r.Clock,
+					}
 				}
 			}
 
-			if test.du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
+			if test.du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress && !test.notCreateFSBR {
 				if fsBR := r.dataPathMgr.GetAsyncBR(test.du.Name); fsBR == nil {
 					_, err := r.dataPathMgr.CreateFileSystemBR(test.du.Name, pVBRRequestor, ctx, r.client, velerov1api.DefaultNamespace, datapath.Callbacks{OnCancelled: r.OnDataUploadCancelled}, velerotest.NewLogger())
 					require.NoError(t, err)

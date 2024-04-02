@@ -271,6 +271,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// Update status to InProgress
 		original := dd.DeepCopy()
 		dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseInProgress
+		dd.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if err := r.client.Patch(ctx, dd, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Error("Unable to update status to in progress")
 			return ctrl.Result{}, err
@@ -290,7 +291,11 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Info("Data download is being canceled")
 			fsRestore := r.dataPathMgr.GetAsyncBR(dd.Name)
 			if fsRestore == nil {
-				r.OnDataDownloadCancelled(ctx, dd.GetNamespace(), dd.GetName())
+				if r.nodeName == dd.Status.Node {
+					r.OnDataDownloadCancelled(ctx, dd.GetNamespace(), dd.GetName())
+				} else {
+					log.Info("Data path is not started in this node and will not canceled by current node")
+				}
 				return ctrl.Result{}, nil
 			}
 
@@ -668,7 +673,6 @@ func (r *DataDownloadReconciler) acceptDataDownload(ctx context.Context, dd *vel
 
 	updateFunc := func(datadownload *velerov2alpha1api.DataDownload) {
 		datadownload.Status.Phase = velerov2alpha1api.DataDownloadPhaseAccepted
-		datadownload.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		labels := datadownload.GetLabels()
 		if labels == nil {
 			labels = make(map[string]string)

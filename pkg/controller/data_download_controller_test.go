@@ -149,7 +149,7 @@ func initDataDownloadReconcilerWithError(objects []runtime.Object, needError ...
 
 	dataPathMgr := datapath.NewManager(1)
 
-	return NewDataDownloadReconciler(fakeClient, fakeKubeClient, dataPathMgr, nil, &credentials.CredentialGetter{FromFile: credentialFileStore}, "test_node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
+	return NewDataDownloadReconciler(fakeClient, fakeKubeClient, dataPathMgr, nil, &credentials.CredentialGetter{FromFile: credentialFileStore}, "test-node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
 }
 
 func TestDataDownloadReconcile(t *testing.T) {
@@ -207,11 +207,40 @@ func TestDataDownloadReconcile(t *testing.T) {
 			mockCancel: true,
 		},
 		{
-			name:           "Cancel data downloand in progress",
-			dd:             dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Result(),
+			name: "Cancel data downloand in progress with create FSBR",
+			dd: func() *velerov2alpha1api.DataDownload {
+				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Result()
+				dd.Status.Node = "test-node"
+				return dd
+			}(),
 			targetPVC:      builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
 			needCreateFSBR: true,
 			mockCancel:     true,
+			expected:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseCanceling).Result(),
+		},
+		{
+			name: "Cancel data downloand in progress without create FSBR",
+			dd: func() *velerov2alpha1api.DataDownload {
+				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Result()
+				dd.Status.Node = "test-node"
+				return dd
+			}(),
+			targetPVC:      builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			needCreateFSBR: false,
+			mockCancel:     true,
+			expected:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Result(),
+		},
+		{
+			name: "Cancel data downloand in progress in different node",
+			dd: func() *velerov2alpha1api.DataDownload {
+				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Result()
+				dd.Status.Node = "different-node"
+				return dd
+			}(),
+			targetPVC:      builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			needCreateFSBR: false,
+			mockCancel:     true,
+			expected:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Result(),
 		},
 		{
 			name:           "Error in data path is concurrent limited",
