@@ -353,6 +353,17 @@ Velero restores resources for CSI snapshot data movement restore in the same way
 - When the data transfer completes or any error happens, Velero built-in data mover sets the `DataDownload` CR to the terminal state, either `Completed` or `Failed`.  
 - Velero built-in data mover also monitors the cancellation request to the `DataDownload` CR, once that happens, it cancels its ongoing activities, cleans up the intermediate resources and set the `DataDownload` CR to `Cancelled`.  
 
+### Backup Deletion
+When a backup is created, a snapshot is saved into the repository for the volume data. The snapshot is a reference to the volume data saved in the repository.  
+When deleting a backup, Velero calls the repository to delete the repository snapshot. So the repository snapshot disappears immediately after the backup is deleted. Then the volume data backed up in the repository turns to orphan, but it is not deleted by this time. The repository relies on the maintenance functionalitiy to delete the orphan data.  
+As a result, after you delete a backup, you don't see the backup storage size reduces until some full maintenance jobs completes successfully. And for the same reason, you should check and make sure that the periodical repository maintenance job runs and completes successfully.  
+
+Even after deleting all the backups and their backup data (by repository maintenance), the backup storage is still not empty, some repository metadata are there to keep the instance of the backup repository.  
+Furthermore, Velero never deletes these repository metadata, if you are sure you'll never usage the backup repository, you can empty the backup storage manually.  
+
+For Velero built-in data mover, Kopia uploader may keep some internal snapshots which is not managed by Velero. In normal cases, the internal snapshots are deleted along with running of backups.  
+However, if you run a backup which aborts halfway(some internal snapshots are thereby generated) and never run new backups again, some internal snapshots may be left there. In this case, since you stop using the backup repository, you can delete the entire repository metadata from the backup storage manually.  
+
 
 ### Parallelism
 
