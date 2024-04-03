@@ -19,6 +19,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,8 +34,6 @@ import (
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
-const deletionTest = "deletion-workload"
-
 // Test backup and restore of Kibishi using restic
 
 func BackupDeletionWithSnapshots() {
@@ -45,11 +44,7 @@ func BackupDeletionWithRestic() {
 	backup_deletion_test(false)
 }
 func backup_deletion_test(useVolumeSnapshots bool) {
-	var (
-		backupName string
-		veleroCfg  VeleroConfig
-	)
-	veleroCfg = VeleroCfg
+	veleroCfg := VeleroCfg
 	veleroCfg.UseVolumeSnapshots = useVolumeSnapshots
 	veleroCfg.UseNodeAgent = !useVolumeSnapshots
 
@@ -76,16 +71,23 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 
 	When("kibishii is the sample workload", func() {
 		It("Deleted backups are deleted from object storage and backups deleted from object storage can be deleted locally", func() {
-			backupName = "backup-" + UUIDgen.String()
-			Expect(runBackupDeletionTests(*veleroCfg.ClientToInstallVelero, veleroCfg, backupName, "", useVolumeSnapshots, veleroCfg.KibishiiDirectory)).To(Succeed(),
+			Expect(runBackupDeletionTests(*veleroCfg.ClientToInstallVelero, veleroCfg, "", useVolumeSnapshots, veleroCfg.KibishiiDirectory)).To(Succeed(),
 				"Failed to run backup deletion test")
 		})
 	})
 }
 
-// runBackupDeletionTests runs upgrade test on the provider by kibishii.
-func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupName, backupLocation string,
+// runUpgradeTests runs upgrade test on the provider by kibishii.
+func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupLocation string,
 	useVolumeSnapshots bool, kibishiiDirectory string) error {
+	var err error
+	var snapshotCheckPoint SnapshotCheckPoint
+	backupName := "backup-" + UUIDgen.String()
+
+	workloadNamespaceList := []string{"backup-deletion-1-" + UUIDgen.String(), "backup-deletion-2-" + UUIDgen.String()}
+	nsCount := len(workloadNamespaceList)
+	workloadNamespaces := strings.Join(workloadNamespaceList[:], ",")
+
 	if useVolumeSnapshots && veleroCfg.CloudProvider == "kind" {
 		Skip("Volume snapshots not supported on kind")
 	}
@@ -98,29 +100,30 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 	bslPrefix := veleroCfg.BSLPrefix
 	bslConfig := veleroCfg.BSLConfig
 	veleroFeatures := veleroCfg.Features
+	for _, ns := range workloadNamespaceList {
+		if err := CreateNamespace(oneHourTimeout, client, ns); err != nil {
+			return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", ns)
+		}
+		if !veleroCfg.Debug {
+			defer func() {
+				if err := DeleteNamespace(context.Background(), client, ns, true); err != nil {
+					fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", ns))
+				}
+			}()
+		}
+		if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, ns,
+			registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData); err != nil {
+			return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", ns)
+		}
+		err := ObjectsShouldNotBeInBucket(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLPrefix, veleroCfg.BSLConfig, backupName, BackupObjectsPrefix, 1)
+		if err != nil {
+			return err
+		}
+	}
 
-	if err := CreateNamespace(oneHourTimeout, client, deletionTest); err != nil {
-		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", deletionTest)
-	}
-	if !veleroCfg.Debug {
-		defer func() {
-			if err := DeleteNamespace(context.Background(), client, deletionTest, true); err != nil {
-				fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", deletionTest))
-			}
-		}()
-	}
-
-	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, deletionTest,
-		registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData); err != nil {
-		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", deletionTest)
-	}
-	err := ObjectsShouldNotBeInBucket(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLPrefix, veleroCfg.BSLConfig, backupName, BackupObjectsPrefix, 1)
-	if err != nil {
-		return err
-	}
 	var BackupCfg BackupConfig
 	BackupCfg.BackupName = backupName
-	BackupCfg.Namespace = deletionTest
+	BackupCfg.Namespace = workloadNamespaces
 	BackupCfg.BackupLocation = backupLocation
 	BackupCfg.UseVolumeSnapshots = useVolumeSnapshots
 	BackupCfg.DefaultVolumesToFsBackup = !useVolumeSnapshots
@@ -133,34 +136,70 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 			return "Fail to backup workload"
 		})
 	})
-
-	if providerName == Vsphere && useVolumeSnapshots {
-		// Wait for uploads started by the Velero Plugin for vSphere to complete
-		// TODO - remove after upload progress monitoring is implemented
-		fmt.Println("Waiting for vSphere uploads to complete")
-		if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, deletionTest, 2); err != nil {
-			return errors.Wrapf(err, "Error waiting for uploads to complete")
+	for _, ns := range workloadNamespaceList {
+		if providerName == Vsphere && useVolumeSnapshots {
+			// Wait for uploads started by the Velero Plugin for vSphere to complete
+			// TODO - remove after upload progress monitoring is implemented
+			fmt.Println("Waiting for vSphere uploads to complete")
+			if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, ns, DefaultKibishiiWorkerCounts); err != nil {
+				return errors.Wrapf(err, "Error waiting for uploads to complete")
+			}
 		}
 	}
 	err = ObjectsShouldBeInBucket(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslPrefix, bslConfig, backupName, BackupObjectsPrefix)
 	if err != nil {
 		return err
 	}
-	var snapshotCheckPoint SnapshotCheckPoint
+
 	if useVolumeSnapshots {
-		snapshotCheckPoint, err = GetSnapshotCheckPoint(client, veleroCfg, 2, deletionTest, backupName, KibishiiPVCNameList)
-		Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
-		err = SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,
-			veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslConfig,
-			backupName, snapshotCheckPoint)
+		// Check for snapshots existence
+		if veleroCfg.CloudProvider == Vsphere {
+			// For vSphere, checking snapshot should base on namespace and backup name
+			for _, ns := range workloadNamespaceList {
+				snapshotCheckPoint, err = GetSnapshotCheckPoint(client, veleroCfg, DefaultKibishiiWorkerCounts, ns, backupName, KibishiiPVCNameList)
+				Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
+				err = SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,
+					veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslConfig,
+					backupName, snapshotCheckPoint)
+				if err != nil {
+					return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
+				}
+			}
+		} else {
+			// For public cloud, When using backup name to index VolumeSnapshotContents, make sure count of VolumeSnapshotContents should including PVs in all namespace
+			// so VolumeSnapshotContents count should be equal to "namespace count" * "Kibishii worker count per namespace".
+			snapshotCheckPoint, err = GetSnapshotCheckPoint(client, veleroCfg, DefaultKibishiiWorkerCounts*nsCount, "", backupName, KibishiiPVCNameList)
+			Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
+
+			// Get all snapshots base on backup name, regardless of namespaces
+			err = SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,
+				veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, bslConfig,
+				backupName, snapshotCheckPoint)
+			if err != nil {
+				return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
+			}
+		}
+	} else {
+		// Check for BackupRepository and DeleteRequest
+		var brList, pvbList []string
+		brList, err = KubectlGetBackupRepository(oneHourTimeout, "kopia", veleroCfg.VeleroNamespace)
 		if err != nil {
-			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
+			return err
+		}
+		pvbList, err = KubectlGetPodVolumeBackup(oneHourTimeout, BackupCfg.BackupName, veleroCfg.VeleroNamespace)
+
+		fmt.Println(brList)
+		fmt.Println(pvbList)
+		if err != nil {
+			return err
 		}
 	}
-	err = DeleteBackupResource(context.Background(), backupName, &veleroCfg)
+
+	err = DeleteBackup(context.Background(), backupName, &veleroCfg)
 	if err != nil {
 		return err
 	}
+
 	if useVolumeSnapshots {
 		err = SnapshotsShouldNotExistInCloud(veleroCfg.CloudProvider,
 			veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLConfig,
@@ -207,7 +246,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupNam
 		return err
 	}
 
-	err = DeleteBackupResource(context.Background(), backupName, &veleroCfg)
+	err = DeleteBackup(context.Background(), backupName, &veleroCfg)
 	if err != nil {
 		return errors.Wrapf(err, "|| UNEXPECTED || - Failed to delete backup %q", backupName)
 	} else {
