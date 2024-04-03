@@ -241,14 +241,11 @@ kubectl -n velero get datadownloads -l velero.io/restore-name=YOUR_RESTORE_NAME 
 
 ## Limitations
 
-- CSI and CSI snapshot support both file system volume mode and block volume mode. At present, Velero built-in data mover doesn't support 
-block mode volume or volume snapshot. 
+- CSI and CSI snapshot support both file system volume mode and block volume mode. At present, block mode is only supported for non-Windows platforms, because the block mode code invokes some system calls that are not present in the Windows platform.  
 - [Velero built-in data mover] At present, Velero uses a static, common encryption key for all backup repositories it creates. **This means 
 that anyone who has access to your backup storage can decrypt your backup data**. Make sure that you limit access 
 to the backup storage appropriately. 
-- [Velero built-in data mover] Even though the backup data could be incrementally preserved, for a single file data, Velero built-in data mover leverages on deduplication to find the difference to be saved. This means that large files (such as ones storing a database) will take a long time to scan for data  deduplication, even if the actual difference is small.
-- [Velero built-in data mover] You may need to [customize the resource limits][11] to make sure backups complete successfully for massive small files or large backup size cases, for more details refer to [Velero file system level backup performance guide][12]. 
-- The block mode is supported by the Kopia uploader, but it only supports non-Windows platforms, because the block mode code invokes some system calls that are not present in the Windows platform.
+- [Velero built-in data mover] Even though the backup data could be incrementally preserved, for a single file data, Velero built-in data mover leverages on deduplication to find the difference to be saved. This means that large files (such as ones storing a database) will take a long time to scan for data  deduplication, even if the actual difference is small.  
 
 ## Troubleshooting
 
@@ -387,6 +384,53 @@ However, Velero cancels the `DataUpload`/`DataDownload` in below scenarios autom
 
 Customized data movers that support cancellation could cancel their ongoing tasks and clean up any intermediate resources. If you are using Velero built-in data mover, the cancellation is supported.  
 
+### Support ReadOnlyRootFilesystem setting
+When the Velero server/node-agent pod's SecurityContext sets the `ReadOnlyRootFileSystem` parameter to true, the Velero server/node-agent pod's filesystem is running in read-only mode. Then the backup/restore may fail, because the uploader/repository needs to write some cache and configuration data into the pod's root filesystem.
+
+```
+Errors: Velero:    name: /mongodb-0 message: /Error backing up item error: /failed to wait BackupRepository: backup repository is not ready: error to connect to backup repo: error to connect repo with storage: error to connect to repository: unable to write config file: unable to create config directory: mkdir /home/cnb/udmrepo: read-only file system name: /mongodb-1 message: /Error backing up item error: /failed to wait BackupRepository: backup repository is not ready: error to connect to backup repo: error to connect repo with storage: error to connect to repository: unable to write config file: unable to create config directory: mkdir /home/cnb/udmrepo: read-only file system name: /mongodb-2 message: /Error backing up item error: /failed to wait BackupRepository: backup repository is not ready: error to connect to backup repo: error to connect repo with storage: error to connect to repository: unable to write config file: unable to create config directory: mkdir /home/cnb/udmrepo: read-only file system Cluster:    <none>
+```
+
+The workaround is making those directories as ephemeral k8s volumes, then those directories are not counted as pod's root filesystem.
+The `user-name` is the Velero pod's running user name. The default value is `cnb`.
+
+``` yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: velero
+  namespace: velero
+spec:
+  template:
+    spec:
+      containers:
+      - name: velero
+        ......
+        volumeMounts:
+          ......
+          - mountPath: /home/<user-name>/udmrepo
+            name: udmrepo
+          - mountPath: /home/<user-name>/.cache
+            name: cache
+          ......
+      volumes:
+        ......
+        - emptyDir: {}
+          name: udmrepo
+        - emptyDir: {}
+          name: cache
+        ......
+```
+
+### Resource Consumption
+
+Both the uploader and repository consume remarkable CPU/memory during the backup/restore, especially for massive small files or large backup size cases.  
+Velero node-agent uses [BestEffort as the QoS][13] for node-agent pods (so no CPU/memory request/limit is set), so that backups/restores wouldn't fail due to resource throttling in any cases.  
+If you want to constraint the CPU/memory usage, you need to [customize the resource limits][11]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][12] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.   
+
+During the restore, the repository may also cache data/metadata so as to reduce the network footprint and speed up the restore. The repository uses its own policy to store and clean up the cache.  
+For Kopia repository, the cache is stored in the node-agent pod's root file system and the cleanup is triggered for the data/metadata that are older than 10 minutes (not configurable at present). So you should prepare enough disk space, otherwise, the node-agent pod may be evicted due to running out of the ephemeral storage.  
+
 
 [1]: https://github.com/vmware-tanzu/velero/pull/5968
 [2]: csi.md
@@ -400,3 +444,4 @@ Customized data movers that support cancellation could cancel their ongoing task
 [10]: restore-reference.md#changing-pv/pvc-Storage-Classes
 [11]: customize-installation.md#customize-resource-requests-and-limits
 [12]: performance-guidance.md
+[13]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
