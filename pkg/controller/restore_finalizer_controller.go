@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/clock"
 
+	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
@@ -55,6 +56,7 @@ type restoreFinalizerReconciler struct {
 	metrics           *metrics.ServerMetrics
 	clock             clock.WithTickerAndDelayedExecution
 	crClient          client.Client
+	multiHookTracker  *hook.MultiHookTracker
 }
 
 func NewRestoreFinalizerReconciler(
@@ -65,6 +67,7 @@ func NewRestoreFinalizerReconciler(
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	metrics *metrics.ServerMetrics,
 	crClient client.Client,
+	multiHookTracker *hook.MultiHookTracker,
 ) *restoreFinalizerReconciler {
 	return &restoreFinalizerReconciler{
 		Client:            client,
@@ -75,6 +78,7 @@ func NewRestoreFinalizerReconciler(
 		metrics:           metrics,
 		clock:             &clock.RealClock{},
 		crClient:          crClient,
+		multiHookTracker:  multiHookTracker,
 	}
 }
 
@@ -151,11 +155,12 @@ func (r *restoreFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	restoredPVCList := volume.RestoredPVCFromRestoredResourceList(restoredResourceList)
 
 	finalizerCtx := &finalizerContext{
-		logger:          log,
-		restore:         restore,
-		crClient:        r.crClient,
-		volumeInfo:      volumeInfo,
-		restoredPVCList: restoredPVCList,
+		logger:           log,
+		restore:          restore,
+		crClient:         r.crClient,
+		volumeInfo:       volumeInfo,
+		restoredPVCList:  restoredPVCList,
+		multiHookTracker: r.multiHookTracker,
 	}
 	warnings, errs := finalizerCtx.execute()
 
@@ -233,11 +238,12 @@ func (r *restoreFinalizerReconciler) finishProcessing(restorePhase velerov1api.R
 // finalizerContext includes all the dependencies required by finalization tasks and
 // a function execute() to orderly implement task logic.
 type finalizerContext struct {
-	logger          logrus.FieldLogger
-	restore         *velerov1api.Restore
-	crClient        client.Client
-	volumeInfo      []*volume.BackupVolumeInfo
-	restoredPVCList map[string]struct{}
+	logger           logrus.FieldLogger
+	restore          *velerov1api.Restore
+	crClient         client.Client
+	volumeInfo       []*volume.BackupVolumeInfo
+	restoredPVCList  map[string]struct{}
+	multiHookTracker *hook.MultiHookTracker
 }
 
 func (ctx *finalizerContext) execute() (results.Result, results.Result) { //nolint:unparam //temporarily ignore the lint report: result 0 is always nil (unparam)
@@ -246,6 +252,9 @@ func (ctx *finalizerContext) execute() (results.Result, results.Result) { //noli
 	// implement finalization tasks
 	pdpErrs := ctx.patchDynamicPVWithVolumeInfo()
 	errs.Merge(&pdpErrs)
+
+	rehErrs := ctx.WaitRestoreExecHook()
+	errs.Merge(&rehErrs)
 
 	return warnings, errs
 }
@@ -372,4 +381,46 @@ func needPatch(newPV *v1.PersistentVolume, pvInfo *volume.PVInfo) bool {
 	}
 
 	return false
+}
+
+// WaitRestoreExecHook waits for restore exec hooks to finish then update the hook execution results
+func (ctx *finalizerContext) WaitRestoreExecHook() (errs results.Result) {
+	log := ctx.logger.WithField("restore", ctx.restore.Name)
+	log.Info("Waiting for restore exec hooks starts")
+
+	// wait for restore exec hooks to finish
+	err := wait.PollUntilContextCancel(context.Background(), 1*time.Second, true, func(context.Context) (bool, error) {
+		log.Debug("Checking the progress of hooks execution")
+		if ctx.multiHookTracker.IsComplete(ctx.restore.Name) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		errs.Add(ctx.restore.Namespace, err)
+		return errs
+	}
+	log.Info("Done waiting for restore exec hooks starts")
+
+	for _, ei := range ctx.multiHookTracker.HookErrs(ctx.restore.Name) {
+		errs.Add(ei.Namespace, ei.Err)
+	}
+
+	// update hooks execution status
+	updated := ctx.restore.DeepCopy()
+	if updated.Status.HookStatus == nil {
+		updated.Status.HookStatus = &velerov1api.HookStatus{}
+	}
+	updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed = ctx.multiHookTracker.Stat(ctx.restore.Name)
+	log.Debugf("hookAttempted: %d, hookFailed: %d", updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed)
+
+	if err := kubeutil.PatchResource(ctx.restore, updated, ctx.crClient); err != nil {
+		log.WithError(errors.WithStack((err))).Error("Updating restore status")
+		errs.Add(ctx.restore.Namespace, err)
+	}
+
+	// delete the hook data for this restore
+	ctx.multiHookTracker.Delete(ctx.restore.Name)
+
+	return errs
 }

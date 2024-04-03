@@ -39,7 +39,8 @@ type WaitExecHookHandler interface {
 		log logrus.FieldLogger,
 		pod *v1.Pod,
 		byContainer map[string][]PodExecRestoreHook,
-		hookTrack *HookTracker,
+		multiHookTracker *MultiHookTracker,
+		restoreName string,
 	) []error
 }
 
@@ -74,7 +75,8 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	log logrus.FieldLogger,
 	pod *v1.Pod,
 	byContainer map[string][]PodExecRestoreHook,
-	hookTracker *HookTracker,
+	multiHookTracker *MultiHookTracker,
+	restoreName string,
 ) []error {
 	if pod == nil {
 		return nil
@@ -167,7 +169,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					hookLog.Error(err)
 					errors = append(errors, err)
 
-					errTracker := hookTracker.Record(newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true)
+					errTracker := multiHookTracker.Record(restoreName, newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true, err)
 					if errTracker != nil {
 						hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 					}
@@ -193,7 +195,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					hookFailed = true
 				}
 
-				errTracker := hookTracker.Record(newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), hookFailed)
+				errTracker := multiHookTracker.Record(restoreName, newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), hookFailed, hookErr)
 				if errTracker != nil {
 					hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 				}
@@ -245,7 +247,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 				},
 			)
 
-			errTracker := hookTracker.Record(pod.Namespace, pod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true)
+			errTracker := multiHookTracker.Record(restoreName, pod.Namespace, pod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true, err)
 			if errTracker != nil {
 				hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 			}
