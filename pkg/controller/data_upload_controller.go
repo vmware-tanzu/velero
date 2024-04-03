@@ -282,6 +282,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// Update status to InProgress
 		original := du.DeepCopy()
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseInProgress
+		du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if err := r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
 			return r.errorOut(ctx, du, err, "error updating dataupload status", log)
 		}
@@ -300,7 +301,11 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 			fsBackup := r.dataPathMgr.GetAsyncBR(du.Name)
 			if fsBackup == nil {
-				r.OnDataUploadCancelled(ctx, du.GetNamespace(), du.GetName())
+				if du.Status.Node == r.nodeName {
+					r.OnDataUploadCancelled(ctx, du.GetNamespace(), du.GetName())
+				} else {
+					log.Info("Data path is not started in this node and will not canceled by current node")
+				}
 				return ctrl.Result{}, nil
 			}
 
@@ -720,7 +725,6 @@ func (r *DataUploadReconciler) acceptDataUpload(ctx context.Context, du *velerov
 
 	updateFunc := func(dataUpload *velerov2alpha1api.DataUpload) {
 		dataUpload.Status.Phase = velerov2alpha1api.DataUploadPhaseAccepted
-		dataUpload.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		labels := dataUpload.GetLabels()
 		if labels == nil {
 			labels = make(map[string]string)
