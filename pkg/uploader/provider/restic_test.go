@@ -156,7 +156,7 @@ func TestResticRunBackup(t *testing.T) {
 			}
 
 			tc.rp.log.Infof("test name %v error %v", tc.name, err)
-			require.Equal(t, true, tc.errorHandleFunc(err))
+			require.True(t, tc.errorHandleFunc(err))
 		})
 	}
 }
@@ -229,7 +229,7 @@ func TestResticRunRestore(t *testing.T) {
 			}
 
 			tc.rp.log.Infof("test name %v error %v", tc.name, err)
-			require.Equal(t, true, tc.errorHandleFunc(err))
+			require.True(t, tc.errorHandleFunc(err))
 		})
 	}
 }

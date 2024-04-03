@@ -814,7 +814,7 @@ func TestToSystemAffinity(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			affinity := toSystemAffinity(test.loadAffinity)
-			assert.Equal(t, true, reflect.DeepEqual(affinity, test.expected))
+			assert.True(t, reflect.DeepEqual(affinity, test.expected))
 		})
 	}
 }
