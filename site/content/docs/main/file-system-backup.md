@@ -573,7 +573,18 @@ on to running other init containers/the main containers.
 
 Velero won't restore a resource if a that resource is scaled to 0 and already exists in the cluster. If Velero restored the 
 requested pods in this scenario, the Kubernetes reconciliation loops that manage resources would delete the running pods 
-because its scaled to be 0. Velero will be able to restore once the resources is scaled up, and the pods are created and remain running.
+because its scaled to be 0. Velero will be able to restore once the resources is scaled up, and the pods are created and remain running.  
+
+### Backup Deletion
+When a backup is created, a snapshot is saved into the repository for the volume data under the both path. The snapshot is a reference to the volume data saved in the repository.  
+When deleting a backup, Velero calls the repository to delete the repository snapshot. So the repository snapshot disappears immediately after the backup is deleted. Then the volume data backed up in the repository turns to orphan, but it is not deleted by this time. The repository relies on the maintenance functionalitiy to delete the orphan data.  
+As a result, after you delete a backup, you don't see the backup storage size reduces until some full maintenance jobs completes successfully. And for the same reason, you should check and make sure that the periodical repository maintenance job runs and completes successfully.  
+
+Even after deleting all the backups and their backup data (by repository maintenance), the backup storage is still not empty, some repository metadata are there to keep the instance of the backup repository.  
+Furthermore, Velero never deletes these repository metadata, if you are sure you'll never usage the backup repository, you can empty the backup storage manually.  
+
+For Kopia path, Kopia uploader may keep some internal snapshots which is not managed by Velero. In normal cases, the internal snapshots are deleted along with running of backups.  
+However, if you run a backup which aborts halfway(some internal snapshots are thereby generated) and never run new backups again, some internal snapshots may be left there. In this case, since you stop using the backup repository, you can delete the entire repository metadata from the backup storage manually.  
 
 ## 3rd party controllers
 
