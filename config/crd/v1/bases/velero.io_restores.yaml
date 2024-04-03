@@ -432,8 +432,6 @@ spec:
                     nullable: true
                     type: boolean
                 type: object
-            required:
-            - backupName
             type: object
           status:
             description: RestoreStatus captures the current status of a Velero restore
