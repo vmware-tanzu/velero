@@ -74,8 +74,8 @@ type BackupStore interface {
 	GetCSIVolumeSnapshots(name string) ([]*snapshotv1api.VolumeSnapshot, error)
 	GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1api.VolumeSnapshotContent, error)
 	GetCSIVolumeSnapshotClasses(name string) ([]*snapshotv1api.VolumeSnapshotClass, error)
-	GetBackupVolumeInfos(name string) ([]*volume.VolumeInfo, error)
 	PutBackupVolumeInfos(name string, volumeInfo io.Reader) error
+	GetBackupVolumeInfos(name string) ([]*volume.BackupVolumeInfo, error)
 	GetRestoreResults(name string) (map[string]results.Result, error)
 
 	// BackupExists checks if the backup metadata file exists in object storage.
@@ -88,6 +88,7 @@ type BackupStore interface {
 	PutRestoredResourceList(restore string, results io.Reader) error
 	PutRestoreItemOperations(restore string, restoreItemOperations io.Reader) error
 	GetRestoreItemOperations(name string) ([]*itemoperation.RestoreOperation, error)
+	PutRestoreVolumeInfo(restore string, volumeInfo io.Reader) error
 	DeleteRestore(name string) error
 	GetRestoredResourceList(name string) (map[string][]string, error)
 
@@ -498,8 +499,8 @@ func (s *objectBackupStore) GetPodVolumeBackups(name string) ([]*velerov1api.Pod
 	return podVolumeBackups, nil
 }
 
-func (s *objectBackupStore) GetBackupVolumeInfos(name string) ([]*volume.VolumeInfo, error) {
-	volumeInfos := make([]*volume.VolumeInfo, 0)
+func (s *objectBackupStore) GetBackupVolumeInfos(name string) ([]*volume.BackupVolumeInfo, error) {
+	volumeInfos := make([]*volume.BackupVolumeInfo, 0)
 
 	res, err := tryGet(s.objectStore, s.bucket, s.layout.getBackupVolumeInfoKey(name))
 	if err != nil {
@@ -602,6 +603,10 @@ func (s *objectBackupStore) PutRestoreItemOperations(restore string, restoreItem
 	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getRestoreItemOperationsKey(restore), restoreItemOperations)
 }
 
+func (s *objectBackupStore) PutRestoreVolumeInfo(restore string, volumeInfo io.Reader) error {
+	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getRestoreVolumeInfoKey(restore), volumeInfo)
+}
+
 func (s *objectBackupStore) PutBackupItemOperations(backup string, backupItemOperations io.Reader) error {
 	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupItemOperationsKey(backup), backupItemOperations)
 }
@@ -638,6 +643,8 @@ func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (s
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupResultsKey(target.Name), DownloadURLTTL)
 	case velerov1api.DownloadTargetKindBackupVolumeInfos:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupVolumeInfoKey(target.Name), DownloadURLTTL)
+	case velerov1api.DownloadTargetKindRestoreVolumeInfo:
+		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getRestoreVolumeInfoKey(target.Name), DownloadURLTTL)
 	default:
 		return "", errors.Errorf("unsupported download target kind %q", target.Kind)
 	}

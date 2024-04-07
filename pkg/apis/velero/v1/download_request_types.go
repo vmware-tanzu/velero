@@ -42,6 +42,7 @@ const (
 	DownloadTargetKindCSIBackupVolumeSnapshots        DownloadTargetKind = "CSIBackupVolumeSnapshots"
 	DownloadTargetKindCSIBackupVolumeSnapshotContents DownloadTargetKind = "CSIBackupVolumeSnapshotContents"
 	DownloadTargetKindBackupVolumeInfos               DownloadTargetKind = "BackupVolumeInfos"
+	DownloadTargetKindRestoreVolumeInfo               DownloadTargetKind = "RestoreVolumeInfo"
 )
 
 // DownloadTarget is the specification for what kind of file to download, and the name of the

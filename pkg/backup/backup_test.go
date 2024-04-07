@@ -4454,7 +4454,7 @@ func TestGetVolumeInfos(t *testing.T) {
 	backupStore := new(persistencemocks.BackupStore)
 	h.backupper.pluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
 	h.backupper.backupStoreGetter = NewFakeSingleObjectBackupStoreGetter(backupStore)
-	backupStore.On("GetBackupVolumeInfos", "backup-01").Return([]*volume.VolumeInfo{}, nil)
+	backupStore.On("GetBackupVolumeInfos", "backup-01").Return([]*volume.BackupVolumeInfo{}, nil)
 	pluginManager.On("CleanupClients").Return()
 
 	backup := builder.ForBackup("velero", "backup-01").StorageLocation("default").Result()
@@ -4474,8 +4474,8 @@ func TestUpdateVolumeInfos(t *testing.T) {
 		name                string
 		operations          []*itemoperation.BackupOperation
 		dataUpload          *velerov2alpha1.DataUpload
-		volumeInfos         []*volume.VolumeInfo
-		expectedVolumeInfos []*volume.VolumeInfo
+		volumeInfos         []*volume.BackupVolumeInfo
+		expectedVolumeInfos []*volume.BackupVolumeInfo
 	}{
 		{
 			name: "CSISnapshot VolumeInfo update",
@@ -4489,7 +4489,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 					},
 				},
 			},
-			volumeInfos: []*volume.VolumeInfo{
+			volumeInfos: []*volume.BackupVolumeInfo{
 				{
 					BackupMethod:        volume.CSISnapshot,
 					CompletionTimestamp: &metav1.Time{},
@@ -4498,7 +4498,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 					},
 				},
 			},
-			expectedVolumeInfos: []*volume.VolumeInfo{
+			expectedVolumeInfos: []*volume.BackupVolumeInfo{
 				{
 					BackupMethod:        volume.CSISnapshot,
 					CompletionTimestamp: &now,
@@ -4519,7 +4519,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 				SourceNamespace("ns-1").
 				SourcePVC("pvc-1").
 				Result(),
-			volumeInfos: []*volume.VolumeInfo{
+			volumeInfos: []*volume.BackupVolumeInfo{
 				{
 					PVCName:             "pvc-1",
 					PVCNamespace:        "ns-1",
@@ -4529,7 +4529,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 					},
 				},
 			},
-			expectedVolumeInfos: []*volume.VolumeInfo{
+			expectedVolumeInfos: []*volume.BackupVolumeInfo{
 				{
 					PVCName:             "pvc-1",
 					PVCNamespace:        "ns-1",
@@ -4572,7 +4572,7 @@ func TestPutVolumeInfos(t *testing.T) {
 
 	backupStore.On("PutBackupVolumeInfos", mock.Anything, mock.Anything).Return(nil)
 
-	require.NoError(t, putVolumeInfos(backupName, []*volume.VolumeInfo{}, backupStore))
+	require.NoError(t, putVolumeInfos(backupName, []*volume.BackupVolumeInfo{}, backupStore))
 }
 
 type fakeSingleObjectBackupStoreGetter struct {

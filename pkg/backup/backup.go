@@ -798,7 +798,7 @@ type tarWriter interface {
 func (kb *kubernetesBackupper) getVolumeInfos(
 	backup velerov1api.Backup,
 	log logrus.FieldLogger,
-) (persistence.BackupStore, []*volume.VolumeInfo, error) {
+) (persistence.BackupStore, []*volume.BackupVolumeInfo, error) {
 	location := &velerov1api.BackupStorageLocation{}
 	if err := kb.kbClient.Get(context.Background(), kbclient.ObjectKey{
 		Namespace: backup.Namespace,
@@ -825,7 +825,7 @@ func (kb *kubernetesBackupper) getVolumeInfos(
 
 // updateVolumeInfos update the VolumeInfos according to the AsyncOperations
 func updateVolumeInfos(
-	volumeInfos []*volume.VolumeInfo,
+	volumeInfos []*volume.BackupVolumeInfo,
 	unstructuredItems []unstructured.Unstructured,
 	operations []*itemoperation.BackupOperation,
 	log logrus.FieldLogger,
@@ -874,7 +874,7 @@ func updateVolumeInfos(
 
 func putVolumeInfos(
 	backupName string,
-	volumeInfos []*volume.VolumeInfo,
+	volumeInfos []*volume.BackupVolumeInfo,
 	backupStore persistence.BackupStore,
 ) error {
 	backupVolumeInfoBuf := new(bytes.Buffer)

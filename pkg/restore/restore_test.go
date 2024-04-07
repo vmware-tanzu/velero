@@ -70,7 +70,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 		apiResources  []*test.APIResource
 		tarball       io.Reader
 		want          map[*test.APIResource][]string
-		volumeInfoMap map[string]volume.VolumeInfo
+		volumeInfoMap map[string]volume.BackupVolumeInfo
 	}{
 		{
 			name:    "Restore PV with native snapshot",
@@ -83,7 +83,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]volume.VolumeInfo{
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
 				"pv-1": {
 					BackupMethod: volume.NativeSnapshot,
 					PVName:       "pv-1",
@@ -107,11 +107,11 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]volume.VolumeInfo{
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
 				"pv-1": {
 					BackupMethod: volume.PodVolumeBackup,
 					PVName:       "pv-1",
-					PVBInfo: &volume.PodVolumeBackupInfo{
+					PVBInfo: &volume.PodVolumeInfo{
 						SnapshotHandle: "testSnapshotHandle",
 						Size:           100,
 						NodeName:       "testNode",
@@ -133,7 +133,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]volume.VolumeInfo{
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
 				"pv-1": {
 					BackupMethod:      volume.CSISnapshot,
 					SnapshotDataMoved: false,
@@ -158,7 +158,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]volume.VolumeInfo{
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
 				"pv-1": {
 					BackupMethod:      volume.CSISnapshot,
 					SnapshotDataMoved: true,
@@ -186,7 +186,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]volume.VolumeInfo{
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
 				"pv-1": {
 					PVName:  "pv-1",
 					Skipped: true,
@@ -207,7 +207,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]volume.VolumeInfo{
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
 				"pv-1": {
 					PVName:  "pv-1",
 					Skipped: true,
@@ -235,13 +235,13 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			h.restorer.featureVerifier = verifier
 
 			data := &Request{
-				Log:              h.log,
-				Restore:          tc.restore,
-				Backup:           tc.backup,
-				PodVolumeBackups: nil,
-				VolumeSnapshots:  nil,
-				BackupReader:     tc.tarball,
-				VolumeInfoMap:    tc.volumeInfoMap,
+				Log:                 h.log,
+				Restore:             tc.restore,
+				Backup:              tc.backup,
+				PodVolumeBackups:    nil,
+				VolumeSnapshots:     nil,
+				BackupReader:        tc.tarball,
+				BackupVolumeInfoMap: tc.volumeInfoMap,
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
@@ -3311,12 +3311,13 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			}
 
 			data := &Request{
-				Log:                h.log,
-				Restore:            tc.restore,
-				Backup:             tc.backup,
-				VolumeSnapshots:    tc.volumeSnapshots,
-				BackupReader:       tc.tarball,
-				CSIVolumeSnapshots: tc.csiVolumeSnapshots,
+				Log:                      h.log,
+				Restore:                  tc.restore,
+				Backup:                   tc.backup,
+				VolumeSnapshots:          tc.volumeSnapshots,
+				BackupReader:             tc.tarball,
+				CSIVolumeSnapshots:       tc.csiVolumeSnapshots,
+				RestoreVolumeInfoTracker: volume.NewRestoreVolInfoTracker(tc.restore, h.log, test.NewFakeControllerRuntimeClient(t)),
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
@@ -3441,7 +3442,7 @@ func TestRestoreWithPodVolume(t *testing.T) {
 					BackupLocation:   "",
 				}
 				restorer.
-					On("RestorePodVolumes", expectedArgs).
+					On("RestorePodVolumes", expectedArgs, mock.Anything).
 					Return(nil)
 			}
 

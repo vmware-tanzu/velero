@@ -61,3 +61,9 @@ func NewListOptionsForBackup(name string) metav1.ListOptions {
 		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.BackupNameLabel, GetValidName(name)),
 	}
 }
+
+// NewSelectorForRestore returns a Selector based on the restore name.
+// This is useful for interacting with Listers that need a Selector.
+func NewSelectorForRestore(name string) labels.Selector {
+	return labels.SelectorFromSet(map[string]string{velerov1api.RestoreNameLabel: GetValidName(name)})
+}

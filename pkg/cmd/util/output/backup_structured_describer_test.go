@@ -284,13 +284,13 @@ func TestDescribePodVolumeBackupsInSF(t *testing.T) {
 func TestDescribeNativeSnapshotsInSF(t *testing.T) {
 	testcases := []struct {
 		name         string
-		volumeInfo   []*volume.VolumeInfo
+		volumeInfo   []*volume.BackupVolumeInfo
 		inputDetails bool
 		expect       map[string]interface{}
 	}{
 		{
 			name: "no details",
-			volumeInfo: []*volume.VolumeInfo{
+			volumeInfo: []*volume.BackupVolumeInfo{
 				{
 					BackupMethod: volume.NativeSnapshot,
 					PVName:       "pv-1",
@@ -310,7 +310,7 @@ func TestDescribeNativeSnapshotsInSF(t *testing.T) {
 		},
 		{
 			name: "details",
-			volumeInfo: []*volume.VolumeInfo{
+			volumeInfo: []*volume.BackupVolumeInfo{
 				{
 					BackupMethod: volume.NativeSnapshot,
 					PVName:       "pv-1",
@@ -348,21 +348,21 @@ func TestDescribeNativeSnapshotsInSF(t *testing.T) {
 func TestDescribeCSISnapshotsInSF(t *testing.T) {
 	testcases := []struct {
 		name             string
-		volumeInfo       []*volume.VolumeInfo
+		volumeInfo       []*volume.BackupVolumeInfo
 		inputDetails     bool
 		expect           map[string]interface{}
 		legacyInfoSource bool
 	}{
 		{
 			name:       "empty info, not legacy",
-			volumeInfo: []*volume.VolumeInfo{},
+			volumeInfo: []*volume.BackupVolumeInfo{},
 			expect: map[string]interface{}{
 				"csiSnapshots": "<none included>",
 			},
 		},
 		{
 			name:             "empty info, legacy",
-			volumeInfo:       []*volume.VolumeInfo{},
+			volumeInfo:       []*volume.BackupVolumeInfo{},
 			legacyInfoSource: true,
 			expect: map[string]interface{}{
 				"csiSnapshots": "<none included or not detectable>",
@@ -370,7 +370,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 		},
 		{
 			name: "no details, local snapshot",
-			volumeInfo: []*volume.VolumeInfo{
+			volumeInfo: []*volume.BackupVolumeInfo{
 				{
 					BackupMethod:          volume.CSISnapshot,
 					PVCNamespace:          "pvc-ns-1",
@@ -395,7 +395,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 		},
 		{
 			name: "details, local snapshot",
-			volumeInfo: []*volume.VolumeInfo{
+			volumeInfo: []*volume.BackupVolumeInfo{
 				{
 					BackupMethod:          volume.CSISnapshot,
 					PVCNamespace:          "pvc-ns-2",
@@ -427,7 +427,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 		},
 		{
 			name: "no details, data movement",
-			volumeInfo: []*volume.VolumeInfo{
+			volumeInfo: []*volume.BackupVolumeInfo{
 				{
 					BackupMethod:      volume.CSISnapshot,
 					PVCNamespace:      "pvc-ns-3",
@@ -451,7 +451,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 		},
 		{
 			name: "details, data movement",
-			volumeInfo: []*volume.VolumeInfo{
+			volumeInfo: []*volume.BackupVolumeInfo{
 				{
 					BackupMethod:      volume.CSISnapshot,
 					PVCNamespace:      "pvc-ns-4",
@@ -480,7 +480,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 		},
 		{
 			name: "details, data movement, data mover is empty",
-			volumeInfo: []*volume.VolumeInfo{
+			volumeInfo: []*volume.BackupVolumeInfo{
 				{
 					BackupMethod:      volume.CSISnapshot,
 					PVCNamespace:      "pvc-ns-4",

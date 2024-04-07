@@ -439,8 +439,8 @@ func describeBackupVolumes(ctx context.Context, kbClient kbclient.Client, d *Des
 
 	d.Println("Backup Volumes:")
 
-	nativeSnapshots := []*volume.VolumeInfo{}
-	csiSnapshots := []*volume.VolumeInfo{}
+	nativeSnapshots := []*volume.BackupVolumeInfo{}
+	csiSnapshots := []*volume.BackupVolumeInfo{}
 	legacyInfoSource := false
 
 	buf := new(bytes.Buffer)
@@ -463,7 +463,7 @@ func describeBackupVolumes(ctx context.Context, kbClient kbclient.Client, d *Des
 		d.Printf("\t<error getting backup volume info: %v>\n", err)
 		return
 	} else {
-		var volumeInfos []volume.VolumeInfo
+		var volumeInfos []volume.BackupVolumeInfo
 		if err := json.NewDecoder(buf).Decode(&volumeInfos); err != nil {
 			d.Printf("\t<error reading backup volume info: %v>\n", err)
 			return
@@ -488,9 +488,9 @@ func describeBackupVolumes(ctx context.Context, kbClient kbclient.Client, d *Des
 	describePodVolumeBackups(d, details, podVolumeBackupCRs)
 }
 
-func retrieveNativeSnapshotLegacy(ctx context.Context, kbClient kbclient.Client, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) ([]*volume.VolumeInfo, error) {
+func retrieveNativeSnapshotLegacy(ctx context.Context, kbClient kbclient.Client, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) ([]*volume.BackupVolumeInfo, error) {
 	status := backup.Status
-	nativeSnapshots := []*volume.VolumeInfo{}
+	nativeSnapshots := []*volume.BackupVolumeInfo{}
 
 	if status.VolumeSnapshotsAttempted == 0 {
 		return nativeSnapshots, nil
@@ -507,7 +507,7 @@ func retrieveNativeSnapshotLegacy(ctx context.Context, kbClient kbclient.Client,
 	}
 
 	for _, snap := range snapshots {
-		volumeInfo := volume.VolumeInfo{
+		volumeInfo := volume.BackupVolumeInfo{
 			PVName: snap.Spec.PersistentVolumeName,
 			NativeSnapshotInfo: &volume.NativeSnapshotInfo{
 				SnapshotHandle: snap.Status.ProviderSnapshotID,
@@ -526,9 +526,9 @@ func retrieveNativeSnapshotLegacy(ctx context.Context, kbClient kbclient.Client,
 	return nativeSnapshots, nil
 }
 
-func retrieveCSISnapshotLegacy(ctx context.Context, kbClient kbclient.Client, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) ([]*volume.VolumeInfo, error) {
+func retrieveCSISnapshotLegacy(ctx context.Context, kbClient kbclient.Client, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) ([]*volume.BackupVolumeInfo, error) {
 	status := backup.Status
-	csiSnapshots := []*volume.VolumeInfo{}
+	csiSnapshots := []*volume.BackupVolumeInfo{}
 
 	if status.CSIVolumeSnapshotsAttempted == 0 {
 		return csiSnapshots, nil
@@ -557,7 +557,7 @@ func retrieveCSISnapshotLegacy(ctx context.Context, kbClient kbclient.Client, ba
 	}
 
 	for _, vsc := range vscList {
-		volInfo := volume.VolumeInfo{
+		volInfo := volume.BackupVolumeInfo{
 			PreserveLocalSnapshot: true,
 			CSISnapshotInfo: &volume.CSISnapshotInfo{
 				VSCName: vsc.Name,
@@ -598,7 +598,7 @@ func retrieveCSISnapshotLegacy(ctx context.Context, kbClient kbclient.Client, ba
 	return csiSnapshots, nil
 }
 
-func describeNativeSnapshots(d *Describer, details bool, infos []*volume.VolumeInfo) {
+func describeNativeSnapshots(d *Describer, details bool, infos []*volume.BackupVolumeInfo) {
 	if len(infos) == 0 {
 		d.Printf("\tVelero-Native Snapshots: <none included>\n")
 		return
@@ -610,7 +610,7 @@ func describeNativeSnapshots(d *Describer, details bool, infos []*volume.VolumeI
 	}
 }
 
-func describNativeSnapshot(d *Describer, details bool, info *volume.VolumeInfo) {
+func describNativeSnapshot(d *Describer, details bool, info *volume.BackupVolumeInfo) {
 	if details {
 		d.Printf("\t\t%s:\n", info.PVName)
 		d.Printf("\t\t\tSnapshot ID:\t%s\n", info.NativeSnapshotInfo.SnapshotHandle)
@@ -622,7 +622,7 @@ func describNativeSnapshot(d *Describer, details bool, info *volume.VolumeInfo) 
 	}
 }
 
-func describeCSISnapshots(d *Describer, details bool, infos []*volume.VolumeInfo, legacyInfoSource bool) {
+func describeCSISnapshots(d *Describer, details bool, infos []*volume.BackupVolumeInfo, legacyInfoSource bool) {
 	if len(infos) == 0 {
 		if legacyInfoSource {
 			d.Printf("\tCSI Snapshots: <none included or not detectable>\n")
@@ -638,14 +638,14 @@ func describeCSISnapshots(d *Describer, details bool, infos []*volume.VolumeInfo
 	}
 }
 
-func describeCSISnapshot(d *Describer, details bool, info *volume.VolumeInfo) {
+func describeCSISnapshot(d *Describer, details bool, info *volume.BackupVolumeInfo) {
 	d.Printf("\t\t%s:\n", fmt.Sprintf("%s/%s", info.PVCNamespace, info.PVCName))
 
 	describeLocalSnapshot(d, details, info)
 	describeDataMovement(d, details, info)
 }
 
-func describeLocalSnapshot(d *Describer, details bool, info *volume.VolumeInfo) {
+func describeLocalSnapshot(d *Describer, details bool, info *volume.BackupVolumeInfo) {
 	if !info.PreserveLocalSnapshot {
 		return
 	}
@@ -665,7 +665,7 @@ func describeLocalSnapshot(d *Describer, details bool, info *volume.VolumeInfo) 
 	}
 }
 
-func describeDataMovement(d *Describer, details bool, info *volume.VolumeInfo) {
+func describeDataMovement(d *Describer, details bool, info *volume.BackupVolumeInfo) {
 	if !info.SnapshotDataMoved {
 		return
 	}

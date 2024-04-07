@@ -52,17 +52,18 @@ func resourceKey(obj runtime.Object) string {
 type Request struct {
 	*velerov1api.Restore
 
-	Log                  logrus.FieldLogger
-	Backup               *velerov1api.Backup
-	PodVolumeBackups     []*velerov1api.PodVolumeBackup
-	VolumeSnapshots      []*volume.Snapshot
-	BackupReader         io.Reader
-	RestoredItems        map[itemKey]restoredItemStatus
-	itemOperationsList   *[]*itemoperation.RestoreOperation
-	ResourceModifiers    *resourcemodifiers.ResourceModifiers
-	DisableInformerCache bool
-	CSIVolumeSnapshots   []*snapshotv1api.VolumeSnapshot
-	VolumeInfoMap        map[string]volume.VolumeInfo
+	Log                      logrus.FieldLogger
+	Backup                   *velerov1api.Backup
+	PodVolumeBackups         []*velerov1api.PodVolumeBackup
+	VolumeSnapshots          []*volume.Snapshot
+	BackupReader             io.Reader
+	RestoredItems            map[itemKey]restoredItemStatus
+	itemOperationsList       *[]*itemoperation.RestoreOperation
+	ResourceModifiers        *resourcemodifiers.ResourceModifiers
+	DisableInformerCache     bool
+	CSIVolumeSnapshots       []*snapshotv1api.VolumeSnapshot
+	BackupVolumeInfoMap      map[string]volume.BackupVolumeInfo
+	RestoreVolumeInfoTracker *volume.RestoreVolumeInfoTracker
 }
 
 type restoredItemStatus struct {

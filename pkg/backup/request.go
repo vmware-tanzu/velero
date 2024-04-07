@@ -52,11 +52,11 @@ type Request struct {
 	itemOperationsList        *[]*itemoperation.BackupOperation
 	ResPolicies               *resourcepolicies.Policies
 	SkippedPVTracker          *skipPVTracker
-	VolumesInformation        volume.VolumesInformation
+	VolumesInformation        volume.BackupVolumesInformation
 }
 
-// VolumesInformation contains the information needs by generating
-// the backup VolumeInfo array.
+// BackupVolumesInformation contains the information needs by generating
+// the backup BackupVolumeInfo array.
 
 // GetItemOperationsList returns ItemOperationsList, initializing it if necessary
 func (r *Request) GetItemOperationsList() *[]*itemoperation.BackupOperation {

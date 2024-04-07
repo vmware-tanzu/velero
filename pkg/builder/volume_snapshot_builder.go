@@ -75,6 +75,12 @@ func (v *VolumeSnapshotBuilder) SourcePVC(name string) *VolumeSnapshotBuilder {
 	return v
 }
 
+// SourceVolumeSnapshotContentName set the built VolumeSnapshot's spec.Source.VolumeSnapshotContentName
+func (v *VolumeSnapshotBuilder) SourceVolumeSnapshotContentName(name string) *VolumeSnapshotBuilder {
+	v.object.Spec.Source.VolumeSnapshotContentName = &name
+	return v
+}
+
 // RestoreSize set the built VolumeSnapshot's status.RestoreSize.
 func (v *VolumeSnapshotBuilder) RestoreSize(size string) *VolumeSnapshotBuilder {
 	resourceSize := resource.MustParse(size)

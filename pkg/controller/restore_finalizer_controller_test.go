@@ -210,7 +210,7 @@ func TestUpdateResult(t *testing.T) {
 func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 	tests := []struct {
 		name             string
-		volumeInfo       []*volume.VolumeInfo
+		volumeInfo       []*volume.BackupVolumeInfo
 		restoredPVCNames map[string]struct{}
 		restore          *velerov1api.Restore
 		restoredPVC      []*corev1api.PersistentVolumeClaim
@@ -220,21 +220,21 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 	}{
 		{
 			name:           "no applicable volumeInfo",
-			volumeInfo:     []*volume.VolumeInfo{{BackupMethod: "VeleroNativeSnapshot", PVCName: "pvc1"}},
+			volumeInfo:     []*volume.BackupVolumeInfo{{BackupMethod: "VeleroNativeSnapshot", PVCName: "pvc1"}},
 			restore:        builder.ForRestore(velerov1api.DefaultNamespace, "restore").Result(),
 			expectedPatch:  nil,
 			expectedErrNum: 0,
 		},
 		{
 			name:           "no restored PVC",
-			volumeInfo:     []*volume.VolumeInfo{{BackupMethod: "PodVolumeBackup", PVCName: "pvc1"}},
+			volumeInfo:     []*volume.BackupVolumeInfo{{BackupMethod: "PodVolumeBackup", PVCName: "pvc1"}},
 			restore:        builder.ForRestore(velerov1api.DefaultNamespace, "restore").Result(),
 			expectedPatch:  nil,
 			expectedErrNum: 0,
 		},
 		{
 			name: "no applicable pv patch",
-			volumeInfo: []*volume.VolumeInfo{{
+			volumeInfo: []*volume.BackupVolumeInfo{{
 				BackupMethod: "PodVolumeBackup",
 				PVCName:      "pvc1",
 				PVName:       "pv1",
@@ -256,7 +256,7 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 		},
 		{
 			name: "an applicable pv patch",
-			volumeInfo: []*volume.VolumeInfo{{
+			volumeInfo: []*volume.BackupVolumeInfo{{
 				BackupMethod: "PodVolumeBackup",
 				PVCName:      "pvc1",
 				PVName:       "pv1",
@@ -281,7 +281,7 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 		},
 		{
 			name: "a mapped namespace restore",
-			volumeInfo: []*volume.VolumeInfo{{
+			volumeInfo: []*volume.BackupVolumeInfo{{
 				BackupMethod: "PodVolumeBackup",
 				PVCName:      "pvc1",
 				PVName:       "pv1",
@@ -306,7 +306,7 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 		},
 		{
 			name: "two applicable pv patches",
-			volumeInfo: []*volume.VolumeInfo{{
+			volumeInfo: []*volume.BackupVolumeInfo{{
 				BackupMethod: "PodVolumeBackup",
 				PVCName:      "pvc1",
 				PVName:       "pv1",
@@ -354,7 +354,7 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 		},
 		{
 			name: "an applicable pv patch with bound error",
-			volumeInfo: []*volume.VolumeInfo{{
+			volumeInfo: []*volume.BackupVolumeInfo{{
 				BackupMethod: "PodVolumeBackup",
 				PVCName:      "pvc1",
 				PVName:       "pv1",
@@ -375,7 +375,7 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 		},
 		{
 			name: "two applicable pv patches with an error",
-			volumeInfo: []*volume.VolumeInfo{{
+			volumeInfo: []*volume.BackupVolumeInfo{{
 				BackupMethod: "PodVolumeBackup",
 				PVCName:      "pvc1",
 				PVName:       "pv1",
@@ -453,38 +453,4 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 			assert.Equal(t, expectedPVInfo.Labels, pv.Labels)
 		}
 	}
-}
-
-func TestGetRestoredPVCFromRestoredResourceList(t *testing.T) {
-	// test empty list
-	restoredResourceList := map[string][]string{}
-	actual := getRestoredPVCFromRestoredResourceList(restoredResourceList)
-	assert.Empty(t, actual)
-
-	// test no match
-	restoredResourceList = map[string][]string{
-		"v1/PersistentVolumeClaim": {
-			"namespace1/pvc1(updated)",
-		},
-		"v1/PersistentVolume": {
-			"namespace1/pv(created)",
-		},
-	}
-	actual = getRestoredPVCFromRestoredResourceList(restoredResourceList)
-	assert.Empty(t, actual)
-
-	// test matches
-	restoredResourceList = map[string][]string{
-		"v1/PersistentVolumeClaim": {
-			"namespace1/pvc1(created)",
-			"namespace2/pvc2(updated)",
-			"namespace3/pvc(3)(created)",
-		},
-	}
-	expected := map[string]struct{}{
-		"namespace1/pvc1":   {},
-		"namespace3/pvc(3)": {},
-	}
-	actual = getRestoredPVCFromRestoredResourceList(restoredResourceList)
-	assert.Equal(t, expected, actual)
 }

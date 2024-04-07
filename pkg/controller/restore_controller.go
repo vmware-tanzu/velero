@@ -107,6 +107,7 @@ type restoreReconciler struct {
 
 	newPluginManager  func(logger logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
+	globalCrClient    client.Client
 }
 
 type backupInfo struct {
@@ -127,6 +128,7 @@ func NewRestoreReconciler(
 	logFormat logging.Format,
 	defaultItemOperationTimeout time.Duration,
 	disableInformerCache bool,
+	globalCrClient client.Client,
 ) *restoreReconciler {
 	r := &restoreReconciler{
 		ctx:                         ctx,
@@ -145,6 +147,8 @@ func NewRestoreReconciler(
 		// replaced with fakes for testing.
 		newPluginManager:  newPluginManager,
 		backupStoreGetter: backupStoreGetter,
+
+		globalCrClient: globalCrClient,
 	}
 
 	// Move the periodical backup and restore metrics computing logic from controllers to here.
@@ -521,7 +525,7 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		return errors.Wrap(err, "fail to fetch CSI VolumeSnapshots metadata")
 	}
 
-	backupVolumeInfoMap := make(map[string]volume.VolumeInfo)
+	backupVolumeInfoMap := make(map[string]volume.BackupVolumeInfo)
 	volumeInfos, err := backupStore.GetBackupVolumeInfos(restore.Spec.BackupName)
 	if err != nil {
 		restoreLog.WithError(err).Errorf("fail to get VolumeInfos metadata file for backup %s", restore.Spec.BackupName)
@@ -540,16 +544,17 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 	}
 
 	restoreReq := &pkgrestore.Request{
-		Log:                  restoreLog,
-		Restore:              restore,
-		Backup:               info.backup,
-		PodVolumeBackups:     podVolumeBackups,
-		VolumeSnapshots:      volumeSnapshots,
-		BackupReader:         backupFile,
-		ResourceModifiers:    resourceModifiers,
-		DisableInformerCache: r.disableInformerCache,
-		CSIVolumeSnapshots:   csiVolumeSnapshots,
-		VolumeInfoMap:        backupVolumeInfoMap,
+		Log:                      restoreLog,
+		Restore:                  restore,
+		Backup:                   info.backup,
+		PodVolumeBackups:         podVolumeBackups,
+		VolumeSnapshots:          volumeSnapshots,
+		BackupReader:             backupFile,
+		ResourceModifiers:        resourceModifiers,
+		DisableInformerCache:     r.disableInformerCache,
+		CSIVolumeSnapshots:       csiVolumeSnapshots,
+		BackupVolumeInfoMap:      backupVolumeInfoMap,
+		RestoreVolumeInfoTracker: volume.NewRestoreVolInfoTracker(restore, restoreLog, r.globalCrClient),
 	}
 	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, pluginManager)
 
@@ -638,6 +643,11 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 
 	if err := putOperationsForRestore(restore, *restoreReq.GetItemOperationsList(), backupStore); err != nil {
 		r.logger.WithError(err).Error("Error uploading restore item action operation resource list to backup storage")
+	}
+
+	restoreReq.RestoreVolumeInfoTracker.Populate(context.TODO(), restoreReq.RestoredResourceList())
+	if err := putRestoreVolumeInfoList(restore, restoreReq.RestoreVolumeInfoTracker.Result(), backupStore); err != nil {
+		r.logger.WithError(err).Error("Error uploading restored volume info to backup storage")
 	}
 
 	if restore.Status.Errors > 0 {
@@ -774,6 +784,22 @@ func putOperationsForRestore(restore *api.Restore, operations []*itemoperation.R
 	}
 
 	return nil
+}
+
+func putRestoreVolumeInfoList(restore *api.Restore, volInfoList []*volume.RestoreVolumeInfo, store persistence.BackupStore) error {
+	buf := new(bytes.Buffer)
+	gzw := gzip.NewWriter(buf)
+	defer gzw.Close()
+
+	if err := json.NewEncoder(gzw).Encode(volInfoList); err != nil {
+		return errors.Wrap(err, "error encoding restore volume info list to JSON")
+	}
+
+	if err := gzw.Close(); err != nil {
+		return errors.Wrap(err, "error closing gzip writer")
+	}
+
+	return store.PutRestoreVolumeInfo(restore.Name, buf)
 }
 
 func downloadToTempFile(backupName string, backupStore persistence.BackupStore, logger logrus.FieldLogger) (*os.File, error) {

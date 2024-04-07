@@ -20,6 +20,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -39,6 +41,7 @@ func defaultBackup() *builder.BackupBuilder {
 }
 
 func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
+	fakeClient := velerotest.NewFakeControllerRuntimeClient(t)
 	tests := []struct {
 		name            string
 		obj             *unstructured.Unstructured
@@ -115,9 +118,10 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			r := &pvRestorer{
-				logger:     velerotest.NewLogger(),
-				restorePVs: tc.restore.Spec.RestorePVs,
-				kbclient:   velerotest.NewFakeControllerRuntimeClient(t),
+				logger:         velerotest.NewLogger(),
+				restorePVs:     tc.restore.Spec.RestorePVs,
+				kbclient:       velerotest.NewFakeControllerRuntimeClient(t),
+				volInfoTracker: volume.NewRestoreVolInfoTracker(tc.restore, logrus.New(), fakeClient),
 			}
 			if tc.backup != nil {
 				r.backup = tc.backup
@@ -180,6 +184,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
+				logger                  = velerotest.NewLogger()
 				volumeSnapshotter       = new(providermocks.VolumeSnapshotter)
 				volumeSnapshotterGetter = providerToVolumeSnapshotterMap(map[string]vsv1.VolumeSnapshotter{
 					tc.expectedProvider: volumeSnapshotter,
@@ -192,11 +197,12 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 			}
 
 			r := &pvRestorer{
-				logger:                  velerotest.NewLogger(),
+				logger:                  logger,
 				backup:                  tc.backup,
 				volumeSnapshots:         tc.volumeSnapshots,
 				kbclient:                fakeClient,
 				volumeSnapshotterGetter: volumeSnapshotterGetter,
+				volInfoTracker:          volume.NewRestoreVolInfoTracker(tc.restore, logger, fakeClient),
 			}
 
 			volumeSnapshotter.On("Init", mock.Anything).Return(nil)

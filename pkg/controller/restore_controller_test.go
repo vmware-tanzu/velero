@@ -91,11 +91,12 @@ func TestFetchBackupInfo(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				fakeClient    = velerotest.NewFakeControllerRuntimeClient(t)
-				restorer      = &fakeRestorer{kbClient: fakeClient}
-				logger        = velerotest.NewLogger()
-				pluginManager = &pluginmocks.Manager{}
-				backupStore   = &persistencemocks.BackupStore{}
+				fakeClient       = velerotest.NewFakeControllerRuntimeClient(t)
+				fakeGlobalClient = velerotest.NewFakeControllerRuntimeClient(t)
+				restorer         = &fakeRestorer{kbClient: fakeClient}
+				logger           = velerotest.NewLogger()
+				pluginManager    = &pluginmocks.Manager{}
+				backupStore      = &persistencemocks.BackupStore{}
 			)
 
 			defer restorer.AssertExpectations(t)
@@ -114,6 +115,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				formatFlag,
 				60*time.Minute,
 				false,
+				fakeGlobalClient,
 			)
 
 			if test.backupStoreError == nil {
@@ -170,9 +172,10 @@ func TestProcessQueueItemSkips(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
-				restorer   = &fakeRestorer{kbClient: fakeClient}
-				logger     = velerotest.NewLogger()
+				fakeClient       = velerotest.NewFakeControllerRuntimeClient(t)
+				fakeGlobalClient = velerotest.NewFakeControllerRuntimeClient(t)
+				restorer         = &fakeRestorer{kbClient: fakeClient}
+				logger           = velerotest.NewLogger()
 			)
 
 			if test.restore != nil {
@@ -192,6 +195,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 				formatFlag,
 				60*time.Minute,
 				false,
+				fakeGlobalClient,
 			)
 
 			_, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{
@@ -432,11 +436,12 @@ func TestRestoreReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				fakeClient    = velerotest.NewFakeControllerRuntimeClientBuilder(t).Build()
-				restorer      = &fakeRestorer{kbClient: fakeClient}
-				logger        = velerotest.NewLogger()
-				pluginManager = &pluginmocks.Manager{}
-				backupStore   = &persistencemocks.BackupStore{}
+				fakeClient       = velerotest.NewFakeControllerRuntimeClientBuilder(t).Build()
+				fakeGlobalClient = velerotest.NewFakeControllerRuntimeClient(t)
+				restorer         = &fakeRestorer{kbClient: fakeClient}
+				logger           = velerotest.NewLogger()
+				pluginManager    = &pluginmocks.Manager{}
+				backupStore      = &persistencemocks.BackupStore{}
 			)
 
 			defer restorer.AssertExpectations(t)
@@ -459,6 +464,7 @@ func TestRestoreReconcile(t *testing.T) {
 				formatFlag,
 				60*time.Minute,
 				false,
+				fakeGlobalClient,
 			)
 
 			r.clock = clocktesting.NewFakeClock(now)
@@ -500,10 +506,11 @@ func TestRestoreReconcile(t *testing.T) {
 				backupStore.On("PutRestoreResults", test.backup.Name, test.restore.Name, mock.Anything).Return(nil)
 				backupStore.On("PutRestoredResourceList", test.restore.Name, mock.Anything).Return(nil)
 				backupStore.On("PutRestoreItemOperations", mock.Anything, mock.Anything).Return(nil)
+				backupStore.On("PutRestoreVolumeInfo", test.restore.Name, mock.Anything).Return(nil)
 				if test.emptyVolumeInfo == true {
 					backupStore.On("GetBackupVolumeInfos", test.backup.Name).Return(nil, nil)
 				} else {
-					backupStore.On("GetBackupVolumeInfos", test.backup.Name).Return([]*volume.VolumeInfo{}, nil)
+					backupStore.On("GetBackupVolumeInfos", test.backup.Name).Return([]*volume.BackupVolumeInfo{}, nil)
 				}
 
 				volumeSnapshots := []*volume.Snapshot{
@@ -626,10 +633,11 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 	formatFlag := logging.FormatText
 
 	var (
-		logger        = velerotest.NewLogger()
-		pluginManager = &pluginmocks.Manager{}
-		fakeClient    = velerotest.NewFakeControllerRuntimeClient(t)
-		backupStore   = &persistencemocks.BackupStore{}
+		logger           = velerotest.NewLogger()
+		pluginManager    = &pluginmocks.Manager{}
+		fakeClient       = velerotest.NewFakeControllerRuntimeClient(t)
+		fakeGlobalClient = velerotest.NewFakeControllerRuntimeClient(t)
+		backupStore      = &persistencemocks.BackupStore{}
 	)
 
 	r := NewRestoreReconciler(
@@ -645,6 +653,7 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		formatFlag,
 		60*time.Minute,
 		false,
+		fakeGlobalClient,
 	)
 
 	restore := &velerov1api.Restore{
@@ -719,10 +728,11 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 	formatFlag := logging.FormatText
 
 	var (
-		logger        = velerotest.NewLogger()
-		pluginManager = &pluginmocks.Manager{}
-		fakeClient    = velerotest.NewFakeControllerRuntimeClient(t)
-		backupStore   = &persistencemocks.BackupStore{}
+		logger           = velerotest.NewLogger()
+		pluginManager    = &pluginmocks.Manager{}
+		fakeClient       = velerotest.NewFakeControllerRuntimeClient(t)
+		fakeGlobalClient = velerotest.NewFakeControllerRuntimeClient(t)
+		backupStore      = &persistencemocks.BackupStore{}
 	)
 
 	r := NewRestoreReconciler(
@@ -738,6 +748,7 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		formatFlag,
 		60*time.Minute,
 		false,
+		fakeGlobalClient,
 	)
 
 	restore := &velerov1api.Restore{

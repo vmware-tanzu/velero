@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"sync"
 	"time"
 
@@ -39,7 +38,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
-	"github.com/vmware-tanzu/velero/pkg/restore"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
@@ -150,7 +148,7 @@ func (r *restoreFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, errors.Wrap(err, "error getting restoredResourceList")
 	}
 
-	restoredPVCList := getRestoredPVCFromRestoredResourceList(restoredResourceList)
+	restoredPVCList := volume.RestoredPVCFromRestoredResourceList(restoredResourceList)
 
 	finalizerCtx := &finalizerContext{
 		logger:          log,
@@ -238,7 +236,7 @@ type finalizerContext struct {
 	logger          logrus.FieldLogger
 	restore         *velerov1api.Restore
 	crClient        client.Client
-	volumeInfo      []*volume.VolumeInfo
+	volumeInfo      []*volume.BackupVolumeInfo
 	restoredPVCList map[string]struct{}
 }
 
@@ -277,7 +275,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 			}
 
 			pvWaitGroup.Add(1)
-			go func(volInfo volume.VolumeInfo, restoredNamespace string) {
+			go func(volInfo volume.BackupVolumeInfo, restoredNamespace string) {
 				defer pvWaitGroup.Done()
 
 				semaphore <- struct{}{}
@@ -356,23 +354,6 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 	ctx.logger.Info("patching newly dynamically provisioned PV ends")
 
 	return errs
-}
-
-func getRestoredPVCFromRestoredResourceList(restoredResourceList map[string][]string) map[string]struct{} {
-	pvcKey := "v1/PersistentVolumeClaim"
-	pvcList := make(map[string]struct{})
-
-	for _, pvc := range restoredResourceList[pvcKey] {
-		// the format of pvc string in restoredResourceList is like: "namespace/pvcName(status)"
-		// extract the substring before "(created)" if the status in rightmost Parenthesis is "created"
-		r := regexp.MustCompile(`\(([^)]+)\)`)
-		matches := r.FindAllStringSubmatch(pvc, -1)
-		if len(matches) > 0 && matches[len(matches)-1][1] == restore.ItemRestoreResultCreated {
-			pvcList[pvc[:len(pvc)-len("(created)")]] = struct{}{}
-		}
-	}
-
-	return pvcList
 }
 
 func needPatch(newPV *v1.PersistentVolume, pvInfo *volume.PVInfo) bool {
