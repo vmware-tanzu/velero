@@ -39,7 +39,7 @@ func (f *fakeCredentialsFileStore) Path(*corev1api.SecretKeySelector) (string, e
 	return f.path, f.err
 }
 
-// NewFakeCredentialFileStore creates a FileStore which will return the given path
+// NewFakeCredentialsFileStore creates a FileStore which will return the given path
 // and error when Path is called.
 func NewFakeCredentialsFileStore(path string, err error) FileStore {
 	return &fakeCredentialsFileStore{
