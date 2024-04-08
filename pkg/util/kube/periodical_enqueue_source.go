@@ -69,6 +69,11 @@ type PeriodicalEnqueueSourceOption struct {
 func (p *PeriodicalEnqueueSource) Start(ctx context.Context, h handler.EventHandler, q workqueue.RateLimitingInterface, predicates ...predicate.Predicate) error {
 	go wait.Until(func() {
 		p.logger.Debug("enqueueing resources ...")
+		// empty the list otherwise the result of the new list call will be appended
+		if err := meta.SetList(p.objList, nil); err != nil {
+			p.logger.WithError(err).Error("error reset resource list")
+			return
+		}
 		if err := p.List(ctx, p.objList); err != nil {
 			p.logger.WithError(err).Error("error listing resources")
 			return
