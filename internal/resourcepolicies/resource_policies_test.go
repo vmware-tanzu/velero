@@ -121,9 +121,9 @@ func TestLoadResourcePolicies(t *testing.T) {
 }
 
 func TestGetResourceMatchedAction(t *testing.T) {
-	resPolicies := &resourcePolicies{
+	resPolicies := &ResourcePolicies{
 		Version: "v1",
-		VolumePolicies: []volumePolicy{
+		VolumePolicies: []VolumePolicy{
 			{
 				Action: Action{Type: "skip"},
 				Conditions: map[string]interface{}{
@@ -136,7 +136,7 @@ func TestGetResourceMatchedAction(t *testing.T) {
 				},
 			},
 			{
-				Action: Action{Type: "volume-snapshot"},
+				Action: Action{Type: "snapshot"},
 				Conditions: map[string]interface{}{
 					"capacity":     "10,100Gi",
 					"storageClass": []string{"gp2", "ebs-sc"},
@@ -147,7 +147,7 @@ func TestGetResourceMatchedAction(t *testing.T) {
 				},
 			},
 			{
-				Action: Action{Type: "file-system-backup"},
+				Action: Action{Type: "fs-backup"},
 				Conditions: map[string]interface{}{
 					"storageClass": []string{"gp2", "ebs-sc"},
 					"csi": interface{}(
@@ -179,7 +179,7 @@ func TestGetResourceMatchedAction(t *testing.T) {
 				storageClass: "ebs-sc",
 				csi:          &csiVolumeSource{Driver: "aws.efs.csi.driver"},
 			},
-			expectedAction: &Action{Type: "volume-snapshot"},
+			expectedAction: &Action{Type: "snapshot"},
 		},
 		{
 			name: "dismatch all policies",
@@ -195,7 +195,7 @@ func TestGetResourceMatchedAction(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			policies := &Policies{}
-			err := policies.buildPolicy(resPolicies)
+			err := policies.BuildPolicy(resPolicies)
 			if err != nil {
 				t.Errorf("Failed to build policy with error %v", err)
 			}
@@ -237,9 +237,9 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 	// Check that the returned resourcePolicies object contains the expected data
 	assert.Equal(t, "v1", resPolicies.version)
 	assert.Len(t, resPolicies.volumePolicies, 1)
-	policies := resourcePolicies{
+	policies := ResourcePolicies{
 		Version: "v1",
-		VolumePolicies: []volumePolicy{
+		VolumePolicies: []VolumePolicy{
 			{
 				Conditions: map[string]interface{}{
 					"capacity": "0,10Gi",
@@ -251,7 +251,7 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 		},
 	}
 	p := &Policies{}
-	err = p.buildPolicy(&policies)
+	err = p.BuildPolicy(&policies)
 	if err != nil {
 		t.Fatalf("failed to build policy with error %v", err)
 	}
@@ -424,7 +424,7 @@ volumePolicies:
 			}
 			assert.Nil(t, err)
 			policies := &Policies{}
-			err = policies.buildPolicy(resPolicies)
+			err = policies.BuildPolicy(resPolicies)
 			assert.Nil(t, err)
 			action, err := policies.GetMatchAction(tc.vol)
 			assert.Nil(t, err)

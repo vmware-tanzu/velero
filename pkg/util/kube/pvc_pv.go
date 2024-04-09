@@ -386,3 +386,21 @@ func GetPVForPVC(
 	}
 	return pv, nil
 }
+
+func GetPVCForPodVolume(vol *corev1api.Volume, pod *corev1api.Pod, crClient crclient.Client) (*corev1api.PersistentVolumeClaim, error) {
+	if vol.PersistentVolumeClaim == nil {
+		return nil, errors.Errorf("volume %s/%s has no PVC associated with it", pod.Namespace, vol.Name)
+	}
+	pvc := &corev1api.PersistentVolumeClaim{}
+	err := crClient.Get(
+		context.TODO(),
+		crclient.ObjectKey{Name: vol.PersistentVolumeClaim.ClaimName, Namespace: pod.Namespace},
+		pvc,
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get PVC %s for Volume %s/%s",
+			vol.PersistentVolumeClaim.ClaimName, pod.Namespace, vol.Name)
+	}
+
+	return pvc, nil
+}

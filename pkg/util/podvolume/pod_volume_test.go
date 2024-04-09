@@ -369,7 +369,7 @@ func TestGetVolumesByPod(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualIncluded, actualOptedOut := GetVolumesByPod(tc.pod, tc.defaultVolumesToFsBackup, tc.backupExcludePVC)
+			actualIncluded, actualOptedOut := GetVolumesByPod(tc.pod, tc.defaultVolumesToFsBackup, tc.backupExcludePVC, []string{})
 
 			sort.Strings(tc.expected.included)
 			sort.Strings(actualIncluded)
@@ -789,6 +789,100 @@ func TestGetPodsUsingPVC(t *testing.T) {
 			actualPods, err := getPodsUsingPVC(tc.pvcNamespace, tc.pvcName, fakeClient)
 			assert.Nilf(t, err, "Want error=nil; Got error=%v", err)
 			assert.Lenf(t, actualPods, tc.expectedPodCount, "unexpected number of pods in result; Want: %d; Got: %d", tc.expectedPodCount, len(actualPods))
+		})
+	}
+}
+
+func TestGetVolumesToProcess(t *testing.T) {
+	testCases := []struct {
+		name                          string
+		volumes                       []corev1api.Volume
+		volsToProcessByLegacyApproach []string
+		expectedVolumes               []corev1api.Volume
+	}{
+		{
+			name: "pod has 2 volumes empty volsToProcessByLegacyApproach list return 2 volumes",
+			volumes: []corev1api.Volume{
+				{
+					Name: "sample-volume-1",
+					VolumeSource: corev1api.VolumeSource{
+						PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "sample-pvc-1",
+						},
+					},
+				},
+				{
+					Name: "sample-volume-2",
+					VolumeSource: corev1api.VolumeSource{
+						PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "sample-pvc-2",
+						},
+					},
+				},
+			},
+			volsToProcessByLegacyApproach: []string{},
+			expectedVolumes: []corev1api.Volume{
+				{
+					Name: "sample-volume-1",
+					VolumeSource: corev1api.VolumeSource{
+						PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "sample-pvc-1",
+						},
+					},
+				},
+				{
+					Name: "sample-volume-2",
+					VolumeSource: corev1api.VolumeSource{
+						PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "sample-pvc-2",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "pod has 2 volumes non-empty volsToProcessByLegacyApproach list returns 1 volumes",
+			volumes: []corev1api.Volume{
+				{
+					Name: "sample-volume-1",
+					VolumeSource: corev1api.VolumeSource{
+						PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "sample-pvc-1",
+						},
+					},
+				},
+				{
+					Name: "sample-volume-2",
+					VolumeSource: corev1api.VolumeSource{
+						PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "sample-pvc-2",
+						},
+					},
+				},
+			},
+			volsToProcessByLegacyApproach: []string{"sample-volume-2"},
+			expectedVolumes: []corev1api.Volume{
+				{
+					Name: "sample-volume-2",
+					VolumeSource: corev1api.VolumeSource{
+						PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "sample-pvc-2",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                          "empty case, return empty list",
+			volumes:                       []corev1api.Volume{},
+			volsToProcessByLegacyApproach: []string{},
+			expectedVolumes:               []corev1api.Volume{},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actualVolumes := GetVolumesToProcess(tc.volumes, tc.volsToProcessByLegacyApproach)
+			assert.Equal(t, tc.expectedVolumes, actualVolumes, "Want Volumes List %v; Got Volumes List %v", tc.expectedVolumes, actualVolumes)
 		})
 	}
 }
