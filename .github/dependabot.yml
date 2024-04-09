@@ -1,5 +1,14 @@
 version: 2
 updates:
+  # Dependencies listed in .github/workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "Dependencies"
+      - "github_actions"
+      - "kind/changelog-not-required"
   # Dependencies listed in go.mod
   - package-ecosystem: "gomod"
     directory: "/" # Location of package manifests
