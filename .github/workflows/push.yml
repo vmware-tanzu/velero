@@ -64,7 +64,7 @@ jobs:
         verbose: true
 
     # Use the JSON key in secret to login gcr.io
-    - uses: 'docker/login-action@v2'
+    - uses: 'docker/login-action@v3'
       with:
         registry: 'gcr.io' # or REGION.docker.pkg.dev
         username: '_json_key'
