@@ -164,7 +164,7 @@ func TestBackupProgressIsUpdated(t *testing.T) {
 	assert.Len(t, req.BackedUpItems, req.Status.Progress.ItemsBackedUp)
 }
 
-// TestBackupResourceFiltering runs backups with different combinations
+// TestBackupOldResourceFiltering runs backups with different combinations
 // of resource filters (included/excluded resources, included/excluded
 // namespaces, label selectors, "include cluster resources" flag), and
 // verifies that the set of items written to the backup tarball are
@@ -1430,7 +1430,7 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 	}
 }
 
-// TestBackupActionsRunsForCorrectItems runs backups with backup item actions, and
+// TestBackupActionsRunForCorrectItems runs backups with backup item actions, and
 // verifies that each backup item action is run for the correct set of resources based on its
 // AppliesTo() resource selector. Verification is done by using the recordResourcesAction struct,
 // which records which resources it's executed for.

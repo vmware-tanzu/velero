@@ -1491,7 +1491,7 @@ func (a *recordResourcesAction) WithAdditionalItems(items []velero.ResourceIdent
 	return a
 }
 
-// TestRestoreActionsRunsForCorrectItems runs restores with restore item actions, and
+// TestRestoreActionsRunForCorrectItems runs restores with restore item actions, and
 // verifies that each restore item action is run for the correct set of resources based on its
 // AppliesTo() resource selector. Verification is done by using the recordResourcesAction struct,
 // which records which resources it's executed for.
