@@ -7,10 +7,10 @@ Area/Design:
 
 # Anything in the site directory gets the website label *EXCEPT* docs
 Website:
-- any:
+- all:
   - changed-files:
     - any-glob-to-any-file: 'site/**/*'
-    - any-glob-to-any-file: '!site/content/docs/**/*'
+    - all-globs-to-all-files: '!site/content/docs/**/*'
 
 Documentation:
 - changed-files:
