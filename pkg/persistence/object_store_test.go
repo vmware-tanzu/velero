@@ -427,7 +427,7 @@ func TestGetBackupVolumeSnapshots(t *testing.T) {
 	// volumesnapshots file containing invalid data should error
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-volumesnapshots.json.gz", newStringReadSeeker("foo"))
 	_, err = harness.GetBackupVolumeSnapshots("test-backup")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// volumesnapshots file containing gzipped json data should return correctly
 	snapshots := []*volume.Snapshot{
@@ -469,7 +469,7 @@ func TestGetBackupItemOperations(t *testing.T) {
 	// itemoperations file containing invalid data should error
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-itemoperations.json.gz", newStringReadSeeker("foo"))
 	_, err = harness.GetBackupItemOperations("test-backup")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// itemoperations file containing gzipped json data should return correctly
 	operations := []*itemoperation.BackupOperation{
@@ -518,7 +518,7 @@ func TestGetRestoreItemOperations(t *testing.T) {
 	// itemoperations file containing invalid data should error
 	harness.objectStore.PutObject(harness.bucket, "restores/test-restore/restore-test-restore-itemoperations.json.gz", newStringReadSeeker("foo"))
 	_, err = harness.GetRestoreItemOperations("test-restore")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// itemoperations file containing gzipped json data should return correctly
 	operations := []*itemoperation.RestoreOperation{
@@ -806,7 +806,7 @@ func TestGetCSIVolumeSnapshotClasses(t *testing.T) {
 	// file containing invalid data should error
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-csi-volumesnapshotclasses.json.gz", newStringReadSeeker("foo"))
 	_, err = harness.GetCSIVolumeSnapshotClasses("test-backup")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// file containing gzipped json data should return correctly
 	classes := []*snapshotv1api.VolumeSnapshotClass{
@@ -838,7 +838,7 @@ func TestGetCSIVolumeSnapshots(t *testing.T) {
 	// file containing invalid data should error
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-csi-volumesnapshots.json.gz", newStringReadSeeker("foo"))
 	_, err = harness.GetCSIVolumeSnapshots("test-backup")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// file containing gzipped json data should return correctly
 	snapshots := []*snapshotv1api.VolumeSnapshot{
@@ -874,7 +874,7 @@ func TestGetCSIVolumeSnapshotContents(t *testing.T) {
 	// file containing invalid data should error
 	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-csi-volumesnapshotcontents.json.gz", newStringReadSeeker("foo"))
 	_, err = harness.GetCSIVolumeSnapshotContents("test-backup")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// file containing gzipped json data should return correctly
 	contents := []*snapshotv1api.VolumeSnapshotContent{
@@ -986,7 +986,7 @@ func TestNewObjectBackupStoreGetter(t *testing.T) {
 			if tc.wantErr != "" {
 				require.EqualError(t, err, tc.wantErr)
 			} else {
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				store, ok := res.(*objectBackupStore)
 				require.True(t, ok)
@@ -1155,7 +1155,7 @@ func TestGetRestoreResults(t *testing.T) {
 	// file containing invalid data should error
 	harness.objectStore.PutObject(harness.bucket, "restores/test-restore/restore-test-restore-results.gz", newStringReadSeeker("foo"))
 	_, err = harness.GetRestoreResults("test-restore")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// file containing gzipped json data should return correctly
 	contents := map[string]results.Result{
@@ -1185,7 +1185,7 @@ func TestGetRestoredResourceList(t *testing.T) {
 	// file containing invalid data should error
 	harness.objectStore.PutObject(harness.bucket, "restores/test-restore/restore-test-restore-resource-list.json.gz", newStringReadSeeker("foo"))
 	_, err = harness.GetRestoredResourceList("test-restore")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// file containing gzipped json data should return correctly
 	list := map[string][]string{

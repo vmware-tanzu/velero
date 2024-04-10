@@ -79,7 +79,7 @@ func TestConfig(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client, err := Config(test.kubeconfig, test.kubecontext, "velero", test.QPS, test.burst)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, test.expectedHost, client.Host)
 			assert.Equal(t, test.QPS, client.QPS)
 			assert.Equal(t, test.burst, client.Burst)

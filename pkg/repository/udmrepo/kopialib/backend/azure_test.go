@@ -41,7 +41,7 @@ func TestAzureSetup(t *testing.T) {
 	}
 
 	err := backend.Setup(context.Background(), flags)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, flags, backend.option.Config)
 	assert.Equal(t, limits, backend.option.Limits)
 }

@@ -14,7 +14,7 @@ func TestStringOfStringArray(t *testing.T) {
 
 func TestSetOfStringArray(t *testing.T) {
 	array := NewStringArray()
-	require.Nil(t, array.Set("a,b"))
+	require.NoError(t, array.Set("a,b"))
 	assert.Equal(t, "a,b", array.String())
 }
 
