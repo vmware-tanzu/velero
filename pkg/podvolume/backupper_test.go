@@ -51,7 +51,7 @@ func TestIsHostPathVolume(t *testing.T) {
 		},
 	}
 	isHostPath, err := isHostPathVolume(vol, nil, nil)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.True(t, isHostPath)
 
 	// non-hostPath pod volume
@@ -61,7 +61,7 @@ func TestIsHostPathVolume(t *testing.T) {
 		},
 	}
 	isHostPath, err = isHostPathVolume(vol, nil, nil)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.False(t, isHostPath)
 
 	// PVC that doesn't have a PV
@@ -79,7 +79,7 @@ func TestIsHostPathVolume(t *testing.T) {
 		},
 	}
 	isHostPath, err = isHostPathVolume(vol, pvc, nil)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.False(t, isHostPath)
 
 	// PVC that claims a non-hostPath PV
@@ -107,7 +107,7 @@ func TestIsHostPathVolume(t *testing.T) {
 	}
 	crClient1 := velerotest.NewFakeControllerRuntimeClient(t, pv)
 	isHostPath, err = isHostPathVolume(vol, pvc, crClient1)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.False(t, isHostPath)
 
 	// PVC that claims a hostPath PV
@@ -140,7 +140,7 @@ func TestIsHostPathVolume(t *testing.T) {
 	crClient2 := velerotest.NewFakeControllerRuntimeClient(t, pv)
 
 	isHostPath, err = isHostPathVolume(vol, pvc, crClient2)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.True(t, isHostPath)
 }
 
@@ -632,11 +632,11 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 		if c.statusToBeUpdated != nil {
 			pvb := &velerov1api.PodVolumeBackup{}
 			err := client.Get(context.Background(), ctrlclient.ObjectKey{Namespace: newPVB.Namespace, Name: newPVB.Name}, pvb)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			pvb.Status = *c.statusToBeUpdated
 			err = client.Update(context.Background(), pvb)
-			require.Nil(t, err)
+			require.NoError(t, err)
 		}
 
 		pvbs := backuper.WaitAllPodVolumesProcessed(logger)

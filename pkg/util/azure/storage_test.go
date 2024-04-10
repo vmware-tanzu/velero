@@ -32,15 +32,15 @@ func TestNewStorageClient(t *testing.T) {
 
 	name := filepath.Join(os.TempDir(), "credential")
 	file, err := os.Create(name)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer file.Close()
 	defer os.Remove(name)
 	_, err = file.WriteString("AccessKey: YWNjZXNza2V5\nAZURE_TENANT_ID: tenantid\nAZURE_CLIENT_ID: clientid\nAZURE_CLIENT_SECRET: secret")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// storage account isn't specified
 	_, _, err = NewStorageClient(log, config)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	// auth with storage account access key
 	config = map[string]string{
@@ -49,7 +49,7 @@ func TestNewStorageClient(t *testing.T) {
 		BSLConfigStorageAccountAccessKeyName: "AccessKey",
 	}
 	client, credential, err := NewStorageClient(log, config)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, client)
 	assert.NotNil(t, credential)
 
@@ -60,7 +60,7 @@ func TestNewStorageClient(t *testing.T) {
 		"useAAD":                "true",
 	}
 	client, credential, err = NewStorageClient(log, config)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, client)
 	assert.Nil(t, credential)
 }
@@ -72,7 +72,7 @@ func TestGetStorageAccountCredentials(t *testing.T) {
 	}
 	creds := map[string]string{}
 	_, err := GetStorageAccountCredentials(cfg, creds)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	// use access secret
 	cfg = map[string]string{
@@ -82,7 +82,7 @@ func TestGetStorageAccountCredentials(t *testing.T) {
 		"KEY": "key",
 	}
 	m, err := GetStorageAccountCredentials(cfg, creds)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "key", m[CredentialKeyStorageAccountAccessKey])
 
 	// use AAD, but useAAD invalid
@@ -91,7 +91,7 @@ func TestGetStorageAccountCredentials(t *testing.T) {
 	}
 	creds = map[string]string{}
 	_, err = GetStorageAccountCredentials(cfg, creds)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	// use AAD
 	cfg = map[string]string{
@@ -101,7 +101,7 @@ func TestGetStorageAccountCredentials(t *testing.T) {
 		"KEY": "key",
 	}
 	m, err = GetStorageAccountCredentials(cfg, creds)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, creds, m)
 }
 
@@ -114,7 +114,7 @@ func Test_getStorageAccountURI(t *testing.T) {
 	}
 	creds := map[string]string{}
 	uri, err := getStorageAccountURI(log, bslCfg, creds)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "uri", uri)
 
 	// no URI specified, and auth with access key
@@ -125,7 +125,7 @@ func Test_getStorageAccountURI(t *testing.T) {
 		"KEY": "value",
 	}
 	uri, err = getStorageAccountURI(log, bslCfg, creds)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "https://.blob.core.windows.net", uri)
 
 	// no URI specified, auth with AAD, resource group isn't specified
@@ -138,7 +138,7 @@ func Test_getStorageAccountURI(t *testing.T) {
 		"AZURE_CLIENT_SECRET": "secret",
 	}
 	uri, err = getStorageAccountURI(log, bslCfg, creds)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "https://.blob.core.windows.net", uri)
 
 	// no URI specified, auth with AAD, resource group specified
@@ -153,7 +153,7 @@ func Test_getStorageAccountURI(t *testing.T) {
 		"AZURE_CLIENT_SECRET": "secret",
 	}
 	uri, err = getStorageAccountURI(log, bslCfg, creds)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "https://account.blob.core.windows.net", uri)
 }
 
@@ -168,7 +168,7 @@ func Test_exchangeStorageAccountAccessKey(t *testing.T) {
 		"AZURE_CLIENT_SECRET": "secret",
 	}
 	_, err := exchangeStorageAccountAccessKey(bslCfg, creds)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	// storage account isn't specified
 	bslCfg = map[string]string{
@@ -181,7 +181,7 @@ func Test_exchangeStorageAccountAccessKey(t *testing.T) {
 		"AZURE_CLIENT_SECRET": "secret",
 	}
 	_, err = exchangeStorageAccountAccessKey(bslCfg, creds)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	// storage account specified
 	bslCfg = map[string]string{
@@ -195,7 +195,7 @@ func Test_exchangeStorageAccountAccessKey(t *testing.T) {
 		"AZURE_CLIENT_SECRET": "secret",
 	}
 	_, err = exchangeStorageAccountAccessKey(bslCfg, creds)
-	require.NotNil(t, err)
+	require.Error(t, err)
 }
 
 func Test_newStorageAccountManagemenClient(t *testing.T) {
@@ -207,7 +207,7 @@ func Test_newStorageAccountManagemenClient(t *testing.T) {
 		"AZURE_CLIENT_SECRET": "secret",
 	}
 	_, err := newStorageAccountManagemenClient(bslCfg, creds)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	// subscription ID isn't specified
 	bslCfg = map[string]string{
@@ -219,5 +219,5 @@ func Test_newStorageAccountManagemenClient(t *testing.T) {
 		"AZURE_CLIENT_SECRET": "secret",
 	}
 	_, err = newStorageAccountManagemenClient(bslCfg, creds)
-	require.Nil(t, err)
+	require.NoError(t, err)
 }

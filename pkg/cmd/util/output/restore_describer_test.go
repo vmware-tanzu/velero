@@ -79,11 +79,11 @@ func TestDescribeResult(t *testing.T) {
 
 func TestDescribeRestoreItemOperation(t *testing.T) {
 	t1, err1 := time.Parse("2006-Jan-02", "2023-Jun-26")
-	require.Nil(t, err1)
+	require.NoError(t, err1)
 	t2, err2 := time.Parse("2006-Jan-02", "2023-Jun-25")
-	require.Nil(t, err2)
+	require.NoError(t, err2)
 	t3, err3 := time.Parse("2006-Jan-02", "2023-Jun-24")
-	require.Nil(t, err3)
+	require.NoError(t, err3)
 	input := builder.ForRestoreOperation().
 		RestoreName("restore-1").
 		OperationID("op-1").

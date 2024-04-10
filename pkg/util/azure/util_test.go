@@ -29,30 +29,30 @@ import (
 func TestLoadCredentials(t *testing.T) {
 	// no credential file
 	credentials, err := LoadCredentials(nil)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, credentials)
 
 	// specified credential file in the config
 	name := filepath.Join(os.TempDir(), "credential")
 	file, err := os.Create(name)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer file.Close()
 	defer os.Remove(name)
 	_, err = file.WriteString("key: value")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	config := map[string]string{
 		"credentialsFile": name,
 	}
 	credentials, err = LoadCredentials(config)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "value", credentials["key"])
 
 	// use the default path defined via env variable
 	config = nil
 	os.Setenv("AZURE_CREDENTIALS_FILE", name)
 	credentials, err = LoadCredentials(config)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "value", credentials["key"])
 }
 
@@ -63,7 +63,7 @@ func TestGetClientOptions(t *testing.T) {
 		CredentialKeyCloudName: "invalid",
 	}
 	_, err := GetClientOptions(bslCfg, creds)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	// specify caCert
 	bslCfg = map[string]string{
@@ -72,7 +72,7 @@ func TestGetClientOptions(t *testing.T) {
 	}
 	creds = map[string]string{}
 	options, err := GetClientOptions(bslCfg, creds)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, options.Cloud, cloud.AzurePublic)
 	assert.NotNil(t, options.Transport)
 
@@ -82,7 +82,7 @@ func TestGetClientOptions(t *testing.T) {
 	}
 	creds = map[string]string{}
 	options, err = GetClientOptions(bslCfg, creds)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, options.Cloud, cloud.AzurePublic)
 	assert.Nil(t, options.Transport)
 }

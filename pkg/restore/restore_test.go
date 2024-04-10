@@ -2316,11 +2316,11 @@ func TestShouldRestore(t *testing.T) {
 			res, err := ctx.shouldRestore(tc.pvName, pvClient)
 			assert.Equal(t, tc.want, res)
 			if tc.wantErr != nil {
-				if assert.NotNil(t, err, "expected a non-nil error") {
+				if assert.Error(t, err, "expected a non-nil error") {
 					assert.EqualError(t, err, tc.wantErr.Error())
 				}
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}

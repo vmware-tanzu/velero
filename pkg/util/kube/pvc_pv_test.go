@@ -1248,12 +1248,12 @@ func TestGetPVForPVC(t *testing.T) {
 			actualPV, actualError := GetPVForPVC(tc.inPVC, fakeClient)
 
 			if tc.expectError {
-				assert.NotNil(t, actualError, "Want error; Got nil error")
+				assert.Error(t, actualError, "Want error; Got nil error")
 				assert.Nilf(t, actualPV, "Want PV: nil; Got PV: %q", actualPV)
 				return
 			}
 
-			assert.Nilf(t, actualError, "Want: nil error; Got: %v", actualError)
+			assert.NoErrorf(t, actualError, "Want: nil error; Got: %v", actualError)
 			assert.Equalf(t, actualPV.Name, tc.expectedPV.Name, "Want PV with name %q; Got PV with name %q", tc.expectedPV.Name, actualPV.Name)
 		})
 	}
@@ -1371,11 +1371,11 @@ func TestGetPVCForPodVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actualPVC, actualError := GetPVCForPodVolume(tc.vol, samplePod, fakeClient)
 			if tc.expectedError {
-				assert.NotNil(t, actualError, "Want error; Got nil error")
+				assert.Error(t, actualError, "Want error; Got nil error")
 				assert.Nilf(t, actualPVC, "Want PV: nil; Got PV: %q", actualPVC)
 				return
 			}
-			assert.Nilf(t, actualError, "Want: nil error; Got: %v", actualError)
+			assert.NoErrorf(t, actualError, "Want: nil error; Got: %v", actualError)
 			assert.Equalf(t, actualPVC.Name, tc.expectedPVC.Name, "Want PVC with name %q; Got PVC with name %q", tc.expectedPVC.Name, actualPVC)
 		})
 	}

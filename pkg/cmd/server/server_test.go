@@ -194,14 +194,14 @@ func Test_newServer(t *testing.T) {
 	_, err := newServer(factory, serverConfig{
 		uploaderType: "invalid",
 	}, logger)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// invalid clientQPS
 	_, err = newServer(factory, serverConfig{
 		uploaderType: uploader.KopiaType,
 		clientQPS:    -1,
 	}, logger)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// invalid clientBurst
 	factory.On("SetClientQPS", mock.Anything).Return()
@@ -210,7 +210,7 @@ func Test_newServer(t *testing.T) {
 		clientQPS:    1,
 		clientBurst:  -1,
 	}, logger)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// invalid clientBclientPageSizeurst
 	factory.On("SetClientQPS", mock.Anything).Return().
@@ -221,7 +221,7 @@ func Test_newServer(t *testing.T) {
 		clientBurst:    1,
 		clientPageSize: -1,
 	}, logger)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// got error when creating client
 	factory.On("SetClientQPS", mock.Anything).Return().
@@ -235,7 +235,7 @@ func Test_newServer(t *testing.T) {
 		clientBurst:    1,
 		clientPageSize: 100,
 	}, logger)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 }
 
 func Test_namespaceExists(t *testing.T) {
@@ -250,10 +250,10 @@ func Test_namespaceExists(t *testing.T) {
 	}
 
 	// namespace doesn't exist
-	assert.NotNil(t, server.namespaceExists("not-exist"))
+	assert.Error(t, server.namespaceExists("not-exist"))
 
 	// namespace exists
-	assert.Nil(t, server.namespaceExists("velero"))
+	assert.NoError(t, server.namespaceExists("velero"))
 }
 
 func Test_veleroResourcesExist(t *testing.T) {
@@ -265,7 +265,7 @@ func Test_veleroResourcesExist(t *testing.T) {
 
 	// velero resources don't exist
 	helper.On("Resources").Return(nil)
-	assert.NotNil(t, server.veleroResourcesExist())
+	assert.Error(t, server.veleroResourcesExist())
 
 	// velero resources exist
 	helper.On("Resources").Unset()
@@ -294,7 +294,7 @@ func Test_veleroResourcesExist(t *testing.T) {
 			},
 		},
 	})
-	assert.Nil(t, server.veleroResourcesExist())
+	assert.NoError(t, server.veleroResourcesExist())
 }
 
 func Test_markInProgressBackupsFailed(t *testing.T) {
@@ -329,11 +329,11 @@ func Test_markInProgressBackupsFailed(t *testing.T) {
 	markInProgressBackupsFailed(context.Background(), c, "velero", logrus.New())
 
 	backup01 := &velerov1api.Backup{}
-	require.Nil(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "backup01"}, backup01))
+	require.NoError(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "backup01"}, backup01))
 	assert.Equal(t, velerov1api.BackupPhaseFailed, backup01.Status.Phase)
 
 	backup02 := &velerov1api.Backup{}
-	require.Nil(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "backup02"}, backup02))
+	require.NoError(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "backup02"}, backup02))
 	assert.Equal(t, velerov1api.BackupPhaseCompleted, backup02.Status.Phase)
 }
 
@@ -369,11 +369,11 @@ func Test_markInProgressRestoresFailed(t *testing.T) {
 	markInProgressRestoresFailed(context.Background(), c, "velero", logrus.New())
 
 	restore01 := &velerov1api.Restore{}
-	require.Nil(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "restore01"}, restore01))
+	require.NoError(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "restore01"}, restore01))
 	assert.Equal(t, velerov1api.RestorePhaseFailed, restore01.Status.Phase)
 
 	restore02 := &velerov1api.Restore{}
-	require.Nil(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "restore02"}, restore02))
+	require.NoError(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "restore02"}, restore02))
 	assert.Equal(t, velerov1api.RestorePhaseCompleted, restore02.Status.Phase)
 }
 
@@ -403,11 +403,11 @@ func Test_setDefaultBackupLocation(t *testing.T) {
 	setDefaultBackupLocation(context.Background(), c, "velero", "default", logrus.New())
 
 	defaultLocation := &velerov1api.BackupStorageLocation{}
-	require.Nil(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "default"}, defaultLocation))
+	require.NoError(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "default"}, defaultLocation))
 	assert.True(t, defaultLocation.Spec.Default)
 
 	nonDefaultLocation := &velerov1api.BackupStorageLocation{}
-	require.Nil(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "non-default"}, nonDefaultLocation))
+	require.NoError(t, c.Get(context.Background(), client.ObjectKey{Namespace: "velero", Name: "non-default"}, nonDefaultLocation))
 	assert.False(t, nonDefaultLocation.Spec.Default)
 
 	// no default location specified

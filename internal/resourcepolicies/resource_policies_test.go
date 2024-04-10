@@ -232,7 +232,7 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 
 	// Call the function and check for errors
 	resPolicies, err := getResourcePoliciesFromConfig(cm)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// Check that the returned resourcePolicies object contains the expected data
 	assert.Equal(t, "v1", resPolicies.version)
@@ -422,12 +422,12 @@ volumePolicies:
 			if err != nil {
 				t.Fatalf("got error when get match action %v", err)
 			}
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			policies := &Policies{}
 			err = policies.BuildPolicy(resPolicies)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			action, err := policies.GetMatchAction(tc.vol)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			if tc.skip {
 				if action.Type != Skip {

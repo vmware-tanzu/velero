@@ -382,7 +382,7 @@ func TestNewKopiaUploaderProvider(t *testing.T) {
 			if tc.expectedError != "" {
 				assert.Contains(t, err.Error(), tc.expectedError)
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 
 			// Verify that the expected methods were called on the mocks.
