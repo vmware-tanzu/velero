@@ -195,6 +195,9 @@ func (f *factory) KubebuilderWatchClient() (kbclient.WithWatch, error) {
 	if err := apiextv1.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
+	if err := snapshotv1api.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
 	kubebuilderWatchClient, err := kbclient.NewWithWatch(clientConfig, kbclient.Options{
 		Scheme: scheme,
 	})

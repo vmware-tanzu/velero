@@ -160,7 +160,7 @@ func TestExpose(t *testing.T) {
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
 			},
-			err: "error wait volume snapshot ready: error to get volumesnapshot /fake-vs: volumesnapshots.snapshot.storage.k8s.io \"fake-vs\" not found",
+			err: "error wait volume snapshot ready: error to get VolumeSnapshot /fake-vs: volumesnapshots.snapshot.storage.k8s.io \"fake-vs\" not found",
 		},
 		{
 			name:        "get vsc fail",
