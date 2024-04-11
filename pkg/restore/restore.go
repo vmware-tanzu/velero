@@ -1112,6 +1112,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// itemExists bool is used to determine whether to include this item in the "wait for additional items" list
 	itemExists := false
 	resourceID := getResourceID(groupResource, namespace, obj.GetName())
+	resourceKind := obj.GetKind()
 
 	restoreLogger := ctx.log.WithFields(logrus.Fields{
 		"namespace":     obj.GetNamespace(),
@@ -1216,13 +1217,13 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		return warnings, errs, itemExists
 	}
 
-	resourceClient, err := ctx.getResourceClient(groupResource, obj, namespace)
-	if err != nil {
-		errs.AddVeleroError(fmt.Errorf("error getting resource client for namespace %q, resource %q: %v", namespace, &groupResource, err))
-		return warnings, errs, itemExists
-	}
-
 	if groupResource == kuberesource.PersistentVolumes {
+		resourceClient, err := ctx.getResourceClient(groupResource, obj, namespace)
+		if err != nil {
+			errs.AddVeleroError(fmt.Errorf("error getting resource client for namespace %q, resource %q: %v", namespace, &groupResource, err))
+			return warnings, errs, itemExists
+		}
+
 		if volumeInfo, ok := ctx.volumeInfoMap[obj.GetName()]; ok {
 			ctx.log.Infof("Find VolumeInfo for PV %s.", obj.GetName())
 
@@ -1503,9 +1504,21 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// The object apiVersion might get modified by a RestorePlugin so we need to
 	// get a new client to reflect updated resource path.
 	newGR := schema.GroupResource{Group: obj.GroupVersionKind().Group, Resource: groupResource.Resource}
-	resourceClient, err = ctx.getResourceClient(newGR, obj, obj.GetNamespace())
+	// obj kind might change within a special RIA which is used to convert objects,
+	// like from Openshift DeploymentConfig to native Deployment.
+	// we should re-get the newGR.Resource again in such a case
+	if obj.GetKind() != resourceKind {
+		ctx.log.Infof("Resource kind changed from %s to %s", resourceKind, obj.GetKind())
+		gvr, _, err := ctx.discoveryHelper.KindFor(obj.GroupVersionKind())
+		if err != nil {
+			errs.Add(namespace, fmt.Errorf("error getting GVR for %s: %v", obj.GroupVersionKind(), err))
+			return warnings, errs, itemExists
+		}
+		newGR.Resource = gvr.Resource
+	}
+	resourceClient, err := ctx.getResourceClient(newGR, obj, obj.GetNamespace())
 	if err != nil {
-		errs.AddVeleroError(fmt.Errorf("error getting updated resource client for namespace %q, resource %q: %v", namespace, &groupResource, err))
+		warnings.Add(namespace, fmt.Errorf("error getting updated resource client for namespace %q, resource %q: %v", namespace, &groupResource, err))
 		return warnings, errs, itemExists
 	}
 
@@ -2183,13 +2196,16 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 		resourceList = resourcePriorities.HighPriorities
 	}
 	for _, resource := range resourceList {
+		groupResource := schema.ParseGroupResource(resource)
 		// try to resolve the resource via discovery to a complete group/version/resource
-		gvr, _, err := ctx.discoveryHelper.ResourceFor(schema.ParseGroupResource(resource).WithVersion(""))
+		gvr, _, err := ctx.discoveryHelper.ResourceFor(groupResource.WithVersion(""))
 		if err != nil {
-			ctx.log.WithField("resource", resource).Infof("Skipping restore of resource because it cannot be resolved via discovery")
-			continue
+			// don't skip if we can't resolve the resource via discovery, log it
+			// the gv of this resource may be changed in a RIA, we can try to get it after that
+			ctx.log.WithField("resource", resource).Infof("resource cannot be resolved via discovery")
+		} else {
+			groupResource = gvr.GroupResource()
 		}
-		groupResource := gvr.GroupResource()
 
 		// Check if we've already restored this resource (this would happen if
 		// the resource we're currently looking at was already restored because
