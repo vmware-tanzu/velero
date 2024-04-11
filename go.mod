@@ -1,8 +1,6 @@
 module github.com/vmware-tanzu/velero
 
-go 1.21
-
-toolchain go1.21.3
+go 1.22
 
 require (
 	cloud.google.com/go/storage v1.39.1

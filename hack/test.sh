@@ -21,10 +21,9 @@ set -o pipefail
 
 export CGO_ENABLED=0
 
-TARGETS=($(go list ./pkg/... | grep -v "github.com/vmware-tanzu/velero/pkg/builder"))
+TARGETS=($(go list ./pkg/... ./internal/...| grep -vE "/pkg/builder|pkg/apis|pkg/test|pkg/generated|pkg/plugin/generated|mocks|internal/restartabletest"))
 TARGETS+=(
   ./cmd/...
-  ./internal/...
 )
 
 if [[ ${#@} -ne 0 ]]; then
