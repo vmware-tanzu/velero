@@ -371,8 +371,8 @@ Velero calls the CSI plugin concurrently for the volume, so `DataUpload`/`DataDo
 In which manner the `DataUpload`/`DataDownload` CRs are processed is totally decided by the data mover you select for the backup/restore.  
 
 For Velero built-in data mover, it uses Kubernetes' scheduler to mount a snapshot volume/restore volume associated to a `DataUpload`/`DataDownload` CR into a specific node, and then the `DataUpload`/`DataDownload` controller (in node-agent daemonset) in that node will handle the `DataUpload`/`DataDownload`.  
-At present, a `DataUpload`/`DataDownload` controller in one node handles one request at a time.  
-That is to say, the snapshot volumes/restore volumes may spread in different nodes, then their associated `DataUpload`/`DataDownload` CRs will be processed in parallel; while for the snapshot volumes/restore volumes in the same node, their associated `DataUpload`/`DataDownload` CRs are processed sequentially.  
+By default, a `DataUpload`/`DataDownload` controller in one node handles one request at a time. You can configure more parallelism per node by [node-agent Concurrency Configuration][14].  
+That is to say, the snapshot volumes/restore volumes may spread in different nodes, then their associated `DataUpload`/`DataDownload` CRs will be processed in parallel; while for the snapshot volumes/restore volumes in the same node, by default, their associated `DataUpload`/`DataDownload` CRs are processed sequentially and can be processed concurrently according to your [node-agent Concurrency Configuration][14].    
 
 You can check in which node the `DataUpload`/`DataDownload` CRs are processed and their parallelism by watching the `DataUpload`/`DataDownload` CRs:
 
@@ -436,11 +436,22 @@ spec:
 ### Resource Consumption
 
 Both the uploader and repository consume remarkable CPU/memory during the backup/restore, especially for massive small files or large backup size cases.  
-Velero node-agent uses [BestEffort as the QoS][13] for node-agent pods (so no CPU/memory request/limit is set), so that backups/restores wouldn't fail due to resource throttling in any cases.  
+
+For Velero built-in data mover, Velero uses [BestEffort as the QoS][13] for node-agent pods (so no CPU/memory request/limit is set), so that backups/restores wouldn't fail due to resource throttling in any cases.  
 If you want to constraint the CPU/memory usage, you need to [customize the resource limits][11]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][12] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.   
 
 During the restore, the repository may also cache data/metadata so as to reduce the network footprint and speed up the restore. The repository uses its own policy to store and clean up the cache.  
 For Kopia repository, the cache is stored in the node-agent pod's root file system and the cleanup is triggered for the data/metadata that are older than 10 minutes (not configurable at present). So you should prepare enough disk space, otherwise, the node-agent pod may be evicted due to running out of the ephemeral storage.  
+
+### Node Selection
+
+The node where a data movement backup/restore runs is decided by the data mover.  
+
+For Velero built-in data mover, it uses Kubernetes' scheduler to mount a snapshot volume/restore volume associated to a `DataUpload`/`DataDownload` CR into a specific node, and then the data movement backup/restore will happen in that node.  
+For the backup, you can intervene this scheduling process through [Data Movement Backup Node Selection][15], so that you can decide which node(s) should/should not run the data movement backup for various purposes.  
+For the restore, this is not supported because sometimes the data movement restore must run in the same node where the restored workload pod is scheduled.  
+
+
 
 
 [1]: https://github.com/vmware-tanzu/velero/pull/5968
@@ -456,3 +467,5 @@ For Kopia repository, the cache is stored in the node-agent pod's root file syst
 [11]: customize-installation.md#customize-resource-requests-and-limits
 [12]: performance-guidance.md
 [13]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
+[14]: node-agent-concurrency.md
+[15]: data-movement-backup-node-selection.md
