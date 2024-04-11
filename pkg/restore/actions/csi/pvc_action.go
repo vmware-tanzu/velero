@@ -481,12 +481,7 @@ func newDataDownload(
 		},
 	}
 	if restore.Spec.UploaderConfig != nil {
-		dataDownload.Spec.DataMoverConfig = make(map[string]string)
-		if boolptr.IsSetToTrue(restore.Spec.UploaderConfig.WriteSparseFiles) {
-			dataDownload.Spec.DataMoverConfig[uploaderUtil.WriteSparseFiles] = "true"
-		} else {
-			dataDownload.Spec.DataMoverConfig[uploaderUtil.WriteSparseFiles] = "false"
-		}
+		dataDownload.Spec.DataMoverConfig = uploaderUtil.StoreRestoreConfig(restore.Spec.UploaderConfig)
 	}
 	return dataDownload
 }
