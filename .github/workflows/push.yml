@@ -28,12 +28,18 @@ jobs:
         sudo apt-get install python2.7
         export CLOUDSDK_PYTHON="/usr/bin/python2"
 
-    - uses: google-github-actions/setup-gcloud@v2
+    - id: 'auth'
+      uses: google-github-actions/auth@v2
       with:
-        version: '285.0.0'
-        service_account_key: ${{ secrets.GCS_SA_KEY }}
-        export_default_credentials: true
-    - run: gcloud info
+        credentials_json: '${{ secrets.GCS_SA_KEY }}'
+
+    - name: 'set up GCloud SDK'
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: 'use gcloud CLI'
+      run: |
+        gcloud auth login
+        gcloud info
 
     - name: Set up QEMU
       id: qemu
