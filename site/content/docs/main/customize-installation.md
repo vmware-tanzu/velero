@@ -95,7 +95,7 @@ the config file setting.
 
 ## Customize resource requests and limits
 
-At installation, You could set resource requests and limits for the Velero pod and the node-agent pod, if you are using the [File System Backup][3] or [CSI Snapshot Data Movement][12].  
+At installation, You could set resource requests and limits for the Velero pod, the node-agent pod and the [repository maintenance job][14], if you are using the [File System Backup][3] or [CSI Snapshot Data Movement][12].  
 
 {{< table caption="Velero Customize resource requests and limits defaults" >}}
 |Setting|Velero pod defaults|node-agent pod defaults|
@@ -107,7 +107,10 @@ At installation, You could set resource requests and limits for the Velero pod a
 {{< /table >}}
   
 For Velero pod, through testing, the Velero maintainers have found these defaults work well when backing up and restoring 1000 or less resources.  
-For node-agent pod, by default it doesn't have CPU/memory request/limit, so that the backups/restores won't break due to resource throttling. The Velero maintainers have also done some [Performance Tests][13] to show the relationship of CPU/memory usage and the scale of data being backed up/restored.  
+For node-agent pod, by default it doesn't have CPU/memory request/limit, so that the backups/restores won't break due to resource throttling. The Velero maintainers have also done some [Performance Tests][13] to show the relationship of CPU/memory usage and the scale of data being backed up/restored.
+
+For repository maintenance job, it's no limit on resources by default. You could configure the job resource limitation based on target data to be backed up, some further settings please refer to [repository maintenance job][14].
+
 You don't have to change the defaults all the time, but if you need, it's recommended that you perform your own testing to find the best resource limits for your clusters and resources.   
 
 ### Install with custom resource requests and limits
@@ -125,7 +128,11 @@ velero install \
   [--node-agent-pod-cpu-request <CPU_REQUEST>] \
   [--node-agent-pod-mem-request <MEMORY_REQUEST>] \
   [--node-agent-pod-cpu-limit <CPU_LIMIT>] \
-  [--node-agent-pod-mem-limit <MEMORY_LIMIT>]
+  [--node-agent-pod-mem-limit <MEMORY_LIMIT>] \
+  [--maintenance-job-cpu-request <CPU_REQUEST>] \
+  [--maintenance-job-mem-request <MEMORY_REQUEST>] \
+  [--maintenance-job-cpu-limit <CPU_LIMIT>] \
+  [--maintenance-job-mem-limit <MEMORY_LIMIT>]
 ```
 
 ### Update resource requests and limits after install
@@ -423,3 +430,4 @@ If you get an error like `complete:13: command not found: compdef`, then add the
 [11]: https://github.com/vmware-tanzu/velero/blob/main/pkg/apis/velero/v1/constants.go
 [12]: csi-snapshot-data-movement.md
 [13]: performance-guidance.md
+[14]: repository-maintenance.md

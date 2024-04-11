@@ -43,6 +43,8 @@ spec:
   uploaderConfig:
     # WriteSparseFiles is a flag to indicate whether write files sparsely or not
     writeSparseFiles: true
+    # ParallelFilesDownload is the concurrency number setting for restore
+    parallelFilesDownload: 10
   # Array of namespaces to include in the restore. If unspecified, all namespaces are included.
   # Optional.
   includedNamespaces:
