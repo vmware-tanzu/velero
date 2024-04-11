@@ -17,11 +17,25 @@ limitations under the License.
 package csi
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 var (
@@ -86,4 +100,145 @@ func TestResetVolumeSnapshotSpecForRestore(t *testing.T) {
 			assert.Nil(t, tc.vs.Status)
 		})
 	}
+}
+
+func TestVSExecute(t *testing.T) {
+	snapshotHandle := "vsc"
+	tests := []struct {
+		name        string
+		item        runtime.Unstructured
+		vs          *snapshotv1api.VolumeSnapshot
+		restore     *velerov1api.Restore
+		expectErr   bool
+		createVS    bool
+		expectedVSC *snapshotv1api.VolumeSnapshotContent
+	}{
+		{
+			name:      "Restore's RestorePVs is false",
+			restore:   builder.ForRestore("velero", "restore").RestorePVs(false).Result(),
+			expectErr: false,
+		},
+		{
+			name:      "Namespace remapping and VS already exists in cluster. Nothing change",
+			vs:        builder.ForVolumeSnapshot("ns", "name").Result(),
+			restore:   builder.ForRestore("velero", "restore").NamespaceMappings("ns", "newNS").Result(),
+			createVS:  true,
+			expectErr: false,
+		},
+		{
+			name:      "VS doesn't have VolumeSnapshotHandleAnnotation annotation",
+			vs:        builder.ForVolumeSnapshot("ns", "name").Result(),
+			restore:   builder.ForRestore("velero", "restore").NamespaceMappings("ns", "newNS").Result(),
+			expectErr: true,
+		},
+		{
+			name: "VS doesn't have DriverNameAnnotation annotation",
+			vs: builder.ForVolumeSnapshot("ns", "name").ObjectMeta(
+				builder.WithAnnotations(velerov1api.VolumeSnapshotHandleAnnotation, ""),
+			).Result(),
+			restore:   builder.ForRestore("velero", "restore").NamespaceMappings("ns", "newNS").Result(),
+			expectErr: true,
+		},
+		{
+			name: "Normal case, VSC should be created",
+			vs: builder.ForVolumeSnapshot("ns", "test").ObjectMeta(builder.WithAnnotationsMap(
+				map[string]string{
+					velerov1api.VolumeSnapshotHandleAnnotation: "vsc",
+					velerov1api.DriverNameAnnotation:           "pd.csi.storage.gke.io",
+				},
+			)).Result(),
+			restore:   builder.ForRestore("velero", "restore").Result(),
+			expectErr: false,
+			expectedVSC: builder.ForVolumeSnapshotContent("vsc").ObjectMeta(
+				builder.WithLabels(velerov1api.RestoreNameLabel, "restore"),
+			).VolumeSnapshotRef("ns", "test").
+				DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).
+				Driver("pd.csi.storage.gke.io").
+				Source(snapshotv1api.VolumeSnapshotContentSource{
+					SnapshotHandle: &snapshotHandle,
+				}).
+				Result(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			p := volumeSnapshotRestoreItemAction{
+				log:      logrus.StandardLogger(),
+				crClient: velerotest.NewFakeControllerRuntimeClient(t),
+			}
+
+			if test.vs != nil {
+				vsMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(test.vs)
+				require.NoError(t, err)
+				test.item = &unstructured.Unstructured{Object: vsMap}
+
+				if test.createVS == true {
+					if newNS, ok := test.restore.Spec.NamespaceMapping[test.vs.Namespace]; ok {
+						test.vs.SetNamespace(newNS)
+					}
+					require.NoError(t, p.crClient.Create(context.TODO(), test.vs))
+				}
+			}
+
+			_, err := p.Execute(
+				&velero.RestoreItemActionExecuteInput{
+					Item:    test.item,
+					Restore: test.restore,
+				},
+			)
+
+			if test.expectErr == false {
+				require.NoError(t, err)
+			}
+
+			if test.expectedVSC != nil {
+				vscList := new(snapshotv1api.VolumeSnapshotContentList)
+				require.NoError(t, p.crClient.List(context.TODO(), vscList))
+				require.True(t, cmp.Equal(
+					*test.expectedVSC,
+					vscList.Items[0],
+					cmpopts.IgnoreFields(
+						snapshotv1api.VolumeSnapshotContent{},
+						"Kind", "APIVersion", "GenerateName", "Name",
+						"ResourceVersion",
+					),
+				))
+			}
+		})
+	}
+}
+
+func TestVSAppliesTo(t *testing.T) {
+	p := volumeSnapshotRestoreItemAction{
+		log: logrus.StandardLogger(),
+	}
+	selector, err := p.AppliesTo()
+
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		velero.ResourceSelector{
+			IncludedResources: []string{"volumesnapshots.snapshot.storage.k8s.io"},
+		},
+		selector,
+	)
+}
+
+func TestNewVolumeSnapshotRestoreItemAction(t *testing.T) {
+	logger := logrus.StandardLogger()
+	crClient := velerotest.NewFakeControllerRuntimeClient(t)
+
+	f := &factorymocks.Factory{}
+	f.On("KubebuilderClient").Return(nil, fmt.Errorf(""))
+	plugin := NewVolumeSnapshotRestoreItemAction(f)
+	_, err := plugin(logger)
+	require.Error(t, err)
+
+	f1 := &factorymocks.Factory{}
+	f1.On("KubebuilderClient").Return(crClient, nil)
+	plugin1 := NewVolumeSnapshotRestoreItemAction(f1)
+	_, err1 := plugin1(logger)
+	require.NoError(t, err1)
 }

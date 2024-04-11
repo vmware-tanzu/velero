@@ -76,13 +76,14 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 	input *velero.RestoreItemActionExecuteInput,
 ) (*velero.RestoreItemActionExecuteOutput, error) {
 	p.log.Info("Starting VolumeSnapshotRestoreItemAction")
+
 	if boolptr.IsSetToFalse(input.Restore.Spec.RestorePVs) {
 		p.log.Infof("Restore %s/%s did not request for PVs to be restored.",
 			input.Restore.Namespace, input.Restore.Name)
 		return &velero.RestoreItemActionExecuteOutput{SkipRestore: true}, nil
 	}
-	var vs snapshotv1api.VolumeSnapshot
 
+	var vs snapshotv1api.VolumeSnapshot
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(
 		input.Item.UnstructuredContent(), &vs); err != nil {
 		return &velero.RestoreItemActionExecuteOutput{},
@@ -101,7 +102,7 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 		snapHandle, exists := vs.Annotations[velerov1api.VolumeSnapshotHandleAnnotation]
 		if !exists {
 			return nil, errors.Errorf(
-				"Volumesnapshot %s/%s does not have a %s annotation",
+				"VolumeSnapshot %s/%s does not have a %s annotation",
 				vs.Namespace,
 				vs.Name,
 				velerov1api.VolumeSnapshotHandleAnnotation,
@@ -111,7 +112,7 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 		csiDriverName, exists := vs.Annotations[velerov1api.DriverNameAnnotation]
 		if !exists {
 			return nil, errors.Errorf(
-				"Volumesnapshot %s/%s does not have a %s annotation",
+				"VolumeSnapshot %s/%s does not have a %s annotation",
 				vs.Namespace, vs.Name, velerov1api.DriverNameAnnotation)
 		}
 
@@ -129,9 +130,10 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 				DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
 				Driver:         csiDriverName,
 				VolumeSnapshotRef: core_v1.ObjectReference{
-					Kind:      "VolumeSnapshot",
-					Namespace: newNamespace,
-					Name:      vs.Name,
+					APIVersion: "snapshot.storage.k8s.io/v1",
+					Kind:       "VolumeSnapshot",
+					Namespace:  newNamespace,
+					Name:       vs.Name,
 				},
 				Source: snapshotv1api.VolumeSnapshotContentSource{
 					SnapshotHandle: &snapHandle,
@@ -149,7 +151,7 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 		// See: https://github.com/kubernetes-csi/external-snapshotter/issues/274
 		if err := p.crClient.Create(context.TODO(), &vsc); err != nil {
 			return nil, errors.Wrapf(err,
-				"failed to create volumesnapshotcontents %s",
+				"failed to create VolumeSnapshotContents %s",
 				vsc.GenerateName)
 		}
 		p.log.Infof("Created VolumesnapshotContents %s with static binding to volumesnapshot %s/%s",
@@ -169,7 +171,8 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 		return nil, errors.WithStack(err)
 	}
 
-	p.log.Infof("Returning from VolumeSnapshotRestoreItemAction with no additionalItems")
+	p.log.Infof(`Returning from VolumeSnapshotRestoreItemAction with 
+		no additionalItems`)
 
 	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem:     &unstructured.Unstructured{Object: vsMap},

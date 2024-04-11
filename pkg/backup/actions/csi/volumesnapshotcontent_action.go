@@ -43,7 +43,7 @@ type volumeSnapshotContentBackupItemAction struct {
 // backup VolumeSnapshotContents.
 func (p *volumeSnapshotContentBackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
-		IncludedResources: []string{"volumesnapshotcontent.snapshot.storage.k8s.io"},
+		IncludedResources: []string{"volumesnapshotcontents.snapshot.storage.k8s.io"},
 	}, nil
 }
 

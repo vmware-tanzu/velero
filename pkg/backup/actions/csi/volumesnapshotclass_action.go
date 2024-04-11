@@ -45,7 +45,7 @@ func (p *volumeSnapshotClassBackupItemAction) AppliesTo() (
 	error,
 ) {
 	return velero.ResourceSelector{
-		IncludedResources: []string{"volumesnapshotclass.snapshot.storage.k8s.io"},
+		IncludedResources: []string{"volumesnapshotclasses.snapshot.storage.k8s.io"},
 	}, nil
 }
 

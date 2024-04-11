@@ -122,8 +122,6 @@ const (
 	VolumeSnapshotHandleAnnotation                  = "velero.io/csi-volumesnapshot-handle"
 	VolumeSnapshotRestoreSize                       = "velero.io/csi-volumesnapshot-restore-size"
 	DriverNameAnnotation                            = "velero.io/csi-driver-name"
-	DeleteSecretNameAnnotation                      = "velero.io/csi-deletesnapshotsecret-name"      // #nosec G101
-	DeleteSecretNamespaceAnnotation                 = "velero.io/csi-deletesnapshotsecret-namespace" // #nosec G101
 	VSCDeletionPolicyAnnotation                     = "velero.io/csi-vsc-deletion-policy"
 	VolumeSnapshotClassSelectorLabel                = "velero.io/csi-volumesnapshot-class"
 	VolumeSnapshotClassDriverBackupAnnotationPrefix = "velero.io/csi-volumesnapshot-class"

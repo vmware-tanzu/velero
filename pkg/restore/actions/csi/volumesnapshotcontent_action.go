@@ -42,7 +42,7 @@ func (p *volumeSnapshotContentRestoreItemAction) AppliesTo() (
 	velero.ResourceSelector, error,
 ) {
 	return velero.ResourceSelector{
-		IncludedResources: []string{"volumesnapshotcontent.snapshot.storage.k8s.io"},
+		IncludedResources: []string{"volumesnapshotcontents.snapshot.storage.k8s.io"},
 	}, nil
 }
 
@@ -69,8 +69,8 @@ func (p *volumeSnapshotContentRestoreItemAction) Execute(
 		additionalItems = append(additionalItems,
 			velero.ResourceIdentifier{
 				GroupResource: schema.GroupResource{Group: "", Resource: "secrets"},
-				Name:          snapCont.Annotations[velerov1api.DeleteSecretNameAnnotation],
-				Namespace:     snapCont.Annotations[velerov1api.DeleteSecretNamespaceAnnotation],
+				Name:          snapCont.Annotations[velerov1api.PrefixedSecretNameAnnotation],
+				Namespace:     snapCont.Annotations[velerov1api.PrefixedSecretNamespaceAnnotation],
 			},
 		)
 	}

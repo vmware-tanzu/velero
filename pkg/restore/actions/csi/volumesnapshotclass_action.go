@@ -39,7 +39,7 @@ type volumeSnapshotClassRestoreItemAction struct {
 // should be invoked while restoring volumesnapshotclass.snapshot.storage.k8s.io resources.
 func (p *volumeSnapshotClassRestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
-		IncludedResources: []string{"volumesnapshotclass.snapshot.storage.k8s.io"},
+		IncludedResources: []string{"volumesnapshotclasses.snapshot.storage.k8s.io"},
 	}, nil
 }
 
