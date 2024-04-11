@@ -37,9 +37,6 @@ type Registry interface {
 	List(kind common.PluginKind) []framework.PluginIdentifier
 	// Get returns the PluginIdentifier for kind and name.
 	Get(kind common.PluginKind, name string) (framework.PluginIdentifier, error)
-
-	// Find checks if the specified plugin exists in the registry
-	Find(kind common.PluginKind, name string) bool
 }
 
 // KindAndName is a convenience struct that combines a PluginKind and a name.
@@ -126,12 +123,6 @@ func (r *registry) Get(kind common.PluginKind, name string) (framework.PluginIde
 		return framework.PluginIdentifier{}, newPluginNotFoundError(kind, name)
 	}
 	return p, nil
-}
-
-// Contain if the specified plugin exists in the registry
-func (r *registry) Find(kind common.PluginKind, name string) bool {
-	_, found := r.pluginsByID[KindAndName{Kind: kind, Name: name}]
-	return found
 }
 
 // readPluginsDir recursively reads dir looking for plugins.

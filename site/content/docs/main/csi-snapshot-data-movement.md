@@ -152,14 +152,22 @@ Backup repository is created during the first execution of backup targeting to i
 
 ## Install Velero with CSI support on source cluster
 
-On source cluster, Velero needs to manipulate CSI snapshots through the CSI volume snapshot APIs, so you must enable the `EnableCSI` feature flag and install the Velero [CSI plugin][2] on the Velero server.  
+On source cluster, Velero needs to manipulate CSI snapshots through the CSI volume snapshot APIs, so you must enable the `EnableCSI` feature flag on the Velero server.  
 
-Both of these can be added with the `velero install` command.
+To integrate Velero with the CSI volume snapshot APIs, you must enable the `EnableCSI` feature flag.
+
+From release-1.14, the `github.com/vmware-tanzu/velero-plugin-for-csi` repository, which is the Velero CSI plugin, is merged into the `github.com/vmware-tanzu/velero` repository.
+The reasons to merge the CSI plugin are:
+* The VolumeSnapshot data mover depends on the CSI plugin, it's reasonabe to integrate them.
+* This change reduces the Velero deploying complexity.
+* This makes performance tuning easier in the future.
+
+As a result, no need to install Velero CSI plugin anymore.
 
 ```bash
 velero install \
 --features=EnableCSI \
---plugins=<object storage plugin>,velero/velero-plugin-for-csi:v0.6.0 \
+--plugins=<object storage plugin> \
 ...
 ```
 

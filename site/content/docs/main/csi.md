@@ -5,7 +5,16 @@ layout: docs
 
 Integrating Container Storage Interface (CSI) snapshot support into Velero enables Velero to backup and restore CSI-backed volumes using the [Kubernetes CSI Snapshot APIs](https://kubernetes.io/docs/concepts/storage/volume-snapshots/).
 
-By supporting CSI snapshot APIs, Velero can support any volume provider that has a CSI driver, without requiring a Velero-specific plugin to be available. This page gives an overview of how to add support for CSI snapshots to Velero  through CSI plugins. For more information about specific components, see the [plugin repo](https://github.com/vmware-tanzu/velero-plugin-for-csi/).
+By supporting CSI snapshot APIs, Velero can support any volume provider that has a CSI driver, without requiring a Velero-specific plugin to be available. This page gives an overview of how to add support for CSI snapshots to Velero.
+
+## Notice
+From release-1.14, the `github.com/vmware-tanzu/velero-plugin-for-csi` repository, which is the Velero CSI plugin, is merged into the `github.com/vmware-tanzu/velero` repository.
+The reasons to merge the CSI plugin are:
+* The VolumeSnapshot data mover depends on the CSI plugin, it's reasonabe to integrate them.
+* This change reduces the Velero deploying complexity.
+* This makes performance tuning easier in the future.
+
+As a result, no need to install Velero CSI plugin anymore.
 
 ## Prerequisites
 
@@ -17,27 +26,25 @@ By supporting CSI snapshot APIs, Velero can support any volume provider that has
 
 ## Installing Velero with CSI support
 
-To integrate Velero with the CSI volume snapshot APIs, you must enable the `EnableCSI` feature flag and install the Velero [CSI plugins][2] on the Velero server.
-
-Both of these can be added with the `velero install` command.
+To integrate Velero with the CSI volume snapshot APIs, you must enable the `EnableCSI` feature flag.
 
 ```bash
 velero install \
 --features=EnableCSI \
---plugins=<object storage plugin>,velero/velero-plugin-for-csi:v0.7.0 \
+--plugins=<object storage plugin> \
 ...
 ```
 
 To include the status of CSI objects associated with a Velero backup in `velero backup describe` output, run `velero client config set features=EnableCSI`.
-See [Enabling Features][1] for more information about managing client-side feature flags. You can also view the image on [Docker Hub][3].
+See [Enabling Features][1] for more information about managing client-side feature flags.
 
 ## Implementation Choices
 
-This section documents some of the choices made during implementation of the Velero [CSI plugins][2]:
+This section documents some of the choices made during implementing the CSI snapshot.
 
  1. VolumeSnapshots created by the Velero CSI plugins are retained only for the lifetime of the backup even if the `DeletionPolicy` on the VolumeSnapshotClass is set to `Retain`. To accomplish this, during deletion of the backup the prior to deleting the VolumeSnapshot, VolumeSnapshotContent object is patched to set its `DeletionPolicy` to `Delete`. Deleting the VolumeSnapshot object will result in cascade delete of the VolumeSnapshotContent and the snapshot in the storage provider.
- 1. VolumeSnapshotContent objects created during a `velero backup` that are dangling, unbound to a VolumeSnapshot object, will be discovered, using labels, and deleted on backup deletion.
- 1. The Velero CSI plugins, to backup CSI backed PVCs, will choose the VolumeSnapshotClass in the cluster based on the following logic:
+ 2. VolumeSnapshotContent objects created during a `velero backup` that are dangling, unbound to a VolumeSnapshot object, will be discovered, using labels, and deleted on backup deletion.
+ 3. The Velero CSI plugins, to backup CSI backed PVCs, will choose the VolumeSnapshotClass in the cluster based on the following logic:
     1. **Default Behavior:**
     You can simply create a VolumeSnapshotClass for a particular driver and put a label on it to indicate that it is the default VolumeSnapshotClass for that driver.  For example, if you want to create a VolumeSnapshotClass for the CSI driver `disk.csi.cloud.com` for taking snapshots of disks created with `disk.csi.cloud.com` based storage classes, you can create a VolumeSnapshotClass like this:
         ```yaml
@@ -83,7 +90,7 @@ This section documents some of the choices made during implementation of the Vel
                 storage: 1Gi
             storageClassName: disk.csi.cloud.com
         ```
- 1. The VolumeSnapshot objects will be removed from the cluster after the backup is uploaded to the object storage, so that the namespace that is backed up can be deleted without removing the snapshot in the storage provider if the `DeletionPolicy` is `Delete`.  
+ 4. The VolumeSnapshot objects will be removed from the cluster after the backup is uploaded to the object storage, so that the namespace that is backed up can be deleted without removing the snapshot in the storage provider if the `DeletionPolicy` is `Delete`.  
 
 ## How it Works - Overview
 
@@ -110,10 +117,7 @@ The `DeletionPolicy` on the VolumeSnapshotContent will be the same as the `Delet
 
 When the Velero backup expires, the VolumeSnapshot objects will be deleted and the VolumeSnapshotContent objects will be updated to have a `DeletionPolicy` of `Delete`, to free space on the storage system.
 
-For more details on how each plugin works, see the [CSI plugin repo][2]'s documentation.
-
 **Note:** The AWS, Microsoft Azure, and Google Cloud Platform (GCP) Velero plugins version 1.4 and later are able to snapshot and restore persistent volumes provisioned by a CSI driver via the APIs of the cloud provider, without having to install Velero CSI plugins. See the [AWS](https://github.com/vmware-tanzu/velero-plugin-for-aws), [Microsoft Azure](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure), and [Google Cloud Platform (GCP)](https://github.com/vmware-tanzu/velero-plugin-for-gcp) Velero plugin repo for more information on supported CSI drivers.
+From v1.14, no need to install the CSI plugin, because it is integrated into the Velero code base.
 
 [1]: customize-installation.md#enable-server-side-features
-[2]: https://github.com/vmware-tanzu/velero-plugin-for-csi/
-[3]: https://hub.docker.com/repository/docker/velero/velero-plugin-for-csi

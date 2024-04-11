@@ -284,7 +284,6 @@ type server struct {
 	mgr                   manager.Manager
 	credentialFileStore   credentials.FileStore
 	credentialSecretStore credentials.SecretStore
-	featureVerifier       features.Verifier
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
@@ -324,12 +323,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	pluginRegistry := process.NewRegistry(config.pluginDir, logger, logger.Level)
 	if err := pluginRegistry.DiscoverPlugins(); err != nil {
 		return nil, err
-	}
-
-	featureVerifier := features.NewVerifier(pluginRegistry)
-
-	if _, err := featureVerifier.Verify(velerov1api.CSIFeatureFlag); err != nil {
-		logger.WithError(err).Warn("CSI feature verification failed, the feature may not be ready.")
 	}
 
 	// cancelFunc is not deferred here because if it was, then ctx would immediately
@@ -425,7 +418,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		mgr:                   mgr,
 		credentialFileStore:   credentialFileStore,
 		credentialSecretStore: credentialSecretStore,
-		featureVerifier:       featureVerifier,
 	}
 
 	return s, nil
@@ -973,7 +965,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.kubeClient.CoreV1().RESTClient(),
 			s.credentialFileStore,
 			s.mgr.GetClient(),
-			s.featureVerifier,
 		)
 
 		cmd.CheckError(err)

@@ -55,7 +55,6 @@ Here is an example:
         "aws": "../velero-plugin-for-aws",
         "gcp": "../velero-plugin-for-gcp",
         "azure": "../velero-plugin-for-microsoft-azure",
-        "csi": "../velero-plugin-for-csi"
     },
     "allowed_contexts": [
         "development"
