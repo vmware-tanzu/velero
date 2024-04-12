@@ -20,15 +20,6 @@ ENV GO111MODULE=on
 # Use a proxy for go modules to reduce the likelihood of various hosts being down and breaking the build
 ENV GOPROXY=${GOPROXY}
 
-# kubebuilder test bundle is separated from kubebuilder. Need to setup it for CI test.
-RUN curl -sSLo envtest-bins.tar.gz https://go.kubebuilder.io/test-tools/1.22.1/linux/$(go env GOARCH) && \
-    mkdir /usr/local/kubebuilder && \
-    tar -C /usr/local/kubebuilder --strip-components=1 -zvxf envtest-bins.tar.gz
-
-RUN wget --quiet https://github.com/kubernetes-sigs/kubebuilder/releases/download/v3.2.0/kubebuilder_linux_$(go env GOARCH) && \
-    mv kubebuilder_linux_$(go env GOARCH) /usr/local/kubebuilder/bin/kubebuilder && \
-    chmod +x /usr/local/kubebuilder/bin/kubebuilder
-
 # get controller-tools
 RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0
 
