@@ -626,8 +626,7 @@ func TestRetainVSC(t *testing.T) {
 			clientObj: []runtime.Object{vscObj},
 			updated: &snapshotv1api.VolumeSnapshotContent{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:       "fake-vsc",
-					Finalizers: []string{volumeSnapshotContentProtectFinalizer},
+					Name: "fake-vsc",
 				},
 				Spec: snapshotv1api.VolumeSnapshotContentSpec{
 					DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
