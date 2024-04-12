@@ -308,8 +308,8 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 
 	backupVolumes := make(map[string]interface{})
 
-	nativeSnapshots := []*volume.VolumeInfo{}
-	csiSnapshots := []*volume.VolumeInfo{}
+	nativeSnapshots := []*volume.BackupVolumeInfo{}
+	csiSnapshots := []*volume.BackupVolumeInfo{}
 	legacyInfoSource := false
 
 	buf := new(bytes.Buffer)
@@ -332,7 +332,7 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 		backupVolumes["errorGetBackupVolumeInfo"] = fmt.Sprintf("error getting backup volume info: %v", err)
 		return
 	} else {
-		var volumeInfos []volume.VolumeInfo
+		var volumeInfos []volume.BackupVolumeInfo
 		if err := json.NewDecoder(buf).Decode(&volumeInfos); err != nil {
 			backupVolumes["errorReadBackupVolumeInfo"] = fmt.Sprintf("error reading backup volume info: %v", err)
 			return
@@ -357,7 +357,7 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 	backupStatusInfo["backupVolumes"] = backupVolumes
 }
 
-func describeNativeSnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVolumes map[string]interface{}) {
+func describeNativeSnapshotsInSF(details bool, infos []*volume.BackupVolumeInfo, backupVolumes map[string]interface{}) {
 	if len(infos) == 0 {
 		backupVolumes["nativeSnapshots"] = "<none included>"
 		return
@@ -370,7 +370,7 @@ func describeNativeSnapshotsInSF(details bool, infos []*volume.VolumeInfo, backu
 	backupVolumes["nativeSnapshots"] = snapshotDetails
 }
 
-func describNativeSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDetails map[string]interface{}) {
+func describNativeSnapshotInSF(details bool, info *volume.BackupVolumeInfo, snapshotDetails map[string]interface{}) {
 	if details {
 		snapshotInfo := make(map[string]string)
 		snapshotInfo["snapshotID"] = info.NativeSnapshotInfo.SnapshotHandle
@@ -384,7 +384,7 @@ func describNativeSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDe
 	}
 }
 
-func describeCSISnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVolumes map[string]interface{}, legacyInfoSource bool) {
+func describeCSISnapshotsInSF(details bool, infos []*volume.BackupVolumeInfo, backupVolumes map[string]interface{}, legacyInfoSource bool) {
 	if len(infos) == 0 {
 		if legacyInfoSource {
 			backupVolumes["csiSnapshots"] = "<none included or not detectable>"
@@ -401,7 +401,7 @@ func describeCSISnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVo
 	backupVolumes["csiSnapshots"] = snapshotDetails
 }
 
-func describeCSISnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDetails map[string]interface{}) {
+func describeCSISnapshotInSF(details bool, info *volume.BackupVolumeInfo, snapshotDetails map[string]interface{}) {
 	snapshotDetail := make(map[string]interface{})
 
 	describeLocalSnapshotInSF(details, info, snapshotDetail)
@@ -411,7 +411,7 @@ func describeCSISnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDeta
 }
 
 // describeLocalSnapshotInSF describes CSI volume snapshot contents in structured format.
-func describeLocalSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDetail map[string]interface{}) {
+func describeLocalSnapshotInSF(details bool, info *volume.BackupVolumeInfo, snapshotDetail map[string]interface{}) {
 	if !info.PreserveLocalSnapshot {
 		return
 	}
@@ -434,7 +434,7 @@ func describeLocalSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDe
 	}
 }
 
-func describeDataMovementInSF(details bool, info *volume.VolumeInfo, snapshotDetail map[string]interface{}) {
+func describeDataMovementInSF(details bool, info *volume.BackupVolumeInfo, snapshotDetail map[string]interface{}) {
 	if !info.SnapshotDataMoved {
 		return
 	}

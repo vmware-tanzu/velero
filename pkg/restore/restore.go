@@ -276,6 +276,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		volumeSnapshotterGetter: volumeSnapshotterGetter,
 		kbclient:                kr.kbClient,
 		credentialFileStore:     kr.credentialFileStore,
+		volInfoTracker:          req.RestoreVolumeInfoTracker,
 	}
 
 	req.RestoredItems = make(map[itemKey]restoredItemStatus)
@@ -323,7 +324,8 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		disableInformerCache:           req.DisableInformerCache,
 		featureVerifier:                kr.featureVerifier,
 		hookTracker:                    hook.NewHookTracker(),
-		volumeInfoMap:                  req.VolumeInfoMap,
+		backupVolumeInfoMap:            req.BackupVolumeInfoMap,
+		restoreVolumeInfoTracker:       req.RestoreVolumeInfoTracker,
 	}
 
 	return restoreCtx.execute()
@@ -376,7 +378,8 @@ type restoreContext struct {
 	disableInformerCache           bool
 	featureVerifier                features.Verifier
 	hookTracker                    *hook.HookTracker
-	volumeInfoMap                  map[string]volume.VolumeInfo
+	backupVolumeInfoMap            map[string]volume.BackupVolumeInfo
+	restoreVolumeInfoTracker       *volume.RestoreVolumeInfoTracker
 }
 
 type resourceClientKey struct {
@@ -1224,8 +1227,8 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs, itemExists
 		}
 
-		if volumeInfo, ok := ctx.volumeInfoMap[obj.GetName()]; ok {
-			ctx.log.Infof("Find VolumeInfo for PV %s.", obj.GetName())
+		if volumeInfo, ok := ctx.backupVolumeInfoMap[obj.GetName()]; ok {
+			ctx.log.Infof("Find BackupVolumeInfo for PV %s.", obj.GetName())
 
 			switch volumeInfo.BackupMethod {
 			case volume.NativeSnapshot:
@@ -1258,7 +1261,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				// want to dynamically re-provision it.
 				return warnings, errs, itemExists
 
-			// When the PV data is skipped from backup, it's VolumeInfo BackupMethod
+			// When the PV data is skipped from backup, it's BackupVolumeInfo BackupMethod
 			// is not set, and it will fall into the default case.
 			default:
 				if hasDeleteReclaimPolicy(obj.Object) {
@@ -1277,9 +1280,9 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				}
 			}
 		} else {
-			// TODO: VolumeInfo is adopted and old logic is deprecated in v1.13.
+			// TODO: BackupVolumeInfo is adopted and old logic is deprecated in v1.13.
 			// Remove the old logic in v1.15.
-			ctx.log.Infof("Cannot find VolumeInfo for PV %s.", obj.GetName())
+			ctx.log.Infof("Cannot find BackupVolumeInfo for PV %s.", obj.GetName())
 
 			switch {
 			case hasSnapshot(name, ctx.volumeSnapshots):
@@ -1899,7 +1902,7 @@ func restorePodVolumeBackups(ctx *restoreContext, createdObj *unstructured.Unstr
 				SourceNamespace:  originalNamespace,
 				BackupLocation:   ctx.backup.Spec.StorageLocation,
 			}
-			if errs := ctx.podVolumeRestorer.RestorePodVolumes(data); errs != nil {
+			if errs := ctx.podVolumeRestorer.RestorePodVolumes(data, ctx.restoreVolumeInfoTracker); errs != nil {
 				ctx.log.WithError(kubeerrs.NewAggregate(errs)).Error("unable to successfully complete pod volume restores of pod's volumes")
 
 				for _, err := range errs {
@@ -2498,7 +2501,7 @@ func (ctx *restoreContext) handlePVHasNativeSnapshot(obj *unstructured.Unstructu
 
 		ctx.renamedPVs[oldName] = pvName
 		retObj.SetName(pvName)
-
+		ctx.restoreVolumeInfoTracker.RenamePVForNativeSnapshot(oldName, pvName)
 		// Add the original PV name as an annotation.
 		annotations := retObj.GetAnnotations()
 		if annotations == nil {

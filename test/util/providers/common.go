@@ -235,7 +235,7 @@ func GetVolumeInfo(
 	bslConfig,
 	backupName,
 	subPrefix string,
-) ([]*volume.VolumeInfo, error) {
+) ([]*volume.BackupVolumeInfo, error) {
 	readCloser, err := GetVolumeInfoMetadataContent(objectStoreProvider,
 		cloudCredentialsFile,
 		bslBucket,
@@ -254,7 +254,7 @@ func GetVolumeInfo(
 	}
 	defer gzr.Close()
 
-	volumeInfos := make([]*volume.VolumeInfo, 0)
+	volumeInfos := make([]*volume.BackupVolumeInfo, 0)
 
 	if err := json.NewDecoder(gzr).Decode(&volumeInfos); err != nil {
 		return nil, errors.Wrap(err, "error decoding object data")

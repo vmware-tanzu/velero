@@ -314,16 +314,16 @@ func (_m *BackupStore) GetRestoreItemOperations(name string) ([]*itemoperation.R
 	return r0, r1
 }
 
-// GetBackupVolumeInfos provides a mock function with given fields: name
-func (_m *BackupStore) GetBackupVolumeInfos(name string) ([]*volume.VolumeInfo, error) {
+// GetRestoreItemOperations provides a mock function with given fields: name
+func (_m *BackupStore) GetBackupVolumeInfos(name string) ([]*volume.BackupVolumeInfo, error) {
 	ret := _m.Called(name)
 
-	var r0 []*volume.VolumeInfo
-	if rf, ok := ret.Get(0).(func(string) []*volume.VolumeInfo); ok {
+	var r0 []*volume.BackupVolumeInfo
+	if rf, ok := ret.Get(0).(func(string) []*volume.BackupVolumeInfo); ok {
 		r0 = rf(name)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*volume.VolumeInfo)
+			r0 = ret.Get(0).([]*volume.BackupVolumeInfo)
 		}
 	}
 
@@ -546,6 +546,19 @@ func (_m *BackupStore) PutRestoredResourceList(restore string, results io.Reader
 	return r0
 }
 
+// PutRestoreVolumeInfo provides a mock function with given fields: restore, results
+func (_m *BackupStore) 	PutRestoreVolumeInfo(restore string, results io.Reader) error {
+	ret := _m.Called(restore, results)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, io.Reader) error); ok {
+		r0 = rf(restore, results)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
 type mockConstructorTestingTNewBackupStore interface {
 	mock.TestingT
 	Cleanup(func())

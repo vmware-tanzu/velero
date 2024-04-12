@@ -991,6 +991,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.formatFlag.Parse(),
 			s.config.defaultItemOperationTimeout,
 			s.config.disableInformerCache,
+			s.crClient,
 		)
 
 		if err = r.SetupWithManager(s.mgr); err != nil {

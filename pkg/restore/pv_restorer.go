@@ -44,6 +44,7 @@ type pvRestorer struct {
 	volumeSnapshotterGetter VolumeSnapshotterGetter
 	kbclient                client.Client
 	credentialFileStore     credentials.FileStore
+	volInfoTracker          *volume.RestoreVolumeInfoTracker
 }
 
 func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -97,6 +98,11 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 	if !ok {
 		return nil, errors.Errorf("unexpected type %T", updated1)
 	}
+	var iops int64 = 0
+	if snapshotInfo.volumeIOPS != nil {
+		iops = *snapshotInfo.volumeIOPS
+	}
+	r.volInfoTracker.TrackNativeSnapshot(updated2.GetName(), snapshotInfo.providerSnapshotID, snapshotInfo.volumeType, snapshotInfo.volumeAZ, iops)
 	return updated2, nil
 }
 

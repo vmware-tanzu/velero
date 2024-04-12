@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -51,7 +53,7 @@ type RestoreData struct {
 // Restorer can execute pod volume restores of volumes in a pod.
 type Restorer interface {
 	// RestorePodVolumes restores all annotated volumes in a pod.
-	RestorePodVolumes(RestoreData) []error
+	RestorePodVolumes(RestoreData, *volume.RestoreVolumeInfoTracker) []error
 }
 
 type restorer struct {
@@ -114,7 +116,7 @@ func newRestorer(
 	return r
 }
 
-func (r *restorer) RestorePodVolumes(data RestoreData) []error {
+func (r *restorer) RestorePodVolumes(data RestoreData, tracker *volume.RestoreVolumeInfoTracker) []error {
 	volumesToRestore := getVolumeBackupInfoForPod(data.PodVolumeBackups, data.Pod, data.SourceNamespace)
 	if len(volumesToRestore) == 0 {
 		return nil
@@ -229,6 +231,7 @@ ForEachVolume:
 			if res.Status.Phase == velerov1api.PodVolumeRestorePhaseFailed {
 				errs = append(errs, errors.Errorf("pod volume restore failed: %s", res.Status.Message))
 			}
+			tracker.TrackPodVolume(res)
 		case err := <-r.nodeAgentCheck:
 			errs = append(errs, err)
 			break ForEachVolume

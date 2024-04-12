@@ -1068,17 +1068,17 @@ func TestNewObjectBackupStoreGetterConfig(t *testing.T) {
 func TestGetBackupVolumeInfos(t *testing.T) {
 	tests := []struct {
 		name           string
-		volumeInfo     []*volume.VolumeInfo
+		volumeInfo     []*volume.BackupVolumeInfo
 		volumeInfoStr  string
 		expectedErr    string
-		expectedResult []*volume.VolumeInfo
+		expectedResult []*volume.BackupVolumeInfo
 	}{
 		{
 			name: "No VolumeInfos, expect no error.",
 		},
 		{
-			name: "Valid VolumeInfo, should pass.",
-			volumeInfo: []*volume.VolumeInfo{
+			name: "Valid BackupVolumeInfo, should pass.",
+			volumeInfo: []*volume.BackupVolumeInfo{
 				{
 					PVCName:           "pvcName",
 					PVName:            "pvName",
@@ -1086,7 +1086,7 @@ func TestGetBackupVolumeInfos(t *testing.T) {
 					SnapshotDataMoved: false,
 				},
 			},
-			expectedResult: []*volume.VolumeInfo{
+			expectedResult: []*volume.BackupVolumeInfo{
 				{
 					PVCName:           "pvcName",
 					PVName:            "pvName",
@@ -1096,9 +1096,9 @@ func TestGetBackupVolumeInfos(t *testing.T) {
 			},
 		},
 		{
-			name:          "Invalid VolumeInfo string, should also pass.",
+			name:          "Invalid BackupVolumeInfo string, should also pass.",
 			volumeInfoStr: `[{"abc": "123", "def": "456", "pvcName": "pvcName"}]`,
-			expectedResult: []*volume.VolumeInfo{
+			expectedResult: []*volume.BackupVolumeInfo{
 				{
 					PVCName: "pvcName",
 				},
@@ -1223,7 +1223,7 @@ func TestPutBackupVolumeInfos(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
 
-			volumeInfos := []*volume.VolumeInfo{
+			volumeInfos := []*volume.BackupVolumeInfo{
 				{
 					PVCName: "test",
 				},
