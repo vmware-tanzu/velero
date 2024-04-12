@@ -115,9 +115,7 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 				vs.Namespace, vs.Name, velerov1api.DriverNameAnnotation)
 		}
 
-		p.log.Debugf("Set VolumeSnapshotContent %s/%s DeletionPolicy",
-			"to Retain to make sure VS deletion in namespace will not",
-			"delete Snapshot on cloud provider.",
+		p.log.Debugf("Set VolumeSnapshotContent %s/%s DeletionPolicy to Retain to make sure VS deletion in namespace will not delete Snapshot on cloud provider.",
 			newNamespace, vs.Name)
 
 		vsc := snapshotv1api.VolumeSnapshotContent{
@@ -154,8 +152,8 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 				"failed to create volumesnapshotcontents %s",
 				vsc.GenerateName)
 		}
-		p.log.Infof("Created VolumesnapshotContents %s with static",
-			"binding to volumesnapshot %s/%s", vsc, newNamespace, vs.Name)
+		p.log.Infof("Created VolumesnapshotContents %s with static binding to volumesnapshot %s/%s",
+			vsc, newNamespace, vs.Name)
 
 		// Reset Spec to convert the VolumeSnapshot from using
 		// the dynamic VolumeSnapshotContent to the static one.

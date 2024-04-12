@@ -1,11 +1,11 @@
 ---
-title: "Upgrading to Velero 1.13"
+title: "Upgrading to Velero 1.14"
 layout: docs
 ---
 
 ## Prerequisites
 
-- Velero [v1.12.x][5] installed.
+- Velero [v1.13.x][5] installed.
 
 If you're not yet running at least Velero v1.8, see the following:
 
@@ -14,6 +14,7 @@ If you're not yet running at least Velero v1.8, see the following:
 - [Upgrading to v1.10][3]
 - [Upgrading to v1.11][4]
 - [Upgrading to v1.12][5]
+- [Upgrading to v1.13][6]
 
 Before upgrading, check the [Velero compatibility matrix](https://github.com/vmware-tanzu/velero#velero-compatibility-matrix) to make sure your version of Kubernetes is supported by the new version of Velero.
 
@@ -34,7 +35,7 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 
     ```bash
     Client:
-        Version: v1.13.0
+        Version: v1.14.0
         Git commit: <git SHA>
     ```
 
@@ -46,21 +47,29 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 
     **NOTE:** Since velero v1.10.0 only v1 CRD will be supported during installation, therefore, the v1.10.0 will only work on Kubernetes version >= v1.16
 
-3. Update the container image used by the Velero deployment, plugin and (optionally) the node agent daemon set:
+3. Delete the CSI plugin. Because the Velero CSI plugin is already merged into the Velero, need to remove the existing CSI plugin InitContainer. Otherwise, the Velero server plugin would fail to start due to same plugin registered twice.
+Please find more information of CSI plugin merging in this page [csi].
+If the plugin move CLI fails due to `not found`, that is caused by the Velero CSI plugin not installed before upgrade. It's safe to ignore the error.
+   
+   ``` bash
+   velero plugin remove velero-velero-plugin-for-csi; echo 0
+   ```
+
+4. Update the container image used by the Velero deployment, plugin and (optionally) the node agent daemon set:
     ```bash
    # set the container and image of the init container for plugin accordingly,
    # if you are using other plugin
     kubectl set image deployment/velero \
-        velero=velero/velero:v1.13.0 \
-        velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.9.0 \
+        velero=velero/velero:v1.14.0 \
+        velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.10.0 \
         --namespace velero
 
     # optional, if using the node agent daemonset
     kubectl set image daemonset/node-agent \
-        node-agent=velero/velero:v1.13.0 \
+        node-agent=velero/velero:v1.14.0 \
         --namespace velero
     ```
-4. Confirm that the deployment is up and running with the correct version by running:
+5. Confirm that the deployment is up and running with the correct version by running:
 
     ```bash
     velero version
@@ -70,23 +79,23 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 
     ```bash
     Client:
-        Version: v1.13.0
+        Version: v1.14.0
         Git commit: <git SHA>
 
     Server:
-        Version: v1.13.0
+        Version: v1.14.0
     ```
 
 
 ### Upgrade from version lower than v1.10.0
-The procedure for upgrading from a version lower than v1.10.0 is identical to the procedure above, except for step 3 as shown below.
+The procedure for upgrading from a version lower than v1.10.0 is identical to the procedure above, except for step 4 as shown below.
 
-3. Update the container image and objects fields used by the Velero deployment and, optionally, the restic daemon set:
+1. Update the container image and objects fields used by the Velero deployment and, optionally, the restic daemon set:
 
     ```bash
     # uploader_type value could be restic or kopia
     kubectl get deploy -n velero -ojson \
-    | sed "s#\"image\"\: \"velero\/velero\:v[0-9]*.[0-9]*.[0-9]\"#\"image\"\: \"velero\/velero\:v1.13.0\"#g" \
+    | sed "s#\"image\"\: \"velero\/velero\:v[0-9]*.[0-9]*.[0-9]\"#\"image\"\: \"velero\/velero\:v1.14.0\"#g" \
     | sed "s#\"server\",#\"server\",\"--uploader-type=$uploader_type\",#g" \
     | sed "s#default-volumes-to-restic#default-volumes-to-fs-backup#g" \
     | sed "s#default-restic-prune-frequency#default-repo-maintain-frequency#g" \
@@ -95,7 +104,7 @@ The procedure for upgrading from a version lower than v1.10.0 is identical to th
 
     # optional, if using the restic daemon set
     echo $(kubectl get ds -n velero restic -ojson) \
-    | sed "s#\"image\"\: \"velero\/velero\:v[0-9]*.[0-9]*.[0-9]\"#\"image\"\: \"velero\/velero\:v1.13.0\"#g" \
+    | sed "s#\"image\"\: \"velero\/velero\:v[0-9]*.[0-9]*.[0-9]\"#\"image\"\: \"velero\/velero\:v1.14.0\"#g" \
     | sed "s#\"name\"\: \"restic\"#\"name\"\: \"node-agent\"#g" \
     | sed "s#\[ \"restic\",#\[ \"node-agent\",#g" \
     | kubectl apply -f -
@@ -115,3 +124,4 @@ If upgrading from Velero v1.9.x or lower, there will likely remain some unused r
 [3]: https://velero.io/docs/v1.10/upgrade-to-1.10
 [4]: https://velero.io/docs/v1.11/upgrade-to-1.11
 [5]: https://velero.io/docs/v1.12/upgrade-to-1.12
+[6]: https://velero.io/docs/v1.13/upgrade-to-1.13

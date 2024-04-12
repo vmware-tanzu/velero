@@ -61,10 +61,6 @@ func (r *mockRegistry) Get(kind common.PluginKind, name string) (framework.Plugi
 	return id, args.Error(1)
 }
 
-func (r *mockRegistry) Find(kind common.PluginKind, name string) bool {
-	return false
-}
-
 func TestNewManager(t *testing.T) {
 	logger := test.NewLogger()
 	logLevel := logrus.InfoLevel

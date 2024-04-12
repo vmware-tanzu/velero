@@ -75,8 +75,8 @@ func (p *volumeSnapshotContentRestoreItemAction) Execute(
 		)
 	}
 
-	p.log.Infof("Returning from VolumeSnapshotContentRestoreItemAction",
-		"with %d additionalItems", len(additionalItems))
+	p.log.Infof("Returning from VolumeSnapshotContentRestoreItemAction with %d additionalItems",
+		len(additionalItems))
 	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem:     input.Item,
 		AdditionalItems: additionalItems,

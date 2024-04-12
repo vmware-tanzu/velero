@@ -272,7 +272,7 @@ As we provided several examples for E2E test execution, what if no filter is inv
 ### Suggested pipelines for full test
 Following pipelines should cover all E2E tests along with proper filters:
 
-1. **CSI pipeline:** As we can see lots of labels in E2E test code, there're many snapshot-labeled test scripts. To cover CSI scenario, a pipeline with CSI enabled should be a good choice, otherwise, we will double all the snapshot cases for CSI scenario, it's very time-wasting. By providing `FEATURES=EnableCSI` and  `PLUGINS=<provider-plugin-images>,velero/velero-plugin-for-csi:<target-version>`, a CSI pipeline is ready for testing.
+1. **CSI pipeline:** As we can see lots of labels in E2E test code, there're many snapshot-labeled test scripts. To cover CSI scenario, a pipeline with CSI enabled should be a good choice, otherwise, we will double all the snapshot cases for CSI scenario, it's very time-wasting. By providing `FEATURES=EnableCSI` and  `PLUGINS=<provider-plugin-images>`, a CSI pipeline is ready for testing.
 1. **Data mover pipeline:** Data mover scenario is the same scenario with migaration test except the restriction of migaration between different providers, so it better to separated it out from other pipelines. Please refer the example in previous.
 1. **Restic/Kopia backup path pipelines:**
     1. **Restic pipeline:** For the same reason of saving time, set `UPLOADER_TYPE` to `restic` for all file system backup test cases;

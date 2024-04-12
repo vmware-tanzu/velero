@@ -224,8 +224,8 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 		return nil, nil, "", nil, errors.WithStack(err)
 	}
 
-	p.log.Infof("Returning from VolumeSnapshotBackupItemAction",
-		"with %d additionalItems to backup", len(additionalItems))
+	p.log.Infof("Returning from VolumeSnapshotBackupItemAction with %d additionalItems to backup",
+		len(additionalItems))
 	for _, ai := range additionalItems {
 		p.log.Debugf("%s: %s", ai.GroupResource.String(), ai.Name)
 	}
@@ -294,22 +294,20 @@ func (p *volumeSnapshotBackupItemAction) Progress(
 	}
 
 	if vs.Status == nil {
-		p.log.Debugf("VolumeSnapshot %s/%s has an empty status.",
-			"Skip progress update.", vs.Namespace, vs.Name)
+		p.log.Debugf("VolumeSnapshot %s/%s has an empty status. Skip progress update.", vs.Namespace, vs.Name)
 		return progress, nil
 	}
 
 	if boolptr.IsSetToTrue(vs.Status.ReadyToUse) {
-		p.log.Debugf("VolumeSnapshot %s/%s is ReadyToUse.",
-			"Continue on querying corresponding VolumeSnapshotContent.",
+		p.log.Debugf("VolumeSnapshot %s/%s is ReadyToUse. Continue on querying corresponding VolumeSnapshotContent.",
 			vs.Namespace, vs.Name)
 	} else if vs.Status.Error != nil {
 		errorMessage := ""
 		if vs.Status.Error.Message != nil {
 			errorMessage = *vs.Status.Error.Message
 		}
-		p.log.Warnf("VolumeSnapshot has a temporary error %s.",
-			"Snapshot controller will retry later.", errorMessage)
+		p.log.Warnf("VolumeSnapshot has a temporary error %s. Snapshot controller will retry later.",
+			errorMessage)
 
 		return progress, nil
 	}
@@ -328,8 +326,8 @@ func (p *volumeSnapshotBackupItemAction) Progress(
 		}
 
 		if vsc.Status == nil {
-			p.log.Debugf("VolumeSnapshotContent %s has an empty Status.",
-				"Skip progress update.", vsc.Name)
+			p.log.Debugf("VolumeSnapshotContent %s has an empty Status. Skip progress update.",
+				vsc.Name)
 			return progress, nil
 		}
 
