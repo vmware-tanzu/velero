@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/applyconfiguration/velero/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +38,25 @@ type FakeRestores struct {
 	ns   string
 }
 
-var restoresResource = schema.GroupVersionResource{Group: "velero.io", Version: "v1", Resource: "restores"}
+var restoresResource = v1.SchemeGroupVersion.WithResource("restores")
 
-var restoresKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "Restore"}
+var restoresKind = v1.SchemeGroupVersion.WithKind("Restore")
 
 // Get takes name of the restore, and returns the corresponding restore object, and an error if there is any.
-func (c *FakeRestores) Get(ctx context.Context, name string, options v1.GetOptions) (result *velerov1.Restore, err error) {
+func (c *FakeRestores) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Restore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(restoresResource, c.ns, name), &velerov1.Restore{})
+		Invokes(testing.NewGetAction(restoresResource, c.ns, name), &v1.Restore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.Restore), err
+	return obj.(*v1.Restore), err
 }
 
 // List takes label and field selectors, and returns the list of Restores that match those selectors.
-func (c *FakeRestores) List(ctx context.Context, opts v1.ListOptions) (result *velerov1.RestoreList, err error) {
+func (c *FakeRestores) List(ctx context.Context, opts metav1.ListOptions) (result *v1.RestoreList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(restoresResource, restoresKind, c.ns, opts), &velerov1.RestoreList{})
+		Invokes(testing.NewListAction(restoresResource, restoresKind, c.ns, opts), &v1.RestoreList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +66,8 @@ func (c *FakeRestores) List(ctx context.Context, opts v1.ListOptions) (result *v
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &velerov1.RestoreList{ListMeta: obj.(*velerov1.RestoreList).ListMeta}
-	for _, item := range obj.(*velerov1.RestoreList).Items {
+	list := &v1.RestoreList{ListMeta: obj.(*v1.RestoreList).ListMeta}
+	for _, item := range obj.(*v1.RestoreList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +76,114 @@ func (c *FakeRestores) List(ctx context.Context, opts v1.ListOptions) (result *v
 }
 
 // Watch returns a watch.Interface that watches the requested restores.
-func (c *FakeRestores) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeRestores) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(restoresResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a restore and creates it.  Returns the server's representation of the restore, and an error, if there is any.
-func (c *FakeRestores) Create(ctx context.Context, restore *velerov1.Restore, opts v1.CreateOptions) (result *velerov1.Restore, err error) {
+func (c *FakeRestores) Create(ctx context.Context, restore *v1.Restore, opts metav1.CreateOptions) (result *v1.Restore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(restoresResource, c.ns, restore), &velerov1.Restore{})
+		Invokes(testing.NewCreateAction(restoresResource, c.ns, restore), &v1.Restore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.Restore), err
+	return obj.(*v1.Restore), err
 }
 
 // Update takes the representation of a restore and updates it. Returns the server's representation of the restore, and an error, if there is any.
-func (c *FakeRestores) Update(ctx context.Context, restore *velerov1.Restore, opts v1.UpdateOptions) (result *velerov1.Restore, err error) {
+func (c *FakeRestores) Update(ctx context.Context, restore *v1.Restore, opts metav1.UpdateOptions) (result *v1.Restore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(restoresResource, c.ns, restore), &velerov1.Restore{})
+		Invokes(testing.NewUpdateAction(restoresResource, c.ns, restore), &v1.Restore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.Restore), err
+	return obj.(*v1.Restore), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeRestores) UpdateStatus(ctx context.Context, restore *velerov1.Restore, opts v1.UpdateOptions) (*velerov1.Restore, error) {
+func (c *FakeRestores) UpdateStatus(ctx context.Context, restore *v1.Restore, opts metav1.UpdateOptions) (*v1.Restore, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(restoresResource, "status", c.ns, restore), &velerov1.Restore{})
+		Invokes(testing.NewUpdateSubresourceAction(restoresResource, "status", c.ns, restore), &v1.Restore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.Restore), err
+	return obj.(*v1.Restore), err
 }
 
 // Delete takes name of the restore and deletes it. Returns an error if one occurs.
-func (c *FakeRestores) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeRestores) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(restoresResource, c.ns, name), &velerov1.Restore{})
+		Invokes(testing.NewDeleteActionWithOptions(restoresResource, c.ns, name, opts), &v1.Restore{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeRestores) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeRestores) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(restoresResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &velerov1.RestoreList{})
+	_, err := c.Fake.Invokes(action, &v1.RestoreList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched restore.
-func (c *FakeRestores) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *velerov1.Restore, err error) {
+func (c *FakeRestores) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Restore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(restoresResource, c.ns, name, pt, data, subresources...), &velerov1.Restore{})
+		Invokes(testing.NewPatchSubresourceAction(restoresResource, c.ns, name, pt, data, subresources...), &v1.Restore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.Restore), err
+	return obj.(*v1.Restore), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied restore.
+func (c *FakeRestores) Apply(ctx context.Context, restore *velerov1.RestoreApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Restore, err error) {
+	if restore == nil {
+		return nil, fmt.Errorf("restore provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(restore)
+	if err != nil {
+		return nil, err
+	}
+	name := restore.Name
+	if name == nil {
+		return nil, fmt.Errorf("restore.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(restoresResource, c.ns, *name, types.ApplyPatchType, data), &v1.Restore{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.Restore), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeRestores) ApplyStatus(ctx context.Context, restore *velerov1.RestoreApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Restore, err error) {
+	if restore == nil {
+		return nil, fmt.Errorf("restore provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(restore)
+	if err != nil {
+		return nil, err
+	}
+	name := restore.Name
+	if name == nil {
+		return nil, fmt.Errorf("restore.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(restoresResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.Restore{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.Restore), err
 }

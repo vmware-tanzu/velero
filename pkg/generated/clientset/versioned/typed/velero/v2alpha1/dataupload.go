@@ -20,9 +20,12 @@ package v2alpha1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/generated/applyconfiguration/velero/v2alpha1"
 	scheme "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,6 +50,8 @@ type DataUploadInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v2alpha1.DataUploadList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2alpha1.DataUpload, err error)
+	Apply(ctx context.Context, dataUpload *velerov2alpha1.DataUploadApplyConfiguration, opts v1.ApplyOptions) (result *v2alpha1.DataUpload, err error)
+	ApplyStatus(ctx context.Context, dataUpload *velerov2alpha1.DataUploadApplyConfiguration, opts v1.ApplyOptions) (result *v2alpha1.DataUpload, err error)
 	DataUploadExpansion
 }
 
@@ -188,6 +193,62 @@ func (c *dataUploads) Patch(ctx context.Context, name string, pt types.PatchType
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied dataUpload.
+func (c *dataUploads) Apply(ctx context.Context, dataUpload *velerov2alpha1.DataUploadApplyConfiguration, opts v1.ApplyOptions) (result *v2alpha1.DataUpload, err error) {
+	if dataUpload == nil {
+		return nil, fmt.Errorf("dataUpload provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(dataUpload)
+	if err != nil {
+		return nil, err
+	}
+	name := dataUpload.Name
+	if name == nil {
+		return nil, fmt.Errorf("dataUpload.Name must be provided to Apply")
+	}
+	result = &v2alpha1.DataUpload{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("datauploads").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *dataUploads) ApplyStatus(ctx context.Context, dataUpload *velerov2alpha1.DataUploadApplyConfiguration, opts v1.ApplyOptions) (result *v2alpha1.DataUpload, err error) {
+	if dataUpload == nil {
+		return nil, fmt.Errorf("dataUpload provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(dataUpload)
+	if err != nil {
+		return nil, err
+	}
+
+	name := dataUpload.Name
+	if name == nil {
+		return nil, fmt.Errorf("dataUpload.Name must be provided to Apply")
+	}
+
+	result = &v2alpha1.DataUpload{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("datauploads").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/applyconfiguration/velero/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +38,25 @@ type FakePodVolumeRestores struct {
 	ns   string
 }
 
-var podvolumerestoresResource = schema.GroupVersionResource{Group: "velero.io", Version: "v1", Resource: "podvolumerestores"}
+var podvolumerestoresResource = v1.SchemeGroupVersion.WithResource("podvolumerestores")
 
-var podvolumerestoresKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "PodVolumeRestore"}
+var podvolumerestoresKind = v1.SchemeGroupVersion.WithKind("PodVolumeRestore")
 
 // Get takes name of the podVolumeRestore, and returns the corresponding podVolumeRestore object, and an error if there is any.
-func (c *FakePodVolumeRestores) Get(ctx context.Context, name string, options v1.GetOptions) (result *velerov1.PodVolumeRestore, err error) {
+func (c *FakePodVolumeRestores) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PodVolumeRestore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(podvolumerestoresResource, c.ns, name), &velerov1.PodVolumeRestore{})
+		Invokes(testing.NewGetAction(podvolumerestoresResource, c.ns, name), &v1.PodVolumeRestore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.PodVolumeRestore), err
+	return obj.(*v1.PodVolumeRestore), err
 }
 
 // List takes label and field selectors, and returns the list of PodVolumeRestores that match those selectors.
-func (c *FakePodVolumeRestores) List(ctx context.Context, opts v1.ListOptions) (result *velerov1.PodVolumeRestoreList, err error) {
+func (c *FakePodVolumeRestores) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PodVolumeRestoreList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podvolumerestoresResource, podvolumerestoresKind, c.ns, opts), &velerov1.PodVolumeRestoreList{})
+		Invokes(testing.NewListAction(podvolumerestoresResource, podvolumerestoresKind, c.ns, opts), &v1.PodVolumeRestoreList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +66,8 @@ func (c *FakePodVolumeRestores) List(ctx context.Context, opts v1.ListOptions) (
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &velerov1.PodVolumeRestoreList{ListMeta: obj.(*velerov1.PodVolumeRestoreList).ListMeta}
-	for _, item := range obj.(*velerov1.PodVolumeRestoreList).Items {
+	list := &v1.PodVolumeRestoreList{ListMeta: obj.(*v1.PodVolumeRestoreList).ListMeta}
+	for _, item := range obj.(*v1.PodVolumeRestoreList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +76,114 @@ func (c *FakePodVolumeRestores) List(ctx context.Context, opts v1.ListOptions) (
 }
 
 // Watch returns a watch.Interface that watches the requested podVolumeRestores.
-func (c *FakePodVolumeRestores) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakePodVolumeRestores) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(podvolumerestoresResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a podVolumeRestore and creates it.  Returns the server's representation of the podVolumeRestore, and an error, if there is any.
-func (c *FakePodVolumeRestores) Create(ctx context.Context, podVolumeRestore *velerov1.PodVolumeRestore, opts v1.CreateOptions) (result *velerov1.PodVolumeRestore, err error) {
+func (c *FakePodVolumeRestores) Create(ctx context.Context, podVolumeRestore *v1.PodVolumeRestore, opts metav1.CreateOptions) (result *v1.PodVolumeRestore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(podvolumerestoresResource, c.ns, podVolumeRestore), &velerov1.PodVolumeRestore{})
+		Invokes(testing.NewCreateAction(podvolumerestoresResource, c.ns, podVolumeRestore), &v1.PodVolumeRestore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.PodVolumeRestore), err
+	return obj.(*v1.PodVolumeRestore), err
 }
 
 // Update takes the representation of a podVolumeRestore and updates it. Returns the server's representation of the podVolumeRestore, and an error, if there is any.
-func (c *FakePodVolumeRestores) Update(ctx context.Context, podVolumeRestore *velerov1.PodVolumeRestore, opts v1.UpdateOptions) (result *velerov1.PodVolumeRestore, err error) {
+func (c *FakePodVolumeRestores) Update(ctx context.Context, podVolumeRestore *v1.PodVolumeRestore, opts metav1.UpdateOptions) (result *v1.PodVolumeRestore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(podvolumerestoresResource, c.ns, podVolumeRestore), &velerov1.PodVolumeRestore{})
+		Invokes(testing.NewUpdateAction(podvolumerestoresResource, c.ns, podVolumeRestore), &v1.PodVolumeRestore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.PodVolumeRestore), err
+	return obj.(*v1.PodVolumeRestore), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePodVolumeRestores) UpdateStatus(ctx context.Context, podVolumeRestore *velerov1.PodVolumeRestore, opts v1.UpdateOptions) (*velerov1.PodVolumeRestore, error) {
+func (c *FakePodVolumeRestores) UpdateStatus(ctx context.Context, podVolumeRestore *v1.PodVolumeRestore, opts metav1.UpdateOptions) (*v1.PodVolumeRestore, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(podvolumerestoresResource, "status", c.ns, podVolumeRestore), &velerov1.PodVolumeRestore{})
+		Invokes(testing.NewUpdateSubresourceAction(podvolumerestoresResource, "status", c.ns, podVolumeRestore), &v1.PodVolumeRestore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.PodVolumeRestore), err
+	return obj.(*v1.PodVolumeRestore), err
 }
 
 // Delete takes name of the podVolumeRestore and deletes it. Returns an error if one occurs.
-func (c *FakePodVolumeRestores) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakePodVolumeRestores) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(podvolumerestoresResource, c.ns, name), &velerov1.PodVolumeRestore{})
+		Invokes(testing.NewDeleteActionWithOptions(podvolumerestoresResource, c.ns, name, opts), &v1.PodVolumeRestore{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakePodVolumeRestores) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakePodVolumeRestores) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(podvolumerestoresResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &velerov1.PodVolumeRestoreList{})
+	_, err := c.Fake.Invokes(action, &v1.PodVolumeRestoreList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched podVolumeRestore.
-func (c *FakePodVolumeRestores) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *velerov1.PodVolumeRestore, err error) {
+func (c *FakePodVolumeRestores) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodVolumeRestore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podvolumerestoresResource, c.ns, name, pt, data, subresources...), &velerov1.PodVolumeRestore{})
+		Invokes(testing.NewPatchSubresourceAction(podvolumerestoresResource, c.ns, name, pt, data, subresources...), &v1.PodVolumeRestore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.PodVolumeRestore), err
+	return obj.(*v1.PodVolumeRestore), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied podVolumeRestore.
+func (c *FakePodVolumeRestores) Apply(ctx context.Context, podVolumeRestore *velerov1.PodVolumeRestoreApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodVolumeRestore, err error) {
+	if podVolumeRestore == nil {
+		return nil, fmt.Errorf("podVolumeRestore provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(podVolumeRestore)
+	if err != nil {
+		return nil, err
+	}
+	name := podVolumeRestore.Name
+	if name == nil {
+		return nil, fmt.Errorf("podVolumeRestore.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(podvolumerestoresResource, c.ns, *name, types.ApplyPatchType, data), &v1.PodVolumeRestore{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.PodVolumeRestore), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakePodVolumeRestores) ApplyStatus(ctx context.Context, podVolumeRestore *velerov1.PodVolumeRestoreApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodVolumeRestore, err error) {
+	if podVolumeRestore == nil {
+		return nil, fmt.Errorf("podVolumeRestore provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(podVolumeRestore)
+	if err != nil {
+		return nil, err
+	}
+	name := podVolumeRestore.Name
+	if name == nil {
+		return nil, fmt.Errorf("podVolumeRestore.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(podvolumerestoresResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.PodVolumeRestore{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.PodVolumeRestore), err
 }

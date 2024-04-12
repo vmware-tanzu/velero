@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/applyconfiguration/velero/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +38,25 @@ type FakeSchedules struct {
 	ns   string
 }
 
-var schedulesResource = schema.GroupVersionResource{Group: "velero.io", Version: "v1", Resource: "schedules"}
+var schedulesResource = v1.SchemeGroupVersion.WithResource("schedules")
 
-var schedulesKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "Schedule"}
+var schedulesKind = v1.SchemeGroupVersion.WithKind("Schedule")
 
 // Get takes name of the schedule, and returns the corresponding schedule object, and an error if there is any.
-func (c *FakeSchedules) Get(ctx context.Context, name string, options v1.GetOptions) (result *velerov1.Schedule, err error) {
+func (c *FakeSchedules) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Schedule, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(schedulesResource, c.ns, name), &velerov1.Schedule{})
+		Invokes(testing.NewGetAction(schedulesResource, c.ns, name), &v1.Schedule{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.Schedule), err
+	return obj.(*v1.Schedule), err
 }
 
 // List takes label and field selectors, and returns the list of Schedules that match those selectors.
-func (c *FakeSchedules) List(ctx context.Context, opts v1.ListOptions) (result *velerov1.ScheduleList, err error) {
+func (c *FakeSchedules) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ScheduleList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(schedulesResource, schedulesKind, c.ns, opts), &velerov1.ScheduleList{})
+		Invokes(testing.NewListAction(schedulesResource, schedulesKind, c.ns, opts), &v1.ScheduleList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +66,8 @@ func (c *FakeSchedules) List(ctx context.Context, opts v1.ListOptions) (result *
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &velerov1.ScheduleList{ListMeta: obj.(*velerov1.ScheduleList).ListMeta}
-	for _, item := range obj.(*velerov1.ScheduleList).Items {
+	list := &v1.ScheduleList{ListMeta: obj.(*v1.ScheduleList).ListMeta}
+	for _, item := range obj.(*v1.ScheduleList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +76,114 @@ func (c *FakeSchedules) List(ctx context.Context, opts v1.ListOptions) (result *
 }
 
 // Watch returns a watch.Interface that watches the requested schedules.
-func (c *FakeSchedules) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeSchedules) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(schedulesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a schedule and creates it.  Returns the server's representation of the schedule, and an error, if there is any.
-func (c *FakeSchedules) Create(ctx context.Context, schedule *velerov1.Schedule, opts v1.CreateOptions) (result *velerov1.Schedule, err error) {
+func (c *FakeSchedules) Create(ctx context.Context, schedule *v1.Schedule, opts metav1.CreateOptions) (result *v1.Schedule, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(schedulesResource, c.ns, schedule), &velerov1.Schedule{})
+		Invokes(testing.NewCreateAction(schedulesResource, c.ns, schedule), &v1.Schedule{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.Schedule), err
+	return obj.(*v1.Schedule), err
 }
 
 // Update takes the representation of a schedule and updates it. Returns the server's representation of the schedule, and an error, if there is any.
-func (c *FakeSchedules) Update(ctx context.Context, schedule *velerov1.Schedule, opts v1.UpdateOptions) (result *velerov1.Schedule, err error) {
+func (c *FakeSchedules) Update(ctx context.Context, schedule *v1.Schedule, opts metav1.UpdateOptions) (result *v1.Schedule, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(schedulesResource, c.ns, schedule), &velerov1.Schedule{})
+		Invokes(testing.NewUpdateAction(schedulesResource, c.ns, schedule), &v1.Schedule{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.Schedule), err
+	return obj.(*v1.Schedule), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeSchedules) UpdateStatus(ctx context.Context, schedule *velerov1.Schedule, opts v1.UpdateOptions) (*velerov1.Schedule, error) {
+func (c *FakeSchedules) UpdateStatus(ctx context.Context, schedule *v1.Schedule, opts metav1.UpdateOptions) (*v1.Schedule, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(schedulesResource, "status", c.ns, schedule), &velerov1.Schedule{})
+		Invokes(testing.NewUpdateSubresourceAction(schedulesResource, "status", c.ns, schedule), &v1.Schedule{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.Schedule), err
+	return obj.(*v1.Schedule), err
 }
 
 // Delete takes name of the schedule and deletes it. Returns an error if one occurs.
-func (c *FakeSchedules) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeSchedules) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(schedulesResource, c.ns, name), &velerov1.Schedule{})
+		Invokes(testing.NewDeleteActionWithOptions(schedulesResource, c.ns, name, opts), &v1.Schedule{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeSchedules) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeSchedules) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(schedulesResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &velerov1.ScheduleList{})
+	_, err := c.Fake.Invokes(action, &v1.ScheduleList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched schedule.
-func (c *FakeSchedules) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *velerov1.Schedule, err error) {
+func (c *FakeSchedules) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Schedule, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(schedulesResource, c.ns, name, pt, data, subresources...), &velerov1.Schedule{})
+		Invokes(testing.NewPatchSubresourceAction(schedulesResource, c.ns, name, pt, data, subresources...), &v1.Schedule{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.Schedule), err
+	return obj.(*v1.Schedule), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied schedule.
+func (c *FakeSchedules) Apply(ctx context.Context, schedule *velerov1.ScheduleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Schedule, err error) {
+	if schedule == nil {
+		return nil, fmt.Errorf("schedule provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(schedule)
+	if err != nil {
+		return nil, err
+	}
+	name := schedule.Name
+	if name == nil {
+		return nil, fmt.Errorf("schedule.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(schedulesResource, c.ns, *name, types.ApplyPatchType, data), &v1.Schedule{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.Schedule), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeSchedules) ApplyStatus(ctx context.Context, schedule *velerov1.ScheduleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Schedule, err error) {
+	if schedule == nil {
+		return nil, fmt.Errorf("schedule provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(schedule)
+	if err != nil {
+		return nil, err
+	}
+	name := schedule.Name
+	if name == nil {
+		return nil, fmt.Errorf("schedule.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(schedulesResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.Schedule{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.Schedule), err
 }

@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/applyconfiguration/velero/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +38,25 @@ type FakeServerStatusRequests struct {
 	ns   string
 }
 
-var serverstatusrequestsResource = schema.GroupVersionResource{Group: "velero.io", Version: "v1", Resource: "serverstatusrequests"}
+var serverstatusrequestsResource = v1.SchemeGroupVersion.WithResource("serverstatusrequests")
 
-var serverstatusrequestsKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "ServerStatusRequest"}
+var serverstatusrequestsKind = v1.SchemeGroupVersion.WithKind("ServerStatusRequest")
 
 // Get takes name of the serverStatusRequest, and returns the corresponding serverStatusRequest object, and an error if there is any.
-func (c *FakeServerStatusRequests) Get(ctx context.Context, name string, options v1.GetOptions) (result *velerov1.ServerStatusRequest, err error) {
+func (c *FakeServerStatusRequests) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ServerStatusRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(serverstatusrequestsResource, c.ns, name), &velerov1.ServerStatusRequest{})
+		Invokes(testing.NewGetAction(serverstatusrequestsResource, c.ns, name), &v1.ServerStatusRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.ServerStatusRequest), err
+	return obj.(*v1.ServerStatusRequest), err
 }
 
 // List takes label and field selectors, and returns the list of ServerStatusRequests that match those selectors.
-func (c *FakeServerStatusRequests) List(ctx context.Context, opts v1.ListOptions) (result *velerov1.ServerStatusRequestList, err error) {
+func (c *FakeServerStatusRequests) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ServerStatusRequestList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(serverstatusrequestsResource, serverstatusrequestsKind, c.ns, opts), &velerov1.ServerStatusRequestList{})
+		Invokes(testing.NewListAction(serverstatusrequestsResource, serverstatusrequestsKind, c.ns, opts), &v1.ServerStatusRequestList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +66,8 @@ func (c *FakeServerStatusRequests) List(ctx context.Context, opts v1.ListOptions
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &velerov1.ServerStatusRequestList{ListMeta: obj.(*velerov1.ServerStatusRequestList).ListMeta}
-	for _, item := range obj.(*velerov1.ServerStatusRequestList).Items {
+	list := &v1.ServerStatusRequestList{ListMeta: obj.(*v1.ServerStatusRequestList).ListMeta}
+	for _, item := range obj.(*v1.ServerStatusRequestList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +76,114 @@ func (c *FakeServerStatusRequests) List(ctx context.Context, opts v1.ListOptions
 }
 
 // Watch returns a watch.Interface that watches the requested serverStatusRequests.
-func (c *FakeServerStatusRequests) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeServerStatusRequests) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(serverstatusrequestsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a serverStatusRequest and creates it.  Returns the server's representation of the serverStatusRequest, and an error, if there is any.
-func (c *FakeServerStatusRequests) Create(ctx context.Context, serverStatusRequest *velerov1.ServerStatusRequest, opts v1.CreateOptions) (result *velerov1.ServerStatusRequest, err error) {
+func (c *FakeServerStatusRequests) Create(ctx context.Context, serverStatusRequest *v1.ServerStatusRequest, opts metav1.CreateOptions) (result *v1.ServerStatusRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(serverstatusrequestsResource, c.ns, serverStatusRequest), &velerov1.ServerStatusRequest{})
+		Invokes(testing.NewCreateAction(serverstatusrequestsResource, c.ns, serverStatusRequest), &v1.ServerStatusRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.ServerStatusRequest), err
+	return obj.(*v1.ServerStatusRequest), err
 }
 
 // Update takes the representation of a serverStatusRequest and updates it. Returns the server's representation of the serverStatusRequest, and an error, if there is any.
-func (c *FakeServerStatusRequests) Update(ctx context.Context, serverStatusRequest *velerov1.ServerStatusRequest, opts v1.UpdateOptions) (result *velerov1.ServerStatusRequest, err error) {
+func (c *FakeServerStatusRequests) Update(ctx context.Context, serverStatusRequest *v1.ServerStatusRequest, opts metav1.UpdateOptions) (result *v1.ServerStatusRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(serverstatusrequestsResource, c.ns, serverStatusRequest), &velerov1.ServerStatusRequest{})
+		Invokes(testing.NewUpdateAction(serverstatusrequestsResource, c.ns, serverStatusRequest), &v1.ServerStatusRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.ServerStatusRequest), err
+	return obj.(*v1.ServerStatusRequest), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeServerStatusRequests) UpdateStatus(ctx context.Context, serverStatusRequest *velerov1.ServerStatusRequest, opts v1.UpdateOptions) (*velerov1.ServerStatusRequest, error) {
+func (c *FakeServerStatusRequests) UpdateStatus(ctx context.Context, serverStatusRequest *v1.ServerStatusRequest, opts metav1.UpdateOptions) (*v1.ServerStatusRequest, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(serverstatusrequestsResource, "status", c.ns, serverStatusRequest), &velerov1.ServerStatusRequest{})
+		Invokes(testing.NewUpdateSubresourceAction(serverstatusrequestsResource, "status", c.ns, serverStatusRequest), &v1.ServerStatusRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.ServerStatusRequest), err
+	return obj.(*v1.ServerStatusRequest), err
 }
 
 // Delete takes name of the serverStatusRequest and deletes it. Returns an error if one occurs.
-func (c *FakeServerStatusRequests) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeServerStatusRequests) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(serverstatusrequestsResource, c.ns, name), &velerov1.ServerStatusRequest{})
+		Invokes(testing.NewDeleteActionWithOptions(serverstatusrequestsResource, c.ns, name, opts), &v1.ServerStatusRequest{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeServerStatusRequests) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeServerStatusRequests) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(serverstatusrequestsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &velerov1.ServerStatusRequestList{})
+	_, err := c.Fake.Invokes(action, &v1.ServerStatusRequestList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched serverStatusRequest.
-func (c *FakeServerStatusRequests) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *velerov1.ServerStatusRequest, err error) {
+func (c *FakeServerStatusRequests) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ServerStatusRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(serverstatusrequestsResource, c.ns, name, pt, data, subresources...), &velerov1.ServerStatusRequest{})
+		Invokes(testing.NewPatchSubresourceAction(serverstatusrequestsResource, c.ns, name, pt, data, subresources...), &v1.ServerStatusRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.ServerStatusRequest), err
+	return obj.(*v1.ServerStatusRequest), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied serverStatusRequest.
+func (c *FakeServerStatusRequests) Apply(ctx context.Context, serverStatusRequest *velerov1.ServerStatusRequestApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ServerStatusRequest, err error) {
+	if serverStatusRequest == nil {
+		return nil, fmt.Errorf("serverStatusRequest provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(serverStatusRequest)
+	if err != nil {
+		return nil, err
+	}
+	name := serverStatusRequest.Name
+	if name == nil {
+		return nil, fmt.Errorf("serverStatusRequest.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(serverstatusrequestsResource, c.ns, *name, types.ApplyPatchType, data), &v1.ServerStatusRequest{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ServerStatusRequest), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeServerStatusRequests) ApplyStatus(ctx context.Context, serverStatusRequest *velerov1.ServerStatusRequestApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ServerStatusRequest, err error) {
+	if serverStatusRequest == nil {
+		return nil, fmt.Errorf("serverStatusRequest provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(serverStatusRequest)
+	if err != nil {
+		return nil, err
+	}
+	name := serverStatusRequest.Name
+	if name == nil {
+		return nil, fmt.Errorf("serverStatusRequest.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(serverstatusrequestsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.ServerStatusRequest{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ServerStatusRequest), err
 }

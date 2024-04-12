@@ -20,9 +20,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/applyconfiguration/velero/v1"
 	scheme "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,6 +50,8 @@ type PodVolumeBackupInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.PodVolumeBackupList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodVolumeBackup, err error)
+	Apply(ctx context.Context, podVolumeBackup *velerov1.PodVolumeBackupApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodVolumeBackup, err error)
+	ApplyStatus(ctx context.Context, podVolumeBackup *velerov1.PodVolumeBackupApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodVolumeBackup, err error)
 	PodVolumeBackupExpansion
 }
 
@@ -188,6 +193,62 @@ func (c *podVolumeBackups) Patch(ctx context.Context, name string, pt types.Patc
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied podVolumeBackup.
+func (c *podVolumeBackups) Apply(ctx context.Context, podVolumeBackup *velerov1.PodVolumeBackupApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodVolumeBackup, err error) {
+	if podVolumeBackup == nil {
+		return nil, fmt.Errorf("podVolumeBackup provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(podVolumeBackup)
+	if err != nil {
+		return nil, err
+	}
+	name := podVolumeBackup.Name
+	if name == nil {
+		return nil, fmt.Errorf("podVolumeBackup.Name must be provided to Apply")
+	}
+	result = &v1.PodVolumeBackup{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("podvolumebackups").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *podVolumeBackups) ApplyStatus(ctx context.Context, podVolumeBackup *velerov1.PodVolumeBackupApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodVolumeBackup, err error) {
+	if podVolumeBackup == nil {
+		return nil, fmt.Errorf("podVolumeBackup provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(podVolumeBackup)
+	if err != nil {
+		return nil, err
+	}
+
+	name := podVolumeBackup.Name
+	if name == nil {
+		return nil, fmt.Errorf("podVolumeBackup.Name must be provided to Apply")
+	}
+
+	result = &v1.PodVolumeBackup{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("podvolumebackups").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

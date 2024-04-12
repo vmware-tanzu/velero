@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/applyconfiguration/velero/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +38,25 @@ type FakeBackupRepositories struct {
 	ns   string
 }
 
-var backuprepositoriesResource = schema.GroupVersionResource{Group: "velero.io", Version: "v1", Resource: "backuprepositories"}
+var backuprepositoriesResource = v1.SchemeGroupVersion.WithResource("backuprepositories")
 
-var backuprepositoriesKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "BackupRepository"}
+var backuprepositoriesKind = v1.SchemeGroupVersion.WithKind("BackupRepository")
 
 // Get takes name of the backupRepository, and returns the corresponding backupRepository object, and an error if there is any.
-func (c *FakeBackupRepositories) Get(ctx context.Context, name string, options v1.GetOptions) (result *velerov1.BackupRepository, err error) {
+func (c *FakeBackupRepositories) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.BackupRepository, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(backuprepositoriesResource, c.ns, name), &velerov1.BackupRepository{})
+		Invokes(testing.NewGetAction(backuprepositoriesResource, c.ns, name), &v1.BackupRepository{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.BackupRepository), err
+	return obj.(*v1.BackupRepository), err
 }
 
 // List takes label and field selectors, and returns the list of BackupRepositories that match those selectors.
-func (c *FakeBackupRepositories) List(ctx context.Context, opts v1.ListOptions) (result *velerov1.BackupRepositoryList, err error) {
+func (c *FakeBackupRepositories) List(ctx context.Context, opts metav1.ListOptions) (result *v1.BackupRepositoryList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(backuprepositoriesResource, backuprepositoriesKind, c.ns, opts), &velerov1.BackupRepositoryList{})
+		Invokes(testing.NewListAction(backuprepositoriesResource, backuprepositoriesKind, c.ns, opts), &v1.BackupRepositoryList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +66,8 @@ func (c *FakeBackupRepositories) List(ctx context.Context, opts v1.ListOptions) 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &velerov1.BackupRepositoryList{ListMeta: obj.(*velerov1.BackupRepositoryList).ListMeta}
-	for _, item := range obj.(*velerov1.BackupRepositoryList).Items {
+	list := &v1.BackupRepositoryList{ListMeta: obj.(*v1.BackupRepositoryList).ListMeta}
+	for _, item := range obj.(*v1.BackupRepositoryList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +76,114 @@ func (c *FakeBackupRepositories) List(ctx context.Context, opts v1.ListOptions) 
 }
 
 // Watch returns a watch.Interface that watches the requested backupRepositories.
-func (c *FakeBackupRepositories) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeBackupRepositories) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(backuprepositoriesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a backupRepository and creates it.  Returns the server's representation of the backupRepository, and an error, if there is any.
-func (c *FakeBackupRepositories) Create(ctx context.Context, backupRepository *velerov1.BackupRepository, opts v1.CreateOptions) (result *velerov1.BackupRepository, err error) {
+func (c *FakeBackupRepositories) Create(ctx context.Context, backupRepository *v1.BackupRepository, opts metav1.CreateOptions) (result *v1.BackupRepository, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(backuprepositoriesResource, c.ns, backupRepository), &velerov1.BackupRepository{})
+		Invokes(testing.NewCreateAction(backuprepositoriesResource, c.ns, backupRepository), &v1.BackupRepository{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.BackupRepository), err
+	return obj.(*v1.BackupRepository), err
 }
 
 // Update takes the representation of a backupRepository and updates it. Returns the server's representation of the backupRepository, and an error, if there is any.
-func (c *FakeBackupRepositories) Update(ctx context.Context, backupRepository *velerov1.BackupRepository, opts v1.UpdateOptions) (result *velerov1.BackupRepository, err error) {
+func (c *FakeBackupRepositories) Update(ctx context.Context, backupRepository *v1.BackupRepository, opts metav1.UpdateOptions) (result *v1.BackupRepository, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(backuprepositoriesResource, c.ns, backupRepository), &velerov1.BackupRepository{})
+		Invokes(testing.NewUpdateAction(backuprepositoriesResource, c.ns, backupRepository), &v1.BackupRepository{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.BackupRepository), err
+	return obj.(*v1.BackupRepository), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeBackupRepositories) UpdateStatus(ctx context.Context, backupRepository *velerov1.BackupRepository, opts v1.UpdateOptions) (*velerov1.BackupRepository, error) {
+func (c *FakeBackupRepositories) UpdateStatus(ctx context.Context, backupRepository *v1.BackupRepository, opts metav1.UpdateOptions) (*v1.BackupRepository, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(backuprepositoriesResource, "status", c.ns, backupRepository), &velerov1.BackupRepository{})
+		Invokes(testing.NewUpdateSubresourceAction(backuprepositoriesResource, "status", c.ns, backupRepository), &v1.BackupRepository{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.BackupRepository), err
+	return obj.(*v1.BackupRepository), err
 }
 
 // Delete takes name of the backupRepository and deletes it. Returns an error if one occurs.
-func (c *FakeBackupRepositories) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeBackupRepositories) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(backuprepositoriesResource, c.ns, name), &velerov1.BackupRepository{})
+		Invokes(testing.NewDeleteActionWithOptions(backuprepositoriesResource, c.ns, name, opts), &v1.BackupRepository{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeBackupRepositories) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeBackupRepositories) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(backuprepositoriesResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &velerov1.BackupRepositoryList{})
+	_, err := c.Fake.Invokes(action, &v1.BackupRepositoryList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched backupRepository.
-func (c *FakeBackupRepositories) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *velerov1.BackupRepository, err error) {
+func (c *FakeBackupRepositories) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.BackupRepository, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(backuprepositoriesResource, c.ns, name, pt, data, subresources...), &velerov1.BackupRepository{})
+		Invokes(testing.NewPatchSubresourceAction(backuprepositoriesResource, c.ns, name, pt, data, subresources...), &v1.BackupRepository{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.BackupRepository), err
+	return obj.(*v1.BackupRepository), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied backupRepository.
+func (c *FakeBackupRepositories) Apply(ctx context.Context, backupRepository *velerov1.BackupRepositoryApplyConfiguration, opts metav1.ApplyOptions) (result *v1.BackupRepository, err error) {
+	if backupRepository == nil {
+		return nil, fmt.Errorf("backupRepository provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(backupRepository)
+	if err != nil {
+		return nil, err
+	}
+	name := backupRepository.Name
+	if name == nil {
+		return nil, fmt.Errorf("backupRepository.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(backuprepositoriesResource, c.ns, *name, types.ApplyPatchType, data), &v1.BackupRepository{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.BackupRepository), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeBackupRepositories) ApplyStatus(ctx context.Context, backupRepository *velerov1.BackupRepositoryApplyConfiguration, opts metav1.ApplyOptions) (result *v1.BackupRepository, err error) {
+	if backupRepository == nil {
+		return nil, fmt.Errorf("backupRepository provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(backupRepository)
+	if err != nil {
+		return nil, err
+	}
+	name := backupRepository.Name
+	if name == nil {
+		return nil, fmt.Errorf("backupRepository.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(backuprepositoriesResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.BackupRepository{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.BackupRepository), err
 }

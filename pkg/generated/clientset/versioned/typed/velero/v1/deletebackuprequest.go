@@ -20,9 +20,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/applyconfiguration/velero/v1"
 	scheme "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,6 +50,8 @@ type DeleteBackupRequestInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.DeleteBackupRequestList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.DeleteBackupRequest, err error)
+	Apply(ctx context.Context, deleteBackupRequest *velerov1.DeleteBackupRequestApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DeleteBackupRequest, err error)
+	ApplyStatus(ctx context.Context, deleteBackupRequest *velerov1.DeleteBackupRequestApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DeleteBackupRequest, err error)
 	DeleteBackupRequestExpansion
 }
 
@@ -188,6 +193,62 @@ func (c *deleteBackupRequests) Patch(ctx context.Context, name string, pt types.
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied deleteBackupRequest.
+func (c *deleteBackupRequests) Apply(ctx context.Context, deleteBackupRequest *velerov1.DeleteBackupRequestApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DeleteBackupRequest, err error) {
+	if deleteBackupRequest == nil {
+		return nil, fmt.Errorf("deleteBackupRequest provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(deleteBackupRequest)
+	if err != nil {
+		return nil, err
+	}
+	name := deleteBackupRequest.Name
+	if name == nil {
+		return nil, fmt.Errorf("deleteBackupRequest.Name must be provided to Apply")
+	}
+	result = &v1.DeleteBackupRequest{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("deletebackuprequests").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *deleteBackupRequests) ApplyStatus(ctx context.Context, deleteBackupRequest *velerov1.DeleteBackupRequestApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DeleteBackupRequest, err error) {
+	if deleteBackupRequest == nil {
+		return nil, fmt.Errorf("deleteBackupRequest provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(deleteBackupRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	name := deleteBackupRequest.Name
+	if name == nil {
+		return nil, fmt.Errorf("deleteBackupRequest.Name must be provided to Apply")
+	}
+
+	result = &v1.DeleteBackupRequest{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("deletebackuprequests").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

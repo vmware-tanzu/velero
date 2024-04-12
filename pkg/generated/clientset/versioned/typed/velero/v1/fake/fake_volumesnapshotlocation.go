@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/applyconfiguration/velero/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +38,25 @@ type FakeVolumeSnapshotLocations struct {
 	ns   string
 }
 
-var volumesnapshotlocationsResource = schema.GroupVersionResource{Group: "velero.io", Version: "v1", Resource: "volumesnapshotlocations"}
+var volumesnapshotlocationsResource = v1.SchemeGroupVersion.WithResource("volumesnapshotlocations")
 
-var volumesnapshotlocationsKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "VolumeSnapshotLocation"}
+var volumesnapshotlocationsKind = v1.SchemeGroupVersion.WithKind("VolumeSnapshotLocation")
 
 // Get takes name of the volumeSnapshotLocation, and returns the corresponding volumeSnapshotLocation object, and an error if there is any.
-func (c *FakeVolumeSnapshotLocations) Get(ctx context.Context, name string, options v1.GetOptions) (result *velerov1.VolumeSnapshotLocation, err error) {
+func (c *FakeVolumeSnapshotLocations) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.VolumeSnapshotLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(volumesnapshotlocationsResource, c.ns, name), &velerov1.VolumeSnapshotLocation{})
+		Invokes(testing.NewGetAction(volumesnapshotlocationsResource, c.ns, name), &v1.VolumeSnapshotLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.VolumeSnapshotLocation), err
+	return obj.(*v1.VolumeSnapshotLocation), err
 }
 
 // List takes label and field selectors, and returns the list of VolumeSnapshotLocations that match those selectors.
-func (c *FakeVolumeSnapshotLocations) List(ctx context.Context, opts v1.ListOptions) (result *velerov1.VolumeSnapshotLocationList, err error) {
+func (c *FakeVolumeSnapshotLocations) List(ctx context.Context, opts metav1.ListOptions) (result *v1.VolumeSnapshotLocationList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(volumesnapshotlocationsResource, volumesnapshotlocationsKind, c.ns, opts), &velerov1.VolumeSnapshotLocationList{})
+		Invokes(testing.NewListAction(volumesnapshotlocationsResource, volumesnapshotlocationsKind, c.ns, opts), &v1.VolumeSnapshotLocationList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +66,8 @@ func (c *FakeVolumeSnapshotLocations) List(ctx context.Context, opts v1.ListOpti
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &velerov1.VolumeSnapshotLocationList{ListMeta: obj.(*velerov1.VolumeSnapshotLocationList).ListMeta}
-	for _, item := range obj.(*velerov1.VolumeSnapshotLocationList).Items {
+	list := &v1.VolumeSnapshotLocationList{ListMeta: obj.(*v1.VolumeSnapshotLocationList).ListMeta}
+	for _, item := range obj.(*v1.VolumeSnapshotLocationList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +76,114 @@ func (c *FakeVolumeSnapshotLocations) List(ctx context.Context, opts v1.ListOpti
 }
 
 // Watch returns a watch.Interface that watches the requested volumeSnapshotLocations.
-func (c *FakeVolumeSnapshotLocations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeVolumeSnapshotLocations) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(volumesnapshotlocationsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a volumeSnapshotLocation and creates it.  Returns the server's representation of the volumeSnapshotLocation, and an error, if there is any.
-func (c *FakeVolumeSnapshotLocations) Create(ctx context.Context, volumeSnapshotLocation *velerov1.VolumeSnapshotLocation, opts v1.CreateOptions) (result *velerov1.VolumeSnapshotLocation, err error) {
+func (c *FakeVolumeSnapshotLocations) Create(ctx context.Context, volumeSnapshotLocation *v1.VolumeSnapshotLocation, opts metav1.CreateOptions) (result *v1.VolumeSnapshotLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(volumesnapshotlocationsResource, c.ns, volumeSnapshotLocation), &velerov1.VolumeSnapshotLocation{})
+		Invokes(testing.NewCreateAction(volumesnapshotlocationsResource, c.ns, volumeSnapshotLocation), &v1.VolumeSnapshotLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.VolumeSnapshotLocation), err
+	return obj.(*v1.VolumeSnapshotLocation), err
 }
 
 // Update takes the representation of a volumeSnapshotLocation and updates it. Returns the server's representation of the volumeSnapshotLocation, and an error, if there is any.
-func (c *FakeVolumeSnapshotLocations) Update(ctx context.Context, volumeSnapshotLocation *velerov1.VolumeSnapshotLocation, opts v1.UpdateOptions) (result *velerov1.VolumeSnapshotLocation, err error) {
+func (c *FakeVolumeSnapshotLocations) Update(ctx context.Context, volumeSnapshotLocation *v1.VolumeSnapshotLocation, opts metav1.UpdateOptions) (result *v1.VolumeSnapshotLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(volumesnapshotlocationsResource, c.ns, volumeSnapshotLocation), &velerov1.VolumeSnapshotLocation{})
+		Invokes(testing.NewUpdateAction(volumesnapshotlocationsResource, c.ns, volumeSnapshotLocation), &v1.VolumeSnapshotLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.VolumeSnapshotLocation), err
+	return obj.(*v1.VolumeSnapshotLocation), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeVolumeSnapshotLocations) UpdateStatus(ctx context.Context, volumeSnapshotLocation *velerov1.VolumeSnapshotLocation, opts v1.UpdateOptions) (*velerov1.VolumeSnapshotLocation, error) {
+func (c *FakeVolumeSnapshotLocations) UpdateStatus(ctx context.Context, volumeSnapshotLocation *v1.VolumeSnapshotLocation, opts metav1.UpdateOptions) (*v1.VolumeSnapshotLocation, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(volumesnapshotlocationsResource, "status", c.ns, volumeSnapshotLocation), &velerov1.VolumeSnapshotLocation{})
+		Invokes(testing.NewUpdateSubresourceAction(volumesnapshotlocationsResource, "status", c.ns, volumeSnapshotLocation), &v1.VolumeSnapshotLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.VolumeSnapshotLocation), err
+	return obj.(*v1.VolumeSnapshotLocation), err
 }
 
 // Delete takes name of the volumeSnapshotLocation and deletes it. Returns an error if one occurs.
-func (c *FakeVolumeSnapshotLocations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeVolumeSnapshotLocations) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(volumesnapshotlocationsResource, c.ns, name), &velerov1.VolumeSnapshotLocation{})
+		Invokes(testing.NewDeleteActionWithOptions(volumesnapshotlocationsResource, c.ns, name, opts), &v1.VolumeSnapshotLocation{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeVolumeSnapshotLocations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeVolumeSnapshotLocations) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(volumesnapshotlocationsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &velerov1.VolumeSnapshotLocationList{})
+	_, err := c.Fake.Invokes(action, &v1.VolumeSnapshotLocationList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched volumeSnapshotLocation.
-func (c *FakeVolumeSnapshotLocations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *velerov1.VolumeSnapshotLocation, err error) {
+func (c *FakeVolumeSnapshotLocations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.VolumeSnapshotLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(volumesnapshotlocationsResource, c.ns, name, pt, data, subresources...), &velerov1.VolumeSnapshotLocation{})
+		Invokes(testing.NewPatchSubresourceAction(volumesnapshotlocationsResource, c.ns, name, pt, data, subresources...), &v1.VolumeSnapshotLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velerov1.VolumeSnapshotLocation), err
+	return obj.(*v1.VolumeSnapshotLocation), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied volumeSnapshotLocation.
+func (c *FakeVolumeSnapshotLocations) Apply(ctx context.Context, volumeSnapshotLocation *velerov1.VolumeSnapshotLocationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.VolumeSnapshotLocation, err error) {
+	if volumeSnapshotLocation == nil {
+		return nil, fmt.Errorf("volumeSnapshotLocation provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(volumeSnapshotLocation)
+	if err != nil {
+		return nil, err
+	}
+	name := volumeSnapshotLocation.Name
+	if name == nil {
+		return nil, fmt.Errorf("volumeSnapshotLocation.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(volumesnapshotlocationsResource, c.ns, *name, types.ApplyPatchType, data), &v1.VolumeSnapshotLocation{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.VolumeSnapshotLocation), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeVolumeSnapshotLocations) ApplyStatus(ctx context.Context, volumeSnapshotLocation *velerov1.VolumeSnapshotLocationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.VolumeSnapshotLocation, err error) {
+	if volumeSnapshotLocation == nil {
+		return nil, fmt.Errorf("volumeSnapshotLocation provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(volumeSnapshotLocation)
+	if err != nil {
+		return nil, err
+	}
+	name := volumeSnapshotLocation.Name
+	if name == nil {
+		return nil, fmt.Errorf("volumeSnapshotLocation.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(volumesnapshotlocationsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.VolumeSnapshotLocation{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.VolumeSnapshotLocation), err
 }

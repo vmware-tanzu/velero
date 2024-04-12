@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/generated/applyconfiguration/velero/v2alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,9 +38,9 @@ type FakeDataDownloads struct {
 	ns   string
 }
 
-var datadownloadsResource = schema.GroupVersionResource{Group: "velero.io", Version: "v2alpha1", Resource: "datadownloads"}
+var datadownloadsResource = v2alpha1.SchemeGroupVersion.WithResource("datadownloads")
 
-var datadownloadsKind = schema.GroupVersionKind{Group: "velero.io", Version: "v2alpha1", Kind: "DataDownload"}
+var datadownloadsKind = v2alpha1.SchemeGroupVersion.WithKind("DataDownload")
 
 // Get takes name of the dataDownload, and returns the corresponding dataDownload object, and an error if there is any.
 func (c *FakeDataDownloads) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2alpha1.DataDownload, err error) {
@@ -117,7 +119,7 @@ func (c *FakeDataDownloads) UpdateStatus(ctx context.Context, dataDownload *v2al
 // Delete takes name of the dataDownload and deletes it. Returns an error if one occurs.
 func (c *FakeDataDownloads) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(datadownloadsResource, c.ns, name), &v2alpha1.DataDownload{})
+		Invokes(testing.NewDeleteActionWithOptions(datadownloadsResource, c.ns, name, opts), &v2alpha1.DataDownload{})
 
 	return err
 }
@@ -134,6 +136,51 @@ func (c *FakeDataDownloads) DeleteCollection(ctx context.Context, opts v1.Delete
 func (c *FakeDataDownloads) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2alpha1.DataDownload, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(datadownloadsResource, c.ns, name, pt, data, subresources...), &v2alpha1.DataDownload{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2alpha1.DataDownload), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied dataDownload.
+func (c *FakeDataDownloads) Apply(ctx context.Context, dataDownload *velerov2alpha1.DataDownloadApplyConfiguration, opts v1.ApplyOptions) (result *v2alpha1.DataDownload, err error) {
+	if dataDownload == nil {
+		return nil, fmt.Errorf("dataDownload provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(dataDownload)
+	if err != nil {
+		return nil, err
+	}
+	name := dataDownload.Name
+	if name == nil {
+		return nil, fmt.Errorf("dataDownload.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(datadownloadsResource, c.ns, *name, types.ApplyPatchType, data), &v2alpha1.DataDownload{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2alpha1.DataDownload), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeDataDownloads) ApplyStatus(ctx context.Context, dataDownload *velerov2alpha1.DataDownloadApplyConfiguration, opts v1.ApplyOptions) (result *v2alpha1.DataDownload, err error) {
+	if dataDownload == nil {
+		return nil, fmt.Errorf("dataDownload provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(dataDownload)
+	if err != nil {
+		return nil, err
+	}
+	name := dataDownload.Name
+	if name == nil {
+		return nil, fmt.Errorf("dataDownload.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(datadownloadsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v2alpha1.DataDownload{})
 
 	if obj == nil {
 		return nil, err
