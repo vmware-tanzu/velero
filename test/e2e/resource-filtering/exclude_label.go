@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -57,9 +58,9 @@ func (e *ExcludeFromBackup) Init() error {
 		*e.NSIncluded = append(*e.NSIncluded, createNSName)
 	}
 	e.labels = map[string]string{
-		"velero.io/exclude-from-backup": "true",
+		velerov1api.ExcludeFromBackupLabel: "true",
 	}
-	e.labelSelector = "velero.io/exclude-from-backup"
+	e.labelSelector = velerov1api.ExcludeFromBackupLabel
 
 	e.BackupArgs = []string{
 		"create", "--namespace", e.VeleroCfg.VeleroNamespace, "backup", e.BackupName,
@@ -82,7 +83,7 @@ func (e *ExcludeFromBackup) CreateResources() error {
 		"meaningless-label-resource-to-include": "true",
 	}
 	label2 := map[string]string{
-		"velero.io/exclude-from-backup": "false",
+		velerov1api.ExcludeFromBackupLabel: "false",
 	}
 	fmt.Printf("Creating resources in namespace ...%s\n", namespace)
 	if err := CreateNamespace(e.Ctx, e.Client, namespace); err != nil {

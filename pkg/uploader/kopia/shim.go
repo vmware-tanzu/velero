@@ -95,7 +95,7 @@ func (sr *shimRepository) FindManifests(ctx context.Context, labels map[string]s
 	return GetKopiaManifestEntries(metadata), nil
 }
 
-// GetKopiaManifestEntries get metadata from specific ManifestEntryMetadata
+// GetKopiaManifestEntry get metadata from specific ManifestEntryMetadata
 func GetKopiaManifestEntry(uMani *udmrepo.ManifestEntryMetadata) *manifest.EntryMetadata {
 	var ret manifest.EntryMetadata
 

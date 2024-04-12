@@ -431,7 +431,7 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	// Add namespaces with label velero.io/exclude-from-backup=true into request.Spec.ExcludedNamespaces
 	// Essentially, adding the label velero.io/exclude-from-backup=true to a namespace would be equivalent to setting spec.ExcludedNamespaces
 	namespaces := corev1api.NamespaceList{}
-	if err := b.kbClient.List(context.Background(), &namespaces, kbclient.MatchingLabels{"velero.io/exclude-from-backup": "true"}); err == nil {
+	if err := b.kbClient.List(context.Background(), &namespaces, kbclient.MatchingLabels{velerov1api.ExcludeFromBackupLabel: "true"}); err == nil {
 		for _, ns := range namespaces.Items {
 			request.Spec.ExcludedNamespaces = append(request.Spec.ExcludedNamespaces, ns.Name)
 		}
@@ -464,7 +464,7 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	}
 
 	// validate the included/excluded namespaces
-	for _, err := range collections.ValidateNamespaceIncludesExcludes(request.Spec.IncludedNamespaces, request.Spec.ExcludedNamespaces) {
+	for _, err := range b.validateNamespaceIncludesExcludes(request.Spec.IncludedNamespaces, request.Spec.ExcludedNamespaces) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
@@ -599,6 +599,24 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 	}
 
 	return providerLocations, nil
+}
+
+func (b *backupReconciler) validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces []string) []error {
+	var errs []error
+	if errs = collections.ValidateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces); len(errs) > 0 {
+		return errs
+	}
+
+	namespace := &corev1api.Namespace{}
+	for _, name := range collections.NewIncludesExcludes().Includes(includedNamespaces...).GetIncludes() {
+		if name == "" || name == "*" {
+			continue
+		}
+		if err := b.kbClient.Get(context.Background(), kbclient.ObjectKey{Name: name}, namespace); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errs
 }
 
 // runBackup runs and uploads a validated backup. Any error returned from this function

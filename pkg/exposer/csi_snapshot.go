@@ -20,27 +20,22 @@ import (
 	"context"
 	"time"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
-	"github.com/vmware-tanzu/velero/pkg/nodeagent"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
-
-	"github.com/vmware-tanzu/velero/pkg/util/csi"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/csi"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 // CSISnapshotExposeParam define the input param for Expose of CSI snapshots

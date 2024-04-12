@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restore
+package actions
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -120,8 +119,6 @@ func TestDataUploadRetrieveActionExectue(t *testing.T) {
 				})
 
 				require.NoError(t, err)
-				// debug
-				fmt.Printf("CM: %s\n", &cmList.Items[0])
 				require.Equal(t, tc.expectedDataUploadResult.Labels, cmList.Items[0].Labels)
 				require.Equal(t, tc.expectedDataUploadResult.Data, cmList.Items[0].Data)
 			}

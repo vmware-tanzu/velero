@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restore
+package actions
 
 import (
 	"context"
@@ -33,7 +33,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
-// TestChangeImageNameActionExecute runs the ChangeImageNameAction's Execute
+// TestChangeImageRepositoryActionExecute runs the ChangeImageNameAction's Execute
 // method and validates that the item's image name is modified (or not) as expected.
 // Validation is done by comparing the result of the Execute method to the test case's
 // desired result.

@@ -190,9 +190,15 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		},
 		{
 			name:           "use old filter parameters and new filter parameters together",
-			backup:         defaultBackup().IncludeClusterResources(true).IncludedNamespaceScopedResources("Deployment").IncludedNamespaces("default").Result(),
+			backup:         defaultBackup().IncludeClusterResources(true).IncludedNamespaceScopedResources("Deployment").IncludedNamespaces("foo").Result(),
 			backupLocation: defaultBackupLocation,
 			expectedErrs:   []string{"include-resources, exclude-resources and include-cluster-resources are old filter parameters.\ninclude-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\nThey cannot be used together"},
+		},
+		{
+			name:           "nonexisting namespace",
+			backup:         defaultBackup().IncludedNamespaces("non-existing").Result(),
+			backupLocation: defaultBackupLocation,
+			expectedErrs:   []string{"Invalid included/excluded namespace lists: namespaces \"non-existing\" not found"},
 		},
 	}
 
@@ -208,10 +214,11 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 			require.NoError(t, err)
 
 			var fakeClient kbclient.Client
+			namespace := builder.ForNamespace("foo").Result()
 			if test.backupLocation != nil {
-				fakeClient = velerotest.NewFakeControllerRuntimeClient(t, test.backupLocation)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t, test.backupLocation, namespace)
 			} else {
-				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t, namespace)
 			}
 
 			c := &backupReconciler{
@@ -1565,6 +1572,43 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateNamespaceIncludesExcludes(t *testing.T) {
+	namespace := builder.ForNamespace("default").Result()
+	reconciler := &backupReconciler{
+		kbClient: velerotest.NewFakeControllerRuntimeClient(t, namespace),
+	}
+
+	// empty string as includedNamespaces
+	includedNamespaces := []string{""}
+	excludedNamespaces := []string{"test"}
+	errs := reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces)
+	assert.Empty(t, errs)
+
+	// "*" as includedNamespaces
+	includedNamespaces = []string{"*"}
+	excludedNamespaces = []string{"test"}
+	errs = reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces)
+	assert.Empty(t, errs)
+
+	// invalid namespaces
+	includedNamespaces = []string{"1@#"}
+	excludedNamespaces = []string{"2@#"}
+	errs = reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces)
+	assert.Len(t, errs, 2)
+
+	// not exist namespaces
+	includedNamespaces = []string{"non-existing-namespace"}
+	excludedNamespaces = []string{}
+	errs = reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces)
+	assert.Len(t, errs, 1)
+
+	// valid namespaces
+	includedNamespaces = []string{"default"}
+	excludedNamespaces = []string{}
+	errs = reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces)
+	assert.Empty(t, errs)
 }
 
 // Test_getLastSuccessBySchedule verifies that the getLastSuccessBySchedule helper function correctly returns

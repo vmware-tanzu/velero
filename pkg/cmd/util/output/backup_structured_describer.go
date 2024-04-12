@@ -410,7 +410,7 @@ func describeCSISnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDeta
 	snapshotDetails[fmt.Sprintf("%s/%s", info.PVCNamespace, info.PVCName)] = snapshotDetail
 }
 
-// describeVSCInSF describes CSI volume snapshot contents in structured format.
+// describeLocalSnapshotInSF describes CSI volume snapshot contents in structured format.
 func describeLocalSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDetail map[string]interface{}) {
 	if !info.PreserveLocalSnapshot {
 		return
