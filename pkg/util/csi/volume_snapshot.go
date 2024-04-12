@@ -129,8 +129,7 @@ func GetVolumeSnapshotContentForVolumeSnapshot(
 	return vsc, nil
 }
 
-// RetainVSC updates the VSC's deletion policy to Retain and add a
-// finalizer and then return the update VSC
+// RetainVSC updates the VSC's deletion policy to Retain and then return the update VSC
 func RetainVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interface,
 	vsc *snapshotv1api.VolumeSnapshotContent) (*snapshotv1api.VolumeSnapshotContent, error) {
 	if vsc.Spec.DeletionPolicy == snapshotv1api.VolumeSnapshotContentRetain {
@@ -139,7 +138,6 @@ func RetainVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1Interfa
 
 	return patchVSC(ctx, snapshotClient, vsc, func(updated *snapshotv1api.VolumeSnapshotContent) {
 		updated.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
-		updated.Finalizers = append(updated.Finalizers, volumeSnapshotContentProtectFinalizer)
 	})
 }
 

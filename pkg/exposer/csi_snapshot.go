@@ -113,41 +113,6 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 
 	curLog.WithField("vsc name", vsc.Name).WithField("vs name", volumeSnapshot.Name).Infof("Got VSC from VS in namespace %s", volumeSnapshot.Namespace)
 
-	retained, err := csi.RetainVSC(ctx, e.csiSnapshotClient, vsc)
-	if err != nil {
-		return errors.Wrap(err, "error to retain volume snapshot content")
-	}
-
-	curLog.WithField("vsc name", vsc.Name).WithField("retained", (retained != nil)).Info("Finished to retain VSC")
-
-	defer func() {
-		if retained != nil {
-			csi.DeleteVolumeSnapshotContentIfAny(ctx, e.csiSnapshotClient, retained.Name, curLog)
-		}
-	}()
-
-	err = csi.EnsureDeleteVS(ctx, e.csiSnapshotClient, volumeSnapshot.Name, volumeSnapshot.Namespace, csiExposeParam.OperationTimeout)
-	if err != nil {
-		return errors.Wrap(err, "error to delete volume snapshot")
-	}
-
-	curLog.WithField("vs name", volumeSnapshot.Name).Infof("VS is deleted in namespace %s", volumeSnapshot.Namespace)
-
-	err = csi.RemoveVSCProtect(ctx, e.csiSnapshotClient, vsc.Name, csiExposeParam.ExposeTimeout)
-	if err != nil {
-		return errors.Wrap(err, "error to remove protect from volume snapshot content")
-	}
-
-	curLog.WithField("vsc name", vsc.Name).Infof("Removed protect from VSC")
-
-	err = csi.EnsureDeleteVSC(ctx, e.csiSnapshotClient, vsc.Name, csiExposeParam.OperationTimeout)
-	if err != nil {
-		return errors.Wrap(err, "error to delete volume snapshot content")
-	}
-
-	curLog.WithField("vsc name", vsc.Name).Infof("VSC is deleted")
-	retained = nil
-
 	backupVS, err := e.createBackupVS(ctx, ownerObject, volumeSnapshot)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup volume snapshot")
@@ -167,6 +132,27 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 	}
 
 	curLog.WithField("vsc name", backupVSC.Name).Infof("Backup VSC is created from %s", vsc.Name)
+
+	retained, err := csi.RetainVSC(ctx, e.csiSnapshotClient, vsc)
+	if err != nil {
+		return errors.Wrap(err, "error to retain volume snapshot content")
+	}
+
+	curLog.WithField("vsc name", vsc.Name).WithField("retained", (retained != nil)).Info("Finished to retain VSC")
+
+	err = csi.EnsureDeleteVS(ctx, e.csiSnapshotClient, volumeSnapshot.Name, volumeSnapshot.Namespace, csiExposeParam.OperationTimeout)
+	if err != nil {
+		return errors.Wrap(err, "error to delete volume snapshot")
+	}
+
+	curLog.WithField("vs name", volumeSnapshot.Name).Infof("VS is deleted in namespace %s", volumeSnapshot.Namespace)
+
+	err = csi.EnsureDeleteVSC(ctx, e.csiSnapshotClient, vsc.Name, csiExposeParam.OperationTimeout)
+	if err != nil {
+		return errors.Wrap(err, "error to delete volume snapshot content")
+	}
+
+	curLog.WithField("vsc name", vsc.Name).Infof("VSC is deleted")
 
 	var volumeSize resource.Quantity
 	if volumeSnapshot.Status.RestoreSize != nil && !volumeSnapshot.Status.RestoreSize.IsZero() {
