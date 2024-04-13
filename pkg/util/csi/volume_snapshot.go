@@ -753,7 +753,7 @@ func WaitUntilVSCHandleIsReady(
 	)
 
 	if err != nil {
-		if err == wait.ErrorInterrupted(errors.New("timed out waiting for the condition")) {
+		if wait.Interrupted(err) {
 			if vsc != nil &&
 				vsc.Status != nil &&
 				vsc.Status.Error != nil {
