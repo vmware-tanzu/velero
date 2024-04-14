@@ -3439,7 +3439,7 @@ func assertTarballOrdering(t *testing.T, backupFile io.Reader, orderedResources 
 
 		// get the resource name
 		parts := strings.Split(hdr.Name, "/")
-		require.True(t, len(parts) >= 2)
+		require.GreaterOrEqual(t, len(parts), 2)
 		resourceName := parts[1]
 
 		// Find the index in 'orderedResources' of the resource type for
@@ -3459,7 +3459,7 @@ func assertTarballOrdering(t *testing.T, backupFile io.Reader, orderedResources 
 
 		// the index of the current resource must be the same as or greater than the index of
 		// the last resource we saw for the backed-up order to be correct.
-		assert.True(t, current >= lastSeen, "%s was backed up out of order", resourceName)
+		assert.GreaterOrEqual(t, current, lastSeen, "%s was backed up out of order", resourceName)
 		lastSeen = current
 	}
 }

@@ -239,7 +239,6 @@ linters-settings:
       # TODO: enable them all
       disable:
         - bool-compare
-        - compares
         - error-is-as
         - error-nil
         - expected-actual
@@ -249,10 +248,7 @@ linters-settings:
         - suite-dont-use-pkg
         - suite-extra-assert-call
         - suite-thelper
-      enable:
-        - empty
-        - len
-        - nil-compare
+      enable-all: true
   testpackage:
     # regexp pattern to skip files
     skip-regexp: (export|internal)_test\.go

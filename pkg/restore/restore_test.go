@@ -3598,7 +3598,7 @@ func assertResourceCreationOrder(t *testing.T, resourcePriorities []string, crea
 
 		// the index of the current resource must be the same as or greater than the index of
 		// the last resource we saw for the restored order to be correct.
-		assert.True(t, current >= lastSeen, "%s was restored out of order", r.groupResource)
+		assert.GreaterOrEqual(t, current, lastSeen, "%s was restored out of order", r.groupResource)
 		lastSeen = current
 	}
 }
