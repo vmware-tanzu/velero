@@ -18,6 +18,7 @@ package csi
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -40,6 +41,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -710,4 +712,38 @@ func TestExecute(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPVCAppliesTo(t *testing.T) {
+	p := pvcRestoreItemAction{
+		log: logrus.StandardLogger(),
+	}
+	selector, err := p.AppliesTo()
+
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		velero.ResourceSelector{
+			IncludedResources: []string{"persistentvolumeclaims"},
+		},
+		selector,
+	)
+}
+
+func TestNewPvcRestoreItemAction(t *testing.T) {
+	logger := logrus.StandardLogger()
+	crClient := velerotest.NewFakeControllerRuntimeClient(t)
+
+	f := &factorymocks.Factory{}
+	f.On("KubebuilderClient").Return(nil, fmt.Errorf(""))
+	plugin := NewPvcRestoreItemAction(f)
+	_, err := plugin(logger)
+	require.Error(t, err)
+
+	f1 := &factorymocks.Factory{}
+	f1.On("KubebuilderClient").Return(crClient, nil)
+	plugin1 := NewPvcRestoreItemAction(f1)
+	_, err1 := plugin1(logger)
+	require.NoError(t, err1)
 }

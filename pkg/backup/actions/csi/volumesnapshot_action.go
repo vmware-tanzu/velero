@@ -84,10 +84,15 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 		return nil, nil, "", nil, errors.WithStack(err)
 	}
 
+	volumeSnapshotClassName := ""
+	if vs.Spec.VolumeSnapshotClassName != nil {
+		volumeSnapshotClassName = *vs.Spec.VolumeSnapshotClassName
+	}
+
 	additionalItems := []velero.ResourceIdentifier{
 		{
 			GroupResource: kuberesource.VolumeSnapshotClasses,
-			Name:          *vs.Spec.VolumeSnapshotClassName,
+			Name:          volumeSnapshotClassName,
 		},
 	}
 
@@ -127,6 +132,10 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 		p.log.
 			WithField("Backup", fmt.Sprintf("%s/%s", backup.Namespace, backup.Name)).
 			WithField("BackupPhase", backup.Status.Phase).Debugf("Clean VolumeSnapshots.")
+
+		if vsc == nil {
+			vsc = &snapshotv1api.VolumeSnapshotContent{}
+		}
 
 		csi.DeleteVolumeSnapshot(*vs, *vsc, backup, p.crClient, p.log)
 		return item, nil, "", nil, nil

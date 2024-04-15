@@ -447,14 +447,6 @@ func IsVolumeSnapshotContentHasDeleteSecret(vsc *snapshotv1api.VolumeSnapshotCon
 	return nameExists && nsExists
 }
 
-// IsVolumeSnapshotHasVSCDeleteSecret returns whether a volumesnapshot should set the deletesnapshot secret
-// for the static volumesnapshotcontent that is created on restore
-func IsVolumeSnapshotHasVSCDeleteSecret(vs *snapshotv1api.VolumeSnapshot) bool {
-	_, nameExists := vs.Annotations[velerov1api.DeleteSecretNameAnnotation]
-	_, nsExists := vs.Annotations[velerov1api.DeleteSecretNamespaceAnnotation]
-	return nameExists && nsExists
-}
-
 // IsVolumeSnapshotExists returns whether a specific volumesnapshot object exists.
 func IsVolumeSnapshotExists(
 	ns,
@@ -761,7 +753,7 @@ func WaitUntilVSCHandleIsReady(
 	)
 
 	if err != nil {
-		if err == wait.ErrorInterrupted(errors.New("timed out waiting for the condition")) {
+		if wait.Interrupted(err) {
 			if vsc != nil &&
 				vsc.Status != nil &&
 				vsc.Status.Error != nil {

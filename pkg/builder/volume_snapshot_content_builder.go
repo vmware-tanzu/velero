@@ -84,3 +84,13 @@ func (v *VolumeSnapshotContentBuilder) ObjectMeta(opts ...ObjectMetaOpt) *Volume
 
 	return v
 }
+
+func (v *VolumeSnapshotContentBuilder) Driver(driver string) *VolumeSnapshotContentBuilder {
+	v.object.Spec.Driver = driver
+	return v
+}
+
+func (v *VolumeSnapshotContentBuilder) Source(source snapshotv1api.VolumeSnapshotContentSource) *VolumeSnapshotContentBuilder {
+	v.object.Spec.Source = source
+	return v
+}

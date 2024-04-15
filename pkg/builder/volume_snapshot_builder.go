@@ -93,3 +93,15 @@ func (v *VolumeSnapshotBuilder) VolumeSnapshotClass(name string) *VolumeSnapshot
 	v.object.Spec.VolumeSnapshotClassName = &name
 	return v
 }
+
+// StatusError set the built VolumeSnapshot's status.Error value.
+func (v *VolumeSnapshotBuilder) StatusError(snapshotError snapshotv1api.VolumeSnapshotError) *VolumeSnapshotBuilder {
+	v.object.Status.Error = &snapshotError
+	return v
+}
+
+// ReadyToUse set the built VolumeSnapshot's status.ReadyToUse value.
+func (v *VolumeSnapshotBuilder) ReadyToUse(readyToUse bool) *VolumeSnapshotBuilder {
+	v.object.Status.ReadyToUse = &readyToUse
+	return v
+}
