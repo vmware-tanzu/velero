@@ -165,7 +165,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			resourceTerminatingTimeout:     defaultResourceTerminatingTimeout,
 			formatFlag:                     logging.NewFormatFlag(),
 			defaultVolumesToFsBackup:       podvolume.DefaultVolumesToFsBackup,
-			uploaderType:                   uploader.ResticType,
+			uploaderType:                   uploader.KopiaType,
 			maxConcurrentK8SConnections:    defaultMaxConcurrentK8SConnections,
 			defaultSnapshotMoveData:        false,
 			disableInformerCache:           defaultDisableInformerCache,

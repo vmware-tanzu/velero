@@ -155,7 +155,7 @@ func getUploaderTypeOrDefault(uploaderType string) string {
 	if uploaderType != "" {
 		return uploaderType
 	}
-	return uploader.ResticType
+	return uploader.KopiaType
 }
 
 // getRepositoryType returns the hardcode repositoryType for different backup methods - Restic or Kopia,uploaderType
@@ -169,9 +169,9 @@ func getUploaderTypeOrDefault(uploaderType string) string {
 // the repositoryType to BackupRepositoryTypeKopia for Unified Repo.
 func getRepositoryType(uploaderType string) string {
 	switch uploaderType {
-	case "", uploader.ResticType:
+	case uploader.ResticType:
 		return velerov1api.BackupRepositoryTypeRestic
-	case uploader.KopiaType:
+	case "", uploader.KopiaType:
 		return velerov1api.BackupRepositoryTypeKopia
 	default:
 		return ""
