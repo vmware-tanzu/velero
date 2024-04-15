@@ -102,6 +102,22 @@ pre:
 
 Note that the container must support the shell command you use. 
 
+## Backup Hook Execution Results
+### Viewing Results
+
+Velero records the execution results of hooks, allowing users to obtain this information by running the following command:
+
+```bash
+$ velero backup describe <backup name>
+```
+
+The displayed results include the number of hooks that were attempted to be executed and the number of hooks that failed execution. Any detailed failure reasons will be present in `Errors` section if applicable. 
+
+```bash
+HooksAttempted:   1
+HooksFailed:      0
+```
+
 
 [1]: api-types/backup.md
 [2]: https://github.com/vmware-tanzu/velero/blob/main/examples/nginx-app/with-pv.yaml

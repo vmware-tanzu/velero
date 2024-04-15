@@ -280,4 +280,21 @@ postHooks:
 
 Note that the container must support the shell command you use. 
 
+## Restore Hook Execution Results
+### Viewing Results
+
+Velero records the execution results of hooks, allowing users to obtain this information by running the following command:
+
+```bash
+$ velero restore describe <restore name>
+```
+
+The displayed results include the number of hooks that were attempted to be executed and the number of hooks that failed execution. Any detailed failure reasons will be present in `Errors` section if applicable. 
+
+```bash
+HooksAttempted:   1
+HooksFailed:      0
+```
+
+
 [1]: api-types/restore.md
