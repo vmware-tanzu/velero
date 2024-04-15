@@ -587,7 +587,7 @@ func (m *ServerMetrics) RemoveSchedule(scheduleName string) {
 	}
 }
 
-// InitSchedule initializes counter metrics for a node.
+// InitMetricsForNode initializes counter metrics for a node.
 func (m *ServerMetrics) InitMetricsForNode(node string) {
 	if c, ok := m.metrics[podVolumeBackupEnqueueTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(node).Add(0)
