@@ -12,4 +12,4 @@ General phases for a Velero release
 - Feature freeze & pruning
 - Code freeze & prerelease
 - Release
-
+- Velero plugin repositories would be bumped up one minor version when new Velero is released
