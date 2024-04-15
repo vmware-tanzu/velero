@@ -70,7 +70,7 @@ func (m *MetricsCollector) UpdateMetrics() {
 	}
 }
 
-// UpdateMetrics periodically updates the one-time metrics for all metrics
+// UpdateOneTimeMetrics periodically updates the one-time metrics for all metrics
 func (m *MetricsCollector) UpdateOneTimeMetrics() {
 	// NotifyOneTimeMonitors notifies the one-time metrics about the metric
 	for _, metric := range m.OneTimeMetrics {

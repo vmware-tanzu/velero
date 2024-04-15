@@ -83,7 +83,7 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 	})
 }
 
-// runUpgradeTests runs upgrade test on the provider by kibishii.
+// runBackupDeletionTests runs upgrade test on the provider by kibishii.
 func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupName, backupLocation string,
 	useVolumeSnapshots bool, kibishiiDirectory string) error {
 	if useVolumeSnapshots && veleroCfg.CloudProvider == "kind" {
