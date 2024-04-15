@@ -17,36 +17,63 @@ limitations under the License.
 package azure
 
 import (
-	"context"
+	"os"
 	"testing"
-	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewCredential(t *testing.T) {
 	options := policy.ClientOptions{}
-	// no credentials
-	creds := map[string]string{}
-	tokenCredential, _ := NewCredential(creds, options)
 
-	var scopes []string
-	scopes = append(scopes, "https://management.core.windows.net//.default")
-
-	ctx, _ := context.WithTimeout(context.Background(), time.Second*2)
-	_, err := tokenCredential.GetToken(ctx, policy.TokenRequestOptions{Scopes: scopes})
+	// invalid client secret credential (missing tenant ID)
+	creds := map[string]string{
+		CredentialKeyClientID:     "clientid",
+		CredentialKeyClientSecret: "secret",
+	}
+	_, err := NewCredential(creds, options)
 	require.NotNil(t, err)
 
-	// config credential
+	// valid client secret credential
 	creds = map[string]string{
 		CredentialKeyTenantID:     "tenantid",
 		CredentialKeyClientID:     "clientid",
 		CredentialKeyClientSecret: "secret",
 	}
-	_, err = NewCredential(creds, options)
+	tokenCredential, err := NewCredential(creds, options)
 	require.Nil(t, err)
+	assert.IsType(t, &azidentity.ClientSecretCredential{}, tokenCredential)
+
+	// client certificate credential
+	certData, err := readCertData()
+	require.Nil(t, err)
+	creds = map[string]string{
+		CredentialKeyTenantID:          "tenantid",
+		CredentialKeyClientID:          "clientid",
+		CredentialKeyClientCertificate: certData,
+	}
+	tokenCredential, err = NewCredential(creds, options)
+	require.Nil(t, err)
+	assert.IsType(t, &azidentity.ClientCertificateCredential{}, tokenCredential)
+
+	// workload identity credential
+	os.Setenv(CredentialKeyTenantID, "tenantid")
+	os.Setenv(CredentialKeyClientID, "clientid")
+	os.Setenv("AZURE_FEDERATED_TOKEN_FILE", "/tmp/token")
+	creds = map[string]string{}
+	tokenCredential, err = NewCredential(creds, options)
+	require.Nil(t, err)
+	assert.IsType(t, &azidentity.WorkloadIdentityCredential{}, tokenCredential)
+	os.Clearenv()
+
+	// managed identity credential
+	creds = map[string]string{}
+	tokenCredential, err = NewCredential(creds, options)
+	require.Nil(t, err)
+	assert.IsType(t, &azidentity.ManagedIdentityCredential{}, tokenCredential)
 }
 
 func Test_newConfigCredential(t *testing.T) {
@@ -77,10 +104,12 @@ func Test_newConfigCredential(t *testing.T) {
 	require.True(t, ok)
 
 	// client certificate
+	certData, err := readCertData()
+	require.Nil(t, err)
 	creds = map[string]string{
-		CredentialKeyTenantID:              "clientid",
-		CredentialKeyClientID:              "clientid",
-		CredentialKeyClientCertificatePath: "testdata/certificate.pem",
+		CredentialKeyTenantID:          "clientid",
+		CredentialKeyClientID:          "clientid",
+		CredentialKeyClientCertificate: certData,
 	}
 	credential, err = newConfigCredential(creds, options)
 	require.Nil(t, err)
@@ -100,4 +129,12 @@ func Test_newConfigCredential(t *testing.T) {
 	require.NotNil(t, credential)
 	_, ok = credential.(*azidentity.UsernamePasswordCredential)
 	require.True(t, ok)
+}
+
+func readCertData() (string, error) {
+	data, err := os.ReadFile("testdata/certificate.pem")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
