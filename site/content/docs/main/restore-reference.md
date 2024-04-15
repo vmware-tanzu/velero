@@ -279,6 +279,12 @@ If using fs-restore or CSI snapshot data movements, it's supported to write spar
 velero restore create <RESTORE_NAME> --from-backup <BACKUP_NAME> --write-sparse-files --wait
 ``` 
 
+## Parallel Files Download
+If using fs-restore or CSI snapshot data movements, it's possible to configure one option for parallel file downloads during the restore by Kopia uploader using the command below:
+```bash
+velero restore create <RESTORE_NAME> --from-backup <BACKUP_NAME> --parallel-files-download <NUM> --wait
+``` 
+
 ## Removing a Restore object
 
 There are two ways to delete a Restore object:

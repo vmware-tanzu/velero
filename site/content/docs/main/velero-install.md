@@ -26,7 +26,11 @@ velero install \
     [--node-agent-pod-cpu-request <CPU_REQUEST>] \
     [--node-agent-pod-mem-request <MEMORY_REQUEST>] \
     [--node-agent-pod-cpu-limit <CPU_LIMIT>] \
-    [--node-agent-pod-mem-limit <MEMORY_LIMIT>]
+    [--node-agent-pod-mem-limit <MEMORY_LIMIT>] \
+    [--maintenance-job-cpu-request <CPU_REQUEST>] \
+    [--maintenance-job-mem-request <MEMORY_REQUEST>] \
+    [--maintenance-job-cpu-limit <CPU_LIMIT>] \
+    [--maintenance-job-mem-limit <MEMORY_LIMIT>]
 ```
 
 The values for the resource requests and limits flags follow the same format as [Kubernetes resource requirements][3]
