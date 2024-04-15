@@ -23,16 +23,18 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 
-	disk "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-08-01/compute"
-	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-storage-blob-go/azblob"
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -53,6 +55,26 @@ const (
 	subscriptionID          = "subscriptionId"
 	resourceGroup           = "resourceGroup"
 )
+
+var environments = map[string]cloud.Configuration{
+	"AZURECHINACLOUD":        cloud.AzureChina,
+	"AZURECLOUD":             cloud.AzurePublic,
+	"AZUREGERMANCLOUD":       cloud.AzurePublic,
+	"AZUREPUBLICCLOUD":       cloud.AzurePublic,
+	"AZUREUSGOVERNMENT":      cloud.AzureGovernment,
+	"AZUREUSGOVERNMENTCLOUD": cloud.AzureGovernment,
+}
+
+// cloudConfigurationFromName returns cloud configuration based on the common name specified.
+func cloudConfigurationFromName(name string) (cloud.Configuration, error) {
+	name = strings.ToUpper(name)
+	env, ok := environments[name]
+	if !ok {
+		return env, fmt.Errorf("there is no cloud configuration matching the name %q", name)
+	}
+
+	return env, nil
+}
 
 func getStorageCredential(cloudCredentialsFile, bslConfig string) (string, string, error) {
 	config := flag.NewMap()
@@ -81,14 +103,14 @@ func loadCredentialsIntoEnv(credentialsFile string) error {
 	}
 	return nil
 }
-func parseAzureEnvironment(cloudName string) (*azure.Environment, error) {
+func parseCloudConfiguration(cloudName string) (cloud.Configuration, error) {
 	if cloudName == "" {
 		fmt.Println("cloudName is empty")
-		return &azure.PublicCloud, nil
+		return cloud.AzurePublic, nil
 	}
 
-	env, err := azure.EnvironmentFromName(cloudName)
-	return &env, errors.WithStack(err)
+	cloudConfiguration, err := cloudConfigurationFromName(cloudName)
+	return cloudConfiguration, errors.WithStack(err)
 }
 func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resourceGroupCfg string) (string, error) {
 	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
@@ -112,8 +134,8 @@ func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resource
 		resourceGroup = os.Getenv(resourceGroupEnvVar)
 	}
 	// get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
-	// exist, parseAzureEnvironment will return azure.PublicCloud.
-	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
+	// exist, parseCloudConfiguration will return cloud.AzurePublic.
+	cloudConfiguration, err := parseCloudConfiguration(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return "", errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
@@ -123,28 +145,38 @@ func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resource
 		return "", errors.New("azure subscription ID not found in object store's config or in environment variable")
 	}
 
-	authorizer, err := auth.NewAuthorizerFromEnvironment()
+	cred, err := azidentity.NewEnvironmentCredential(&azidentity.EnvironmentCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Cloud: cloudConfiguration,
+		},
+	})
 	if err != nil {
-		return "", errors.Wrap(err, "error getting authorizer from environment")
+		return "", errors.Wrap(err, "error getting credential from environment")
 	}
 
 	// get storageAccountsClient
-	storageAccountsClient := storagemgmt.NewAccountsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
-	storageAccountsClient.Authorizer = authorizer
+	storageAccountsClient, err := armstorage.NewAccountsClient(subscriptionID, cred, &arm.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Cloud: cloudConfiguration,
+		},
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "error creating new AccountsClient")
+	}
 
 	// get storage key
-	res, err := storageAccountsClient.ListKeys(context.TODO(), resourceGroup, accountName, storagemgmt.Kerb)
+	res, err := storageAccountsClient.ListKeys(context.TODO(), resourceGroup, accountName, &armstorage.AccountsClientListKeysOptions{Expand: to.Ptr("kerb")})
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
-	if res.Keys == nil || len(*res.Keys) == 0 {
+	if res.Keys == nil || len(res.Keys) == 0 {
 		return "", errors.New("No storage keys found")
 	}
 
-	for _, key := range *res.Keys {
+	for _, key := range res.Keys {
 		// uppercase both strings for comparison because the ListKeys call returns e.g. "FULL" but
-		// the storagemgmt.Full constant in the SDK is defined as "Full".
-		if strings.EqualFold(string(key.Permissions), string(storagemgmt.Full)) {
+		// the armstorage.KeyPermissionFull constant in the SDK is defined as "Full".
+		if strings.EqualFold(string(*key.Permissions), string(armstorage.KeyPermissionFull)) {
 			storageKey = *key.Value
 			break
 		}
@@ -295,8 +327,8 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupN
 	}
 
 	// Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
-	// exist, parseAzureEnvironment will return azure.PublicCloud.
-	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
+	// exist, parseCloudConfiguration will return cloud.AzurePublic.
+	cloudConfiguration, err := parseCloudConfiguration(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
@@ -304,57 +336,54 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupN
 	// set a different subscriptionId for snapshots if specified
 	snapshotsSubscriptionID := envVars[subscriptionIDEnvVar]
 
+	cred, err := azidentity.NewEnvironmentCredential(&azidentity.EnvironmentCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Cloud: cloudConfiguration,
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "error getting credential from environment")
+	}
+
 	// set up clients
-	snapsClient := disk.NewSnapshotsClientWithBaseURI(env.ResourceManagerEndpoint, snapshotsSubscriptionID)
-	snapsClient.PollingDelay = 5 * time.Second
-
-	authorizer, err := auth.NewAuthorizerFromEnvironment()
+	snapshotsClient, err := armcompute.NewSnapshotsClient(snapshotsSubscriptionID, cred, &arm.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Cloud: cloudConfiguration,
+		},
+	})
 	if err != nil {
-		return errors.Wrap(err, "error getting authorizer from environment")
+		return errors.Wrap(err, "error getting snapshots client")
 	}
-	// // if config["snapsIncrementalConfigKey"] is empty, default to nil; otherwise, parse i
-	snapsClient.Authorizer = authorizer
-	snaps := &snapsClient
-	//return ListByResourceGroup(ctx, snaps, envVars[resourceGroupEnvVar], backupName, snapshotCount)
-	req, err := snaps.ListByResourceGroupPreparer(ctx, envVars[resourceGroupEnvVar])
-	if err != nil {
-		return autorest.NewErrorWithError(err, "compute.SnapshotsClient", "ListByResourceGroup", nil, "Failure preparing request")
-	}
-
-	resp, err := snaps.ListByResourceGroupSender(req)
-	if err != nil {
-		return autorest.NewErrorWithError(err, "compute.SnapshotsClient", "ListByResourceGroup", resp, "Failure sending request")
-	}
-	result, err := snaps.ListByResourceGroupResponder(resp)
+	pager := snapshotsClient.NewListByResourceGroupPager(envVars[resourceGroupEnvVar], &armcompute.SnapshotsClientListByResourceGroupOptions{})
 	snapshotCountFound := 0
 	backupNameInSnapshot := ""
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Fail to list snapshots %s\n", envVars[resourceGroupEnvVar]))
-	}
-	if result.Value == nil {
-		return errors.New(fmt.Sprintf("No snapshots in Azure resource group %s\n", envVars[resourceGroupEnvVar]))
-	}
-	for _, v := range *result.Value {
-		if snapshotCheck.EnableCSI {
-			for _, s := range snapshotCheck.SnapshotIDList {
-				fmt.Println("Azure CSI local snapshot CR: " + s)
-				fmt.Println("Azure provider snapshot name: " + *v.Name)
-				if s == *v.Name {
-					fmt.Printf("Azure snapshot %s is created.\n", s)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			errors.Wrap(err, fmt.Sprintf("Fail to list snapshots %s\n", envVars[resourceGroupEnvVar]))
+		}
+		if page.Value == nil {
+			return errors.New(fmt.Sprintf("No snapshots in Azure resource group %s\n", envVars[resourceGroupEnvVar]))
+		}
+		for _, v := range page.Value {
+			if snapshotCheck.EnableCSI {
+				for _, s := range snapshotCheck.SnapshotIDList {
+					fmt.Println("Azure CSI local snapshot CR: " + s)
+					fmt.Println("Azure provider snapshot name: " + *v.Name)
+					if s == *v.Name {
+						fmt.Printf("Azure snapshot %s is created.\n", s)
+						snapshotCountFound++
+					}
+				}
+			} else {
+				fmt.Println(v.Tags)
+				backupNameInSnapshot = *v.Tags["velero.io-backup"]
+				fmt.Println(backupNameInSnapshot)
+				if backupName == backupNameInSnapshot {
 					snapshotCountFound++
 				}
 			}
-		} else {
-			fmt.Println(v.Tags)
-			backupNameInSnapshot = *v.Tags["velero.io-backup"]
-			fmt.Println(backupNameInSnapshot)
-			if backupName == backupNameInSnapshot {
-				snapshotCountFound++
-			}
 		}
-	}
-	if err != nil {
-		return autorest.NewErrorWithError(err, "compute.SnapshotsClient", "ListByResourceGroup", resp, "Failure responding to request")
 	}
 	if snapshotCountFound != snapshotCheck.ExpectCount {
 		return errors.New(fmt.Sprintf("Snapshot count %d is not as expected %d\n", snapshotCountFound, snapshotCheck.ExpectCount))
