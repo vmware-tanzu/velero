@@ -20,9 +20,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/vmware-tanzu/velero/internal/volume"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -165,6 +168,21 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		if len(podVolumeRestores) > 0 {
 			d.Println()
 			describePodVolumeRestores(d, podVolumeRestores, details)
+		}
+
+		buf := new(bytes.Buffer)
+		if err := downloadrequest.Stream(ctx, kbClient, restore.Namespace, restore.Name, velerov1api.DownloadTargetKindRestoreVolumeInfo,
+			buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertFile); err == nil {
+			var restoreVolInfo []volume.RestoreVolumeInfo
+			if err := json.NewDecoder(buf).Decode(&restoreVolInfo); err != nil {
+				d.Printf("\t<error reading restore volume info: %v>\n", err)
+			} else {
+				describeCSISnapshotsRestores(d, restoreVolInfo, details)
+			}
+		} else if err != nil && !errors.Is(err, downloadrequest.ErrNotFound) {
+			// For the restores by older versions of velero, it will see NotFound Error when downloading the volume info.
+			// In that case, no errors will be printed.
+			d.Printf("\t<error getting restore volume info: %v>\n", err)
 		}
 
 		d.Println()
@@ -357,6 +375,50 @@ func describePodVolumeRestores(d *Describer, restores []velerov1api.PodVolumeRes
 
 			// print volumes restored up for this pod
 			d.Printf("\t\t%s: %s\n", restoreGroup.label, strings.Join(restoreGroup.volumes, ", "))
+		}
+	}
+}
+
+// describeCSISnapshotsRestores describes PVC restored via CSISnapshots, incl. data-movement, in human-readable format.
+func describeCSISnapshotsRestores(d *Describer, restoreVolInfo []volume.RestoreVolumeInfo, details bool) {
+	d.Println()
+	var nonDMInfoList, dmInfoList []volume.RestoreVolumeInfo
+	for _, info := range restoreVolInfo {
+		if info.RestoreMethod != volume.CSISnapshot {
+			continue
+		}
+		if info.SnapshotDataMoved {
+			dmInfoList = append(dmInfoList, info)
+		} else {
+			nonDMInfoList = append(nonDMInfoList, info)
+		}
+	}
+	if len(nonDMInfoList) == 0 && len(dmInfoList) == 0 {
+		d.Printf("CSI Snapshot Restores: <none included>\n")
+		return
+	}
+	d.Printf("CSI Snapshot Restores:\n")
+	for _, info := range nonDMInfoList {
+		// All CSI snapshots are restored via PVC
+		d.Printf("\t%s/%s:\n", info.PVCNamespace, info.PVCName)
+		if details {
+			d.Printf("\t\tSnapshot:\n")
+			d.Printf("\t\t\tSnapshot Content Name: %s\n", info.CSISnapshotInfo.VSCName)
+			d.Printf("\t\t\tStorage Snapshot ID: %s\n", info.CSISnapshotInfo.SnapshotHandle)
+			d.Printf("\t\t\tCSI Driver: %s\n", info.CSISnapshotInfo.Driver)
+		} else {
+			d.Printf("\t\tSnapshot: specify --details for more information\n")
+		}
+	}
+	for _, info := range dmInfoList {
+		d.Printf("\t%s/%s:\n", info.PVCNamespace, info.PVCName)
+		if details {
+			d.Printf("\t\tData Movement:\n")
+			d.Printf("\t\t\tOperation ID: %s\n", info.SnapshotDataMovementInfo.OperationID)
+			d.Printf("\t\t\tData Mover: %s\n", info.SnapshotDataMovementInfo.DataMover)
+			d.Printf("\t\t\tUploader Type: %s\n", info.SnapshotDataMovementInfo.UploaderType)
+		} else {
+			d.Printf("\t\tData Movement: specify --details for more information\n")
 		}
 	}
 }
