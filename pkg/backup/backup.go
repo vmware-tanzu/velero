@@ -467,7 +467,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		updated.Status.HookStatus = &velerov1api.HookStatus{}
 	}
 	updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed = itemBackupper.hookTracker.Stat()
-	log.Infof("hookTracker: %+v, hookAttempted: %d, hookFailed: %d", itemBackupper.hookTracker.GetTracker(), updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed)
+	log.Debugf("hookAttempted: %d, hookFailed: %d", updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed)
 
 	if err := kube.PatchResource(backupRequest.Backup, updated, kb.kbClient); err != nil {
 		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress and hook status")

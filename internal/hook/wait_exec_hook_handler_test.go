@@ -743,8 +743,8 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				defer ctxCancel()
 			}
 
-			hookTracker := NewHookTracker()
-			errs := h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer, hookTracker)
+			hookTracker := NewMultiHookTracker()
+			errs := h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer, hookTracker, "restore1")
 
 			// for i, ee := range test.expectedErrors {
 			require.Len(t, errs, len(test.expectedErrors))
@@ -1011,15 +1011,18 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 		pod   *v1.Pod
 	}
 
-	hookTracker1 := NewHookTracker()
-	hookTracker1.Add("default", "my-pod", "container1", HookSourceAnnotation, "<from-annotation>", hookPhase(""))
+	hookTracker1 := NewMultiHookTracker()
+	hookTracker1.Add("restore1", "default", "my-pod", "container1", HookSourceAnnotation, "<from-annotation>", hookPhase(""))
 
-	hookTracker2 := NewHookTracker()
-	hookTracker2.Add("default", "my-pod", "container1", HookSourceSpec, "my-hook-1", hookPhase(""))
+	hookTracker2 := NewMultiHookTracker()
+	hookTracker2.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", hookPhase(""))
 
-	hookTracker3 := NewHookTracker()
-	hookTracker3.Add("default", "my-pod", "container1", HookSourceSpec, "my-hook-1", hookPhase(""))
-	hookTracker3.Add("default", "my-pod", "container2", HookSourceSpec, "my-hook-2", hookPhase(""))
+	hookTracker3 := NewMultiHookTracker()
+	hookTracker3.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", hookPhase(""))
+	hookTracker3.Add("restore1", "default", "my-pod", "container2", HookSourceSpec, "my-hook-2", hookPhase(""))
+
+	hookTracker4 := NewMultiHookTracker()
+	hookTracker4.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", hookPhase(""))
 
 	tests1 := []struct {
 		name               string
@@ -1027,7 +1030,7 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 		groupResource      string
 		byContainer        map[string][]PodExecRestoreHook
 		expectedExecutions []expectedExecution
-		hookTracker        *HookTracker
+		hookTracker        *MultiHookTracker
 		expectedFailed     int
 	}{
 		{
@@ -1159,7 +1162,7 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 					},
 				},
 			},
-			hookTracker:    hookTracker2,
+			hookTracker:    hookTracker4,
 			expectedFailed: 1,
 		},
 		{
@@ -1243,7 +1246,7 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 					},
 				},
 			},
-			hookTracker:    NewHookTracker(),
+			hookTracker:    NewMultiHookTracker(),
 			expectedFailed: 0,
 		},
 	}
@@ -1271,8 +1274,8 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			_ = h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer, test.hookTracker)
-			_, actualFailed := test.hookTracker.Stat()
+			_ = h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer, test.hookTracker, "restore1")
+			_, actualFailed := test.hookTracker.Stat("restore1")
 			assert.Equal(t, test.expectedFailed, actualFailed)
 		})
 	}

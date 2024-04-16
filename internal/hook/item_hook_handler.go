@@ -239,7 +239,7 @@ func (h *DefaultItemHookHandler) HandleHooks(
 			hookLog.WithError(errExec).Error("Error executing hook")
 			hookFailed = true
 		}
-		errTracker := hookTracker.Record(namespace, name, hookFromAnnotations.Container, HookSourceAnnotation, "", phase, hookFailed)
+		errTracker := hookTracker.Record(namespace, name, hookFromAnnotations.Container, HookSourceAnnotation, "", phase, hookFailed, errExec)
 		if errTracker != nil {
 			hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 		}
@@ -291,7 +291,7 @@ func (h *DefaultItemHookHandler) HandleHooks(
 								modeFailError = err
 							}
 						}
-						errTracker := hookTracker.Record(namespace, name, hook.Exec.Container, HookSourceSpec, resourceHook.Name, phase, hookFailed)
+						errTracker := hookTracker.Record(namespace, name, hook.Exec.Container, HookSourceSpec, resourceHook.Name, phase, hookFailed, err)
 						if errTracker != nil {
 							hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 						}
@@ -540,10 +540,11 @@ type PodExecRestoreHook struct {
 // container name. If an exec hook is defined in annotation that is used, else applicable exec
 // hooks from the restore resource are accumulated.
 func GroupRestoreExecHooks(
+	restoreName string,
 	resourceRestoreHooks []ResourceRestoreHook,
 	pod *corev1api.Pod,
 	log logrus.FieldLogger,
-	hookTrack *HookTracker,
+	hookTrack *MultiHookTracker,
 ) (map[string][]PodExecRestoreHook, error) {
 	byContainer := map[string][]PodExecRestoreHook{}
 
@@ -560,7 +561,7 @@ func GroupRestoreExecHooks(
 		if hookFromAnnotation.Container == "" {
 			hookFromAnnotation.Container = pod.Spec.Containers[0].Name
 		}
-		hookTrack.Add(metadata.GetNamespace(), metadata.GetName(), hookFromAnnotation.Container, HookSourceAnnotation, "<from-annotation>", hookPhase(""))
+		hookTrack.Add(restoreName, metadata.GetNamespace(), metadata.GetName(), hookFromAnnotation.Container, HookSourceAnnotation, "<from-annotation>", hookPhase(""))
 		byContainer[hookFromAnnotation.Container] = []PodExecRestoreHook{
 			{
 				HookName:   "<from-annotation>",
@@ -595,7 +596,7 @@ func GroupRestoreExecHooks(
 			if named.Hook.Container == "" {
 				named.Hook.Container = pod.Spec.Containers[0].Name
 			}
-			hookTrack.Add(metadata.GetNamespace(), metadata.GetName(), named.Hook.Container, HookSourceSpec, rrh.Name, hookPhase(""))
+			hookTrack.Add(restoreName, metadata.GetNamespace(), metadata.GetName(), named.Hook.Container, HookSourceSpec, rrh.Name, hookPhase(""))
 			byContainer[named.Hook.Container] = append(byContainer[named.Hook.Container], named)
 		}
 	}

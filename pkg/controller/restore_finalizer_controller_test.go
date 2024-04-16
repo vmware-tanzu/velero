@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -135,6 +137,7 @@ func TestRestoreFinalizerReconcile(t *testing.T) {
 				NewFakeSingleObjectBackupStoreGetter(backupStore),
 				metrics.NewServerMetrics(),
 				fakeClient,
+				hook.NewMultiHookTracker(),
 			)
 			r.clock = testclocks.NewFakeClock(now)
 
@@ -196,6 +199,7 @@ func TestUpdateResult(t *testing.T) {
 		NewFakeSingleObjectBackupStoreGetter(backupStore),
 		metrics.NewServerMetrics(),
 		fakeClient,
+		hook.NewMultiHookTracker(),
 	)
 	restore := builder.ForRestore(velerov1api.DefaultNamespace, "restore-1").Result()
 	res := map[string]results.Result{"warnings": {}, "errors": {}}
@@ -452,5 +456,101 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 			assert.Equal(t, expectedPVInfo.ReclaimPolicy, string(pv.Spec.PersistentVolumeReclaimPolicy))
 			assert.Equal(t, expectedPVInfo.Labels, pv.Labels)
 		}
+	}
+}
+
+func TestWaitRestoreExecHook(t *testing.T) {
+	hookTracker1 := hook.NewMultiHookTracker()
+	restoreName1 := "restore1"
+
+	hookTracker2 := hook.NewMultiHookTracker()
+	restoreName2 := "restore2"
+	hookTracker2.Add(restoreName2, "ns", "pod", "con1", "s1", "h1", "")
+	hookTracker2.Record(restoreName2, "ns", "pod", "con1", "s1", "h1", "", false, nil)
+
+	hookTracker3 := hook.NewMultiHookTracker()
+	restoreName3 := "restore3"
+	podNs, podName, container, source, hookName := "ns", "pod", "con1", "s1", "h1"
+	hookFailed, hookErr := true, fmt.Errorf("hook failed")
+	hookTracker3.Add(restoreName3, podNs, podName, container, source, hookName, hook.PhasePre)
+
+	tests := []struct {
+		name                   string
+		hookTracker            *hook.MultiHookTracker
+		restore                *velerov1api.Restore
+		expectedHooksAttempted int
+		expectedHooksFailed    int
+		expectedHookErrs       int
+		waitSec                int
+		podName                string
+		podNs                  string
+		Container              string
+		Source                 string
+		hookName               string
+		hookFailed             bool
+		hookErr                error
+	}{
+		{
+			name:                   "no restore exec hooks",
+			hookTracker:            hookTracker1,
+			restore:                builder.ForRestore(velerov1api.DefaultNamespace, restoreName1).Result(),
+			expectedHooksAttempted: 0,
+			expectedHooksFailed:    0,
+			expectedHookErrs:       0,
+		},
+		{
+			name:                   "1 restore exec hook having been executed",
+			hookTracker:            hookTracker2,
+			restore:                builder.ForRestore(velerov1api.DefaultNamespace, restoreName2).Result(),
+			expectedHooksAttempted: 1,
+			expectedHooksFailed:    0,
+			expectedHookErrs:       0,
+		},
+		{
+			name:                   "1 restore exec hook to be executed",
+			hookTracker:            hookTracker3,
+			restore:                builder.ForRestore(velerov1api.DefaultNamespace, restoreName3).Result(),
+			waitSec:                2,
+			expectedHooksAttempted: 1,
+			expectedHooksFailed:    1,
+			expectedHookErrs:       1,
+			podName:                podName,
+			podNs:                  podNs,
+			Container:              container,
+			Source:                 source,
+			hookName:               hookName,
+			hookFailed:             hookFailed,
+			hookErr:                hookErr,
+		},
+	}
+
+	for _, tc := range tests {
+		var (
+			fakeClient = velerotest.NewFakeControllerRuntimeClientBuilder(t).Build()
+			logger     = velerotest.NewLogger()
+		)
+		ctx := &finalizerContext{
+			logger:           logger,
+			crClient:         fakeClient,
+			restore:          tc.restore,
+			multiHookTracker: tc.hookTracker,
+		}
+		require.NoError(t, ctx.crClient.Create(context.Background(), tc.restore))
+
+		if tc.waitSec > 0 {
+			go func() {
+				time.Sleep(time.Second * time.Duration(tc.waitSec))
+				tc.hookTracker.Record(tc.restore.Name, tc.podNs, tc.podName, tc.Container, tc.Source, tc.hookName, hook.PhasePre, tc.hookFailed, tc.hookErr)
+			}()
+		}
+
+		errs := ctx.WaitRestoreExecHook()
+		assert.Len(t, errs.Namespaces, tc.expectedHookErrs)
+
+		updated := &velerov1api.Restore{}
+		err := ctx.crClient.Get(context.Background(), crclient.ObjectKey{Namespace: velerov1api.DefaultNamespace, Name: tc.restore.Name}, updated)
+		assert.NoError(t, err)
+		assert.Equal(t, tc.expectedHooksAttempted, updated.Status.HookStatus.HooksAttempted)
+		assert.Equal(t, tc.expectedHooksFailed, updated.Status.HookStatus.HooksFailed)
 	}
 }
