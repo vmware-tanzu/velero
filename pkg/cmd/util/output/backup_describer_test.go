@@ -502,6 +502,7 @@ func TestCSISnapshots(t *testing.T) {
         Operation ID: fake-operation-4
         Data Mover: velero
         Uploader Type: fake-uploader
+        Moved data Size (bytes): 0
 `,
 		},
 		{
@@ -516,6 +517,7 @@ func TestCSISnapshots(t *testing.T) {
 						UploaderType:   "fake-uploader",
 						SnapshotHandle: "fake-repo-id-5",
 						OperationID:    "fake-operation-5",
+						Size:           100,
 					},
 				},
 			},
@@ -526,6 +528,7 @@ func TestCSISnapshots(t *testing.T) {
         Operation ID: fake-operation-5
         Data Mover: velero
         Uploader Type: fake-uploader
+        Moved data Size (bytes): 100
 `,
 		},
 	}
