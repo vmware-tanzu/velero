@@ -26,54 +26,36 @@ import (
 	"github.com/pkg/errors"
 )
 
-// NewCredential chains the config credential , workload identity credential , managed identity credential
+// NewCredential constructs a Credential that tries the config credential, workload identity credential
+// and managed identity credential according to the provided creds.
 func NewCredential(creds map[string]string, options policy.ClientOptions) (azcore.TokenCredential, error) {
-	var (
-		credential []azcore.TokenCredential
-		errMsgs    []string
-	)
-
 	additionalTenants := []string{}
 	if tenants := creds[CredentialKeyAdditionallyAllowedTenants]; tenants != "" {
 		additionalTenants = strings.Split(tenants, ";")
 	}
 
 	// config credential
-	cfgCred, err := newConfigCredential(creds, configCredentialOptions{
-		ClientOptions:              options,
-		AdditionallyAllowedTenants: additionalTenants,
-	})
-	if err == nil {
-		credential = append(credential, cfgCred)
-	} else {
-		errMsgs = append(errMsgs, err.Error())
+	if len(creds[CredentialKeyClientSecret]) > 0 ||
+		len(creds[CredentialKeyClientCertificate]) > 0 ||
+		len(creds[CredentialKeyClientCertificatePath]) > 0 ||
+		len(creds[CredentialKeyUsername]) > 0 {
+		return newConfigCredential(creds, configCredentialOptions{
+			ClientOptions:              options,
+			AdditionallyAllowedTenants: additionalTenants,
+		})
 	}
 
 	// workload identity credential
-	wic, err := azidentity.NewWorkloadIdentityCredential(&azidentity.WorkloadIdentityCredentialOptions{
-		AdditionallyAllowedTenants: additionalTenants,
-		ClientOptions:              options,
-	})
-	if err == nil {
-		credential = append(credential, wic)
-	} else {
-		errMsgs = append(errMsgs, err.Error())
+	if len(os.Getenv("AZURE_FEDERATED_TOKEN_FILE")) > 0 {
+		return azidentity.NewWorkloadIdentityCredential(&azidentity.WorkloadIdentityCredentialOptions{
+			AdditionallyAllowedTenants: additionalTenants,
+			ClientOptions:              options,
+		})
 	}
 
-	//managed identity credential
+	// managed identity credential
 	o := &azidentity.ManagedIdentityCredentialOptions{ClientOptions: options, ID: azidentity.ClientID(creds[CredentialKeyClientID])}
-	msi, err := azidentity.NewManagedIdentityCredential(o)
-	if err == nil {
-		credential = append(credential, msi)
-	} else {
-		errMsgs = append(errMsgs, err.Error())
-	}
-
-	if len(credential) == 0 {
-		return nil, errors.Errorf("failed to create Azure credential: %s", strings.Join(errMsgs, "\n\t"))
-	}
-
-	return azidentity.NewChainedTokenCredential(credential, nil)
+	return azidentity.NewManagedIdentityCredential(o)
 }
 
 type configCredentialOptions struct {
