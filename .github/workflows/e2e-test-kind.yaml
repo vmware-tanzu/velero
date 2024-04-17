@@ -135,7 +135,7 @@ jobs:
               ADDITIONAL_CREDS_FILE=/tmp/credential ADDITIONAL_BSL_BUCKET=additional-bucket \
               GINKGO_FOCUS='${{ matrix.focus }}' VELERO_IMAGE=velero:pr-test \
               GINKGO_SKIP='SKIP_KIND|pv-backup|Restic|Snapshot|LongTime' \
-              make -C test/e2e run
+              make -C test/ run-e2e
         timeout-minutes: 30
       - name: Upload debug bundle
         if: ${{ failure() }}

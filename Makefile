@@ -370,11 +370,11 @@ gen-docs:
 
 .PHONY: test-e2e
 test-e2e: local
-	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) -C test/ run-e2e
 
 .PHONY: test-perf
 test-perf: local
-	$(MAKE) -e VERSION=$(VERSION) -C test/perf run
+	$(MAKE) -e VERSION=$(VERSION) -C test/ run-perf
 
 go-generate:
 	go generate ./pkg/...
