@@ -299,6 +299,29 @@ func PrepareVolumeList(volumeNameList []string) (vols []*corev1.Volume) {
 	return
 }
 
+func CalFileHashInPod(ctx context.Context, namespace, podName, containerName, filePath string) (string, error) {
+	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
+		"--", "/bin/sh", "-c", fmt.Sprintf("sha256sum %s | awk '{ print $1 }'", filePath)}
+	cmd := exec.CommandContext(ctx, "kubectl", arg...)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	// Trim any leading or trailing whitespace characters from the output
+	hash := string(output)
+	hash = strings.TrimSpace(hash)
+
+	return hash, nil
+}
+
+func WriteRandomDataToFileInPod(ctx context.Context, namespace, podName, containerName, volume, filename string, fileSize int64) error {
+	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
+		"--", "/bin/sh", "-c", fmt.Sprintf("dd if=/dev/urandom of=/%s/%s bs=%d count=1", volume, filename, fileSize)}
+	cmd := exec.CommandContext(ctx, "kubectl", arg...)
+	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
+	return cmd.Run()
+}
+
 func CreateFileToPod(ctx context.Context, namespace, podName, containerName, volume, filename, content string) error {
 	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("echo ns-%s pod-%s volume-%s  > /%s/%s", namespace, podName, volume, volume, filename)}
@@ -306,6 +329,7 @@ func CreateFileToPod(ctx context.Context, namespace, podName, containerName, vol
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	return cmd.Run()
 }
+
 func FileExistInPV(ctx context.Context, namespace, podName, containerName, volume, filename string) (bool, error) {
 	stdout, stderr, err := ReadFileFromPodVolume(ctx, namespace, podName, containerName, volume, filename)
 

@@ -39,6 +39,8 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
 	. "github.com/vmware-tanzu/velero/test/e2e/bsl-mgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/migration"
+	. "github.com/vmware-tanzu/velero/test/e2e/parallelfilesdownload"
+	. "github.com/vmware-tanzu/velero/test/e2e/parallelfilesupload"
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/pv-backup"
 	. "github.com/vmware-tanzu/velero/test/e2e/resource-filtering"
@@ -181,6 +183,9 @@ var _ = Describe("[pv-backup][Opt-Out] Backup resources should follow the specif
 var _ = Describe("[Basic][Nodeport] Service nodeport reservation during restore is configurable", NodePortTest)
 var _ = Describe("[Basic][StorageClass] Storage class of persistent volumes and persistent volume claims can be changed during restores", StorageClasssChangingTest)
 var _ = Describe("[Basic][SelectedNode][SKIP_KIND] Node selectors of persistent volume claims can be changed during restores", PVCSelectedNodeChangingTest)
+
+var _ = Describe("[UploaderConfig][ParallelFilesUpload] Velero test on parallel files upload", ParallelFilesUploadTest)
+var _ = Describe("[UploaderConfig][ParallelFilesDownload] Velero test on parallel files download", ParallelFilesDownloadTest)
 
 func GetKubeconfigContext() error {
 	var err error
