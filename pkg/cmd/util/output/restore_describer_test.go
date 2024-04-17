@@ -6,6 +6,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -234,6 +236,156 @@ func TestDescribeUploaderConfigForRestore(t *testing.T) {
 			describeUploaderConfigForRestore(d, tc.spec)
 			d.out.Flush()
 			assert.Equal(t, tc.expected, d.buf.String(), "Output should match expected")
+		})
+	}
+}
+
+func TestDescribeCSISnapshotsRestore(t *testing.T) {
+	cases := []struct {
+		name             string
+		inputVolInfoList []volume.RestoreVolumeInfo
+		inputDetail      bool
+		expect           string
+	}{
+		{
+			name:             "empty list",
+			inputVolInfoList: []volume.RestoreVolumeInfo{},
+			inputDetail:      true,
+			expect: `
+CSI Snapshot Restores: <none included>
+`,
+		},
+		{
+			name: "list with non CSI snapshot",
+			inputVolInfoList: []volume.RestoreVolumeInfo{
+				{
+					PVCName:       "pvc-2",
+					PVCNamespace:  "ns-2",
+					PVName:        "pv-2",
+					RestoreMethod: volume.NativeSnapshot,
+					NativeSnapshotInfo: &volume.NativeSnapshotInfo{
+						SnapshotHandle: "snap-1",
+					},
+				},
+			},
+			inputDetail: true,
+			expect: `
+CSI Snapshot Restores: <none included>
+`,
+		},
+		{
+			name: "CSI restore without data movement, detailed",
+			inputVolInfoList: []volume.RestoreVolumeInfo{
+				{
+					PVCName:       "pvc-1",
+					PVCNamespace:  "ns-1",
+					PVName:        "pv-1",
+					RestoreMethod: volume.CSISnapshot,
+					CSISnapshotInfo: &volume.CSISnapshotInfo{
+						SnapshotHandle: "snapshot-handle-1",
+						Size:           1234,
+						Driver:         "csi.test.driver",
+						VSCName:        "content-1",
+					},
+				},
+			},
+			inputDetail: true,
+			expect: `
+CSI Snapshot Restores:
+  ns-1/pvc-1:
+    Snapshot:
+      Snapshot Content Name: content-1
+      Storage Snapshot ID: snapshot-handle-1
+      CSI Driver: csi.test.driver
+`,
+		},
+		{
+			name: "CSI restore with data movement, detailed",
+			inputVolInfoList: []volume.RestoreVolumeInfo{
+				{
+					PVCName:           "pvc-3",
+					PVCNamespace:      "ns-3",
+					PVName:            "pv-3",
+					RestoreMethod:     volume.CSISnapshot,
+					SnapshotDataMoved: true,
+					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
+						OperationID:  "op-3",
+						DataMover:    "velero",
+						UploaderType: "kopia",
+						Size:         1234,
+					},
+				},
+			},
+			inputDetail: true,
+			expect: `
+CSI Snapshot Restores:
+  ns-3/pvc-3:
+    Data Movement:
+      Operation ID: op-3
+      Data Mover: velero
+      Uploader Type: kopia
+`,
+		},
+		{
+			name: "vol info with different entries, without details",
+			inputVolInfoList: []volume.RestoreVolumeInfo{
+				{
+					PVCName:           "pvc-3",
+					PVCNamespace:      "ns-3",
+					PVName:            "pv-3",
+					RestoreMethod:     volume.CSISnapshot,
+					SnapshotDataMoved: true,
+					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
+						OperationID:  "op-3",
+						DataMover:    "velero",
+						UploaderType: "kopia",
+						Size:         1234,
+					},
+				},
+				{
+					PVCName:       "pvc-2",
+					PVCNamespace:  "ns-2",
+					PVName:        "pv-2",
+					RestoreMethod: volume.NativeSnapshot,
+					NativeSnapshotInfo: &volume.NativeSnapshotInfo{
+						SnapshotHandle: "snap-1",
+					},
+				},
+				{
+					PVCName:       "pvc-1",
+					PVCNamespace:  "ns-1",
+					PVName:        "pv-1",
+					RestoreMethod: volume.CSISnapshot,
+					CSISnapshotInfo: &volume.CSISnapshotInfo{
+						SnapshotHandle: "snapshot-handle-1",
+						Size:           1234,
+						Driver:         "csi.test.driver",
+						VSCName:        "content-1",
+					},
+				},
+			},
+			inputDetail: false,
+			expect: `
+CSI Snapshot Restores:
+  ns-1/pvc-1:
+    Snapshot: specify --details for more information
+  ns-3/pvc-3:
+    Data Movement: specify --details for more information
+`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			d := &Describer{
+				Prefix: "",
+				out:    &tabwriter.Writer{},
+				buf:    &bytes.Buffer{},
+			}
+			d.out.Init(d.buf, 0, 8, 2, ' ', 0)
+			describeCSISnapshotsRestores(d, tc.inputVolInfoList, tc.inputDetail)
+			d.out.Flush()
+			assert.Equal(t, tc.expect, d.buf.String())
 		})
 	}
 }

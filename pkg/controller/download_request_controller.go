@@ -134,7 +134,8 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreLog ||
 			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreResults ||
 			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreResourceList ||
-			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreItemOperations {
+			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreItemOperations ||
+			downloadRequest.Spec.Target.Kind == velerov1api.DownloadTargetKindRestoreVolumeInfo {
 			restore := &velerov1api.Restore{}
 			if err := r.client.Get(ctx, kbclient.ObjectKey{
 				Namespace: downloadRequest.Namespace,
