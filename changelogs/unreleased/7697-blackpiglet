@@ -1,1 +1,1 @@
-Modify namespace filter logic for backup with label selector
+When Included/ExcludedNamespaces are omitted, and LabelSelector or OrLabelSelector is used, namespaces without selected items are excluded from backup.

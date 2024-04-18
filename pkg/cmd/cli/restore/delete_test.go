@@ -62,15 +62,15 @@ func TestDeleteCommand(t *testing.T) {
 	args := []string{restore1, restore2}
 
 	e := o.Complete(f, args)
-	require.Equal(t, nil, e)
+	require.NoError(t, e)
 
 	e = o.Validate(c, f, args)
-	require.Equal(t, nil, e)
+	require.NoError(t, e)
 
 	Run(o)
 
 	e = c.Execute()
-	require.Equal(t, nil, e)
+	require.NoError(t, e)
 
 	if os.Getenv(cmdtest.CaptureFlag) == "1" {
 		return

@@ -55,9 +55,18 @@ type itemCollector struct {
 }
 
 // nsTracker is used to integrate several namespace filters together.
-//  1. backup's namespace include and exclude filters;
-//  2. backup's LabelSelector and OrLabelSelector selected namespace;
-//  3. resources namespaces selected by label selectors.
+//  1. Backup's namespace Include/Exclude filters;
+//  2. Backup's (Or)LabelSelector selected namespace;
+//  3. Backup's (Or)LabelSelector selected resources' namespaces.
+//
+// Rules:
+//
+//	a. When backup namespace Include/Exclude filters get everything,
+//	The namespaces, which do not have backup including resources,
+//	are not collected.
+//
+//	b. If the namespace I/E filters and the (Or)LabelSelectors selected
+//	namespaces are different. The tracker takes the union of them.
 type nsTracker struct {
 	singleLabelSelector labels.Selector
 	orLabelSelector     []labels.Selector
@@ -67,6 +76,7 @@ type nsTracker struct {
 	namespaceMap map[string]bool
 }
 
+// track add the namespace into the namespaceMap.
 func (nt *nsTracker) track(ns string) {
 	if nt.namespaceMap == nil {
 		nt.namespaceMap = make(map[string]bool)
@@ -77,6 +87,8 @@ func (nt *nsTracker) track(ns string) {
 	}
 }
 
+// isTracked check whether the namespace's name exists in
+// namespaceMap.
 func (nt *nsTracker) isTracked(ns string) bool {
 	if nt.namespaceMap != nil {
 		return nt.namespaceMap[ns]
@@ -84,6 +96,8 @@ func (nt *nsTracker) isTracked(ns string) bool {
 	return false
 }
 
+// init initialize the namespaceMap, and add elements according to
+// namespace include/exclude filters and the backup label selectors.
 func (nt *nsTracker) init(
 	unstructuredNSs []unstructured.Unstructured,
 	singleLabelSelector labels.Selector,
@@ -91,18 +105,21 @@ func (nt *nsTracker) init(
 	namespaceFilter *collections.IncludesExcludes,
 	logger logrus.FieldLogger,
 ) {
-	nt.namespaceMap = make(map[string]bool)
+	if nt.namespaceMap == nil {
+		nt.namespaceMap = make(map[string]bool)
+	}
 	nt.singleLabelSelector = singleLabelSelector
 	nt.orLabelSelector = orLabelSelector
 	nt.namespaceFilter = namespaceFilter
 	nt.logger = logger
 
 	for _, namespace := range unstructuredNSs {
-
 		if nt.singleLabelSelector != nil &&
-			nt.singleLabelSelector.Matches(labels.Set(namespace.GetLabels())) == true {
-			nt.logger.Debugf("Track namespace %s,", namespace.GetName(),
-				"because its labels match backup LabelSelector.")
+			nt.singleLabelSelector.Matches(labels.Set(namespace.GetLabels())) {
+			nt.logger.Debugf(`Track namespace %s, 
+				because its labels match backup LabelSelector.`,
+				namespace.GetName(),
+			)
 
 			nt.track(namespace.GetName())
 			continue
@@ -110,9 +127,11 @@ func (nt *nsTracker) init(
 
 		if len(nt.orLabelSelector) > 0 {
 			for _, selector := range nt.orLabelSelector {
-				if selector.Matches(labels.Set(namespace.GetLabels())) == true {
-					nt.logger.Debugf("Track namespace %s", namespace.GetName(),
-						"because its labels match the backup OrLabelSelector.")
+				if selector.Matches(labels.Set(namespace.GetLabels())) {
+					nt.logger.Debugf(`Track namespace %s",
+						"because its labels match the backup OrLabelSelector.`,
+						namespace.GetName(),
+					)
 					nt.track(namespace.GetName())
 					continue
 				}
@@ -120,25 +139,26 @@ func (nt *nsTracker) init(
 		}
 
 		// Skip the backup when the backup's namespace filter has
-		// default value(*), and the namespace doesn't match backup
+		// default value, and the namespace doesn't match backup
 		// LabelSelector and OrLabelSelector.
 		// https://github.com/vmware-tanzu/velero/issues/7105
-		if nt.namespaceFilter.ShouldInclude("*") == true &&
+		if nt.namespaceFilter.IncludeEverything() &&
 			(nt.singleLabelSelector != nil || len(nt.orLabelSelector) > 0) {
-			nt.logger.Debugf("Skip namespace %s,", namespace.GetName(),
-				"because backup's namespace filter is *, and backup has label selector.")
 			continue
 		}
 
-		if nt.namespaceFilter.ShouldInclude(namespace.GetName()) == true {
-			nt.logger.Debugf("Track namespace %s", namespace.GetName(),
-				"because its name match the backup namespace filter.")
+		if nt.namespaceFilter.ShouldInclude(namespace.GetName()) {
+			nt.logger.Debugf(`Track namespace %s,
+				because its name match the backup namespace filter.`,
+				namespace.GetName(),
+			)
 			nt.track(namespace.GetName())
 		}
 	}
 }
 
-// filterNamespaces only keeps namespace tracked by the nsTracker
+// filterNamespaces filters the input resource list to remove the
+// namespaces not tracked by the nsTracker.
 func (nt *nsTracker) filterNamespaces(
 	resources []*kubernetesResource,
 ) []*kubernetesResource {
@@ -146,7 +166,7 @@ func (nt *nsTracker) filterNamespaces(
 
 	for _, resource := range resources {
 		if resource.groupResource != kuberesource.Namespaces ||
-			nt.isTracked(resource.name) == true {
+			nt.isTracked(resource.name) {
 			result = append(result, resource)
 		}
 	}
@@ -160,8 +180,8 @@ type kubernetesResource struct {
 	namespace, name, path string
 }
 
-// getItemsFromResourceIdentifiers converts ResourceIdentifiers to
-// kubernetesResources
+// getItemsFromResourceIdentifiers get the kubernetesResources
+// specified by the input parameter resourceIDs.
 func (r *itemCollector) getItemsFromResourceIdentifiers(
 	resourceIDs []velero.ResourceIdentifier,
 ) []*kubernetesResource {
@@ -173,16 +193,20 @@ func (r *itemCollector) getItemsFromResourceIdentifiers(
 	return r.getItems(grResourceIDsMap)
 }
 
-// getAllItems gets all relevant items from all API groups.
+// getAllItems gets all backup-relevant items from all API groups.
 func (r *itemCollector) getAllItems() []*kubernetesResource {
 	resources := r.getItems(nil)
 
 	return r.nsTracker.filterNamespaces(resources)
 }
 
-// getItems gets all relevant items from all API groups.
+// getItems gets all backup-relevant items from all API groups,
+//
 // If resourceIDsMap is nil, then all items from the cluster are
-// pulled for each API group, subject to include/exclude rules.
+// pulled for each API group, subject to include/exclude rules,
+// except the namespace, because the namespace filtering depends on
+// all namespaced-scoped resources.
+//
 // If resourceIDsMap is supplied, then only those resources are
 // returned, with the appropriate APIGroup information filled in. In
 // this case, include/exclude rules are not invoked, since we already
@@ -409,10 +433,10 @@ func (r *itemCollector) getResourceItems(
 	}
 
 	// Handle namespace resource here.
-	// Namespace are only filtered by namespace include/exclude filters.
-	// Label selectors are not checked.
+	// Namespace are filtered by namespace include/exclude filters,
+	// backup LabelSelectors and OrLabelSelectors are checked too.
 	if gr == kuberesource.Namespaces {
-		return r.backupNamespaces(
+		return r.collectNamespaces(
 			resource,
 			gv,
 			gr,
@@ -697,8 +721,8 @@ func (r *itemCollector) listItemsForLabel(
 	return unstructuredItems, nil
 }
 
-// backupNamespaces process namespace resource according to namespace filters.
-func (r *itemCollector) backupNamespaces(
+// collectNamespaces process namespace resource according to namespace filters.
+func (r *itemCollector) collectNamespaces(
 	resource metav1.APIResource,
 	gv schema.GroupVersion,
 	gr schema.GroupResource,
@@ -750,17 +774,18 @@ func (r *itemCollector) backupNamespaces(
 
 	var items []*kubernetesResource
 
-	for index, unstructured := range unstructuredList.Items {
+	for index := range unstructuredList.Items {
 		path, err := r.writeToFile(&unstructuredList.Items[index])
 		if err != nil {
-			log.WithError(err).Error("Error writing item to file")
+			log.WithError(err).Errorf("Error writing item %s to file",
+				unstructuredList.Items[index].GetName())
 			continue
 		}
 
 		items = append(items, &kubernetesResource{
 			groupResource: gr,
 			preferredGVR:  preferredGVR,
-			name:          unstructured.GetName(),
+			name:          unstructuredList.Items[index].GetName(),
 			path:          path,
 		})
 	}

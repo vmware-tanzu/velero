@@ -4334,8 +4334,7 @@ func TestBackupNamespaces(t *testing.T) {
 			backup: defaultBackup().OrLabelSelector([]*metav1.LabelSelector{
 				{MatchLabels: map[string]string{"a": "b"}},
 				{MatchLabels: map[string]string{"c": "d"}},
-			}).
-				Result(),
+			}).Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
 					builder.ForNamespace("ns-1").Result(),
@@ -4377,6 +4376,27 @@ func TestBackupNamespaces(t *testing.T) {
 				"resources/namespaces/v1-preferredversion/cluster/ns-1.json",
 				"resources/deployments.apps/namespaces/ns-1/deploy-1.json",
 				"resources/deployments.apps/v1-preferredversion/namespaces/ns-1/deploy-1.json",
+			},
+		},
+		{
+			name: "LabelSelector and Namespace exclude filtering test",
+			backup: defaultBackup().ExcludedNamespaces("ns-1", "ns-2").LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).
+				Result(),
+			apiResources: []*test.APIResource{
+				test.Namespaces(
+					builder.ForNamespace("ns-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
+					builder.ForNamespace("ns-2").Result(),
+					builder.ForNamespace("ns-3").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
+				),
+			},
+			want: []string{
+				"resources/namespaces/cluster/ns-1.json",
+				"resources/namespaces/v1-preferredversion/cluster/ns-1.json",
+				"resources/namespaces/cluster/ns-3.json",
+				"resources/namespaces/v1-preferredversion/cluster/ns-3.json",
 			},
 		},
 		{

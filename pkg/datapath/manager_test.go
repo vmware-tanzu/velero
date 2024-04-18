@@ -36,7 +36,7 @@ func TestManager(t *testing.T) {
 	assert.Equal(t, ConcurrentLimitExceed, err)
 
 	ret := m.GetAsyncBR("job-0")
-	assert.Equal(t, nil, ret)
+	assert.Nil(t, ret)
 
 	ret = m.GetAsyncBR("job-1")
 	assert.Equal(t, async_job_1, ret)
@@ -48,5 +48,5 @@ func TestManager(t *testing.T) {
 	assert.Len(t, m.tracker, 1)
 
 	ret = m.GetAsyncBR("job-1")
-	assert.Equal(t, nil, ret)
+	assert.Nil(t, ret)
 }

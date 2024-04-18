@@ -62,13 +62,13 @@ func TestConfigOperations(t *testing.T) {
 
 	// Remove config file if it exists
 	err := removeConfigfileName()
-	assert.Equal(t, err, nil)
+	assert.NoError(t, err)
 
 	// Test LoadConfig: expect an empty velero config
 	expectedConfig := VeleroConfig{}
 	config, err := LoadConfig()
 
-	assert.Equal(t, err, nil)
+	assert.NoError(t, err)
 	assert.True(t, reflect.DeepEqual(expectedConfig, config))
 
 	// Test savedConfig
@@ -84,9 +84,9 @@ func TestConfigOperations(t *testing.T) {
 
 	err = SaveConfig(config)
 
-	assert.Equal(t, err, nil)
+	assert.NoError(t, err)
 	savedConfig, err := LoadConfig()
-	assert.Equal(t, err, nil)
+	assert.NoError(t, err)
 
 	// Test Features
 	feature := savedConfig.Features()
@@ -107,7 +107,7 @@ func TestConfigOperations(t *testing.T) {
 
 	t.Cleanup(func() {
 		err = removeConfigfileName()
-		assert.Equal(t, err, nil)
+		assert.NoError(t, err)
 		os.Unsetenv("HOME")
 		os.Setenv("HOME", preHomeEnv)
 	})

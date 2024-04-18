@@ -206,12 +206,23 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 			backup: builder.ForBackup("velero", "backup").OrLabelSelector([]*metav1.LabelSelector{
 				{MatchLabels: map[string]string{"name": "ns1"}},
 			}).Result(),
-			ie: collections.NewIncludesExcludes().Excludes("ns1"),
+			ie: collections.NewIncludesExcludes().Excludes("ns1", "ns2"),
+			namespaces: []*corev1.Namespace{
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
+				builder.ForNamespace("ns2").Result(),
+				builder.ForNamespace("ns3").Result(),
+			},
+			expectedTrackedNS: []string{"ns1", "ns3"},
+		},
+		{
+			name:   "No ns filters",
+			backup: builder.ForBackup("velero", "backup").Result(),
+			ie:     collections.NewIncludesExcludes().Includes("*"),
 			namespaces: []*corev1.Namespace{
 				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
 				builder.ForNamespace("ns2").Result(),
 			},
-			expectedTrackedNS: []string{"ns1"},
+			expectedTrackedNS: []string{"ns1", "ns2"},
 		},
 	}
 
@@ -248,7 +259,7 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 				dir:            tempDir,
 			}
 
-			r.backupNamespaces(
+			r.collectNamespaces(
 				metav1.APIResource{
 					Name:       "Namespace",
 					Kind:       "Namespace",
