@@ -21,6 +21,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -220,7 +221,7 @@ func TestE2e(t *testing.T) {
 		t.Skip("Skipping E2E tests")
 	}
 
-	if VeleroCfg.CloudProvider != "kind" {
+	if !slices.Contains(LocalCloudProviders, VeleroCfg.CloudProvider) {
 		fmt.Println("For cloud platforms, object store plugin provider will be set as cloud provider")
 		// If ObjectStoreProvider is not provided, then using the value same as CloudProvider
 		if VeleroCfg.ObjectStoreProvider == "" {

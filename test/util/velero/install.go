@@ -387,7 +387,7 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 		return errors.Wrapf(err, "failed to unmarshal the resources: %s", stdout)
 	}
 
-	if err = patchResources(ctx, resources, namespace, options); err != nil {
+	if err = patchResources(resources, namespace, options); err != nil {
 		return errors.Wrapf(err, "failed to patch resources")
 	}
 
@@ -409,7 +409,7 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 }
 
 // patch the velero resources
-func patchResources(ctx context.Context, resources *unstructured.UnstructuredList, namespace string, options *installOptions) error {
+func patchResources(resources *unstructured.UnstructuredList, namespace string, options *installOptions) error {
 	i := 0
 	size := 2
 	var deploy apps.Deployment
