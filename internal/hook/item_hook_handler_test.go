@@ -1976,7 +1976,7 @@ func TestValidateContainer(t *testing.T) {
 	expectedError := fmt.Errorf("invalid InitContainer in restore hook, it doesn't have Command, Name or Image field")
 
 	// valid string should return nil as result.
-	assert.Equal(t, nil, ValidateContainer([]byte(valid)))
+	assert.Nil(t, ValidateContainer([]byte(valid)))
 
 	// noName string should return expected error as result.
 	assert.Equal(t, expectedError, ValidateContainer([]byte(noName)))
