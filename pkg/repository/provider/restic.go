@@ -82,7 +82,9 @@ func (r *resticRepositoryProvider) BatchForget(ctx context.Context, snapshotIDs 
 	errs := []error{}
 	for _, snapshot := range snapshotIDs {
 		err := r.Forget(ctx, snapshot, param)
-		errs = append(errs, err)
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	return errs
