@@ -95,7 +95,7 @@ func TestFactory(t *testing.T) {
 
 	baseName := "velero-bn"
 	config, err := LoadConfig()
-	assert.Equal(t, err, nil)
+	assert.NoError(t, err)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			f = NewFactory(baseName, config)

@@ -680,6 +680,7 @@ func describeDataMovement(d *Describer, details bool, info *volume.BackupVolumeI
 		}
 		d.Printf("\t\t\t\tData Mover: %s\n", dataMover)
 		d.Printf("\t\t\t\tUploader Type: %s\n", info.SnapshotDataMovementInfo.UploaderType)
+		d.Printf("\t\t\t\tMoved data Size (bytes): %d\n", info.SnapshotDataMovementInfo.Size)
 	} else {
 		d.Printf("\t\t\tData Movement: %s\n", "included, specify --details for more information")
 	}
