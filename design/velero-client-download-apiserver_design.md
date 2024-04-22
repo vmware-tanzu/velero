@@ -33,9 +33,9 @@ Create an endpoint on the Velero server that CLI users can connect to and downlo
 
 ### Velero Download Server URL generation using Service to Expose Download Server
 
-Upon enabling Download Server API, Velero will create a service of type that user specifies, which will expose the download server to the outside world. The download server will proxy requested data from the object store and stream it back to the client using one of the available service types (ClusterIP/NodePort/LoadBalancer/ExternalName). User can also precreate a service and pass the service name to velero during install time with `velero install --veleroServerServiceName=veleroDownloadServerServiceName` to use the precreated service to expose the download server.
+Upon enabling Download Server API, Velero will create a service of type that user specifies, which will expose the download server to the outside world. The download server will proxy requested data from the object store and stream it back to the client using one of the available service types (ClusterIP/NodePort/LoadBalancer). User can also precreate a service and pass the service name to velero during install time with `velero install --veleroServerServiceName=veleroDownloadServerServiceName` to use the precreated service to expose the download server.
 
-If the service can also be reached via a fully qualified domain name (FQDN), user can pass the FQDN to velero during install time with `velero install --veleroServerFQDN=dnsNameToVeleroServerService.com`. Velero Download Server will use FQDN in-place of values auto discovered from created service (ie. NodePort/Cluster IP)
+If the service can also be reached via a fully qualified domain name (FQDN) such as when user created [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the service, user can pass the FQDN to velero during install time with `velero install --veleroServerFQDN=dnsNameToVeleroServerService.com`. Velero Download Server will use FQDN in-place of values auto discovered from created service (ie. NodePort/Cluster IP)
 
 This approach may also [work on KinD clusters](https://kind.sigs.k8s.io/docs/user/loadbalancer/)
 
