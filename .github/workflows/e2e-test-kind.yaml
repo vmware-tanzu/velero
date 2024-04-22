@@ -40,7 +40,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
       - name: Check out the code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         if: steps.cli-cache.outputs.cache-hit != 'true' || steps.image-cache.outputs.cache-hit != 'true'
       # If no binaries were built for this PR, build it now.
       - name: Build Velero CLI
@@ -85,7 +85,7 @@ jobs:
           go-version: '1.22'
         id: go
       - name: Check out the code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install MinIO
         run:
           docker run -d --rm -p 9000:9000 -e "MINIO_ACCESS_KEY=minio" -e "MINIO_SECRET_KEY=minio123" -e "MINIO_DEFAULT_BUCKETS=bucket,additional-bucket" bitnami/minio:2021.6.17-debian-10-r7
