@@ -109,12 +109,11 @@ var pluginsMatrix = map[string]map[string][]string{
 		"azure":     {"velero/velero-plugin-for-microsoft-azure:main"},
 		"vsphere":   {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
 		"gcp":       {"velero/velero-plugin-for-gcp:main"},
-		"csi":       {"velero/velero-plugin-for-csi:main"},
 		"datamover": {"velero/velero-plugin-for-aws:main"},
 	},
 }
 
-func getPluginsByVersion(version, cloudProvider, objectStoreProvider, feature string, needDataMoverPlugin bool) ([]string, error) {
+func getPluginsByVersion(version, cloudProvider, objectStoreProvider string, needDataMoverPlugin bool) ([]string, error) {
 	var cloudMap map[string][]string
 	arr := strings.Split(version, ".")
 	if len(arr) >= 3 {
@@ -126,43 +125,33 @@ func getPluginsByVersion(version, cloudProvider, objectStoreProvider, feature st
 			return nil, errors.Errorf("fail to get plugins by version: main")
 		}
 	}
-	var pluginsForFeature []string
+	var plugins []string
+	var ok bool
 
 	if slices.Contains(LocalCloudProviders, cloudProvider) {
-		var pluginsCSI []string
-		plugins, ok := cloudMap[Aws]
+		plugins, ok = cloudMap[Aws]
 		if !ok {
 			return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, cloudProvider)
 		}
-		if cloudProvider == VanillaZFS {
-			pluginsCSI, ok = cloudMap["csi"]
-			if !ok {
-				return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, cloudProvider)
-			}
+	} else {
+		plugins, ok = cloudMap[cloudProvider]
+		if !ok {
+			return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, cloudProvider)
 		}
-		return append(plugins, pluginsCSI...), nil
 	}
-
-	plugins, ok := cloudMap[cloudProvider]
-	if !ok {
-		return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, cloudProvider)
-	}
-
+	// TODO: Is this section need?
 	if objectStoreProvider != cloudProvider {
 		pluginsForObjectStoreProvider, ok := cloudMap[objectStoreProvider]
 		if !ok {
 			return nil, errors.Errorf("fail to get plugins by version: %s and object store provider %s", version, objectStoreProvider)
 		}
-		plugins = append(plugins, pluginsForObjectStoreProvider...)
+		for _, p := range pluginsForObjectStoreProvider {
+			if !slices.Contains(plugins, p) {
+				plugins = append(plugins, p)
+			}
+		}
 	}
 
-	if strings.EqualFold(feature, FeatureCSI) {
-		pluginsForFeature, ok = cloudMap["csi"]
-		if !ok {
-			return nil, errors.Errorf("fail to get CSI plugins by version: %s ", version)
-		}
-		plugins = append(plugins, pluginsForFeature...)
-	}
 	if needDataMoverPlugin {
 		pluginsForDatamover, ok := cloudMap["datamover"]
 		if !ok {
@@ -647,7 +636,7 @@ func getProviderPlugins(ctx context.Context, veleroCLI string, cloudProvider str
 		return nil, errors.WithMessage(err, "failed to get velero version")
 	}
 
-	plugins, err := getPluginsByVersion(version, cloudProvider, cloudProvider, "", false)
+	plugins, err := getPluginsByVersion(version, cloudProvider, cloudProvider, false)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", cloudProvider, version)
 	}
@@ -663,7 +652,6 @@ func getPlugins(ctx context.Context, veleroCfg VeleroConfig) ([]string, error) {
 	cloudProvider := veleroCfg.CloudProvider
 	objectStoreProvider := veleroCfg.ObjectStoreProvider
 	providerPlugins := veleroCfg.Plugins
-	feature := veleroCfg.Features
 	needDataMoverPlugin := false
 
 	// Fetch the plugins for the provider before checking for the object store provider below.
@@ -691,7 +679,7 @@ func getPlugins(ctx context.Context, veleroCfg VeleroConfig) ([]string, error) {
 		if veleroCfg.SnapshotMoveData && veleroCfg.DataMoverPlugin == "" && !veleroCfg.IsUpgradeTest {
 			needDataMoverPlugin = true
 		}
-		plugins, err = getPluginsByVersion(version, cloudProvider, objectStoreProvider, feature, needDataMoverPlugin)
+		plugins, err = getPluginsByVersion(version, cloudProvider, objectStoreProvider, needDataMoverPlugin)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", objectStoreProvider, version)
 		}
