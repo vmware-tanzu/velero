@@ -145,6 +145,15 @@ func (t *TestCase) Backup() error {
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, t.BackupName, "")
 		return errors.Wrapf(err, "Failed to backup resources")
 	}
+
+	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
+	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
+	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
+	if t.UseVolumeSnapshots {
+		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
+		time.Sleep(5 * time.Minute)
+	}
+
 	return nil
 }
 
