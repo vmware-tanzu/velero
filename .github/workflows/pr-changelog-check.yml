@@ -12,7 +12,7 @@ jobs:
     steps:
 
     - name: Check out the code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Changelog check
       if: ${{ !(contains(github.event.pull_request.labels.*.name, 'kind/changelog-not-required') || contains(github.event.pull_request.labels.*.name, 'Design') || contains(github.event.pull_request.labels.*.name, 'Website') || contains(github.event.pull_request.labels.*.name, 'Documentation'))}}

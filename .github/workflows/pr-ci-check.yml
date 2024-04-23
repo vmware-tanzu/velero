@@ -13,7 +13,7 @@ jobs:
           go-version: '1.22'
         id: go
       - name: Check out the code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Fetch cached go modules
         uses: actions/cache@v2
         with:

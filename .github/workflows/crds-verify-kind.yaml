@@ -40,7 +40,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Check out the code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         if: steps.cache.outputs.cache-hit != 'true'
 
       # If no binaries were built for this PR, build it now.
