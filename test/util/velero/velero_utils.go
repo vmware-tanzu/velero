@@ -706,7 +706,7 @@ func VeleroAddPluginsForProvider(ctx context.Context, veleroCLI string, veleroNa
 		stdoutBuf := new(bytes.Buffer)
 		stderrBuf := new(bytes.Buffer)
 
-		installPluginCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "plugin", "add", plugin)
+		installPluginCmd := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "plugin", "add", plugin, "--confirm")
 		fmt.Printf("installPluginCmd cmd =%v\n", installPluginCmd)
 		installPluginCmd.Stdout = stdoutBuf
 		installPluginCmd.Stderr = stderrBuf
