@@ -7,7 +7,7 @@ For both of these goals, Velero needs a way to determine which items should be b
 
 This design proposal will include two development phases:
 - Phase 1 will refactor the backup workflow to identify blocks of items that should be backed up together, and then coordinate backup hooks among items in the block.
-- Phase 2 will add multiple multiple worker threads for backing up item blocks, so instead of backing up each block as it identified, the velero backup workflow will instead add the block to a channel and one of the workers will pick it up.
+- Phase 2 will add multiple worker threads for backing up item blocks, so instead of backing up each block as it identified, the velero backup workflow will instead add the block to a channel and one of the workers will pick it up.
 - Actual support for VolumeGroupSnapshots is out-of-scope here and will be handled in a future design proposal, but the item block refactor introduced in Phase 1 is a primary building block for this future proposal.
 
 ## Background
@@ -81,9 +81,9 @@ message BackupItemActionAdditionalItemsResponse {
 }
 ```
 
-A new PluginKind, `BackupItemActionV3`, will be created, and the backup process will be modified to use this plugin kind. Unlike with the V1->V2 transition, however, we will not provide a V3 adapter for BIAv2, because there is no reliable way to know what items to return from the new method. Instead, Velero will only invoke the new `GetAdditionalItems` method if *all* registered plugins are V3. If there are any V2 plugins registered, then we will continue to use the BIAv2 API, and process item blocks with only one item. If there are both V2 and V3 plugins, we will adapt (i.e. downgrade) V3 plugins to V2 rather than vice versa. In order for Velero to support item block processing out of the box, all existing V1 and V2 plugins in velero core and supported plugins will need to be converted to V3 as part of implementation. If we are adapting to V2 plugins, then velero will *not* call the new V3 plugin API method, and every item returned from the Item Collector will be in its own ItemBlock of one.
+A new PluginKind, `BackupItemActionV3`, will be created, and the backup process will be modified to use this plugin kind. Existing v1/v2 plugins will be adapted to v3 with an empty `GetAdditionalItems` method, meaning that those plugins will not add anything to the ItemBlock for the item being backed up.
 
-The compatibility mode fallback to using BIAv2 is necessary, because without complete information about inter-item dependencies provided by the new BIAv3 method, we run the risk of breaking these dependencies when backing up items in parallel. To give a specific example, if the Pod BIA was not upgraded to implement the new method, then we would have no way of knowing when generating ItemBlocks that Pods must be backed up with the PVCs they mount. As a result, for a backup with a single pod and single pvc, the pod might end up in itemBlock1, and its pvc in itemBlock2. Now the two item blocks get sent to separate workers to get backed up. Since pod and related PVC are being backed up separately, it's possible that the PVC backup operation will begin before the pod backup hook is started. On the other hand, it's also possible that the pod post hook will run before the PVC is backed up. If we recognize that we have a v1/v2 plugin, then we can only run a single worker goroutine, which will force the incomplete ItemBlocks to run sequentially, which will resolve this difficulty.
+Any BIA plugins which return additional items from `Execute()` that need to be backed up at the same time or sequentially in the same worker thread as the current items need to be upgraded to v3. This mainly applies to plugins that operate on pods which reference resources which must be backed up along with the pod and are potentially affected by pod hooks or for plugins which connect multiple pods whose volumes should be backed up at the same time.
 
 ### Changes to processing item list from the Item Collector
 
@@ -118,8 +118,6 @@ The current workflow within each iteration of the ItemCollector.items loop will 
 - Once full ItemBlock list is generated, call `backupItemBlock(block ItemBlock)
 - Add `backupItemBlock` return values to `backedUpGroupResources` map
 
-Note that if there are BIAv2 plugins present, we will downgrade all v3 plugins to v2, meaning that we will not have a `GetAdditionalItems` func to call. In this case, we will make the following change to the ItemCollector iteration workflow described above:
-- At the point where we call `GetAdditionalItems` on the item's registered plugins, we will not call this. Instead, we will treat the item as if it had returned no additional items. The ItemBlock will only have one entry.
 
 #### New func `backupItemBlock`
 
@@ -223,11 +221,20 @@ The ItemBlock processing loop described above will be split into two separate it
 
 Velero uses a map of BackedUpItems to track which items have already been backed up. This prevents velero from attempting to back up an item more than once, as well as guarding against creating infinite loops due to circular dependencies in the additional items returns. Since velero will now be accessing this map from the parallel goroutines, access to the map must be synchronized with mutexes.
 
-#### V3 vs V1/2 BackupItemAction plugins registered
-
-Full item block functionality is only possible if all registered BIA plugins implement the v3 interface. In phase 1 work, if any v1 or v2 plugins are registered, then v3 plugins are adapted to v2 and we treat every item returned from the collector as an ItemBlock of one. Because we are not able to track inter-item dependencies in this operation mode, we will also need to ensure that only one worker is active in processing these ItemBlocks of size 1 -- since we're not tracking dependencies, we must process items in the order returned by the collector to ensure that PVCs are backed up with their Pods, etc. Therefore, the worker count will be 1, regardless of configuration, in this scenario. A warning should be logged when starting the worker pool when this happens.
-
 ## Alternatives considered
+
+### New ItemBlockAction plugin type
+
+Instead of adding a new `GetAdditionalItems` method to BackupItemAction, another possibility would be to leave BIA alone and create a new plugin type, ItemBlockAction.
+Rather than adding the `GetAdditionalItems` method to the existing BIA plugin type, velero would introduce a new ItemBlockAction plugin type which provides the single `GetAdditionalItems` method, described above as a new BIAv3 method.
+For existing BIA implementations which return additional items in `Execute()`, instead of adding the new v3 method (and, if necessary, the missing v2 methods) to the existing BIA, they would create a new ItemBlockAction plugin to provide this method.
+
+The change to the backup workflow would be relatively simple: resolve registered ItemBlockAction (IBA) plugins as well as BIA plugins, determine for both plugin types which apply to the current resource type, and when calling the new API method, iterate over IBA plugins rather than BIA plugins.
+
+The change to the "BackupItemAction plugin changes" section would be to create a new plugin type rather than enhancing the existing plugin type. The API function needed in this new plugin type would be identical to the one described as a new BIAv3 method. The other work here would be to create the infrastructure/scaffolding to define, register, etc. the new plugin type.
+
+Overall, the decision of extending BIA vs. creating a new plugin type won't change much in the design here.
+The new plugin type will require more initial work, but ongoing maintenance should be similar between the options.
 
 ### Per-backup worker pool
 
@@ -248,16 +255,6 @@ For the per-backup worker approach, the worker count represents the worker count
   - Lower memory consumption than permanent worker pool, but the total memory used by a worker blocked on input will be pretty low, so if we're talking only 10-20 workers, the impact will be minimal.
 
 ## Compatibility
-
-Because V1 and V2 BIA plugins do not provide the new `GetAdditionalItems` call and there is no reasonable default value, they cannot be adapted to V3.
-An empty list of items would result in nothing added to the current ItemBlock, which would miss required additional items returned by `Execute`, which could result in invalid backup data if associated items end up backed up in parallel with each other.
-The ability to back up items in parallel (and, eventually, the ability to make use of VolumeGroupSnapshots) depends on *every* registered BIA plugin being V3 or later.
-Any V1/V2 plugins registered will result in equivalent performance to current Velero -- a single worker goroutine, and ItemBlocks of exactly one item.
-
-A specific example to illustrate why the v2 fallback is required: if the Pod BIA was not upgraded to implement the new method, then we would have no way of knowing when generating ItemBlocks that Pods must be backed up with the PVCs they mount. As a result, for a backup with a single pod and single pvc, the pod might end up in itemBlock1, and its pvc in itemBlock2. Now the two item blocks get sent to separate workers to get backed up. Since pod and related PVC are being backed up separately, it's possible that the PVC backup operation will begin before the pod backup hook is started. On the other hand, it's also possible that the pod post hook will run before the PVC is backed up. If we recognize that we have a v1/v2 plugin, then we can only run a single worker goroutine, which will force the incomplete ItemBlocks to run sequentially, which will resolve this difficulty.
-
-In order to ensure that the new functionality works out of the box for anyone using only supported Velero plugins, phase 1 implementation must include upgrading all supported BIA plugins to V3.
-Since the CSI plugin is moving back into the main Velero repo starting with Velero 1.14, all of this should be internal to the main velero repo, as the supported storage plugins do not implement BackupItemActions.
 
 ### Example upgrade to BIAv3
 
