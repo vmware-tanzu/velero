@@ -30,7 +30,7 @@ import (
 )
 
 // GetVolumesByPod returns a list of volume names to backup for the provided pod.
-func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup, backupExcludePVC bool) ([]string, []string) {
+func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup, backupExcludePVC bool, volsToProcessByLegacyApproach []string) ([]string, []string) {
 	// tracks the volumes that have been explicitly opted out of backup via the annotation in the pod
 	optedOutVolumes := make([]string, 0)
 
@@ -38,9 +38,13 @@ func GetVolumesByPod(pod *corev1api.Pod, defaultVolumesToFsBackup, backupExclude
 		return GetVolumesToBackup(pod), optedOutVolumes
 	}
 
-	volsToExclude := getVolumesToExclude(pod)
+	volsToExclude := GetVolumesToExclude(pod)
 	podVolumes := []string{}
-	for _, pv := range pod.Spec.Volumes {
+	// Identify volume to process
+	// For normal case all the pod volume will be processed
+	// For case when volsToProcessByLegacyApproach is non-empty then only those volume will be processed
+	volsToProcess := GetVolumesToProcess(pod.Spec.Volumes, volsToProcessByLegacyApproach)
+	for _, pv := range volsToProcess {
 		// cannot backup hostpath volumes as they are not mounted into /var/lib/kubelet/pods
 		// and therefore not accessible to the node agent daemon set.
 		if pv.HostPath != nil {
@@ -96,7 +100,7 @@ func GetVolumesToBackup(obj metav1.Object) []string {
 	return strings.Split(backupsValue, ",")
 }
 
-func getVolumesToExclude(obj metav1.Object) []string {
+func GetVolumesToExclude(obj metav1.Object) []string {
 	annotations := obj.GetAnnotations()
 	if annotations == nil {
 		return nil
@@ -112,7 +116,7 @@ func IsPVCDefaultToFSBackup(pvcNamespace, pvcName string, crClient crclient.Clie
 	}
 
 	for index := range pods {
-		vols, _ := GetVolumesByPod(&pods[index], defaultVolumesToFsBackup, false)
+		vols, _ := GetVolumesByPod(&pods[index], defaultVolumesToFsBackup, false, []string{})
 		if len(vols) > 0 {
 			volName, err := getPodVolumeNameForPVC(pods[index], pvcName)
 			if err != nil {
@@ -159,4 +163,30 @@ func getPodsUsingPVC(
 	}
 
 	return podsUsingPVC, nil
+}
+
+func GetVolumesToProcess(volumes []corev1api.Volume, volsToProcessByLegacyApproach []string) []corev1api.Volume {
+	volsToProcess := make([]corev1api.Volume, 0)
+
+	// return empty list when no volumes associated with pod
+	if len(volumes) == 0 {
+		return volsToProcess
+	}
+
+	// legacy approach as a fallback option case
+	if len(volsToProcessByLegacyApproach) > 0 {
+		for _, vol := range volumes {
+			// don't process volumes that are already matched for supported action in volume policy approach
+			if !util.Contains(volsToProcessByLegacyApproach, vol.Name) {
+				continue
+			}
+
+			// add volume that is not processed in volume policy approach
+			volsToProcess = append(volsToProcess, vol)
+		}
+
+		return volsToProcess
+	}
+	// normal case return the list as in
+	return volumes
 }

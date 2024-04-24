@@ -27,8 +27,13 @@ type VolumeActionType string
 
 const (
 	// currently only support configmap type of resource config
-	ConfigmapRefType string           = "configmap"
-	Skip             VolumeActionType = "skip"
+	ConfigmapRefType string = "configmap"
+	// skip action implies the volume would be skipped from the backup operation
+	Skip VolumeActionType = "skip"
+	// fs-backup action implies that the volume would be backed up via file system copy method using the uploader(kopia/restic) configured by the user
+	FSBackup VolumeActionType = "fs-backup"
+	// snapshot action can have 3 different meaning based on velero configuration and backup spec - cloud provider based snapshots, local csi snapshots and datamover snapshots
+	Snapshot VolumeActionType = "snapshot"
 )
 
 // Action defined as one action for a specific way of backup
@@ -40,16 +45,16 @@ type Action struct {
 }
 
 // volumePolicy defined policy to conditions to match Volumes and related action to handle matched Volumes
-type volumePolicy struct {
+type VolumePolicy struct {
 	// Conditions defined list of conditions to match Volumes
 	Conditions map[string]interface{} `yaml:"conditions"`
 	Action     Action                 `yaml:"action"`
 }
 
 // resourcePolicies currently defined slice of volume policies to handle backup
-type resourcePolicies struct {
+type ResourcePolicies struct {
 	Version        string         `yaml:"version"`
-	VolumePolicies []volumePolicy `yaml:"volumePolicies"`
+	VolumePolicies []VolumePolicy `yaml:"volumePolicies"`
 	// we may support other resource policies in the future, and they could be added separately
 	// OtherResourcePolicies []OtherResourcePolicy
 }
@@ -60,8 +65,8 @@ type Policies struct {
 	// OtherPolicies
 }
 
-func unmarshalResourcePolicies(yamlData *string) (*resourcePolicies, error) {
-	resPolicies := &resourcePolicies{}
+func unmarshalResourcePolicies(yamlData *string) (*ResourcePolicies, error) {
+	resPolicies := &ResourcePolicies{}
 	err := decodeStruct(strings.NewReader(*yamlData), resPolicies)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode yaml data into resource policies  %v", err)
@@ -69,7 +74,7 @@ func unmarshalResourcePolicies(yamlData *string) (*resourcePolicies, error) {
 	return resPolicies, nil
 }
 
-func (p *Policies) buildPolicy(resPolicies *resourcePolicies) error {
+func (p *Policies) BuildPolicy(resPolicies *ResourcePolicies) error {
 	for _, vp := range resPolicies.VolumePolicies {
 		con, err := unmarshalVolConditions(vp.Conditions)
 		if err != nil {
@@ -162,7 +167,7 @@ func GetResourcePoliciesFromConfig(cm *v1.ConfigMap) (*Policies, error) {
 	}
 
 	policies := &Policies{}
-	if err := policies.buildPolicy(resPolicies); err != nil {
+	if err := policies.BuildPolicy(resPolicies); err != nil {
 		return nil, errors.WithStack(err)
 	}
 

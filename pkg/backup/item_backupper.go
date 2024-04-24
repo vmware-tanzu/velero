@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vmware-tanzu/velero/internal/volumehelper"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -52,7 +54,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	csiutil "github.com/vmware-tanzu/velero/pkg/util/csi"
-	pdvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
 )
 
 const (
@@ -187,6 +188,16 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		ib.trackSkippedPV(obj, groupResource, podVolumeApproach, fmt.Sprintf("opted out due to annotation in pod %s", podName), log)
 	}
 
+	// Instantiate volumepolicyhelper struct here
+	vh := &volumehelper.VolumeHelperImpl{
+		SnapshotVolumes: ib.backupRequest.Spec.SnapshotVolumes,
+		Logger:          logger,
+	}
+
+	if ib.backupRequest.ResPolicies != nil {
+		vh.VolumePolicy = ib.backupRequest.ResPolicies
+	}
+
 	if groupResource == kuberesource.Pods {
 		// pod needs to be initialized for the unstructured converter
 		pod = new(corev1api.Pod)
@@ -195,14 +206,13 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 			// nil it on error since it's not valid
 			pod = nil
 		} else {
-			// Get the list of volumes to back up using pod volume backup from the pod's annotations. Remove from this list
+			// Get the list of volumes to back up using pod volume backup from the pod's annotations or volume policy approach. Remove from this list
 			// any volumes that use a PVC that we've already backed up (this would be in a read-write-many scenario,
 			// where it's been backed up from another pod), since we don't need >1 backup per PVC.
-			includedVolumes, optedOutVolumes := pdvolumeutil.GetVolumesByPod(
-				pod,
-				boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToFsBackup),
-				!ib.backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()),
-			)
+			includedVolumes, optedOutVolumes, err := vh.GetVolumesForFSBackup(pod, boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToFsBackup), !ib.backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()), ib.kbClient)
+			if err != nil {
+				backupErrs = append(backupErrs, errors.WithStack(err))
+			}
 
 			for _, volume := range includedVolumes {
 				// track the volumes that are PVCs using the PVC snapshot tracker, so that when we backup PVCs/PVs
@@ -229,7 +239,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	// the group version of the object.
 	versionPath := resourceVersion(obj)
 
-	updatedObj, additionalItemFiles, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata, finalize)
+	updatedObj, additionalItemFiles, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata, finalize, vh)
 	if err != nil {
 		backupErrs = append(backupErrs, err)
 
@@ -255,7 +265,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 			backupErrs = append(backupErrs, err)
 		}
 
-		if err := ib.takePVSnapshot(obj, log); err != nil {
+		if err := ib.takePVSnapshot(obj, log, vh); err != nil {
 			backupErrs = append(backupErrs, err)
 		}
 	}
@@ -351,6 +361,7 @@ func (ib *itemBackupper) executeActions(
 	name, namespace string,
 	metadata metav1.Object,
 	finalize bool,
+	vh *volumehelper.VolumeHelperImpl,
 ) (runtime.Unstructured, []FileForArchive, error) {
 	var itemFiles []FileForArchive
 	for _, action := range ib.backupRequest.ResolvedActions {
@@ -372,6 +383,19 @@ func (ib *itemBackupper) executeActions(
 			log.Infof("Skip action %s for resource %s:%s/%s, because the CSI feature is not enabled. Feature setting is %s.",
 				actionName, groupResource.String(), metadata.GetNamespace(), metadata.GetName(), features.Serialize())
 			continue
+		}
+
+		if groupResource == kuberesource.PersistentVolumeClaims && actionName == csiBIAPluginName && vh.VolumePolicy != nil {
+			snapshotVolume, err := vh.ShouldPerformSnapshot(obj, kuberesource.PersistentVolumeClaims, ib.kbClient)
+			if err != nil {
+				return nil, itemFiles, errors.WithStack(err)
+			}
+
+			if !snapshotVolume {
+				log.Info(fmt.Sprintf("skipping csi volume snapshot for PVC %s as it does not fit the volume policy criteria specified by the user for snapshot action", namespace+"/"+name))
+				ib.trackSkippedPV(obj, kuberesource.PersistentVolumeClaims, volumeSnapshotApproach, "does not satisfy the criteria for volume policy based snapshot action", log)
+				continue
+			}
 		}
 
 		updatedItem, additionalItemIdentifiers, operationID, postOperationItems, err := action.Execute(obj, ib.backupRequest.Backup)
@@ -504,14 +528,8 @@ const (
 // takePVSnapshot triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
 // backup has volume snapshots enabled and the PV is of a compatible type. Also records cloud
 // disk type and IOPS (if applicable) to be able to restore to current state later.
-func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.FieldLogger) error {
+func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.FieldLogger, vh *volumehelper.VolumeHelperImpl) error {
 	log.Info("Executing takePVSnapshot")
-
-	if boolptr.IsSetToFalse(ib.backupRequest.Spec.SnapshotVolumes) {
-		log.Info("Backup has volume snapshots disabled; skipping volume snapshot action.")
-		ib.trackSkippedPV(obj, kuberesource.PersistentVolumes, volumeSnapshotApproach, "backup has volume snapshots disabled", log)
-		return nil
-	}
 
 	pv := new(corev1api.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pv); err != nil {
@@ -519,6 +537,26 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	}
 
 	log = log.WithField("persistentVolume", pv.Name)
+
+	if vh.VolumePolicy != nil {
+		snapshotVolume, err := vh.ShouldPerformSnapshot(obj, kuberesource.PersistentVolumes, ib.kbClient)
+
+		if err != nil {
+			return err
+		}
+
+		if !snapshotVolume {
+			log.Info(fmt.Sprintf("skipping volume snapshot for PV %s as it does not fit the volume policy criteria specified by the user for snapshot action", pv.Name))
+			ib.trackSkippedPV(obj, kuberesource.PersistentVolumes, volumeSnapshotApproach, "does not satisfy the criteria for volume policy based snapshot action", log)
+			return nil
+		}
+	}
+
+	if boolptr.IsSetToFalse(ib.backupRequest.Spec.SnapshotVolumes) {
+		log.Info("Backup has volume snapshots disabled; skipping volume snapshot action.")
+		ib.trackSkippedPV(obj, kuberesource.PersistentVolumes, volumeSnapshotApproach, "backup has volume snapshots disabled", log)
+		return nil
+	}
 
 	// If this PV is claimed, see if we've already taken a (pod volume backup) snapshot of the contents
 	// of this PV. If so, don't take a snapshot.
