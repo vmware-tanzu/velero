@@ -29,7 +29,9 @@ This design allows velero CLI to request files from any object store plugin that
 - Making the download server the default way to download data from object store.
 
 ## High-Level Design
-Create an endpoint on the Velero server that CLI users can connect to and download data from without requiring signed URL from object store directly when configured explicitly or as a fallback.
+Create an endpoint on the Velero server that CLI can use to download data from without requiring signed URL from object store directly when configured explicitly or as a fallback.
+
+The direct download from signedUrl will still be the default behavior for Velero CLI.
 
 ### Velero Download Server URL generation using Service to Expose Download Server
 
