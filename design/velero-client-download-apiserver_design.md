@@ -35,13 +35,15 @@ The direct download from signedUrl will still be the default behavior for Velero
 
 ### Velero Download Server URL generation using Service to Expose Download Server
 
-Upon enabling Download Server API, Velero will create a service of type that user specifies, which will expose the download server to the outside world. The download server will proxy requested data from the object store and stream it back to the client using one of the available service types (ClusterIP/NodePort/LoadBalancer). User can also precreate a service and pass the service name to velero during install time with `velero install --veleroServerServiceName=veleroDownloadServerServiceName` to use the precreated service to expose the download server.
+Upon enabling Download Server API, Velero will create a service of type that user specifies, which will expose the download server to the outside world. The download server will proxy requested data from the object store and stream it back to the client using one of the available service types (ClusterIP/NodePort/LoadBalancer). User can also pre-create a service named `velero` to use the pre-created service to expose the download server.
 
-If the service can also be reached via a fully qualified domain name (FQDN) such as when user created [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the service, user can pass the FQDN to velero during install time with `velero install --veleroServerFQDN=dnsNameToVeleroServerService.com`. Velero Download Server will use FQDN in-place of values auto discovered from created service (ie. NodePort/Cluster IP)
+If the service can also be reached via a fully qualified domain name (FQDN) such as when user created [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the service, user can pass the FQDN to velero during install time with `velero install --veleroServerFQDN=dnsNameToVeleroServerService.com`. Velero Download Server will use FQDN in-place of values from created service (ie. NodePort/Cluster IP).
+
+If using Ingress, the FQDN should match `ingress.spec.rules.host` field that the user wants to use to access the download server. Ingress HTTP path should be set to `/` to allow all requests to be proxied to the download server. There may be future enhancements after initial implementation to allow values other than `/` for the path to support multiple velero namespaces on the same cluster.
 
 This approach may also [work on KinD clusters](https://kind.sigs.k8s.io/docs/user/loadbalancer/)
 
-The current DownloadRequest CR status `veleroServerURL` field will be populated to use the Download Server URL instead of the signed object store URL where available.
+The current DownloadRequest CR status `downloadURL` field will be populated to use the Download Server URL instead of the signed object store URL when `BSL.spec.downloadViaVeleroServer` is set to true.
 
 Velero will be updated to download data from the object store and stream it back to the client.
 
