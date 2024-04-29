@@ -19,7 +19,7 @@ jobs:
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
         id: cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         env:
           cache-name: cache-velero-cli
         with:
@@ -31,7 +31,7 @@ jobs:
             velero-${{ github.event.pull_request.number }}-
 
       - name: Fetch cached go modules
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         if: steps.cache.outputs.cache-hit != 'true'
         with:
           path: ~/go/pkg/mod
@@ -69,7 +69,7 @@ jobs:
     steps:
       - name: Fetch built CLI
         id: cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         env:
           cache-name: cache-velero-cli
         with:
