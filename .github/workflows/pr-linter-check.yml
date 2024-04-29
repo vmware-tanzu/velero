@@ -16,7 +16,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v4
+      uses: golangci/golangci-lint-action@v5
       with:
         version: v1.57.2
         args: --out-format=colored-line-number
