@@ -164,9 +164,6 @@ func NewInstallOptions() *Options {
 		DefaultSnapshotMoveData:  false,
 		DisableInformerCache:     false,
 		ScheduleSkipImmediately:  false,
-		MaintenanceCfg: repository.MaintenanceConfig{
-			KeepLatestMaitenanceJobs: repository.DefaultKeepLatestMaitenanceJobs,
-		},
 	}
 }
 
