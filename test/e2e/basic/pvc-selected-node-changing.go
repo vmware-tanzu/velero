@@ -3,7 +3,6 @@ package basic
 import (
 	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -64,7 +63,6 @@ func (p *PVCSelectedNodeChanging) Init() error {
 }
 
 func (p *PVCSelectedNodeChanging) CreateResources() error {
-	p.Ctx, p.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
 		Expect(CreateNamespace(p.Ctx, p.Client, p.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", p.namespace))

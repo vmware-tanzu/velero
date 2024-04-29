@@ -17,10 +17,8 @@ limitations under the License.
 package basic
 
 import (
-	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -63,7 +61,6 @@ func (n *NSAnnotationCase) Init() error {
 }
 
 func (n *NSAnnotationCase) CreateResources() error {
-	n.Ctx, n.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", n.CaseBaseName, nsNum)
 		createAnnotationName := fmt.Sprintf("annotation-%s-%00000d", n.CaseBaseName, nsNum)

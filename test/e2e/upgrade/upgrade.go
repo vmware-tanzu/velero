@@ -33,10 +33,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
-const (
-	upgradeNamespace = "upgrade-workload"
-)
-
+var upgradeNamespace string
 var veleroCfg VeleroConfig
 
 func BackupUpgradeRestoreWithSnapshots() {
@@ -62,6 +59,8 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 	BeforeEach(func() {
 		veleroCfg = VeleroCfg
 		veleroCfg.IsUpgradeTest = true
+		UUIDgen, err = uuid.NewRandom()
+		upgradeNamespace = "upgrade-" + UUIDgen.String()
 		if !InstallVelero {
 			Skip("Upgrade test should not be triggered if veleroCfg.InstallVelero is set to false")
 		}
@@ -223,7 +222,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			// the snapshots of AWS may be still in pending status when do the restore, wait for a while
 			// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
 			// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
-			if tmpCfg.CloudProvider == Aws && useVolumeSnapshots {
+			if tmpCfg.CloudProvider == AWS && useVolumeSnapshots {
 				fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
 				time.Sleep(5 * time.Minute)
 			}

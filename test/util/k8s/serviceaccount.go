@@ -23,14 +23,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
-
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func WaitUntilServiceAccountCreated(ctx context.Context, client TestClient, namespace, serviceAccount string, timeout time.Duration) error {
@@ -81,7 +80,7 @@ func CreateServiceAccount(ctx context.Context, client TestClient, namespace stri
 		AutomountServiceAccountToken: nil,
 	}
 
-	_, err = client.ClientGo.CoreV1().ServiceAccounts(namespace).Create(ctx, sa, metav1.CreateOptions{})
+	_, err = client.ClientGo.CoreV1().ServiceAccounts(namespace).Create(context.TODO(), sa, metav1.CreateOptions{})
 
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
@@ -90,5 +89,5 @@ func CreateServiceAccount(ctx context.Context, client TestClient, namespace stri
 }
 
 func GetServiceAccount(ctx context.Context, client TestClient, namespace string, serviceAccount string) (*corev1.ServiceAccount, error) {
-	return client.ClientGo.CoreV1().ServiceAccounts(namespace).Get(ctx, serviceAccount, metav1.GetOptions{})
+	return client.ClientGo.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), serviceAccount, metav1.GetOptions{})
 }

@@ -17,10 +17,8 @@ limitations under the License.
 package filtering
 
 import (
-	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -103,7 +101,6 @@ func (i *IncludeNamespaces) Init() error {
 }
 
 func (i *IncludeNamespaces) CreateResources() error {
-	i.Ctx, i.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	for nsNum := 0; nsNum < i.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", i.CaseBaseName, nsNum)
 		fmt.Printf("Creating namespaces ...%s\n", createNSName)
