@@ -53,11 +53,11 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
-	"github.com/vmware-tanzu/velero/pkg/restore/util"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
+	pkgrestoreUtil "github.com/vmware-tanzu/velero/pkg/util/velero/restore"
 )
 
 // nonRestorableResources is an exclusion list  for the restoration process. Any resources
@@ -348,7 +348,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 	}
 
 	// validate ExistingResourcePolicy
-	if restore.Spec.ExistingResourcePolicy != "" && !util.IsResourcePolicyValid(string(restore.Spec.ExistingResourcePolicy)) {
+	if restore.Spec.ExistingResourcePolicy != "" && !pkgrestoreUtil.IsResourcePolicyValid(string(restore.Spec.ExistingResourcePolicy)) {
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Invalid ExistingResourcePolicy: %s", restore.Spec.ExistingResourcePolicy))
 	}
 

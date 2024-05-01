@@ -1,4 +1,4 @@
-package util
+package restore
 
 import (
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
