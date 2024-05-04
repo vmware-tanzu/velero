@@ -11,11 +11,12 @@ jobs:
   build-cli:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
-        id: go
+          go-version-file: 'go.mod'
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
         id: cache
@@ -29,26 +30,11 @@ jobs:
           # This key controls the prefixes that we'll look at in the cache to restore from
           restore-keys: |
             velero-${{ github.event.pull_request.number }}-
-
-      - name: Fetch cached go modules
-        uses: actions/cache@v4
-        if: steps.cache.outputs.cache-hit != 'true'
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Check out the code
-        uses: actions/checkout@v4
-        if: steps.cache.outputs.cache-hit != 'true'
-
       # If no binaries were built for this PR, build it now.
       - name: Build Velero CLI
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           make local
-
   # Check the common CLI against all Kubernetes versions
   crd-check:
     needs: build-cli
