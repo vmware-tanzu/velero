@@ -33,10 +33,8 @@ limitations under the License.
 package basic
 
 import (
-	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -79,7 +77,6 @@ func (r *RBACCase) Init() error {
 }
 
 func (r *RBACCase) CreateResources() error {
-	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
 		fmt.Printf("Creating namespaces ...%s\n", createNSName)

@@ -34,7 +34,7 @@ func CreateRBACWithBindingSA(ctx context.Context, client TestClient, namespace s
 		},
 	}
 
-	_, err = client.ClientGo.RbacV1().ClusterRoles().Create(ctx, role, metav1.CreateOptions{})
+	_, err = client.ClientGo.RbacV1().ClusterRoles().Create(context.TODO(), role, metav1.CreateOptions{})
 
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err

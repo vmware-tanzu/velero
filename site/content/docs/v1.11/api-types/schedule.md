@@ -30,6 +30,8 @@ metadata:
   namespace: velero
 # Parameters about the scheduled backup. Required.
 spec:
+  # Paused specifies whether the schedule is paused or not
+  paused: false
   # Schedule is a Cron expression defining when to run the Backup
   schedule: 0 7 * * *
   # Specifies whether to use OwnerReferences on backups created by this Schedule. 

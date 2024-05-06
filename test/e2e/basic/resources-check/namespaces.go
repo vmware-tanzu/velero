@@ -84,7 +84,6 @@ func (m *MultiNSBackup) Init() error {
 }
 
 func (m *MultiNSBackup) CreateResources() error {
-	m.Ctx, m.CtxCancel = context.WithTimeout(context.Background(), m.TimeoutDuration)
 	fmt.Printf("Creating namespaces ...\n")
 	labels := map[string]string{
 		"ns-test": "true",

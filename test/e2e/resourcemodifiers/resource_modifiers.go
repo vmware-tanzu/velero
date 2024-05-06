@@ -17,10 +17,8 @@ limitations under the License.
 package resourcemodifiers
 
 import (
-	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -97,9 +95,6 @@ func (r *ResourceModifiersCase) Init() error {
 }
 
 func (r *ResourceModifiersCase) CreateResources() error {
-	// It's better to set a global timeout in CreateResources function which is the real beginning of one e2e test
-	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
-
 	By(fmt.Sprintf("Create configmap %s in namespaces %s for workload\n", r.cmName, r.VeleroCfg.VeleroNamespace), func() {
 		Expect(CreateConfigMapFromYAMLData(r.Client.ClientGo, r.yamlConfig, r.cmName, r.VeleroCfg.VeleroNamespace)).To(Succeed(), fmt.Sprintf("Failed to create configmap %s in namespaces %s for workload\n", r.cmName, r.VeleroCfg.VeleroNamespace))
 	})

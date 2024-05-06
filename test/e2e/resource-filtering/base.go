@@ -19,7 +19,6 @@ package filtering
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +60,6 @@ func (f *FilteringCase) Init() error {
 }
 
 func (f *FilteringCase) CreateResources() error {
-	f.Ctx, f.CtxCancel = context.WithTimeout(context.Background(), 30*time.Minute)
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", f.CaseBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)

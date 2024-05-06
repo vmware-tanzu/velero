@@ -17,10 +17,8 @@ limitations under the License.
 package filtering
 
 import (
-	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -103,9 +101,6 @@ func (r *ResourcePoliciesCase) Init() error {
 }
 
 func (r *ResourcePoliciesCase) CreateResources() error {
-	// It's better to set a global timeout in CreateResources function which is the real beginning of one e2e test
-	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
-
 	By(("Installing storage class..."), func() {
 		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", r.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
 	})

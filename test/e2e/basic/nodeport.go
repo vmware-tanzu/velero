@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -61,9 +60,8 @@ func (n *NodePort) Init() error {
 	}
 	return nil
 }
-func (n *NodePort) CreateResources() error {
-	n.Ctx, n.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 
+func (n *NodePort) CreateResources() error {
 	for _, ns := range *n.NSIncluded {
 		By(fmt.Sprintf("Creating service %s in namespaces %s ......\n", n.serviceName, ns), func() {
 			Expect(CreateNamespace(n.Ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))

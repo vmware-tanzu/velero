@@ -55,6 +55,14 @@ var KibishiiPodNameList = []string{"kibishii-deployment-0", "kibishii-deployment
 var KibishiiPVCNameList = []string{"kibishii-data-kibishii-deployment-0", "kibishii-data-kibishii-deployment-1"}
 var KibishiiStorageClassName = "kibishii-storage-class"
 
+func GetKibishiiPVCNameList(workerCount int) []string {
+	var kibishiiPVCNameList []string
+	for i := 0; i < workerCount; i++ {
+		kibishiiPVCNameList = append(kibishiiPVCNameList, fmt.Sprintf("kibishii-data-kibishii-deployment-%d", i))
+	}
+	return kibishiiPVCNameList
+}
+
 // RunKibishiiTests runs kibishii tests on the provider.
 func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
 	useVolumeSnapshots, defaultVolumesToFsBackup bool) error {
@@ -211,10 +219,10 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		}
 	}
 
-	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
-	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
-	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
 	if useVolumeSnapshots {
+		// the snapshots of AWS may be still in pending status when do the restore, wait for a while
+		// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
+		// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
 		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
 		time.Sleep(5 * time.Minute)
 	}
@@ -248,7 +256,7 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 		strings.EqualFold(veleroFeatures, FeatureCSI) {
 		cloudPlatform = AzureCSI
 	}
-	if strings.EqualFold(cloudPlatform, Aws) &&
+	if strings.EqualFold(cloudPlatform, AWS) &&
 		strings.EqualFold(veleroFeatures, FeatureCSI) {
 		cloudPlatform = AwsCSI
 	}

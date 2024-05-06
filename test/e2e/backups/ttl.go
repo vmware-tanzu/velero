@@ -139,7 +139,7 @@ func TTLTest() {
 				fmt.Sprintf("Failed to delete namespace %s", BackupCfg.BackupName))
 		})
 
-		if veleroCfg.CloudProvider == Aws && useVolumeSnapshots {
+		if veleroCfg.CloudProvider == AWS && useVolumeSnapshots {
 			fmt.Println("Waiting 7 minutes to make sure the snapshots are ready...")
 			time.Sleep(7 * time.Minute)
 		}

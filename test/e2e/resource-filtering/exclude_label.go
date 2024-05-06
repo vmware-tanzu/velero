@@ -17,9 +17,7 @@ limitations under the License.
 package filtering
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -76,7 +74,6 @@ func (e *ExcludeFromBackup) Init() error {
 }
 
 func (e *ExcludeFromBackup) CreateResources() error {
-	e.Ctx, e.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	namespace := e.CaseBaseName
 	// These 2 labels for resources to be included
 	label1 := map[string]string{
