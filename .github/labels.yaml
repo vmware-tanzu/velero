@@ -31,13 +31,13 @@ area:
   - upgrade
   - volume-snapshot-dm
 kind:
-  - changelog-not-required
-  - question
-  - refactor
-  - requirement
-  - release-note
-  - release-blocker
-  - spike
-  - tech-debt
-  - usage-error
-  - voting
+  - 'spike'
+  - 'voting'
+  - 'question'
+  - 'refactor'
+  - 'tech-debt'
+  - 'requirement'
+  - 'usage-error'
+  - 'release-note'
+  - 'release-blocker'
+  - 'changelog-not-required'
