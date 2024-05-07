@@ -238,10 +238,15 @@ func getMaintenanceResultFromJob(cli client.Client, job *batchv1.Job) (string, e
 	return podList.Items[0].Status.ContainerStatuses[0].State.Terminated.Message, nil
 }
 
-func GetLatestMaintenanceJob(cli client.Client, repo string) (*batchv1.Job, error) {
+func getLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error) {
 	// Get the maintenance job list by label
 	jobList := &batchv1.JobList{}
-	err := cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
+	err := cli.List(context.TODO(), jobList, &client.ListOptions{
+		Namespace: ns,
+	},
+		&client.HasLabels{RepositoryNameLabel},
+	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -254,5 +259,6 @@ func GetLatestMaintenanceJob(cli client.Client, repo string) (*batchv1.Job, erro
 	sort.Slice(jobList.Items, func(i, j int) bool {
 		return jobList.Items[i].CreationTimestamp.Time.After(jobList.Items[j].CreationTimestamp.Time)
 	})
+
 	return &jobList.Items[0], nil
 }

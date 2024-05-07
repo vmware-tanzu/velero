@@ -191,16 +191,26 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 		return errors.WithStack(err)
 	}
 
-	if err := prd.BoostRepoConnect(context.Background(), param); err != nil {
-		return errors.WithStack(err)
-	}
-
 	log := m.log.WithFields(logrus.Fields{
 		"BSL name":  param.BackupLocation.Name,
 		"repo type": param.BackupRepo.Spec.RepositoryType,
 		"repo name": param.BackupRepo.Name,
 		"repo UID":  param.BackupRepo.UID,
 	})
+
+	job, err := getLatestMaintenanceJob(m.client, m.namespace)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	if job != nil && job.Status.Succeeded == 0 && job.Status.Failed == 0 {
+		log.Debugf("There already has a unfinished maintenance job %s/%s for repository %s, please wait for it to complete", job.Namespace, job.Name, param.BackupRepo.Name)
+		return nil
+	}
+
+	if err := prd.BoostRepoConnect(context.Background(), param); err != nil {
+		return errors.WithStack(err)
+	}
 
 	log.Info("Start to maintence repo")
 

@@ -257,7 +257,7 @@ func TestGetLatestMaintenanceJob(t *testing.T) {
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	// Call the function
-	job, err := GetLatestMaintenanceJob(cli, repo)
+	job, err := getLatestMaintenanceJob(cli, "default")
 	assert.NoError(t, err)
 
 	// We expect the returned job to be the newer job
