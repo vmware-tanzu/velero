@@ -863,6 +863,13 @@ func updateVolumeInfos(
 				volumeInfos[index].SnapshotDataMovementInfo.SnapshotHandle = dataUpload.Status.SnapshotID
 				volumeInfos[index].SnapshotDataMovementInfo.RetainedSnapshot = dataUpload.Spec.CSISnapshot.VolumeSnapshot
 				volumeInfos[index].SnapshotDataMovementInfo.Size = dataUpload.Status.Progress.TotalBytes
+				volumeInfos[index].SnapshotDataMovementInfo.Phase = dataUpload.Status.Phase
+
+				if dataUpload.Status.Phase == velerov2alpha1.DataUploadPhaseCompleted {
+					volumeInfos[index].Result = volume.VolumeResultSucceeded
+				} else {
+					volumeInfos[index].Result = volume.VolumeResultFailed
+				}
 			}
 		}
 	}
@@ -879,6 +886,13 @@ func updateVolumeInfos(
 					// VSC and VS status. When the controller finds they reach to the ReadyToUse state,
 					// The operation.Status.Updated is set as the found time.
 					volumeInfos[volumeIndex].CompletionTimestamp = operations[opIndex].Status.Updated
+
+					// Set Succeeded to true when the operation has no error.
+					if operations[opIndex].Status.Error == "" {
+						volumeInfos[volumeIndex].Result = volume.VolumeResultSucceeded
+					} else {
+						volumeInfos[volumeIndex].Result = volume.VolumeResultFailed
+					}
 				}
 			}
 		}

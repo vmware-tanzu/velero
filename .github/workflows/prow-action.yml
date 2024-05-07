@@ -9,22 +9,21 @@ jobs:
   execute:
     runs-on: ubuntu-latest
     steps:
-      - uses: jpmcb/prow-github-actions@v1
+      - uses: jpmcb/prow-github-actions@v1.1.3
         with:
           # TODO: before allowing the /lgtm command, see if we can block merging if changelog labels are missing.
           prow-commands: |
-            /assign
-            /unassign
             /approve
-            /retitle
-            /close
-            /reopen
-            /approve
-            /milestone
             /area
-            /kind
+            /assign
             /cc
-            /uncc
+            /close
             /hold
+            /kind
+            /milestone
+            /retitle
             /remove
+            /reopen
+            /uncc
+            /unassign
           github-token: "${{ secrets.GITHUB_TOKEN }}"
