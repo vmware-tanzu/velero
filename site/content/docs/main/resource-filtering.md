@@ -360,3 +360,104 @@ Velero supported conditions and format listed below:
 **Resource policies rules**
 - Velero already has lots of include or exclude filters. the resource policies are the final filters after others include or exclude filters in one backup processing workflow. So if use a defined similar filter like the opt-in approach to backup one pod volume but skip backup of the same pod volume in resource policies, as resource policies are the final filters that are applied, the volume will not be backed up.
 - If volume resource policies conflict with themselves the first matched policy will be respected when many policies are defined.
+
+
+**Support for `fs-backup` and `snapshot` actions via volume policy feature**
+- Starting from velero 1.14, the resource policy/volume policy feature has been extended to support more actions like `fs-backup` and `snapshot`.
+- This feature only extends the action aspect of volume policy and not criteria aspect, the criteria components as described above remain the same.
+- When we are using the volume policy approach for backing up the volumes then the volume policy criteria and action need to be specific and explicit, 
+there is no default behaviour, if a volume matches fs-backup action then fs-backup method will be used for that volume and similarly if the volume matches
+the criteria for snapshot action then the snapshot workflow will be used for the volume backup.
+- Another thing to note is that the volume policy workflow uses the legacy opt-in/opt-out approach as a fallback option. For instance, the user specifies
+a volume policy but for a particular volume included in the backup there are no actions(fs-backup/snapshot) matching in the volume policy for that volume,
+in such a scenario the legacy approach will be used for backing up the particular volume. Considering everything, the recommendation would be to use only one
+of the approaches to backup volumes - volume policy approach or the opt-in/opt-out legacy approach, and not mix them for clarity.
+- Snapshot action can either be a native snapshot or a csi snapshot or csi snapshot datamover, as is the case with the current flow where velero itself makes the decision based on the backup CR's existing options.
+- The `snapshot` action via Volume Policy has higher priority if there is a `snapshot` action matching for a particular volume, this volume would be backed up via snapshot irrespective of the value of `backup.Spec.SnapshotVolumes`.
+- If for a particular volume there is no `snapshot` matching action then the volume will be backed up via snapshot given that `backup.Spec.SnapshotVolumes` is not explicitly set to false.
+- Let's see some examples on how to use the volume policy feature for `fs-backup` and `snapshot` action purposes:
+
+We will use a simple application example in which there is an application pod which has 2 volumes: 
+- Volume 1 has associated Persistent Volume Claim 1 and Persistent Volume 1 which uses storage class `gp2-csi`
+- Volume 2 has associated Persistent Volume Claim 2 and Persistent Volume 2 which uses storage class `gp3-csi`
+
+Now lets go through some example uses-cases and their outcomes:
+
+***Example 1: User wants to use `fs-backup` action for backing up the volumes having storage class as `gp2-csi`*** 
+1. User specifies the volume policy as follows:
+```yaml
+version: v1
+volumePolicies:
+- conditions:
+    storageClass:
+    - gp2-csi
+  action:
+    type: fs-backup
+```
+
+2. User creates a backup using this volume policy
+3. The outcome would be that velero would perform `fs-backup` operation ***only*** on `Volume 1` as ***only*** `Volume 1` satisfies the criteria for `fs-backup` action.
+
+***Example 2: User wants to use `snapshot` action for backing up the volumes having storage class as `gp2-csi`***
+1. User specifies the volume policy as follows:
+```yaml
+version: v1
+volumePolicies:
+- conditions:
+    storageClass:
+    - gp2-csi
+  action:
+    type: snapshot
+```
+2. User creates a backup using this volume policy
+3. The outcome would be that velero would perform `snapshot` operation ***only*** on `Volume 1` as ***only*** `Volume 1` satisfies the criteria for `snapshot` action.
+
+***Example 3: User wants to use `snapshot` action for backing up the volumes having storage class as `gp2-csi` and wants to use `fs-backup` action for backing up the volumes having storage class as `gp3-csi`***
+1. User specifies the volume policy as follows:
+```yaml
+version: v1
+volumePolicies:
+- conditions:
+    storageClass:
+    - gp2-csi
+  action:
+    type: snapshot
+- conditions:
+    storageClass:
+    - gp3-csi
+  action:
+    type: fs-backup
+```
+2. User creates a backup using this volume policy
+3. The outcome would be that velero would perform `snapshot` operation ***only*** on `Volume 1` as ***only*** `Volume 1` satisfies the criteria for `snapshot` action. Also, velero would perform `fs-backup` operation ***only*** on `Volume 2` as ***only*** `Volume 2` satisfies the criteria for `fs-backup` action.
+
+***Example 4: User wants to use `snapshot` action for backing up the volumes having storage class as `gp3-csi` and at the same time also annotates the pod to use opt-in fs-backup legacy approach for Volume 1***
+1. User specifies the volume policy as follows and also annotates the pod with `backup.velero.io/backup-volumes=Volume 1`
+```yaml
+version: v1
+volumePolicies:
+- conditions:
+    storageClass:
+    - gp3-csi
+  action:
+    type: snapshot
+```
+2. User creates a backup using this volume policy
+3. The outcome would be that velero would perform `snapshot` operation for `Volume 2` as it matches the action criteria and velero would also perform the `fs-backup` operation for `Volume-1` via the legacy annotations based fallback approach as there is no matching action for `Volume-1`  
+
+***Example 5: User wants to use `fs-backup` action for backing up the volumes having storage class as `gp2-csi` and at the same time also specifies `defaultVolumesToFSBackup: true` (fallback option for no action matching volumes)***
+1. User specifies the volume policy as follows and specifies `defaultVolumesToFSBackup: true`:
+```yaml
+version: v1
+volumePolicies:
+- conditions:
+    storageClass:
+    - gp2-csi
+  action:
+    type: fs-backup
+```
+2. User creates a backup using this volume policy
+3. The outcome would be that velero would perform `fs-backup` operation on both the volumes
+   - `fs-backup` on `Volume 1` because `Volume 1` satisfies the criteria for `fs-backup` action. 
+   - Also, for Volume 2 as no matching action was found so legacy approach will be used as a fallback option for this volume (`fs-backup` operation will be done as `defaultVolumesToFSBackup: true` is specified by the user).
+
