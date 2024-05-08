@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	waitutil "k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -66,8 +67,8 @@ func SSRTest() {
 		})
 		ssrListResp := new(v1.ServerStatusRequestList)
 		By(fmt.Sprintf("Check ssr object in %s namespace", veleroCfg.VeleroNamespace))
-		err = waitutil.PollImmediate(5*time.Second, time.Minute,
-			func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second, time.Minute, true,
+			func(context.Context) (bool, error) {
 				if err = veleroCfg.ClientToInstallVelero.Kubebuilder.List(ctx, ssrListResp, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
 					return false, fmt.Errorf("failed to list ssr object in %s namespace with err %v", veleroCfg.VeleroNamespace, err)
 				}
@@ -85,9 +86,8 @@ func SSRTest() {
 				}
 				return true, nil
 			})
-		if err == waitutil.ErrWaitTimeout {
-			fmt.Printf("exceed test case deadline and failed to check ssr object in %s namespace", veleroCfg.VeleroNamespace)
-		}
+		fmt.Printf("exceed test case deadline and failed to check ssr object in %s namespace", veleroCfg.VeleroNamespace)
+
 		Expect(err).To(Succeed(), fmt.Sprintf("Failed to check ssr object in %s namespace", veleroCfg.VeleroNamespace))
 
 		By(fmt.Sprintf("Check ssr object in %s namespace", testNS))

@@ -929,7 +929,7 @@ func getVeleroCliTarball(cliTarballUrl string) (*os.File, error) {
 	return tmpfile, nil
 }
 
-func DeleteBackupResource(ctx context.Context, backupName string, velerocfg *VeleroConfig) error {
+func DeleteBackup(ctx context.Context, backupName string, velerocfg *VeleroConfig) error {
 	veleroCLI := velerocfg.VeleroCLI
 	args := []string{"--namespace", velerocfg.VeleroNamespace, "backup", "delete", backupName, "--confirm"}
 
@@ -945,20 +945,53 @@ func DeleteBackupResource(ctx context.Context, backupName string, velerocfg *Vel
 
 	args = []string{"--namespace", velerocfg.VeleroNamespace, "backup", "get", backupName}
 
-	retryTimes := 5
-	for i := 1; i < retryTimes+1; i++ {
-		cmd = exec.CommandContext(ctx, veleroCLI, args...)
-		fmt.Printf("Try %d times to delete backup %s \n", i, cmd.String())
-		stdout, stderr, err = veleroexec.RunCommand(cmd)
-		if err != nil {
-			if strings.Contains(stderr, "not found") {
-				fmt.Printf("|| EXPECTED || - Backup %s was deleted successfully according to message %s\n", backupName, stderr)
-				return nil
+	err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second, time.Minute, true,
+		func(context.Context) (bool, error) {
+			cmd = exec.CommandContext(ctx, veleroCLI, args...)
+			fmt.Printf("Try to get backup with cmd: %s \n", cmd.String())
+			stdout, stderr, err = veleroexec.RunCommand(cmd)
+			if err != nil {
+				if strings.Contains(stderr, "not found") {
+					fmt.Printf("|| EXPECTED || - Backup %s was deleted successfully according to message %s\n", backupName, stderr)
+					return true, nil
+				}
+				return false, errors.Wrapf(err, "Fail to perform get backup, stdout=%s, stderr=%s", stdout, stderr)
 			}
-			return errors.Wrapf(err, "Fail to perform get backup, stdout=%s, stderr=%s", stdout, stderr)
+
+			var status string
+			var drList []string
+			drList, err = KubectlGetAllDeleteBackupRequest(context.Background(), backupName, velerocfg.VeleroNamespace)
+			if len(drList) > 1 {
+				return false, errors.New(fmt.Sprintf("Count of DeleteBackupRequest %d is not expected", len(drList)))
+			}
+
+			// Record DeleteBackupRequest status for debugging
+			for _, dr := range drList {
+				status, err = KubectlGetDeleteBackupRequestStatus(context.Background(), dr, velerocfg.VeleroNamespace)
+				fmt.Printf("DeleteBackupRequest status: %s\n", status)
+			}
+
+			return true, nil
+		})
+
+	// Waiting for completion of handling deleteBackupRequest CR
+	time.Sleep(1 * time.Minute)
+
+	// Verify deleteBackupRequest are all gone because they are handled successfully
+	var drList []string
+	drList, err = KubectlGetAllDeleteBackupRequest(context.Background(), backupName, velerocfg.VeleroNamespace)
+	if len(drList) > 1 {
+		// Log deleteBackupRequest details for debug
+		for _, dr := range drList {
+			details, err := KubectlGetDeleteBackupRequestDetails(context.Background(), dr, velerocfg.VeleroNamespace)
+			if err != nil {
+				return errors.Wrapf(err, "fail to get DeleteBackupRequest %s details", dr)
+			}
+			fmt.Printf("Failed DeleteBackupRequest details: %s", details)
 		}
-		time.Sleep(1 * time.Minute)
+		return errors.New(fmt.Sprintf("Count of DeleteBackupRequest %d is not expected", len(drList)))
 	}
+
 	return nil
 }
 
@@ -1634,4 +1667,118 @@ func CleanAllRetainedPV(ctx context.Context, client TestClient) {
 			fmt.Printf("fail to delete PV %s reclaim policy to delete: stdout: %s, stderr: %s", pv, stdout, errMsg)
 		}
 	}
+}
+
+func KubectlGetBackupRepository(ctx context.Context, uploaderType, veleroNamespace string) ([]string, error) {
+	args1 := []string{"get", "backuprepository", "-n", veleroNamespace}
+
+	cmds := []*common.OsCommandLine{}
+
+	cmd := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: args1,
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "grep",
+		Args: []string{uploaderType},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+	cmds = append(cmds, cmd)
+
+	return common.GetListByCmdPipes(ctx, cmds)
+}
+
+func KubectlGetPodVolumeBackup(ctx context.Context, backupName, veleroNamespace string) ([]string, error) {
+	args1 := []string{"get", "podvolumebackup", "-n", veleroNamespace}
+
+	cmds := []*common.OsCommandLine{}
+
+	cmd := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: args1,
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "grep",
+		Args: []string{backupName},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+	cmds = append(cmds, cmd)
+
+	return common.GetListByCmdPipes(ctx, cmds)
+}
+
+func KubectlGetDeleteBackupRequestDetails(ctx context.Context, deleteBackupRequest, veleroNamespace string) (string, error) {
+	cmd := exec.CommandContext(ctx, "kubectl", "get", "deletebackuprequests", "-n", veleroNamespace, deleteBackupRequest, "-o", "json")
+	fmt.Printf("Get DeleteBackupRequest details cmd =%v\n", cmd)
+	stdout, stderr, err := veleroexec.RunCommand(cmd)
+	if err != nil {
+		fmt.Print(stdout)
+		fmt.Print(stderr)
+		return "", errors.Wrap(err, fmt.Sprintf("failed to run command %s", cmd))
+	}
+	return stdout, err
+}
+func KubectlGetDeleteBackupRequestStatus(ctx context.Context, deleteBackupRequest, veleroNamespace string) (string, error) {
+	args1 := []string{"get", "deletebackuprequests", "-n", veleroNamespace, deleteBackupRequest, "-o", "json"}
+
+	cmds := []*common.OsCommandLine{}
+
+	cmd := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: args1,
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "jq",
+		Args: []string{"-r", ".status.phase"},
+	}
+	cmds = append(cmds, cmd)
+
+	ret, err := common.GetListByCmdPipes(ctx, cmds)
+
+	if len(ret) != 1 {
+		return "", errors.New(fmt.Sprintf("fail to get status of deletebackuprequests %s", deleteBackupRequest))
+	}
+	return ret[0], err
+}
+
+func KubectlGetAllDeleteBackupRequest(ctx context.Context, backupName, veleroNamespace string) ([]string, error) {
+	args1 := []string{"get", "deletebackuprequests", "-n", veleroNamespace}
+
+	cmds := []*common.OsCommandLine{}
+
+	cmd := &common.OsCommandLine{
+		Cmd:  "kubectl",
+		Args: args1,
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "grep",
+		Args: []string{backupName},
+	}
+	cmds = append(cmds, cmd)
+
+	cmd = &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+	cmds = append(cmds, cmd)
+
+	return common.GetListByCmdPipes(ctx, cmds)
 }
