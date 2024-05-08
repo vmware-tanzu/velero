@@ -1,0 +1,1 @@
+Fix issue #7535, don't skip must have resources for label selector
