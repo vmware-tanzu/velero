@@ -2303,29 +2303,31 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource string, original
 			continue
 		}
 
-		if !ctx.selector.Matches(labels.Set(obj.GetLabels())) {
-			continue
-		}
-
-		// Processing OrLabelSelectors when specified in the restore request. LabelSelectors as well as OrLabelSelectors
-		// cannot co-exist, only one of them can be specified
-		var skipItem = false
-		var skip = 0
-		ctx.log.Debugf("orSelectors specified: %s for item: %s", ctx.OrSelectors, item)
-		for _, s := range ctx.OrSelectors {
-			if !s.Matches(labels.Set(obj.GetLabels())) {
-				skip++
+		if !ctx.resourceMustHave.Has(resource) {
+			if !ctx.selector.Matches(labels.Set(obj.GetLabels())) {
+				continue
 			}
 
-			if len(ctx.OrSelectors) == skip && skip > 0 {
-				ctx.log.Infof("setting skip flag to true for item: %s", item)
-				skipItem = true
-			}
-		}
+			// Processing OrLabelSelectors when specified in the restore request. LabelSelectors as well as OrLabelSelectors
+			// cannot co-exist, only one of them can be specified
+			var skipItem = false
+			var skip = 0
+			ctx.log.Debugf("orSelectors specified: %s for item: %s", ctx.OrSelectors, item)
+			for _, s := range ctx.OrSelectors {
+				if !s.Matches(labels.Set(obj.GetLabels())) {
+					skip++
+				}
 
-		if skipItem {
-			ctx.log.Infof("restore orSelector labels did not match, skipping restore of item: %s", skipItem, item)
-			continue
+				if len(ctx.OrSelectors) == skip && skip > 0 {
+					ctx.log.Infof("setting skip flag to true for item: %s", item)
+					skipItem = true
+				}
+			}
+
+			if skipItem {
+				ctx.log.Infof("restore orSelector labels did not match, skipping restore of item: %s", skipItem, item)
+				continue
+			}
 		}
 
 		selectedItem := restoreableItem{
