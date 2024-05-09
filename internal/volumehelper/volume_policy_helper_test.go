@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/pointer"
 
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
@@ -63,16 +62,15 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                string
-		obj                 runtime.Unstructured
-		groupResource       schema.GroupResource
-		resourcePolicies    resourcepolicies.ResourcePolicies
-		snapshotVolumesFlag *bool
-		shouldSnapshot      bool
-		expectedErr         bool
+		name             string
+		obj              runtime.Unstructured
+		groupResource    schema.GroupResource
+		resourcePolicies resourcepolicies.ResourcePolicies
+		shouldSnapshot   bool
+		expectedErr      bool
 	}{
 		{
-			name:          "Given PV object matches volume policy snapshot action snapshotVolumes flags is true returns true and no error",
+			name:          "Given PV object matches volume policy snapshot action returns true and no error",
 			obj:           PVObjectGP2,
 			groupResource: kuberesource.PersistentVolumes,
 			resourcePolicies: resourcepolicies.ResourcePolicies{
@@ -88,33 +86,11 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 					},
 				},
 			},
-			snapshotVolumesFlag: pointer.Bool(true),
-			shouldSnapshot:      true,
-			expectedErr:         false,
+			shouldSnapshot: true,
+			expectedErr:    false,
 		},
 		{
-			name:          "Given PV object matches volume policy snapshot action snapshotVolumes flags is false returns false and no error",
-			obj:           PVObjectGP2,
-			groupResource: kuberesource.PersistentVolumes,
-			resourcePolicies: resourcepolicies.ResourcePolicies{
-				Version: "v1",
-				VolumePolicies: []resourcepolicies.VolumePolicy{
-					{
-						Conditions: map[string]interface{}{
-							"storageClass": []string{"gp2-csi"},
-						},
-						Action: resourcepolicies.Action{
-							Type: resourcepolicies.Snapshot,
-						},
-					},
-				},
-			},
-			snapshotVolumesFlag: pointer.Bool(false),
-			shouldSnapshot:      false,
-			expectedErr:         false,
-		},
-		{
-			name:          "Given PV object matches volume policy snapshot action snapshotVolumes flags is true returns false and no error",
+			name:          "Given PV object does not match volume policy snapshot action returns false and no error",
 			obj:           PVObjectGP3,
 			groupResource: kuberesource.PersistentVolumes,
 			resourcePolicies: resourcepolicies.ResourcePolicies{
@@ -130,12 +106,11 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 					},
 				},
 			},
-			snapshotVolumesFlag: pointer.Bool(true),
-			shouldSnapshot:      false,
-			expectedErr:         false,
+			shouldSnapshot: false,
+			expectedErr:    false,
 		},
 		{
-			name: "Given PVC object matches volume policy snapshot action snapshotVolumes flags is true return false and error case PVC not found",
+			name: "Given PVC object matches volume policy snapshot action and error case PVC not found",
 			obj: &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"apiVersion": "v1",
@@ -169,9 +144,8 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 					},
 				},
 			},
-			snapshotVolumesFlag: pointer.Bool(true),
-			shouldSnapshot:      false,
-			expectedErr:         true,
+			shouldSnapshot: false,
+			expectedErr:    true,
 		},
 	}
 
@@ -204,9 +178,8 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 				t.Fatalf("failed to build policy with error %v", err)
 			}
 			vh := &VolumeHelperImpl{
-				VolumePolicy:    p,
-				SnapshotVolumes: tc.snapshotVolumesFlag,
-				Logger:          velerotest.NewLogger(),
+				VolumePolicy: p,
+				Logger:       velerotest.NewLogger(),
 			}
 			ActualShouldSnapshot, actualError := vh.ShouldPerformSnapshot(tc.obj, tc.groupResource, fakeClient)
 			if tc.expectedErr {
@@ -355,9 +328,8 @@ func TestVolumeHelperImpl_ShouldIncludeVolumeInBackup(t *testing.T) {
 				t.Fatalf("failed to build policy with error %v", err)
 			}
 			vh := &VolumeHelperImpl{
-				VolumePolicy:    p,
-				SnapshotVolumes: pointer.Bool(true),
-				Logger:          velerotest.NewLogger(),
+				VolumePolicy: p,
+				Logger:       velerotest.NewLogger(),
 			}
 			actualShouldInclude := vh.ShouldIncludeVolumeInBackup(tc.vol, tc.backupExcludePVC)
 			assert.Equalf(t, actualShouldInclude, tc.shouldInclude, "Want shouldInclude as %v; Got actualShouldInclude as %v", tc.shouldInclude, actualShouldInclude)
@@ -611,9 +583,8 @@ func TestVolumeHelperImpl_GetVolumesMatchingFSBackupAction(t *testing.T) {
 				t.Fatalf("failed to build policy with error %v", err)
 			}
 			vh := &VolumeHelperImpl{
-				VolumePolicy:    p,
-				SnapshotVolumes: pointer.Bool(true),
-				Logger:          velerotest.NewLogger(),
+				VolumePolicy: p,
+				Logger:       velerotest.NewLogger(),
 			}
 			objs := []runtime.Object{samplePod, samplePVC1, samplePVC2, samplePV1, samplePV2}
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
@@ -682,9 +653,8 @@ func TestVolumeHelperImpl_GetVolumesForFSBackup(t *testing.T) {
 				t.Fatalf("failed to build policy with error %v", err)
 			}
 			vh := &VolumeHelperImpl{
-				VolumePolicy:    p,
-				SnapshotVolumes: pointer.Bool(true),
-				Logger:          velerotest.NewLogger(),
+				VolumePolicy: p,
+				Logger:       velerotest.NewLogger(),
 			}
 			objs := []runtime.Object{samplePod, samplePVC1, samplePVC2, samplePV1, samplePV2}
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)

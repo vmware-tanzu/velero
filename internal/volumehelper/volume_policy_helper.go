@@ -8,7 +8,6 @@ import (
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 
 	"github.com/sirupsen/logrus"
@@ -26,9 +25,8 @@ type VolumeHelper interface {
 }
 
 type VolumeHelperImpl struct {
-	VolumePolicy    *resourcepolicies.Policies
-	SnapshotVolumes *bool
-	Logger          logrus.FieldLogger
+	VolumePolicy *resourcepolicies.Policies
+	Logger       logrus.FieldLogger
 }
 
 func (v *VolumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, groupResource schema.GroupResource, kbclient kbclient.Client) (bool, error) {
@@ -61,12 +59,11 @@ func (v *VolumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 			return false, err
 		}
 
-		// Also account for SnapshotVolumes flag on backup CR
-		if action != nil && action.Type == resourcepolicies.Snapshot && boolptr.IsSetToTrue(v.SnapshotVolumes) {
-			v.Logger.Infof(fmt.Sprintf("performing snapshot action for pv %s as it satisfies the volume policy criteria and snapshotVolumes is set to true", pv.Name))
+		if action != nil && action.Type == resourcepolicies.Snapshot {
+			v.Logger.Infof(fmt.Sprintf("performing snapshot action for pv %s as it satisfies the volume policy criteria", pv.Name))
 			return true, nil
 		}
-		v.Logger.Infof(fmt.Sprintf("skipping snapshot action for pv %s possibly due to not satisfying the volume policy criteria or snapshotVolumes is not true", pv.Name))
+		v.Logger.Infof(fmt.Sprintf("skipping snapshot action for pv %s due to not satisfying the volume policy criteria for snapshot action", pv.Name))
 		return false, nil
 	}
 

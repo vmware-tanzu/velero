@@ -190,8 +190,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 
 	// Instantiate volumepolicyhelper struct here
 	vh := &volumehelper.VolumeHelperImpl{
-		SnapshotVolumes: ib.backupRequest.Spec.SnapshotVolumes,
-		Logger:          logger,
+		Logger: logger,
 	}
 
 	if ib.backupRequest.ResPolicies != nil {
@@ -552,7 +551,7 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 		}
 	}
 
-	if boolptr.IsSetToFalse(ib.backupRequest.Spec.SnapshotVolumes) {
+	if boolptr.IsSetToFalse(ib.backupRequest.Spec.SnapshotVolumes) && vh.VolumePolicy == nil {
 		log.Info("Backup has volume snapshots disabled; skipping volume snapshot action.")
 		ib.trackSkippedPV(obj, kuberesource.PersistentVolumes, volumeSnapshotApproach, "backup has volume snapshots disabled", log)
 		return nil

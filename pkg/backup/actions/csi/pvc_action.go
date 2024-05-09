@@ -64,8 +64,8 @@ func (p *pvcBackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
 }
 
 func (p *pvcBackupItemAction) validateBackup(backup velerov1api.Backup) (valid bool) {
-	// Do nothing if volume snapshots have not been requested in this backup
-	if boolptr.IsSetToFalse(backup.Spec.SnapshotVolumes) {
+	// Do nothing if volume snapshots have not been requested in this backup (check for snapshotVolumes is only applicable for non-volume policy based approach)
+	if boolptr.IsSetToFalse(backup.Spec.SnapshotVolumes) && backup.Spec.ResourcePolicy == nil {
 		p.log.Infof(
 			"Volume snapshotting not requested for backup %s/%s",
 			backup.Namespace, backup.Name)
