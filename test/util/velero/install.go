@@ -598,22 +598,32 @@ func IsVeleroReady(ctx context.Context, veleroCfg *VeleroConfig) (bool, error) {
 		}
 	}
 
-	// Check BSL
-	stdout, stderr, err = velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "bsl", "default",
+	// Check BSL with poll
+	err = wait.PollUntilContextTimeout(ctx, PollInterval, time.Minute, true, func(ctx context.Context) (bool, error) {
+		return checkBSL(ctx, veleroCfg) == nil, nil
+	})
+	if err != nil {
+		return false, errors.Wrap(err, "failed to check the bsl")
+	}
+	return true, nil
+}
+
+func checkBSL(ctx context.Context, veleroCfg *VeleroConfig) error {
+	namespace := veleroCfg.VeleroNamespace
+	stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "bsl", "default",
 		"-o", "json", "-n", namespace))
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to get bsl %s stdout=%s, stderr=%s", veleroCfg.BSLBucket, stdout, stderr)
+		return errors.Wrapf(err, "failed to get bsl %s stdout=%s, stderr=%s", veleroCfg.BSLBucket, stdout, stderr)
 	} else {
 		bsl := &velerov1api.BackupStorageLocation{}
 		if err = json.Unmarshal([]byte(stdout), bsl); err != nil {
-			return false, errors.Wrapf(err, "failed to unmarshal the velero bsl")
+			return errors.Wrapf(err, "failed to unmarshal the velero bsl")
 		}
 		if bsl.Status.Phase != velerov1api.BackupStorageLocationPhaseAvailable {
-			return false, fmt.Errorf("current bsl %s is not available", veleroCfg.BSLBucket)
+			return fmt.Errorf("current bsl %s is not available", veleroCfg.BSLBucket)
 		}
 	}
-
-	return true, nil
+	return nil
 }
 
 func PrepareVelero(ctx context.Context, caseName string, veleroCfg VeleroConfig) error {
