@@ -1,0 +1,24 @@
+# This file is used by the [PROW action](https://github.com/jpmcb/prow-github-actions) to approve and merge PRs.
+# The file's format follows the [OWNERS SPEC](https://www.kubernetes.dev/docs/guide/owners/#owners-spec).
+
+# List of usernames who may use /lgtm
+reviewers:
+- @Lyndon-Li
+- @anshulahuja98
+- @blackpiglet
+- @qiuming-best
+- @reasonerjt
+- @shubham-pampattiwar
+- @sseago
+- @ywk253100
+
+# List of usernames who may use /approve
+approvers:
+- @Lyndon-Li
+- @anshulahuja98
+- @blackpiglet
+- @qiuming-best
+- @reasonerjt
+- @shubham-pampattiwar
+- @sseago
+- @ywk253100

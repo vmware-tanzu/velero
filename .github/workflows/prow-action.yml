@@ -13,8 +13,17 @@ jobs:
         with:
           # TODO: before allowing the /lgtm command, see if we can block merging if changelog labels are missing.
           prow-commands: |
+            /approve
             /area
+            /assign
             /cc
+            /close
+            /hold
             /kind
+            /milestone
+            /retitle
+            /remove
+            /reopen
             /uncc
+            /unassign
           github-token: "${{ secrets.GITHUB_TOKEN }}"
