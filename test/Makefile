@@ -132,7 +132,7 @@ POD_VOLUME_OPERATION_TIMEOUT ?= 6h
 COMMON_ARGS := -velerocli=$(VELERO_CLI) \
 	-velero-image=$(VELERO_IMAGE) \
 	-plugins=$(PLUGINS) \
-	-velero-version=$(VELERO_VERSION) \
+	-velero-version=$(VERSION) \
 	-restore-helper-image=$(RESTORE_HELPER_IMAGE) \
 	-velero-namespace=$(VELERO_NAMESPACE) \
 	-credentials-file=$(CREDS_FILE) \
