@@ -907,7 +907,9 @@ func getVeleroCliTarball(cliTarballUrl string) (*os.File, error) {
 	lastInd := strings.LastIndex(cliTarballUrl, "/")
 	tarball := cliTarballUrl[lastInd+1:]
 
-	resp, err := http.Get(cliTarballUrl)
+	cli := &http.Client{}
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, cliTarballUrl, nil)
+	resp, err := cli.Do(req)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "failed to access Velero CLI tarball")
 	}

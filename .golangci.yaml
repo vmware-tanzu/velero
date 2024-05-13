@@ -359,7 +359,6 @@ issues:
         - gosec
         - gosimple
         - nilerr
-        - noctx
         - staticcheck
         - stylecheck
         - unconvert
