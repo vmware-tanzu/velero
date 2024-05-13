@@ -21,10 +21,7 @@ set -o pipefail
 
 export CGO_ENABLED=0
 
-TARGETS=($(go list ./pkg/... ./internal/...| grep -vE "/pkg/builder|pkg/apis|pkg/test|pkg/generated|pkg/plugin/generated|mocks|internal/restartabletest"))
-TARGETS+=(
-  ./cmd/...
-)
+TARGETS=($(go list ./cmd/... ./pkg/... ./internal/...| grep -vE "/pkg/builder|pkg/apis|pkg/test|pkg/plugin/generated|mocks|internal/restartabletest"))
 
 if [[ ${#@} -ne 0 ]]; then
   TARGETS=("$@")
