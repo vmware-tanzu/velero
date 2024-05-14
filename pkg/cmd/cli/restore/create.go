@@ -39,6 +39,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/util/velero/restore"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -199,7 +200,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return errors.New("either a 'selector' or an 'or-selector' can be specified, but not both")
 	}
 
-	if len(o.ExistingResourcePolicy) > 0 && !isResourcePolicyValid(o.ExistingResourcePolicy) {
+	if len(o.ExistingResourcePolicy) > 0 && !restore.IsResourcePolicyValid(o.ExistingResourcePolicy) {
 		return errors.New("existing-resource-policy has invalid value, it accepts only none, update as value")
 	}
 
@@ -427,11 +428,4 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	fmt.Printf("Run `velero restore describe %s` or `velero restore logs %s` for more details.\n", restore.Name, restore.Name)
 
 	return nil
-}
-
-func isResourcePolicyValid(resourcePolicy string) bool {
-	if resourcePolicy == string(api.PolicyTypeNone) || resourcePolicy == string(api.PolicyTypeUpdate) {
-		return true
-	}
-	return false
 }

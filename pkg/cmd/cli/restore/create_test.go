@@ -34,12 +34,6 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-func TestIsResourcePolicyValid(t *testing.T) {
-	require.True(t, isResourcePolicyValid(string(velerov1api.PolicyTypeNone)))
-	require.True(t, isResourcePolicyValid(string(velerov1api.PolicyTypeUpdate)))
-	require.False(t, isResourcePolicyValid(""))
-}
-
 func TestMostRecentBackup(t *testing.T) {
 	backups := []velerov1api.Backup{
 		*builder.ForBackup(cmdtest.VeleroNameSpace, "backup0").StartTimestamp(time.Now().Add(3 * time.Second)).Phase(velerov1api.BackupPhaseDeleting).Result(),
