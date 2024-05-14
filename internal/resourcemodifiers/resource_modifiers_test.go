@@ -456,6 +456,20 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 		},
 	}
 
+	pvcGoldSc := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "PersistentVolumeClaim",
+			"metadata": map[string]interface{}{
+				"name":      "test-pvc",
+				"namespace": "foo",
+			},
+			"spec": map[string]interface{}{
+				"storageClassName": "gold",
+			},
+		},
+	}
+
 	deployNginxOneReplica := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "apps/v1",
@@ -678,6 +692,110 @@ func TestResourceModifiers_ApplyResourceModifierRules(t *testing.T) {
 			},
 			wantErr: false,
 			wantObj: pvcPremiumSc.DeepCopy(),
+		},
+		{
+			name: "pvc with standard storage class should be patched to premium, even when rules are [standard => premium, premium => gold]",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupResource:     "persistentvolumeclaims",
+							ResourceNameRegex: ".*",
+							Matches: []MatchRule{
+								{
+									Path:  "/spec/storageClassName",
+									Value: "standard",
+								},
+							},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "replace",
+								Path:      "/spec/storageClassName",
+								Value:     "premium",
+							},
+						},
+					},
+					{
+						Conditions: Conditions{
+							GroupResource:     "persistentvolumeclaims",
+							ResourceNameRegex: ".*",
+							Matches: []MatchRule{
+								{
+									Path:  "/spec/storageClassName",
+									Value: "premium",
+								},
+							},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "replace",
+								Path:      "/spec/storageClassName",
+								Value:     "gold",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           pvcStandardSc.DeepCopy(),
+				groupResource: "persistentvolumeclaims",
+			},
+			wantErr: false,
+			wantObj: pvcPremiumSc.DeepCopy(),
+		},
+		{
+			name: "pvc with standard storage class should be patched to gold, even when rules are [standard => premium, standard => gold]",
+			fields: fields{
+				Version: "v1",
+				ResourceModifierRules: []ResourceModifierRule{
+					{
+						Conditions: Conditions{
+							GroupResource:     "persistentvolumeclaims",
+							ResourceNameRegex: ".*",
+							Matches: []MatchRule{
+								{
+									Path:  "/spec/storageClassName",
+									Value: "standard",
+								},
+							},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "replace",
+								Path:      "/spec/storageClassName",
+								Value:     "premium",
+							},
+						},
+					},
+					{
+						Conditions: Conditions{
+							GroupResource:     "persistentvolumeclaims",
+							ResourceNameRegex: ".*",
+							Matches: []MatchRule{
+								{
+									Path:  "/spec/storageClassName",
+									Value: "standard",
+								},
+							},
+						},
+						Patches: []JSONPatch{
+							{
+								Operation: "replace",
+								Path:      "/spec/storageClassName",
+								Value:     "gold",
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				obj:           pvcStandardSc.DeepCopy(),
+				groupResource: "persistentvolumeclaims",
+			},
+			wantErr: false,
+			wantObj: pvcGoldSc.DeepCopy(),
 		},
 		{
 			name: "nginx deployment: 1 -> 2 replicas",
