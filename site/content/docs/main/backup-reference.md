@@ -66,6 +66,33 @@ velero backup create --from-schedule example-schedule
 
 This command will immediately trigger a new backup based on your template for `example-schedule`. This will not affect the backup schedule, and another backup will trigger at the scheduled time.
 
+### Time zone specification
+Time zone can be specified in the schedule cron. The format is `CRON_TZ=<timezone> <cron>`.
+
+Specifying timezones can reduce disputes in the case of daylight saving time changes. For example, if the schedule is set to run at 3am, and daylight saving time changes, the schedule will still run at 3am in the timezone specified.
+
+Be aware that jobs scheduled during daylight-savings leap-ahead transitions will not be run!
+
+For example, the command below creates a backup that runs every day at 3am in the timezone `America/New_York`.
+
+```
+velero schedule create example-schedule --schedule="CRON_TZ=America/New_York 0 3 * * *"
+```
+
+Another example, the command below creates a backup that runs every day at 3am in the timezone `Asia/Shanghai`.
+
+```
+velero schedule create example-schedule --schedule="CRON_TZ=Asia/Shanghai 0 3 * * *"
+```
+
+The supported timezone names are listed in the [IANA Time Zone Database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones#List) under 'TZ identifier'.
+<!--
+cron's WithLocation functions uses time.Location as parameter, and [time.LoadLocation](https://pkg.go.dev/time#LoadLocation) support names from IANA timezone database in following locations in this order
+- the directory or uncompressed zip file named by the ZONEINFO environment variable
+- on a Unix system, the system standard installation location
+- $GOROOT/lib/time/zoneinfo.zip
+- the time/tzdata package, if it was imported
+ -->
 
 ### Limitation
 
