@@ -1335,10 +1335,12 @@ func (a *recordResourcesAction) WithSkippedCSISnapshotFlag(flag bool) *recordRes
 // verifies that the data in SkippedPVTracker is updated as expected.
 func TestBackupItemActionsForSkippedPV(t *testing.T) {
 	tests := []struct {
-		name         string
-		backupReq    *Request
-		apiResources []*test.APIResource
-		actions      []*recordResourcesAction
+		name             string
+		backupReq        *Request
+		apiResources     []*test.APIResource
+		runtimeResources []runtime.Object
+		actions          []*recordResourcesAction
+		resPolicies      *resourcepolicies.ResourcePolicies
 		// {pvName:{approach: reason}}
 		expectSkippedPVs    map[string]map[string]string
 		expectNotSkippedPVs []string
@@ -1346,13 +1348,31 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 		{
 			name: "backup item action returns the 'not a CSI volume' error and the PV should be tracked as skippedPV",
 			backupReq: &Request{
-				Backup:           defaultBackup().Result(),
+				Backup:           defaultBackup().SnapshotVolumes(false).Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
 			},
+			resPolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Action: resourcepolicies.Action{Type: "snapshot"},
+						Conditions: map[string]interface{}{
+							"storageClass": []string{"gp2"},
+						},
+					},
+				},
+			},
 			apiResources: []*test.APIResource{
-				test.PVCs(
-					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Result(),
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").StorageClass("gp2").Result(),
 				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").StorageClass("gp2").Phase(corev1.ClaimBound).Result(),
+				),
+			},
+			runtimeResources: []runtime.Object{
+				builder.ForPersistentVolume("pv-1").StorageClass("gp2").Result(),
+				builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").StorageClass("gp2").Phase(corev1.ClaimBound).Result(),
 			},
 			actions: []*recordResourcesAction{
 				new(recordResourcesAction).WithName(csiBIAPluginName).ForNamespace("ns-1").ForResource("persistentvolumeclaims").WithSkippedCSISnapshotFlag(true),
@@ -1379,8 +1399,12 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 			},
 			apiResources: []*test.APIResource{
 				test.PVCs(
-					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Result(),
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Phase(corev1.ClaimBound).Result(),
 				),
+			},
+			runtimeResources: []runtime.Object{
+				builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Phase(corev1.ClaimBound).Result(),
+				builder.ForPersistentVolume("pv-1").StorageClass("gp2").Result(),
 			},
 			actions: []*recordResourcesAction{
 				new(recordResourcesAction).ForNamespace("ns-1").ForResource("persistentvolumeclaims").WithName(csiBIAPluginName),
@@ -1399,7 +1423,9 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 			var (
 				h          = newHarness(t)
 				backupFile = bytes.NewBuffer([]byte{})
+				fakeClient = test.NewFakeControllerRuntimeClient(t, tc.runtimeResources...)
 			)
+			h.backupper.kbClient = fakeClient
 
 			for _, resource := range tc.apiResources {
 				h.addItems(t, resource)
@@ -1408,6 +1434,11 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 			actions := []biav2.BackupItemAction{}
 			for _, action := range tc.actions {
 				actions = append(actions, action)
+			}
+
+			if tc.resPolicies != nil {
+				tc.backupReq.ResPolicies = new(resourcepolicies.Policies)
+				require.NoError(t, tc.backupReq.ResPolicies.BuildPolicy(tc.resPolicies))
 			}
 
 			err := h.backupper.Backup(h.log, tc.backupReq, backupFile, actions, nil)
@@ -3098,6 +3129,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 		name              string
 		backup            *velerov1.Backup
 		apiResources      []*test.APIResource
+		pod               *corev1.Pod
 		vsl               *velerov1.VolumeSnapshotLocation
 		snapshotterGetter volumeSnapshotterGetter
 		want              []*velerov1.PodVolumeBackup
@@ -3107,8 +3139,19 @@ func TestBackupWithPodVolume(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "foo")).Result(),
+					builder.ForPod("ns-1", "pod-1").
+						ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "foo")).
+						Volumes(&corev1.Volume{
+							Name: "foo",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "foo",
+								},
+							},
+						}).
+						Result(),
 				),
+				test.PVCs(),
 			},
 			want: []*velerov1.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-foo").Volume("foo").Result(),
@@ -3130,6 +3173,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 						Volumes(builder.ForVolume("bar").PersistentVolumeClaimSource("pvc-1").Result()).
 						Result(),
 				),
+				test.PVCs(),
 			},
 			want: []*velerov1.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-foo").Volume("foo").Result(),
@@ -3151,6 +3195,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 						Volumes(builder.ForVolume("bar").PersistentVolumeClaimSource("pvc-1").Result()).
 						Result(),
 				),
+				test.PVCs(),
 			},
 			want: []*velerov1.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-2-bar").Volume("bar").Result(),
@@ -3176,11 +3221,19 @@ func TestBackupWithPodVolume(t *testing.T) {
 					builder.ForPersistentVolumeClaim("ns-1", "pvc-2").VolumeName("pv-2").Result(),
 				),
 				test.PVs(
-
 					builder.ForPersistentVolume("pv-1").ClaimRef("ns-1", "pvc-1").Result(),
 					builder.ForPersistentVolume("pv-2").ClaimRef("ns-1", "pvc-2").Result(),
 				),
 			},
+			pod: builder.ForPod("ns-1", "pod-1").
+				Volumes(
+					builder.ForVolume("vol-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("vol-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				ObjectMeta(
+					builder.WithAnnotations("backup.velero.io/backup-volumes", "vol-1,vol-2"),
+				).
+				Result(),
 			vsl: newSnapshotLocation("velero", "default", "default"),
 			snapshotterGetter: map[string]vsv1.VolumeSnapshotter{
 				"default": new(fakeVolumeSnapshotter).
@@ -3205,6 +3258,10 @@ func TestBackupWithPodVolume(t *testing.T) {
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
+
+			if tc.pod != nil {
+				require.NoError(t, h.backupper.kbClient.Create(context.Background(), tc.pod))
+			}
 
 			h.backupper.podVolumeBackupperFactory = new(fakePodVolumeBackupperFactory)
 

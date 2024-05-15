@@ -110,7 +110,7 @@ func GetVolumesToExclude(obj metav1.Object) []string {
 }
 
 func IsPVCDefaultToFSBackup(pvcNamespace, pvcName string, crClient crclient.Client, defaultVolumesToFsBackup bool) (bool, error) {
-	pods, err := getPodsUsingPVC(pvcNamespace, pvcName, crClient)
+	pods, err := GetPodsUsingPVC(pvcNamespace, pvcName, crClient)
 	if err != nil {
 		return false, errors.WithStack(err)
 	}
@@ -140,7 +140,7 @@ func getPodVolumeNameForPVC(pod corev1api.Pod, pvcName string) (string, error) {
 	return "", errors.Errorf("Pod %s/%s does not use PVC %s/%s", pod.Namespace, pod.Name, pod.Namespace, pvcName)
 }
 
-func getPodsUsingPVC(
+func GetPodsUsingPVC(
 	pvcNamespace, pvcName string,
 	crClient crclient.Client,
 ) ([]corev1api.Pod, error) {

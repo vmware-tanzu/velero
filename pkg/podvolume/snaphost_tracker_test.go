@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package podvolume
 
 import (
 	"testing"
@@ -29,7 +29,7 @@ func TestOptoutVolume(t *testing.T) {
 		builder.ForVolume("pod-vol-1").PersistentVolumeClaimSource("pvc-1").Result(),
 		builder.ForVolume("pod-vol-2").PersistentVolumeClaimSource("pvc-2").Result(),
 	).Result()
-	tracker := newPVCSnapshotTracker()
+	tracker := NewTracker()
 	tracker.Optout(pod, "pod-vol-1")
 	ok, pn := tracker.OptedoutByPod("ns-1", "pvc-1")
 	assert.True(t, ok)
@@ -48,7 +48,7 @@ func TestOptoutVolume(t *testing.T) {
 }
 
 func TestABC(t *testing.T) {
-	tracker := newPVCSnapshotTracker()
+	tracker := NewTracker()
 	v1, v2 := tracker.OptedoutByPod("a", "b")
 	t.Logf("v1: %v, v2: %v", v1, v2)
 }

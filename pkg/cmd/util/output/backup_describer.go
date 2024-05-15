@@ -40,7 +40,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 
 	"github.com/vmware-tanzu/velero/internal/volume"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
@@ -430,13 +429,16 @@ func describeBackupResourceList(ctx context.Context, kbClient kbclient.Client, d
 	}
 }
 
-func describeBackupVolumes(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, details bool,
-	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackupCRs []velerov1api.PodVolumeBackup) {
-	if boolptr.IsSetToFalse(backup.Spec.SnapshotVolumes) {
-		d.Println("Backup Volumes: <none included>")
-		return
-	}
-
+func describeBackupVolumes(
+	ctx context.Context,
+	kbClient kbclient.Client,
+	d *Describer,
+	backup *velerov1api.Backup,
+	details bool,
+	insecureSkipTLSVerify bool,
+	caCertPath string,
+	podVolumeBackupCRs []velerov1api.PodVolumeBackup,
+) {
 	d.Println("Backup Volumes:")
 
 	nativeSnapshots := []*volume.BackupVolumeInfo{}

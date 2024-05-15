@@ -38,7 +38,6 @@ type PVRestorer interface {
 type pvRestorer struct {
 	logger                  logrus.FieldLogger
 	backup                  *api.Backup
-	snapshotVolumes         *bool
 	restorePVs              *bool
 	volumeSnapshots         []*volume.Snapshot
 	volumeSnapshotterGetter VolumeSnapshotterGetter
@@ -51,11 +50,6 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 	pvName := obj.GetName()
 	if pvName == "" {
 		return nil, errors.New("PersistentVolume is missing its name")
-	}
-
-	if boolptr.IsSetToFalse(r.snapshotVolumes) {
-		// The backup had snapshots disabled, so we can return early
-		return obj, nil
 	}
 
 	if boolptr.IsSetToFalse(r.restorePVs) {

@@ -786,7 +786,7 @@ func TestGetPodsUsingPVC(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualPods, err := getPodsUsingPVC(tc.pvcNamespace, tc.pvcName, fakeClient)
+			actualPods, err := GetPodsUsingPVC(tc.pvcNamespace, tc.pvcName, fakeClient)
 			assert.Nilf(t, err, "Want error=nil; Got error=%v", err)
 			assert.Lenf(t, actualPods, tc.expectedPodCount, "unexpected number of pods in result; Want: %d; Got: %d", tc.expectedPodCount, len(actualPods))
 		})

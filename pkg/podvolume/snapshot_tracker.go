@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package podvolume
 
 import (
 	"fmt"
@@ -22,9 +22,9 @@ import (
 	corev1api "k8s.io/api/core/v1"
 )
 
-// pvcSnapshotTracker keeps track of persistent volume claims that have been handled
+// Tracker keeps track of persistent volume claims that have been handled
 // via pod volume backup.
-type pvcSnapshotTracker struct {
+type Tracker struct {
 	pvcs   map[string]pvcSnapshotStatus
 	pvcPod map[string]string
 }
@@ -38,8 +38,8 @@ const (
 	pvcSnapshotStatusOptedout
 )
 
-func newPVCSnapshotTracker() *pvcSnapshotTracker {
-	return &pvcSnapshotTracker{
+func NewTracker() *Tracker {
+	return &Tracker{
 		pvcs: make(map[string]pvcSnapshotStatus),
 		// key: pvc ns/name, value: pod name
 		pvcPod: make(map[string]string),
@@ -47,23 +47,23 @@ func newPVCSnapshotTracker() *pvcSnapshotTracker {
 }
 
 // Track indicates a volume from a pod should be snapshotted by pod volume backup.
-func (t *pvcSnapshotTracker) Track(pod *corev1api.Pod, volumeName string) {
+func (t *Tracker) Track(pod *corev1api.Pod, volumeName string) {
 	t.recordStatus(pod, volumeName, pvcSnapshotStatusTracked, pvcSnapshotStatusNotTracked)
 }
 
 // Take indicates a volume from a pod has been taken by pod volume backup.
-func (t *pvcSnapshotTracker) Take(pod *corev1api.Pod, volumeName string) {
+func (t *Tracker) Take(pod *corev1api.Pod, volumeName string) {
 	t.recordStatus(pod, volumeName, pvcSnapshotStatusTaken, pvcSnapshotStatusTracked)
 }
 
 // Optout indicates a volume from a pod has been opted out by pod's annotation
-func (t *pvcSnapshotTracker) Optout(pod *corev1api.Pod, volumeName string) {
+func (t *Tracker) Optout(pod *corev1api.Pod, volumeName string) {
 	t.recordStatus(pod, volumeName, pvcSnapshotStatusOptedout, pvcSnapshotStatusNotTracked)
 }
 
 // OptedoutByPod returns true if the PVC with the specified namespace and name has been opted out by the pod.  The
 // second return value is the name of the pod which has the annotation that opted out the volume/pvc
-func (t *pvcSnapshotTracker) OptedoutByPod(namespace, name string) (bool, string) {
+func (t *Tracker) OptedoutByPod(namespace, name string) (bool, string) {
 	status, found := t.pvcs[key(namespace, name)]
 
 	if !found || status != pvcSnapshotStatusOptedout {
@@ -73,7 +73,7 @@ func (t *pvcSnapshotTracker) OptedoutByPod(namespace, name string) (bool, string
 }
 
 // if the volume is a PVC, record the status and the related pod
-func (t *pvcSnapshotTracker) recordStatus(pod *corev1api.Pod, volumeName string, status pvcSnapshotStatus, preReqStatus pvcSnapshotStatus) {
+func (t *Tracker) recordStatus(pod *corev1api.Pod, volumeName string, status pvcSnapshotStatus, preReqStatus pvcSnapshotStatus) {
 	for _, volume := range pod.Spec.Volumes {
 		if volume.Name == volumeName {
 			if volume.PersistentVolumeClaim != nil {
@@ -92,14 +92,14 @@ func (t *pvcSnapshotTracker) recordStatus(pod *corev1api.Pod, volumeName string,
 }
 
 // Has returns true if the PVC with the specified namespace and name has been tracked.
-func (t *pvcSnapshotTracker) Has(namespace, name string) bool {
+func (t *Tracker) Has(namespace, name string) bool {
 	status, found := t.pvcs[key(namespace, name)]
 	return found && (status == pvcSnapshotStatusTracked || status == pvcSnapshotStatusTaken)
 }
 
 // TakenForPodVolume returns true and the PVC's name if the pod volume with the specified name uses a
 // PVC and that PVC has been taken by pod volume backup.
-func (t *pvcSnapshotTracker) TakenForPodVolume(pod *corev1api.Pod, volume string) (bool, string) {
+func (t *Tracker) TakenForPodVolume(pod *corev1api.Pod, volume string) (bool, string) {
 	for _, podVolume := range pod.Spec.Volumes {
 		if podVolume.Name != volume {
 			continue

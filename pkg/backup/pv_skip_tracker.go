@@ -50,10 +50,11 @@ type skipPVTracker struct {
 }
 
 const (
-	podVolumeApproach      = "podvolume"
-	csiSnapshotApproach    = "csiSnapshot"
-	volumeSnapshotApproach = "volumeSnapshot"
-	anyApproach            = "any"
+	podVolumeApproach       = "podvolume"
+	csiSnapshotApproach     = "csiSnapshot"
+	volumeSnapshotApproach  = "volumeSnapshot"
+	vsphereSnapshotApproach = "vsphereSnapshot"
+	anyApproach             = "any"
 )
 
 func NewSkipPVTracker() *skipPVTracker {

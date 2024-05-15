@@ -4,34 +4,56 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
-
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	pdvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
+	podvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
 )
 
 type VolumeHelper interface {
-	GetVolumesForFSBackup(pod *corev1api.Pod, defaultVolumesToFsBackup, backupExcludePVC bool, kbclient kbclient.Client) ([]string, []string, error)
-	ShouldPerformSnapshot(obj runtime.Unstructured, groupResource schema.GroupResource, kbclient kbclient.Client) (bool, error)
+	ShouldPerformSnapshot(obj runtime.Unstructured, groupResource schema.GroupResource) (bool, error)
+	ShouldPerformFSBackup(volume corev1api.Volume, pod corev1api.Pod) (bool, error)
 }
 
-type VolumeHelperImpl struct {
-	VolumePolicy    *resourcepolicies.Policies
-	SnapshotVolumes *bool
-	Logger          logrus.FieldLogger
+type volumeHelperImpl struct {
+	volumePolicy             *resourcepolicies.Policies
+	snapshotVolumes          *bool
+	logger                   logrus.FieldLogger
+	client                   crclient.Client
+	defaultVolumesToFSBackup bool
+	// This parameter is used to align the fs-backup with snapshot action,
+	// because PVC is already filtered by the resource filter before getting
+	// to the volume policy check, but fs-backup is based on the pod resource,
+	// the resource filter on PVC and PV doesn't work on this scenario.
+	backupExcludePVC bool
 }
 
-func (v *VolumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, groupResource schema.GroupResource, kbclient kbclient.Client) (bool, error) {
+func NewVolumeHelperImpl(
+	volumePolicy *resourcepolicies.Policies,
+	snapshotVolumes *bool,
+	logger logrus.FieldLogger,
+	client crclient.Client,
+	defaultVolumesToFSBackup bool,
+	backupExcludePVC bool,
+) VolumeHelper {
+	return &volumeHelperImpl{
+		volumePolicy:             volumePolicy,
+		snapshotVolumes:          snapshotVolumes,
+		logger:                   logger,
+		client:                   client,
+		defaultVolumesToFSBackup: defaultVolumesToFSBackup,
+		backupExcludePVC:         backupExcludePVC,
+	}
+}
+
+func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, groupResource schema.GroupResource) (bool, error) {
 	// check if volume policy exists and also check if the object(pv/pvc) fits a volume policy criteria and see if the associated action is snapshot
 	// if it is not snapshot then skip the code path for snapshotting the PV/PVC
 	pvc := new(corev1api.PersistentVolumeClaim)
@@ -40,130 +62,156 @@ func (v *VolumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 
 	if groupResource == kuberesource.PersistentVolumeClaims {
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
+			v.logger.WithError(err).Error("fail to convert unstructured into PVC")
 			return false, err
 		}
 
-		pv, err = kubeutil.GetPVForPVC(pvc, kbclient)
+		pv, err = kubeutil.GetPVForPVC(pvc, v.client)
 		if err != nil {
+			v.logger.WithError(err).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
 			return false, err
 		}
 	}
 
 	if groupResource == kuberesource.PersistentVolumes {
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pv); err != nil {
+			v.logger.WithError(err).Error("fail to convert unstructured into PV")
 			return false, err
 		}
 	}
 
-	if v.VolumePolicy != nil {
-		action, err := v.VolumePolicy.GetMatchAction(pv)
+	if v.volumePolicy != nil {
+		action, err := v.volumePolicy.GetMatchAction(pv)
 		if err != nil {
+			v.logger.WithError(err).Errorf("fail to get VolumePolicy match action for PV %s", pv.Name)
 			return false, err
 		}
 
-		// Also account for SnapshotVolumes flag on backup CR
-		if action != nil && action.Type == resourcepolicies.Snapshot && boolptr.IsSetToTrue(v.SnapshotVolumes) {
-			v.Logger.Infof(fmt.Sprintf("performing snapshot action for pv %s as it satisfies the volume policy criteria and snapshotVolumes is set to true", pv.Name))
-			return true, nil
+		// If there is a match action, and the action type is snapshot, return true,
+		// or the action type is not snapshot, then return false.
+		// If there is no match action, go on to the next check.
+		if action != nil {
+			if action.Type == resourcepolicies.Snapshot {
+				v.logger.Infof(fmt.Sprintf("performing snapshot action for pv %s", pv.Name))
+				return true, nil
+			} else {
+				v.logger.Infof("Skip snapshot action for pv %s as the action type is %s", pv.Name, action.Type)
+				return false, nil
+			}
 		}
-		v.Logger.Infof(fmt.Sprintf("skipping snapshot action for pv %s possibly due to not satisfying the volume policy criteria or snapshotVolumes is not true", pv.Name))
-		return false, nil
 	}
 
+	// If this PV is claimed, see if we've already taken a (pod volume backup)
+	// snapshot of the contents of this PV. If so, don't take a snapshot.
+	if pv.Spec.ClaimRef != nil {
+		pods, err := podvolumeutil.GetPodsUsingPVC(
+			pv.Spec.ClaimRef.Namespace,
+			pv.Spec.ClaimRef.Name,
+			v.client,
+		)
+		if err != nil {
+			v.logger.WithError(err).Errorf("fail to get pod for PV %s", pv.Name)
+			return false, err
+		}
+
+		for _, pod := range pods {
+			for _, vol := range pod.Spec.Volumes {
+				if vol.PersistentVolumeClaim != nil &&
+					vol.PersistentVolumeClaim.ClaimName == pv.Spec.ClaimRef.Name &&
+					v.shouldPerformFSBackupLegacy(vol, pod) {
+					v.logger.Infof("Skipping snapshot of pv %s because it is backed up with PodVolumeBackup.", pv.Name)
+					return false, nil
+				}
+			}
+		}
+	}
+
+	if !boolptr.IsSetToFalse(v.snapshotVolumes) {
+		// If the backup.Spec.SnapshotVolumes is not set, or set to true, then should take the snapshot.
+		v.logger.Infof("performing snapshot action for pv %s as the snapshotVolumes is not set to false")
+		return true, nil
+	}
+
+	v.logger.Infof(fmt.Sprintf("skipping snapshot action for pv %s possibly due to no volume policy setting or snapshotVolumes is false", pv.Name))
 	return false, nil
 }
 
-func (v *VolumeHelperImpl) GetVolumesForFSBackup(pod *corev1api.Pod, defaultVolumesToFsBackup, backupExcludePVC bool, kbclient kbclient.Client) ([]string, []string, error) {
-	// Check if there is a fs-backup/snapshot volume policy specified by the user, if yes then use the volume policy approach to
-	// get the list volumes for fs-backup else go via the legacy annotation based approach
-	var fsBackupVolumePolicyVols, nonFsBackupVolumePolicyVols, volsToProcessByLegacyApproach = make([]string, 0), make([]string, 0), make([]string, 0)
-	var err error
+func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod corev1api.Pod) (bool, error) {
+	if !v.shouldIncludeVolumeInBackup(volume) {
+		v.logger.Debugf("skip fs-backup action for pod %s's volume %s, due to not pass volume check.", pod.Namespace+"/"+pod.Name, volume.Name)
+		return false, nil
+	}
 
-	if v.VolumePolicy != nil {
-		// Get the list of volumes to back up using pod volume backup for the given pod matching fs-backup volume policy action
-		v.Logger.Infof("Volume Policy specified by the user, using volume policy approach to segregate pod volumes for fs-backup")
-		// GetVolumesMatchingFSBackupAction return 3 list of Volumes:
-		// fsBackupVolumePolicyVols: Volumes that have a matching fs-backup action from the volume policy specified by the user
-		// nonFsBackupVolumePolicyVols: Volumes that have an action matching from the volume policy specified by the user, but it is not fs-backup action
-		// volsToProcessByLegacyApproach: Volumes that did not have any matching action i.e. action was nil from the volume policy specified by the user, these volumes will be processed via the legacy annotations based approach (fallback option)
-		fsBackupVolumePolicyVols, nonFsBackupVolumePolicyVols, volsToProcessByLegacyApproach, err = v.GetVolumesMatchingFSBackupAction(pod, v.VolumePolicy, backupExcludePVC, kbclient)
+	if v.volumePolicy != nil {
+		pvc, err := kubeutil.GetPVCForPodVolume(&volume, &pod, v.client)
 		if err != nil {
-			return fsBackupVolumePolicyVols, nonFsBackupVolumePolicyVols, err
+			v.logger.WithError(err).Errorf("fail to get PVC for pod %s", pod.Namespace+"/"+pod.Name)
+			return false, err
 		}
-		// if volsToProcessByLegacyApproach is empty then no need to sue legacy approach as fallback option return from here
-		if len(volsToProcessByLegacyApproach) == 0 {
-			return fsBackupVolumePolicyVols, nonFsBackupVolumePolicyVols, nil
+		pv, err := kubeutil.GetPVForPVC(pvc, v.client)
+		if err != nil {
+			v.logger.WithError(err).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
+			return false, err
+		}
+
+		action, err := v.volumePolicy.GetMatchAction(pv)
+		if err != nil {
+			v.logger.WithError(err).Errorf("fail to get VolumePolicy match action for PV %s", pv.Name)
+			return false, err
+		}
+
+		if action != nil {
+			if action.Type == resourcepolicies.FSBackup {
+				v.logger.Infof("Perform fs-backup action for volume %s of pod %s due to volume policy match",
+					volume.Name, pod.Namespace+"/"+pod.Name)
+				return true, nil
+			} else {
+				v.logger.Infof("Skip fs-backup action for volume %s for pod %s because the action type is %s",
+					volume.Name, pod.Namespace+"/"+pod.Name, action.Type)
+				return false, nil
+			}
 		}
 	}
 
-	// process legacy annotation based approach, this will done when:
-	// 1. volume policy os specified by the user
-	// 2. And there are some volumes for which the volume policy approach did not get any supported matching actions
-	if v.VolumePolicy != nil && len(volsToProcessByLegacyApproach) > 0 {
-		v.Logger.Infof("volume policy specified by the user but there are volumes with no matching action, using legacy approach based on annotations as a fallback for those volumes")
-		includedVolumesFromLegacyFallBack, optedOutVolumesFromLegacyFallBack := pdvolumeutil.GetVolumesByPod(pod, defaultVolumesToFsBackup, backupExcludePVC, volsToProcessByLegacyApproach)
-		// merge the volumePolicy approach and legacy Fallback lists
-		fsBackupVolumePolicyVols = append(fsBackupVolumePolicyVols, includedVolumesFromLegacyFallBack...)
-		nonFsBackupVolumePolicyVols = append(nonFsBackupVolumePolicyVols, optedOutVolumesFromLegacyFallBack...)
-		return fsBackupVolumePolicyVols, nonFsBackupVolumePolicyVols, nil
+	if v.shouldPerformFSBackupLegacy(volume, pod) {
+		v.logger.Infof("Perform fs-backup action for volume %s of pod %s due to opt-in/out way",
+			volume.Name, pod.Namespace+"/"+pod.Name)
+		return true, nil
+	} else {
+		v.logger.Infof("Skip fs-backup action for volume %s of pod %s due to opt-in/out way",
+			volume.Name, pod.Namespace+"/"+pod.Name)
+		return false, nil
 	}
-	// Normal legacy workflow
-	// Get the list of volumes to back up using pod volume backup from the pod's annotations.
-	// We will also pass the list of volume that did not have any supported volume policy action matched in legacy approach so that
-	// those volumes get processed via legacy annotation based approach, this is a fallback option on annotation based legacy approach
-	v.Logger.Infof("fs-backup or snapshot Volume Policy not specified by the user, using legacy approach based on annotations")
-	includedVolumes, optedOutVolumes := pdvolumeutil.GetVolumesByPod(pod, defaultVolumesToFsBackup, backupExcludePVC, volsToProcessByLegacyApproach)
-	return includedVolumes, optedOutVolumes, nil
 }
 
-// GetVolumesMatchingFSBackupAction returns a list of volume names to backup for the provided pod having fs-backup volume policy action
-func (v *VolumeHelperImpl) GetVolumesMatchingFSBackupAction(pod *corev1api.Pod, volumePolicies *resourcepolicies.Policies, backupExcludePVC bool, kbclient kbclient.Client) ([]string, []string, []string, error) {
-	FSBackupActionMatchingVols := []string{}
-	FSBackupNonActionMatchingVols := []string{}
-	NoActionMatchingVols := []string{}
-
-	for i, vol := range pod.Spec.Volumes {
-		if !v.ShouldIncludeVolumeInBackup(vol, backupExcludePVC) {
-			continue
-		}
-
-		if vol.PersistentVolumeClaim != nil {
-			// fetch the associated PVC first
-			pvc, err := kubeutil.GetPVCForPodVolume(&pod.Spec.Volumes[i], pod, kbclient)
-			if err != nil {
-				return FSBackupActionMatchingVols, FSBackupNonActionMatchingVols, NoActionMatchingVols, err
-			}
-			// now fetch the PV and call GetMatchAction on it
-			pv, err := kubeutil.GetPVForPVC(pvc, kbclient)
-			if err != nil {
-				return FSBackupActionMatchingVols, FSBackupNonActionMatchingVols, NoActionMatchingVols, err
-			}
-			// now get the action for pv
-			action, err := volumePolicies.GetMatchAction(pv)
-			if err != nil {
-				return FSBackupActionMatchingVols, FSBackupNonActionMatchingVols, NoActionMatchingVols, err
-			}
-
-			// Record volume list having no matched action so that they are processed in legacy fallback option
-			if action == nil {
-				NoActionMatchingVols = append(NoActionMatchingVols, vol.Name)
-			}
-
-			// Now if the matched action is not nil and is `fs-backup` then add that Volume to the FSBackupActionMatchingVols
-			// else add that volume to FSBackupNonActionMatchingVols
-			// we already tracked the volume not matching any kind actions supported by volume policy in  NoActionMatchingVols
-			// The NoActionMatchingVols list will be processed via legacy annotation based approach as a fallback option
-			if action != nil && action.Type == resourcepolicies.FSBackup {
-				FSBackupActionMatchingVols = append(FSBackupActionMatchingVols, vol.Name)
-			} else if action != nil {
-				FSBackupNonActionMatchingVols = append(FSBackupNonActionMatchingVols, vol.Name)
+func (v volumeHelperImpl) shouldPerformFSBackupLegacy(
+	volume corev1api.Volume,
+	pod corev1api.Pod,
+) bool {
+	// Check volume in opt-in way
+	if !v.defaultVolumesToFSBackup {
+		optInVolumeNames := podvolumeutil.GetVolumesToBackup(&pod)
+		for _, volumeName := range optInVolumeNames {
+			if volume.Name == volumeName {
+				return true
 			}
 		}
+
+		return false
+	} else {
+		// Check volume in opt-out way
+		optOutVolumeNames := podvolumeutil.GetVolumesToExclude(&pod)
+		for _, volumeName := range optOutVolumeNames {
+			if volume.Name == volumeName {
+				return false
+			}
+		}
+
+		return true
 	}
-	return FSBackupActionMatchingVols, FSBackupNonActionMatchingVols, NoActionMatchingVols, nil
 }
 
-func (v *VolumeHelperImpl) ShouldIncludeVolumeInBackup(vol corev1api.Volume, backupExcludePVC bool) bool {
+func (v *volumeHelperImpl) shouldIncludeVolumeInBackup(vol corev1api.Volume) bool {
 	includeVolumeInBackup := true
 	// cannot backup hostpath volumes as they are not mounted into /var/lib/kubelet/pods
 	// and therefore not accessible to the node agent daemon set.
@@ -186,7 +234,7 @@ func (v *VolumeHelperImpl) ShouldIncludeVolumeInBackup(vol corev1api.Volume, bac
 	if vol.DownwardAPI != nil {
 		includeVolumeInBackup = false
 	}
-	if vol.PersistentVolumeClaim != nil && backupExcludePVC {
+	if vol.PersistentVolumeClaim != nil && v.backupExcludePVC {
 		includeVolumeInBackup = false
 	}
 	// don't include volumes that mount the default service account token.

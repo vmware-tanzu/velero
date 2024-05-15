@@ -270,7 +270,6 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 	pvRestorer := &pvRestorer{
 		logger:                  req.Log,
 		backup:                  req.Backup,
-		snapshotVolumes:         req.Backup.Spec.SnapshotVolumes,
 		restorePVs:              req.Restore.Spec.RestorePVs,
 		volumeSnapshots:         req.VolumeSnapshots,
 		volumeSnapshotterGetter: volumeSnapshotterGetter,

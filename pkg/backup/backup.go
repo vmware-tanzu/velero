@@ -39,7 +39,9 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/internal/volumehelper"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -321,6 +323,11 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(items)}
 
+	var resourcePolicy *resourcepolicies.Policies = nil
+	if backupRequest.ResPolicies != nil {
+		resourcePolicy = backupRequest.ResPolicies
+	}
+
 	itemBackupper := &itemBackupper{
 		backupRequest:            backupRequest,
 		tarWriter:                tw,
@@ -328,12 +335,20 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		kbClient:                 kb.kbClient,
 		discoveryHelper:          kb.discoveryHelper,
 		podVolumeBackupper:       podVolumeBackupper,
-		podVolumeSnapshotTracker: newPVCSnapshotTracker(),
+		podVolumeSnapshotTracker: podvolume.NewTracker(),
 		volumeSnapshotterGetter:  volumeSnapshotterGetter,
 		itemHookHandler: &hook.DefaultItemHookHandler{
 			PodCommandExecutor: kb.podCommandExecutor,
 		},
 		hookTracker: hook.NewHookTracker(),
+		volumeHelperImpl: volumehelper.NewVolumeHelperImpl(
+			resourcePolicy,
+			backupRequest.Spec.SnapshotVolumes,
+			log,
+			kb.kbClient,
+			boolptr.IsSetToTrue(backupRequest.Spec.DefaultVolumesToFsBackup),
+			!backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()),
+		),
 	}
 
 	// helper struct to send current progress between the main
@@ -652,7 +667,7 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 		kbClient:                 kb.kbClient,
 		discoveryHelper:          kb.discoveryHelper,
 		itemHookHandler:          &hook.NoOpItemHookHandler{},
-		podVolumeSnapshotTracker: newPVCSnapshotTracker(),
+		podVolumeSnapshotTracker: podvolume.NewTracker(),
 		hookTracker:              hook.NewHookTracker(),
 	}
 	updateFiles := make(map[string]FileForArchive)

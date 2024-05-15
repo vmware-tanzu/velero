@@ -63,11 +63,6 @@ func TestExecute(t *testing.T) {
 		expectedPVC        *corev1.PersistentVolumeClaim
 	}{
 		{
-			name:        "Skip PVC handling if SnapshotVolume set to false",
-			backup:      builder.ForBackup("velero", "test").SnapshotVolumes(false).Result(),
-			expectedErr: nil,
-		},
-		{
 			name:        "Skip PVC BIA when backup is in finalizing phase",
 			backup:      builder.ForBackup("velero", "test").Phase(velerov1api.BackupPhaseFinalizing).Result(),
 			expectedErr: nil,
