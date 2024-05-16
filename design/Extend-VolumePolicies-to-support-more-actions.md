@@ -213,8 +213,8 @@ func (v *VolumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured) (bool
 			return false, err
 		}
 
-		// Also account for SnapshotVolumes flag on backup CR
-		if action != nil && action.Type == resourcepolicies.Snapshot && boolptr.IsSetToTrue(v.SnapshotVolumes) {
+		// check if the action is not nil and the type is snapshot
+		if action != nil && action.Type == resourcepolicies.Snapshot {
 			return true, nil
 		}
 	}
@@ -257,8 +257,8 @@ func (v *VolumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured) (bool
 			return false, err
 		}
 
-		// Also account for SnapshotVolumes flag on backup CR
-		if action != nil && action.Type == resourcepolicies.Snapshot && boolptr.IsSetToTrue(v.SnapshotVolumes) {
+        // check if the action is not nil and the type is snapshot
+		if action != nil && action.Type == resourcepolicies.Snapshot {
 			return true, nil
 		}
 	}
