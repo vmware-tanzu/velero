@@ -19,20 +19,20 @@ jobs:
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
         id: cli-cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ./_output/bin/linux/amd64/velero
           # The cache key a combination of the current PR number and the commit SHA
           key: velero-cli-${{ github.event.pull_request.number }}-${{ github.sha }}
       - name: Fetch built image
         id: image-cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ./velero.tar
           # The cache key a combination of the current PR number and the commit SHA
           key: velero-image-${{ github.event.pull_request.number }}-${{ github.sha }}
       - name: Fetch cached go modules
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         if: steps.cli-cache.outputs.cache-hit != 'true'
         with:
           path: ~/go/pkg/mod
@@ -95,13 +95,13 @@ jobs:
           image: "kindest/node:v${{ matrix.k8s }}"
       - name: Fetch built CLI
         id: cli-cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ./_output/bin/linux/amd64/velero
           key: velero-cli-${{ github.event.pull_request.number }}-${{ github.sha }}
       - name: Fetch built Image
         id: image-cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ./velero.tar
           key: velero-image-${{ github.event.pull_request.number }}-${{ github.sha }}
@@ -110,7 +110,7 @@ jobs:
           kind load image-archive velero.tar
       # always try to fetch the cached go modules as the e2e test needs it either
       - name: Fetch cached go modules
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}

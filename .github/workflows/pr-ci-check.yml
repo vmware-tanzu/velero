@@ -15,7 +15,7 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
       - name: Fetch cached go modules
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
