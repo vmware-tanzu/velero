@@ -117,12 +117,14 @@ func (r *Ensurer) createBackupRepositoryAndWait(ctx context.Context, namespace s
 
 func (r *Ensurer) waitBackupRepository(ctx context.Context, namespace string, backupRepoKey BackupRepositoryKey) (*velerov1api.BackupRepository, error) {
 	var repo *velerov1api.BackupRepository
+	var checkErr error
 	checkFunc := func(ctx context.Context) (bool, error) {
 		found, err := GetBackupRepository(ctx, r.repoClient, namespace, backupRepoKey, true)
 		if err == nil {
 			repo = found
 			return true, nil
 		} else if isBackupRepositoryNotFoundError(err) || isBackupRepositoryNotProvisionedError(err) {
+			checkErr = err
 			return false, nil
 		} else {
 			return false, err
@@ -131,7 +133,12 @@ func (r *Ensurer) waitBackupRepository(ctx context.Context, namespace string, ba
 
 	err := wait.PollUntilContextTimeout(ctx, time.Millisecond*500, r.resourceTimeout, true, checkFunc)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to wait BackupRepository")
+		if err == context.DeadlineExceeded {
+			// if deadline is exceeded, return the error from the last check instead of the wait error
+			return nil, errors.Wrap(checkErr, "failed to wait BackupRepository, timeout exceeded")
+		}
+		// if the error is not deadline exceeded, return the error from the wait
+		return nil, errors.Wrap(err, "failed to wait BackupRepository, errored early")
 	}
 
 	return repo, nil
