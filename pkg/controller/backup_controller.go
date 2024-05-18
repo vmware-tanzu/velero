@@ -692,7 +692,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	// Completed yet.
 	inProgressOperations, _, opsCompleted, opsFailed, errs := getBackupItemOperationProgress(backup.Backup, pluginManager, *backup.GetItemOperationsList())
 	if len(errs) > 0 {
-		for err := range errs {
+		for _, err := range errs {
 			backupLog.Error(err)
 		}
 	}
