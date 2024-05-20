@@ -22,7 +22,7 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 
 **Caution:** Starting in Velero v1.10, kopia has replaced restic as the default uploader. It is now possible to upgrade from a version >= v1.10 directly. However, the procedure for upgrading to v1.13 from a Velero release lower than v1.10 is different.
 
-### Upgrade from v1.10 or higher
+### Upgrade from v1.13
 1. Install the Velero v1.13 command-line interface (CLI) by following the [instructions here][0].
 
     Verify that you've properly installed it by running:
@@ -45,14 +45,12 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
     velero install --crds-only --dry-run -o yaml | kubectl apply -f -
     ```
 
-    **NOTE:** Since velero v1.10.0 only v1 CRD will be supported during installation, therefore, the v1.10.0 will only work on Kubernetes version >= v1.16
-
 3. Delete the CSI plugin. Because the Velero CSI plugin is already merged into the Velero, need to remove the existing CSI plugin InitContainer. Otherwise, the Velero server plugin would fail to start due to same plugin registered twice.
 Please find more information of CSI plugin merging in this page [csi].
-If the plugin move CLI fails due to `not found`, that is caused by the Velero CSI plugin not installed before upgrade. It's safe to ignore the error.
+If the `plugin remove` command fails due to `not found`, that is caused by the Velero CSI plugin not installed before upgrade. It's safe to ignore the error.
    
    ``` bash
-   velero plugin remove velero-velero-plugin-for-csi; echo 0
+   velero plugin remove velero-velero-plugin-for-csi
    ```
 
 4. Update the container image used by the Velero deployment, plugin and (optionally) the node agent daemon set:
@@ -85,38 +83,6 @@ If the plugin move CLI fails due to `not found`, that is caused by the Velero CS
     Server:
         Version: v1.14.0
     ```
-
-
-### Upgrade from version lower than v1.10.0
-The procedure for upgrading from a version lower than v1.10.0 is identical to the procedure above, except for step 4 as shown below.
-
-1. Update the container image and objects fields used by the Velero deployment and, optionally, the restic daemon set:
-
-    ```bash
-    # uploader_type value could be restic or kopia
-    kubectl get deploy -n velero -ojson \
-    | sed "s#\"image\"\: \"velero\/velero\:v[0-9]*.[0-9]*.[0-9]\"#\"image\"\: \"velero\/velero\:v1.14.0\"#g" \
-    | sed "s#\"server\",#\"server\",\"--uploader-type=$uploader_type\",#g" \
-    | sed "s#default-volumes-to-restic#default-volumes-to-fs-backup#g" \
-    | sed "s#default-restic-prune-frequency#default-repo-maintain-frequency#g" \
-    | sed "s#restic-timeout#fs-backup-timeout#g" \
-    | kubectl apply -f -
-
-    # optional, if using the restic daemon set
-    echo $(kubectl get ds -n velero restic -ojson) \
-    | sed "s#\"image\"\: \"velero\/velero\:v[0-9]*.[0-9]*.[0-9]\"#\"image\"\: \"velero\/velero\:v1.14.0\"#g" \
-    | sed "s#\"name\"\: \"restic\"#\"name\"\: \"node-agent\"#g" \
-    | sed "s#\[ \"restic\",#\[ \"node-agent\",#g" \
-    | kubectl apply -f -
-    kubectl delete ds -n velero restic --force --grace-period 0
-    ```
-
-## Notes
-If upgrading from Velero v1.9.x or lower, there will likely remain some unused resources leftover in the cluster.These can be deleted manually (e.g. using kubectl) at your own discretion:
-
-    - resticrepository CRD and related CRs
-    - velero-restic-credentials secret in velero install namespace
-
 
 [0]: basic-install.md#install-the-cli
 [1]: https://velero.io/docs/v1.8/upgrade-to-1.8
