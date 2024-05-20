@@ -4045,6 +4045,21 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 			expectedResult: false,
 		},
 		{
+			name: "VS's source PVC is nil, expect false",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "PersistentVolume",
+					"apiVersion": "v1",
+					"metadata": map[string]interface{}{
+						"namespace": "default",
+						"name":      "test",
+					},
+				},
+			},
+			vs:             builder.ForVolumeSnapshot("velero", "test").Result(),
+			expectedResult: false,
+		},
+		{
 			name: "Find VS, expect true.",
 			obj: &unstructured.Unstructured{
 				Object: map[string]interface{}{
