@@ -77,12 +77,14 @@ func (t *pvcSnapshotTracker) recordStatus(pod *corev1api.Pod, volumeName string,
 	for _, volume := range pod.Spec.Volumes {
 		if volume.Name == volumeName {
 			if volume.PersistentVolumeClaim != nil {
+				// lock on pvcPod
 				t.pvcPod[key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)] = pod.Name
 				currStatus, ok := t.pvcs[key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)]
 				if !ok {
 					currStatus = pvcSnapshotStatusNotTracked
 				}
 				if currStatus == preReqStatus {
+					// lock on pvcs
 					t.pvcs[key(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)] = status
 				}
 			}

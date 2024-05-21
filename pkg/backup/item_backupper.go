@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vmware-tanzu/velero/internal/volumehelper"
@@ -165,7 +166,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		namespace: namespace,
 		name:      name,
 	}
-
+	// mutex on BackedUpItems needed.
 	if _, exists := ib.backupRequest.BackedUpItems[key]; exists {
 		log.Info("Skipping item because it's already been backed up.")
 		// returning true since this item *is* in the backup, even though we're not backing it up here
@@ -446,7 +447,22 @@ func (ib *itemBackupper) executeActions(
 			itemOperList := ib.backupRequest.GetItemOperationsList()
 			*itemOperList = append(*itemOperList, &newOperation)
 		}
+		// ## Approach 1
+		// Extract all PVCs from the Additional Items
+		// Create a label such as <podname>:<>
+		// Apply label to all these PVCs
+		// Create VolumeSnapshotGroup CR with label selector
+		// Invoke VolumeSnapshotGroup Action with the the CR
+		// Poll for VSG in CSI VSG Plugin's Execute()
+		// Return Additional Items and continue backup
 
+		// ## Approach 2
+		// Async call the current CSI Plugin's Execute()
+		// Wait for all snapshots to complete.
+		// Max parallelism can be controlled by further tweaking the WaitGroup.
+		additionalItemFilesChannel := make(chan FileForArchive)
+		errChannel := make(chan error)
+		var wg sync.WaitGroup
 		for _, additionalItem := range additionalItemIdentifiers {
 			gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
 			if err != nil {
@@ -471,12 +487,32 @@ func (ib *itemBackupper) executeActions(
 			if err != nil {
 				return nil, itemFiles, errors.WithStack(err)
 			}
-
-			_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
-			if err != nil {
-				return nil, itemFiles, err
-			}
-			itemFiles = append(itemFiles, additionalItemFiles...)
+			wg.Add(1)
+			go func(additionalItem velero.ResourceIdentifier, log logrus.FieldLogger, item runtime.Unstructured, gvr schema.GroupVersionResource, mustInclude, finalize bool) {
+				defer wg.Done()
+				log.WithFields(logrus.Fields{
+					"groupResource": additionalItem.GroupResource,
+					"namespace":     additionalItem.Namespace,
+					"name":          additionalItem.Name,
+				}).Infof("Triggering async backupitem for additional item")
+				_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
+				if err != nil {
+					errChannel <- err
+					return
+				}
+				for _, file := range additionalItemFiles {
+					additionalItemFilesChannel <- file
+				}
+			}(additionalItem, log, item.DeepCopy(), gvr, mustInclude, finalize)
+		}
+		wg.Wait()
+		close(additionalItemFilesChannel)
+		close(errChannel)
+		for itemFilesFromChannel := range additionalItemFilesChannel {
+			itemFiles = append(itemFiles, itemFilesFromChannel)
+		}
+		for err := range errChannel {
+			return nil, itemFiles, err
 		}
 	}
 	return obj, itemFiles, nil
@@ -712,6 +748,7 @@ func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource 
 // this function will be called throughout the process of backup, it needs to handle any object
 func (ib *itemBackupper) trackSkippedPV(obj runtime.Unstructured, groupResource schema.GroupResource, approach string, reason string, log logrus.FieldLogger) {
 	if name, err := getPVName(obj, groupResource); len(name) > 0 && err == nil {
+		// Skip PV Tracker already has Mutex lock.
 		ib.backupRequest.SkippedPVTracker.Track(name, approach, reason)
 	} else if err != nil {
 		log.WithError(err).Warnf("unable to get PV name, skip tracking.")
