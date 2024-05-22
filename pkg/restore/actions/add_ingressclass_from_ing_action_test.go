@@ -55,7 +55,7 @@ func TestAddIngressClassFromIngActionExecute(t *testing.T) {
 				},
 			},
 			want: []velero.ResourceIdentifier{
-				{GroupResource: kuberesource.PersistentVolumeClaims, Name: "ingressclass"},
+				{GroupResource: kuberesource.IngressClasses, Name: "ingressclass"},
 			},
 		},
 	}
