@@ -1,0 +1,1 @@
+Add ingressClass resource to backup or restore if ingress is backuped and its spec.ingressClass is not nil.
