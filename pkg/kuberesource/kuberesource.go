@@ -35,5 +35,6 @@ var (
 	VolumeSnapshots           = schema.GroupResource{Group: "snapshot.storage.k8s.io", Resource: "volumesnapshots"}
 	VolumeSnapshotContents    = schema.GroupResource{Group: "snapshot.storage.k8s.io", Resource: "volumesnapshotcontents"}
 	PriorityClasses           = schema.GroupResource{Group: "scheduling.k8s.io", Resource: "priorityclasses"}
+	IngressClasses            = schema.GroupResource{Group: "networking.k8s.io", Resource: "ingressclasses"}
 	DataUploads               = schema.GroupResource{Group: "velero.io", Resource: "datauploads"}
 )
