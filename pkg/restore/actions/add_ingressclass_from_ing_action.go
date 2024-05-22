@@ -51,7 +51,7 @@ func (a *AddIngressClassFromIngAction) Execute(input *velero.RestoreItemActionEx
 	var additionalItems []velero.ResourceIdentifier
 
 	if ing.Spec.IngressClassName != nil && *ing.Spec.IngressClassName != "" {
-		a.logger.Infof("Adding IngressClass %s as an additional item to restore", ing.Namespace, *ing.Spec.IngressClassName)
+		a.logger.Infof("Adding IngressClass %s as an additional item to restore", *ing.Spec.IngressClassName)
 		additionalItems = append(additionalItems, velero.ResourceIdentifier{
 			GroupResource: kuberesource.IngressClasses,
 			Name:          *ing.Spec.IngressClassName,

@@ -53,6 +53,10 @@ func NewCommand(f client.Factory) *cobra.Command {
 					newPodBackupItemAction,
 				).
 				RegisterBackupItemAction(
+					"velero.io/ingress",
+					newIngressBackupItemAction,
+				).
+				RegisterBackupItemAction(
 					"velero.io/service-account",
 					newServiceAccountBackupItemAction(f),
 				).
@@ -87,6 +91,10 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction(
 					"velero.io/add-pv-from-pvc",
 					newAddPVFromPVCRestoreItemAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/add-ingressclass-from-ing",
+					newAddIngressClassFromIngAction,
 				).
 				RegisterRestoreItemAction(
 					"velero.io/change-storage-class",
