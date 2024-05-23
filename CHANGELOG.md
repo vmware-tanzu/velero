@@ -1,7 +1,8 @@
 ## Current release:
-  * [CHANGELOG-1.13.md][23]
+  * [CHANGELOG-1.14.md][24]
 
 ## Older releases:
+  * [CHANGELOG-1.13.md][23]
   * [CHANGELOG-1.12.md][22]
   * [CHANGELOG-1.11.md][21]
   * [CHANGELOG-1.10.md][20]
@@ -26,6 +27,7 @@
   * [CHANGELOG-0.3.md][1]
 
 
+[24]: https://github.com/vmware-tanzu/velero/blob/main/changelogs/CHANGELOG-1.14.md
 [23]: https://github.com/vmware-tanzu/velero/blob/main/changelogs/CHANGELOG-1.13.md
 [22]: https://github.com/vmware-tanzu/velero/blob/main/changelogs/CHANGELOG-1.12.md
 [21]: https://github.com/vmware-tanzu/velero/blob/main/changelogs/CHANGELOG-1.11.md

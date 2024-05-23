@@ -1,1 +1,0 @@
-Respect and use `credentialsFile` specified in BSL.spec.config when IRSA is configured over Velero Pod Environment credentials

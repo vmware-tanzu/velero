@@ -1,1 +1,0 @@
-Increase the k8s client QPS/burst to avoid throttling request errors
