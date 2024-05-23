@@ -1,2 +1,0 @@
-Check whether the VolumeSnapshot's source PVC is nil before using it.
-Skip populate VolumeInfo for data-moved PV when CSI is not enabled.

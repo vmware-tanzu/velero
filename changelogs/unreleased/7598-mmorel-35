@@ -1,1 +1,0 @@
-Migrate from `github.com/Azure/azure-storage-blob-go` to `github.com/Azure/azure-sdk-for-go/sdk/storage/azblob`

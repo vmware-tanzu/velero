@@ -1,1 +1,0 @@
-When Included/ExcludedNamespaces are omitted, and LabelSelector or OrLabelSelector is used, namespaces without selected items are excluded from backup.

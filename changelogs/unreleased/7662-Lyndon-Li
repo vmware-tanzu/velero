@@ -1,1 +1,0 @@
-Fix issue #7648. Adjust the exposing logic to avoid exposing failure and snapshot leak when expose fails
