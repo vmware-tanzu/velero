@@ -225,7 +225,7 @@ Kubernetes namespace resources to exclude from the backup, formatted as resource
 ## Resource policies
 Velero provides resource policies to filter resources to do backup or restore. currently, it only supports skip backup volume by resource policies.
 
-**Creating resource policies**
+### Creating resource policies
 
 Below is the two-step of using resource policies to skip backup of volume:
 1. Creating resource policies configmap
@@ -242,7 +242,7 @@ Below is the two-step of using resource policies to skip backup of volume:
    ```
    This flag could also be combined with the other include and exclude filters above
 
-**YAML template**
+### YAML template
 
 Velero only support volume resource policies currently, other kinds of resource policies could be extended in the future. The policies YAML config file would look like this:
 - Yaml template:
@@ -299,7 +299,7 @@ Velero only support volume resource policies currently, other kinds of resource 
         type: skip
     ```
 
-**Supported conditions**
+### Supported conditions
 
 Currently, Velero supports the volume attributes listed below:
 - capacity: matching volumes have the capacity that falls within this `capacity` range. The capacity value should include the lower value and upper value concatenated by commas, the unit of each value in capacity could be `Ti`, `Gi`, `Mi`, `Ki` etc, which is a standard storage unit in Kubernetes. And it has several combinations below:
@@ -357,12 +357,23 @@ Velero supported conditions and format listed below:
   ```
    Volume types could be found in [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes) and pod [Volume](https://kubernetes.io/docs/concepts/storage/volumes)
 
-**Resource policies rules**
+### Resource policies rules
 - Velero already has lots of include or exclude filters. the resource policies are the final filters after others include or exclude filters in one backup processing workflow. So if use a defined similar filter like the opt-in approach to backup one pod volume but skip backup of the same pod volume in resource policies, as resource policies are the final filters that are applied, the volume will not be backed up.
 - If volume resource policies conflict with themselves the first matched policy will be respected when many policies are defined.
 
+#### VolumePolicy priority with existing filters
+* [Includes filters](#includes) and [Excludes filters](#excludes) have the highest priority. The filtered-out resources by them cannot reach to the VolumePolicy.
+* The VolumePolicy has the second priority. It supersedes all the other filters.
+* The filesystem volume backup opt-in/opt-out way has the third priority.
+* The `backup.Spec.SnapshotVolumes` has the fourth priority.
 
-**Support for `fs-backup` and `snapshot` actions via volume policy feature**
+### Supported VolumePolicy actions 
+By now, there are three supporting action types:
+* skip: don't back up the action matching volume's data.
+* snapshot: back up the action matching volume's data by the snapshot way.
+* fs-backup: back up the action matching volumes' data by the fs-backup way.
+
+#### Support for `fs-backup` and `snapshot` actions via volume policy feature
 - Starting from velero 1.14, the resource policy/volume policy feature has been extended to support more actions like `fs-backup` and `snapshot`.
 - This feature only extends the action aspect of volume policy and not criteria aspect, the criteria components as described above remain the same.
 - When we are using the volume policy approach for backing up the volumes then the volume policy criteria and action need to be specific and explicit, 
@@ -460,4 +471,3 @@ volumePolicies:
 3. The outcome would be that velero would perform `fs-backup` operation on both the volumes
    - `fs-backup` on `Volume 1` because `Volume 1` satisfies the criteria for `fs-backup` action. 
    - Also, for Volume 2 as no matching action was found so legacy approach will be used as a fallback option for this volume (`fs-backup` operation will be done as `defaultVolumesToFSBackup: true` is specified by the user).
-

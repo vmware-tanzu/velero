@@ -1489,7 +1489,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			expectedSuccess:                     true,
 		},
 		{
-			name:   "location name does not correspond to any existing location and snapshotvolume disabled; should return empty VSL and no error",
+			name:   "location name does not correspond to any existing location and snapshotvolume disabled; should return error",
 			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).VolumeSnapshotLocations("random-name").SnapshotVolumes(false).Result(),
 			locations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
@@ -1497,36 +1497,36 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "some-name").Provider("fake-provider").Result(),
 			},
 			expectedVolumeSnapshotLocationNames: nil,
-			expectedSuccess:                     true,
+			expectedErrors:                      "a VolumeSnapshotLocation CRD for the location random-name with the name specified in the backup spec needs to be created before this snapshot can be executed. Error: volumesnapshotlocations.velero.io \"random-name\" not found", expectedSuccess: false,
 		},
 		{
-			name:   "duplicate locationName per provider and snapshotvolume disabled; should return empty VSL and no error",
+			name:   "duplicate locationName per provider and snapshotvolume disabled; should return only one BSL",
 			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).VolumeSnapshotLocations("aws-us-west-1", "aws-us-west-1").SnapshotVolumes(false).Result(),
 			locations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-west-1").Provider("aws").Result(),
 			},
-			expectedVolumeSnapshotLocationNames: nil,
+			expectedVolumeSnapshotLocationNames: []string{"aws-us-west-1"},
 			expectedSuccess:                     true,
 		},
 		{
-			name:   "no location name for the provider exists, only one VSL created and snapshotvolume disabled; should return empty VSL and no error",
+			name:   "no location name for the provider exists, only one VSL created and snapshotvolume disabled; should return the VSL",
 			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).SnapshotVolumes(false).Result(),
 			locations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
 			},
-			expectedVolumeSnapshotLocationNames: nil,
+			expectedVolumeSnapshotLocationNames: []string{"aws-us-east-1"},
 			expectedSuccess:                     true,
 		},
 		{
-			name:   "multiple location names for a provider, no default location and backup has no location defined, but snapshotvolume disabled, should return empty VSL and no error",
+			name:   "multiple location names for a provider, no default location and backup has no location defined, but snapshotvolume disabled, should return error",
 			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).SnapshotVolumes(false).Result(),
 			locations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-west-1").Provider("aws").Result(),
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
 			},
 			expectedVolumeSnapshotLocationNames: nil,
-			expectedSuccess:                     true,
+			expectedErrors:                      "provider aws has more than one possible volume snapshot location, and none were specified explicitly or as a default",
 		},
 	}
 

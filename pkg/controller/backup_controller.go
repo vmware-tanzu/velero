@@ -504,11 +504,6 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 	errors := []string{}
 	providerLocations := make(map[string]*velerov1api.VolumeSnapshotLocation)
 
-	// if snapshotVolume is set to false then we don't need to validate volumesnapshotlocation
-	if boolptr.IsSetToFalse(backup.Spec.SnapshotVolumes) {
-		return nil, nil
-	}
-
 	for _, locationName := range backup.Spec.VolumeSnapshotLocations {
 		// validate each locationName exists as a VolumeSnapshotLocation
 		location := &velerov1api.VolumeSnapshotLocation{}

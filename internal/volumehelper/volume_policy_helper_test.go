@@ -1,81 +1,59 @@
+/*
+Copyright the Velero contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package volumehelper
 
 import (
+	"context"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
-	PVObjectGP2 := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "PersistentVolume",
-			"metadata": map[string]interface{}{
-				"name": "example-pv",
-			},
-			"spec": map[string]interface{}{
-				"capacity": map[string]interface{}{
-					"storage": "1Gi",
-				},
-				"volumeMode":                    "Filesystem",
-				"accessModes":                   []interface{}{"ReadWriteOnce"},
-				"persistentVolumeReclaimPolicy": "Retain",
-				"storageClassName":              "gp2-csi",
-				"hostPath": map[string]interface{}{
-					"path": "/mnt/data",
-				},
-			},
-		},
-	}
-
-	PVObjectGP3 := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "PersistentVolume",
-			"metadata": map[string]interface{}{
-				"name": "example-pv",
-			},
-			"spec": map[string]interface{}{
-				"capacity": map[string]interface{}{
-					"storage": "1Gi",
-				},
-				"volumeMode":                    "Filesystem",
-				"accessModes":                   []interface{}{"ReadWriteOnce"},
-				"persistentVolumeReclaimPolicy": "Retain",
-				"storageClassName":              "gp3-csi",
-				"hostPath": map[string]interface{}{
-					"path": "/mnt/data",
-				},
-			},
-		},
-	}
-
 	testCases := []struct {
-		name                string
-		obj                 runtime.Unstructured
-		groupResource       schema.GroupResource
-		resourcePolicies    resourcepolicies.ResourcePolicies
-		snapshotVolumesFlag *bool
-		shouldSnapshot      bool
-		expectedErr         bool
+		name                     string
+		inputObj                 runtime.Object
+		groupResource            schema.GroupResource
+		pod                      *corev1.Pod
+		resourcePolicies         *resourcepolicies.ResourcePolicies
+		snapshotVolumesFlag      *bool
+		defaultVolumesToFSBackup bool
+		shouldSnapshot           bool
+		expectedErr              bool
 	}{
 		{
-			name:          "Given PV object matches volume policy snapshot action snapshotVolumes flags is true returns true and no error",
-			obj:           PVObjectGP2,
+			name:          "VolumePolicy match, returns true and no error",
+			inputObj:      builder.ForPersistentVolume("example-pv").StorageClass("gp2-csi").ClaimRef("ns", "pvc-1").Result(),
 			groupResource: kuberesource.PersistentVolumes,
-			resourcePolicies: resourcepolicies.ResourcePolicies{
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
@@ -88,15 +66,15 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 					},
 				},
 			},
-			snapshotVolumesFlag: pointer.Bool(true),
+			snapshotVolumesFlag: ptr.To(true),
 			shouldSnapshot:      true,
 			expectedErr:         false,
 		},
 		{
-			name:          "Given PV object matches volume policy snapshot action snapshotVolumes flags is false returns false and no error",
-			obj:           PVObjectGP2,
+			name:          "VolumePolicy match, snapshotVolumes is false, return true and no error",
+			inputObj:      builder.ForPersistentVolume("example-pv").StorageClass("gp2-csi").ClaimRef("ns", "pvc-1").Result(),
 			groupResource: kuberesource.PersistentVolumes,
-			resourcePolicies: resourcepolicies.ResourcePolicies{
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
@@ -109,15 +87,37 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 					},
 				},
 			},
-			snapshotVolumesFlag: pointer.Bool(false),
+			snapshotVolumesFlag: ptr.To(false),
+			shouldSnapshot:      true,
+			expectedErr:         false,
+		},
+		{
+			name:          "VolumePolicy match but action is unexpected, return false and no error",
+			inputObj:      builder.ForPersistentVolume("example-pv").StorageClass("gp2-csi").ClaimRef("ns", "pvc-1").Result(),
+			groupResource: kuberesource.PersistentVolumes,
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]interface{}{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.FSBackup,
+						},
+					},
+				},
+			},
+			snapshotVolumesFlag: ptr.To(true),
 			shouldSnapshot:      false,
 			expectedErr:         false,
 		},
 		{
-			name:          "Given PV object matches volume policy snapshot action snapshotVolumes flags is true returns false and no error",
-			obj:           PVObjectGP3,
+			name:          "VolumePolicy not match, not selected by fs-backup as opt-out way, snapshotVolumes is true, returns true and no error",
+			inputObj:      builder.ForPersistentVolume("example-pv").StorageClass("gp3-csi").ClaimRef("ns", "pvc-1").Result(),
 			groupResource: kuberesource.PersistentVolumes,
-			resourcePolicies: resourcepolicies.ResourcePolicies{
+			pod:           builder.ForPod("ns", "pod-1").Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
@@ -130,33 +130,59 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 					},
 				},
 			},
-			snapshotVolumesFlag: pointer.Bool(true),
-			shouldSnapshot:      false,
+			snapshotVolumesFlag: ptr.To(true),
+			shouldSnapshot:      true,
 			expectedErr:         false,
 		},
 		{
-			name: "Given PVC object matches volume policy snapshot action snapshotVolumes flags is true return false and error case PVC not found",
-			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "PersistentVolumeClaim",
-					"metadata": map[string]interface{}{
-						"name":      "example-pvc",
-						"namespace": "default",
+			name:          "VolumePolicy not match, selected by fs-backup as opt-out way, snapshotVolumes is true, returns false and no error",
+			inputObj:      builder.ForPersistentVolume("example-pv").StorageClass("gp3-csi").ClaimRef("ns", "pvc-1").Result(),
+			groupResource: kuberesource.PersistentVolumes,
+			pod: builder.ForPod("ns", "pod-1").Volumes(
+				&corev1.Volume{
+					Name: "volume",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc-1",
+						},
 					},
-					"spec": map[string]interface{}{
-						"accessModes": []string{"ReadWriteOnce"},
-						"resources": map[string]interface{}{
-							"requests": map[string]interface{}{
-								"storage": "1Gi",
+				},
+			).Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]interface{}{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Snapshot,
+						},
+					},
+				},
+			},
+			snapshotVolumesFlag:      ptr.To(true),
+			defaultVolumesToFSBackup: true,
+			shouldSnapshot:           false,
+			expectedErr:              false,
+		},
+		{
+			name:          "VolumePolicy not match, selected by fs-backup as opt-out way, snapshotVolumes is true, returns false and no error",
+			inputObj:      builder.ForPersistentVolume("example-pv").StorageClass("gp3-csi").ClaimRef("ns", "pvc-1").Result(),
+			groupResource: kuberesource.PersistentVolumes,
+			pod: builder.ForPod("ns", "pod-1").
+				ObjectMeta(builder.WithAnnotations(velerov1api.VolumesToExcludeAnnotation, "volume")).
+				Volumes(
+					&corev1.Volume{
+						Name: "volume",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-1",
 							},
 						},
-						"storageClassName": "gp2-csi",
 					},
-				},
-			},
-			groupResource: kuberesource.PersistentVolumeClaims,
-			resourcePolicies: resourcepolicies.ResourcePolicies{
+				).Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
@@ -169,52 +195,152 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 					},
 				},
 			},
-			snapshotVolumesFlag: pointer.Bool(true),
+			snapshotVolumesFlag:      ptr.To(true),
+			defaultVolumesToFSBackup: true,
+			shouldSnapshot:           true,
+			expectedErr:              false,
+		},
+		{
+			name:          "VolumePolicy not match, not selected by fs-backup as opt-in way, snapshotVolumes is true, returns false and no error",
+			inputObj:      builder.ForPersistentVolume("example-pv").StorageClass("gp3-csi").ClaimRef("ns", "pvc-1").Result(),
+			groupResource: kuberesource.PersistentVolumes,
+			pod: builder.ForPod("ns", "pod-1").
+				ObjectMeta(builder.WithAnnotations(velerov1api.VolumesToBackupAnnotation, "volume")).
+				Volumes(
+					&corev1.Volume{
+						Name: "volume",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-1",
+							},
+						},
+					},
+				).Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]interface{}{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Snapshot,
+						},
+					},
+				},
+			},
+			snapshotVolumesFlag:      ptr.To(true),
+			defaultVolumesToFSBackup: false,
+			shouldSnapshot:           false,
+			expectedErr:              false,
+		},
+		{
+			name:          "VolumePolicy not match, not selected by fs-backup as opt-in way, snapshotVolumes is true, returns true and no error",
+			inputObj:      builder.ForPersistentVolume("example-pv").StorageClass("gp3-csi").ClaimRef("ns", "pvc-1").Result(),
+			groupResource: kuberesource.PersistentVolumes,
+			pod: builder.ForPod("ns", "pod-1").
+				Volumes(
+					&corev1.Volume{
+						Name: "volume",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-1",
+							},
+						},
+					},
+				).Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]interface{}{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Snapshot,
+						},
+					},
+				},
+			},
+			snapshotVolumesFlag:      ptr.To(true),
+			defaultVolumesToFSBackup: false,
+			shouldSnapshot:           true,
+			expectedErr:              false,
+		},
+		{
+			name:                "No VolumePolicy, not selected by fs-backup, snapshotVolumes is true, returns true and no error",
+			inputObj:            builder.ForPersistentVolume("example-pv").StorageClass("gp3-csi").ClaimRef("ns", "pvc-1").Result(),
+			groupResource:       kuberesource.PersistentVolumes,
+			resourcePolicies:    nil,
+			snapshotVolumesFlag: ptr.To(true),
+			shouldSnapshot:      true,
+			expectedErr:         false,
+		},
+		{
+			name:                "No VolumePolicy, not selected by fs-backup, snapshotVolumes is false, returns false and no error",
+			inputObj:            builder.ForPersistentVolume("example-pv").StorageClass("gp3-csi").ClaimRef("ns", "pvc-1").Result(),
+			groupResource:       kuberesource.PersistentVolumes,
+			resourcePolicies:    nil,
+			snapshotVolumesFlag: ptr.To(false),
+			shouldSnapshot:      false,
+			expectedErr:         false,
+		},
+		{
+			name:          "PVC not having PV, return false and error case PV not found",
+			inputObj:      builder.ForPersistentVolumeClaim("default", "example-pvc").StorageClass("gp2-csi").Result(),
+			groupResource: kuberesource.PersistentVolumeClaims,
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+			},
+			snapshotVolumesFlag: ptr.To(true),
 			shouldSnapshot:      false,
 			expectedErr:         true,
 		},
 	}
 
-	mockedPV := &corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "example-pv",
-		},
-		Spec: corev1.PersistentVolumeSpec{
-			Capacity: corev1.ResourceList{
-				corev1.ResourceStorage: resource.MustParse("1Gi"),
-			},
-			AccessModes:                   []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimRetain,
-			StorageClassName:              "gp2-csi",
-			ClaimRef: &corev1.ObjectReference{
-				Name:      "example-pvc",
-				Namespace: "default",
+	objs := []runtime.Object{
+		&corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "ns",
+				Name:      "pvc-1",
 			},
 		},
 	}
 
-	objs := []runtime.Object{mockedPV}
-	fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			policies := tc.resourcePolicies
-			p := &resourcepolicies.Policies{}
-			err := p.BuildPolicy(&policies)
-			if err != nil {
-				t.Fatalf("failed to build policy with error %v", err)
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
+			if tc.pod != nil {
+				fakeClient.Create(context.Background(), tc.pod)
 			}
-			vh := &VolumeHelperImpl{
-				VolumePolicy:    p,
-				SnapshotVolumes: tc.snapshotVolumesFlag,
-				Logger:          velerotest.NewLogger(),
+
+			var p *resourcepolicies.Policies = nil
+			if tc.resourcePolicies != nil {
+				p = &resourcepolicies.Policies{}
+				err := p.BuildPolicy(tc.resourcePolicies)
+				if err != nil {
+					t.Fatalf("failed to build policy with error %v", err)
+				}
 			}
-			ActualShouldSnapshot, actualError := vh.ShouldPerformSnapshot(tc.obj, tc.groupResource, fakeClient)
+			vh := NewVolumeHelperImpl(
+				p,
+				tc.snapshotVolumesFlag,
+				logrus.StandardLogger(),
+				fakeClient,
+				tc.defaultVolumesToFSBackup,
+				false,
+			)
+
+			obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.inputObj)
+			require.NoError(t, err)
+
+			actualShouldSnapshot, actualError := vh.ShouldPerformSnapshot(&unstructured.Unstructured{Object: obj}, tc.groupResource)
 			if tc.expectedErr {
-				assert.NotNil(t, actualError, "Want error; Got nil error")
+				require.NotNil(t, actualError, "Want error; Got nil error")
 				return
 			}
 
-			assert.Equalf(t, ActualShouldSnapshot, tc.shouldSnapshot, "Want shouldSnapshot as %v; Got shouldSnapshot as %v", tc.shouldSnapshot, ActualShouldSnapshot)
+			require.Equalf(t, tc.shouldSnapshot, actualShouldSnapshot, "Want shouldSnapshot as %t; Got shouldSnapshot as %t", tc.shouldSnapshot, actualShouldSnapshot)
 		})
 	}
 }
@@ -354,348 +480,203 @@ func TestVolumeHelperImpl_ShouldIncludeVolumeInBackup(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to build policy with error %v", err)
 			}
-			vh := &VolumeHelperImpl{
-				VolumePolicy:    p,
-				SnapshotVolumes: pointer.Bool(true),
-				Logger:          velerotest.NewLogger(),
+			vh := &volumeHelperImpl{
+				volumePolicy:     p,
+				snapshotVolumes:  ptr.To(true),
+				logger:           velerotest.NewLogger(),
+				backupExcludePVC: tc.backupExcludePVC,
 			}
-			actualShouldInclude := vh.ShouldIncludeVolumeInBackup(tc.vol, tc.backupExcludePVC)
+			actualShouldInclude := vh.shouldIncludeVolumeInBackup(tc.vol)
 			assert.Equalf(t, actualShouldInclude, tc.shouldInclude, "Want shouldInclude as %v; Got actualShouldInclude as %v", tc.shouldInclude, actualShouldInclude)
 		})
 	}
 }
 
-var (
-	gp2csi = "gp2-csi"
-	gp3csi = "gp3-csi"
-)
-var (
-	samplePod = &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "sample-pod",
-			Namespace: "sample-ns",
-		},
-
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:  "sample-container",
-					Image: "sample-image",
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "sample-vm",
-							MountPath: "/etc/pod-info",
-						},
-					},
-				},
-			},
-			Volumes: []corev1.Volume{
-				{
-					Name: "sample-volume-1",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "sample-pvc-1",
-						},
-					},
-				},
-				{
-					Name: "sample-volume-2",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "sample-pvc-2",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	samplePVC1 = &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "sample-pvc-1",
-			Namespace: "sample-ns",
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{},
-			},
-			StorageClassName: &gp2csi,
-			VolumeName:       "sample-pv-1",
-		},
-		Status: corev1.PersistentVolumeClaimStatus{
-			Phase:       corev1.ClaimBound,
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Capacity:    corev1.ResourceList{},
-		},
-	}
-
-	samplePVC2 = &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "sample-pvc-2",
-			Namespace: "sample-ns",
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{},
-			},
-			StorageClassName: &gp3csi,
-			VolumeName:       "sample-pv-2",
-		},
-		Status: corev1.PersistentVolumeClaimStatus{
-			Phase:       corev1.ClaimBound,
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Capacity:    corev1.ResourceList{},
-		},
-	}
-
-	samplePV1 = &corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "sample-pv-1",
-		},
-		Spec: corev1.PersistentVolumeSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Capacity:    corev1.ResourceList{},
-			ClaimRef: &corev1.ObjectReference{
-				Kind:            "PersistentVolumeClaim",
-				Name:            "sample-pvc-1",
-				Namespace:       "sample-ns",
-				ResourceVersion: "1027",
-				UID:             "7d28e566-ade7-4ed6-9e15-2e44d2fbcc08",
-			},
-			PersistentVolumeSource: corev1.PersistentVolumeSource{
-				CSI: &corev1.CSIPersistentVolumeSource{
-					Driver: "ebs.csi.aws.com",
-					FSType: "ext4",
-					VolumeAttributes: map[string]string{
-						"storage.kubernetes.io/csiProvisionerIdentity": "1582049697841-8081-hostpath.csi.k8s.io",
-					},
-					VolumeHandle: "e61f2b48-527a-11ea-b54f-cab6317018f1",
-				},
-			},
-			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimDelete,
-			StorageClassName:              gp2csi,
-		},
-		Status: corev1.PersistentVolumeStatus{
-			Phase: corev1.VolumeBound,
-		},
-	}
-
-	samplePV2 = &corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "sample-pv-2",
-		},
-		Spec: corev1.PersistentVolumeSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Capacity:    corev1.ResourceList{},
-			ClaimRef: &corev1.ObjectReference{
-				Kind:            "PersistentVolumeClaim",
-				Name:            "sample-pvc-2",
-				Namespace:       "sample-ns",
-				ResourceVersion: "1027",
-				UID:             "7d28e566-ade7-4ed6-9e15-2e44d2fbcc08",
-			},
-			PersistentVolumeSource: corev1.PersistentVolumeSource{
-				CSI: &corev1.CSIPersistentVolumeSource{
-					Driver: "ebs.csi.aws.com",
-					FSType: "ext4",
-					VolumeAttributes: map[string]string{
-						"storage.kubernetes.io/csiProvisionerIdentity": "1582049697841-8081-hostpath.csi.k8s.io",
-					},
-					VolumeHandle: "e61f2b48-527a-11ea-b54f-cab6317018f1",
-				},
-			},
-			PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimDelete,
-			StorageClassName:              gp3csi,
-		},
-		Status: corev1.PersistentVolumeStatus{
-			Phase: corev1.VolumeBound,
-		},
-	}
-	resourcePolicies1 = resourcepolicies.ResourcePolicies{
-		Version: "v1",
-		VolumePolicies: []resourcepolicies.VolumePolicy{
-			{
-				Conditions: map[string]interface{}{
-					"storageClass": []string{"gp2-csi"},
-				},
-				Action: resourcepolicies.Action{
-					Type: resourcepolicies.FSBackup,
-				},
-			},
-			{
-				Conditions: map[string]interface{}{
-					"storageClass": []string{"gp3-csi"},
-				},
-				Action: resourcepolicies.Action{
-					Type: resourcepolicies.Snapshot,
-				},
-			},
-		},
-	}
-
-	resourcePolicies2 = resourcepolicies.ResourcePolicies{
-		Version: "v1",
-		VolumePolicies: []resourcepolicies.VolumePolicy{
-			{
-				Conditions: map[string]interface{}{
-					"storageClass": []string{"gp2-csi"},
-				},
-				Action: resourcepolicies.Action{
-					Type: resourcepolicies.FSBackup,
-				},
-			},
-		},
-	}
-
-	resourcePolicies3 = resourcepolicies.ResourcePolicies{
-		Version: "v1",
-		VolumePolicies: []resourcepolicies.VolumePolicy{
-			{
-				Conditions: map[string]interface{}{
-					"storageClass": []string{"gp4-csi"},
-				},
-				Action: resourcepolicies.Action{
-					Type: resourcepolicies.FSBackup,
-				},
-			},
-		},
-	}
-)
-
-func TestVolumeHelperImpl_GetVolumesMatchingFSBackupAction(t *testing.T) {
-	testCases := []struct {
-		name                          string
-		backupExcludePVC              bool
-		resourcepoliciesApplied       resourcepolicies.ResourcePolicies
-		FSBackupActionMatchingVols    []string
-		FSBackupNonActionMatchingVols []string
-		NoActionMatchingVols          []string
-		expectedErr                   bool
-	}{
-		{
-			name:                          "For a given pod with 2 volumes and volume policy we get one fs-backup action matching volume, one fs-back action non-matching volume but has some matching action and zero no action matching volumes",
-			backupExcludePVC:              false,
-			resourcepoliciesApplied:       resourcePolicies1,
-			FSBackupActionMatchingVols:    []string{"sample-volume-1"},
-			FSBackupNonActionMatchingVols: []string{"sample-volume-2"},
-			NoActionMatchingVols:          []string{},
-			expectedErr:                   false,
-		},
-		{
-			name:                          "For a given pod with 2 volumes and volume policy we get one fs-backup action matching volume, zero fs-backup action non-matching volume and one no action matching volumes",
-			backupExcludePVC:              false,
-			resourcepoliciesApplied:       resourcePolicies2,
-			FSBackupActionMatchingVols:    []string{"sample-volume-1"},
-			FSBackupNonActionMatchingVols: []string{},
-			NoActionMatchingVols:          []string{"sample-volume-2"},
-			expectedErr:                   false,
-		},
-		{
-			name:                          "For a given pod with 2 volumes and volume policy we get one fs-backup action matching volume, one fs-backup action non-matching volume and one no action matching volumes but backupExcludePVC is true so all returned list should be empty",
-			backupExcludePVC:              true,
-			resourcepoliciesApplied:       resourcePolicies2,
-			FSBackupActionMatchingVols:    []string{},
-			FSBackupNonActionMatchingVols: []string{},
-			NoActionMatchingVols:          []string{},
-			expectedErr:                   false,
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			policies := tc.resourcepoliciesApplied
-			p := &resourcepolicies.Policies{}
-			err := p.BuildPolicy(&policies)
-			if err != nil {
-				t.Fatalf("failed to build policy with error %v", err)
-			}
-			vh := &VolumeHelperImpl{
-				VolumePolicy:    p,
-				SnapshotVolumes: pointer.Bool(true),
-				Logger:          velerotest.NewLogger(),
-			}
-			objs := []runtime.Object{samplePod, samplePVC1, samplePVC2, samplePV1, samplePV2}
-			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
-			gotFSBackupActionMatchingVols, gotFSBackupNonActionMatchingVols, gotNoActionMatchingVols, actualError := vh.GetVolumesMatchingFSBackupAction(samplePod, vh.VolumePolicy, tc.backupExcludePVC, fakeClient)
-			if tc.expectedErr {
-				assert.NotNil(t, actualError, "Want error; Got nil error")
-				return
-			}
-			assert.Nilf(t, actualError, "Want: nil error; Got: %v", actualError)
-			assert.Equalf(t, gotFSBackupActionMatchingVols, tc.FSBackupActionMatchingVols, "Want FSBackupActionMatchingVols as %v; Got gotFSBackupActionMatchingVols as %v", tc.FSBackupActionMatchingVols, gotFSBackupActionMatchingVols)
-			assert.Equalf(t, gotFSBackupNonActionMatchingVols, tc.FSBackupNonActionMatchingVols, "Want FSBackupNonActionMatchingVols as %v; Got gotFSBackupNonActionMatchingVols as %v", tc.FSBackupNonActionMatchingVols, gotFSBackupNonActionMatchingVols)
-			assert.Equalf(t, gotNoActionMatchingVols, tc.NoActionMatchingVols, "Want NoActionMatchingVols as %v; Got gotNoActionMatchingVols as %v", tc.NoActionMatchingVols, gotNoActionMatchingVols)
-		})
-	}
-}
-
-func TestVolumeHelperImpl_GetVolumesForFSBackup(t *testing.T) {
+func TestVolumeHelperImpl_ShouldPerformFSBackup(t *testing.T) {
 	testCases := []struct {
 		name                     string
-		backupExcludePVC         bool
-		defaultVolumesToFsBackup bool
-		resourcepoliciesApplied  resourcepolicies.ResourcePolicies
-		includedVolumes          []string
-		optedOutVolumes          []string
+		pod                      *corev1.Pod
+		resources                []runtime.Object
+		resourcePolicies         *resourcepolicies.ResourcePolicies
+		snapshotVolumesFlag      *bool
+		defaultVolumesToFSBackup bool
+		shouldFSBackup           bool
 		expectedErr              bool
 	}{
 		{
-			name:                     "For a given pod with 2 volumes and volume policy we get one fs-backup action matching volume, one fs-back action non-matching volume but matches snapshot action so no volumes for legacy fallback process, defaultvolumestofsbackup is false but no effect",
-			backupExcludePVC:         false,
-			defaultVolumesToFsBackup: false,
-			resourcepoliciesApplied:  resourcePolicies1,
-			includedVolumes:          []string{"sample-volume-1"},
-			optedOutVolumes:          []string{"sample-volume-2"},
+			name: "HostPath volume should be skipped.",
+			pod: builder.ForPod("ns", "pod-1").
+				Volumes(
+					&corev1.Volume{
+						Name: "",
+						VolumeSource: corev1.VolumeSource{
+							HostPath: &corev1.HostPathVolumeSource{
+								Path: "/mnt/test",
+							},
+						},
+					}).Result(),
+			shouldFSBackup: false,
+			expectedErr:    false,
 		},
 		{
-			name:                     "For a given pod with 2 volumes and volume policy we get one fs-backup action matching volume, one fs-back action non-matching volume but matches snapshot action so no volumes for legacy fallback process, defaultvolumestofsbackup is true but no effect",
-			backupExcludePVC:         false,
-			defaultVolumesToFsBackup: true,
-			resourcepoliciesApplied:  resourcePolicies1,
-			includedVolumes:          []string{"sample-volume-1"},
-			optedOutVolumes:          []string{"sample-volume-2"},
+			name: "VolumePolicy match, return true and no error",
+			pod: builder.ForPod("ns", "pod-1").
+				Volumes(
+					&corev1.Volume{
+						Name: "",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-1",
+							},
+						},
+					}).Result(),
+			resources: []runtime.Object{
+				builder.ForPersistentVolumeClaim("ns", "pvc-1").
+					VolumeName("pv-1").
+					StorageClass("gp2-csi").Phase(corev1.ClaimBound).Result(),
+				builder.ForPersistentVolume("pv-1").StorageClass("gp2-csi").Result(),
+			},
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]interface{}{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.FSBackup,
+						},
+					},
+				},
+			},
+			shouldFSBackup: true,
+			expectedErr:    false,
 		},
 		{
-			name:                     "For a given pod with 2 volumes and volume policy we get no volume matching fs-backup action defaultvolumesToFSBackup is false, no annotations, using legacy as fallback for non-action matching volumes",
-			backupExcludePVC:         false,
-			defaultVolumesToFsBackup: false,
-			resourcepoliciesApplied:  resourcePolicies3,
-			includedVolumes:          []string{},
-			optedOutVolumes:          []string{},
+			name: "VolumePolicy match, action type is not fs-backup, return false and no error",
+			pod: builder.ForPod("ns", "pod-1").
+				Volumes(
+					&corev1.Volume{
+						Name: "",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-1",
+							},
+						},
+					}).Result(),
+			resources: []runtime.Object{
+				builder.ForPersistentVolumeClaim("ns", "pvc-1").
+					VolumeName("pv-1").
+					StorageClass("gp2-csi").Phase(corev1.ClaimBound).Result(),
+				builder.ForPersistentVolume("pv-1").StorageClass("gp2-csi").Result(),
+			},
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]interface{}{
+							"storageClass": []string{"gp2-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.Snapshot,
+						},
+					},
+				},
+			},
+			shouldFSBackup: false,
+			expectedErr:    false,
 		},
 		{
-			name:                     "For a given pod with 2 volumes and volume policy we get no volume matching fs-backup action defaultvolumesToFSBackup is true, no annotations, using legacy as fallback for non-action matching volumes",
-			backupExcludePVC:         false,
-			defaultVolumesToFsBackup: true,
-			resourcepoliciesApplied:  resourcePolicies3,
-			includedVolumes:          []string{"sample-volume-1", "sample-volume-2"},
-			optedOutVolumes:          []string{},
+			name: "VolumePolicy not match, selected by opt-in way, return true and no error",
+			pod: builder.ForPod("ns", "pod-1").
+				ObjectMeta(builder.WithAnnotations(velerov1api.VolumesToBackupAnnotation, "pvc-1")).
+				Volumes(
+					&corev1.Volume{
+						Name: "pvc-1",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-1",
+							},
+						},
+					}).Result(),
+			resources: []runtime.Object{
+				builder.ForPersistentVolumeClaim("ns", "pvc-1").
+					VolumeName("pv-1").
+					StorageClass("gp2-csi").Phase(corev1.ClaimBound).Result(),
+				builder.ForPersistentVolume("pv-1").StorageClass("gp2-csi").Result(),
+			},
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]interface{}{
+							"storageClass": []string{"gp3-csi"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.FSBackup,
+						},
+					},
+				},
+			},
+			shouldFSBackup: true,
+			expectedErr:    false,
+		},
+		{
+			name: "No VolumePolicy, not selected by opt-out way, return false and no error",
+			pod: builder.ForPod("ns", "pod-1").
+				ObjectMeta(builder.WithAnnotations(velerov1api.VolumesToExcludeAnnotation, "pvc-1")).
+				Volumes(
+					&corev1.Volume{
+						Name: "pvc-1",
+						VolumeSource: corev1.VolumeSource{
+							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc-1",
+							},
+						},
+					}).Result(),
+			resources: []runtime.Object{
+				builder.ForPersistentVolumeClaim("ns", "pvc-1").
+					VolumeName("pv-1").
+					StorageClass("gp2-csi").Phase(corev1.ClaimBound).Result(),
+				builder.ForPersistentVolume("pv-1").StorageClass("gp2-csi").Result(),
+			},
+			defaultVolumesToFSBackup: true,
+			shouldFSBackup:           false,
+			expectedErr:              false,
 		},
 	}
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			policies := tc.resourcepoliciesApplied
-			p := &resourcepolicies.Policies{}
-			err := p.BuildPolicy(&policies)
-			if err != nil {
-				t.Fatalf("failed to build policy with error %v", err)
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, tc.resources...)
+			if tc.pod != nil {
+				fakeClient.Create(context.Background(), tc.pod)
 			}
-			vh := &VolumeHelperImpl{
-				VolumePolicy:    p,
-				SnapshotVolumes: pointer.Bool(true),
-				Logger:          velerotest.NewLogger(),
+
+			var p *resourcepolicies.Policies = nil
+			if tc.resourcePolicies != nil {
+				p = &resourcepolicies.Policies{}
+				err := p.BuildPolicy(tc.resourcePolicies)
+				if err != nil {
+					t.Fatalf("failed to build policy with error %v", err)
+				}
 			}
-			objs := []runtime.Object{samplePod, samplePVC1, samplePVC2, samplePV1, samplePV2}
-			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
-			gotIncludedVolumes, gotOptedOutVolumes, actualError := vh.GetVolumesForFSBackup(samplePod, tc.defaultVolumesToFsBackup, tc.backupExcludePVC, fakeClient)
+			vh := NewVolumeHelperImpl(
+				p,
+				tc.snapshotVolumesFlag,
+				logrus.StandardLogger(),
+				fakeClient,
+				tc.defaultVolumesToFSBackup,
+				false,
+			)
+
+			actualShouldFSBackup, actualError := vh.ShouldPerformFSBackup(tc.pod.Spec.Volumes[0], *tc.pod)
 			if tc.expectedErr {
-				assert.NotNil(t, actualError, "Want error; Got nil error")
+				require.NotNil(t, actualError, "Want error; Got nil error")
 				return
 			}
-			assert.Nilf(t, actualError, "Want: nil error; Got: %v", actualError)
-			assert.Equalf(t, tc.includedVolumes, gotIncludedVolumes, "Want includedVolumes as %v; Got gotIncludedVolumes as %v", tc.includedVolumes, gotIncludedVolumes)
-			assert.Equalf(t, tc.optedOutVolumes, gotOptedOutVolumes, "Want optedOutVolumes as %v; Got gotOptedOutVolumes as %v", tc.optedOutVolumes, gotOptedOutVolumes)
+
+			require.Equalf(t, tc.shouldFSBackup, actualShouldFSBackup, "Want shouldFSBackup as %t; Got shouldFSBackup as %t", tc.shouldFSBackup, actualShouldFSBackup)
 		})
 	}
 }

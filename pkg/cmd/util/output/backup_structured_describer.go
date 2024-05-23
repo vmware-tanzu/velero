@@ -31,7 +31,6 @@ import (
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
@@ -301,11 +300,6 @@ func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Clien
 
 func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, backup *velerov1api.Backup, details bool,
 	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackupCRs []velerov1api.PodVolumeBackup, backupStatusInfo map[string]interface{}) {
-	if boolptr.IsSetToFalse(backup.Spec.SnapshotVolumes) {
-		backupStatusInfo["backupVolumes"] = "<none included>"
-		return
-	}
-
 	backupVolumes := make(map[string]interface{})
 
 	nativeSnapshots := []*volume.BackupVolumeInfo{}

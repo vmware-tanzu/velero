@@ -46,7 +46,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/csi"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/pkg/util/podvolume"
 )
 
 // pvcBackupItemAction is a backup item action plugin for Velero.
@@ -64,14 +63,6 @@ func (p *pvcBackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
 }
 
 func (p *pvcBackupItemAction) validateBackup(backup velerov1api.Backup) (valid bool) {
-	// Do nothing if volume snapshots have not been requested in this backup
-	if boolptr.IsSetToFalse(backup.Spec.SnapshotVolumes) {
-		p.log.Infof(
-			"Volume snapshotting not requested for backup %s/%s",
-			backup.Namespace, backup.Name)
-		return false
-	}
-
 	if backup.Status.Phase == velerov1api.BackupPhaseFinalizing ||
 		backup.Status.Phase == velerov1api.BackupPhaseFinalizingPartiallyFailed {
 		p.log.WithFields(
@@ -88,7 +79,6 @@ func (p *pvcBackupItemAction) validateBackup(backup velerov1api.Backup) (valid b
 
 func (p *pvcBackupItemAction) validatePVCandPV(
 	pvc corev1api.PersistentVolumeClaim,
-	defaultVolumesToFsBackup *bool,
 	item runtime.Unstructured,
 ) (
 	valid bool,
@@ -130,23 +120,6 @@ func (p *pvcBackupItemAction) validatePVCandPV(
 		data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pvc)
 		updateItem = &unstructured.Unstructured{Object: data}
 		return false, updateItem, err
-	}
-
-	// Do nothing if FS uploader is used to backup this PV
-	isFSUploaderUsed, err := podvolume.IsPVCDefaultToFSBackup(
-		pvc.Namespace,
-		pvc.Name,
-		p.crClient,
-		boolptr.IsSetToTrue(defaultVolumesToFsBackup),
-	)
-	if err != nil {
-		return false, updateItem, errors.WithStack(err)
-	}
-	if isFSUploaderUsed {
-		p.log.Infof(
-			"Skipping  PVC %s/%s, PV %s will be backed up using FS uploader",
-			pvc.Namespace, pvc.Name, pv.Name)
-		return false, updateItem, nil
 	}
 
 	return true, updateItem, nil
@@ -248,7 +221,6 @@ func (p *pvcBackupItemAction) Execute(
 
 	if valid, item, err := p.validatePVCandPV(
 		pvc,
-		backup.Spec.DefaultVolumesToFsBackup,
 		item,
 	); !valid {
 		if err != nil {

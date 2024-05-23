@@ -125,7 +125,6 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			}
 			if tc.backup != nil {
 				r.backup = tc.backup
-				r.snapshotVolumes = tc.backup.Spec.SnapshotVolumes
 			}
 
 			for _, loc := range tc.locations {
