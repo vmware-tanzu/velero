@@ -182,7 +182,7 @@ func TestGetResourceMatchedAction(t *testing.T) {
 			expectedAction: &Action{Type: "snapshot"},
 		},
 		{
-			name: "dismatch all policies",
+			name: "mismatch all policies",
 			volume: &structuredVolume{
 				capacity:     *resource.NewQuantity(50<<30, resource.BinarySI),
 				storageClass: "ebs-sc",
@@ -394,7 +394,7 @@ volumePolicies:
 			skip: true,
 		},
 		{
-			name: "dismatch volume by types",
+			name: "mismatch volume by types",
 			yamlData: `version: v1
 volumePolicies:
 - conditions:

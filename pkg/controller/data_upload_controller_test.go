@@ -427,7 +427,7 @@ func TestReconcile(t *testing.T) {
 			notCreateFSBR:     true,
 		},
 		{
-			name: "Dataupload should not be cancel with dismatch node",
+			name: "Dataupload should not be cancel with mismatch node",
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
 			du: func() *velerov2alpha1api.DataUpload {
 				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).SnapshotType(fakeSnapshotType).Cancel(true).Result()
