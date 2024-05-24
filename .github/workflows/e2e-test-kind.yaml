@@ -14,7 +14,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.22.2'
         id: go
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
@@ -82,7 +82,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.22.2'
         id: go
       - name: Check out the code
         uses: actions/checkout@v4
