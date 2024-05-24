@@ -65,7 +65,7 @@ This page contains a pre-migration checklist for ensuring a repo migration goes 
 
 #### Updating Netlify
 
-The settings for Netflify should remain the same, except that it now needs to be installed in the new repo. The instructions on how to install Netlify on the new repo are here: https://www.netlify.com/docs/github-permissions/.
+The settings for Netlify should remain the same, except that it now needs to be installed in the new repo. The instructions on how to install Netlify on the new repo are here: https://www.netlify.com/docs/github-permissions/.
 
 #### Communication strategy
 

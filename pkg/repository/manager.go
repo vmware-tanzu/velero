@@ -212,7 +212,7 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 		return errors.WithStack(err)
 	}
 
-	log.Info("Start to maintence repo")
+	log.Info("Start to maintenance repo")
 
 	maintenanceJob, err := buildMaintenanceJob(m.maintenanceCfg, param, m.client, m.namespace)
 	if err != nil {

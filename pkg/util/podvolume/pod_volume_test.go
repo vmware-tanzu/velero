@@ -581,7 +581,7 @@ func TestGetPodVolumeNameForPVC(t *testing.T) {
 		expectedVolumeName string
 	}{
 		{
-			name: "should get volume name for pod with multuple PVCs",
+			name: "should get volume name for pod with multiple PVCs",
 			pod: v1.Pod{
 				Spec: v1.PodSpec{
 					Volumes: []v1.Volume{

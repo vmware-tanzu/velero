@@ -27,7 +27,7 @@ Moreover, we would like to create a general workflow to variations during the da
 - Support different data accesses, i.e., file system level and block level
 - Support different snapshot types, i.e., CSI snapshot, volume snapshot API from storage vendors
 - Support different snapshot accesses, i.e., through PV generated from snapshots, and through direct access API from storage vendors
-- Reuse the existing Velero generic data path as creatd in [Unified Repository design][1]
+- Reuse the existing Velero generic data path as created in [Unified Repository design][1]
 
 ## Non-Goals
 
