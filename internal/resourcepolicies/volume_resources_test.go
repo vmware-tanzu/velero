@@ -165,7 +165,7 @@ func TestNFSConditionMatch(t *testing.T) {
 			expectedMatch: true,
 		},
 		{
-			name:          "server dismatch",
+			name:          "server mismatch",
 			condition:     &nfsCondition{&nFSVolumeSource{Server: "192.168.10.20", Path: ""}},
 			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: ""}, nil),
 			expectedMatch: false,
