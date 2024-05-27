@@ -87,7 +87,7 @@ RUN ARCH=$(go env GOARCH) && \
     elif [ "$ARCH" = "ppc64le" ] ; then \
         ARCH="ppc64"; \
     fi && \
-    wget --quiet "https://github.com/goreleaser/goreleaser/releases/download/v1.15.2/goreleaser_Linux_$ARCH.tar.gz" && \
+    wget --quiet "https://github.com/goreleaser/goreleaser/releases/download/v1.26.2/goreleaser_Linux_$ARCH.tar.gz" && \
     tar xvf goreleaser_Linux_$ARCH.tar.gz; \
     mv goreleaser /usr/bin/goreleaser && \
     chmod +x /usr/bin/goreleaser
