@@ -99,3 +99,6 @@ RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/i
 RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/$(go env GOARCH)/kubectl
 RUN chmod +x ./kubectl
 RUN mv ./kubectl /usr/local/bin
+
+# Fix the "dubious ownership" issue from git when running goreleaser.sh
+RUN echo "[safe] \n\t directory = *" > /.gitconfig
