@@ -571,11 +571,11 @@ func TestDefaultVolumesToResticDeprecation(t *testing.T) {
 			if test.expectRemap {
 				assert.Equal(t, res.Spec.DefaultVolumesToRestic, res.Spec.DefaultVolumesToFsBackup)
 			} else if test.expectGlobal {
-				assert.False(t, res.Spec.DefaultVolumesToRestic == res.Spec.DefaultVolumesToFsBackup)
+				assert.NotSame(t, res.Spec.DefaultVolumesToRestic, res.Spec.DefaultVolumesToFsBackup)
 				assert.Equal(t, &c.defaultVolumesToFsBackup, res.Spec.DefaultVolumesToFsBackup)
 			} else {
-				assert.False(t, res.Spec.DefaultVolumesToRestic == res.Spec.DefaultVolumesToFsBackup)
-				assert.False(t, &c.defaultVolumesToFsBackup == res.Spec.DefaultVolumesToFsBackup)
+				assert.NotSame(t, res.Spec.DefaultVolumesToRestic, res.Spec.DefaultVolumesToFsBackup)
+				assert.NotEqual(t, &c.defaultVolumesToFsBackup, res.Spec.DefaultVolumesToFsBackup)
 			}
 
 			assert.Equal(t, test.expectVal, *res.Spec.DefaultVolumesToFsBackup)
