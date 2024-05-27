@@ -18,7 +18,6 @@ package restore
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -42,7 +41,7 @@ func (r *RestoreTest) Init() error {
 	r.TestMsg = &TestMSG{
 		Desc:      "Do restore resources for performance test",
 		FailedMSG: "Failed to restore resources",
-		Text:      fmt.Sprintf("Should restore resources success"),
+		Text:      "Should restore resources success",
 	}
 	return nil
 }

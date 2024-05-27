@@ -360,7 +360,6 @@ issues:
         - errcheck
         - goconst
         - gosec
-        - gosimple
         - nilerr
         - staticcheck
         - stylecheck
