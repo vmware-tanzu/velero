@@ -32,6 +32,18 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
+func TestAddIngressClassFromIngAppliesTo(t *testing.T) {
+	a := NewAddIngressClassFromIngAction(velerotest.NewLogger())
+
+	actual, err := a.AppliesTo()
+	require.NoError(t, err)
+
+	expected := velero.ResourceSelector{
+		IncludedResources: []string{"ingresses"},
+	}
+	assert.Equal(t, expected, actual)
+}
+
 func TestAddIngressClassFromIngActionExecute(t *testing.T) {
 	tests := []struct {
 		name string
