@@ -26,6 +26,7 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -231,8 +232,15 @@ func (r *restoreFinalizerReconciler) finishProcessing(restorePhase velerov1api.R
 		r.metrics.RegisterRestoreSuccess(restore.Spec.ScheduleName)
 	}
 	restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
-
-	return kubeutil.PatchResource(original, restore, r.Client)
+	// retry using DefaultBackoff to resolve connection refused error that may occur when the server is under heavy load
+	// TODO: consider using a more specific error type to retry, for now, we retry on all errors
+	// specific errors:
+	// - connection refused: https://pkg.go.dev/syscall#:~:text=Errno(0x67)-,ECONNREFUSED,-%3D%20Errno(0x6f
+	return retry.OnError(retry.DefaultBackoff, func(err error) bool {
+		return err != nil
+	}, func() error {
+		return kubeutil.PatchResource(original, restore, r.Client)
+	})
 }
 
 // finalizerContext includes all the dependencies required by finalization tasks and
