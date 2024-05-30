@@ -182,10 +182,6 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 	m.repoLocker.LockExclusive(repo.Name)
 	defer m.repoLocker.UnlockExclusive(repo.Name)
 
-	prd, err := m.getRepositoryProvider(repo)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 	param, err := m.assembleRepoParam(repo)
 	if err != nil {
 		return errors.WithStack(err)
@@ -206,10 +202,6 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 	if job != nil && job.Status.Succeeded == 0 && job.Status.Failed == 0 {
 		log.Debugf("There already has a unfinished maintenance job %s/%s for repository %s, please wait for it to complete", job.Namespace, job.Name, param.BackupRepo.Name)
 		return nil
-	}
-
-	if err := prd.BoostRepoConnect(context.Background(), param); err != nil {
-		return errors.WithStack(err)
 	}
 
 	log.Info("Start to maintenance repo")
