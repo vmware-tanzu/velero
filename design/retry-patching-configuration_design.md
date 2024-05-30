@@ -37,6 +37,10 @@ and from above non final phases to
 - Completed
 - PartiallyFailed
 
+Once backup/restore is in some phase it will already be reconciled again periodically and do not need additional retry
+- WaitingForPluginOperations
+- WaitingForPluginOperationsPartiallyFailed
+
 ## Detailed Design
 Relevant reconcilers will have `resourceTimeout   time.Duration` added to its struct and to parameters of New[Backup|Restore]XReconciler functions.
 

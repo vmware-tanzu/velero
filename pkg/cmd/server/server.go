@@ -689,6 +689,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupStoreGetter,
 			s.logger,
 			s.metrics,
+			s.config.ResourceTimeout,
 		)
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupFinalizer)
@@ -814,6 +815,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.DefaultItemOperationTimeout,
 			s.config.DisableInformerCache,
 			s.crClient,
+			s.config.ResourceTimeout,
 		)
 
 		if err = r.SetupWithManager(s.mgr); err != nil {
