@@ -130,6 +130,7 @@ func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if err != nil {
 		log.Warnf("Cannot check progress on Restore operations because backup info is unavailable %s; marking restore FinalizingPartiallyFailed", err.Error())
 		restore.Status.Phase = velerov1api.RestorePhaseFinalizingPartiallyFailed
+		// Don't need to retry as Reconcile will be called again
 		err2 := r.updateRestoreAndOperationsJSON(ctx, original, restore, nil, &itemoperationmap.OperationsForRestore{ErrsSinceUpdate: []string{err.Error()}}, false, false)
 		if err2 != nil {
 			log.WithError(err2).Error("error updating Restore")
@@ -183,6 +184,7 @@ func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			restore.Status.Phase = velerov1api.RestorePhaseFinalizingPartiallyFailed
 		}
 	}
+	// No need to retry as Reconcile will be called again
 	err = r.updateRestoreAndOperationsJSON(ctx, original, restore, backupStore, operations, changes, completionChanges)
 	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "error updating Restore")

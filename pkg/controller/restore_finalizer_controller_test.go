@@ -30,7 +30,6 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
 	testclocks "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,6 +40,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	veleroPkgClient "github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
@@ -560,6 +560,8 @@ func TestWaitRestoreExecHook(t *testing.T) {
 
 // test finishprocessing with mocks of kube client to simulate connection refused
 func Test_restoreFinalizerReconciler_finishProcessing(t *testing.T) {
+	veleroPkgClient.TestOverrideBackoff()
+	defer veleroPkgClient.TestResetBackoff()
 	type args struct {
 		// mockClientActions simulate different client errors
 		mockClientActions func(*pkgUtilKubeMocks.Client)
@@ -590,7 +592,7 @@ func Test_restoreFinalizerReconciler_finishProcessing(t *testing.T) {
 					client.On("Patch", mock.Anything, mock.Anything, mock.Anything).Return(syscall.ECONNREFUSED)
 				},
 				mockClientAsserts: func(client *pkgUtilKubeMocks.Client) bool {
-					return client.AssertNumberOfCalls(t, "Patch", retry.DefaultBackoff.Steps)
+					return client.AssertNumberOfCalls(t, "Patch", veleroPkgClient.GetBackoffSteps())
 				},
 			},
 			wantErr: true,

@@ -18,8 +18,10 @@ package client
 
 import (
 	"context"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -35,4 +37,48 @@ func CreateRetryGenerateName(client kbclient.Client, ctx context.Context, obj kb
 	} else {
 		return client.Create(ctx, obj, &kbclient.CreateOptions{})
 	}
+}
+
+// two minute backoff
+var twoMinBackoff = wait.Backoff{
+	Factor:   5.0,
+	Steps:    8,
+	Duration: 10 * time.Millisecond,
+	Jitter:   0.1,
+	Cap: 	2 * time.Minute,
+}
+
+// override backoff for testing
+func TestOverrideBackoff() {
+	twoMinBackoff = wait.Backoff{
+		Factor:   1.0,
+		Steps:    twoMinBackoff.Steps,
+		Duration: 1,
+		Jitter:   0.0,
+		Cap: 	2 * time.Minute,
+	}
+}
+
+func TestResetBackoff() {
+	twoMinBackoff = wait.Backoff{
+		Factor:   5.0,
+		Steps:    8,
+		Duration: 10 * time.Millisecond,
+		Jitter:   0.1,
+		Cap: 	2 * time.Minute,
+	}
+}
+
+func GetBackoffSteps() int {
+	return twoMinBackoff.Steps
+}
+
+// RetriesPhasePatchFunc accepts a patch function param, retrying when the provided retriable function returns true.
+// We want retry to last up to 2 minutes: https://github.com/vmware-tanzu/velero/issues/7207#:~:text=A%20two%2Dminute%20retry%20is%20reasonable%20when%20there%20is%20API%20outage%20due%20to%20cert%20rotation.
+func RetriesPhasePatchFunc(fn func() error, retriable func(error) bool, ) error {
+	return retry.OnError(twoMinBackoff, func(err error) bool {
+		return retriable(err)
+	}, func() error {
+		return fn()
+	})
 }

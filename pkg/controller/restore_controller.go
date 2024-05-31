@@ -276,7 +276,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	log.Debug("Updating restore's final status")
 
-	if err = kubeutil.PatchResource(original, restore, r.kbClient); err != nil {
+	if err = kubeutil.PatchResourceWithRetriesOnErrors(original, restore, r.kbClient); err != nil {
 		log.WithError(errors.WithStack(err)).Info("Error updating restore's final status")
 		// No need to re-enqueue here, because restore's already set to InProgress before.
 		// Controller only handle New restore.

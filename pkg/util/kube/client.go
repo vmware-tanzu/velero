@@ -19,6 +19,7 @@ package kube
 import (
 	"context"
 
+	veleroPkgClient "github.com/vmware-tanzu/velero/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -26,4 +27,21 @@ func PatchResource(original, updated client.Object, kbClient client.Client) erro
 	err := kbClient.Patch(context.Background(), updated, client.MergeFrom(original))
 
 	return err
+}
+
+// PatchResourceWithRetries patches the original resource with the updated resource, retrying when the provided retriable function returns true.
+// We want retry to last up to 2 minutes: https://github.com/vmware-tanzu/velero/issues/7207#:~:text=A%20two%2Dminute%20retry%20is%20reasonable%20when%20there%20is%20API%20outage%20due%20to%20cert%20rotation.
+func PatchResourceWithRetries(original, updated client.Object, kbClient client.Client, retriable func(error) bool) error {
+	return veleroPkgClient.RetriesPhasePatchFunc(func () error {return PatchResource(original, updated, kbClient)}, retriable)
+}
+
+// PatchResourceWithRetriesOnErrors patches the original resource with the updated resource, retrying when the operation returns an error.
+func PatchResourceWithRetriesOnErrors(original, updated client.Object, kbClient client.Client) error {
+	return PatchResourceWithRetries(original, updated, kbClient, func(err error) bool {
+		// retry using DefaultBackoff to resolve connection refused error that may occur when the server is under heavy load
+		// TODO: consider using a more specific error type to retry, for now, we retry on all errors
+		// specific errors:
+		// - connection refused: https://pkg.go.dev/syscall#:~:text=Errno(0x67)-,ECONNREFUSED,-%3D%20Errno(0x6f
+		return err != nil
+	})
 }
