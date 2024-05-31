@@ -150,7 +150,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f = flags.VarPF(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", "", "Use pod volume file system backup by default for volumes")
 	f.NoOptDefVal = cmd.TRUE
 
-	flags.StringVar(&o.ResPoliciesConfigmap, "resource-policies-configmap", "", "Reference to the resource policies configmap that backup using")
+	flags.StringVar(&o.ResPoliciesConfigmap, "resource-policies-configmap", "", "Reference to the resource policies configmap that backup should use")
 	flags.StringVar(&o.DataMover, "data-mover", "", "Specify the data mover to be used by the backup. If the parameter is not set or set as 'velero', the built-in data mover will be used")
 	flags.IntVar(&o.ParallelFilesUpload, "parallel-files-upload", 0, "Number of files uploads simultaneously when running a backup. This is only applicable for the kopia uploader")
 }
