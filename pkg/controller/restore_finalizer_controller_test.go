@@ -34,8 +34,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	testingclock "k8s.io/utils/clock/testing"
-
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -617,7 +615,7 @@ func Test_restoreFinalizerReconciler_finishProcessing(t *testing.T) {
 			r := &restoreFinalizerReconciler{
 				Client:  client,
 				metrics: metrics.NewServerMetrics(),
-				clock:   testingclock.NewFakeClock(time.Now()),
+				clock:   testclocks.NewFakeClock(time.Now()),
 			}
 			restore := builder.ForRestore(velerov1api.DefaultNamespace, "restoreName").Result()
 			if err := r.finishProcessing(velerov1api.RestorePhaseInProgress, restore, restore); (err != nil) != tt.wantErr {

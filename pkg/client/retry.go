@@ -45,7 +45,7 @@ var twoMinBackoff = wait.Backoff{
 	Steps:    8,
 	Duration: 10 * time.Millisecond,
 	Jitter:   0.1,
-	Cap: 	2 * time.Minute,
+	Cap:      2 * time.Minute,
 }
 
 // override backoff for testing
@@ -55,7 +55,7 @@ func TestOverrideBackoff() {
 		Steps:    twoMinBackoff.Steps,
 		Duration: 1,
 		Jitter:   0.0,
-		Cap: 	2 * time.Minute,
+		Cap:      2 * time.Minute,
 	}
 }
 
@@ -65,7 +65,7 @@ func TestResetBackoff() {
 		Steps:    8,
 		Duration: 10 * time.Millisecond,
 		Jitter:   0.1,
-		Cap: 	2 * time.Minute,
+		Cap:      2 * time.Minute,
 	}
 }
 
@@ -75,10 +75,12 @@ func GetBackoffSteps() int {
 
 // RetriesPhasePatchFunc accepts a patch function param, retrying when the provided retriable function returns true.
 // We want retry to last up to 2 minutes: https://github.com/vmware-tanzu/velero/issues/7207#:~:text=A%20two%2Dminute%20retry%20is%20reasonable%20when%20there%20is%20API%20outage%20due%20to%20cert%20rotation.
-func RetriesPhasePatchFunc(fn func() error, retriable func(error) bool, ) error {
-	return retry.OnError(twoMinBackoff, func(err error) bool {
-		return retriable(err)
-	}, func() error {
-		return fn()
-	})
+func RetriesPhasePatchFunc(fn func() error, retriable func(error) bool) error {
+	return retry.OnError(twoMinBackoff, func(err error) bool { return retriable(err) }, fn)
+}
+
+// RetriesPhasePatchFuncOnErrors accepts a patch function param, retrying when the error is not nil.
+// We want retry to last up to 2 minutes: https://github.com/vmware-tanzu/velero/issues/7207#:~:text=A%20two%2Dminute%20retry%20is%20reasonable%20when%20there%20is%20API%20outage%20due%20to%20cert%20rotation.
+func RetriesPhasePatchFuncOnErrors(fn func() error) error {
+	return RetriesPhasePatchFunc(fn, func(err error) bool { return err != nil })
 }

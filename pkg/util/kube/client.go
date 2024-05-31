@@ -19,8 +19,9 @@ package kube
 import (
 	"context"
 
-	veleroPkgClient "github.com/vmware-tanzu/velero/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	veleroPkgClient "github.com/vmware-tanzu/velero/pkg/client"
 )
 
 func PatchResource(original, updated client.Object, kbClient client.Client) error {
@@ -32,7 +33,7 @@ func PatchResource(original, updated client.Object, kbClient client.Client) erro
 // PatchResourceWithRetries patches the original resource with the updated resource, retrying when the provided retriable function returns true.
 // We want retry to last up to 2 minutes: https://github.com/vmware-tanzu/velero/issues/7207#:~:text=A%20two%2Dminute%20retry%20is%20reasonable%20when%20there%20is%20API%20outage%20due%20to%20cert%20rotation.
 func PatchResourceWithRetries(original, updated client.Object, kbClient client.Client, retriable func(error) bool) error {
-	return veleroPkgClient.RetriesPhasePatchFunc(func () error {return PatchResource(original, updated, kbClient)}, retriable)
+	return veleroPkgClient.RetriesPhasePatchFunc(func() error { return PatchResource(original, updated, kbClient) }, retriable)
 }
 
 // PatchResourceWithRetriesOnErrors patches the original resource with the updated resource, retrying when the operation returns an error.
