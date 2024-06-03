@@ -933,7 +933,7 @@ func TestRestoreVolumeInfoResult(t *testing.T) {
 					data: make(map[string]pvcPvInfo),
 				},
 				pvNativeSnapshotMap: map[string]*NativeSnapshotInfo{},
-				pvCSISnapshotMap:    map[string]snapshotv1api.VolumeSnapshot{},
+				pvcCSISnapshotMap:   map[string]snapshotv1api.VolumeSnapshot{},
 				datadownloadList:    &velerov2alpha1.DataDownloadList{},
 				pvrs:                []*velerov1api.PodVolumeRestore{},
 			},
@@ -968,8 +968,8 @@ func TestRestoreVolumeInfoResult(t *testing.T) {
 						IOPS:           "10000",
 					},
 				},
-				pvCSISnapshotMap: map[string]snapshotv1api.VolumeSnapshot{},
-				datadownloadList: &velerov2alpha1.DataDownloadList{},
+				pvcCSISnapshotMap: map[string]snapshotv1api.VolumeSnapshot{},
+				datadownloadList:  &velerov2alpha1.DataDownloadList{},
 				pvrs: []*velerov1api.PodVolumeRestore{
 					builder.ForPodVolumeRestore("velero", "testRestore-1234").
 						PodNamespace("testNS").
@@ -1031,8 +1031,8 @@ func TestRestoreVolumeInfoResult(t *testing.T) {
 					},
 				},
 				pvNativeSnapshotMap: map[string]*NativeSnapshotInfo{},
-				pvCSISnapshotMap: map[string]snapshotv1api.VolumeSnapshot{
-					"testPV": *builder.ForVolumeSnapshot("sourceNS", "testCSISnapshot").
+				pvcCSISnapshotMap: map[string]snapshotv1api.VolumeSnapshot{
+					"testNS/testPVC": *builder.ForVolumeSnapshot("sourceNS", "testCSISnapshot").
 						ObjectMeta(
 							builder.WithAnnotations(VolumeSnapshotHandleAnnotation, "csi-snap-001",
 								CSIDriverNameAnnotation, "test-csi-driver"),
@@ -1101,7 +1101,7 @@ func TestRestoreVolumeInfoResult(t *testing.T) {
 					},
 				},
 				pvNativeSnapshotMap: map[string]*NativeSnapshotInfo{},
-				pvCSISnapshotMap:    map[string]snapshotv1api.VolumeSnapshot{},
+				pvcCSISnapshotMap:   map[string]snapshotv1api.VolumeSnapshot{},
 				datadownloadList: &velerov2alpha1.DataDownloadList{
 					Items: []velerov2alpha1.DataDownload{
 						*builder.ForDataDownload("velero", "testDataDownload-1").
