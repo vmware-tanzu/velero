@@ -662,17 +662,17 @@ type RestoreVolumeInfoTracker struct {
 
 	// map of PV name to the NativeSnapshotInfo from which the PV is restored
 	pvNativeSnapshotMap map[string]*NativeSnapshotInfo
-	// map of PV name to the CSISnapshot object from which the PV is restored
-	pvCSISnapshotMap map[string]snapshotv1api.VolumeSnapshot
-	datadownloadList *velerov2alpha1.DataDownloadList
-	pvrs             []*velerov1api.PodVolumeRestore
+	// map of PVC object to the CSISnapshot object from which the PV is restored
+	// the key is in the form of $pvc-ns/$pvc-name
+	pvcCSISnapshotMap map[string]snapshotv1api.VolumeSnapshot
+	datadownloadList  *velerov2alpha1.DataDownloadList
+	pvrs              []*velerov1api.PodVolumeRestore
 }
 
 // Populate data objects in the tracker, which will be used to generate the RestoreVolumeInfo array in Result()
 // The input param resourceList should be the final result of the restore.
 func (t *RestoreVolumeInfoTracker) Populate(ctx context.Context, restoredResourceList map[string][]string) {
 	pvcs := RestoredPVCFromRestoredResourceList(restoredResourceList)
-
 	t.Lock()
 	defer t.Unlock()
 	for item := range pvcs {
@@ -684,24 +684,25 @@ func (t *RestoreVolumeInfoTracker) Populate(ctx context.Context, restoredResourc
 			log.WithError(err).Error("Failed to get PVC")
 			continue
 		}
-		if pvc.Status.Phase != corev1api.ClaimBound || pvc.Spec.VolumeName == "" {
-			log.Info("PVC is not bound or has no volume name")
-			continue
-		}
-		pv := &corev1api.PersistentVolume{}
-		if err := t.client.Get(ctx, kbclient.ObjectKey{Name: pvc.Spec.VolumeName}, pv); err != nil {
-			log.WithError(err).Error("Failed to get PV")
-		} else {
-			t.pvPvc.insert(*pv, pvcName, pvcNS)
-		}
 		// Collect the CSI VolumeSnapshot objects referenced by the restored PVCs,
 		if pvc.Spec.DataSource != nil && pvc.Spec.DataSource.Kind == "VolumeSnapshot" {
 			vs := &snapshotv1api.VolumeSnapshot{}
 			if err := t.client.Get(ctx, kbclient.ObjectKey{Namespace: pvcNS, Name: pvc.Spec.DataSource.Name}, vs); err != nil {
 				log.WithError(err).Error("Failed to get VolumeSnapshot")
 			} else {
-				t.pvCSISnapshotMap[pv.Name] = *vs
+				t.pvcCSISnapshotMap[pvc.Namespace+"/"+pvcName] = *vs
 			}
+		}
+		if pvc.Status.Phase == corev1api.ClaimBound && pvc.Spec.VolumeName != "" {
+			pv := &corev1api.PersistentVolume{}
+			if err := t.client.Get(ctx, kbclient.ObjectKey{Name: pvc.Spec.VolumeName}, pv); err != nil {
+				log.WithError(err).Error("Failed to get PV")
+			} else {
+				t.pvPvc.insert(*pv, pvcName, pvcNS)
+			}
+		} else {
+			log.Warn("PVC is not bound or has no volume name")
+			continue
 		}
 	}
 	if err := t.client.List(ctx, t.datadownloadList, &kbclient.ListOptions{
@@ -761,9 +762,16 @@ func (t *RestoreVolumeInfoTracker) Result() []*RestoreVolumeInfo {
 	}
 
 	// Generate RestoreVolumeInfo for PVs restored from CSISnapshots
-	for pvName, csiSnapshot := range t.pvCSISnapshotMap {
+	for pvc, csiSnapshot := range t.pvcCSISnapshotMap {
+		n := strings.Split(pvc, "/")
+		if len(n) != 2 {
+			t.log.Warnf("Invalid PVC key '%s' in the pvc-CSISnapshot map, skip populating it to volume info", pvc)
+			continue
+		}
+		pvcNS, pvcName := n[0], n[1]
 		volumeInfo := &RestoreVolumeInfo{
-			PVName:            pvName,
+			PVCNamespace:      pvcNS,
+			PVCName:           pvcName,
 			SnapshotDataMoved: false,
 			RestoreMethod:     CSISnapshot,
 			CSISnapshotInfo: &CSISnapshotInfo{
@@ -773,9 +781,8 @@ func (t *RestoreVolumeInfoTracker) Result() []*RestoreVolumeInfo {
 				VSCName:        *csiSnapshot.Spec.Source.VolumeSnapshotContentName,
 			},
 		}
-		if pvcPVInfo := t.pvPvc.retrieve(pvName, "", ""); pvcPVInfo != nil {
-			volumeInfo.PVCName = pvcPVInfo.PVCName
-			volumeInfo.PVCNamespace = pvcPVInfo.PVCNamespace
+		if pvcPVInfo := t.pvPvc.retrieve("", pvcName, pvcNS); pvcPVInfo != nil {
+			volumeInfo.PVName = pvcPVInfo.PV.Name
 		}
 		volumeInfos = append(volumeInfos, volumeInfo)
 	}
@@ -829,7 +836,7 @@ func NewRestoreVolInfoTracker(restore *velerov1api.Restore, logger logrus.FieldL
 			data: make(map[string]pvcPvInfo),
 		},
 		pvNativeSnapshotMap: make(map[string]*NativeSnapshotInfo),
-		pvCSISnapshotMap:    make(map[string]snapshotv1api.VolumeSnapshot),
+		pvcCSISnapshotMap:   make(map[string]snapshotv1api.VolumeSnapshot),
 		datadownloadList:    &velerov2alpha1.DataDownloadList{},
 	}
 }
