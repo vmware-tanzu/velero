@@ -26,7 +26,7 @@ Please use the version selector at the top of the site to ensure you are using t
 
 ## Troubleshooting
 
-If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [#velero channel][25] on the Kubernetes Slack server.
+If you encounter any issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [#velero channel][25] on the Kubernetes Slack server.
 
 ## Contributing
 
