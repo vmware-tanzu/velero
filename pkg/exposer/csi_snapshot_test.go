@@ -138,7 +138,17 @@ func TestExpose(t *testing.T) {
 			Kind:       "DaemonSet",
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
-		Spec: appsv1.DaemonSetSpec{},
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "node-agent",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	tests := []struct {

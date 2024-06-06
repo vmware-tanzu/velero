@@ -31,6 +31,7 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	corev1api "k8s.io/api/core/v1"
 	clientTesting "k8s.io/client-go/testing"
 )
@@ -74,7 +75,17 @@ func TestRestoreExpose(t *testing.T) {
 			Kind:       "DaemonSet",
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
-		Spec: appsv1.DaemonSetSpec{},
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image: "fake-image",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	tests := []struct {

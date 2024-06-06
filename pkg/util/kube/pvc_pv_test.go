@@ -1378,3 +1378,65 @@ func TestGetPVCForPodVolume(t *testing.T) {
 		})
 	}
 }
+
+func TestMakePodPVCAttachment(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		volumeName           string
+		volumeMode           corev1api.PersistentVolumeMode
+		expectedVolumeMount  []corev1api.VolumeMount
+		expectedVolumeDevice []corev1api.VolumeDevice
+		expectedVolumePath   string
+	}{
+		{
+			name:       "no volume mode specified",
+			volumeName: "volume-1",
+			expectedVolumeMount: []corev1api.VolumeMount{
+				{
+					Name:      "volume-1",
+					MountPath: "/volume-1",
+				},
+			},
+			expectedVolumePath: "/volume-1",
+		},
+		{
+			name:       "fs mode specified",
+			volumeName: "volume-2",
+			volumeMode: corev1api.PersistentVolumeFilesystem,
+			expectedVolumeMount: []corev1api.VolumeMount{
+				{
+					Name:      "volume-2",
+					MountPath: "/volume-2",
+				},
+			},
+			expectedVolumePath: "/volume-2",
+		},
+		{
+			name:       "block volume mode specified",
+			volumeName: "volume-3",
+			volumeMode: corev1api.PersistentVolumeBlock,
+			expectedVolumeDevice: []corev1api.VolumeDevice{
+				{
+					Name:       "volume-3",
+					DevicePath: "/volume-3",
+				},
+			},
+			expectedVolumePath: "/volume-3",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var volMode *v1.PersistentVolumeMode
+			if tc.volumeMode != "" {
+				volMode = &tc.volumeMode
+			}
+
+			mount, device, path := MakePodPVCAttachment(tc.volumeName, volMode)
+
+			assert.Equal(t, tc.expectedVolumeMount, mount)
+			assert.Equal(t, tc.expectedVolumeDevice, device)
+			assert.Equal(t, tc.expectedVolumePath, path)
+		})
+	}
+}
