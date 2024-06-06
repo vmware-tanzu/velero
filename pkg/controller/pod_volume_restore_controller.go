@@ -141,8 +141,15 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	log.WithField("path", volumePath.ByPath).Debugf("Found host path")
 
-	if err := fsRestore.Init(ctx, pvr.Spec.BackupStorageLocation, pvr.Spec.SourceNamespace, pvr.Spec.UploaderType,
-		podvolume.GetPvrRepositoryType(pvr), pvr.Spec.RepoIdentifier, c.repositoryEnsurer, c.credentialGetter); err != nil {
+	if err := fsRestore.Init(ctx, &datapath.FSBRInitParam{
+		BSLName:           pvr.Spec.BackupStorageLocation,
+		SourceNamespace:   pvr.Spec.SourceNamespace,
+		UploaderType:      pvr.Spec.UploaderType,
+		RepositoryType:    podvolume.GetPvrRepositoryType(pvr),
+		RepoIdentifier:    pvr.Spec.RepoIdentifier,
+		RepositoryEnsurer: c.repositoryEnsurer,
+		CredentialGetter:  c.credentialGetter,
+	}); err != nil {
 		return c.errorOut(ctx, pvr, err, "error to initialize data path", log)
 	}
 

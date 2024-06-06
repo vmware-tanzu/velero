@@ -139,7 +139,7 @@ func (o *Options) runRepoPrune(f velerocli.Factory, namespace string, logger log
 			credentials.CredentialGetter{
 				FromFile:   credentialFileStore,
 				FromSecret: credentialSecretStore,
-			}, o.RepoType, cli, logger)
+			}, o.RepoType, logger)
 	}
 
 	// backupRepository
