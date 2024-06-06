@@ -338,23 +338,38 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 func (r *DataUploadReconciler) runCancelableDataUpload(ctx context.Context, fsBackup datapath.AsyncBR, du *velerov2alpha1api.DataUpload, res *exposer.ExposeResult, log logrus.FieldLogger) (reconcile.Result, error) {
 	log.Info("Run cancelable dataUpload")
+
 	path, err := exposer.GetPodVolumeHostPath(ctx, res.ByPod.HostingPod, res.ByPod.VolumeName, r.client, r.fileSystem, log)
 	if err != nil {
 		return r.errorOut(ctx, du, err, "error exposing host path for pod volume", log)
 	}
 
 	log.WithField("path", path.ByPath).Debug("Found host path")
-	if err := fsBackup.Init(ctx, du.Spec.BackupStorageLocation, du.Spec.SourceNamespace, datamover.GetUploaderType(du.Spec.DataMover),
-		velerov1api.BackupRepositoryTypeKopia, "", r.repoEnsurer, r.credentialGetter); err != nil {
+
+	if err := fsBackup.Init(ctx, &datapath.FSBRInitParam{
+		BSLName:           du.Spec.BackupStorageLocation,
+		SourceNamespace:   du.Spec.SourceNamespace,
+		UploaderType:      datamover.GetUploaderType(du.Spec.DataMover),
+		RepositoryType:    velerov1api.BackupRepositoryTypeKopia,
+		RepoIdentifier:    "",
+		RepositoryEnsurer: r.repoEnsurer,
+		CredentialGetter:  r.credentialGetter,
+	}); err != nil {
 		return r.errorOut(ctx, du, err, "error to initialize data path", log)
 	}
+
 	log.WithField("path", path.ByPath).Info("fs init")
 
 	tags := map[string]string{
 		velerov1api.AsyncOperationIDLabel: du.Labels[velerov1api.AsyncOperationIDLabel],
 	}
 
-	if err := fsBackup.StartBackup(path, datamover.GetRealSource(du.Spec.SourceNamespace, du.Spec.SourcePVC), "", false, tags, du.Spec.DataMoverConfig); err != nil {
+	if err := fsBackup.StartBackup(path, du.Spec.DataMoverConfig, &datapath.FSBRStartParam{
+		RealSource:     datamover.GetRealSource(du.Spec.SourceNamespace, du.Spec.SourcePVC),
+		ParentSnapshot: "",
+		ForceFull:      false,
+		Tags:           tags,
+	}); err != nil {
 		return r.errorOut(ctx, du, err, "error starting data path backup", log)
 	}
 
