@@ -123,8 +123,6 @@ spec:
     ttl: 24h0m0s
     # whether pod volume file system backup should be used for all volumes by default.
     defaultVolumesToFsBackup: true
-    # The labels you want on backup objects, created from this schedule (instead of copying the labels you have on schedule object itself).
-    # When this field is set, the labels from the Schedule resource are not copied to the Backup resource.
     # Whether snapshot data should be moved. If set, data movement is launched after the snapshot is created.
     snapshotMoveData: true
     # The data mover to be used by the backup. If the value is "" or "velero", the built-in data mover will be used.
@@ -133,6 +131,8 @@ spec:
     uploaderConfig:
         # ParallelFilesUpload is the number of files parallel uploads to perform when using the uploader.
         parallelFilesUpload: 10
+    # The labels you want on backup objects, created from this schedule (instead of copying the labels you have on schedule object itself).
+    # When this field is set, the labels from the Schedule resource are not copied to the Backup resource.
     metadata:
       labels:
         labelname: somelabelvalue
