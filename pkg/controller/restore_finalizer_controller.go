@@ -33,6 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/clock"
 
+	storagev1api "k8s.io/api/storage/v1"
+
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -291,10 +293,11 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 
 				log := ctx.logger.WithField("PVC", volInfo.PVCName).WithField("PVCNamespace", restoredNamespace)
 				log.Debug("patching dynamic PV is in progress")
+				pvc := &v1.PersistentVolumeClaim{}
+				pv := &v1.PersistentVolume{}
 
 				err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, PVPatchMaximumDuration, true, func(context.Context) (bool, error) {
 					// wait for PVC to be bound
-					pvc := &v1.PersistentVolumeClaim{}
 					err := ctx.crClient.Get(context.Background(), client.ObjectKey{Name: volInfo.PVCName, Namespace: restoredNamespace}, pvc)
 					if apierrors.IsNotFound(err) {
 						log.Debug("error not finding PVC")
@@ -311,7 +314,6 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 
 					// wait for PV to be bound
 					pvName := pvc.Spec.VolumeName
-					pv := &v1.PersistentVolume{}
 					err = ctx.crClient.Get(context.Background(), client.ObjectKey{Name: pvName}, pv)
 					if apierrors.IsNotFound(err) {
 						log.Debugf("error not finding PV: %s", pvName)
@@ -347,6 +349,25 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 				})
 
 				if err != nil {
+					// If a timeout error occurs, check if the PVC is in the pending state and if the storage class used by the PVC
+					// has VolumeBindingMode set to WaitForFirstConsumer. This situation may arise if the user has excluded pods from the backup.
+					// In such cases, log a specific error message to inform the user that pods are required for the WaitForFirstConsumer binding mode.
+					if errors.Is(err, context.DeadlineExceeded) {
+						// check if pv is not nil and has a pending status after timeout
+						if pvc != nil && pvc.Status.Phase == v1.ClaimPending {
+							// check if storage class used for the PV has VolumeBindingMode as WaitForFirstConsumer
+							scName := *pvc.Spec.StorageClassName
+							sc := &storagev1api.StorageClass{}
+							err = ctx.crClient.Get(context.Background(), client.ObjectKey{Name: scName}, sc)
+							if err != nil {
+								errs.Add(restoredNamespace, err)
+							}
+							if *sc.VolumeBindingMode == storagev1api.VolumeBindingWaitForFirstConsumer {
+								ctx.logger.WithError(err).Errorf("StorageClass %s used by PV %s has VolumeBindingMode as WaitForFirstConsumer, you may need to be change it to Immediate if pods are excluded from backup", scName, pv.Name)
+								errs.Add(restoredNamespace, fmt.Errorf("StorageClass %s used by PV %s has VolumeBindingMode as WaitForFirstConsumer, you may need to be change it to Immediate if pods are excluded from backup", scName, pv.Name))
+							}
+						}
+					}
 					err = fmt.Errorf("fail to patch dynamic PV, err: %s, PVC: %s, PV: %s", err, volInfo.PVCName, volInfo.PVName)
 					ctx.logger.WithError(errors.WithStack((err))).Error("err patching dynamic PV using volume info")
 					resultLock.Lock()
