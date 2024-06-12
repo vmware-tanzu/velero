@@ -14,7 +14,7 @@ https://velero.io/docs/v1.14/upgrade-to-1.14/
 
 ### Highlights
 
-#### The maintenance work for kopia backup repositories is run in jobs
+#### The maintenance work for kopia/restic backup repositories is run in jobs
 Since velero started using kopia as the approach for filesystem-level backup/restore, we've noticed an issue when velero connects to the kopia backup repositories and performs maintenance, it sometimes consumes excessive memory that can cause the velero pod to get OOM Killed.  To mitigate this issue, the maintenance work will be moved out of velero pod to a separate kubernetes job, and the user will be able to specify the resource request in "velero install".
 #### Volume Policies are extended to support more actions to handle volumes
 In an earlier release, a flexible volume policy was introduced to skip certain volumes from a backup.  In v1.14 we've made enhancement to this policy to allow the user to set how the volumes should be backed up.  The user will be able to set "fs-backup" or "snapshot" as value of “action" in the policy and velero will backup the volumes accordingly.  This enhancement allows the user to achieve a fine-grained control like "opt-in/out" without having to update the target workload.  For more details please refer to https://velero.io/docs/v1.14/resource-filtering/#supported-volumepolicy-actions
@@ -38,6 +38,7 @@ Besides the service principal with secret(password)-based authentication, Velero
 * CSI plugin has been merged into velero repo in v1.14 release.  It will be installed by default as an internal plugin, and should not be installed via "–plugins " parameter in "velero install" command.
 * The default resource requests and limitations for node agent are removed in v1.14, to make the node agent pods have the QoS class of "BestEffort", more details please refer to #7391
 * There's a change in namespace filtering behavior during backup:  In v1.14, when the includedNamespaces/excludedNamespaces fields are not set and the labelSelector/OrLabelSelectors are set in the backup spec, the backup will only include the namespaces which contain the resources that match the label selectors, while in previous releases all namespaces will be included in the backup with such settings.  More details refer to #7105
+* Patching the PV in the "Finalizing" state may cause the restore to be in "PartiallyFailed" state when the PV is blocked in "Pending" state, while in the previous release the restore may end up being in "Complete" state. For more details refer to #7866
 
 ### All Changes
 * Fix backup log to show error string, not index (#7805, @piny940)
