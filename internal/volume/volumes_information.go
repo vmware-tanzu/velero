@@ -769,6 +769,14 @@ func (t *RestoreVolumeInfoTracker) Result() []*RestoreVolumeInfo {
 			continue
 		}
 		pvcNS, pvcName := n[0], n[1]
+		var restoreSize int64 = 0
+		if csiSnapshot.Status != nil && csiSnapshot.Status.RestoreSize != nil {
+			restoreSize = csiSnapshot.Status.RestoreSize.Value()
+		}
+		vscName := ""
+		if csiSnapshot.Spec.Source.VolumeSnapshotContentName != nil {
+			vscName = *csiSnapshot.Spec.Source.VolumeSnapshotContentName
+		}
 		volumeInfo := &RestoreVolumeInfo{
 			PVCNamespace:      pvcNS,
 			PVCName:           pvcName,
@@ -776,9 +784,9 @@ func (t *RestoreVolumeInfoTracker) Result() []*RestoreVolumeInfo {
 			RestoreMethod:     CSISnapshot,
 			CSISnapshotInfo: &CSISnapshotInfo{
 				SnapshotHandle: csiSnapshot.Annotations[VolumeSnapshotHandleAnnotation],
-				Size:           csiSnapshot.Status.RestoreSize.Value(),
+				Size:           restoreSize,
 				Driver:         csiSnapshot.Annotations[CSIDriverNameAnnotation],
-				VSCName:        *csiSnapshot.Spec.Source.VolumeSnapshotContentName,
+				VSCName:        vscName,
 			},
 		}
 		if pvcPVInfo := t.pvPvc.retrieve("", pvcName, pvcNS); pvcPVInfo != nil {
