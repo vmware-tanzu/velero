@@ -429,14 +429,7 @@ func TestRestorePeekExpose(t *testing.T) {
 			Name:      restore.Name,
 		},
 		Status: corev1api.PodStatus{
-			Phase: corev1api.PodPending,
-			Conditions: []corev1api.PodCondition{
-				{
-					Type:    corev1api.PodScheduled,
-					Reason:  "Unschedulable",
-					Message: "unrecoverable",
-				},
-			},
+			Phase: corev1api.PodFailed,
 		},
 	}
 
@@ -463,7 +456,7 @@ func TestRestorePeekExpose(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				restorePodUrecoverable,
 			},
-			err: "Pod is unschedulable: unrecoverable",
+			err: "Pod is in abnormal state Failed",
 		},
 		{
 			name:         "succeed",
