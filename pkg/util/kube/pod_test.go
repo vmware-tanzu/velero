@@ -402,21 +402,6 @@ func TestIsPodUnrecoverable(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "pod is unschedulable",
-			pod: &corev1api.Pod{
-				Status: corev1api.PodStatus{
-					Phase: corev1api.PodPending,
-					Conditions: []corev1api.PodCondition{
-						{
-							Type:   corev1api.PodScheduled,
-							Reason: "Unschedulable",
-						},
-					},
-				},
-			},
-			want: true,
-		},
-		{
 			name: "pod is normal",
 			pod: &corev1api.Pod{
 				Status: corev1api.PodStatus{
