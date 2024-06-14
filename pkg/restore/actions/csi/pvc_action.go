@@ -157,7 +157,6 @@ func (p *pvcRestoreItemAction) Execute(
 			AnnBoundByController,
 			AnnStorageProvisioner,
 			AnnBetaStorageProvisioner,
-			AnnSelectedNode,
 			velerov1api.VolumeSnapshotLabel,
 			velerov1api.DataUploadNameAnnotation,
 		},
