@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestManager(t *testing.T) {
+func TestCreateFileSystemBR(t *testing.T) {
 	m := NewManager(2)
 
 	async_job_1, err := m.CreateFileSystemBR("job-1", "test", context.TODO(), nil, "velero", Callbacks{}, nil)
