@@ -18,7 +18,6 @@ package exposer
 
 import (
 	"context"
-	"slices"
 	"time"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
@@ -423,8 +422,11 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 
 	// PVCs with accessmode ReadOnlyMany must be mounted with readonly flags set
 	// without the readonly flags the volume will be unable to mount
-	if slices.Contains(backupPVC.Spec.AccessModes, corev1.ReadOnlyMany) {
-		readOnlyMount = true
+	for _, accessMode  := range backupPVC.Spec.AccessModes {
+		if accessMode == corev1.ReadOnlyMany {
+			readOnlyMount = true
+			break
+		}
 	}
 
 	volumeMounts, volumeDevices := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode, backupPVC.Spec.AccessModes)
