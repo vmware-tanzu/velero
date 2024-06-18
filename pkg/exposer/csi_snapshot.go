@@ -18,6 +18,7 @@ package exposer
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
@@ -36,6 +37,13 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/csi"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+
+	shallowprovisioner "github.com/vmware-tanzu/velero/pkg/exposer/shallowprovisioner"
+
+	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/typed/volumesnapshot/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // CSISnapshotExposeParam define the input param for Expose of CSI snapshots
@@ -383,7 +391,14 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 		},
 	}
 
-	created, err := e.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
+	// transform the PVC if the storage class provisioner supports shallow copy restore to avoid copy on restore for some storage provisioners
+	updated_pvc, err := shallowprovisioner.ShallowCopyTransform(ctx, e.kubeClient.StorageV1(), pvc)
+	if err != nil {
+		// failed to retrieve the storageClass of the PVC
+		return nil, err
+	}
+
+	created, err := e.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, updated_pvc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error to create pvc")
 	}
@@ -404,7 +419,15 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 	}
 
 	var gracePeriod int64 = 0
-	volumeMounts, volumeDevices := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode)
+	var readOnlyMount bool = false
+
+	// PVCs with accessmode ReadOnlyMany must be mounted with readonly flags set
+	// without the readonly flags the volume will be unable to mount
+	if slices.Contains(backupPVC.Spec.AccessModes, corev1.ReadOnlyMany) {
+		readOnlyMount = true
+	}
+
+	volumeMounts, volumeDevices := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode, backupPVC.Spec.AccessModes)
 
 	if label == nil {
 		label = make(map[string]string)
@@ -458,6 +481,7 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: backupPVC.Name,
+						ReadOnly:  readOnlyMount,
 					},
 				},
 			}},

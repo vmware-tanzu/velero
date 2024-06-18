@@ -25,6 +25,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -340,9 +341,14 @@ func IsPVCBound(pvc *corev1api.PersistentVolumeClaim) bool {
 }
 
 // MakePodPVCAttachment returns the volume mounts and devices for a pod needed to attach a PVC
-func MakePodPVCAttachment(volumeName string, volumeMode *corev1api.PersistentVolumeMode) ([]corev1api.VolumeMount, []corev1api.VolumeDevice) {
+func MakePodPVCAttachment(volumeName string, volumeMode *corev1api.PersistentVolumeMode, accessModes []corev1api.PersistentVolumeAccessMode) ([]corev1api.VolumeMount, []corev1api.VolumeDevice) {
 	var volumeMounts []corev1api.VolumeMount = nil
 	var volumeDevices []corev1api.VolumeDevice = nil
+	readOnlyMount := false
+
+	if slices.Contains(accessModes, corev1api.ReadOnlyMany) {
+		readOnlyMount = true
+	}
 
 	if volumeMode != nil && *volumeMode == corev1api.PersistentVolumeBlock {
 		volumeDevices = []corev1api.VolumeDevice{{
@@ -353,6 +359,7 @@ func MakePodPVCAttachment(volumeName string, volumeMode *corev1api.PersistentVol
 		volumeMounts = []corev1api.VolumeMount{{
 			Name:      volumeName,
 			MountPath: "/" + volumeName,
+			ReadOnly: readOnlyMount,
 		}}
 	}
 
