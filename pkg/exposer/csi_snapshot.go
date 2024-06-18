@@ -422,7 +422,7 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 
 	// PVCs with accessmode ReadOnlyMany must be mounted with readonly flags set
 	// without the readonly flags the volume will be unable to mount
-	for _, accessMode  := range backupPVC.Spec.AccessModes {
+	for _, accessMode := range backupPVC.Spec.AccessModes {
 		if accessMode == corev1.ReadOnlyMany {
 			readOnlyMount = true
 			break

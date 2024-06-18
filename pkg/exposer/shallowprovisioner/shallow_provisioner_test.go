@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
-	
+
 	corev1api "k8s.io/api/core/v1"
 	storagev1api "k8s.io/api/storage/v1"
 	clientTesting "k8s.io/client-go/testing"
@@ -44,7 +44,7 @@ func TestShallowProvisioner(t *testing.T) {
 			Name: "cephfs",
 		},
 		Provisioner: "cephfs.csi.ceph.com",
-		Parameters: map[string]string{},
+		Parameters:  map[string]string{},
 	}
 
 	cephPVCObj := &corev1api.PersistentVolumeClaim{
@@ -54,7 +54,7 @@ func TestShallowProvisioner(t *testing.T) {
 		},
 		Spec: corev1api.PersistentVolumeClaimSpec{
 			StorageClassName: &cephStorageClass.Name,
-			AccessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteMany},
+			AccessModes:      []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteMany},
 		},
 	}
 
@@ -63,7 +63,7 @@ func TestShallowProvisioner(t *testing.T) {
 			Name: "scale",
 		},
 		Provisioner: "spectrumscale.csi.ibm.com",
-		Parameters: map[string]string{},
+		Parameters:  map[string]string{},
 	}
 
 	scalePVCObj := &corev1api.PersistentVolumeClaim{
@@ -73,16 +73,16 @@ func TestShallowProvisioner(t *testing.T) {
 		},
 		Spec: corev1api.PersistentVolumeClaimSpec{
 			StorageClassName: &scaleStorageClass.Name,
-			AccessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce, corev1api.ReadWriteMany},
+			AccessModes:      []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce, corev1api.ReadWriteOncePod},
 		},
 	}
-	
+
 	nfsStorageClass := &storagev1api.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "nfs",
 		},
 		Provisioner: "nfs.csi.k8s.io",
-		Parameters: map[string]string{},
+		Parameters:  map[string]string{},
 	}
 
 	nfsPVCObj := &corev1api.PersistentVolumeClaim{
@@ -92,7 +92,7 @@ func TestShallowProvisioner(t *testing.T) {
 		},
 		Spec: corev1api.PersistentVolumeClaimSpec{
 			StorageClassName: &nfsStorageClass.Name,
-			AccessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
+			AccessModes:      []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
 		},
 	}
 
@@ -106,17 +106,17 @@ func TestShallowProvisioner(t *testing.T) {
 		err                error
 	}{
 		{
-			name:               "test cephfs transform",
+			name: "test cephfs pvc transform",
 			kubeClientObj: []runtime.Object{
 				cephStorageClass,
 			},
-			targetPVC: cephPVCObj,
+			targetPVC:          cephPVCObj,
 			targetStorageClass: cephStorageClass,
-			accessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadOnlyMany,},
+			accessModes:        []corev1api.PersistentVolumeAccessMode{corev1api.ReadOnlyMany},
 			kubeReactors: []reactor{
 				{
-					verb: "create",
-					resource: "storageclasses",
+					verb:     "create",
+					resource: "storageclass",
 					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-create-storageclass-error")
 					},
@@ -125,17 +125,17 @@ func TestShallowProvisioner(t *testing.T) {
 			err: nil,
 		},
 		{
-			name:               "test scale transform",
+			name: "test scale pvc transform",
 			kubeClientObj: []runtime.Object{
-				cephStorageClass,
+				scaleStorageClass,
 			},
-			targetPVC: scalePVCObj,
+			targetPVC:          scalePVCObj,
 			targetStorageClass: scaleStorageClass,
-			accessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadOnlyMany,},
+			accessModes:        []corev1api.PersistentVolumeAccessMode{corev1api.ReadOnlyMany},
 			kubeReactors: []reactor{
 				{
-					verb: "create",
-					resource: "storageclasses",
+					verb:     "create",
+					resource: "storageclass",
 					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-create-storageclass-error")
 					},
@@ -144,23 +144,32 @@ func TestShallowProvisioner(t *testing.T) {
 			err: nil,
 		},
 		{
-			name:               "test nfs transform",
+			name: "test nfs pvc does not transform",
 			kubeClientObj: []runtime.Object{
-				cephStorageClass,
+				nfsStorageClass,
 			},
-			targetPVC: nfsPVCObj,
+			targetPVC:          nfsPVCObj,
 			targetStorageClass: nfsStorageClass,
-			accessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce,},
+			accessModes:        nfsPVCObj.Spec.AccessModes,
 			kubeReactors: []reactor{
 				{
-					verb: "create",
-					resource: "storageclasses",
+					verb:     "create",
+					resource: "storageclass",
 					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-create-storageclass-error")
 					},
 				},
 			},
 			err: nil,
+		},
+		{
+			name:               "test missing storageclass",
+			kubeClientObj:      []runtime.Object{},
+			targetPVC:          nfsPVCObj,
+			targetStorageClass: nfsStorageClass,
+			accessModes:        []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
+			kubeReactors:       []reactor{},
+			err:                errors.Errorf("unable to retrieve storageclass (storageclass=nil): storageclasses.storage.k8s.io \"nfs\" not found"),
 		},
 	}
 
@@ -172,10 +181,11 @@ func TestShallowProvisioner(t *testing.T) {
 				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
 			}
 
-
 			pvc, err := ShallowCopyTransform(context.Background(), fakeKubeClient.StorageV1(), test.targetPVC)
-			assert.Equal(t, pvc.Spec.AccessModes, []corev1api.PersistentVolumeAccessMode{corev1api.ReadOnlyMany,})
-			assert.ErrorIs(t, err, test.err)
+			assert.Equal(t, test.accessModes, pvc.Spec.AccessModes)
+			if test.err != nil && err != nil {
+				assert.EqualError(t, test.err, err.Error())
+			}
 		})
 	}
 }
