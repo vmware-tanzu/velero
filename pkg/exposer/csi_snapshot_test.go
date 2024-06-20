@@ -34,6 +34,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1api "k8s.io/api/storage/v1"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
@@ -139,6 +140,14 @@ func TestExpose(t *testing.T) {
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 		Spec: appsv1.DaemonSetSpec{},
+	}
+
+	cephStorageClass := &storagev1api.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cephfs",
+		},
+		Provisioner: "cephfs.csi.ceph.com",
+		Parameters:  map[string]string{},
 	}
 
 	tests := []struct {
@@ -355,6 +364,25 @@ func TestExpose(t *testing.T) {
 			},
 			kubeClientObj: []runtime.Object{
 				daemonSet,
+			},
+		},
+		{
+			name:        "shallow copy success",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:    "fake-vs",
+				SourceNamespace: "fake-ns",
+				AccessMode:      AccessModeFileSystem,
+				StorageClass:    cephStorageClass.Name,
+				Timeout:         time.Millisecond,
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+				cephStorageClass,
 			},
 		},
 		{

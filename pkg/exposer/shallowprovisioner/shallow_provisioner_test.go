@@ -47,6 +47,15 @@ func TestShallowProvisioner(t *testing.T) {
 		Parameters:  map[string]string{},
 	}
 
+	noStrgClassPVCObj := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "fake-target-pvc",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			AccessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteMany},
+		},
+	}
 	cephPVCObj := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
@@ -97,22 +106,20 @@ func TestShallowProvisioner(t *testing.T) {
 	}
 
 	tests := []struct {
-		name               string
-		kubeClientObj      []runtime.Object
-		targetPVC          *corev1api.PersistentVolumeClaim
-		targetStorageClass *storagev1api.StorageClass
-		accessModes        []corev1api.PersistentVolumeAccessMode
-		kubeReactors       []reactor
-		err                error
+		name          string
+		kubeClientObj []runtime.Object
+		targetPVC     *corev1api.PersistentVolumeClaim
+		accessModes   []corev1api.PersistentVolumeAccessMode
+		kubeReactors  []reactor
+		err           error
 	}{
 		{
 			name: "test cephfs pvc transform",
 			kubeClientObj: []runtime.Object{
 				cephStorageClass,
 			},
-			targetPVC:          cephPVCObj,
-			targetStorageClass: cephStorageClass,
-			accessModes:        []corev1api.PersistentVolumeAccessMode{corev1api.ReadOnlyMany},
+			targetPVC:   cephPVCObj,
+			accessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadOnlyMany},
 			kubeReactors: []reactor{
 				{
 					verb:     "create",
@@ -129,9 +136,8 @@ func TestShallowProvisioner(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				scaleStorageClass,
 			},
-			targetPVC:          scalePVCObj,
-			targetStorageClass: scaleStorageClass,
-			accessModes:        []corev1api.PersistentVolumeAccessMode{corev1api.ReadOnlyMany},
+			targetPVC:   scalePVCObj,
+			accessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadOnlyMany},
 			kubeReactors: []reactor{
 				{
 					verb:     "create",
@@ -148,9 +154,8 @@ func TestShallowProvisioner(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				nfsStorageClass,
 			},
-			targetPVC:          nfsPVCObj,
-			targetStorageClass: nfsStorageClass,
-			accessModes:        nfsPVCObj.Spec.AccessModes,
+			targetPVC:   nfsPVCObj,
+			accessModes: nfsPVCObj.Spec.AccessModes,
 			kubeReactors: []reactor{
 				{
 					verb:     "create",
@@ -163,13 +168,21 @@ func TestShallowProvisioner(t *testing.T) {
 			err: nil,
 		},
 		{
-			name:               "test missing storageclass",
-			kubeClientObj:      []runtime.Object{},
-			targetPVC:          nfsPVCObj,
-			targetStorageClass: nfsStorageClass,
-			accessModes:        []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
-			kubeReactors:       []reactor{},
-			err:                errors.Errorf("unable to retrieve storageclass (storageclass=nil): storageclasses.storage.k8s.io \"nfs\" not found"),
+			name: "test no storageclass in pvc",
+			kubeClientObj: []runtime.Object{
+				nfsStorageClass,
+			},
+			targetPVC:   noStrgClassPVCObj,
+			accessModes: noStrgClassPVCObj.Spec.AccessModes,
+			err:         errors.Errorf("unable to retrieve storageclass (storageclass=nil): storageclasses.storage.k8s.io \"\" not found"),
+		},
+		{
+			name:          "test missing storageclass",
+			kubeClientObj: []runtime.Object{},
+			targetPVC:     nfsPVCObj,
+			accessModes:   []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
+			kubeReactors:  []reactor{},
+			err:           errors.Errorf("unable to retrieve storageclass (storageclass=nil): storageclasses.storage.k8s.io \"nfs\" not found"),
 		},
 	}
 
@@ -182,9 +195,9 @@ func TestShallowProvisioner(t *testing.T) {
 			}
 
 			pvc, err := ShallowCopyTransform(context.Background(), fakeKubeClient.StorageV1(), test.targetPVC)
-			assert.Equal(t, test.accessModes, pvc.Spec.AccessModes)
+			assert.Equal(t, pvc.Spec.AccessModes, test.accessModes)
 			if test.err != nil && err != nil {
-				assert.EqualError(t, test.err, err.Error())
+				assert.EqualError(t, err, test.err.Error())
 			}
 		})
 	}

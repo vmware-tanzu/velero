@@ -61,7 +61,7 @@ type scaleProvisioner struct {
 func ShallowCopyTransform(ctx context.Context, storageClient storagev1.StorageV1Interface, pvc *corev1api.PersistentVolumeClaim) (*corev1api.PersistentVolumeClaim, error) {
 	provisioners := [...]ShallowCopyProvisioner{NewCephFSProvisioner(), NewScaleProvisioner()}
 
-	if pvc.Spec.StorageClassName == nil {
+	if pvc.Spec.StorageClassName == nil || len(*pvc.Spec.StorageClassName) == 0 {
 		return pvc, nil
 	}
 
