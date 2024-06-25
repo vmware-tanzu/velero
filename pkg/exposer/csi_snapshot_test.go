@@ -374,7 +374,7 @@ func TestExpose(t *testing.T) {
 				SourceNamespace: "fake-ns",
 				AccessMode:      AccessModeFileSystem,
 				StorageClass:    cephStorageClass.Name,
-				Timeout:         time.Millisecond,
+				ExposeTimeout:   time.Millisecond,
 			},
 			snapshotClientObj: []runtime.Object{
 				vsObject,
