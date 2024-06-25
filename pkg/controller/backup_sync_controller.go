@@ -272,6 +272,10 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			for _, snapCont := range snapConts {
 				// TODO: Reset ResourceVersion prior to persisting VolumeSnapshotContents
 				snapCont.ResourceVersion = ""
+				// For creating static VSContent, we should put snapshothandle in source rather than volume handle.
+				// Because if VSContent syncs to a different cluster, having volumeHandle will force rePUTs on the snapshot
+				snapCont.Spec.Source.SnapshotHandle = snapCont.Status.SnapshotHandle
+				snapCont.Spec.Source.VolumeHandle = nil
 				err := b.client.Create(ctx, snapCont, &client.CreateOptions{})
 				switch {
 				case err != nil && apierrors.IsAlreadyExists(err):
