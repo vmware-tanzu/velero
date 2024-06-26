@@ -72,7 +72,7 @@ func ErrorStack(err error) *proto.Stack {
 
 		stackTrace.Frames = append(stackTrace.Frames, &proto.StackFrame{
 			File:     location.File,
-			Line:     int32(location.Line),
+			Line:     location.Line,
 			Function: location.Function,
 		})
 	}

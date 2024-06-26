@@ -16,7 +16,7 @@
         {{ range .subfolderitems }}
           <li>
             {{ if .github }}
-              <a href="{{ $gh }}{{ .url }}" target="_blank">{{ .page }}</a>
+              <a href="{{ $gh }}{{ .url }}" target="_blank" rel="noopener noreferrer">{{ .page }}</a>
             {{ else }}
               <a href="/docs/{{ $version }}{{ .url }}">{{ .page }}</a>
             {{ end }}
