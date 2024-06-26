@@ -49,14 +49,14 @@ func TestDualModeLogger(t *testing.T) {
 	logStr, err := readLogString(logFile)
 	require.NoError(t, err)
 
-	assert.Equal(t, true, strings.Contains(logStr, logMsgExpect))
-	assert.Equal(t, false, strings.Contains(logStr, logMsgUnexpect))
+	assert.True(t, strings.Contains(logStr, logMsgExpect))
+	assert.False(t, strings.Contains(logStr, logMsgUnexpect))
 
 	logger.Dispose(velerotest.NewLogger())
 
 	_, err = os.Stat(logFile.Name())
 
-	assert.Equal(t, true, os.IsNotExist(err))
+	assert.True(t, os.IsNotExist(err))
 }
 
 func readLogString(file *os.File) (string, error) {

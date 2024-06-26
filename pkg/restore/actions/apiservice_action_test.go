@@ -49,5 +49,5 @@ func TestAPIServiceActionExecuteSkipsRestore(t *testing.T) {
 	var apiService apiregistrationv1.APIService
 	require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), &apiService))
 	require.Equal(t, obj, apiService)
-	require.Equal(t, true, res.SkipRestore)
+	require.True(t, res.SkipRestore)
 }

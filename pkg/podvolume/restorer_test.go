@@ -442,7 +442,7 @@ func TestRestorePodVolumes(t *testing.T) {
 									break
 								}
 							}
-							assert.Equal(t, true, j < len(test.errs))
+							assert.Less(t, j, len(test.errs))
 						}
 					}
 				}

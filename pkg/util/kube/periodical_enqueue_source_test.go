@@ -172,7 +172,7 @@ func TestOrder(t *testing.T) {
 	bsl := &velerov1.BackupStorageLocation{}
 	require.Equal(t, "location2", first.(reconcile.Request).Name)
 	require.Nil(t, client.Get(ctx, first.(reconcile.Request).NamespacedName, bsl))
-	require.Equal(t, true, bsl.Spec.Default)
+	require.True(t, bsl.Spec.Default)
 
 	cancelFunc()
 }

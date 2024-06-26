@@ -30,5 +30,5 @@ func TestVeleroConfig(t *testing.T) {
 
 	assert.Equal(t, "foo", c.Namespace())
 	assert.Equal(t, []string{"feature1", "feature2"}, c.Features())
-	assert.Equal(t, true, c.Colorized())
+	assert.True(t, c.Colorized())
 }
