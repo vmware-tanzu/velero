@@ -111,15 +111,7 @@ It is possible that node-agent pods, as a daemonset, don't run in every worker n
 Otherwise, if a backupPod are scheduled to a node where node-agent pod is absent, the corresponding DataUpload CR will stay in `Accepted` phase until the prepare timeout (by default 30min).  
 
 At present, as part of the expose operations, the exposer creates a volume, represented by backupPVC, from the snapshot. The backupPVC uses the same storageClass with the source volume. If the `volumeBindingMode` in the storageClass is `Immediate`, the volume is immediately allocated from the underlying storage without waiting for the backupPod. On the other hand, the loadAffinity is set to the backupPod's affinity. If the backupPod is scheduled to a node where the snapshot volume is not accessible, e.g., because of storage topologies, the backupPod won't get into Running state, concequently, the data movement won't complete.  
-Once this problem happens, the backupPod stays in `Pending` phase, and the corresponding DataUpload CR stays in `Accepted` phase until the prepare timeout (by default 30min).   
-
-There is a common solution for the both problems:
-- We have an existing logic to periodically enqueue the dataupload CRs which are in the `Accepted` phase for timeout and cancel checks
-- We add a new logic to this existing logic to check if the corresponding backupPods are in unrecoverable status
-- The above problems could be covered by this check, because in both cases the backupPods are in abnormal and unrecoverable status
-- If a backupPod is unrecoverable, the dataupload controller cancels the dataupload and deletes the backupPod
-
-Specifically, when the above problems happen, the status of a backupPod is like below:
+Once this problem happens, the backupPod stays in `Pending` phase, and the corresponding DataUpload CR stays in `Accepted` phase until the prepare timeout (by default 30min). Below is an example of the backupPod's status when the problem happens:   
 ```
   status:
     conditions:
@@ -132,6 +124,9 @@ Specifically, when the above problems happen, the status of a backupPod is like 
       type: PodScheduled
     phase: Pending
 ```    
+
+On the other hand, the backupPod is deleted after the prepare timeout, so there is no way to tell the cause is one of the above problems or others.  
+To help the troubleshooting, we can add some diagnostic mechanism to discover the status of the backupPod and node-agent in the same node before deleting it as a result of the prepare timeout.  
 
 [1]: Implemented/unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
 [2]: volume-snapshot-data-movement/volume-snapshot-data-movement.md
