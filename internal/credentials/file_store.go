@@ -17,7 +17,6 @@ limitations under the License.
 package credentials
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -63,26 +62,29 @@ func NewNamespacedFileStore(client kbclient.Client, namespace string, fsRoot str
 
 // Path returns a path on disk where the secret key defined by
 // the given selector is serialized.
+// It also write other keys from the secret for other plugins to use.
 func (n *namespacedFileStore) Path(selector *corev1api.SecretKeySelector) (string, error) {
-	creds, err := kube.GetSecretKey(n.client, n.namespace, selector)
+	s, err := kube.GetSecret(n.client, n.namespace, selector.Name)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to get key for secret")
+		return "", errors.Wrap(err, "unable to get secret")
 	}
+	var credFilePath string
+	for key, data := range s.Data {
+		keyFilePath := filepath.Join(n.fsRoot, selector.Name, key)
+		if key == selector.Key {
+			credFilePath = keyFilePath
+		}
+		file, err := n.fs.OpenFile(keyFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			return "", errors.Wrap(err, "unable to open credentials file for writing")
+		}
+		if _, err := file.Write(data); err != nil {
+			return "", errors.Wrap(err, "unable to write credentials to store")
+		}
 
-	keyFilePath := filepath.Join(n.fsRoot, fmt.Sprintf("%s-%s", selector.Name, selector.Key))
-
-	file, err := n.fs.OpenFile(keyFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		return "", errors.Wrap(err, "unable to open credentials file for writing")
+		if err := file.Close(); err != nil {
+			return "", errors.Wrap(err, "unable to close credentials file")
+		}
 	}
-
-	if _, err := file.Write(creds); err != nil {
-		return "", errors.Wrap(err, "unable to write credentials to store")
-	}
-
-	if err := file.Close(); err != nil {
-		return "", errors.Wrap(err, "unable to close credentials file")
-	}
-
-	return keyFilePath, nil
+	return credFilePath, nil
 }

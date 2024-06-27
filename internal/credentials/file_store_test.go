@@ -35,13 +35,14 @@ func TestNamespacedFileStore(t *testing.T) {
 		secrets          []*corev1.Secret
 		secretSelector   *corev1.SecretKeySelector
 		wantErr          string
-		expectedPath     string
-		expectedContents string
+		expectedCredPath string
+		expectedPaths    []string
+		expectedContents []string
 	}{
 		{
 			name:           "returns an error if the secret can't be found",
 			secretSelector: builder.ForSecretKeySelector("non-existent-secret", "secret-key").Result(),
-			wantErr:        "unable to get key for secret: secrets \"non-existent-secret\" not found",
+			wantErr:        "unable to get secret: secrets \"non-existent-secret\" not found",
 		},
 		{
 			name:           "returns a filepath formed using fsRoot, namespace, secret name and key, with secret contents",
@@ -50,16 +51,28 @@ func TestNamespacedFileStore(t *testing.T) {
 			secretSelector: builder.ForSecretKeySelector("credential", "key2").Result(),
 			secrets: []*corev1.Secret{
 				builder.ForSecret("ns1", "credential").Data(map[string][]byte{
-					"key1": []byte("ns1-secretdata1"),
-					"key2": []byte("ns1-secretdata2"),
-					"key3": []byte("ns1-secretdata3"),
+					"key1":          []byte("ns1-secretdata1"),
+					"key2":          []byte("ns1-secretdata2"),
+					"key3":          []byte("ns1-secretdata3"),
+					"encryptionKey": []byte("ns1-encryptionkey"),
 				}).Result(),
 				builder.ForSecret("ns2", "credential").Data(map[string][]byte{
 					"key2": []byte("ns2-secretdata2"),
 				}).Result(),
 			},
-			expectedPath:     "/tmp/credentials/ns1/credential-key2",
-			expectedContents: "ns1-secretdata2",
+			expectedPaths: []string{
+				"/tmp/credentials/ns1/credential/key1",
+				"/tmp/credentials/ns1/credential/key2",
+				"/tmp/credentials/ns1/credential/key3",
+				"/tmp/credentials/ns1/credential/encryptionKey",
+			},
+			expectedCredPath: "/tmp/credentials/ns1/credential/key2",
+			expectedContents: []string{
+				"ns1-secretdata1",
+				"ns1-secretdata2",
+				"ns1-secretdata3",
+				"ns1-encryptionkey",
+			},
 		},
 	}
 
@@ -75,7 +88,7 @@ func TestNamespacedFileStore(t *testing.T) {
 			fileStore, err := NewNamespacedFileStore(client, tc.namespace, tc.fsRoot, fs)
 			require.NoError(t, err)
 
-			path, err := fileStore.Path(tc.secretSelector)
+			expectedCredPath, err := fileStore.Path(tc.secretSelector)
 
 			if tc.wantErr != "" {
 				require.EqualError(t, err, tc.wantErr)
@@ -83,11 +96,12 @@ func TestNamespacedFileStore(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			require.Equal(t, tc.expectedPath, path)
-
-			contents, err := fs.ReadFile(path)
-			require.NoError(t, err)
-			require.Equal(t, []byte(tc.expectedContents), contents)
+			require.Equal(t, tc.expectedCredPath, expectedCredPath)
+			for i, path := range tc.expectedPaths {
+				contents, err := fs.ReadFile(path)
+				require.NoError(t, err)
+				require.Equal(t, []byte(tc.expectedContents[i]), contents)
+			}
 		})
 	}
 }
