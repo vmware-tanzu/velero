@@ -36,6 +36,7 @@ In case 2, the majority of time spent on the backup will likely be during the sy
 - Support VolumeGroupSnapshots: this is a future feature, although certain prerequisites for this enhancement are included in this proposal.
 - Process multiple backups in parallel: this is a future feature, although certain prerequisites for this enhancement are included in this proposal.
 - Refactoring plugin infrastructure to avoid RPC calls for internal plugins.
+- Restore performance improvements: this is potentially a future feature
 
 ## High-Level Design
 
