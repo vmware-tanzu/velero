@@ -61,6 +61,7 @@ func TestExecute(t *testing.T) {
 		expectedBackup     *velerov1api.Backup
 		expectedDataUpload *velerov2alpha1.DataUpload
 		expectedPVC        *corev1.PersistentVolumeClaim
+		resourcePolicy     *corev1.ConfigMap
 	}{
 		{
 			name:        "Skip PVC BIA when backup is in finalizing phase",
@@ -127,6 +128,16 @@ func TestExecute(t *testing.T) {
 					builder.WithLabels(velerov1api.BackupNameLabel, "test", velerov1api.VolumeSnapshotLabel, "")).
 				VolumeName("testPV").StorageClass("testSC").Phase(corev1.ClaimBound).Result(),
 		},
+		{
+			name:           "Test ResourcePolicy",
+			backup:         builder.ForBackup("velero", "test").ResourcePolicies("resourcePolicy").SnapshotVolumes(false).Result(),
+			resourcePolicy: builder.ForConfigMap("velero", "resourcePolicy").Data("policy", "{\"version\":\"v1\", \"volumePolicies\":[{\"conditions\":{\"csi\": {}},\"action\":{\"type\":\"snapshot\"}}]}").Result(),
+			pvc:            builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1.ClaimBound).Result(),
+			pv:             builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
+			sc:             builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
+			vsClass:        builder.ForVolumeSnapshotClass("tescVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
+			expectedErr:    nil,
+		},
 	}
 
 	for _, tc := range tests {
@@ -146,6 +157,9 @@ func TestExecute(t *testing.T) {
 			}
 			if tc.vsClass != nil {
 				require.NoError(t, crClient.Create(context.Background(), tc.vsClass))
+			}
+			if tc.resourcePolicy != nil {
+				require.NoError(t, crClient.Create(context.Background(), tc.resourcePolicy))
 			}
 
 			pvcBIA := pvcBackupItemAction{
@@ -190,6 +204,8 @@ func TestExecute(t *testing.T) {
 			resultUnstructed, _, _, _, err := pvcBIA.Execute(&unstructured.Unstructured{Object: pvcMap}, tc.backup)
 			if tc.expectedErr != nil {
 				require.Equal(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
 			}
 
 			if tc.expectedDataUpload != nil {

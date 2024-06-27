@@ -76,7 +76,7 @@ volumePolicies:
 - Update VolumePolicy action type validation to account for `fs-backup` and `snapshot` as valid VolumePolicy actions.
 - Modifications needed for `fs-backup` action:
   - Now based on the specification of volume policy on backup request we will decide whether to go via legacy pod annotations approach or the newer volume policy based fs-backup action approach.
-  - If there is a presence of volume policy(fs-backup/snapshot)  on the backup request that matches as an action for a volume we use the newer volume policy approach to get the list of the volumes for `fs-backup` action
+  - If there is a presence of volume policy(fs-backup/snapshot) on the backup request that matches as an action for a volume we use the newer volume policy approach to get the list of the volumes for `fs-backup` action
   - Else continue with the annotation based legacy approach workflow.
 
 - Modifications needed for `snapshot` action:
