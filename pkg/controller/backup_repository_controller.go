@@ -214,7 +214,7 @@ func (r *BackupRepoReconciler) getIdentiferByBSL(ctx context.Context, req *veler
 		return "", errors.Wrapf(err, "error to get BSL %s", req.Spec.BackupStorageLocation)
 	}
 
-	repoIdentifier, err := repoconfig.GetRepoIdentifier(loc, req.Spec.VolumeNamespace)
+	repoIdentifier, err := repoconfig.GetRepoIdentifier(loc, req.Spec.VolumeNamespace, req.Spec.RepositoryType)
 	if err != nil {
 		return "", errors.Wrapf(err, "error to get identifier for repo %s", req.Name)
 	}
