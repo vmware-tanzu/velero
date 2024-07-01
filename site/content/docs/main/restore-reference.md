@@ -241,6 +241,8 @@ data:
   <old-node-name>: <new-node-name>
 ```
 
+Note: This feature doesn't work for PVCs with ```WaitForFirstConsumer``` as the ```volumeBindingMode```. These kind of PVCs won't be bound until the pod is scheduled and the scheduler will overwrite the selected-node annotation to the node where the pod is scheduled to.  
+
 ## Restoring into a different namespace
 
 Velero can restore resources into a different namespace than the one they were backed up from. To do this, use the `--namespace-mappings` flag:
