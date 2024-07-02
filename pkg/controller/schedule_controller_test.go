@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/robfig/cron"
+	cron "github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -289,7 +289,7 @@ func TestGetNextRunTime(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cronSchedule, err := cron.Parse(test.schedule.Spec.Schedule)
+			cronSchedule, err := cron.ParseStandard(test.schedule.Spec.Schedule)
 			require.NoError(t, err, "unable to parse test.schedule.Spec.Schedule: %v", err)
 
 			testClock := testclocks.NewFakeClock(time.Now())
