@@ -65,18 +65,23 @@ func NamespaceAndName(objMeta metav1.Object) string {
 }
 
 // EnsureNamespaceExistsAndIsReady attempts to create the provided Kubernetes namespace.
-// It returns three values: a bool indicating whether or not the namespace is ready,
-// a bool indicating whether or not the namespace was created and an error if the creation failed
-// for a reason other than that the namespace already exists. Note that in the case where the
-// namespace already exists and is not ready, this function will return (false, false, nil).
-// If the namespace exists and is marked for deletion, this function will wait up to the timeout for it to fully delete.
-func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client corev1client.NamespaceInterface, timeout time.Duration) (bool, bool, error) {
+// It returns three values:
+//   - a bool indicating whether or not the namespace is ready,
+//   - a bool indicating whether or not the namespace was created
+//   - an error if one occurred.
+//
+// examples:
+//
+//	namespace already exists and is not ready, this function will return (false, false, nil).
+//	If the namespace exists and is marked for deletion, this function will wait up to the timeout for it to fully delete.
+func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client corev1client.NamespaceInterface, timeout time.Duration) (ready bool, nsCreated bool, err error) {
 	// nsCreated tells whether the namespace was created by this method
 	// required for keeping track of number of restored items
-	var nsCreated bool
-	var ready bool
-	err := wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, true, func(ctx context.Context) (bool, error) {
+	// if namespace is marked for deletion, and we timed out, report an error
+	var terminatingNamespace bool
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		clusterNS, err := client.Get(ctx, namespace.Name, metav1.GetOptions{})
+		// if namespace is marked for deletion, and we timed out, report an error
 
 		if apierrors.IsNotFound(err) {
 			// Namespace isn't in cluster, we're good to create.
@@ -90,6 +95,7 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 
 		if clusterNS != nil && (clusterNS.GetDeletionTimestamp() != nil || clusterNS.Status.Phase == corev1api.NamespaceTerminating) {
 			// Marked for deletion, keep waiting
+			terminatingNamespace = true
 			return false, nil
 		}
 
@@ -100,6 +106,9 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 
 	// err will be set if we timed out or encountered issues retrieving the namespace,
 	if err != nil {
+		if terminatingNamespace {
+			return false, nsCreated, errors.Wrapf(err, "timed out waiting for terminating namespace %s to disappear before restoring", namespace.Name)
+		}
 		return false, nsCreated, errors.Wrapf(err, "error getting namespace %s", namespace.Name)
 	}
 
