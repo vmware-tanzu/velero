@@ -100,13 +100,13 @@ func TestAsyncBackup(t *testing.T) {
 			fs.initialized = true
 			fs.callbacks = test.callbacks
 
-			err := fs.StartBackup(AccessPoint{ByPath: test.path}, "", "", false, nil, map[string]string{})
+			err := fs.StartBackup(AccessPoint{ByPath: test.path}, map[string]string{}, &FSBRStartParam{})
 			require.NoError(t, err)
 
 			<-finish
 
-			assert.Equal(t, asyncErr, test.err)
-			assert.Equal(t, asyncResult, test.result)
+			assert.Equal(t, test.err, asyncErr)
+			assert.Equal(t, test.result, asyncResult)
 		})
 	}
 

@@ -128,7 +128,7 @@ func NewManager(
 	mgr.providers[velerov1api.BackupRepositoryTypeKopia] = provider.NewUnifiedRepoProvider(credentials.CredentialGetter{
 		FromFile:   credentialFileStore,
 		FromSecret: credentialSecretStore,
-	}, velerov1api.BackupRepositoryTypeKopia, client, mgr.log)
+	}, velerov1api.BackupRepositoryTypeKopia, mgr.log)
 
 	return mgr
 }

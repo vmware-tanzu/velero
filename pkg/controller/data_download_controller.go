@@ -334,10 +334,19 @@ func (r *DataDownloadReconciler) runCancelableDataPath(ctx context.Context, fsRe
 	}
 
 	log.WithField("path", path.ByPath).Debug("Found host path")
-	if err := fsRestore.Init(ctx, dd.Spec.BackupStorageLocation, dd.Spec.SourceNamespace, datamover.GetUploaderType(dd.Spec.DataMover),
-		velerov1api.BackupRepositoryTypeKopia, "", r.repositoryEnsurer, r.credentialGetter); err != nil {
+
+	if err := fsRestore.Init(ctx, &datapath.FSBRInitParam{
+		BSLName:           dd.Spec.BackupStorageLocation,
+		SourceNamespace:   dd.Spec.SourceNamespace,
+		UploaderType:      datamover.GetUploaderType(dd.Spec.DataMover),
+		RepositoryType:    velerov1api.BackupRepositoryTypeKopia,
+		RepoIdentifier:    "",
+		RepositoryEnsurer: r.repositoryEnsurer,
+		CredentialGetter:  r.credentialGetter,
+	}); err != nil {
 		return r.errorOut(ctx, dd, err, "error to initialize data path", log)
 	}
+
 	log.WithField("path", path.ByPath).Info("fs init")
 
 	if err := fsRestore.StartRestore(dd.Spec.SnapshotID, path, dd.Spec.DataMoverConfig); err != nil {

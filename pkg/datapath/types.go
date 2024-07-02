@@ -19,8 +19,6 @@ package datapath
 import (
 	"context"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
-	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
@@ -32,14 +30,14 @@ type Result struct {
 
 // BackupResult represents the result of a backup
 type BackupResult struct {
-	SnapshotID    string
-	EmptySnapshot bool
-	Source        AccessPoint
+	SnapshotID    string      `json:"snapshotID"`
+	EmptySnapshot bool        `json:"emptySnapshot"`
+	Source        AccessPoint `json:"source,omitempty"`
 }
 
 // RestoreResult represents the result of a restore
 type RestoreResult struct {
-	Target AccessPoint
+	Target AccessPoint `json:"target,omitempty"`
 }
 
 // Callbacks defines the collection of callbacks during backup/restore
@@ -59,10 +57,10 @@ type AccessPoint struct {
 // AsyncBR is the interface for asynchronous data path methods
 type AsyncBR interface {
 	// Init initializes an asynchronous data path instance
-	Init(ctx context.Context, bslName string, sourceNamespace string, uploaderType string, repositoryType string, repoIdentifier string, repositoryEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter) error
+	Init(ctx context.Context, param interface{}) error
 
 	// StartBackup starts an asynchronous data path instance for backup
-	StartBackup(source AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, dataMoverConfig map[string]string) error
+	StartBackup(source AccessPoint, dataMoverConfig map[string]string, param interface{}) error
 
 	// StartRestore starts an asynchronous data path instance for restore
 	StartRestore(snapshotID string, target AccessPoint, dataMoverConfig map[string]string) error
