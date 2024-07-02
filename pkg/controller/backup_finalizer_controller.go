@@ -31,6 +31,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
@@ -119,7 +120,10 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			r.backupTracker.Delete(backup.Namespace, backup.Name)
 		}
 		// Always attempt to Patch the backup object and status after each reconciliation.
-		if err := r.client.Patch(ctx, backup, kbclient.MergeFrom(original)); err != nil {
+		//
+		// if this patch fails, there may not be another opportunity to update the backup object without external update event.
+		// so we retry
+		if err := client.RetriesPhasePatchFuncOnErrors(func() error { return r.client.Patch(ctx, backup, kbclient.MergeFrom(original)) }); err != nil {
 			log.WithError(err).Error("Error updating backup")
 			return
 		}

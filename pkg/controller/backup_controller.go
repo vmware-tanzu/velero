@@ -305,7 +305,7 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		b.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
 	}
 	log.Info("Updating backup's final status")
-	if err := kubeutil.PatchResource(original, request.Backup, b.kbClient); err != nil {
+	if err := kubeutil.PatchResourceWithRetriesOnErrors(original, request.Backup, b.kbClient); err != nil {
 		log.WithError(err).Error("error updating backup's final status")
 	}
 	return ctrl.Result{}, nil
