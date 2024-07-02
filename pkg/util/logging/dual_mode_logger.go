@@ -23,6 +23,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
 // DualModeLogger is a thread safe logger interface to write logs to dual targets, one of which
@@ -35,6 +37,10 @@ type DualModeLogger interface {
 	GetPersistFile() (*os.File, error)
 	// Dispose closes the temp file pointer and removes the file
 	Dispose(log logrus.FieldLogger)
+	// GetLogEntryByLevel get the log entries by log level collected by LogCountHook
+	GetLogEntryByLevel(level logrus.Level) results.Result
+	// GetLogEntryCountByLevel get the log count by log level collected by LogCountHook
+	GetLogEntryCountByLevel(level logrus.Level) int
 }
 
 type tempFileLogger struct {
@@ -45,7 +51,7 @@ type tempFileLogger struct {
 }
 
 // NewTempFileLogger creates a DualModeLogger instance that writes logs to both Stdout and a file in the temp folder.
-func NewTempFileLogger(logLevel logrus.Level, logFormat Format, hook *LogHook, fields logrus.Fields) (DualModeLogger, error) {
+func NewTempFileLogger(logLevel logrus.Level, logFormat Format, hook *LogCountHook, fields logrus.Fields) (DualModeLogger, error) {
 	file, err := os.CreateTemp("", "")
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating temp file")
@@ -100,4 +106,30 @@ func closeAndRemoveFile(file *os.File, log logrus.FieldLogger) {
 	if err := os.Remove(file.Name()); err != nil {
 		log.WithError(err).WithField("file", file.Name()).Warn("error removing temp log file")
 	}
+}
+
+func (p *tempFileLogger) GetLogEntryCountByLevel(level logrus.Level) int {
+	levelHooks := p.logger.Hooks[level]
+	for _, hook := range levelHooks {
+		logCountHook, ok := hook.(*LogCountHook)
+		if ok {
+			return logCountHook.GetCount(level)
+		}
+	}
+
+	return 0
+}
+
+func (p *tempFileLogger) GetLogEntryByLevel(level logrus.Level) results.Result {
+	var result results.Result
+
+	levelHooks := p.logger.Hooks[level]
+	for _, hook := range levelHooks {
+		logCountHook, ok := hook.(*LogCountHook)
+		if ok {
+			return logCountHook.GetEntries(level)
+		}
+	}
+
+	return result
 }

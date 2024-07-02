@@ -12,7 +12,7 @@ import (
 )
 
 func TestLogHook_Fire(t *testing.T) {
-	hook := NewLogHook()
+	hook := NewLogCountHook()
 
 	entry := &logrus.Entry{
 		Level: logrus.ErrorLevel,
@@ -60,7 +60,7 @@ func TestLogHook_Fire(t *testing.T) {
 }
 
 func TestLogHook_Levels(t *testing.T) {
-	hook := NewLogHook()
+	hook := NewLogCountHook()
 
 	levels := hook.Levels()
 
@@ -78,7 +78,7 @@ func TestLogHook_Levels(t *testing.T) {
 }
 
 func TestLogHook_GetCount(t *testing.T) {
-	hook := NewLogHook()
+	hook := NewLogCountHook()
 
 	// Set up test data
 	hook.counts[logrus.ErrorLevel] = 5
@@ -101,7 +101,7 @@ func TestLogHook_GetCount(t *testing.T) {
 }
 
 func TestLogHook_GetEntries(t *testing.T) {
-	hook := NewLogHook()
+	hook := NewLogCountHook()
 
 	// Set up test data
 	entry := &logrus.Entry{
