@@ -28,6 +28,8 @@ import (
 	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
@@ -98,14 +100,6 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		log.WithError(err).Error("Error getting Backup")
 		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	switch backup.Status.Phase {
-	case velerov1api.BackupPhaseFinalizing, velerov1api.BackupPhaseFinalizingPartiallyFailed:
-		// only process backups finalizing after  plugin operations are complete
-	default:
-		log.Debug("Backup is not awaiting finalizing, skipping")
-		return ctrl.Result{}, nil
 	}
 
 	original := backup.DeepCopy()
@@ -228,6 +222,19 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 func (r *backupFinalizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Backup{}).
+		WithEventFilter(predicate.Funcs{
+			// Only process backups that are updated to finalizing phase after plugin operations are complete
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				backup, ok := e.ObjectNew.(*velerov1api.Backup)
+				if !ok {
+					return false
+				}
+				return backup.Status.Phase == velerov1api.BackupPhaseFinalizing || backup.Status.Phase == velerov1api.BackupPhaseFinalizingPartiallyFailed
+			},
+			CreateFunc:  func(e event.CreateEvent) bool { return false },
+			DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+			GenericFunc: func(e event.GenericEvent) bool { return false },
+		}).
 		Complete(r)
 }
 
