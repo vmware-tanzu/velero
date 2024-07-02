@@ -101,6 +101,12 @@ func WithRestoreOnly() podTemplateOption {
 	}
 }
 
+func WithRestoreOnlyBool(b bool) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.restoreOnly = b
+	}
+}
+
 func WithResources(resources corev1.ResourceRequirements) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.resources = resources
@@ -149,15 +155,33 @@ func WithDefaultVolumesToFsBackup() podTemplateOption {
 	}
 }
 
+func WithDefaultVolumesToFsBackupBool(b bool) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.defaultVolumesToFsBackup = b
+	}
+}
+
 func WithDefaultSnapshotMoveData() podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.defaultSnapshotMoveData = true
 	}
 }
 
+func WithDefaultSnapshotMoveDataBool(b bool) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.defaultSnapshotMoveData = b
+	}
+}
+
 func WithDisableInformerCache() podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.disableInformerCache = true
+	}
+}
+
+func WithDisableInformerCacheBool(b bool) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.disableInformerCache = b
 	}
 }
 
@@ -170,6 +194,12 @@ func WithServiceAccountName(sa string) podTemplateOption {
 func WithPrivilegedNodeAgent() podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.privilegedNodeAgent = true
+	}
+}
+
+func WithPrivilegedNodeAgentBool(b bool) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.privilegedNodeAgent = b
 	}
 }
 
