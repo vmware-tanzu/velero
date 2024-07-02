@@ -230,6 +230,20 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	switch original.Status.Phase {
 	case "", velerov1api.BackupPhaseNew:
 		// only process new backups
+	case velerov1api.BackupPhaseInProgress:
+		// if backup is in progress, we should not process it again
+		// we want to mark it as failed to avoid it being stuck in progress
+		// if so, mark it as failed, last loop did not successfully complete the backup
+		log.Debug("Backup has in progress status from prior reconcile, marking it as failed")
+		failedCopy := original.DeepCopy()
+		failedCopy.Status.Phase = velerov1api.BackupPhaseFailed
+		failedCopy.Status.FailureReason = "Backup from previous reconcile still in progress"
+		if err := kubeutil.PatchResource(original, failedCopy, b.kbClient); err != nil {
+			// return the error so the status can be re-processed; it's currently still not completed or failed
+			return ctrl.Result{}, err
+		}
+		// patch to mark it as failed succeeded, do not requeue
+		return ctrl.Result{}, nil
 	default:
 		b.logger.WithFields(logrus.Fields{
 			"backup": kubeutil.NamespaceAndName(original),
@@ -246,7 +260,6 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		request.Status.Phase = velerov1api.BackupPhaseInProgress
 		request.Status.StartTimestamp = &metav1.Time{Time: b.clock.Now()}
 	}
-
 	// update status
 	if err := kubeutil.PatchResource(original, request.Backup, b.kbClient); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "error updating Backup status to %s", request.Status.Phase)
@@ -307,7 +320,10 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log.Info("Updating backup's final status")
 	if err := kubeutil.PatchResource(original, request.Backup, b.kbClient); err != nil {
 		log.WithError(err).Error("error updating backup's final status")
+		// return the error so the status can be re-processed; it's currently still not completed or failed
+		return ctrl.Result{}, err
 	}
+
 	return ctrl.Result{}, nil
 }
 

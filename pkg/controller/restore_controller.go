@@ -168,8 +168,8 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// the controller.
 	log := r.logger.WithField("Restore", req.NamespacedName.String())
 
-	restore := &api.Restore{}
-	err := r.kbClient.Get(ctx, client.ObjectKey{Namespace: req.Namespace, Name: req.Name}, restore)
+	original := &api.Restore{}
+	err := r.kbClient.Get(ctx, client.ObjectKey{Namespace: req.Namespace, Name: req.Name}, original)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Debugf("restore[%s] not found", req.Name)
@@ -181,15 +181,15 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// deal with finalizer
-	if !restore.DeletionTimestamp.IsZero() {
+	if !original.DeletionTimestamp.IsZero() {
 		// check the finalizer and run clean-up
-		if controllerutil.ContainsFinalizer(restore, ExternalResourcesFinalizer) {
-			if err := r.deleteExternalResources(restore); err != nil {
+		if controllerutil.ContainsFinalizer(original, ExternalResourcesFinalizer) {
+			if err := r.deleteExternalResources(original); err != nil {
 				log.Errorf("fail to delete external resources: %s", err.Error())
 				return ctrl.Result{}, err
 			}
 			// once finish clean-up, remove the finalizer from the restore so that the restore will be unlocked and deleted.
-			original := restore.DeepCopy()
+			restore := original.DeepCopy()
 			controllerutil.RemoveFinalizer(restore, ExternalResourcesFinalizer)
 			if err := kubeutil.PatchResource(original, restore, r.kbClient); err != nil {
 				log.Errorf("fail to remove finalizer: %s", err.Error())
@@ -203,8 +203,8 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// add finalizer
-	if restore.DeletionTimestamp.IsZero() && !controllerutil.ContainsFinalizer(restore, ExternalResourcesFinalizer) {
-		original := restore.DeepCopy()
+	if original.DeletionTimestamp.IsZero() && !controllerutil.ContainsFinalizer(original, ExternalResourcesFinalizer) {
+		restore := original.DeepCopy()
 		controllerutil.AddFinalizer(restore, ExternalResourcesFinalizer)
 		if err := kubeutil.PatchResource(original, restore, r.kbClient); err != nil {
 			log.Errorf("fail to add finalizer: %s", err.Error())
@@ -212,20 +212,31 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	switch restore.Status.Phase {
+	switch original.Status.Phase {
 	case "", api.RestorePhaseNew:
 		// only process new restores
+	case api.RestorePhaseInProgress:
+		// if restore is in progress, we should not process it again
+		// we want to mark it as failed to avoid it being stuck in progress
+		// if so, mark it as failed, last loop did not successfully complete the restore
+		log.Debug("Restore has in progress status from prior reconcile, marking it as failed")
+		failedCopy := original.DeepCopy()
+		failedCopy.Status.Phase = api.RestorePhaseFailed
+		failedCopy.Status.FailureReason = "Restore from previous reconcile still in progress"
+		if err := kubeutil.PatchResource(original, failedCopy, r.kbClient); err != nil {
+			// return the error so the status can be re-processed; it's currently still not completed or failed
+			return ctrl.Result{}, err
+		}
+		// patch to mark it as failed succeeded, do not requeue
+		return ctrl.Result{}, nil
 	default:
 		r.logger.WithFields(logrus.Fields{
-			"restore": kubeutil.NamespaceAndName(restore),
-			"phase":   restore.Status.Phase,
+			"restore": kubeutil.NamespaceAndName(original),
+			"phase":   original.Status.Phase,
 		}).Debug("Restore is not handled")
 		return ctrl.Result{}, nil
 	}
-
-	// store a copy of the original restore for creating patch
-	original := restore.DeepCopy()
-
+	restore := original.DeepCopy()
 	// Validate the restore and fetch the backup
 	info, resourceModifiers := r.validateAndComplete(restore)
 
@@ -278,8 +289,8 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if err = kubeutil.PatchResource(original, restore, r.kbClient); err != nil {
 		log.WithError(errors.WithStack(err)).Info("Error updating restore's final status")
-		// No need to re-enqueue here, because restore's already set to InProgress before.
-		// Controller only handle New restore.
+		// return the error so the status can be re-processed; it's currently still not completed or failed
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
