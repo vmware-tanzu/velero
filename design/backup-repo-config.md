@@ -7,14 +7,14 @@
 
 ## Background
 
-According to the [Unified Repository design][1] Velero uses selectable backup respositories for various backup/restore methods, i.e., fs-backup, volume snapshot data movement, etc. To achieve the best performance, backup respositories may need to be configured according to the running environments.  
+According to the [Unified Repository design][1] Velero uses selectable backup repositories for various backup/restore methods, i.e., fs-backup, volume snapshot data movement, etc. To achieve the best performance, backup repositories may need to be configured according to the running environments.  
 For example, if there are sufficient CPU and memory resources in the environment, users may enable compression feature provided by the backup repository, so as to achieve the best backup throughput.  
-As another example, if the local disk space is not sufficent, users may want to constraint the backup repository's cache size, so as to prevent from running out of the disk space.  
-Therefore, it is worthy to allow users to configure some essential prameters of the backup repsoitories, and the configuration may vary from backup respositories.  
+As another example, if the local disk space is not sufficient, users may want to constraint the backup repository's cache size, so as to prevent the repository from running out of the disk space.  
+Therefore, it is worthy to allow users to configure some essential parameters of the backup repsoitories, and the configuration may vary from backup repositories.  
 
 ## Goals
 
-- Create a mechnism for users to specify configurations for backup repositories
+- Create a mechanism for users to specify configurations for backup repositories  
 
 ## Non-Goals
 
@@ -22,32 +22,82 @@ Therefore, it is worthy to allow users to configure some essential prameters of 
 
 ### BackupRepository CRD
 
-After a backup repository is initialized, a BackupRepository CR is created to represent the instance of the backup repository. The BackupRepository's spec is a core parameter used by Uinified Repo when interactive with the backup repsoitory. Therefore, we can add the configurations into the BackupRepository CR.  
-The configurations may be different varying from backup repositories, therefore, we will not define each of the configurations explictly. Instead, we add a map in the BackupRepository's spec to take any configuration to be set to the backup repository.  
-During various operations to the backup repository, the Unified Repo modules will retrieve from the map for the specific configuration that is required at that time. So even though it is specified, a configuration may not be visite/hornored if the operations don't require it for the specific backup repository, this won't bring any issue.  
+After a backup repository is initialized, a BackupRepository CR is created to represent the instance of the backup repository. The BackupRepository's spec is a core parameter used by Uinified Repo modules when interactive with the backup repsoitory. Therefore, we can add the configurations into the BackupRepository CR called ```repositoryConfigs```.  
+The configurations may be different varying from backup repositories, therefore, we will not define each of the configurations explicitly. Instead, we add a map in the BackupRepository's spec to take any configuration to be set to the backup repository.  
+During various operations to the backup repository, the Unified Repo modules will retrieve from the map for the specific configuration that is required at that time. So even though it is specified, a configuration may not be visited/hornored if the operations don't require it for the specific backup repository, this won't bring any issue. When and how a configuration is hornored is decided by the configuration itself and should be clarified in the configuration's specification.    
 
 Below is the new BackupRepository's spec after adding the configuration map:  
+```yaml
+          spec:
+            description: BackupRepositorySpec is the specification for a BackupRepository.
+            properties:
+              backupStorageLocation:
+                description: |-
+                  BackupStorageLocation is the name of the BackupStorageLocation
+                  that should contain this repository.
+                type: string
+              maintenanceFrequency:
+                description: MaintenanceFrequency is how often maintenance should
+                  be run.
+                type: string
+              repositoryConfigs:
+                additionalProperties:
+                  type: string
+                description: RepositoryConfigs is configurations for the specific
+                  repository.
+                type: object
+              repositoryType:
+                description: RepositoryType indicates the type of the backend repository
+                enum:
+                - kopia
+                - restic
+                - ""
+                type: string
+              resticIdentifier:
+                description: |-
+                  ResticIdentifier is the full restic-compatible string for identifying
+                  this repository.
+                type: string
+              volumeNamespace:
+                description: |-
+                  VolumeNamespace is the namespace this backup repository contains
+                  pod volume backups for.
+                type: string
+            required:
+            - backupStorageLocation
+            - maintenanceFrequency
+            - resticIdentifier
+            - volumeNamespace
+            type: object
+```            
 
 ### BackupRepository configMap
 
-The BackupRepository CR is not created explicitly but a Velero CLI, but created as part of the backup/restore/maintenance operation if the CR doesn't exist. As a result, users don't have any way to specify the configurations before the BackupRepository CR is created.  
-Therefore, we create a BackupRepository configMap as a template of the configurations to be applied to the backup repository CR created during the backup/restore/maintenance operation. For an existing BackupRepository CR, the configMap is never visited, if users want to modify the configuration value, they should directly edit the BackupRepository CR.   
-The BackupRepository configMap is created by users. If the configMap is not there, nothing is specified to the backup repository CR, so the Unified Repo modules use the hard-coded values to configre the backup repository.  
-The BackupRepository configMap is backup repository type specific, that is, for each type of backup repository, there is one configMap. Therefore, a ```backup-repository-config``` label should be applied to the configMap with the value of the repository's type. During the backup repository creation, the configMap is searched by the label.  
+The BackupRepository CR is not created explicitly by a Velero CLI, but created as part of the backup/restore/maintenance operation if the CR doesn't exist. As a result, users don't have any way to specify the configurations before the BackupRepository CR is created.  
+Therefore, we create a BackupRepository configMap as a template of the configurations to be applied to the backup repository CR when it is created for the first time. For an existing BackupRepository CR, the configMap is never visited, if users want to modify the configuration value, they should directly edit the BackupRepository CR.   
+The BackupRepository configMap is created by users. If the configMap is not there, nothing is specified to the backup repository CR, so the Unified Repo modules use the hard-coded values to configure the backup repository.  
+The BackupRepository configMap is backup repository type specific, that is, for each type of backup repository, there is one configMap. Therefore, a ```backup-repository-config``` label should be applied to the configMap with the value of the repository's type. During the backup repository creation, the configMap is searched by the label against the repository type, if no configMap is found, nothing is set to the backup repository CR.  
 
 ### Configurations
 
-With the above mechanisms, all kinds of configurations could be added. Here list the configurations supported at present:  
-```cache-limit```: specify the size limit for the local data cache. The more data is cached locally, the less data is donwloaded from the backup storage, so the better performance may be achieved. You can specify any size that is smaller than the free space so that the disk space won't run out. This parameter is for each repository connection, that is, users could change it before connecting to the repository.    
-```compression-algo```: specify the compression algorithm to be used for a backup repsotiory. Most of the backup repositories support the data compression feature, but they may support different compression algorithms or performe differently to compression algorithms. This parameter is used when intializing the backup repository, once the backup repository is initialized, the compression algorithm won't be changed, so this parameter is ignored.  
+With the above mechanisms, any kind of configuration could be added. Here list the configurations defined at present:  
+```cache-limit-mb```: specify the size limit(in MB) for the local data cache. The more data is cached locally, the less data may be downloaded from the backup storage, so the better performance may be achieved. Practically, users can specify any size that is smaller than the free space so that the disk space won't run out. This parameter is for each repository connection, that is, users could change it before connecting to the repository. If a backup repository doesn't use local cache, this parameter will be ignored. For Kopia repository, this parameter is supported.  
+```enable-compression```: specify to enable/disable compression for a backup repsotiory. Most of the backup repositories support the data compression feature, if it is not supported by a backup repository, this parameter is ignored. Most of the backup repositories support to dynamically enable/disable compression, so this parameter is defined to be used whenever creating a write connection to the backup repository, if the dynamically changing is not supported, this parameter will be hornored only when initializing the backup repository. For Kopia repository, this parameter is supported and can be dynamically modified.  
 
-Below is an example of the BackupRepository configMap with the supported configurations:  
-```go
+Below is an example of the BackupRepository configMap with the configurations:  
+```json
+{
+    "repoConfig": {
+        "cache-limit-mb": 2048,
+        "enable-compression": true
+    }
+}
 ```
 
-To create the configMap, users need to save something like the above sample to a json file and then run below command:
+To create the configMap, users need to save something like the above sample to a json file and then run below commands:  
 ```
-kubectl create cm node-agent-config -n velero --from-file=<json file name>
+kubectl create cm <config-name> -n velero --from-file=<json file name>
+kubectl label cm <config-name> -n velero backup-repository-config=<repository type>
 ```
 
 
