@@ -732,7 +732,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 
 			for _, e := range test.expectedExecutions {
 				obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(e.pod)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				podCommandExecutor.On("ExecutePodCommand", mock.Anything, obj, e.pod.Namespace, e.pod.Name, e.name, e.hook).Return(e.error)
 			}
 
@@ -1269,7 +1269,7 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 
 			for _, e := range test.expectedExecutions {
 				obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(e.pod)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				podCommandExecutor.On("ExecutePodCommand", mock.Anything, obj, e.pod.Namespace, e.pod.Name, e.name, e.hook).Return(e.error)
 			}
 

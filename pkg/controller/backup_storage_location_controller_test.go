@@ -238,7 +238,7 @@ func TestEnsureSingleDefaultBSL(t *testing.T) {
 
 	for _, test := range tests {
 		// Setup reconciler
-		assert.Nil(t, velerov1api.AddToScheme(scheme.Scheme))
+		assert.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
 		t.Run(test.name, func(t *testing.T) {
 			r := &backupStorageLocationReconciler{
 				ctx:                       context.Background(),
@@ -282,7 +282,7 @@ func TestBSLReconcile(t *testing.T) {
 	pluginManager.On("CleanupClients").Return(nil)
 	for _, test := range tests {
 		// Setup reconciler
-		assert.Nil(t, velerov1api.AddToScheme(scheme.Scheme))
+		assert.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
 		t.Run(test.name, func(t *testing.T) {
 			r := &backupStorageLocationReconciler{
 				ctx:              context.Background(),

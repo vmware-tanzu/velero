@@ -236,10 +236,10 @@ func TestPodActionExecute(t *testing.T) {
 			})
 
 			if test.expectedErr {
-				assert.NotNil(t, err, "expected an error")
+				assert.Error(t, err, "expected an error")
 				return
 			}
-			assert.Nil(t, err, "expected no error, got %v", err)
+			assert.NoError(t, err, "expected no error, got %v", err)
 
 			var pod corev1api.Pod
 			require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), &pod))

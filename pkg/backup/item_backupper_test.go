@@ -220,7 +220,7 @@ func TestGetPVName(t *testing.T) {
 			if tc.obj != nil {
 				data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.obj)
 				o = &unstructured.Unstructured{Object: data}
-				require.Nil(t, err)
+				require.NoError(t, err)
 			}
 			name, err2 := getPVName(o, tc.groupResource)
 			assert.Equal(t, tc.pvName, name)

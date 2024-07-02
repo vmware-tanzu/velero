@@ -125,7 +125,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
 		td.controller.backupStoreGetter = &fakeErrorBackupStoreGetter{}
 		_, err := td.controller.Reconcile(ctx, td.req)
-		assert.NotNil(t, err)
+		assert.Error(t, err)
 		assert.True(t, strings.HasPrefix(err.Error(), "error getting the backup store"))
 	})
 
@@ -358,7 +358,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		td.backupStore.AssertCalled(t, "DeleteBackup", input.Spec.BackupName)
 
@@ -479,7 +479,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())

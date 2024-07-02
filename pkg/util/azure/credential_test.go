@@ -35,7 +35,7 @@ func TestNewCredential(t *testing.T) {
 		CredentialKeyClientSecret: "secret",
 	}
 	_, err := NewCredential(creds, options)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	// valid client secret credential
 	creds = map[string]string{
@@ -44,19 +44,19 @@ func TestNewCredential(t *testing.T) {
 		CredentialKeyClientSecret: "secret",
 	}
 	tokenCredential, err := NewCredential(creds, options)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.IsType(t, &azidentity.ClientSecretCredential{}, tokenCredential)
 
 	// client certificate credential
 	certData, err := readCertData()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	creds = map[string]string{
 		CredentialKeyTenantID:          "tenantid",
 		CredentialKeyClientID:          "clientid",
 		CredentialKeyClientCertificate: certData,
 	}
 	tokenCredential, err = NewCredential(creds, options)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.IsType(t, &azidentity.ClientCertificateCredential{}, tokenCredential)
 
 	// workload identity credential
@@ -65,14 +65,14 @@ func TestNewCredential(t *testing.T) {
 	os.Setenv("AZURE_FEDERATED_TOKEN_FILE", "/tmp/token")
 	creds = map[string]string{}
 	tokenCredential, err = NewCredential(creds, options)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.IsType(t, &azidentity.WorkloadIdentityCredential{}, tokenCredential)
 	os.Clearenv()
 
 	// managed identity credential
 	creds = map[string]string{}
 	tokenCredential, err = NewCredential(creds, options)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.IsType(t, &azidentity.ManagedIdentityCredential{}, tokenCredential)
 }
 
@@ -82,14 +82,14 @@ func Test_newConfigCredential(t *testing.T) {
 	// tenantID not specified
 	creds := map[string]string{}
 	_, err := newConfigCredential(creds, options)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	// clientID not specified
 	creds = map[string]string{
 		CredentialKeyTenantID: "clientid",
 	}
 	_, err = newConfigCredential(creds, options)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	// client secret
 	creds = map[string]string{
@@ -98,21 +98,21 @@ func Test_newConfigCredential(t *testing.T) {
 		CredentialKeyClientSecret: "secret",
 	}
 	credential, err := newConfigCredential(creds, options)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, credential)
 	_, ok := credential.(*azidentity.ClientSecretCredential)
 	require.True(t, ok)
 
 	// client certificate
 	certData, err := readCertData()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	creds = map[string]string{
 		CredentialKeyTenantID:          "clientid",
 		CredentialKeyClientID:          "clientid",
 		CredentialKeyClientCertificate: certData,
 	}
 	credential, err = newConfigCredential(creds, options)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, credential)
 	_, ok = credential.(*azidentity.ClientCertificateCredential)
 	require.True(t, ok)
@@ -125,7 +125,7 @@ func Test_newConfigCredential(t *testing.T) {
 		CredentialKeyPassword: "password",
 	}
 	credential, err = newConfigCredential(creds, options)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, credential)
 	_, ok = credential.(*azidentity.UsernamePasswordCredential)
 	require.True(t, ok)

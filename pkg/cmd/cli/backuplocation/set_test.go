@@ -66,7 +66,7 @@ func TestNewSetCommand(t *testing.T) {
 	args := []string{backupName}
 	o.Complete(args, f)
 	e := o.Validate(c, args, f)
-	assert.Nil(t, e)
+	assert.NoError(t, e)
 
 	e = o.Run(c, f)
 	assert.Contains(t, e.Error(), fmt.Sprintf("%s: no such file or directory", cacert))

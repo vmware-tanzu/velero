@@ -88,7 +88,7 @@ func TestNewUploaderProvider(t *testing.T) {
 			}
 			_, err := NewUploaderProvider(ctx, client, testCase.UploaderType, testCase.RequestorType, repoIdentifier, bsl, backupRepo, credGetter, repoKeySelector, log)
 			if testCase.ExpectedError == "" {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			} else {
 				assert.Contains(t, err.Error(), testCase.ExpectedError)
 			}

@@ -194,9 +194,9 @@ func TestRefreshServerPreferredResources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			resources, err := refreshServerPreferredResources(fakeServer, logging.DefaultLogger(logrus.DebugLevel, formatFlag))
 			if test.returnError != nil {
-				assert.NotNil(t, err)
+				assert.Error(t, err)
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, test.returnError, err)
 			}
 
@@ -567,9 +567,9 @@ func TestHelper_refreshServerPreferredResources(t *testing.T) {
 			resources, err := refreshServerPreferredResources(fakeClient, logrus.New())
 
 			if tc.expectedErr != nil {
-				assert.NotNil(t, err)
+				assert.Error(t, err)
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.NotNil(t, resources)
 			}
 		})
@@ -622,9 +622,9 @@ func TestHelper_refreshServerGroupsAndResources(t *testing.T) {
 			serverGroups, serverResources, err := refreshServerGroupsAndResources(fakeClient, logrus.New())
 
 			if tc.expectedErr != nil {
-				assert.NotNil(t, err)
+				assert.Error(t, err)
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.NotNil(t, serverGroups)
 				assert.NotNil(t, serverResources)
 			}
@@ -637,7 +637,7 @@ func TestHelper(t *testing.T) {
 		Fake: &clientgotesting.Fake{},
 	}
 	h, err := NewHelper(fakeDiscoveryClient, logrus.New())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	// All below calls put together for the implementation are empty or just very simple, and just want to cover testing
 	// If wanting to write unit tests for some functions could remove it and with writing new function alone
 	h.Resources()

@@ -384,7 +384,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 			res, additional, err := action.Execute(test.serviceAccount, nil)
 
 			assert.Equal(t, test.serviceAccount, res)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// ensure slices are ordered for valid comparison
 			sort.Slice(test.expectedAdditionalItems, func(i, j int) bool {
@@ -591,7 +591,7 @@ func TestServiceAccountActionExecuteOnBeta1(t *testing.T) {
 			res, additional, err := action.Execute(test.serviceAccount, nil)
 
 			assert.Equal(t, test.serviceAccount, res)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// ensure slices are ordered for valid comparison
 			sort.Slice(test.expectedAdditionalItems, func(i, j int) bool {

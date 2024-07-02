@@ -240,7 +240,6 @@ linters-settings:
       disable:
         - bool-compare
         - error-is-as
-        - error-nil
         - expected-actual
         - go-require
         - float-compare

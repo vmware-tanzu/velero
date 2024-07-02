@@ -562,7 +562,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 			if tc.expectedError != nil {
 				assert.Contains(t, err.Error(), tc.expectedError.Error())
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 
 			// Check the number of returned snapshots
@@ -655,7 +655,7 @@ func TestBackup(t *testing.T) {
 			if tc.expectedError != nil {
 				assert.Contains(t, err.Error(), tc.expectedError.Error())
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 
 			assert.Equal(t, tc.expectedEmpty, isSnapshotEmpty)
@@ -794,7 +794,7 @@ func TestRestore(t *testing.T) {
 			if tc.expectedError != nil {
 				assert.Contains(t, err.Error(), tc.expectedError.Error())
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 
 			// Check the number of bytes restored

@@ -179,7 +179,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 			)
 
 			if test.restore != nil {
-				assert.Nil(t, fakeClient.Create(context.Background(), test.restore))
+				assert.NoError(t, fakeClient.Create(context.Background(), test.restore))
 			}
 
 			r := NewRestoreReconciler(
