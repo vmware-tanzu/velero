@@ -238,8 +238,21 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
+	// backup log failed for whatever reason.
+	backupLog, err := logging.NewTempFileLogger(
+		b.backupLogLevel,
+		b.formatFlag,
+		logging.NewLogCountHook(),
+		logrus.Fields{Backup: kubeutil.NamespaceAndName(original)},
+	)
+	if err != nil {
+		return ctrl.Result{}, errors.Wrap(err, "error creating dual mode logger for backup")
+	}
+	defer backupLog.Dispose(b.logger.WithField(Backup, kubeutil.NamespaceAndName(original)))
+
 	log.Debug("Preparing backup request")
-	request := b.prepareBackupRequest(original, log)
+	request := b.prepareBackupRequest(original, backupLog)
 	if len(request.Status.ValidationErrors) > 0 {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
@@ -278,7 +291,7 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	b.metrics.RegisterBackupAttempt(backupScheduleName)
 
 	// execution & upload of backup
-	if err := b.runBackup(request); err != nil {
+	if err := b.runBackup(request, backupLog); err != nil {
 		// even though runBackup sets the backup's phase prior
 		// to uploading artifacts to object storage, we have to
 		// check for an error again here and update the phase if
@@ -464,7 +477,11 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	}
 
 	// validate the included/excluded namespaces
-	for _, err := range b.validateNamespaceIncludesExcludes(request.Spec.IncludedNamespaces, request.Spec.ExcludedNamespaces) {
+	for _, err := range b.validateNamespaceIncludesExcludes(
+		request.Spec.IncludedNamespaces,
+		request.Spec.ExcludedNamespaces,
+		logger,
+	) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
@@ -596,7 +613,7 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 	return providerLocations, nil
 }
 
-func (b *backupReconciler) validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces []string) []error {
+func (b *backupReconciler) validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces []string, logger logrus.FieldLogger) []error {
 	var errs []error
 	if errs = collections.ValidateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces); len(errs) > 0 {
 		return errs
@@ -608,7 +625,12 @@ func (b *backupReconciler) validateNamespaceIncludesExcludes(includedNamespaces,
 			continue
 		}
 		if err := b.kbClient.Get(context.Background(), kbclient.ObjectKey{Name: name}, namespace); err != nil {
-			errs = append(errs, err)
+			if apierrors.IsNotFound(err) {
+				logger.Errorf("fail to get namespace %s specified in the includedNamespaces %s",
+					name, strings.Join(includedNamespaces, ","))
+			} else {
+				errs = append(errs, err)
+			}
 		}
 	}
 	return errs
@@ -618,36 +640,28 @@ func (b *backupReconciler) validateNamespaceIncludesExcludes(includedNamespaces,
 // causes the backup to be Failed; if no error is returned, the backup's status's Errors
 // field is checked to see if the backup was a partial failure.
 
-func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
-	b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
-
-	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
-	// backup log failed for whatever reason.
-	logCounter := logging.NewLogHook()
-	backupLog, err := logging.NewTempFileLogger(b.backupLogLevel, b.formatFlag, logCounter, logrus.Fields{Backup: kubeutil.NamespaceAndName(backup)})
-	if err != nil {
-		return errors.Wrap(err, "error creating dual mode logger for backup")
-	}
-	defer backupLog.Dispose(b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
-
-	backupLog.Info("Setting up backup temp file")
+func (b *backupReconciler) runBackup(
+	backup *pkgbackup.Request,
+	logger logging.DualModeLogger,
+) error {
+	logger.Info("Setting up backup temp file")
 	backupFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for backup")
 	}
-	defer closeAndRemoveFile(backupFile, backupLog)
+	defer closeAndRemoveFile(backupFile, logger)
 
-	backupLog.Info("Setting up plugin manager")
-	pluginManager := b.newPluginManager(backupLog)
+	logger.Info("Setting up plugin manager")
+	pluginManager := b.newPluginManager(logger)
 	defer pluginManager.CleanupClients()
 
-	backupLog.Info("Getting backup item actions")
+	logger.Info("Getting backup item actions")
 	actions, err := pluginManager.GetBackupItemActionsV2()
 	if err != nil {
 		return err
 	}
-	backupLog.Info("Setting up backup store to check for backup existence")
-	backupStore, err := b.backupStoreGetter.Get(backup.StorageLocation, pluginManager, backupLog)
+	logger.Info("Setting up backup store to check for backup existence")
+	backupStore, err := b.backupStoreGetter.Get(backup.StorageLocation, pluginManager, logger)
 	if err != nil {
 		return err
 	}
@@ -665,7 +679,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	backupItemActionsResolver := framework.NewBackupItemActionResolverV2(actions)
 
 	var fatalErrs []error
-	if err := b.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver, pluginManager); err != nil {
+	if err := b.backupper.BackupWithResolvers(logger, backup, backupFile, backupItemActionsResolver, pluginManager); err != nil {
 		fatalErrs = append(fatalErrs, err)
 	}
 
@@ -677,7 +691,12 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 			backup.Status.VolumeSnapshotsCompleted++
 		}
 	}
-	volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses := pkgbackup.GetBackupCSIResources(b.kbClient, b.globalCRClient, backup.Backup, backupLog)
+	volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses := pkgbackup.GetBackupCSIResources(
+		b.kbClient,
+		b.globalCRClient,
+		backup.Backup,
+		logger,
+	)
 	// Update CSIVolumeSnapshotsAttempted
 	backup.Status.CSIVolumeSnapshotsAttempted = len(volumeSnapshots)
 
@@ -688,7 +707,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	inProgressOperations, _, opsCompleted, opsFailed, errs := getBackupItemOperationProgress(backup.Backup, pluginManager, *backup.GetItemOperationsList())
 	if len(errs) > 0 {
 		for _, err := range errs {
-			backupLog.Error(err)
+			logger.Error(err)
 		}
 	}
 
@@ -696,17 +715,17 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	backup.Status.BackupItemOperationsCompleted = opsCompleted
 	backup.Status.BackupItemOperationsFailed = opsFailed
 
-	backup.Status.Warnings = logCounter.GetCount(logrus.WarnLevel)
-	backup.Status.Errors = logCounter.GetCount(logrus.ErrorLevel)
+	backup.Status.Warnings = logger.GetLogEntryCountByLevel(logrus.WarnLevel)
+	backup.Status.Errors = logger.GetLogEntryCountByLevel(logrus.ErrorLevel)
 
-	backupWarnings := logCounter.GetEntries(logrus.WarnLevel)
-	backupErrors := logCounter.GetEntries(logrus.ErrorLevel)
+	backupWarnings := logger.GetLogEntryByLevel(logrus.WarnLevel)
+	backupErrors := logger.GetLogEntryByLevel(logrus.ErrorLevel)
 	results := map[string]results.Result{
 		"warnings": backupWarnings,
 		"errors":   backupErrors,
 	}
 
-	backupLog.DoneForPersist(b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
+	logger.DoneForPersist(b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
 
 	// Assign finalize phase as close to end as possible so that any errors
 	// logged to backupLog are captured. This is done before uploading the
@@ -715,7 +734,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	switch {
 	case len(fatalErrs) > 0:
 		backup.Status.Phase = velerov1api.BackupPhaseFailed
-	case logCounter.GetCount(logrus.ErrorLevel) > 0:
+	case logger.GetLogEntryCountByLevel(logrus.ErrorLevel) > 0:
 		if inProgressOperations {
 			backup.Status.Phase = velerov1api.BackupPhaseWaitingForPluginOperationsPartiallyFailed
 		} else {
@@ -735,25 +754,36 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 		backup.Status.Phase == velerov1api.BackupPhaseCompleted {
 		backup.Status.CompletionTimestamp = &metav1.Time{Time: b.clock.Now()}
 	}
-	recordBackupMetrics(backupLog, backup.Backup, backupFile, b.metrics, false)
+	recordBackupMetrics(logger, backup.Backup, backupFile, b.metrics, false)
 
 	// re-instantiate the backup store because credentials could have changed since the original
 	// instantiation, if this was a long-running backup
-	backupLog.Info("Setting up backup store to persist the backup")
-	backupStore, err = b.backupStoreGetter.Get(backup.StorageLocation, pluginManager, backupLog)
+	logger.Info("Setting up backup store to persist the backup")
+	backupStore, err = b.backupStoreGetter.Get(backup.StorageLocation, pluginManager, logger)
 	if err != nil {
 		return err
 	}
 
-	if logFile, err := backupLog.GetPersistFile(); err != nil {
+	if logFile, err := logger.GetPersistFile(); err != nil {
 		fatalErrs = append(fatalErrs, errors.Wrap(err, "error getting backup log file"))
 	} else {
-		if errs := persistBackup(backup, backupFile, logFile, backupStore, volumeSnapshots, volumeSnapshotContents, volumeSnapshotClasses, results, b.globalCRClient, backupLog); len(errs) > 0 {
+		if errs := persistBackup(
+			backup,
+			backupFile,
+			logFile,
+			backupStore,
+			volumeSnapshots,
+			volumeSnapshotContents,
+			volumeSnapshotClasses,
+			results,
+			b.globalCRClient,
+			logger,
+		); len(errs) > 0 {
 			fatalErrs = append(fatalErrs, errs...)
 		}
 	}
 
-	b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Infof("Initial backup processing complete, moving to %s", backup.Status.Phase)
+	logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Infof("Initial backup processing complete, moving to %s", backup.Status.Phase)
 
 	// if we return a non-nil error, the calling function will update
 	// the backup's phase to Failed.

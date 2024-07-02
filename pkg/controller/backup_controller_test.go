@@ -194,12 +194,6 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 			backupLocation: defaultBackupLocation,
 			expectedErrs:   []string{"include-resources, exclude-resources and include-cluster-resources are old filter parameters.\ninclude-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\nThey cannot be used together"},
 		},
-		{
-			name:           "nonexisting namespace",
-			backup:         defaultBackup().IncludedNamespaces("non-existing").Result(),
-			backupLocation: defaultBackupLocation,
-			expectedErrs:   []string{"Invalid included/excluded namespace lists: namespaces \"non-existing\" not found"},
-		},
 	}
 
 	for _, test := range tests {
@@ -1575,6 +1569,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 }
 
 func TestValidateNamespaceIncludesExcludes(t *testing.T) {
+	logger := logging.DefaultLogger(logrus.DebugLevel, logging.FormatText)
 	namespace := builder.ForNamespace("default").Result()
 	reconciler := &backupReconciler{
 		kbClient: velerotest.NewFakeControllerRuntimeClient(t, namespace),
@@ -1583,31 +1578,32 @@ func TestValidateNamespaceIncludesExcludes(t *testing.T) {
 	// empty string as includedNamespaces
 	includedNamespaces := []string{""}
 	excludedNamespaces := []string{"test"}
-	errs := reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces)
+	errs := reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces, logger)
 	assert.Empty(t, errs)
 
 	// "*" as includedNamespaces
 	includedNamespaces = []string{"*"}
 	excludedNamespaces = []string{"test"}
-	errs = reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces)
+	errs = reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces, logger)
 	assert.Empty(t, errs)
 
 	// invalid namespaces
 	includedNamespaces = []string{"1@#"}
 	excludedNamespaces = []string{"2@#"}
-	errs = reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces)
+	errs = reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces, logger)
 	assert.Len(t, errs, 2)
 
 	// not exist namespaces
 	includedNamespaces = []string{"non-existing-namespace"}
 	excludedNamespaces = []string{}
-	errs = reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces)
-	assert.Len(t, errs, 1)
+	errs = reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces, logger)
+	// non-existing namespace error is recorded in the log instead of emit error
+	assert.Len(t, errs, 0)
 
 	// valid namespaces
 	includedNamespaces = []string{"default"}
 	excludedNamespaces = []string{}
-	errs = reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces)
+	errs = reconciler.validateNamespaceIncludesExcludes(includedNamespaces, excludedNamespaces, logger)
 	assert.Empty(t, errs)
 }
 

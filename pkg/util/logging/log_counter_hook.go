@@ -26,30 +26,30 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
-// LogHook is a logrus hook that counts the number of log
+// LogCountHook is a logrus hook that counts the number of log
 // statements that have been written at each logrus level. It also
 // maintains log entries at each logrus level in result structure.
-type LogHook struct {
+type LogCountHook struct {
 	mu      sync.RWMutex
 	counts  map[logrus.Level]int
 	entries map[logrus.Level]*results.Result
 }
 
-// NewLogHook returns a pointer to an initialized LogHook.
-func NewLogHook() *LogHook {
-	return &LogHook{
+// NewLogCountHook returns a pointer to an initialized LogHook.
+func NewLogCountHook() *LogCountHook {
+	return &LogCountHook{
 		counts:  make(map[logrus.Level]int),
 		entries: make(map[logrus.Level]*results.Result),
 	}
 }
 
 // Levels returns the logrus levels that the hook should be fired for.
-func (h *LogHook) Levels() []logrus.Level {
+func (h *LogCountHook) Levels() []logrus.Level {
 	return logrus.AllLevels
 }
 
 // Fire executes the hook's logic.
-func (h *LogHook) Fire(entry *logrus.Entry) error {
+func (h *LogCountHook) Fire(entry *logrus.Entry) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -93,7 +93,7 @@ func (h *LogHook) Fire(entry *logrus.Entry) error {
 
 // GetCount returns the number of log statements that have been
 // written at the specific level provided.
-func (h *LogHook) GetCount(level logrus.Level) int {
+func (h *LogCountHook) GetCount(level logrus.Level) int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
@@ -102,7 +102,7 @@ func (h *LogHook) GetCount(level logrus.Level) int {
 
 // GetEntries returns the log statements that have been
 // written at the specific level provided.
-func (h *LogHook) GetEntries(level logrus.Level) results.Result {
+func (h *LogCountHook) GetEntries(level logrus.Level) results.Result {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	response, isPresent := h.entries[level]
