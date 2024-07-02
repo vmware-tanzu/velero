@@ -16,11 +16,16 @@ limitations under the License.
 package resourcepolicies
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 type VolumeActionType string
@@ -148,7 +153,43 @@ func (p *Policies) Validate() error {
 	return nil
 }
 
-func GetResourcePoliciesFromConfig(cm *v1.ConfigMap) (*Policies, error) {
+func GetResourcePoliciesFromBackup(
+	backup velerov1api.Backup,
+	client crclient.Client,
+	logger logrus.FieldLogger,
+) (resourcePolicies *Policies, err error) {
+	if backup.Spec.ResourcePolicy != nil &&
+		strings.EqualFold(backup.Spec.ResourcePolicy.Kind, ConfigmapRefType) {
+		policiesConfigMap := &v1.ConfigMap{}
+		err = client.Get(
+			context.Background(),
+			crclient.ObjectKey{Namespace: backup.Namespace, Name: backup.Spec.ResourcePolicy.Name},
+			policiesConfigMap,
+		)
+		if err != nil {
+			logger.Errorf("Fail to get ResourcePolicies %s ConfigMap with error %s.",
+				backup.Namespace+"/"+backup.Spec.ResourcePolicy.Name, err.Error())
+			return nil, fmt.Errorf("fail to get ResourcePolicies %s ConfigMap with error %s",
+				backup.Namespace+"/"+backup.Spec.ResourcePolicy.Name, err.Error())
+		}
+		resourcePolicies, err = getResourcePoliciesFromConfig(policiesConfigMap)
+		if err != nil {
+			logger.Errorf("Fail to read ResourcePolicies from ConfigMap %s with error %s.",
+				backup.Namespace+"/"+backup.Name, err.Error())
+			return nil, fmt.Errorf("fail to read the ResourcePolicies from ConfigMap %s with error %s",
+				backup.Namespace+"/"+backup.Name, err.Error())
+		} else if err = resourcePolicies.Validate(); err != nil {
+			logger.Errorf("Fail to validate ResourcePolicies in ConfigMap %s with error %s.",
+				backup.Namespace+"/"+backup.Name, err.Error())
+			return nil, fmt.Errorf("fail to validate ResourcePolicies in ConfigMap %s with error %s",
+				backup.Namespace+"/"+backup.Name, err.Error())
+		}
+	}
+
+	return resourcePolicies, nil
+}
+
+func getResourcePoliciesFromConfig(cm *v1.ConfigMap) (*Policies, error) {
 	if cm == nil {
 		return nil, fmt.Errorf("could not parse config from nil configmap")
 	}

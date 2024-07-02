@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
@@ -473,20 +472,11 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, "encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified")
 	}
 
-	if request.Spec.ResourcePolicy != nil && strings.EqualFold(request.Spec.ResourcePolicy.Kind, resourcepolicies.ConfigmapRefType) {
-		policiesConfigmap := &corev1api.ConfigMap{}
-		err := b.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: request.Namespace, Name: request.Spec.ResourcePolicy.Name}, policiesConfigmap)
-		if err != nil {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("failed to get resource policies %s/%s configmap with err %v", request.Namespace, request.Spec.ResourcePolicy.Name, err))
-		}
-		res, err := resourcepolicies.GetResourcePoliciesFromConfig(policiesConfigmap)
-		if err != nil {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("resource policies %s/%s", request.Namespace, request.Spec.ResourcePolicy.Name)).Error())
-		} else if err = res.Validate(); err != nil {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("resource policies %s/%s", request.Namespace, request.Spec.ResourcePolicy.Name)).Error())
-		}
-		request.ResPolicies = res
+	resourcePolicies, err := resourcepolicies.GetResourcePoliciesFromBackup(*request.Backup, b.kbClient, logger)
+	if err != nil {
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, err.Error())
 	}
+	request.ResPolicies = resourcePolicies
 
 	return request
 }

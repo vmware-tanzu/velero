@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vmware-tanzu/velero/internal/volumehelper"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -42,6 +40,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/internal/volumehelper"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/client"
