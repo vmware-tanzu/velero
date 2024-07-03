@@ -551,6 +551,22 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromPVB() {
 	v.volumeInfos = append(v.volumeInfos, tmpVolumeInfos...)
 }
 
+func (v *BackupVolumesInformation) getVolumeSnapshotClasses(
+	classes *snapshotv1api.VolumeSnapshotClassList,
+) (*snapshotv1api.VolumeSnapshotClassList, error) {
+	if classes != nil {
+		return classes, nil
+	}
+
+	vsClassList := new(snapshotv1api.VolumeSnapshotClassList)
+	if err := v.crClient.List(context.TODO(), vsClassList); err != nil {
+		v.logger.Warnf("Cannot list VolumeSnapshotClass with error %s.", err.Error())
+		return nil, err
+	}
+
+	return vsClassList, nil
+}
+
 // generateVolumeInfoFromDataUpload generate BackupVolumeInfo for DataUpload.
 func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
@@ -559,11 +575,7 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 	}
 
 	tmpVolumeInfos := make([]*BackupVolumeInfo, 0)
-	vsClassList := new(snapshotv1api.VolumeSnapshotClassList)
-	if err := v.crClient.List(context.TODO(), vsClassList); err != nil {
-		v.logger.WithError(err).Errorf("cannot list VolumeSnapshotClass %s", err.Error())
-		return
-	}
+	var vsClassList *snapshotv1api.VolumeSnapshotClassList
 
 	for _, operation := range v.BackupOperations {
 		if operation.Spec.ResourceIdentifier.GroupResource.String() == kuberesource.PersistentVolumeClaims.String() {
@@ -591,6 +603,11 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 			if err != nil {
 				v.logger.Warnf("fail to get DataUpload for operation %s: %s", operation.Spec.OperationID, err.Error())
 				continue
+			}
+
+			vsClassList, err = v.getVolumeSnapshotClasses(vsClassList)
+			if err != nil {
+				return
 			}
 
 			driverUsedByVSClass := ""

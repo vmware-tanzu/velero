@@ -1310,3 +1310,12 @@ func int64Ptr(val int) *int64 {
 	i := int64(val)
 	return &i
 }
+
+func TestGetVolumeSnapshotClasses(t *testing.T) {
+	volumesInfo := BackupVolumesInformation{}
+	var vsClass snapshotv1api.VolumeSnapshotClassList
+
+	result, err := volumesInfo.getVolumeSnapshotClasses(&vsClass)
+	require.NoError(t, err)
+	require.Equal(t, &vsClass, result)
+}
