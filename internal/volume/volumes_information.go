@@ -36,7 +36,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
 type Method string
@@ -551,6 +550,19 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromPVB() {
 	v.volumeInfos = append(v.volumeInfos, tmpVolumeInfos...)
 }
 
+func (v *BackupVolumesInformation) getVolumeSnapshotClasses() (
+	[]snapshotv1api.VolumeSnapshotClass,
+	error,
+) {
+	vsClassList := new(snapshotv1api.VolumeSnapshotClassList)
+	if err := v.crClient.List(context.TODO(), vsClassList); err != nil {
+		v.logger.Warnf("Cannot list VolumeSnapshotClass with error %s.", err.Error())
+		return nil, err
+	}
+
+	return vsClassList.Items, nil
+}
+
 // generateVolumeInfoFromDataUpload generate BackupVolumeInfo for DataUpload.
 func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
@@ -558,88 +570,101 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 		return
 	}
 
-	tmpVolumeInfos := make([]*BackupVolumeInfo, 0)
-	vsClassList := new(snapshotv1api.VolumeSnapshotClassList)
-	if err := v.crClient.List(context.TODO(), vsClassList); err != nil {
-		v.logger.WithError(err).Errorf("cannot list VolumeSnapshotClass %s", err.Error())
+	// Retrieve the operations containing DataUpload.
+	duOperationMap := make(map[kbclient.ObjectKey]*itemoperation.BackupOperation)
+	for _, operation := range v.BackupOperations {
+		if operation.Spec.ResourceIdentifier.GroupResource.String() == kuberesource.PersistentVolumeClaims.String() {
+			for _, identifier := range operation.Spec.PostOperationItems {
+				if identifier.GroupResource.String() == "datauploads.velero.io" {
+					duOperationMap[kbclient.ObjectKey{
+						Namespace: identifier.Namespace,
+						Name:      identifier.Name,
+					}] = operation
+
+					break
+				}
+			}
+		}
+	}
+
+	var vsClassList []snapshotv1api.VolumeSnapshotClass
+	if len(duOperationMap) > 0 {
+		var err error
+		vsClassList, err = v.getVolumeSnapshotClasses()
+		if err != nil {
+			return
+		}
+	} else {
+		// No DataUpload is found. Return early.
 		return
 	}
 
-	for _, operation := range v.BackupOperations {
-		if operation.Spec.ResourceIdentifier.GroupResource.String() == kuberesource.PersistentVolumeClaims.String() {
-			var duIdentifier velero.ResourceIdentifier
-
-			for _, identifier := range operation.Spec.PostOperationItems {
-				if identifier.GroupResource.String() == "datauploads.velero.io" {
-					duIdentifier = identifier
-				}
-			}
-			if duIdentifier.Empty() {
-				v.logger.Warnf("cannot find DataUpload for PVC %s/%s backup async operation",
-					operation.Spec.ResourceIdentifier.Namespace, operation.Spec.ResourceIdentifier.Name)
-				continue
-			}
-
-			dataUpload := new(velerov2alpha1.DataUpload)
-			err := v.crClient.Get(
-				context.TODO(),
-				kbclient.ObjectKey{
-					Namespace: duIdentifier.Namespace,
-					Name:      duIdentifier.Name},
-				dataUpload,
+	tmpVolumeInfos := make([]*BackupVolumeInfo, 0)
+	for duObjectKey, operation := range duOperationMap {
+		dataUpload := new(velerov2alpha1.DataUpload)
+		err := v.crClient.Get(
+			context.TODO(),
+			duObjectKey,
+			dataUpload,
+		)
+		if err != nil {
+			v.logger.Warnf("Fail to get DataUpload %s: %s",
+				duObjectKey.Namespace+"/"+duObjectKey.Name,
+				err.Error(),
 			)
-			if err != nil {
-				v.logger.Warnf("fail to get DataUpload for operation %s: %s", operation.Spec.OperationID, err.Error())
-				continue
+			continue
+		}
+
+		driverUsedByVSClass := ""
+		for index := range vsClassList {
+			if vsClassList[index].Name == dataUpload.Spec.CSISnapshot.SnapshotClass {
+				driverUsedByVSClass = vsClassList[index].Driver
+			}
+		}
+
+		if pvcPVInfo := v.pvMap.retrieve(
+			"",
+			operation.Spec.ResourceIdentifier.Name,
+			operation.Spec.ResourceIdentifier.Namespace,
+		); pvcPVInfo != nil {
+			dataMover := veleroDatamover
+			if dataUpload.Spec.DataMover != "" {
+				dataMover = dataUpload.Spec.DataMover
 			}
 
-			driverUsedByVSClass := ""
-			for index := range vsClassList.Items {
-				if vsClassList.Items[index].Name == dataUpload.Spec.CSISnapshot.SnapshotClass {
-					driverUsedByVSClass = vsClassList.Items[index].Driver
-				}
+			volumeInfo := &BackupVolumeInfo{
+				BackupMethod:      CSISnapshot,
+				PVCName:           pvcPVInfo.PVCName,
+				PVCNamespace:      pvcPVInfo.PVCNamespace,
+				PVName:            pvcPVInfo.PV.Name,
+				SnapshotDataMoved: true,
+				Skipped:           false,
+				CSISnapshotInfo: &CSISnapshotInfo{
+					SnapshotHandle: FieldValueIsUnknown,
+					VSCName:        FieldValueIsUnknown,
+					OperationID:    FieldValueIsUnknown,
+					Driver:         driverUsedByVSClass,
+				},
+				SnapshotDataMovementInfo: &SnapshotDataMovementInfo{
+					DataMover:    dataMover,
+					UploaderType: kopia,
+					OperationID:  operation.Spec.OperationID,
+					Phase:        dataUpload.Status.Phase,
+				},
+				PVInfo: &PVInfo{
+					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
+					Labels:        pvcPVInfo.PV.Labels,
+				},
 			}
 
-			if pvcPVInfo := v.pvMap.retrieve("", operation.Spec.ResourceIdentifier.Name, operation.Spec.ResourceIdentifier.Namespace); pvcPVInfo != nil {
-				dataMover := veleroDatamover
-				if dataUpload.Spec.DataMover != "" {
-					dataMover = dataUpload.Spec.DataMover
-				}
-
-				volumeInfo := &BackupVolumeInfo{
-					BackupMethod:      CSISnapshot,
-					PVCName:           pvcPVInfo.PVCName,
-					PVCNamespace:      pvcPVInfo.PVCNamespace,
-					PVName:            pvcPVInfo.PV.Name,
-					SnapshotDataMoved: true,
-					Skipped:           false,
-					CSISnapshotInfo: &CSISnapshotInfo{
-						SnapshotHandle: FieldValueIsUnknown,
-						VSCName:        FieldValueIsUnknown,
-						OperationID:    FieldValueIsUnknown,
-						Driver:         driverUsedByVSClass,
-					},
-					SnapshotDataMovementInfo: &SnapshotDataMovementInfo{
-						DataMover:    dataMover,
-						UploaderType: kopia,
-						OperationID:  operation.Spec.OperationID,
-						Phase:        dataUpload.Status.Phase,
-					},
-					PVInfo: &PVInfo{
-						ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
-						Labels:        pvcPVInfo.PV.Labels,
-					},
-				}
-
-				if dataUpload.Status.StartTimestamp != nil {
-					volumeInfo.StartTimestamp = dataUpload.Status.StartTimestamp
-				}
-
-				tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
-			} else {
-				v.logger.Warnf("Cannot find info for PVC %s/%s", operation.Spec.ResourceIdentifier.Namespace, operation.Spec.ResourceIdentifier.Name)
-				continue
+			if dataUpload.Status.StartTimestamp != nil {
+				volumeInfo.StartTimestamp = dataUpload.Status.StartTimestamp
 			}
+
+			tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
+		} else {
+			v.logger.Warnf("Cannot find info for PVC %s/%s", operation.Spec.ResourceIdentifier.Namespace, operation.Spec.ResourceIdentifier.Name)
+			continue
 		}
 	}
 

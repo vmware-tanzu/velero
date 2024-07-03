@@ -1310,3 +1310,20 @@ func int64Ptr(val int) *int64 {
 	i := int64(val)
 	return &i
 }
+
+func TestGetVolumeSnapshotClasses(t *testing.T) {
+	class := &snapshotv1api.VolumeSnapshotClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "class",
+			ResourceVersion: "999",
+		},
+	}
+	volumesInfo := BackupVolumesInformation{
+		logger:   logging.DefaultLogger(logrus.DebugLevel, logging.FormatJSON),
+		crClient: velerotest.NewFakeControllerRuntimeClient(t, class),
+	}
+
+	result, err := volumesInfo.getVolumeSnapshotClasses()
+	require.NoError(t, err)
+	require.Equal(t, []snapshotv1api.VolumeSnapshotClass{*class}, result)
+}
