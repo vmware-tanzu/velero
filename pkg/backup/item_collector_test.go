@@ -224,6 +224,17 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 			},
 			expectedTrackedNS: []string{"ns1", "ns2"},
 		},
+		{
+			name:   "ns specified by the IncludeNamespaces cannot be found",
+			backup: builder.ForBackup("velero", "backup").IncludedNamespaces("ns1", "invalid", "*").Result(),
+			ie:     collections.NewIncludesExcludes().Includes("ns1", "invalid", "*"),
+			namespaces: []*corev1.Namespace{
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
+				builder.ForNamespace("ns2").Result(),
+				builder.ForNamespace("ns3").Result(),
+			},
+			expectedTrackedNS: []string{"ns1"},
+		},
 	}
 
 	for _, tc := range tests {
