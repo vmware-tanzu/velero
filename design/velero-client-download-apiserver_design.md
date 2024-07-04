@@ -5,9 +5,9 @@
 <!-- One to two sentences that describes the goal of this proposal and the problem being solved by the proposed change.
 The reader should be able to tell by the title, and the opening paragraph, if this document is relevant to them. -->
 Velero data is stored in an object store.
-When CLI users want to download data from the object store, it connects to the specific object store directly to download data.
-This assumes the target storing the data is always accessible from the client side. This is not always true, especially in the on premise environments.
-Velero may also save the data in non object stores in the future so an object store may not be available for the CLI to download from.
+Velero CLI users currently download data from object stores directly using their [pre-signed URL capability](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html) to download data.
+This assumes the object store is able to generate directly accessible from the client side. This is not always true for scenarios such as on-cluster object-store/NFS/PVC storage which may lack pre-signed URL capability.
+Some object store may also save the data in non object stores in the future so an object store may not be available for the CLI to download from.
 
 This design proposes to add a new endpoint on the Velero server that CLI users can connect to and download data from without having to connect to an object store directly.
 
