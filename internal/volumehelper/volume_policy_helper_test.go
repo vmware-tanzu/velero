@@ -553,6 +553,32 @@ func TestVolumeHelperImpl_ShouldPerformFSBackup(t *testing.T) {
 			expectedErr:    false,
 		},
 		{
+			name: "Volume source is emptyDir, VolumePolicy match, return true and no error",
+			pod: builder.ForPod("ns", "pod-1").
+				Volumes(
+					&corev1.Volume{
+						Name: "",
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{},
+						},
+					}).Result(),
+			resourcePolicies: &resourcepolicies.ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []resourcepolicies.VolumePolicy{
+					{
+						Conditions: map[string]interface{}{
+							"volumeTypes": []string{"emptyDir"},
+						},
+						Action: resourcepolicies.Action{
+							Type: resourcepolicies.FSBackup,
+						},
+					},
+				},
+			},
+			shouldFSBackup: true,
+			expectedErr:    false,
+		},
+		{
 			name: "VolumePolicy match, action type is not fs-backup, return false and no error",
 			pod: builder.ForPod("ns", "pod-1").
 				Volumes(
