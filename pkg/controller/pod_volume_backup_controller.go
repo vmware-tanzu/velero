@@ -159,8 +159,15 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	log.WithField("path", path.ByPath).Debugf("Found host path")
 
-	if err := fsBackup.Init(ctx, pvb.Spec.BackupStorageLocation, pvb.Spec.Pod.Namespace, pvb.Spec.UploaderType,
-		podvolume.GetPvbRepositoryType(&pvb), pvb.Spec.RepoIdentifier, r.repositoryEnsurer, r.credentialGetter); err != nil {
+	if err := fsBackup.Init(ctx, &datapath.FSBRInitParam{
+		BSLName:           pvb.Spec.BackupStorageLocation,
+		SourceNamespace:   pvb.Spec.Pod.Namespace,
+		UploaderType:      pvb.Spec.UploaderType,
+		RepositoryType:    podvolume.GetPvbRepositoryType(&pvb),
+		RepoIdentifier:    pvb.Spec.RepoIdentifier,
+		RepositoryEnsurer: r.repositoryEnsurer,
+		CredentialGetter:  r.credentialGetter,
+	}); err != nil {
 		return r.errorOut(ctx, &pvb, err, "error to initialize data path", log)
 	}
 
@@ -179,7 +186,12 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	if err := fsBackup.StartBackup(path, "", parentSnapshotID, false, pvb.Spec.Tags, pvb.Spec.UploaderSettings); err != nil {
+	if err := fsBackup.StartBackup(path, pvb.Spec.UploaderSettings, &datapath.FSBRStartParam{
+		RealSource:     "",
+		ParentSnapshot: parentSnapshotID,
+		ForceFull:      false,
+		Tags:           pvb.Spec.Tags,
+	}); err != nil {
 		return r.errorOut(ctx, &pvb, err, "error starting data path backup", log)
 	}
 
