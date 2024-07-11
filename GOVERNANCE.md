@@ -113,7 +113,7 @@ Lazy consensus does _not_ apply to the process of:
 
 Any contributor may introduce a request to deprecate a feature or an option of a feature by opening a feature request issue in the vmware-tanzu/velero GitHub project. The issue should describe why the feature is no longer needed or has become detrimental to Velero, as well as whether and how it has been superseded. The submitter should give as much detail as possible.
 
-Once the issue is filed, a discussion period begins which ends at the beginning of the second community meeting after the opening of the issue, and is held at the community meeting and on the issue itself; the person who opens the issue or a maintainer should add that date and time in a comment in the issue as soon after the issue is opened as possible.
+Once the issue is filed, a one-month discussion period begins. Discussions take place within the issue itself as well as in the community meetings. The person who opens the issue, or a maintainer, should add the date and time marking the end of the discussion period in a comment on the issue as soon as possible after it is opened. A decision on the issue needs to be made within this one-month period.
 
 The feature will be deprecated by a supermajority vote of 50% plus one of the project maintainers at the time of the vote tallying, which is 72 hours after the end of the community meeting that is the end of the comment period. (Maintainers are permitted to vote in advance of the deadline, but should hold their votes until as close as possible to hear all possible discussion.) Votes will be tallied in comments on the issue. 
 
