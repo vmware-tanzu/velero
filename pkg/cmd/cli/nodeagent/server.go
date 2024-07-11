@@ -189,6 +189,9 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 			&velerov2alpha1api.DataDownload{}: {
 				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
 			},
+			&v1.Event{}: {
+				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
+			},
 		},
 	}
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
