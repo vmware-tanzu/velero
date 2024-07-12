@@ -4532,7 +4532,6 @@ func TestGetVolumeInfos(t *testing.T) {
 	bsl := builder.ForBackupStorageLocation("velero", "default").Result()
 	require.NoError(t, h.backupper.kbClient.Create(context.Background(), bsl))
 
-	_, _, err := h.backupper.getVolumeInfos(*backup, h.log)
 	require.NoError(t, err)
 }
 
