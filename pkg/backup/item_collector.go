@@ -741,6 +741,23 @@ func (r *itemCollector) collectNamespaces(
 		return nil, errors.WithStack(err)
 	}
 
+	for _, includedNSName := range r.backupRequest.Backup.Spec.IncludedNamespaces {
+		nsExists := false
+		// Skip checking the namespace existing when it's "*".
+		if includedNSName == "*" {
+			continue
+		}
+		for _, unstructuredNS := range unstructuredList.Items {
+			if unstructuredNS.GetName() == includedNSName {
+				nsExists = true
+			}
+		}
+
+		if !nsExists {
+			log.Errorf("fail to get the namespace %s specified in backup.Spec.IncludedNamespaces", includedNSName)
+		}
+	}
+
 	var singleSelector labels.Selector
 	var orSelectors []labels.Selector
 
