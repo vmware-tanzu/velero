@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/reporters"
+	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/reporters"
 	. "github.com/onsi/gomega"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
@@ -177,8 +177,8 @@ var _ = Describe("[NamespaceMapping][Multiple][Restic] Backup resources should f
 var _ = Describe("[NamespaceMapping][Single][Snapshot][SkipVanillaZfs] Backup resources should follow the specific order in schedule", OneNamespaceMappingSnapshotTest)
 var _ = Describe("[NamespaceMapping][Multiple][Snapshot]SkipVanillaZfs] Backup resources should follow the specific order in schedule", MultiNamespacesMappingSnapshotTest)
 
-var _ = Describe("[pv-backup][Opt-In] Backup resources should follow the specific order in schedule", OptInPVBackupTest)
-var _ = Describe("[pv-backup][Opt-Out] Backup resources should follow the specific order in schedule", OptOutPVBackupTest)
+var _ = Describe("Backup resources should follow the specific order in schedule", Label("pv-backup", "Opt-In"), OptInPVBackupTest)
+var _ = Describe("Backup resources should follow the specific order in schedule", Label("pv-backup", "Opt-Out"), OptOutPVBackupTest)
 
 var _ = Describe("[Basic][Nodeport] Service nodeport reservation during restore is configurable", NodePortTest)
 var _ = Describe("[Basic][StorageClass] Storage class of persistent volumes and persistent volume claims can be changed during restores", StorageClasssChangingTest)

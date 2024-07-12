@@ -49,12 +49,12 @@ var UUIDgen uuid.UUID
 
 var VeleroCfg VeleroConfig
 
-type Report struct {
+type E2EReport struct {
 	TestDescription string                 `yaml:"Test Description"`
 	OtherFields     map[string]interface{} `yaml:",inline"`
 }
 
-var ReportData *Report
+var ReportData *E2EReport
 
 type VeleroConfig struct {
 	VeleroCfgInPerf
