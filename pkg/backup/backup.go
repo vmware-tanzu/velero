@@ -728,7 +728,7 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 		}).Infof("Updated %d items out of an estimated total of %d (estimate will change throughout the backup finalizer)", len(backupRequest.BackedUpItems), totalItems)
 	}
 
-	volumeInfos, err := kb.getVolumeInfos(*backupRequest.Backup, backupStore, log)
+	volumeInfos, err := backupStore.GetBackupVolumeInfos(backupRequest.Backup.Name)
 	if err != nil {
 		log.WithError(err).Errorf("fail to get the backup VolumeInfos for backup %s", backupRequest.Name)
 		return err
@@ -810,19 +810,6 @@ type tarWriter interface {
 	io.Closer
 	Write([]byte) (int, error)
 	WriteHeader(*tar.Header) error
-}
-
-func (kb *kubernetesBackupper) getVolumeInfos(
-	backup velerov1api.Backup,
-	backupStore persistence.BackupStore,
-	log logrus.FieldLogger,
-) ([]*volume.BackupVolumeInfo, error) {
-	volumeInfos, err := backupStore.GetBackupVolumeInfos(backup.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	return volumeInfos, nil
 }
 
 // updateVolumeInfos update the VolumeInfos according to the AsyncOperations
