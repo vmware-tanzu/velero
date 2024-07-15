@@ -184,6 +184,7 @@ func (r *backupFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			outBackupFile,
 			backupItemActionsResolver,
 			operations,
+			backupStore,
 		)
 		if err != nil {
 			log.WithError(err).Error("error finalizing Backup")

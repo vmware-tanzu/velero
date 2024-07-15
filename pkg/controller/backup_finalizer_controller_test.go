@@ -225,7 +225,7 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 			backupStore.On("GetBackupVolumeInfos", mock.Anything).Return(nil, nil)
 			backupStore.On("PutBackupVolumeInfos", mock.Anything, mock.Anything).Return(nil)
 			pluginManager.On("GetBackupItemActionsV2").Return(nil, nil)
-			backupper.On("FinalizeBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, framework.BackupItemActionResolverV2{}, mock.Anything).Return(nil)
+			backupper.On("FinalizeBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, framework.BackupItemActionResolverV2{}, mock.Anything, mock.Anything).Return(nil)
 			_, err := reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			gotErr := err != nil
 			assert.Equal(t, test.expectError, gotErr)
