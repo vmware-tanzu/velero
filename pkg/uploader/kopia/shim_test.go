@@ -114,7 +114,7 @@ func TestOpenObject(t *testing.T) {
 				assert.Nil(t, reader)
 			} else {
 				assert.NotNil(t, reader)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -153,7 +153,7 @@ func TestFindManifests(t *testing.T) {
 			if tc.isGetManifestError {
 				assert.Contains(t, err.Error(), "failed")
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}

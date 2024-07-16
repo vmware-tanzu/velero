@@ -955,7 +955,7 @@ func TestGetVolumeSnapshotClass(t *testing.T) {
 			actualSnapshotClass, actualError := GetVolumeSnapshotClass(
 				tc.driverName, tc.backup, tc.pvc, logrus.New(), fakeClient)
 			if tc.expectError {
-				assert.NotNil(t, actualError)
+				assert.Error(t, actualError)
 				assert.Nil(t, actualSnapshotClass)
 				return
 			}
@@ -1070,7 +1070,7 @@ func TestGetVolumeSnapshotClassForStorageClass(t *testing.T) {
 			actualVSC, actualError := GetVolumeSnapshotClassForStorageClass(tc.driverName, snapshotClasses)
 
 			if tc.expectError {
-				assert.NotNil(t, actualError)
+				assert.Error(t, actualError)
 				assert.Nil(t, actualVSC)
 				return
 			}
@@ -1361,16 +1361,16 @@ func TestSetVolumeSnapshotContentDeletionPolicy(t *testing.T) {
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, tc.objs...)
 			err := SetVolumeSnapshotContentDeletionPolicy(tc.inputVSCName, fakeClient)
 			if tc.expectError {
-				assert.NotNil(t, err)
+				assert.Error(t, err)
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				actual := new(snapshotv1api.VolumeSnapshotContent)
 				err := fakeClient.Get(
 					context.TODO(),
 					crclient.ObjectKey{Name: tc.inputVSCName},
 					actual,
 				)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.Equal(
 					t,
 					snapshotv1api.VolumeSnapshotContentDelete,
@@ -1647,7 +1647,7 @@ func TestWaitUntilVSCHandleIsReady(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actualVSC, actualError := WaitUntilVSCHandleIsReady(tc.volSnap, fakeClient, logrus.New().WithField("fake", "test"), tc.wait, 0)
 			if tc.expectError && actualError == nil {
-				assert.NotNil(t, actualError)
+				assert.Error(t, actualError)
 				assert.Nil(t, actualVSC)
 				return
 			}

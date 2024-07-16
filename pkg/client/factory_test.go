@@ -134,11 +134,11 @@ func TestFactory(t *testing.T) {
 			assert.NotNil(t, dynamicClient)
 
 			kubebuilderClient, e := f.KubebuilderClient()
-			assert.Nil(t, e)
+			assert.NoError(t, e)
 			assert.NotNil(t, kubebuilderClient)
 
 			kbClientWithWatch, e := f.KubebuilderWatchClient()
-			assert.Nil(t, e)
+			assert.NoError(t, e)
 			assert.NotNil(t, kbClientWithWatch)
 		})
 	}

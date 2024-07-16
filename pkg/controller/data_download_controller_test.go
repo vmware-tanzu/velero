@@ -448,7 +448,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 			if test.expectedStatusMsg != "" {
 				assert.Contains(t, err.Error(), test.expectedStatusMsg)
 			} else {
-				require.Nil(t, err)
+				require.NoError(t, err)
 			}
 
 			require.NotNil(t, actualResult)
@@ -476,7 +476,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 				if controllerutil.ContainsFinalizer(test.dd, DataUploadDownloadFinalizer) {
 					assert.True(t, true, apierrors.IsNotFound(err))
 				} else {
-					require.Nil(t, err)
+					require.NoError(t, err)
 				}
 			} else {
 				assert.True(t, true, apierrors.IsNotFound(err))

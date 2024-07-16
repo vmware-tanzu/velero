@@ -186,26 +186,26 @@ func TestNewAdmissionWebhookConfigurationActionExecute(t *testing.T) {
 			}
 			output, err := action.Execute(input)
 			if tt.wantErr {
-				assert.NotNil(t, err)
+				assert.Error(t, err)
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 			if tt.NoneSideEffectsIndex != nil {
 				wb, _, err := unstructured.NestedSlice(output.UpdatedItem.UnstructuredContent(), "webhooks")
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				for _, i := range tt.NoneSideEffectsIndex {
 					it, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&wb[i])
-					assert.Nil(t, err)
+					assert.NoError(t, err)
 					s := it["sideEffects"].(string)
 					assert.Equal(t, "None", s)
 				}
 			}
 			if tt.NotNoneSideEffectsIndex != nil {
 				wb, _, err := unstructured.NestedSlice(output.UpdatedItem.UnstructuredContent(), "webhooks")
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				for _, i := range tt.NotNoneSideEffectsIndex {
 					it, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&wb[i])
-					assert.Nil(t, err)
+					assert.NoError(t, err)
 					s := it["sideEffects"].(string)
 					assert.NotEqual(t, "None", s)
 				}

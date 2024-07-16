@@ -135,10 +135,10 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			switch tc.expectedErr {
 			case true:
 				assert.Nil(t, res)
-				assert.NotNil(t, err)
+				assert.Error(t, err)
 			case false:
 				assert.Equal(t, tc.expectedRes, res)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}

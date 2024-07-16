@@ -100,9 +100,9 @@ func TestSetOfPriority(t *testing.T) {
 			p := Priorities{}
 			err := p.Set(c.input)
 			if c.hasErr {
-				require.NotNil(t, err)
+				require.Error(t, err)
 			} else {
-				require.Nil(t, err)
+				require.NoError(t, err)
 			}
 			assert.Equal(t, c.priorities, p)
 		})

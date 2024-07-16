@@ -336,7 +336,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 
 			actualShouldSnapshot, actualError := vh.ShouldPerformSnapshot(&unstructured.Unstructured{Object: obj}, tc.groupResource)
 			if tc.expectedErr {
-				require.NotNil(t, actualError, "Want error; Got nil error")
+				require.Error(t, actualError, "Want error; Got nil error")
 				return
 			}
 
@@ -698,7 +698,7 @@ func TestVolumeHelperImpl_ShouldPerformFSBackup(t *testing.T) {
 
 			actualShouldFSBackup, actualError := vh.ShouldPerformFSBackup(tc.pod.Spec.Volumes[0], *tc.pod)
 			if tc.expectedErr {
-				require.NotNil(t, actualError, "Want error; Got nil error")
+				require.Error(t, actualError, "Want error; Got nil error")
 				return
 			}
 

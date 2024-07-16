@@ -50,10 +50,10 @@ func TestInstall(t *testing.T) {
 	).Build()
 
 	resources := &unstructured.UnstructuredList{}
-	require.Nil(t, appendUnstructured(resources, v1crds.CRDs[0]))
-	require.Nil(t, appendUnstructured(resources, Namespace("velero")))
+	require.NoError(t, appendUnstructured(resources, v1crds.CRDs[0]))
+	require.NoError(t, appendUnstructured(resources, Namespace("velero")))
 
-	assert.Nil(t, Install(factory, c, resources, os.Stdout))
+	assert.NoError(t, Install(factory, c, resources, os.Stdout))
 }
 
 func Test_crdsAreReady(t *testing.T) {
@@ -88,7 +88,7 @@ func Test_crdsAreReady(t *testing.T) {
 		},
 	}
 	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(crd)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	crds := []*unstructured.Unstructured{
 		{
@@ -97,7 +97,7 @@ func Test_crdsAreReady(t *testing.T) {
 	}
 
 	ready, err := crdsAreReady(c, crds)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.True(t, ready)
 }
 
@@ -114,7 +114,7 @@ func TestDeploymentIsReady(t *testing.T) {
 		},
 	}
 	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(deployment)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	dc := &test.FakeDynamicClient{}
 	dc.On("Get", mock.Anything, mock.Anything).Return(&unstructured.Unstructured{Object: obj}, nil)
@@ -123,7 +123,7 @@ func TestDeploymentIsReady(t *testing.T) {
 	factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
 
 	ready, err := DeploymentIsReady(factory, "velero")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.True(t, ready)
 }
 
@@ -135,7 +135,7 @@ func TestDaemonSetIsReady(t *testing.T) {
 		},
 	}
 	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(daemonset)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	dc := &test.FakeDynamicClient{}
 	dc.On("Get", mock.Anything, mock.Anything).Return(&unstructured.Unstructured{Object: obj}, nil)
@@ -144,6 +144,6 @@ func TestDaemonSetIsReady(t *testing.T) {
 	factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
 
 	ready, err := DaemonSetIsReady(factory, "velero")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.True(t, ready)
 }

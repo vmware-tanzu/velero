@@ -14,9 +14,9 @@ func TestStringOfEnum(t *testing.T) {
 
 func TestSetOfEnum(t *testing.T) {
 	enum := NewEnum("a", "a", "b", "c")
-	assert.NotNil(t, enum.Set("d"))
+	assert.Error(t, enum.Set("d"))
 
-	require.Nil(t, enum.Set("b"))
+	require.NoError(t, enum.Set("b"))
 	assert.Equal(t, "b", enum.String())
 }
 

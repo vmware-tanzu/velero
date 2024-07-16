@@ -239,7 +239,6 @@ linters-settings:
       # TODO: enable them all
       disable:
         - error-is-as
-        - error-nil
         - expected-actual
         - go-require
         - float-compare

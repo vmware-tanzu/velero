@@ -623,14 +623,14 @@ func TestDescribePodVolumeBackups(t *testing.T) {
 
 func TestDescribeDeleteBackupRequests(t *testing.T) {
 	t1, err1 := time.Parse("2006-Jan-02", "2023-Jun-26")
-	require.Nil(t, err1)
+	require.NoError(t, err1)
 	dbr1 := builder.ForDeleteBackupRequest("velero", "dbr1").
 		ObjectMeta(builder.WithCreationTimestamp(t1)).
 		BackupName("bak-1").
 		Phase(velerov1api.DeleteBackupRequestPhaseProcessed).
 		Errors("some error").Result()
 	t2, err2 := time.Parse("2006-Jan-02", "2023-Jun-25")
-	require.Nil(t, err2)
+	require.NoError(t, err2)
 	dbr2 := builder.ForDeleteBackupRequest("velero", "dbr2").
 		ObjectMeta(builder.WithCreationTimestamp(t2)).
 		BackupName("bak-2").
@@ -676,11 +676,11 @@ func TestDescribeDeleteBackupRequests(t *testing.T) {
 
 func TestDescribeBackupItemOperation(t *testing.T) {
 	t1, err1 := time.Parse("2006-Jan-02", "2023-Jun-26")
-	require.Nil(t, err1)
+	require.NoError(t, err1)
 	t2, err2 := time.Parse("2006-Jan-02", "2023-Jun-25")
-	require.Nil(t, err2)
+	require.NoError(t, err2)
 	t3, err3 := time.Parse("2006-Jan-02", "2023-Jun-24")
-	require.Nil(t, err3)
+	require.NoError(t, err3)
 	input := builder.ForBackupOperation().
 		BackupName("backup-1").
 		OperationID("op-1").
