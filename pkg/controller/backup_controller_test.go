@@ -85,6 +85,7 @@ func (b *fakeBackupper) FinalizeBackup(
 	outBackupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
 	asyncBIAOperations []*itemoperation.BackupOperation,
+	backupStore persistence.BackupStore,
 ) error {
 	args := b.Called(logger, backup, inBackupFile, outBackupFile, backupItemActionResolver, asyncBIAOperations)
 	return args.Error(0)

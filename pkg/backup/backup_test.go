@@ -54,8 +54,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
-	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
-	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
@@ -4517,23 +4515,6 @@ func TestBackupNamespaces(t *testing.T) {
 			assertTarballContents(t, backupFile, append(tc.want, "metadata/version")...)
 		})
 	}
-}
-
-func TestGetVolumeInfos(t *testing.T) {
-	h := newHarness(t)
-	pluginManager := new(pluginmocks.Manager)
-	backupStore := new(persistencemocks.BackupStore)
-	h.backupper.pluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
-	h.backupper.backupStoreGetter = NewFakeSingleObjectBackupStoreGetter(backupStore)
-	backupStore.On("GetBackupVolumeInfos", "backup-01").Return([]*volume.BackupVolumeInfo{}, nil)
-	pluginManager.On("CleanupClients").Return()
-
-	backup := builder.ForBackup("velero", "backup-01").StorageLocation("default").Result()
-	bsl := builder.ForBackupStorageLocation("velero", "default").Result()
-	require.NoError(t, h.backupper.kbClient.Create(context.Background(), bsl))
-
-	_, _, err := h.backupper.getVolumeInfos(*backup, h.log)
-	require.NoError(t, err)
 }
 
 func TestUpdateVolumeInfos(t *testing.T) {

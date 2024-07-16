@@ -95,6 +95,7 @@ type Backupper interface {
 		outBackupFile io.Writer,
 		backupItemActionResolver framework.BackupItemActionResolverV2,
 		asyncBIAOperations []*itemoperation.BackupOperation,
+		backupStore persistence.BackupStore,
 	) error
 }
 
@@ -610,6 +611,7 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 	outBackupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
 	asyncBIAOperations []*itemoperation.BackupOperation,
+	backupStore persistence.BackupStore,
 ) error {
 	gzw := gzip.NewWriter(outBackupFile)
 	defer gzw.Close()
@@ -726,7 +728,7 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 		}).Infof("Updated %d items out of an estimated total of %d (estimate will change throughout the backup finalizer)", len(backupRequest.BackedUpItems), totalItems)
 	}
 
-	backupStore, volumeInfos, err := kb.getVolumeInfos(*backupRequest.Backup, log)
+	volumeInfos, err := backupStore.GetBackupVolumeInfos(backupRequest.Backup.Name)
 	if err != nil {
 		log.WithError(err).Errorf("fail to get the backup VolumeInfos for backup %s", backupRequest.Name)
 		return err
@@ -808,34 +810,6 @@ type tarWriter interface {
 	io.Closer
 	Write([]byte) (int, error)
 	WriteHeader(*tar.Header) error
-}
-
-func (kb *kubernetesBackupper) getVolumeInfos(
-	backup velerov1api.Backup,
-	log logrus.FieldLogger,
-) (persistence.BackupStore, []*volume.BackupVolumeInfo, error) {
-	location := &velerov1api.BackupStorageLocation{}
-	if err := kb.kbClient.Get(context.Background(), kbclient.ObjectKey{
-		Namespace: backup.Namespace,
-		Name:      backup.Spec.StorageLocation,
-	}, location); err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
-	pluginManager := kb.pluginManager(log)
-	defer pluginManager.CleanupClients()
-
-	backupStore, storeErr := kb.backupStoreGetter.Get(location, pluginManager, log)
-	if storeErr != nil {
-		return nil, nil, storeErr
-	}
-
-	volumeInfos, err := backupStore.GetBackupVolumeInfos(backup.Name)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return backupStore, volumeInfos, nil
 }
 
 // updateVolumeInfos update the VolumeInfos according to the AsyncOperations
