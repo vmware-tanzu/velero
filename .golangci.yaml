@@ -347,7 +347,6 @@ issues:
         - govet
         - staticcheck
         - stylecheck
-        - unconvert
         - unparam
         - unused
     - path: test/
@@ -359,7 +358,6 @@ issues:
         - nilerr
         - staticcheck
         - stylecheck
-        - unconvert
         - unparam
         - unused
 
