@@ -38,6 +38,8 @@ const AWS = "aws"
 const Gcp = "gcp"
 const Vsphere = "vsphere"
 
+const UploaderTypeRestic = "restic"
+
 var PublicCloudProviders = []string{AWS, Azure, Gcp, Vsphere}
 var LocalCloudProviders = []string{Kind, VanillaZFS}
 var CloudProviders = append(PublicCloudProviders, LocalCloudProviders...)

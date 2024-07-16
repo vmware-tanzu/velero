@@ -19,7 +19,7 @@ package test
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -105,8 +105,7 @@ func (t *TestCase) Init() error {
 }
 
 func (t *TestCase) GenerateUUID() string {
-	rand.Seed(time.Now().UnixNano())
-	return fmt.Sprintf("%08d", rand.Intn(100000000))
+	return fmt.Sprintf("%08d", rand.IntN(100000000))
 }
 
 func (t *TestCase) CreateResources() error {
@@ -168,8 +167,15 @@ func (t *TestCase) Verify() error {
 func (t *TestCase) Start() error {
 	t.Ctx, t.CtxCancel = context.WithTimeout(context.Background(), 1*time.Hour)
 	veleroCfg := t.GetTestCase().VeleroCfg
-	if (veleroCfg.CloudProvider == Azure || veleroCfg.CloudProvider == AWS) && strings.Contains(t.GetTestCase().CaseBaseName, "nodeport") {
+
+	if (veleroCfg.CloudProvider == Azure || veleroCfg.CloudProvider == AWS) &&
+		strings.Contains(t.GetTestCase().CaseBaseName, "nodeport") {
 		Skip("Skip due to issue https://github.com/kubernetes/kubernetes/issues/114384 on AKS")
+	}
+
+	if veleroCfg.UploaderType == UploaderTypeRestic &&
+		strings.Contains(t.GetTestCase().CaseBaseName, "ParallelFiles") {
+		Skip("Skip Parallel Files upload and download test cases for environments using Restic as uploader.")
 	}
 	return nil
 }
@@ -178,11 +184,15 @@ func (t *TestCase) Clean() error {
 	veleroCfg := t.GetTestCase().VeleroCfg
 	if !veleroCfg.Debug {
 		By(fmt.Sprintf("Clean namespace with prefix %s after test", t.CaseBaseName), func() {
-			CleanupNamespaces(t.Ctx, t.Client, t.CaseBaseName)
+			if err := CleanupNamespaces(t.Ctx, t.Client, t.CaseBaseName); err != nil {
+				fmt.Println("Fail to cleanup namespaces: ", err)
+			}
 		})
 		By("Clean backups after test", func() {
 			veleroCfg.ClientToInstallVelero = &t.Client
-			DeleteAllBackups(t.Ctx, &veleroCfg)
+			if err := DeleteAllBackups(t.Ctx, &veleroCfg); err != nil {
+				fmt.Println("Fail to clean backups after test: ", err)
+			}
 		})
 	}
 	return nil

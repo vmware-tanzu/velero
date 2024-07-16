@@ -231,7 +231,7 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 	}
 
 	// Call the function and check for errors
-	resPolicies, err := GetResourcePoliciesFromConfig(cm)
+	resPolicies, err := getResourcePoliciesFromConfig(cm)
 	assert.Nil(t, err)
 
 	// Check that the returned resourcePolicies object contains the expected data

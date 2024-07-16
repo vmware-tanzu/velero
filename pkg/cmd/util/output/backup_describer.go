@@ -619,6 +619,7 @@ func describNativeSnapshot(d *Describer, details bool, info *volume.BackupVolume
 		d.Printf("\t\t\tType:\t%s\n", info.NativeSnapshotInfo.VolumeType)
 		d.Printf("\t\t\tAvailability Zone:\t%s\n", info.NativeSnapshotInfo.VolumeAZ)
 		d.Printf("\t\t\tIOPS:\t%s\n", info.NativeSnapshotInfo.IOPS)
+		d.Printf("\t\t\tResult:\t%s\n", info.Result)
 	} else {
 		d.Printf("\t\t%s: specify --details for more information\n", info.PVName)
 	}
@@ -662,6 +663,7 @@ func describeLocalSnapshot(d *Describer, details bool, info *volume.BackupVolume
 		d.Printf("\t\t\t\tStorage Snapshot ID: %s\n", info.CSISnapshotInfo.SnapshotHandle)
 		d.Printf("\t\t\t\tSnapshot Size (bytes): %d\n", info.CSISnapshotInfo.Size)
 		d.Printf("\t\t\t\tCSI Driver: %s\n", info.CSISnapshotInfo.Driver)
+		d.Printf("\t\t\t\tResult: %s\n", info.Result)
 	} else {
 		d.Printf("\t\t\tSnapshot: %s\n", "included, specify --details for more information")
 	}
@@ -683,6 +685,7 @@ func describeDataMovement(d *Describer, details bool, info *volume.BackupVolumeI
 		d.Printf("\t\t\t\tData Mover: %s\n", dataMover)
 		d.Printf("\t\t\t\tUploader Type: %s\n", info.SnapshotDataMovementInfo.UploaderType)
 		d.Printf("\t\t\t\tMoved data Size (bytes): %d\n", info.SnapshotDataMovementInfo.Size)
+		d.Printf("\t\t\t\tResult: %s\n", info.Result)
 	} else {
 		d.Printf("\t\t\tData Movement: %s\n", "included, specify --details for more information")
 	}

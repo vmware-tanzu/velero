@@ -21,17 +21,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/internal/volume"
-	"github.com/vmware-tanzu/velero/pkg/util/results"
-
-	"github.com/stretchr/testify/assert"
-
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
 func TestDescribeBackupInSF(t *testing.T) {
@@ -314,6 +311,7 @@ func TestDescribeNativeSnapshotsInSF(t *testing.T) {
 				{
 					BackupMethod: volume.NativeSnapshot,
 					PVName:       "pv-1",
+					Result:       volume.VolumeResultSucceeded,
 					NativeSnapshotInfo: &volume.NativeSnapshotInfo{
 						SnapshotHandle: "snapshot-1",
 						VolumeType:     "ebs",
@@ -330,6 +328,7 @@ func TestDescribeNativeSnapshotsInSF(t *testing.T) {
 						"type":             "ebs",
 						"availabilityZone": "us-east-2",
 						"IOPS":             "1000 mbps",
+						"result":           "succeeded",
 					},
 				},
 			},
@@ -401,6 +400,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 					PVCNamespace:          "pvc-ns-2",
 					PVCName:               "pvc-2",
 					PreserveLocalSnapshot: true,
+					Result:                volume.VolumeResultSucceeded,
 					CSISnapshotInfo: &volume.CSISnapshotInfo{
 						SnapshotHandle: "snapshot-2",
 						Size:           1024,
@@ -420,6 +420,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 							"storageSnapshotID":   "snapshot-2",
 							"snapshotSize(bytes)": int64(1024),
 							"csiDriver":           "fake-driver",
+							"result":              "succeeded",
 						},
 					},
 				},
@@ -457,6 +458,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 					PVCNamespace:      "pvc-ns-4",
 					PVCName:           "pvc-4",
 					SnapshotDataMoved: true,
+					Result:            volume.VolumeResultSucceeded,
 					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
 						DataMover:      "velero",
 						UploaderType:   "fake-uploader",
@@ -473,6 +475,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 							"operationID":  "fake-operation-4",
 							"dataMover":    "velero",
 							"uploaderType": "fake-uploader",
+							"result":       "succeeded",
 						},
 					},
 				},
@@ -484,6 +487,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 				{
 					BackupMethod:      volume.CSISnapshot,
 					PVCNamespace:      "pvc-ns-4",
+					Result:            volume.VolumeResultFailed,
 					PVCName:           "pvc-4",
 					SnapshotDataMoved: true,
 					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
@@ -501,6 +505,7 @@ func TestDescribeCSISnapshotsInSF(t *testing.T) {
 							"operationID":  "fake-operation-4",
 							"dataMover":    "velero",
 							"uploaderType": "fake-uploader",
+							"result":       "failed",
 						},
 					},
 				},

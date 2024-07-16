@@ -40,6 +40,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
+	"github.com/vmware-tanzu/velero/pkg/plugin/utils/volumehelper"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 	uploaderUtil "github.com/vmware-tanzu/velero/pkg/uploader/util"
@@ -227,6 +228,22 @@ func (p *pvcBackupItemAction) Execute(
 			return nil, nil, "", nil, err
 		}
 		return item, nil, "", nil, nil
+	}
+
+	shouldSnapshot, err := volumehelper.ShouldPerformSnapshotWithBackup(
+		item,
+		kuberesource.PersistentVolumeClaims,
+		*backup,
+		p.crClient,
+		p.log,
+	)
+	if err != nil {
+		return nil, nil, "", nil, err
+	}
+	if !shouldSnapshot {
+		p.log.Debugf("CSI plugin skip snapshot for PVC %s according to the VolumeHelper setting.",
+			pvc.Namespace+"/"+pvc.Name)
+		return nil, nil, "", nil, err
 	}
 
 	vs, err := p.createVolumeSnapshot(pvc, backup)

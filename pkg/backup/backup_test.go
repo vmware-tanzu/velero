@@ -54,8 +54,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
-	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
-	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
@@ -4519,23 +4517,6 @@ func TestBackupNamespaces(t *testing.T) {
 	}
 }
 
-func TestGetVolumeInfos(t *testing.T) {
-	h := newHarness(t)
-	pluginManager := new(pluginmocks.Manager)
-	backupStore := new(persistencemocks.BackupStore)
-	h.backupper.pluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
-	h.backupper.backupStoreGetter = NewFakeSingleObjectBackupStoreGetter(backupStore)
-	backupStore.On("GetBackupVolumeInfos", "backup-01").Return([]*volume.BackupVolumeInfo{}, nil)
-	pluginManager.On("CleanupClients").Return()
-
-	backup := builder.ForBackup("velero", "backup-01").StorageLocation("default").Result()
-	bsl := builder.ForBackupStorageLocation("velero", "default").Result()
-	require.NoError(t, h.backupper.kbClient.Create(context.Background(), bsl))
-
-	_, _, err := h.backupper.getVolumeInfos(*backup, h.log)
-	require.NoError(t, err)
-}
-
 func TestUpdateVolumeInfos(t *testing.T) {
 	timeExample := time.Date(2014, 6, 5, 11, 56, 45, 0, time.Local)
 	now := metav1.NewTime(timeExample)
@@ -4548,6 +4529,39 @@ func TestUpdateVolumeInfos(t *testing.T) {
 		volumeInfos         []*volume.BackupVolumeInfo
 		expectedVolumeInfos []*volume.BackupVolumeInfo
 	}{
+		{
+			name: "CSISnapshot VolumeInfo update with Operation fails",
+			operations: []*itemoperation.BackupOperation{
+				{
+					Spec: itemoperation.BackupOperationSpec{
+						OperationID: "test-operation",
+					},
+					Status: itemoperation.OperationStatus{
+						Error:   "failed",
+						Updated: &now,
+					},
+				},
+			},
+			volumeInfos: []*volume.BackupVolumeInfo{
+				{
+					BackupMethod:        volume.CSISnapshot,
+					CompletionTimestamp: &metav1.Time{},
+					CSISnapshotInfo: &volume.CSISnapshotInfo{
+						OperationID: "test-operation",
+					},
+				},
+			},
+			expectedVolumeInfos: []*volume.BackupVolumeInfo{
+				{
+					BackupMethod:        volume.CSISnapshot,
+					CompletionTimestamp: &now,
+					Result:              volume.VolumeResultFailed,
+					CSISnapshotInfo: &volume.CSISnapshotInfo{
+						OperationID: "test-operation",
+					},
+				},
+			},
+		},
 		{
 			name: "CSISnapshot VolumeInfo update",
 			operations: []*itemoperation.BackupOperation{
@@ -4573,6 +4587,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 				{
 					BackupMethod:        volume.CSISnapshot,
 					CompletionTimestamp: &now,
+					Result:              volume.VolumeResultSucceeded,
 					CSISnapshotInfo: &volume.CSISnapshotInfo{
 						OperationID: "test-operation",
 					},
@@ -4580,13 +4595,14 @@ func TestUpdateVolumeInfos(t *testing.T) {
 			},
 		},
 		{
-			name:       "DataUpload VolumeInfo update",
+			name:       "DataUpload VolumeInfo update with fail phase",
 			operations: []*itemoperation.BackupOperation{},
 			dataUpload: builder.ForDataUpload("velero", "du-1").
 				CompletionTimestamp(&now).
 				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{VolumeSnapshot: "vs-1"}).
 				SnapshotID("snapshot-id").
 				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000}).
+				Phase(velerov2alpha1.DataUploadPhaseFailed).
 				SourceNamespace("ns-1").
 				SourcePVC("pvc-1").
 				Result(),
@@ -4605,11 +4621,51 @@ func TestUpdateVolumeInfos(t *testing.T) {
 					PVCName:             "pvc-1",
 					PVCNamespace:        "ns-1",
 					CompletionTimestamp: &now,
+					Result:              volume.VolumeResultFailed,
 					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
 						DataMover:        "velero",
 						RetainedSnapshot: "vs-1",
 						SnapshotHandle:   "snapshot-id",
 						Size:             1000,
+						Phase:            velerov2alpha1.DataUploadPhaseFailed,
+					},
+				},
+			},
+		},
+		{
+			name:       "DataUpload VolumeInfo update",
+			operations: []*itemoperation.BackupOperation{},
+			dataUpload: builder.ForDataUpload("velero", "du-1").
+				CompletionTimestamp(&now).
+				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{VolumeSnapshot: "vs-1"}).
+				SnapshotID("snapshot-id").
+				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000}).
+				Phase(velerov2alpha1.DataUploadPhaseCompleted).
+				SourceNamespace("ns-1").
+				SourcePVC("pvc-1").
+				Result(),
+			volumeInfos: []*volume.BackupVolumeInfo{
+				{
+					PVCName:             "pvc-1",
+					PVCNamespace:        "ns-1",
+					CompletionTimestamp: &metav1.Time{},
+					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
+						DataMover: "velero",
+					},
+				},
+			},
+			expectedVolumeInfos: []*volume.BackupVolumeInfo{
+				{
+					PVCName:             "pvc-1",
+					PVCNamespace:        "ns-1",
+					CompletionTimestamp: &now,
+					Result:              volume.VolumeResultSucceeded,
+					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
+						DataMover:        "velero",
+						RetainedSnapshot: "vs-1",
+						SnapshotHandle:   "snapshot-id",
+						Size:             1000,
+						Phase:            velerov2alpha1.DataUploadPhaseCompleted,
 					},
 				},
 			},

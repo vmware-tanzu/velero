@@ -333,6 +333,7 @@ func TestDeletePVCIfAny(t *testing.T) {
 		logMessage    string
 		logLevel      string
 		logError      string
+		ensureTimeout time.Duration
 	}{
 		{
 			name:         "pvc not found",
@@ -362,22 +363,6 @@ func TestDeletePVCIfAny(t *testing.T) {
 			pvcName:      "fake-pvc",
 			pvcNamespace: "fake-namespace",
 			pvName:       "fake-pv",
-			kubeReactors: []reactor{
-				{
-					verb:     "get",
-					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
-						return true, pvcObject, nil
-					},
-				},
-				{
-					verb:     "delete",
-					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, nil
-					},
-				},
-			},
 			kubeClientObj: []runtime.Object{
 				pvcObject,
 				pvObject,
@@ -392,13 +377,6 @@ func TestDeletePVCIfAny(t *testing.T) {
 			pvName:       "fake-pv",
 			kubeReactors: []reactor{
 				{
-					verb:     "get",
-					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
-						return true, pvcObject, nil
-					},
-				},
-				{
 					verb:     "delete",
 					resource: "persistentvolumeclaims",
 					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -407,10 +385,10 @@ func TestDeletePVCIfAny(t *testing.T) {
 				},
 			},
 			kubeClientObj: []runtime.Object{
-				pvcObject,
+				pvcWithVolume,
 				pvObject,
 			},
-			logMessage: "failed to delete pvc fake-namespace/fake-pvc with err fake-delete-error",
+			logMessage: "failed to delete pvc fake-namespace/fake-pvc with err error to delete pvc fake-pvc: fake-delete-error",
 			logLevel:   "level=warning",
 		},
 		{
@@ -424,13 +402,6 @@ func TestDeletePVCIfAny(t *testing.T) {
 					resource: "persistentvolumes",
 					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-get-error")
-					},
-				},
-				{
-					verb:     "get",
-					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
-						return true, pvcWithVolume, nil
 					},
 				},
 			},
@@ -452,20 +423,6 @@ func TestDeletePVCIfAny(t *testing.T) {
 			},
 			kubeReactors: []reactor{
 				{
-					verb:     "get",
-					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
-						return true, pvcWithVolume, nil
-					},
-				},
-				{
-					verb:     "get",
-					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
-						return true, pvObject, nil
-					},
-				},
-				{
 					verb:     "patch",
 					resource: "persistentvolumes",
 					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -486,28 +443,39 @@ func TestDeletePVCIfAny(t *testing.T) {
 				pvcWithVolume,
 				pvObject,
 			},
+		},
+		{
+			name:         "delete pv pvc success but wait fail",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-namespace",
+			pvName:       "fake-pv",
+			kubeClientObj: []runtime.Object{
+				pvcWithVolume,
+				pvObject,
+			},
 			kubeReactors: []reactor{
 				{
-					verb:     "get",
+					verb:     "delete",
 					resource: "persistentvolumeclaims",
 					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, pvcWithVolume, nil
 					},
 				},
-				{
-					verb:     "get",
-					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
-						return true, pvObject, nil
-					},
-				},
-				{
-					verb:     "patch",
-					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
-						return true, pvObject, nil
-					},
-				},
+			},
+			ensureTimeout: time.Second,
+			logMessage:    "failed to delete pvc fake-namespace/fake-pvc with err error to ensure pvc deleted for fake-pvc: context deadline exceeded",
+			logLevel:      "level=warning",
+		},
+		{
+			name:         "delete pv pvc success, wait won't succeed but ensureTimeout is 0",
+			pvcName:      "fake-pvc",
+			pvcNamespace: "fake-namespace",
+			pvName:       "fake-pv",
+			kubeClientObj: []runtime.Object{
+				pvcWithVolume,
+				pvObject,
+			},
+			kubeReactors: []reactor{
 				{
 					verb:     "delete",
 					resource: "persistentvolumeclaims",
@@ -530,7 +498,7 @@ func TestDeletePVCIfAny(t *testing.T) {
 			var kubeClient kubernetes.Interface = fakeKubeClient
 
 			logMessage := ""
-			DeletePVAndPVCIfAny(context.Background(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, velerotest.NewSingleLogger(&logMessage))
+			DeletePVAndPVCIfAny(context.Background(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, test.ensureTimeout, velerotest.NewSingleLogger(&logMessage))
 
 			if len(test.logMessage) > 0 {
 				assert.Contains(t, logMessage, test.logMessage)
@@ -623,6 +591,7 @@ func TestEnsureDeletePVC(t *testing.T) {
 		pvcName   string
 		namespace string
 		reactors  []reactor
+		timeout   time.Duration
 		err       string
 	}{
 		{
@@ -632,10 +601,26 @@ func TestEnsureDeletePVC(t *testing.T) {
 			err:       "error to delete pvc fake-pvc: persistentvolumeclaims \"fake-pvc\" not found",
 		},
 		{
+			name:      "0 timeout",
+			pvcName:   "fake-pvc",
+			namespace: "fake-ns",
+			clientObj: []runtime.Object{pvcObject},
+			reactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvcObject, nil
+					},
+				},
+			},
+		},
+		{
 			name:      "wait fail",
 			pvcName:   "fake-pvc",
 			namespace: "fake-ns",
 			clientObj: []runtime.Object{pvcObject},
+			timeout:   time.Millisecond,
 			reactors: []reactor{
 				{
 					verb:     "get",
@@ -645,7 +630,24 @@ func TestEnsureDeletePVC(t *testing.T) {
 					},
 				},
 			},
-			err: "error to retrieve pvc info for fake-pvc: error to get pvc fake-pvc: fake-get-error",
+			err: "error to ensure pvc deleted for fake-pvc: error to get pvc fake-pvc: fake-get-error",
+		},
+		{
+			name:      "wait timeout",
+			pvcName:   "fake-pvc",
+			namespace: "fake-ns",
+			clientObj: []runtime.Object{pvcObject},
+			timeout:   time.Millisecond,
+			reactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvcObject, nil
+					},
+				},
+			},
+			err: "error to ensure pvc deleted for fake-pvc: context deadline exceeded",
 		},
 	}
 
@@ -659,7 +661,7 @@ func TestEnsureDeletePVC(t *testing.T) {
 
 			var kubeClient kubernetes.Interface = fakeKubeClient
 
-			err := EnsureDeletePVC(context.Background(), kubeClient.CoreV1(), test.pvcName, test.namespace, time.Millisecond)
+			err := EnsureDeletePVC(context.Background(), kubeClient.CoreV1(), test.pvcName, test.namespace, test.timeout)
 			if err != nil {
 				assert.EqualError(t, err, test.err)
 			} else {

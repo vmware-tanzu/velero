@@ -201,6 +201,58 @@ func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 			expectedVolumeInfos: []*BackupVolumeInfo{},
 		},
 		{
+			name: "Normal native snapshot with failed phase",
+			pvMap: map[string]pvcPvInfo{
+				"testPV": {
+					PVCName:      "testPVC",
+					PVCNamespace: "velero",
+					PV: corev1api.PersistentVolume{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "testPV",
+							Labels: map[string]string{"a": "b"},
+						},
+						Spec: corev1api.PersistentVolumeSpec{
+							PersistentVolumeReclaimPolicy: corev1api.PersistentVolumeReclaimDelete,
+						},
+					},
+				},
+			},
+			nativeSnapshot: Snapshot{
+				Spec: SnapshotSpec{
+					PersistentVolumeName: "testPV",
+					VolumeIOPS:           int64Ptr(100),
+					VolumeType:           "ssd",
+					VolumeAZ:             "us-central1-a",
+				},
+				Status: SnapshotStatus{
+					ProviderSnapshotID: "pvc-b31e3386-4bbb-4937-95d-7934cd62-b0a1-494b-95d7-0687440e8d0c",
+					Phase:              SnapshotPhaseFailed,
+				},
+			},
+			expectedVolumeInfos: []*BackupVolumeInfo{
+				{
+					PVCName:      "testPVC",
+					PVCNamespace: "velero",
+					PVName:       "testPV",
+					BackupMethod: NativeSnapshot,
+					Result:       VolumeResultFailed,
+					PVInfo: &PVInfo{
+						ReclaimPolicy: "Delete",
+						Labels: map[string]string{
+							"a": "b",
+						},
+					},
+					NativeSnapshotInfo: &NativeSnapshotInfo{
+						SnapshotHandle: "pvc-b31e3386-4bbb-4937-95d-7934cd62-b0a1-494b-95d7-0687440e8d0c",
+						VolumeType:     "ssd",
+						VolumeAZ:       "us-central1-a",
+						IOPS:           "100",
+						Phase:          SnapshotPhaseFailed,
+					},
+				},
+			},
+		},
+		{
 			name: "Normal native snapshot",
 			pvMap: map[string]pvcPvInfo{
 				"testPV": {
@@ -226,6 +278,7 @@ func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 				},
 				Status: SnapshotStatus{
 					ProviderSnapshotID: "pvc-b31e3386-4bbb-4937-95d-7934cd62-b0a1-494b-95d7-0687440e8d0c",
+					Phase:              SnapshotPhaseCompleted,
 				},
 			},
 			expectedVolumeInfos: []*BackupVolumeInfo{
@@ -234,6 +287,7 @@ func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 					PVCNamespace: "velero",
 					PVName:       "testPV",
 					BackupMethod: NativeSnapshot,
+					Result:       VolumeResultSucceeded,
 					PVInfo: &PVInfo{
 						ReclaimPolicy: "Delete",
 						Labels: map[string]string{
@@ -245,6 +299,7 @@ func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 						VolumeType:     "ssd",
 						VolumeAZ:       "us-central1-a",
 						IOPS:           "100",
+						Phase:          SnapshotPhaseCompleted,
 					},
 				},
 			},
@@ -274,6 +329,7 @@ func TestGenerateVolumeInfoForVeleroNativeSnapshot(t *testing.T) {
 func TestGenerateVolumeInfoForCSIVolumeSnapshot(t *testing.T) {
 	resourceQuantity := resource.MustParse("100Gi")
 	now := metav1.Now()
+	readyToUse := true
 	tests := []struct {
 		name                  string
 		volumeSnapshot        snapshotv1api.VolumeSnapshot
@@ -381,6 +437,7 @@ func TestGenerateVolumeInfoForCSIVolumeSnapshot(t *testing.T) {
 					BoundVolumeSnapshotContentName: stringPtr("testContent"),
 					CreationTime:                   &now,
 					RestoreSize:                    &resourceQuantity,
+					ReadyToUse:                     &readyToUse,
 				},
 			},
 			volumeSnapshotClass:   *builder.ForVolumeSnapshotClass("testClass").Driver("pd.csi.storage.gke.io").Result(),
@@ -427,6 +484,7 @@ func TestGenerateVolumeInfoForCSIVolumeSnapshot(t *testing.T) {
 						Size:           107374182400,
 						VSCName:        "testContent",
 						OperationID:    "testID",
+						ReadyToUse:     &readyToUse,
 					},
 					PVInfo: &PVInfo{
 						ReclaimPolicy: "Delete",
@@ -506,6 +564,7 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 					PVCNamespace: "",
 					PVName:       "",
 					BackupMethod: PodVolumeBackup,
+					Result:       VolumeResultFailed,
 					PVBInfo: &PodVolumeInfo{
 						PodName:      "testPod",
 						PodNamespace: "velero",
@@ -537,7 +596,7 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 			expectedVolumeInfos: []*BackupVolumeInfo{},
 		},
 		{
-			name: "PVB's volume has a PVC",
+			name: "PVB's volume has a PVC with failed phase",
 			pvMap: map[string]pvcPvInfo{
 				"testPV": {
 					PVCName:      "testPVC",
@@ -553,7 +612,13 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 					},
 				},
 			},
-			pvb: builder.ForPodVolumeBackup("velero", "testPVB").PodName("testPod").PodNamespace("velero").StartTimestamp(&now).CompletionTimestamp(&now).Result(),
+			pvb: builder.ForPodVolumeBackup("velero", "testPVB").
+				PodName("testPod").
+				PodNamespace("velero").
+				StartTimestamp(&now).
+				CompletionTimestamp(&now).
+				Phase(velerov1api.PodVolumeBackupPhaseFailed).
+				Result(),
 			pod: builder.ForPod("velero", "testPod").Containers(&corev1api.Container{
 				Name: "test",
 				VolumeMounts: []corev1api.VolumeMount{
@@ -580,9 +645,74 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 					BackupMethod:        PodVolumeBackup,
 					StartTimestamp:      &now,
 					CompletionTimestamp: &now,
+					Result:              VolumeResultFailed,
 					PVBInfo: &PodVolumeInfo{
 						PodName:      "testPod",
 						PodNamespace: "velero",
+						Phase:        velerov1api.PodVolumeBackupPhaseFailed,
+					},
+					PVInfo: &PVInfo{
+						ReclaimPolicy: string(corev1api.PersistentVolumeReclaimDelete),
+						Labels:        map[string]string{"a": "b"},
+					},
+				},
+			},
+		},
+		{
+			name: "PVB's volume has a PVC",
+			pvMap: map[string]pvcPvInfo{
+				"testPV": {
+					PVCName:      "testPVC",
+					PVCNamespace: "velero",
+					PV: corev1api.PersistentVolume{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "testPV",
+							Labels: map[string]string{"a": "b"},
+						},
+						Spec: corev1api.PersistentVolumeSpec{
+							PersistentVolumeReclaimPolicy: corev1api.PersistentVolumeReclaimDelete,
+						},
+					},
+				},
+			},
+			pvb: builder.ForPodVolumeBackup("velero", "testPVB").
+				PodName("testPod").
+				PodNamespace("velero").
+				StartTimestamp(&now).
+				CompletionTimestamp(&now).
+				Phase(velerov1api.PodVolumeBackupPhaseCompleted).
+				Result(),
+			pod: builder.ForPod("velero", "testPod").Containers(&corev1api.Container{
+				Name: "test",
+				VolumeMounts: []corev1api.VolumeMount{
+					{
+						Name:      "testVolume",
+						MountPath: "/data",
+					},
+				},
+			}).Volumes(
+				&corev1api.Volume{
+					Name: "",
+					VolumeSource: corev1api.VolumeSource{
+						PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+							ClaimName: "testPVC",
+						},
+					},
+				},
+			).Result(),
+			expectedVolumeInfos: []*BackupVolumeInfo{
+				{
+					PVCName:             "testPVC",
+					PVCNamespace:        "velero",
+					PVName:              "testPV",
+					BackupMethod:        PodVolumeBackup,
+					StartTimestamp:      &now,
+					CompletionTimestamp: &now,
+					Result:              VolumeResultSucceeded,
+					PVBInfo: &PodVolumeInfo{
+						PodName:      "testPod",
+						PodNamespace: "velero",
+						Phase:        velerov1api.PodVolumeBackupPhaseCompleted,
 					},
 					PVInfo: &PVInfo{
 						ReclaimPolicy: string(corev1api.PersistentVolumeReclaimDelete),
@@ -770,10 +900,15 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 		},
 		{
 			name: "Normal DataUpload case",
-			dataUpload: builder.ForDataUpload("velero", "testDU").DataMover("velero").CSISnapshot(&velerov2alpha1.CSISnapshotSpec{
-				VolumeSnapshot: "testVS",
-				SnapshotClass:  "testClass",
-			}).SnapshotID("testSnapshotHandle").StartTimestamp(&now).Result(),
+			dataUpload: builder.ForDataUpload("velero", "testDU").
+				DataMover("velero").
+				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{
+					VolumeSnapshot: "testVS",
+					SnapshotClass:  "testClass",
+				}).SnapshotID("testSnapshotHandle").
+				StartTimestamp(&now).
+				Phase(velerov2alpha1.DataUploadPhaseCompleted).
+				Result(),
 			volumeSnapshotClass: builder.ForVolumeSnapshotClass("testClass").Driver("pd.csi.storage.gke.io").Result(),
 			operation: &itemoperation.BackupOperation{
 				Spec: itemoperation.BackupOperationSpec{
@@ -832,6 +967,7 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 						DataMover:    "velero",
 						UploaderType: "kopia",
 						OperationID:  "testOperation",
+						Phase:        velerov2alpha1.DataUploadPhaseCompleted,
 					},
 					PVInfo: &PVInfo{
 						ReclaimPolicy: string(corev1api.PersistentVolumeReclaimDelete),
@@ -933,7 +1069,7 @@ func TestRestoreVolumeInfoResult(t *testing.T) {
 					data: make(map[string]pvcPvInfo),
 				},
 				pvNativeSnapshotMap: map[string]*NativeSnapshotInfo{},
-				pvCSISnapshotMap:    map[string]snapshotv1api.VolumeSnapshot{},
+				pvcCSISnapshotMap:   map[string]snapshotv1api.VolumeSnapshot{},
 				datadownloadList:    &velerov2alpha1.DataDownloadList{},
 				pvrs:                []*velerov1api.PodVolumeRestore{},
 			},
@@ -968,8 +1104,8 @@ func TestRestoreVolumeInfoResult(t *testing.T) {
 						IOPS:           "10000",
 					},
 				},
-				pvCSISnapshotMap: map[string]snapshotv1api.VolumeSnapshot{},
-				datadownloadList: &velerov2alpha1.DataDownloadList{},
+				pvcCSISnapshotMap: map[string]snapshotv1api.VolumeSnapshot{},
+				datadownloadList:  &velerov2alpha1.DataDownloadList{},
 				pvrs: []*velerov1api.PodVolumeRestore{
 					builder.ForPodVolumeRestore("velero", "testRestore-1234").
 						PodNamespace("testNS").
@@ -1031,8 +1167,8 @@ func TestRestoreVolumeInfoResult(t *testing.T) {
 					},
 				},
 				pvNativeSnapshotMap: map[string]*NativeSnapshotInfo{},
-				pvCSISnapshotMap: map[string]snapshotv1api.VolumeSnapshot{
-					"testPV": *builder.ForVolumeSnapshot("sourceNS", "testCSISnapshot").
+				pvcCSISnapshotMap: map[string]snapshotv1api.VolumeSnapshot{
+					"testNS/testPVC": *builder.ForVolumeSnapshot("sourceNS", "testCSISnapshot").
 						ObjectMeta(
 							builder.WithAnnotations(VolumeSnapshotHandleAnnotation, "csi-snap-001",
 								CSIDriverNameAnnotation, "test-csi-driver"),
@@ -1101,7 +1237,7 @@ func TestRestoreVolumeInfoResult(t *testing.T) {
 					},
 				},
 				pvNativeSnapshotMap: map[string]*NativeSnapshotInfo{},
-				pvCSISnapshotMap:    map[string]snapshotv1api.VolumeSnapshot{},
+				pvcCSISnapshotMap:   map[string]snapshotv1api.VolumeSnapshot{},
 				datadownloadList: &velerov2alpha1.DataDownloadList{
 					Items: []velerov2alpha1.DataDownload{
 						*builder.ForDataDownload("velero", "testDataDownload-1").

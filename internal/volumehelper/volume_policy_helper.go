@@ -143,20 +143,24 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 	}
 
 	if v.volumePolicy != nil {
-		pvc, err := kubeutil.GetPVCForPodVolume(&volume, &pod, v.client)
-		if err != nil {
-			v.logger.WithError(err).Errorf("fail to get PVC for pod %s", pod.Namespace+"/"+pod.Name)
-			return false, err
-		}
-		pv, err := kubeutil.GetPVForPVC(pvc, v.client)
-		if err != nil {
-			v.logger.WithError(err).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
-			return false, err
+		var resource interface{}
+		resource = &volume
+		if volume.VolumeSource.PersistentVolumeClaim != nil {
+			pvc, err := kubeutil.GetPVCForPodVolume(&volume, &pod, v.client)
+			if err != nil {
+				v.logger.WithError(err).Errorf("fail to get PVC for pod %s", pod.Namespace+"/"+pod.Name)
+				return false, err
+			}
+			resource, err = kubeutil.GetPVForPVC(pvc, v.client)
+			if err != nil {
+				v.logger.WithError(err).Errorf("fail to get PV for PVC %s", pvc.Namespace+"/"+pvc.Name)
+				return false, err
+			}
 		}
 
-		action, err := v.volumePolicy.GetMatchAction(pv)
+		action, err := v.volumePolicy.GetMatchAction(resource)
 		if err != nil {
-			v.logger.WithError(err).Errorf("fail to get VolumePolicy match action for PV %s", pv.Name)
+			v.logger.WithError(err).Error("fail to get VolumePolicy match action for volume")
 			return false, err
 		}
 

@@ -47,7 +47,7 @@ func (m *Manager) CreateFileSystemBR(jobName string, requestorType string, ctx c
 	m.trackerLock.Lock()
 	defer m.trackerLock.Unlock()
 
-	if len(m.tracker) == m.cocurrentNum {
+	if len(m.tracker) >= m.cocurrentNum {
 		return nil, ConcurrentLimitExceed
 	}
 

@@ -371,6 +371,7 @@ func describNativeSnapshotInSF(details bool, info *volume.BackupVolumeInfo, snap
 		snapshotInfo["type"] = info.NativeSnapshotInfo.VolumeType
 		snapshotInfo["availabilityZone"] = info.NativeSnapshotInfo.VolumeAZ
 		snapshotInfo["IOPS"] = info.NativeSnapshotInfo.IOPS
+		snapshotInfo["result"] = string(info.Result)
 
 		snapshotDetails[info.PVName] = snapshotInfo
 	} else {
@@ -421,6 +422,7 @@ func describeLocalSnapshotInSF(details bool, info *volume.BackupVolumeInfo, snap
 		localSnapshot["storageSnapshotID"] = info.CSISnapshotInfo.SnapshotHandle
 		localSnapshot["snapshotSize(bytes)"] = info.CSISnapshotInfo.Size
 		localSnapshot["csiDriver"] = info.CSISnapshotInfo.Driver
+		localSnapshot["result"] = string(info.Result)
 
 		snapshotDetail["snapshot"] = localSnapshot
 	} else {
@@ -444,6 +446,7 @@ func describeDataMovementInSF(details bool, info *volume.BackupVolumeInfo, snaps
 		dataMovement["dataMover"] = dataMover
 
 		dataMovement["uploaderType"] = info.SnapshotDataMovementInfo.UploaderType
+		dataMovement["result"] = string(info.Result)
 
 		snapshotDetail["dataMovement"] = dataMovement
 	} else {

@@ -51,7 +51,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/repository"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -307,11 +306,11 @@ type fakeDataUploadFSBR struct {
 	clock      clock.WithTickerAndDelayedExecution
 }
 
-func (f *fakeDataUploadFSBR) Init(ctx context.Context, bslName string, sourceNamespace string, uploaderType string, repositoryType string, repoIdentifier string, repositoryEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter) error {
+func (f *fakeDataUploadFSBR) Init(ctx context.Context, param interface{}) error {
 	return nil
 }
 
-func (f *fakeDataUploadFSBR) StartBackup(source datapath.AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, uploaderConfigs map[string]string) error {
+func (f *fakeDataUploadFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param interface{}) error {
 	du := f.du
 	original := f.du.DeepCopy()
 	du.Status.Phase = velerov2alpha1api.DataUploadPhaseCompleted
