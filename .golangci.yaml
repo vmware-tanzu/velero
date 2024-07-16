@@ -238,7 +238,6 @@ linters-settings:
   testifylint:
       # TODO: enable them all
       disable:
-        - bool-compare
         - error-is-as
         - error-nil
         - expected-actual

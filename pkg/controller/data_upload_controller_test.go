@@ -576,18 +576,18 @@ func TestReconcile(t *testing.T) {
 			t.Logf("%s: \n %v \n", test.name, du)
 			// Assertions
 			if test.expected == nil {
-				assert.Equal(t, err != nil, true)
+				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, du.Status.Phase, test.expected.Status.Phase)
 			}
 
 			if test.expectedProcessed {
-				assert.Equal(t, du.Status.CompletionTimestamp.IsZero(), false)
+				assert.False(t, du.Status.CompletionTimestamp.IsZero())
 			}
 
 			if !test.expectedProcessed {
-				assert.Equal(t, du.Status.CompletionTimestamp.IsZero(), true)
+				assert.True(t, du.Status.CompletionTimestamp.IsZero())
 			}
 
 			if test.checkFunc != nil {
@@ -612,8 +612,8 @@ func TestOnDataUploadCancelled(t *testing.T) {
 	updatedDu := &velerov2alpha1api.DataUpload{}
 	assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 	assert.Equal(t, velerov2alpha1api.DataUploadPhaseCanceled, updatedDu.Status.Phase)
-	assert.Equal(t, updatedDu.Status.CompletionTimestamp.IsZero(), false)
-	assert.Equal(t, updatedDu.Status.StartTimestamp.IsZero(), false)
+	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
+	assert.False(t, updatedDu.Status.StartTimestamp.IsZero())
 }
 
 func TestOnDataUploadProgress(t *testing.T) {
@@ -696,8 +696,8 @@ func TestOnDataUploadFailed(t *testing.T) {
 	updatedDu := &velerov2alpha1api.DataUpload{}
 	assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 	assert.Equal(t, velerov2alpha1api.DataUploadPhaseFailed, updatedDu.Status.Phase)
-	assert.Equal(t, updatedDu.Status.CompletionTimestamp.IsZero(), false)
-	assert.Equal(t, updatedDu.Status.StartTimestamp.IsZero(), false)
+	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
+	assert.False(t, updatedDu.Status.StartTimestamp.IsZero())
 }
 
 func TestOnDataUploadCompleted(t *testing.T) {
@@ -715,7 +715,7 @@ func TestOnDataUploadCompleted(t *testing.T) {
 	updatedDu := &velerov2alpha1api.DataUpload{}
 	assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 	assert.Equal(t, velerov2alpha1api.DataUploadPhaseCompleted, updatedDu.Status.Phase)
-	assert.Equal(t, updatedDu.Status.CompletionTimestamp.IsZero(), false)
+	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
 }
 
 func TestFindDataUploadForPod(t *testing.T) {
