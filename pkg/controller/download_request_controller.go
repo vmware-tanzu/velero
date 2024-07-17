@@ -203,7 +203,7 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			_ = r.restoreItemOperationsMap.UpdateForRestore(backupStore, downloadRequest.Spec.Target.Name)
 		}
 
-		if downloadRequest.Status.DownloadURL, err = backupStore.GetDownloadURL(downloadRequest.Spec.Target); err != nil {
+		if downloadRequest.Status.DownloadURL, _, err = backupStore.GetDownloadURL(downloadRequest.Spec.Target); err != nil {
 			log.Warnf("fail to get Backup metadata file's download URL %s, retry later: %s", downloadRequest.Spec.Target, err)
 			return ctrl.Result{}, errors.WithStack(err)
 		}

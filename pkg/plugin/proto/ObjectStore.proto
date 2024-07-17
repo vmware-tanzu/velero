@@ -54,7 +54,7 @@ message ListObjectsResponse {
 
 message DeleteObjectRequest {
     string plugin = 1;
-    string bucket = 2;  
+    string bucket = 2;
     string key = 3;
 }
 
@@ -66,8 +66,13 @@ message CreateSignedURLRequest {
     int64 ttl = 4;
 }
 
+message HeaderValues {
+    repeated string values = 1;
+}
+
 message CreateSignedURLResponse {
     string url = 1;
+    map<string, HeaderValues> headers = 2;
 }
 
 message ObjectStoreInitRequest {

@@ -786,7 +786,7 @@ func TestGetDownloadURL(t *testing.T) {
 				t.Run(string(kind), func(t *testing.T) {
 					require.NoError(t, harness.objectStore.PutObject("test-bucket", expectedKey, newStringReadSeeker("foo")))
 
-					url, err := harness.GetDownloadURL(velerov1api.DownloadTarget{Kind: kind, Name: test.targetName})
+					url, _, err := harness.GetDownloadURL(velerov1api.DownloadTarget{Kind: kind, Name: test.targetName})
 					require.NoError(t, err)
 					assert.Equal(t, "a-url", url)
 				})
