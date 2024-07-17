@@ -74,7 +74,7 @@ func TestSortOrderedResource(t *testing.T) {
 		{namespace: "ns1", name: "pod1"},
 	}
 	sortedResources := sortResourcesByOrder(log, podResources, order)
-	assert.Equal(t, sortedResources, expectedResources)
+	assert.Equal(t, expectedResources, sortedResources)
 
 	// Test cluster resources
 	pvResources := []*kubernetesResource{
@@ -87,7 +87,7 @@ func TestSortOrderedResource(t *testing.T) {
 		{name: "pv1"},
 	}
 	sortedPvResources := sortResourcesByOrder(log, pvResources, pvOrder)
-	assert.Equal(t, sortedPvResources, expectedPvResources)
+	assert.Equal(t, expectedPvResources, sortedPvResources)
 }
 
 func TestFilterNamespaces(t *testing.T) {

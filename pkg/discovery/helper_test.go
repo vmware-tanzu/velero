@@ -23,6 +23,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
@@ -311,7 +312,7 @@ func TestHelper_ResourceFor(t *testing.T) {
 			if tc.err == "" {
 				assert.NoError(t, err)
 			} else {
-				assert.Contains(t, err.Error(), tc.err)
+				require.ErrorContains(t, err, tc.err)
 			}
 			assert.Equal(t, *tc.expectedGVR, gvr)
 			assert.Equal(t, *tc.expectedAPIResource, apiResource)
@@ -416,7 +417,7 @@ func TestHelper_KindFor(t *testing.T) {
 			if tc.err == "" {
 				assert.NoError(t, err)
 			} else {
-				assert.Contains(t, err.Error(), tc.err)
+				require.ErrorContains(t, err, tc.err)
 			}
 			assert.Equal(t, *tc.expectedGVR, gvr)
 			assert.Equal(t, *tc.expectedAPIResource, apiResource)

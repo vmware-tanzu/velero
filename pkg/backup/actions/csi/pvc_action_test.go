@@ -203,7 +203,7 @@ func TestExecute(t *testing.T) {
 
 			resultUnstructed, _, _, _, err := pvcBIA.Execute(&unstructured.Unstructured{Object: pvcMap}, tc.backup)
 			if tc.expectedErr != nil {
-				require.Equal(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr.Error())
 			} else {
 				require.NoError(t, err)
 			}
@@ -367,7 +367,7 @@ func TestCancel(t *testing.T) {
 
 			err = pvcBIA.Cancel(tc.operationID, tc.backup)
 			if tc.expectedErr != nil {
-				require.Equal(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr.Error())
 			}
 
 			du := new(velerov2alpha1.DataUpload)

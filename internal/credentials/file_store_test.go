@@ -83,7 +83,7 @@ func TestNamespacedFileStore(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			require.Equal(t, path, tc.expectedPath)
+			require.Equal(t, tc.expectedPath, path)
 
 			contents, err := fs.ReadFile(path)
 			require.NoError(t, err)

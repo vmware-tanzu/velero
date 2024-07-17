@@ -1023,28 +1023,28 @@ func TestRestoreVolumeInfoTrackNativeSnapshot(t *testing.T) {
 	restore := builder.ForRestore("velero", "testRestore").Result()
 	tracker := NewRestoreVolInfoTracker(restore, logrus.New(), fakeCilent)
 	tracker.TrackNativeSnapshot("testPV", "snap-001", "ebs", "us-west-1", 10000)
-	assert.Equal(t, *tracker.pvNativeSnapshotMap["testPV"], NativeSnapshotInfo{
+	assert.Equal(t, NativeSnapshotInfo{
 		SnapshotHandle: "snap-001",
 		VolumeType:     "ebs",
 		VolumeAZ:       "us-west-1",
 		IOPS:           "10000",
-	})
+	}, *tracker.pvNativeSnapshotMap["testPV"])
 	tracker.TrackNativeSnapshot("testPV", "snap-002", "ebs", "us-west-2", 15000)
-	assert.Equal(t, *tracker.pvNativeSnapshotMap["testPV"], NativeSnapshotInfo{
+	assert.Equal(t, NativeSnapshotInfo{
 		SnapshotHandle: "snap-002",
 		VolumeType:     "ebs",
 		VolumeAZ:       "us-west-2",
 		IOPS:           "15000",
-	})
+	}, *tracker.pvNativeSnapshotMap["testPV"])
 	tracker.RenamePVForNativeSnapshot("testPV", "newPV")
 	_, ok := tracker.pvNativeSnapshotMap["testPV"]
 	assert.False(t, ok)
-	assert.Equal(t, *tracker.pvNativeSnapshotMap["newPV"], NativeSnapshotInfo{
+	assert.Equal(t, NativeSnapshotInfo{
 		SnapshotHandle: "snap-002",
 		VolumeType:     "ebs",
 		VolumeAZ:       "us-west-2",
 		IOPS:           "15000",
-	})
+	}, *tracker.pvNativeSnapshotMap["newPV"])
 }
 
 func TestRestoreVolumeInfoResult(t *testing.T) {

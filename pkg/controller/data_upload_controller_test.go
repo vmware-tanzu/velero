@@ -561,11 +561,11 @@ func TestReconcile(t *testing.T) {
 				},
 			})
 
-			assert.Equal(t, actualResult, test.expectedRequeue)
+			assert.Equal(t, test.expectedRequeue, actualResult)
 			if test.expectedErrMsg == "" {
 				require.NoError(t, err)
 			} else {
-				assert.Contains(t, err.Error(), test.expectedErrMsg)
+				require.ErrorContains(t, err, test.expectedErrMsg)
 			}
 
 			du := velerov2alpha1api.DataUpload{}

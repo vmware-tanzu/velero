@@ -238,14 +238,9 @@ linters-settings:
   testifylint:
       # TODO: enable them all
       disable:
-        - error-is-as
-        - expected-actual
         - go-require
         - float-compare
         - require-error
-        - suite-dont-use-pkg
-        - suite-extra-assert-call
-        - suite-thelper
       enable-all: true
   testpackage:
     # regexp pattern to skip files

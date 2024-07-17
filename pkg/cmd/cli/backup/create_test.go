@@ -138,7 +138,7 @@ func TestCreateOptions_OrderedResources(t *testing.T) {
 		"pods":                   "ns1/p1,ns1/p2",
 		"persistentvolumeclaims": "ns2/pvc1,ns2/pvc2",
 	}
-	assert.Equal(t, orderedResources, expectedResources)
+	assert.Equal(t, expectedResources, orderedResources)
 
 	orderedResources, err = ParseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumes=pv1,pv2")
 	assert.NoError(t, err)
@@ -147,7 +147,7 @@ func TestCreateOptions_OrderedResources(t *testing.T) {
 		"pods":              "ns1/p1,ns1/p2",
 		"persistentvolumes": "pv1,pv2",
 	}
-	assert.Equal(t, orderedResources, expectedMixedResources)
+	assert.Equal(t, expectedMixedResources, orderedResources)
 }
 
 func TestCreateCommand(t *testing.T) {

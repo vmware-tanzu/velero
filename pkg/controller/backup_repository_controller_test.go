@@ -66,10 +66,10 @@ func TestPatchBackupRepository(t *testing.T) {
 	assert.NoError(t, err)
 	err = reconciler.patchBackupRepository(context.Background(), rr, repoReady())
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
+	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 	err = reconciler.patchBackupRepository(context.Background(), rr, repoNotReady("not ready"))
 	assert.NoError(t, err)
-	assert.NotEqual(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
+	assert.NotEqual(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 }
 
 func TestCheckNotReadyRepo(t *testing.T) {
@@ -94,7 +94,7 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
+	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 	assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
 }
 
@@ -135,7 +135,7 @@ func TestInitializeRepo(t *testing.T) {
 	assert.NoError(t, err)
 	err = reconciler.initializeRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
+	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 }
 
 func TestBackupRepoReconcile(t *testing.T) {

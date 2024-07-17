@@ -813,7 +813,7 @@ func TestSanitizeName(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			sanitizedName := sanitizeName(tc.pluginName)
-			assert.Equal(t, sanitizedName, tc.expectedName)
+			assert.Equal(t, tc.expectedName, sanitizedName)
 		})
 	}
 }
