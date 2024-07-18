@@ -173,7 +173,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 				pod := new(corev1.Pod)
 				err = runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), pod)
 				require.NoError(t, err)
-				assert.Equal(t, pod.Spec.Containers[0].Image, tc.want)
+				assert.Equal(t, tc.want, pod.Spec.Containers[0].Image)
 			}
 		})
 	}

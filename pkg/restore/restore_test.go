@@ -3678,7 +3678,7 @@ func assertNonEmptyResults(t *testing.T, typeMsg string, res ...Result) {
 		total += len(r.Namespaces)
 		total += len(r.Velero)
 	}
-	assert.Greater(t, total, 0, "Expected at least one "+typeMsg)
+	assert.Positive(t, total, "Expected at least one "+typeMsg)
 }
 
 type harness struct {

@@ -427,7 +427,7 @@ func TestExpose(t *testing.T) {
 
 				assert.Equal(t, expectedVS.Annotations, vsObject.Annotations)
 				assert.Equal(t, *expectedVS.Spec.VolumeSnapshotClassName, *vsObject.Spec.VolumeSnapshotClassName)
-				assert.Equal(t, *expectedVS.Spec.Source.VolumeSnapshotContentName, expectedVSC.Name)
+				assert.Equal(t, expectedVSC.Name, *expectedVS.Spec.Source.VolumeSnapshotContentName)
 
 				assert.Equal(t, expectedVSC.Annotations, vscObj.Annotations)
 				assert.Equal(t, expectedVSC.Spec.DeletionPolicy, vscObj.Spec.DeletionPolicy)

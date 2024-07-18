@@ -79,7 +79,7 @@ func TestNewLogsCommand(t *testing.T) {
 
 		err = l.Run(c, f)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), fmt.Sprintf("logs for backup \"%s\" are not available until it's finished processing", backupName))
+		require.ErrorContains(t, err, fmt.Sprintf("logs for backup \"%s\" are not available until it's finished processing", backupName))
 	})
 
 	t.Run("Backup not exist test", func(t *testing.T) {

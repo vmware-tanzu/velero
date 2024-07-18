@@ -479,7 +479,7 @@ func TestSinglePathMatch(t *testing.T) {
 
 	_, err := SinglePathMatch("./*/subpath", fakeFS, logrus.StandardLogger())
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "expected one matching path")
+	require.ErrorContains(t, err, "expected one matching path")
 }
 
 func TestAddAnnotations(t *testing.T) {

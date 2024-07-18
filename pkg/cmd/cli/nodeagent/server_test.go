@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -166,7 +165,7 @@ func Test_getDataPathConfigs(t *testing.T) {
 			if test.expectLog == "" {
 				assert.Equal(t, "", logBuffer)
 			} else {
-				assert.True(t, strings.Contains(logBuffer, test.expectLog))
+				assert.Contains(t, logBuffer, test.expectLog)
 			}
 		})
 	}
@@ -384,7 +383,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			if test.expectLog == "" {
 				assert.Equal(t, "", logBuffer)
 			} else {
-				assert.True(t, strings.Contains(logBuffer, test.expectLog))
+				assert.Contains(t, logBuffer, test.expectLog)
 			}
 		})
 	}

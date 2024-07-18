@@ -45,7 +45,7 @@ func TestBuildUserAgent(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			resp := buildUserAgent(test.command, test.version, test.gitSha, test.os, test.arch)
-			assert.Equal(t, resp, test.expected)
+			assert.Equal(t, test.expected, resp)
 		})
 	}
 }

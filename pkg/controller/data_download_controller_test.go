@@ -446,7 +446,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 			})
 
 			if test.expectedStatusMsg != "" {
-				assert.Contains(t, err.Error(), test.expectedStatusMsg)
+				require.ErrorContains(t, err, test.expectedStatusMsg)
 			} else {
 				require.NoError(t, err)
 			}
