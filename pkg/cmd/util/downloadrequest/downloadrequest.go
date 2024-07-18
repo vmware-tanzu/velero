@@ -54,12 +54,12 @@ func Stream(
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	downloadURL, err := getDownloadURL(ctx, kbClient, namespace, name, kind)
+	downloadURL, downloadHeaders, err := getDownloadURL(ctx, kbClient, namespace, name, kind)
 	if err != nil {
 		return err
 	}
 
-	if err := download(ctx, downloadURL, kind, w, insecureSkipTLSVerify, caCertFile); err != nil {
+	if err := download(ctx, downloadURL, downloadHeaders, kind, w, insecureSkipTLSVerify, caCertFile); err != nil {
 		return err
 	}
 
@@ -71,32 +71,32 @@ func getDownloadURL(
 	kbClient kbclient.Client,
 	namespace, name string,
 	kind veleroV1api.DownloadTargetKind,
-) (string, error) {
+) (string, http.Header, error) {
 	uuid, err := uuid.NewRandom()
 	if err != nil {
-		return "", err
+		return "", http.Header{}, err
 	}
 
 	reqName := fmt.Sprintf("%s-%s", name, uuid.String())
 	created := builder.ForDownloadRequest(namespace, reqName).Target(kind, name).Result()
 
 	if err := kbClient.Create(ctx, created, &kbclient.CreateOptions{}); err != nil {
-		return "", errors.WithStack(err)
+		return "", http.Header{}, errors.WithStack(err)
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			return "", ErrDownloadRequestDownloadURLTimeout
+			return "", http.Header{}, ErrDownloadRequestDownloadURLTimeout
 
 		case <-time.After(25 * time.Millisecond):
 			updated := &veleroV1api.DownloadRequest{}
 			if err := kbClient.Get(ctx, kbclient.ObjectKey{Name: created.Name, Namespace: namespace}, updated); err != nil {
-				return "", errors.WithStack(err)
+				return "", http.Header{}, errors.WithStack(err)
 			}
 
 			if updated.Status.DownloadURL != "" {
-				return updated.Status.DownloadURL, nil
+				return updated.Status.DownloadURL, updated.Status.DownloadHeaders, nil
 			}
 		}
 	}
@@ -105,6 +105,7 @@ func getDownloadURL(
 func download(
 	ctx context.Context,
 	downloadURL string,
+	headers http.Header,
 	kind veleroV1api.DownloadTargetKind,
 	w io.Writer,
 	insecureSkipTLSVerify bool,
@@ -146,6 +147,13 @@ func download(
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 	if err != nil {
 		return err
+	}
+
+	// Add headers to the request
+	if headers != nil {
+		for k, v := range headers {
+			httpReq.Header[k] = v
+		}
 	}
 
 	resp, err := httpClient.Do(httpReq)

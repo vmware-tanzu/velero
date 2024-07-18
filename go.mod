@@ -178,3 +178,4 @@ require (
 )
 
 replace github.com/kopia/kopia => github.com/project-velero/kopia v0.0.0-20240417031915-e07d5b7de567
+replace github.com/vmware-tanzu/velero => github.com/esomore/velero/pkg/apis/velero/v1 v0.0.0-20240718180911-9053c280c77e
