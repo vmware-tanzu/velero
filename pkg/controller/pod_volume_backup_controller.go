@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -373,7 +374,11 @@ func UpdatePVBStatusToFailed(ctx context.Context, c client.Client, pvb *velerov1
 	if dataPathError, ok := errOut.(datapath.DataPathError); ok {
 		pvb.Status.SnapshotID = dataPathError.GetSnapshotID()
 	}
-	pvb.Status.Message = errors.WithMessage(errOut, msg).Error()
+	if len(strings.TrimSpace(msg)) == 0 {
+		pvb.Status.Message = errOut.Error()
+	} else {
+		pvb.Status.Message = errors.WithMessage(errOut, msg).Error()
+	}
 	err := c.Patch(ctx, pvb, client.MergeFrom(original))
 	if err != nil {
 		log.WithError(err).Error("error updating PodVolumeBackup status")
