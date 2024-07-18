@@ -220,5 +220,11 @@ func (c *ObjectStoreGRPCClient) CreateSignedURL(bucket, key string, ttl time.Dur
 		return "", http.Header{}, common.FromGRPCError(err)
 	}
 
-	return res.Url, res.Headers, nil
+	headers := make(http.Header)
+	for _, entry := range res.Headers {
+		for _, value := range entry.Value {
+			headers.Add(entry.Key, value)
+		}
+	}
+	return res.Url, headers, nil
 }

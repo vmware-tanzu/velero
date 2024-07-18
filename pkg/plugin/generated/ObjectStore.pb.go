@@ -7,7 +7,6 @@
 package generated
 
 import (
-	"net/http"
 	reflect "reflect"
 	sync "sync"
 
@@ -675,14 +674,21 @@ func (x *CreateSignedURLRequest) GetTtl() int64 {
 	return 0
 }
 
+
 type CreateSignedURLResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Headers http.Header `protobuf:"bytes,1,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,1,opt,name=value,proto3"`
-	Url string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	Headers []*HeaderEntry `protobuf:"bytes,1,rep,name=headers,proto3" json:"headers,omitempty"`
+	Url     string         `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
 }
+
+type HeaderEntry struct {
+	Key   string   `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value []string `protobuf:"bytes,2,rep,name=value,proto3" json:"value,omitempty"`
+}
+
 
 func (x *CreateSignedURLResponse) Reset() {
 	*x = CreateSignedURLResponse{}

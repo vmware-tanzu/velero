@@ -268,6 +268,11 @@ func (s *ObjectStoreGRPCServer) CreateSignedURL(ctx context.Context, req *proto.
 	if err != nil {
 		return nil, common.NewGRPCError(err)
 	}
-
-	return &proto.CreateSignedURLResponse{Url: url, Headers: headers}, nil
+	headerEntries := make([]*proto.HeaderEntry, 0, len(headers))
+	for key, values := range headers {
+		for _, value := range values {
+			headerEntries = append(headerEntries, &proto.HeaderEntry{Key: key, Value: []string{value}})
+		}
+	}
+	return &proto.CreateSignedURLResponse{Url: url, Headers: headerEntries}, nil
 }
