@@ -504,15 +504,15 @@ func TestOnDataDownloadFailed(t *testing.T) {
 		namespace := dd.Namespace
 		ddName := dd.Name
 		// Add the DataDownload object to the fake client
-		assert.NoError(t, r.client.Create(ctx, dd))
+		require.NoError(t, r.client.Create(ctx, dd))
 		r.OnDataDownloadFailed(ctx, namespace, ddName, fmt.Errorf("Failed to handle %v", ddName))
 		updatedDD := &velerov2alpha1api.DataDownload{}
 		if getErr {
-			assert.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+			require.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 			assert.NotEqual(t, velerov2alpha1api.DataDownloadPhaseFailed, updatedDD.Status.Phase)
 			assert.True(t, updatedDD.Status.StartTimestamp.IsZero())
 		} else {
-			assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+			require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 			assert.Equal(t, velerov2alpha1api.DataDownloadPhaseFailed, updatedDD.Status.Phase)
 			assert.True(t, updatedDD.Status.StartTimestamp.IsZero())
 		}
@@ -530,15 +530,15 @@ func TestOnDataDownloadCancelled(t *testing.T) {
 		namespace := dd.Namespace
 		ddName := dd.Name
 		// Add the DataDownload object to the fake client
-		assert.NoError(t, r.client.Create(ctx, dd))
+		require.NoError(t, r.client.Create(ctx, dd))
 		r.OnDataDownloadCancelled(ctx, namespace, ddName)
 		updatedDD := &velerov2alpha1api.DataDownload{}
 		if getErr {
-			assert.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+			require.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 			assert.NotEqual(t, velerov2alpha1api.DataDownloadPhaseFailed, updatedDD.Status.Phase)
 			assert.True(t, updatedDD.Status.StartTimestamp.IsZero())
 		} else {
-			assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+			require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 			assert.Equal(t, velerov2alpha1api.DataDownloadPhaseCanceled, updatedDD.Status.Phase)
 			assert.False(t, updatedDD.Status.StartTimestamp.IsZero())
 			assert.False(t, updatedDD.Status.CompletionTimestamp.IsZero())
@@ -582,15 +582,15 @@ func TestOnDataDownloadCompleted(t *testing.T) {
 			namespace := dd.Namespace
 			ddName := dd.Name
 			// Add the DataDownload object to the fake client
-			assert.NoError(t, r.client.Create(ctx, dd))
+			require.NoError(t, r.client.Create(ctx, dd))
 			r.OnDataDownloadCompleted(ctx, namespace, ddName, datapath.Result{})
 			updatedDD := &velerov2alpha1api.DataDownload{}
 			if test.isGetErr {
-				assert.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+				require.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 				assert.Equal(t, velerov2alpha1api.DataDownloadPhase(""), updatedDD.Status.Phase)
 				assert.True(t, updatedDD.Status.CompletionTimestamp.IsZero())
 			} else {
-				assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+				require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 				assert.Equal(t, velerov2alpha1api.DataDownloadPhaseCompleted, updatedDD.Status.Phase)
 				assert.False(t, updatedDD.Status.CompletionTimestamp.IsZero())
 			}
@@ -640,7 +640,7 @@ func TestOnDataDownloadProgress(t *testing.T) {
 			namespace := dd.Namespace
 			duName := dd.Name
 			// Add the DataDownload object to the fake client
-			assert.NoError(t, r.client.Create(context.Background(), dd))
+			require.NoError(t, r.client.Create(context.Background(), dd))
 
 			// Create a Progress object
 			progress := &uploader.Progress{
@@ -653,7 +653,7 @@ func TestOnDataDownloadProgress(t *testing.T) {
 			if len(test.needErrs) != 0 && !test.needErrs[0] {
 				// Get the updated DataDownload object from the fake client
 				updatedDu := &velerov2alpha1api.DataDownload{}
-				assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
+				require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 				// Assert that the DataDownload object has been updated with the progress
 				assert.Equal(t, test.progress.TotalBytes, updatedDu.Status.Progress.TotalBytes)
 				assert.Equal(t, test.progress.BytesDone, updatedDu.Status.Progress.BytesDone)
@@ -710,8 +710,8 @@ func TestFindDataDownloadForPod(t *testing.T) {
 	}
 	for _, test := range tests {
 		ctx := context.Background()
-		assert.NoError(t, r.client.Create(ctx, test.pod))
-		assert.NoError(t, r.client.Create(ctx, test.du))
+		require.NoError(t, r.client.Create(ctx, test.pod))
+		require.NoError(t, r.client.Create(ctx, test.du))
 		// Call the findSnapshotRestoreForPod function
 		requests := r.findSnapshotRestoreForPod(context.Background(), test.pod)
 		test.checkFunc(test.du, requests)
@@ -759,9 +759,9 @@ func TestAcceptDataDownload(t *testing.T) {
 		succeeded, err := r.acceptDataDownload(ctx, test.dd)
 		assert.Equal(t, test.succeeded, succeeded)
 		if test.expectedErr == "" {
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		} else {
-			assert.EqualError(t, err, test.expectedErr)
+			require.EqualError(t, err, test.expectedErr)
 		}
 	}
 }
@@ -848,9 +848,9 @@ func TestTryCancelDataDownload(t *testing.T) {
 		r.TryCancelDataDownload(ctx, test.dd, "")
 
 		if test.expectedErr == "" {
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		} else {
-			assert.EqualError(t, err, test.expectedErr)
+			require.EqualError(t, err, test.expectedErr)
 		}
 	}
 }
@@ -902,9 +902,9 @@ func TestUpdateDataDownloadWithRetry(t *testing.T) {
 			}
 			err = UpdateDataDownloadWithRetry(ctx, r.client, namespacedName, velerotest.NewLogger().WithField("name", tc.Name), updateFunc)
 			if tc.ExpectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -977,9 +977,9 @@ func TestFindDataDownloads(t *testing.T) {
 			uploads, err := r.FindDataDownloads(context.Background(), r.client, "velero")
 
 			if test.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, len(test.expectedUploads), len(uploads))
 			}
 		})
@@ -1056,17 +1056,17 @@ func TestAttemptDataDownloadResume(t *testing.T) {
 				}
 			}()
 
-			assert.NoError(t, r.client.Create(ctx, test.du))
+			require.NoError(t, r.client.Create(ctx, test.du))
 			if test.pod != nil {
-				assert.NoError(t, r.client.Create(ctx, test.pod))
+				require.NoError(t, r.client.Create(ctx, test.pod))
 			}
 			// Run the test
 			err = r.AttemptDataDownloadResume(ctx, r.client, r.logger.WithField("name", test.name), test.du.Namespace)
 
 			if test.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// Verify DataDownload marked as Canceled
 				for _, duName := range test.cancelledDataDownloads {

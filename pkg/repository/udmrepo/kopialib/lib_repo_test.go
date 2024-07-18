@@ -140,9 +140,9 @@ func TestOpen(t *testing.T) {
 			}
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -254,9 +254,9 @@ func TestMaintain(t *testing.T) {
 			err := service.Maintain(ctx, tc.repoOptions)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -352,9 +352,9 @@ func TestWriteInitParameters(t *testing.T) {
 			err := writeInitParameters(ctx, tc.repoOptions, logger)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -449,9 +449,9 @@ func TestOpenObject(t *testing.T) {
 			_, err := kr.OpenObject(context.Background(), udmrepo.ID(tc.objectID))
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -491,9 +491,9 @@ func TestGetManifest(t *testing.T) {
 			err := kr.GetManifest(context.Background(), udmrepo.ID(""), &udmrepo.RepoManifest{})
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -530,9 +530,9 @@ func TestFindManifests(t *testing.T) {
 			_, err := kr.FindManifests(context.Background(), udmrepo.ManifestFilter{})
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -589,9 +589,9 @@ func TestClose(t *testing.T) {
 			err := kr.Close(context.Background())
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -630,9 +630,9 @@ func TestPutManifest(t *testing.T) {
 			})
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -669,9 +669,9 @@ func TestDeleteManifest(t *testing.T) {
 			err := kr.DeleteManifest(context.Background(), udmrepo.ID(""))
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -708,9 +708,9 @@ func TestFlush(t *testing.T) {
 			err := kr.Flush(context.Background())
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -780,9 +780,9 @@ func TestConcatenateObjects(t *testing.T) {
 			_, err := kr.ConcatenateObjects(context.Background(), tc.objectIDs)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -904,9 +904,9 @@ func TestReaderRead(t *testing.T) {
 			_, err := kr.Read(nil)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -951,10 +951,10 @@ func TestReaderSeek(t *testing.T) {
 			ret, err := kr.Seek(0, 0)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedRet, ret)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -994,9 +994,9 @@ func TestReaderClose(t *testing.T) {
 			err := kr.Close()
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -1082,10 +1082,10 @@ func TestWriterWrite(t *testing.T) {
 			ret, err := kr.Write(nil)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedRet, ret)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -1130,10 +1130,10 @@ func TestWriterCheckpoint(t *testing.T) {
 			ret, err := kr.Checkpoint()
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedRet, ret)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -1178,10 +1178,10 @@ func TestWriterResult(t *testing.T) {
 			ret, err := kr.Result()
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedRet, ret)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -1221,9 +1221,9 @@ func TestWriterClose(t *testing.T) {
 			err := kr.Close()
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}

@@ -115,7 +115,7 @@ func TestGetVolumesRepositoryType(t *testing.T) {
 
 					assert.Equal(t, tc.expectedErr, errMsg)
 				} else {
-					assert.EqualError(t, err, tc.expectedErr)
+					require.EqualError(t, err, tc.expectedErr)
 				}
 			}
 		})

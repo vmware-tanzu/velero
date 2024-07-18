@@ -312,7 +312,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
 			checkFunc: func(provider Provider, err error) {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, provider)
 			},
 		}, {
@@ -321,7 +321,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 				credGetter.On("Path", repoKeySelector).Return("", errors.New("error creating temp credentials file"))
 			},
 			checkFunc: func(provider Provider, err error) {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, provider)
 			},
 		}, {
@@ -333,7 +333,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 				return "", errors.New("error writing CACert file")
 			},
 			checkFunc: func(provider Provider, err error) {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, provider)
 			},
 		}, {
@@ -348,7 +348,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 				return nil, errors.New("error generating repository cmnd env")
 			},
 			checkFunc: func(provider Provider, err error) {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, provider)
 			},
 		}, {
@@ -363,7 +363,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 				return nil, nil
 			},
 			checkFunc: func(provider Provider, err error) {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, provider)
 			},
 		},
@@ -380,7 +380,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 				return nil, nil
 			},
 			checkFunc: func(provider Provider, err error) {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, provider)
 			},
 		},

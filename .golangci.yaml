@@ -236,11 +236,6 @@ linters-settings:
     packages:
       - github.com/jmoiron/sqlx
   testifylint:
-      # TODO: enable them all
-      disable:
-        - go-require
-        - float-compare
-        - require-error
       enable-all: true
   testpackage:
     # regexp pattern to skip files

@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	flag "github.com/spf13/pflag"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
@@ -48,7 +47,7 @@ func TestNewLogsCommand(t *testing.T) {
 		if os.Getenv(cmdtest.CaptureFlag) == "1" {
 			c.SetArgs([]string{"test"})
 			e := c.Execute()
-			assert.NoError(t, e)
+			require.NoError(t, e)
 			return
 		}
 	})

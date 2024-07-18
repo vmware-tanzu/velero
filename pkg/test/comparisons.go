@@ -111,14 +111,14 @@ func AssertDeepEqual(t *testing.T, expected, actual interface{}) bool {
 	return true
 }
 
-// AssertErrorMatches asserts that if expected is the empty string, actual
+// RequireErrorMatches asserts that if expected is the empty string, actual
 // is nil, otherwise, that actual's error string matches expected.
-func AssertErrorMatches(t *testing.T, expected string, actual error) bool {
+func RequireErrorMatches(t *testing.T, expected string, actual error) {
 	if expected != "" {
-		return assert.EqualError(t, actual, expected)
+		require.EqualError(t, actual, expected)
+		return
 	}
-
-	return assert.NoError(t, actual)
+	require.NoError(t, actual)
 }
 
 func CompareSlice(x, y []string) bool {

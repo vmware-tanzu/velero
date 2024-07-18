@@ -2316,11 +2316,10 @@ func TestShouldRestore(t *testing.T) {
 			res, err := ctx.shouldRestore(tc.pvName, pvClient)
 			assert.Equal(t, tc.want, res)
 			if tc.wantErr != nil {
-				if assert.Error(t, err, "expected a non-nil error") {
-					assert.EqualError(t, err, tc.wantErr.Error())
-				}
+				require.Error(t, err, "expected a non-nil error")
+				require.EqualError(t, err, tc.wantErr.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -2340,21 +2339,15 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 			}
 
 			res, err := client.Get(context.TODO(), item.GetName(), metav1.GetOptions{})
-			if !assert.NoError(t, err) {
-				continue
-			}
+			require.NoError(t, err)
 
 			itemJSON, err := json.Marshal(item)
-			if !assert.NoError(t, err) {
-				continue
-			}
+			require.NoError(t, err)
 
 			t.Logf("%v", string(itemJSON))
 
 			u := make(map[string]interface{})
-			if !assert.NoError(t, json.Unmarshal(itemJSON, &u)) {
-				continue
-			}
+			require.NoError(t, json.Unmarshal(itemJSON, &u))
 			want := &unstructured.Unstructured{Object: u}
 
 			// These fields get non-nil zero values in the unstructured objects if they're
@@ -3623,7 +3616,7 @@ func (cr *createRecorder) reactor() func(kubetesting.Action) (bool, runtime.Obje
 		}
 
 		accessor, err := meta.Accessor(createAction.GetObject())
-		assert.NoError(cr.t, err)
+		require.NoError(cr.t, err)
 
 		cr.resources = append(cr.resources, resourceID{
 			groupResource: action.GetResource().GroupResource().String(),
@@ -3646,7 +3639,7 @@ func assertAPIContents(t *testing.T, h *harness, want map[*test.APIResource][]st
 
 	for r, want := range want {
 		res, err := h.DynamicClient.Resource(r.GVR()).List(context.TODO(), metav1.ListOptions{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		if err != nil {
 			continue
 		}

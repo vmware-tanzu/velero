@@ -114,7 +114,7 @@ func TestDispense(t *testing.T) {
 			dispensed, err := p.dispense(key)
 
 			if tc.expectedError != "" {
-				assert.EqualError(t, err, tc.expectedError)
+				require.EqualError(t, err, tc.expectedError)
 				return
 			}
 			require.NoError(t, err)

@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -232,7 +233,7 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 
 	// Call the function and check for errors
 	resPolicies, err := getResourcePoliciesFromConfig(cm)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check that the returned resourcePolicies object contains the expected data
 	assert.Equal(t, "v1", resPolicies.version)
@@ -422,12 +423,12 @@ volumePolicies:
 			if err != nil {
 				t.Fatalf("got error when get match action %v", err)
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			policies := &Policies{}
 			err = policies.BuildPolicy(resPolicies)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			action, err := policies.GetMatchAction(tc.vol)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if tc.skip {
 				if action.Type != Skip {

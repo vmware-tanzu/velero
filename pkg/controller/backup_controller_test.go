@@ -140,7 +140,7 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 			}
 			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			assert.Equal(t, ctrl.Result{}, actualResult)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// Any backup that would actually proceed to validation will cause a segfault because this
 			// test hasn't set up the necessary controller dependencies for validation/etc. So the lack
@@ -230,7 +230,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 
 			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			assert.Equal(t, ctrl.Result{}, actualResult)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			res := &velerov1api.Backup{}
 			err = c.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: test.backup.Namespace, Name: test.backup.Name}, res)
 			require.NoError(t, err)
@@ -1378,7 +1378,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			assert.Equal(t, ctrl.Result{}, actualResult)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// Disable CSI feature to not impact other test cases.
 			if test.enableCSI {

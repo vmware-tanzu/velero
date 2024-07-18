@@ -87,7 +87,7 @@ func TestSnapshotSource(t *testing.T) {
 		Path:     "/var",
 	}
 	rootDir, err := getLocalFSEntry(sourceInfo.Path)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	log := logrus.New()
 	manifest := &snapshot.Manifest{
 		ID:        "test",
@@ -202,9 +202,9 @@ func TestSnapshotSource(t *testing.T) {
 			MockFuncs(s, tc.args)
 			_, _, err = SnapshotSource(ctx, s.repoWriterMock, s.uploderMock, sourceInfo, rootDir, false, "/", nil, tc.uploaderCfg, log, "TestSnapshotSource")
 			if tc.notError {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.Error(t, err)
+				require.Error(t, err)
 			}
 		})
 	}
@@ -563,7 +563,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 			if tc.expectedError != nil {
 				require.ErrorContains(t, err, tc.expectedError.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			// Check the number of returned snapshots
@@ -656,7 +656,7 @@ func TestBackup(t *testing.T) {
 			if tc.expectedError != nil {
 				require.ErrorContains(t, err, tc.expectedError.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, tc.expectedEmpty, isSnapshotEmpty)
@@ -795,7 +795,7 @@ func TestRestore(t *testing.T) {
 			if tc.expectedError != nil {
 				require.ErrorContains(t, err, tc.expectedError.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			// Check the number of bytes restored
