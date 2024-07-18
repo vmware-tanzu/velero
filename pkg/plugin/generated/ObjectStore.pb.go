@@ -698,7 +698,7 @@ func (x *CreateSignedURLResponse) String() string {
 func (*CreateSignedURLResponse) ProtoMessage() {}
 
 func (x *CreateSignedURLResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ObjectStore_proto_msgTypes[12]
+	mi := &file_ObjectStore_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
