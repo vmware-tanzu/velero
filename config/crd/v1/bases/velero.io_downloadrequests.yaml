@@ -76,14 +76,18 @@ spec:
           status:
             description: DownloadRequestStatus is the current status of a DownloadRequest.
             properties:
+              downloadHeaders:
+                additionalProperties:
+                  items:
+                    type: string
+                  type: array
+                description: DownloadHeaders contains the headers to be used when
+                  downloading the target file.
+                type: object
               downloadURL:
                 description: DownloadURL contains the pre-signed URL for the target
                   file.
                 type: string
-              downloadHeaders:
-                description: DownloadHeaders contains the headers to be used when
-                  downloading the target file.
-                type: object
               expiration:
                 description: Expiration is when this DownloadRequest expires and can
                   be deleted by the system.
