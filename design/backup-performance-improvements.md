@@ -91,13 +91,13 @@ message ItemBlockActionAppliesToResponse {
     ResourceSelector ResourceSelector = 1;
 }
 
-message ItemBlockActionRelatedItemsRequest {
+message ItemBlockActionGetRelatedItemsRequest {
     string plugin = 1;
     bytes item = 2;
     bytes backup = 3;
 }
 
-message ItemBlockActionRelatedItemsResponse {
+message ItemBlockActionGetRelatedItemsResponse {
     repeated generated.ResourceIdentifier relatedItems = 1;
 }
 ```
