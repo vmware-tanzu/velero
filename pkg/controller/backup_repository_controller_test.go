@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,12 +69,12 @@ func TestPatchBackupRepository(t *testing.T) {
 	rr := mockBackupRepositoryCR()
 	reconciler := mockBackupRepoReconciler(t, "", nil, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = reconciler.patchBackupRepository(context.Background(), rr, repoReady())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 	err = reconciler.patchBackupRepository(context.Background(), rr, repoNotReady("not ready"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEqual(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 }
 
@@ -84,7 +85,7 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	rr.Spec.VolumeNamespace = "volume-ns-1"
 	reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	locations := &velerov1api.BackupStorageLocation{
 		Spec: velerov1api.BackupStorageLocationSpec{
 			Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic"},
@@ -96,9 +97,9 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	}
 
 	err = reconciler.Client.Create(context.TODO(), locations)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 	assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
 }
@@ -107,16 +108,16 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 	rr := mockBackupRepositoryCR()
 	reconciler := mockBackupRepoReconciler(t, "PruneRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	lastTm := rr.Status.LastMaintenanceTime
 	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEqual(t, rr.Status.LastMaintenanceTime, lastTm)
 
 	rr.Status.LastMaintenanceTime = &metav1.Time{Time: time.Now()}
 	lastTm = rr.Status.LastMaintenanceTime
 	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, rr.Status.LastMaintenanceTime, lastTm)
 }
 
@@ -125,7 +126,7 @@ func TestInitializeRepo(t *testing.T) {
 	rr.Spec.BackupStorageLocation = "default"
 	reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	locations := &velerov1api.BackupStorageLocation{
 		Spec: velerov1api.BackupStorageLocationSpec{
 			Config: map[string]string{"resticRepoPrefix": "s3:test.amazonaws.com/bucket/restic"},
@@ -137,9 +138,9 @@ func TestInitializeRepo(t *testing.T) {
 	}
 
 	err = reconciler.Client.Create(context.TODO(), locations)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = reconciler.initializeRepo(context.TODO(), rr, reconciler.logger)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 }
 
@@ -196,12 +197,12 @@ func TestBackupRepoReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			reconciler := mockBackupRepoReconciler(t, "", test.repo, nil)
 			err := reconciler.Client.Create(context.TODO(), test.repo)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			_, err = reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: test.repo.Name}})
 			if test.expectNil {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.Error(t, err)
+				require.Error(t, err)
 			}
 		})
 	}
@@ -477,9 +478,9 @@ func TestGetBackupRepositoryConfig(t *testing.T) {
 			result, err := getBackupRepositoryConfig(context.Background(), fakeClient, test.congiName, velerov1api.DefaultNamespace, test.repoName, test.repoType, velerotest.NewLogger())
 
 			if test.expectedErr != "" {
-				assert.EqualError(t, err, test.expectedErr)
+				require.EqualError(t, err, test.expectedErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, test.expectedResult, result)
 			}
 		})

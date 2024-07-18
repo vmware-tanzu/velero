@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,7 +37,7 @@ func TestStrategicMergePatchFailure(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			scheme := runtime.NewScheme()
 			err := clientgoscheme.AddToScheme(scheme)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			pt := &StrategicMergePatcher{
 				patches: []StrategicMergePatch{{PatchData: tt.data}},
 				scheme:  scheme,
@@ -46,7 +46,7 @@ func TestStrategicMergePatchFailure(t *testing.T) {
 			u := &unstructured.Unstructured{}
 			u.SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: tt.kind})
 			_, err = pt.Patch(u, logrus.New())
-			assert.Error(t, err)
+			require.Error(t, err)
 		})
 	}
 }

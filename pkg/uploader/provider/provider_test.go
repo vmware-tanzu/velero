@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -89,7 +88,7 @@ func TestNewUploaderProvider(t *testing.T) {
 			}
 			_, err := NewUploaderProvider(ctx, client, testCase.UploaderType, testCase.RequestorType, repoIdentifier, bsl, backupRepo, credGetter, repoKeySelector, log)
 			if testCase.ExpectedError == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
 				require.ErrorContains(t, err, testCase.ExpectedError)
 			}

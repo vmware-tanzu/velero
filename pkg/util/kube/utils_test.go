@@ -469,7 +469,7 @@ func TestIsCRDReady(t *testing.T) {
 	err := json.Unmarshal(resBytes, obj)
 	require.NoError(t, err)
 	_, err = IsCRDReady(obj)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestSinglePathMatch(t *testing.T) {
@@ -478,7 +478,7 @@ func TestSinglePathMatch(t *testing.T) {
 	fakeFS.MkdirAll("testDir2/subpath", 0755)
 
 	_, err := SinglePathMatch("./*/subpath", fakeFS, logrus.StandardLogger())
-	assert.Error(t, err)
+	require.Error(t, err)
 	require.ErrorContains(t, err, "expected one matching path")
 }
 

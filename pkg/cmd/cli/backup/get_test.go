@@ -58,7 +58,7 @@ func TestNewGetCommand(t *testing.T) {
 
 	c.SetArgs(args)
 	e := c.Execute()
-	assert.NoError(t, e)
+	require.NoError(t, e)
 
 	if os.Getenv(cmdtest.CaptureFlag) == "1" {
 		return
@@ -83,7 +83,7 @@ func TestNewGetCommand(t *testing.T) {
 	d := NewGetCommand(f, "velero backup get")
 	c.SetArgs([]string{"-l", "abc=abc"})
 	e = d.Execute()
-	assert.NoError(t, e)
+	require.NoError(t, e)
 
 	cmd = exec.Command(os.Args[0], []string{"-test.run=TestNewGetCommand"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))

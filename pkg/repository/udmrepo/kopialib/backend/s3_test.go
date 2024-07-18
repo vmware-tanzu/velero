@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/kopia/kopia/repo/blob/s3"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 )
@@ -122,9 +122,9 @@ func TestS3Setup(t *testing.T) {
 			err := s3Flags.Setup(context.Background(), tc.flags)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}

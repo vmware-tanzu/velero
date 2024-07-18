@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -95,9 +96,9 @@ func TestIsRunning(t *testing.T) {
 
 			err := IsRunning(context.TODO(), fakeKubeClient, test.namespace)
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, test.expectErr)
+				require.EqualError(t, err, test.expectErr)
 			}
 		})
 	}
@@ -175,9 +176,9 @@ func TestIsRunningInNode(t *testing.T) {
 
 			err := IsRunningInNode(context.TODO(), "", test.nodeName, fakeClient)
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, test.expectErr)
+				require.EqualError(t, err, test.expectErr)
 			}
 		})
 	}
@@ -231,10 +232,10 @@ func TestGetPodSpec(t *testing.T) {
 
 			spec, err := GetPodSpec(context.TODO(), fakeKubeClient, test.namespace)
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, *spec, test.expectSpec)
 			} else {
-				assert.EqualError(t, err, test.expectErr)
+				require.EqualError(t, err, test.expectErr)
 			}
 		})
 	}
@@ -316,7 +317,7 @@ func TestGetConfigs(t *testing.T) {
 
 			result, err := GetConfigs(context.TODO(), test.namespace, fakeKubeClient, "node-agent-config")
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				if test.expectResult == nil {
 					assert.Nil(t, result)
@@ -326,7 +327,7 @@ func TestGetConfigs(t *testing.T) {
 					assert.Equal(t, *test.expectResult.LoadConcurrency, *result.LoadConcurrency)
 				}
 			} else {
-				assert.EqualError(t, err, test.expectErr)
+				require.EqualError(t, err, test.expectErr)
 			}
 		})
 	}

@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -181,7 +181,7 @@ func TestRestoreExpose(t *testing.T) {
 			}
 
 			err := exposer.Expose(context.Background(), ownerObject, test.targetPVCName, test.sourceNamespace, map[string]string{}, corev1.ResourceRequirements{}, time.Millisecond)
-			assert.EqualError(t, err, test.err)
+			require.EqualError(t, err, test.err)
 		})
 	}
 }
@@ -416,7 +416,7 @@ func TestRebindVolume(t *testing.T) {
 			hookCount = 0
 
 			err := exposer.RebindVolume(context.Background(), ownerObject, test.targetPVCName, test.sourceNamespace, time.Millisecond)
-			assert.EqualError(t, err, test.err)
+			require.EqualError(t, err, test.err)
 		})
 	}
 }
@@ -500,9 +500,9 @@ func TestRestorePeekExpose(t *testing.T) {
 
 			err := exposer.PeekExposed(context.Background(), ownerObject)
 			if test.err == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			}
 		})
 	}

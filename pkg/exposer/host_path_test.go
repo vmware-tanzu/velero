@@ -22,7 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -97,7 +97,7 @@ func TestGetPodVolumeHostPath(t *testing.T) {
 
 			_, err := GetPodVolumeHostPath(context.Background(), test.pod, test.pvc, nil, nil, velerotest.NewLogger())
 			if test.err != "" || err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			}
 		})
 	}

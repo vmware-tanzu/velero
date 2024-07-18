@@ -115,7 +115,7 @@ func TestOpenObject(t *testing.T) {
 				assert.Nil(t, reader)
 			} else {
 				assert.NotNil(t, reader)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -154,7 +154,7 @@ func TestFindManifests(t *testing.T) {
 			if tc.isGetManifestError {
 				require.ErrorContains(t, err, "failed")
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -278,9 +278,9 @@ func TestReplaceManifests(t *testing.T) {
 			id, err := NewShimRepo(tc.backupRepo).ReplaceManifests(ctx, map[string]string{}, nil)
 
 			if tc.expectedError != "" {
-				assert.EqualError(t, err, tc.expectedError)
+				require.EqualError(t, err, tc.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, tc.expectedID, id)
@@ -341,9 +341,9 @@ func TestConcatenateObjects(t *testing.T) {
 			_, err := NewShimRepo(tc.backupRepo).ConcatenateObjects(ctx, tc.objectIDs)
 
 			if tc.expectedError != "" {
-				assert.EqualError(t, err, tc.expectedError)
+				require.EqualError(t, err, tc.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -75,10 +76,10 @@ func TestParseResourceRequirements(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseResourceRequirements(tt.args.cpuRequest, tt.args.memRequest, tt.args.cpuLimit, tt.args.memLimit)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var expected corev1.ResourceRequirements
 			if tt.expected == nil {

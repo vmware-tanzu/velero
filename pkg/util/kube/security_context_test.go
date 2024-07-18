@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -257,10 +258,10 @@ allowPrivilegeEscalation: false`},
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseSecurityContext(tt.args.runAsUser, tt.args.runAsGroup, tt.args.allowPrivilegeEscalation, tt.args.secCtx)
 			if err != nil && tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if tt.expected == nil {
 				tt.expected = &corev1.SecurityContext{}

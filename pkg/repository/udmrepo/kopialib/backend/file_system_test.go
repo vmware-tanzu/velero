@@ -22,6 +22,7 @@ import (
 
 	"github.com/kopia/kopia/repo/blob/filesystem"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 )
@@ -70,10 +71,10 @@ func TestFSSetup(t *testing.T) {
 			err := fsFlags.Setup(context.Background(), tc.flags)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedOptions, fsFlags.options)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}

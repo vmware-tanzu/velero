@@ -62,7 +62,7 @@ func TestVeleroResourcesExist(t *testing.T) {
 			},
 		},
 	}
-	assert.Error(t, server.veleroResourcesExist())
+	require.Error(t, server.veleroResourcesExist())
 
 	// Velero v1 API group doesn't contain any custom resources: should error
 	veleroAPIResourceListVelerov1 := &metav1.APIResourceList{
@@ -70,7 +70,7 @@ func TestVeleroResourcesExist(t *testing.T) {
 	}
 
 	fakeDiscoveryHelper.ResourceList = append(fakeDiscoveryHelper.ResourceList, veleroAPIResourceListVelerov1)
-	assert.Error(t, server.veleroResourcesExist())
+	require.Error(t, server.veleroResourcesExist())
 
 	// Velero v2alpha1 API group doesn't contain any custom resources: should error
 	veleroAPIResourceListVeleroV2alpha1 := &metav1.APIResourceList{
@@ -78,7 +78,7 @@ func TestVeleroResourcesExist(t *testing.T) {
 	}
 
 	fakeDiscoveryHelper.ResourceList = append(fakeDiscoveryHelper.ResourceList, veleroAPIResourceListVeleroV2alpha1)
-	assert.Error(t, server.veleroResourcesExist())
+	require.Error(t, server.veleroResourcesExist())
 
 	// Velero v1 API group contains all custom resources, but v2alpha1 doesn't contain any custom resources: should error
 	for kind := range velerov1api.CustomResources() {
@@ -86,7 +86,7 @@ func TestVeleroResourcesExist(t *testing.T) {
 			Kind: kind,
 		})
 	}
-	assert.Error(t, server.veleroResourcesExist())
+	require.Error(t, server.veleroResourcesExist())
 
 	// Velero v1 and v2alpha1 API group contain all custom resources: should not error
 	for kind := range velerov2alpha1api.CustomResources() {
@@ -94,11 +94,11 @@ func TestVeleroResourcesExist(t *testing.T) {
 			Kind: kind,
 		})
 	}
-	assert.NoError(t, server.veleroResourcesExist())
+	require.NoError(t, server.veleroResourcesExist())
 
 	// Velero API group contains some but not all custom resources: should error
 	veleroAPIResourceListVelerov1.APIResources = veleroAPIResourceListVelerov1.APIResources[:3]
-	assert.Error(t, server.veleroResourcesExist())
+	require.Error(t, server.veleroResourcesExist())
 }
 
 func TestRemoveControllers(t *testing.T) {
@@ -166,9 +166,9 @@ func TestRemoveControllers(t *testing.T) {
 			totalNumOriginalControllers := len(enabledRuntimeControllers)
 
 			if tt.errorExpected {
-				assert.Error(t, removeControllers(tt.disabledControllers, enabledRuntimeControllers, logger))
+				require.Error(t, removeControllers(tt.disabledControllers, enabledRuntimeControllers, logger))
 			} else {
-				assert.NoError(t, removeControllers(tt.disabledControllers, enabledRuntimeControllers, logger))
+				require.NoError(t, removeControllers(tt.disabledControllers, enabledRuntimeControllers, logger))
 
 				totalNumEnabledControllers := len(enabledRuntimeControllers)
 				assert.Equal(t, totalNumEnabledControllers, totalNumOriginalControllers-len(tt.disabledControllers))
@@ -194,21 +194,21 @@ func Test_newServer(t *testing.T) {
 	_, err := newServer(factory, serverConfig{
 		uploaderType: "invalid",
 	}, logger)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	// invalid clientQPS
 	_, err = newServer(factory, serverConfig{
 		uploaderType: uploader.KopiaType,
 		clientQPS:    -1,
 	}, logger)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	// invalid clientQPS Restic uploader
 	_, err = newServer(factory, serverConfig{
 		uploaderType: uploader.ResticType,
 		clientQPS:    -1,
 	}, logger)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	// invalid clientBurst
 	factory.On("SetClientQPS", mock.Anything).Return()
@@ -217,7 +217,7 @@ func Test_newServer(t *testing.T) {
 		clientQPS:    1,
 		clientBurst:  -1,
 	}, logger)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	// invalid clientBclientPageSizeurst
 	factory.On("SetClientQPS", mock.Anything).Return().
@@ -228,7 +228,7 @@ func Test_newServer(t *testing.T) {
 		clientBurst:    1,
 		clientPageSize: -1,
 	}, logger)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	// got error when creating client
 	factory.On("SetClientQPS", mock.Anything).Return().
@@ -242,7 +242,7 @@ func Test_newServer(t *testing.T) {
 		clientBurst:    1,
 		clientPageSize: 100,
 	}, logger)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func Test_namespaceExists(t *testing.T) {
@@ -257,10 +257,10 @@ func Test_namespaceExists(t *testing.T) {
 	}
 
 	// namespace doesn't exist
-	assert.Error(t, server.namespaceExists("not-exist"))
+	require.Error(t, server.namespaceExists("not-exist"))
 
 	// namespace exists
-	assert.NoError(t, server.namespaceExists("velero"))
+	require.NoError(t, server.namespaceExists("velero"))
 }
 
 func Test_veleroResourcesExist(t *testing.T) {
@@ -272,7 +272,7 @@ func Test_veleroResourcesExist(t *testing.T) {
 
 	// velero resources don't exist
 	helper.On("Resources").Return(nil)
-	assert.Error(t, server.veleroResourcesExist())
+	require.Error(t, server.veleroResourcesExist())
 
 	// velero resources exist
 	helper.On("Resources").Unset()
@@ -301,7 +301,7 @@ func Test_veleroResourcesExist(t *testing.T) {
 			},
 		},
 	})
-	assert.NoError(t, server.veleroResourcesExist())
+	require.NoError(t, server.veleroResourcesExist())
 }
 
 func Test_markInProgressBackupsFailed(t *testing.T) {
@@ -420,9 +420,9 @@ func Test_setDefaultBackupLocation(t *testing.T) {
 	// no default location specified
 	c = fake.NewClientBuilder().WithScheme(scheme).Build()
 	err := setDefaultBackupLocation(context.Background(), c, "velero", "", logrus.New())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// no default location created
 	err = setDefaultBackupLocation(context.Background(), c, "velero", "default", logrus.New())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

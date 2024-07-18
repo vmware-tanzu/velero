@@ -135,10 +135,10 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			switch tc.expectedErr {
 			case true:
 				assert.Nil(t, res)
-				assert.Error(t, err)
+				require.Error(t, err)
 			case false:
 				assert.Equal(t, tc.expectedRes, res)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -209,7 +209,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 			volumeSnapshotter.On("SetVolumeID", tc.obj, "volume-1").Return(tc.obj, nil)
 
 			_, err := r.executePVAction(tc.obj)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			volumeSnapshotter.AssertExpectations(t)
 		})

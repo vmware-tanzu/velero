@@ -29,6 +29,7 @@ import (
 	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/fake"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -424,19 +425,19 @@ func TestExpose(t *testing.T) {
 
 			err := exposer.Expose(context.Background(), ownerObject, &test.exposeParam)
 			if err == nil {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				_, err = exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				backupPVC, err := exposer.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				expectedVS, err := exposer.csiSnapshotClient.VolumeSnapshots(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				expectedVSC, err := exposer.csiSnapshotClient.VolumeSnapshotContents().Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				assert.Equal(t, expectedVS.Annotations, vsObject.Annotations)
 				assert.Equal(t, *expectedVS.Spec.VolumeSnapshotClassName, *vsObject.Spec.VolumeSnapshotClassName)
@@ -453,7 +454,7 @@ func TestExpose(t *testing.T) {
 					assert.Equal(t, *resource.NewQuantity(restoreSize, ""), backupPVC.Spec.Resources.Requests[corev1.ResourceStorage])
 				}
 			} else {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			}
 		})
 	}
@@ -620,17 +621,17 @@ func TestGetExpose(t *testing.T) {
 
 			result, err := exposer.GetExposed(context.Background(), ownerObject, test.Timeout, &test.exposeWaitParam)
 			if test.err == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				if test.expectedResult == nil {
 					assert.Nil(t, result)
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, test.expectedResult.ByPod.VolumeName, result.ByPod.VolumeName)
 					assert.Equal(t, test.expectedResult.ByPod.HostingPod.Name, result.ByPod.HostingPod.Name)
 				}
 			} else {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			}
 		})
 	}
@@ -718,9 +719,9 @@ func TestPeekExpose(t *testing.T) {
 
 			err := exposer.PeekExposed(context.Background(), ownerObject)
 			if test.err == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			}
 		})
 	}

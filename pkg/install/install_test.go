@@ -53,7 +53,7 @@ func TestInstall(t *testing.T) {
 	require.NoError(t, appendUnstructured(resources, v1crds.CRDs[0]))
 	require.NoError(t, appendUnstructured(resources, Namespace("velero")))
 
-	assert.NoError(t, Install(factory, c, resources, os.Stdout))
+	require.NoError(t, Install(factory, c, resources, os.Stdout))
 }
 
 func Test_crdsAreReady(t *testing.T) {

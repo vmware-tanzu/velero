@@ -187,7 +187,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Create(context.TODO(), existing2)
 		require.NoError(t, err)
 		_, err = td.controller.Reconcile(context.TODO(), td.req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// verify "existing" is deleted
 		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
 			Namespace: existing.Namespace,
@@ -197,7 +197,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
 		// verify "existing2" remains
-		assert.NoError(t, td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		require.NoError(t, td.fakeClient.Get(context.TODO(), types.NamespacedName{
 			Namespace: existing2.Namespace,
 			Name:      existing2.Name,
 		}, &velerov1api.DeleteBackupRequest{}))
@@ -363,7 +363,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		td.backupStore.AssertCalled(t, "DeleteBackup", input.Spec.BackupName)
 
@@ -484,7 +484,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())
@@ -849,7 +849,7 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			})
 
 			res, err := getSnapshotsInBackup(context.TODO(), veleroBackup, clientBuilder.Build())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.True(t, reflect.DeepEqual(res, test.expected))
 		})
@@ -1021,7 +1021,7 @@ func TestDeleteMovedSnapshots(t *testing.T) {
 			} else {
 				assert.Equal(t, len(test.expected), len(errs))
 				for i := range test.expected {
-					assert.EqualError(t, errs[i], test.expected[i])
+					require.EqualError(t, errs[i], test.expected[i])
 				}
 			}
 		})

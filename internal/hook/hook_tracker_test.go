@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewHookTracker(t *testing.T) {
@@ -65,13 +66,13 @@ func TestHookTracker_Record(t *testing.T) {
 	info := tracker.tracker[key]
 	assert.True(t, info.hookFailed)
 	assert.True(t, info.hookExecuted)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = tracker.Record("ns2", "pod2", "container1", HookSourceAnnotation, "h1", "", true, fmt.Errorf("err"))
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	err = tracker.Record("ns1", "pod1", "container1", HookSourceAnnotation, "h1", "", false, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, info.hookFailed)
 }
 
@@ -141,13 +142,13 @@ func TestMultiHookTracker_Record(t *testing.T) {
 	info := mht.trackers["restore1"].tracker[key]
 	assert.True(t, info.hookFailed)
 	assert.True(t, info.hookExecuted)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = mht.Record("restore1", "ns2", "pod2", "container1", HookSourceAnnotation, "h1", "", true, fmt.Errorf("err"))
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	err = mht.Record("restore2", "ns2", "pod2", "container1", HookSourceAnnotation, "h1", "", true, fmt.Errorf("err"))
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestMultiHookTracker_Stat(t *testing.T) {

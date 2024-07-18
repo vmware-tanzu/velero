@@ -71,7 +71,7 @@ func TestRestartableGetObjectStore(t *testing.T) {
 			}
 			a, err := r.getObjectStore()
 			if tc.expectedError != "" {
-				assert.EqualError(t, err, tc.expectedError)
+				require.EqualError(t, err, tc.expectedError)
 				return
 			}
 			require.NoError(t, err)
@@ -97,7 +97,7 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 	}
 
 	err := r.Reinitialize(3)
-	assert.EqualError(t, err, "plugin int is not a ObjectStore")
+	require.EqualError(t, err, "plugin int is not a ObjectStore")
 
 	objectStore := new(providermocks.ObjectStore)
 	objectStore.Test(t)
@@ -105,11 +105,11 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 
 	objectStore.On("Init", r.config).Return(errors.Errorf("init error")).Once()
 	err = r.Reinitialize(objectStore)
-	assert.EqualError(t, err, "init error")
+	require.EqualError(t, err, "init error")
 
 	objectStore.On("Init", r.config).Return(nil)
 	err = r.Reinitialize(objectStore)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestRestartableObjectStoreGetDelegate(t *testing.T) {
@@ -127,7 +127,7 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 	}
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
-	assert.EqualError(t, err, "reset error")
+	require.EqualError(t, err, "reset error")
 
 	// Happy path
 	p.On("ResetIfNeeded").Return(nil)
@@ -137,7 +137,7 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 	p.On("GetByKindAndName", key).Return(objectStore, nil)
 
 	a, err = r.getDelegate()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, objectStore, a)
 }
 
@@ -159,7 +159,7 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 		"color": "blue",
 	}
 	err := r.Init(config)
-	assert.EqualError(t, err, "GetByKindAndName error")
+	require.EqualError(t, err, "GetByKindAndName error")
 
 	// Delegate returns error
 	objectStore := new(providermocks.ObjectStore)
@@ -169,7 +169,7 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 	objectStore.On("Init", config).Return(errors.Errorf("Init error")).Once()
 
 	err = r.Init(config)
-	assert.EqualError(t, err, "Init error")
+	require.EqualError(t, err, "Init error")
 
 	// wipe this out because the previous failed Init call set it
 	r.config = nil
@@ -177,12 +177,12 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 	// Happy path
 	objectStore.On("Init", config).Return(nil)
 	err = r.Init(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, config, r.config)
 
 	// Calling Init twice is forbidden
 	err = r.Init(config)
-	assert.EqualError(t, err, "already initialized")
+	require.EqualError(t, err, "already initialized")
 }
 
 func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {

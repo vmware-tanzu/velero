@@ -1440,7 +1440,7 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, tc.backupReq, backupFile, actions, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if tc.expectSkippedPVs != nil {
 				for pvName, reasons := range tc.expectSkippedPVs {
@@ -1654,7 +1654,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, req, backupFile, actions, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			for action, want := range tc.actions {
 				assert.Equal(t, want, action.ids)
@@ -1729,7 +1729,7 @@ func TestBackupWithInvalidActions(t *testing.T) {
 				h.addItems(t, resource)
 			}
 
-			assert.Error(t, h.backupper.Backup(h.log, req, backupFile, tc.actions, nil))
+			require.Error(t, h.backupper.Backup(h.log, req, backupFile, tc.actions, nil))
 		})
 	}
 }
@@ -1876,7 +1876,7 @@ func TestBackupActionModifications(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, req, backupFile, tc.actions, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assertTarballFileContents(t, backupFile, tc.want)
 		})
@@ -2131,7 +2131,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, req, backupFile, tc.actions, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assertTarballContents(t, backupFile, append(tc.want, "metadata/version")...)
 		})
@@ -2586,7 +2586,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, tc.req, backupFile, nil, tc.snapshotterGetter)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t, tc.want, tc.req.VolumeSnapshots)
 		})
@@ -2745,7 +2745,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, tc.req, backupFile, tc.actions, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			resultOper := *tc.req.GetItemOperationsList()
 			// set want Created times so it won't fail the assert.Equal test
@@ -2810,7 +2810,7 @@ func TestBackupWithInvalidHooks(t *testing.T) {
 				h.addItems(t, resource)
 			}
 
-			assert.EqualError(t, h.backupper.Backup(h.log, req, backupFile, nil, nil), tc.want.Error())
+			require.EqualError(t, h.backupper.Backup(h.log, req, backupFile, nil, nil), tc.want.Error())
 		})
 	}
 }
@@ -3455,7 +3455,7 @@ func assertTarballFileContents(t *testing.T, backupFile io.Reader, want map[stri
 		// json-unmarshal the data from the tarball
 		var got unstructuredObject
 		err := json.Unmarshal(gotData, &got)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		if err != nil {
 			continue
 		}

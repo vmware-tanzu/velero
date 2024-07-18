@@ -120,7 +120,7 @@ func TestHandleHooksSkips(t *testing.T) {
 
 			groupResource := schema.ParseGroupResource(test.groupResource)
 			err := h.HandleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, PhasePre, hookTracker)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		})
 	}
 }
@@ -490,11 +490,10 @@ func TestHandleHooks(t *testing.T) {
 			err := h.HandleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, test.phase, hookTracker)
 
 			if test.expectedError != nil {
-				assert.EqualError(t, err, test.expectedError.Error())
-				return
+				require.EqualError(t, err, test.expectedError.Error())
+			} else {
+				require.NoError(t, err)
 			}
-
-			require.NoError(t, err)
 		})
 	}
 }
@@ -1199,7 +1198,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			actual, err := GroupRestoreExecHooks("restore1", tc.resourceRestoreHooks, tc.pod, velerotest.NewLogger(), hookTracker)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
@@ -1381,7 +1380,11 @@ func TestGetRestoreHooksFromSpec(t *testing.T) {
 			actual, err := GetRestoreHooksFromSpec(tc.hookSpec)
 
 			assert.Equal(t, tc.expected, actual)
-			assert.Equal(t, tc.expectedError, err)
+			if tc.expectedError != nil {
+				require.EqualError(t, err, tc.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }
@@ -1955,13 +1958,13 @@ func TestHandleRestoreHooks(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			handler := InitContainerRestoreHookHandler{}
 			podMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&tc.podInput)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			actual, err := handler.HandleRestoreHooks(velerotest.NewLogger(), kuberesource.Pods, &unstructured.Unstructured{Object: podMap}, tc.restoreHooks, tc.namespaceMapping)
 			assert.Equal(t, tc.expectedError, err)
 			if actual != nil {
 				actualPod := new(corev1api.Pod)
 				err = runtime.DefaultUnstructuredConverter.FromUnstructured(actual.UnstructuredContent(), actualPod)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedPod, actualPod)
 			}
 		})
@@ -1976,7 +1979,7 @@ func TestValidateContainer(t *testing.T) {
 	expectedError := fmt.Errorf("invalid InitContainer in restore hook, it doesn't have Command, Name or Image field")
 
 	// valid string should return nil as result.
-	assert.NoError(t, ValidateContainer([]byte(valid)))
+	require.NoError(t, ValidateContainer([]byte(valid)))
 
 	// noName string should return expected error as result.
 	assert.Equal(t, expectedError, ValidateContainer([]byte(noName)))

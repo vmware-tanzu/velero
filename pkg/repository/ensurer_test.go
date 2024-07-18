@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -127,9 +128,9 @@ func TestEnsureRepo(t *testing.T) {
 
 			repo, err := ensurer.EnsureRepo(context.Background(), velerov1.DefaultNamespace, test.namespace, test.bsl, test.repositoryType)
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.expectedRepo, repo)
@@ -204,9 +205,9 @@ func TestCreateBackupRepositoryAndWait(t *testing.T) {
 				RepositoryType:  test.repositoryType,
 			})
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.expectedRepo, repo)

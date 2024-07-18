@@ -26,6 +26,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -60,7 +61,7 @@ func TestOnDataDownloadFailed(t *testing.T) {
 	go bs.OnDataDownloadFailed(context.TODO(), velerov1api.DefaultNamespace, dataDownloadName, errors.New("fake-error"))
 
 	result := <-bs.resultSignal
-	assert.EqualError(t, result.err, expectedErr)
+	require.EqualError(t, result.err, expectedErr)
 	assert.Equal(t, expectedEventReason, bt.EventReason())
 	assert.Equal(t, expectedEventMsg, bt.EventMessage())
 }
@@ -84,7 +85,7 @@ func TestOnDataDownloadCancelled(t *testing.T) {
 	go bs.OnDataDownloadCancelled(context.TODO(), velerov1api.DefaultNamespace, dataDownloadName)
 
 	result := <-bs.resultSignal
-	assert.EqualError(t, result.err, expectedErr)
+	require.EqualError(t, result.err, expectedErr)
 	assert.Equal(t, expectedEventReason, bt.EventReason())
 	assert.Equal(t, expectedEventMsg, bt.EventMessage())
 }
@@ -133,9 +134,9 @@ func TestOnDataDownloadCompleted(t *testing.T) {
 
 			result := <-bs.resultSignal
 			if test.marshalErr != nil {
-				assert.EqualError(t, result.err, test.expectedErr)
+				require.EqualError(t, result.err, test.expectedErr)
 			} else {
-				assert.NoError(t, result.err)
+				require.NoError(t, result.err)
 				assert.Equal(t, test.expectedEventReason, bt.EventReason())
 				assert.Equal(t, test.expectedEventMsg, bt.EventMessage())
 			}
@@ -226,7 +227,7 @@ func TestCancelDataDownload(t *testing.T) {
 
 			result := <-bs.resultSignal
 
-			assert.EqualError(t, result.err, test.expectedErr)
+			require.EqualError(t, result.err, test.expectedErr)
 			assert.True(t, bt.withEvent)
 			assert.Equal(t, test.expectedEventReason, bt.EventReason())
 			assert.Equal(t, test.expectedEventMsg, bt.EventMessage())
@@ -375,9 +376,9 @@ func TestRunCancelableRestore(t *testing.T) {
 			result, err := rs.RunCancelableDataPath(test.ctx)
 
 			if test.expectedErr != "" {
-				assert.EqualError(t, err, test.expectedErr)
+				require.EqualError(t, err, test.expectedErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, test.result.result, result)
 			}
 

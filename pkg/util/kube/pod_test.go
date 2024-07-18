@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -90,9 +91,9 @@ func TestEnsureDeletePod(t *testing.T) {
 
 			err := EnsureDeletePod(context.Background(), kubeClient.CoreV1(), test.podName, test.namespace, time.Millisecond)
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -175,9 +176,9 @@ func TestIsPodRunning(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := IsPodRunning(test.pod)
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -275,9 +276,9 @@ func TestIsPodScheduled(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := IsPodScheduled(test.pod)
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -691,7 +692,7 @@ func TestCollectPodLogs(t *testing.T) {
 			if test.expectErr != "" {
 				assert.EqualError(t, err, test.expectErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, fp.outputMessage, test.message)
 			}
 		})

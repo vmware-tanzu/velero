@@ -260,11 +260,11 @@ func TestResetPVCResourceRequest(t *testing.T) {
 	var storageReq50Mi, storageReq1Gi, cpuQty resource.Quantity
 
 	storageReq50Mi, err := resource.ParseQuantity("50Mi")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	storageReq1Gi, err = resource.ParseQuantity("1Gi")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cpuQty, err = resource.ParseQuantity("100m")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	testCases := []struct {
 		name                      string
@@ -345,7 +345,7 @@ func TestResetPVCResourceRequest(t *testing.T) {
 			log := logrus.New().WithField("unit-test", tc.name)
 			setPVCStorageResourceRequest(&tc.pvc, tc.restoreSize, log)
 			expected, err := resource.ParseQuantity(tc.expectedStorageRequestQty)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, expected, tc.pvc.Spec.Resources.Requests[corev1api.ResourceStorage])
 		})
 	}

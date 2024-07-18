@@ -206,9 +206,9 @@ func TestGetStorageCredentials(t *testing.T) {
 			require.Equal(t, tc.expected, actual)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -470,9 +470,9 @@ func TestGetStorageVariables(t *testing.T) {
 			require.Equal(t, tc.expected, actual)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -525,9 +525,9 @@ func TestGetRepoPassword(t *testing.T) {
 			require.Equal(t, tc.expected, password)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -591,9 +591,9 @@ func TestGetStoreOptions(t *testing.T) {
 			require.Equal(t, tc.expected, options)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -724,9 +724,9 @@ func TestPrepareRepo(t *testing.T) {
 			})
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -873,9 +873,9 @@ func TestForget(t *testing.T) {
 			})
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -1029,7 +1029,7 @@ func TestBatchForget(t *testing.T) {
 				assert.Equal(t, len(tc.expectedErr), len(errs))
 
 				for i := range tc.expectedErr {
-					assert.EqualError(t, errs[i], tc.expectedErr[i])
+					require.EqualError(t, errs[i], tc.expectedErr[i])
 				}
 			}
 		})
@@ -1116,9 +1116,9 @@ func TestInitRepo(t *testing.T) {
 			})
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -1204,9 +1204,9 @@ func TestConnectToRepo(t *testing.T) {
 			})
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -1348,9 +1348,9 @@ func TestBoostRepoConnect(t *testing.T) {
 			})
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}
@@ -1436,9 +1436,9 @@ func TestPruneRepo(t *testing.T) {
 			})
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}

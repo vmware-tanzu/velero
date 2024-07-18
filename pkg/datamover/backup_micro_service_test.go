@@ -27,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -105,7 +106,7 @@ func TestOnDataUploadFailed(t *testing.T) {
 	go bs.OnDataUploadFailed(context.TODO(), velerov1api.DefaultNamespace, dataUploadName, errors.New("fake-error"))
 
 	result := <-bs.resultSignal
-	assert.EqualError(t, result.err, expectedErr)
+	require.EqualError(t, result.err, expectedErr)
 	assert.Equal(t, expectedEventReason, bt.EventReason())
 	assert.Equal(t, expectedEventMsg, bt.EventMessage())
 }
@@ -129,7 +130,7 @@ func TestOnDataUploadCancelled(t *testing.T) {
 	go bs.OnDataUploadCancelled(context.TODO(), velerov1api.DefaultNamespace, dataUploadName)
 
 	result := <-bs.resultSignal
-	assert.EqualError(t, result.err, expectedErr)
+	require.EqualError(t, result.err, expectedErr)
 	assert.Equal(t, expectedEventReason, bt.EventReason())
 	assert.Equal(t, expectedEventMsg, bt.EventMessage())
 }
@@ -180,7 +181,7 @@ func TestOnDataUploadCompleted(t *testing.T) {
 			if test.marshalErr != nil {
 				assert.EqualError(t, result.err, test.expectedErr)
 			} else {
-				assert.NoError(t, result.err)
+				require.NoError(t, result.err)
 				assert.Equal(t, test.expectedEventReason, bt.EventReason())
 				assert.Equal(t, test.expectedEventMsg, bt.EventMessage())
 			}
@@ -273,7 +274,7 @@ func TestCancelDataUpload(t *testing.T) {
 
 			result := <-bs.resultSignal
 
-			assert.EqualError(t, result.err, test.expectedErr)
+			require.EqualError(t, result.err, test.expectedErr)
 			assert.True(t, bt.withEvent)
 			assert.Equal(t, test.expectedEventReason, bt.EventReason())
 			assert.Equal(t, test.expectedEventMsg, bt.EventMessage())
@@ -422,9 +423,9 @@ func TestRunCancelableDataPath(t *testing.T) {
 			result, err := bs.RunCancelableDataPath(test.ctx)
 
 			if test.expectedErr != "" {
-				assert.EqualError(t, err, test.expectedErr)
+				require.EqualError(t, err, test.expectedErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, test.result.result, result)
 			}
 
