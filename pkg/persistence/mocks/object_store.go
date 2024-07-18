@@ -19,7 +19,6 @@ package mocks
 
 import (
 	io "io"
-	"net/http"
 	time "time"
 
 	mock "github.com/stretchr/testify/mock"
@@ -31,7 +30,7 @@ type ObjectStore struct {
 }
 
 // CreateSignedURL provides a mock function with given fields: bucket, key, ttl
-func (_m *ObjectStore) CreateSignedURL(bucket string, key string, ttl time.Duration) (string, http.Header ,error) {
+func (_m *ObjectStore) CreateSignedURL(bucket string, key string, ttl time.Duration) (string, map[string][]string ,error) {
 	ret := _m.Called(bucket, key, ttl)
 
 	var r0 string
@@ -48,7 +47,7 @@ func (_m *ObjectStore) CreateSignedURL(bucket string, key string, ttl time.Durat
 		r1 = ret.Error(1)
 	}
 
-	return r0, http.Header{}, r1
+	return r0, make(map[string][]string), r1
 }
 
 // DeleteObject provides a mock function with given fields: bucket, key

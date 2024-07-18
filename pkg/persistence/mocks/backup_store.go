@@ -19,7 +19,6 @@ package mocks
 
 import (
 	io "io"
-	"net/http"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	mock "github.com/stretchr/testify/mock"
@@ -247,7 +246,7 @@ func (_m *BackupStore) GetCSIVolumeSnapshots(name string) ([]*volumesnapshotv1.V
 }
 
 // GetDownloadURL provides a mock function with given fields: target
-func (_m *BackupStore) GetDownloadURL(target v1.DownloadTarget) (string, http.Header ,error) {
+func (_m *BackupStore) GetDownloadURL(target v1.DownloadTarget) (string, map[string][]string ,error) {
 	ret := _m.Called(target)
 
 	var r0 string
@@ -264,7 +263,7 @@ func (_m *BackupStore) GetDownloadURL(target v1.DownloadTarget) (string, http.He
 		r1 = ret.Error(1)
 	}
 
-	return r0,http.Header{}, r1
+	return r0, make(map[string][]string), r1
 }
 
 // GetPodVolumeBackups provides a mock function with given fields: name

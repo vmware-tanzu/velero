@@ -18,7 +18,6 @@ package clientmgmt
 
 import (
 	"io"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -232,8 +231,8 @@ func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 		restartabletest.RestartableDelegateTest{
 			Function:                "CreateSignedURL",
 			Inputs:                  []interface{}{"bucket", "key", 30 * time.Minute},
-			ExpectedErrorOutputs:    []interface{}{"", http.Header{}, errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{"signedURL", http.Header{}, errors.Errorf("delegate error")},
+			ExpectedErrorOutputs:    []interface{}{"", make(map[string][]string), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []interface{}{"signedURL", make(map[string][]string), errors.Errorf("delegate error")},
 		},
 	)
 }

@@ -733,8 +733,16 @@ type CreateSignedURLResponse struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Headers []*HeaderEntry `protobuf:"bytes,1,rep,name=headers,proto3" json:"headers,omitempty"`
-	Url     string         `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	Url     string                        `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	Headers map[string]*HeaderValues      `protobuf:"bytes,2,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=values,proto3"`
+}
+
+type HeaderValues struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Values []string `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
 }
 
 func (x *CreateSignedURLResponse) Reset() {
@@ -769,7 +777,7 @@ func (*CreateSignedURLResponse) Descriptor() ([]byte, []int) {
 	return file_ObjectStore_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *CreateSignedURLResponse) GetHeaders() []*HeaderEntry {
+func (x *CreateSignedURLResponse) GetHeaders() map[string]*HeaderValues {
 	if x != nil {
 		return x.Headers
 	}

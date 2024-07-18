@@ -20,7 +20,6 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 
@@ -93,7 +92,7 @@ type BackupStore interface {
 	DeleteRestore(name string) error
 	GetRestoredResourceList(name string) (map[string][]string, error)
 
-	GetDownloadURL(target velerov1api.DownloadTarget) (string, http.Header, error)
+	GetDownloadURL(target velerov1api.DownloadTarget) (string, map[string][]string, error)
 }
 
 // DownloadURLTTL is how long a download URL is valid for.
@@ -616,7 +615,7 @@ func (s *objectBackupStore) PutBackupContents(backup string, backupContents io.R
 	return seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(backup), backupContents)
 }
 
-func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (string, http.Header, error) {
+func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (string, map[string][]string, error) {
 	switch target.Kind {
 	case velerov1api.DownloadTargetKindBackupContents:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupContentsKey(target.Name), DownloadURLTTL)
@@ -647,7 +646,7 @@ func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (s
 	case velerov1api.DownloadTargetKindRestoreVolumeInfo:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getRestoreVolumeInfoKey(target.Name), DownloadURLTTL)
 	default:
-		return "", http.Header{}, errors.Errorf("unsupported download target kind %q", target.Kind)
+		return "", make(map[string][]string), errors.Errorf("unsupported download target kind %q", target.Kind)
 	}
 }
 

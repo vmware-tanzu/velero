@@ -18,7 +18,6 @@ package velero
 
 import (
 	"io"
-	"net/http"
 	"time"
 )
 
@@ -62,5 +61,5 @@ type ObjectStore interface {
 	DeleteObject(bucket, key string) error
 
 	// CreateSignedURL creates a pre-signed URL for the given bucket and key that expires after ttl.
-	CreateSignedURL(bucket, key string, ttl time.Duration) (string, http.Header, error)
+	CreateSignedURL(bucket, key string, ttl time.Duration) (string, map[string][]string, error)
 }

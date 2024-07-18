@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 )
@@ -153,18 +152,18 @@ func (o *inMemoryObjectStore) DeleteObject(bucket, key string) error {
 	return nil
 }
 
-func (o *inMemoryObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, http.Header, error) {
+func (o *inMemoryObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, map[string][]string, error) {
 	bucketData, ok := o.Data[bucket]
 	if !ok {
-		return "", http.Header{}, errors.New("bucket not found")
+		return "", make(map[string][]string), errors.New("bucket not found")
 	}
 
 	_, ok = bucketData[key]
 	if !ok {
-		return "", http.Header{}, errors.New("key not found")
+		return "", make(map[string][]string), errors.New("key not found")
 	}
 
-	return "a-url", http.Header{}, nil
+	return "a-url", make(map[string][]string), nil
 }
 
 //

@@ -18,7 +18,6 @@ package clientmgmt
 
 import (
 	"io"
-	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
@@ -168,10 +167,10 @@ func (r *restartableObjectStore) DeleteObject(bucket string, key string) error {
 }
 
 // CreateSignedURL restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) CreateSignedURL(bucket string, key string, ttl time.Duration) (string, http.Header, error) {
+func (r *restartableObjectStore) CreateSignedURL(bucket string, key string, ttl time.Duration) (string, map[string][]string, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
-		return "", http.Header{}, err
+		return "", make(map[string][]string), err
 	}
 	return delegate.CreateSignedURL(bucket, key, ttl)
 }
