@@ -100,7 +100,7 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	if downloadRequest.Status != (velerov1api.DownloadRequestStatus{}) && downloadRequest.Status.Expiration != nil {
+	if !isEmptyDownloadRequestStatus(downloadRequest.Status) && downloadRequest.Status.Expiration != nil {
 		if downloadRequest.Status.Expiration.Time.Before(r.clock.Now()) {
 			// Delete any request that is expired, regardless of the phase: it is not
 			// worth proceeding and trying/retrying to find it.
@@ -222,7 +222,7 @@ func (r *downloadRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		&velerov1api.DownloadRequestList{}, defaultDownloadRequestSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
 	downloadRequestPredicates := kube.NewGenericEventPredicate(func(object kbclient.Object) bool {
 		downloadRequest := object.(*velerov1api.DownloadRequest)
-		if downloadRequest.Status != (velerov1api.DownloadRequestStatus{}) && downloadRequest.Status.Expiration != nil {
+		if !isEmptyDownloadRequestStatus(downloadRequest.Status) && downloadRequest.Status.Expiration != nil {
 			return downloadRequest.Status.Expiration.Time.Before(r.clock.Now())
 		}
 		return true
@@ -232,4 +232,9 @@ func (r *downloadRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&velerov1api.DownloadRequest{}).
 		WatchesRawSource(downloadRequestSource, nil, builder.WithPredicates(downloadRequestPredicates)).
 		Complete(r)
+}
+
+// Helper function to check if DownloadRequestStatus is empty because go cannot deep compare structs with maps.
+func isEmptyDownloadRequestStatus(status velerov1api.DownloadRequestStatus) bool {
+	return status.Phase == "" && status.Expiration == nil && status.DownloadURL == ""
 }
