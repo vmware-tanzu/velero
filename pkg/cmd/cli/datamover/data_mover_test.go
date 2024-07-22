@@ -124,7 +124,7 @@ func TestExitWithMessage(t *testing.T) {
 
 				reader.Close()
 
-				assert.Equal(t, string(message), test.expectedMessage)
+				assert.Equal(t, test.expectedMessage, string(message))
 			}
 		})
 	}
