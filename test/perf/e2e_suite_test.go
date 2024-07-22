@@ -24,7 +24,6 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/reporters"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 
@@ -114,8 +113,7 @@ func TestE2e(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	junitReporter := reporters.NewJUnitReporter("report.xml")
-	RunSpecsWithDefaultAndCustomReporters(t, "E2e Suite", []Reporter{junitReporter})
+	RunSpecs(t, "E2e Suite")
 }
 
 var _ = BeforeSuite(func() {

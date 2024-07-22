@@ -166,7 +166,7 @@ run-e2e: ginkgo
 			(echo "Bucket to store the backups from E2E tests is required, please re-run with BSL_BUCKET=<BucketName>"; exit 1 )
 		@[ "${CLOUD_PROVIDER}" ] && echo "Using cloud provider ${CLOUD_PROVIDER}" || \
 			(echo "Cloud provider for target cloud/plugin provider is required, please rerun with CLOUD_PROVIDER=<aws,azure,kind,vsphere>"; exit 1)
-	@$(GINKGO) -v $(FOCUS_STR) $(SKIP_STR) ./e2e -- $(COMMON_ARGS) \
+	@$(GINKGO) run -v $(FOCUS_STR) $(SKIP_STR) --junit-report report.xml ./e2e -- $(COMMON_ARGS) \
 		-upgrade-from-velero-cli=$(UPGRADE_FROM_VELERO_CLI) \
 		-upgrade-from-velero-version=$(UPGRADE_FROM_VELERO_VERSION) \
 		-migrate-from-velero-cli=$(MIGRATE_FROM_VELERO_CLI) \
@@ -200,7 +200,7 @@ run-perf: ginkgo
 			(echo "Bucket to store the backups from E2E tests is required, please re-run with BSL_BUCKET=<BucketName>"; exit 1 )
 		@[ "${CLOUD_PROVIDER}" ] && echo "Using cloud provider ${CLOUD_PROVIDER}" || \
 			(echo "Cloud provider for target cloud/plugin provider is required, please rerun with CLOUD_PROVIDER=<aws,azure,kind,vsphere>"; exit 1)
-	@$(GINKGO) -v $(FOCUS_STR) $(SKIP_STR) ./perf -- $(COMMON_ARGS) \
+	@$(GINKGO) run -v $(FOCUS_STR) $(SKIP_STR) --junit-report report.xml ./perf -- $(COMMON_ARGS) \
 		-nfs-server-path=$(NFS_SERVER_PATH) \
 		-test-case-describe=$(TEST_CASE_DESCRIBE) \
 		-backup-for-restore=$(BACKUP_FOR_RESTORE) \
