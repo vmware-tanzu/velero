@@ -67,9 +67,8 @@ jobs:
           - 1.27.10
           - 1.28.6
           - 1.29.1
-        focus:
-          # tests to focus on, use `|` to concatenate multiple regexes to run on the same job
-          # ordered according to e2e_suite_test.go order
+        labels:
+          # labels are used to filter running E2E cases
           - Basic && (ClusterResource || NodePort || StorageClass)
           - ResourceFiltering && !Restic
           - ResourceModifier || (Backups && BackupsSync) || PrivilegesMgmt || OrderedResources
@@ -136,7 +135,7 @@ jobs:
               ADDITIONAL_CREDS_FILE=/tmp/credential \
               ADDITIONAL_BSL_BUCKET=additional-bucket \
               VELERO_IMAGE=velero:pr-test \
-              GINKGO_LABELS="${{ matrix.focus }}" \
+              GINKGO_LABELS="${{ matrix.labels }}" \
               make -C test/ run-e2e
         timeout-minutes: 30
       - name: Upload debug bundle
