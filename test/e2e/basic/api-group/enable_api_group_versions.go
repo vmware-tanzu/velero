@@ -53,7 +53,7 @@ type apiGropuVersionsTest struct {
 	want       map[string]map[string]string
 }
 
-func APIGropuVersionsTest() {
+func APIGroupVersionsTest() {
 	var (
 		group       string
 		err         error
