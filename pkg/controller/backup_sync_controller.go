@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -78,7 +79,7 @@ func NewBackupSyncReconciler(
 
 // Reconcile syncs between the backups in cluster and backups metadata in object store.
 func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := b.logger.WithField("controller", BackupSync)
+	log := b.logger.WithField("controller", constant.ControllerBackupSync)
 	log = log.WithField("backupLocation", req.String())
 	log.Debug("Begin to sync between backups' metadata in BSL object storage and cluster's existing backups.")
 

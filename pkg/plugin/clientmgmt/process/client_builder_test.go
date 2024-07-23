@@ -25,7 +25,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/framework/backupitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
@@ -39,19 +38,11 @@ func TestNewClientBuilder(t *testing.T) {
 	logLevel := logrus.InfoLevel
 	cb := newClientBuilder("velero", logger, logLevel)
 	assert.Equal(t, "velero", cb.commandName)
-	assert.Equal(t, []string{"--log-level", "info"}, cb.commandArgs)
 	assert.Equal(t, newLogrusAdapter(logger, logLevel), cb.pluginLogger)
 
 	cb = newClientBuilder(os.Args[0], logger, logLevel)
 	assert.Equal(t, cb.commandName, os.Args[0])
-	assert.Equal(t, []string{"run-plugins", "--log-level", "info"}, cb.commandArgs)
 	assert.Equal(t, newLogrusAdapter(logger, logLevel), cb.pluginLogger)
-
-	features.NewFeatureFlagSet("feature1", "feature2")
-	cb = newClientBuilder(os.Args[0], logger, logLevel)
-	assert.Equal(t, []string{"run-plugins", "--log-level", "info", "--features", "feature1,feature2"}, cb.commandArgs)
-	// Clear the features list in case other tests run in the same process.
-	features.NewFeatureFlagSet()
 }
 
 func TestClientConfig(t *testing.T) {

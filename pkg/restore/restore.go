@@ -67,6 +67,7 @@ import (
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	"github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	csiutil "github.com/vmware-tanzu/velero/pkg/util/csi"
@@ -106,7 +107,7 @@ type kubernetesRestorer struct {
 	podVolumeTimeout           time.Duration
 	resourceTerminatingTimeout time.Duration
 	resourceTimeout            time.Duration
-	resourcePriorities         Priorities
+	resourcePriorities         types.Priorities
 	fileSystem                 filesystem.Interface
 	pvRenamer                  func(string) (string, error)
 	logger                     logrus.FieldLogger
@@ -121,7 +122,7 @@ type kubernetesRestorer struct {
 func NewKubernetesRestorer(
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
-	resourcePriorities Priorities,
+	resourcePriorities types.Priorities,
 	namespaceClient corev1.NamespaceInterface,
 	podVolumeRestorerFactory podvolume.RestorerFactory,
 	podVolumeTimeout time.Duration,
@@ -359,7 +360,7 @@ type restoreContext struct {
 	renamedPVs                     map[string]string
 	pvRenamer                      func(string) (string, error)
 	discoveryHelper                discovery.Helper
-	resourcePriorities             Priorities
+	resourcePriorities             types.Priorities
 	kbClient                       crclient.Client
 	itemOperationsList             *[]*itemoperation.RestoreOperation
 	resourceModifiers              *resourcemodifiers.ResourceModifiers
@@ -386,7 +387,7 @@ type informerFactoryWithContext struct {
 // begins with all of the high prioritized resources (in order), ends with all of
 // the low prioritized resources(in order), and an alphabetized list of resources
 // in the backup(pick out the prioritized resources) is put in the middle.
-func getOrderedResources(resourcePriorities Priorities, backupResources map[string]*archive.ResourceItems) []string {
+func getOrderedResources(resourcePriorities types.Priorities, backupResources map[string]*archive.ResourceItems) []string {
 	priorities := map[string]struct{}{}
 	for _, priority := range resourcePriorities.HighPriorities {
 		priorities[priority] = struct{}{}
@@ -515,7 +516,7 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 		backupResources,
 		make([]restoreableResource, 0),
 		sets.New[string](),
-		Priorities{HighPriorities: []string{"customresourcedefinitions"}},
+		types.Priorities{HighPriorities: []string{"customresourcedefinitions"}},
 		false,
 	)
 	warnings.Merge(&w)
@@ -2156,7 +2157,7 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 	backupResources map[string]*archive.ResourceItems,
 	restoreResourceCollection []restoreableResource,
 	processedResources sets.Set[string],
-	resourcePriorities Priorities,
+	resourcePriorities types.Priorities,
 	includeAllResources bool,
 ) ([]restoreableResource, sets.Set[string], results.Result, results.Result) {
 	var warnings, errs results.Result

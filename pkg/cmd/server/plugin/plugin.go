@@ -45,6 +45,9 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Hidden: true,
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
+			config := pluginServer.GetConfig()
+			f.SetClientQPS(config.ClientQPS)
+			f.SetClientBurst(config.ClientBurst)
 			pluginServer = pluginServer.
 				RegisterBackupItemAction(
 					"velero.io/pv",
@@ -196,6 +199,9 @@ func NewCommand(f client.Factory) *cobra.Command {
 				)
 			}
 			pluginServer.Serve()
+		},
+		FParseErrWhitelist: cobra.FParseErrWhitelist{ // Velero.io word list : ignore
+			UnknownFlags: true,
 		},
 	}
 	pluginServer.BindFlags(c.Flags())
