@@ -138,6 +138,7 @@ func TestRestoreFinalizerReconcile(t *testing.T) {
 				metrics.NewServerMetrics(),
 				fakeClient,
 				hook.NewMultiHookTracker(),
+				10*time.Minute,
 			)
 			r.clock = testclocks.NewFakeClock(now)
 
@@ -200,6 +201,7 @@ func TestUpdateResult(t *testing.T) {
 		metrics.NewServerMetrics(),
 		fakeClient,
 		hook.NewMultiHookTracker(),
+		10*time.Minute,
 	)
 	restore := builder.ForRestore(velerov1api.DefaultNamespace, "restore-1").Result()
 	res := map[string]results.Result{"warnings": {}, "errors": {}}
