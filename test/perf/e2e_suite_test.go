@@ -94,11 +94,14 @@ func initConfig() error {
 	return nil
 }
 
-var _ = Describe("[PerformanceTest][BackupAndRestore] Velero test on both backup and restore resources", test.TestFunc(&basic.BasicTest{}))
+var _ = Describe("Velero test on both backup and restore resources",
+	Label("PerformanceTest", "BackupAndRestore"), test.TestFunc(&basic.BasicTest{}))
 
-var _ = Describe("[PerformanceTest][Backup] Velero test on only backup resources", test.TestFunc(&backup.BackupTest{}))
+var _ = Describe("Velero test on only backup resources",
+	Label("PerformanceTest", "Backup"), test.TestFunc(&backup.BackupTest{}))
 
-var _ = Describe("[PerformanceTest][Restore] Velero test on only restore resources", test.TestFunc(&restore.RestoreTest{}))
+var _ = Describe("Velero test on only restore resources",
+	Label("PerformanceTest", "Restore"), test.TestFunc(&restore.RestoreTest{}))
 
 func TestE2e(t *testing.T) {
 	flag.Parse()
