@@ -255,7 +255,7 @@ E2E tests can be run with specific cases to be included and/or excluded using th
 
 1. Run Velero tests with specific cases to be excluded:
     ```bash
-    GINKGO_LABELS="!Scale || !Schedule || !TTL || !(Upgrade && Restic) || !(Migration && Restic)" \
+    GINKGO_LABELS="!(Scale || Schedule || TTL || (Upgrade && Restic) || (Migration && Restic))" \
     CLOUD_PROVIDER=aws \
     BSL_BUCKET=example-bucket \
     CREDS_FILE=/path/to/aws-creds \

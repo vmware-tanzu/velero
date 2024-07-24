@@ -169,6 +169,7 @@ run-e2e: ginkgo
 		-v \
 		--junit-report report.xml \
 		--label-filter="$(GINKGO_LABELS)" \
+		--timeout=5h \
 		./e2e \
 		-- $(COMMON_ARGS) \
 		--upgrade-from-velero-cli=$(UPGRADE_FROM_VELERO_CLI) \
@@ -208,6 +209,7 @@ run-perf: ginkgo
 		-v \
 		--junit-report report.xml \
 		--label-filter="$(GINKGO_LABELS)" \
+		--timeout=5h \
 		./perf \
 		-- $(COMMON_ARGS) \
 		--nfs-server-path=$(NFS_SERVER_PATH) \
