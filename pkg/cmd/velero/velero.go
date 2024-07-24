@@ -51,6 +51,7 @@ import (
 	veleroflag "github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/features"
 
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/datamover"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/nodeagent"
 )
 
@@ -124,6 +125,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		snapshotlocation.NewCommand(f),
 		debug.NewCommand(f),
 		repomantenance.NewCommand(f),
+		datamover.NewCommand(f),
 	)
 
 	// init and add the klog flags
