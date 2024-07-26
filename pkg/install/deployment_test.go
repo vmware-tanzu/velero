@@ -31,7 +31,7 @@ func TestDeployment(t *testing.T) {
 
 	assert.Equal(t, "velero", deploy.ObjectMeta.Namespace)
 
-	deploy = Deployment("velero", WithRestoreOnly())
+	deploy = Deployment("velero", WithRestoreOnly(true))
 	assert.Equal(t, "--restore-only", deploy.Spec.Template.Spec.Containers[0].Args[1])
 
 	deploy = Deployment("velero", WithEnvFromSecretKey("my-var", "my-secret", "my-key"))
@@ -67,7 +67,7 @@ func TestDeployment(t *testing.T) {
 	deploy = Deployment("velero", WithServiceAccountName("test-sa"))
 	assert.Equal(t, "test-sa", deploy.Spec.Template.Spec.ServiceAccountName)
 
-	deploy = Deployment("velero", WithDisableInformerCache())
+	deploy = Deployment("velero", WithDisableInformerCache(true))
 	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
 	assert.Equal(t, "--disable-informer-cache=true", deploy.Spec.Template.Spec.Containers[0].Args[1])
 

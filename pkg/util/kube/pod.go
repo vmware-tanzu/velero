@@ -18,6 +18,7 @@ package kube
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/pkg/errors"
@@ -117,8 +118,9 @@ func EnsureDeletePod(ctx context.Context, podGetter corev1client.CoreV1Interface
 func IsPodUnrecoverable(pod *corev1api.Pod, log logrus.FieldLogger) (bool, string) {
 	// Check the Phase field
 	if pod.Status.Phase == corev1api.PodFailed || pod.Status.Phase == corev1api.PodUnknown {
-		log.Warnf("Pod is in abnormal state %s", pod.Status.Phase)
-		return true, fmt.Sprintf("Pod is in abnormal state %s", pod.Status.Phase)
+		message := GetPodTerminateMessage(pod)
+		log.Warnf("Pod is in abnormal state %s, message [%s]", pod.Status.Phase, message)
+		return true, fmt.Sprintf("Pod is in abnormal state [%s], message [%s]", pod.Status.Phase, message)
 	}
 
 	// removed "Unschedulable" check since unschedulable condition isn't always permanent
@@ -132,4 +134,70 @@ func IsPodUnrecoverable(pod *corev1api.Pod, log logrus.FieldLogger) (bool, strin
 		}
 	}
 	return false, ""
+}
+
+// GetPodContainerTerminateMessage returns the terminate message for a specific container of a pod
+func GetPodContainerTerminateMessage(pod *corev1api.Pod, container string) string {
+	message := ""
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.Name == container {
+			if containerStatus.State.Terminated != nil {
+				message = containerStatus.State.Terminated.Message
+			}
+			break
+		}
+	}
+
+	return message
+}
+
+// GetPodTerminateMessage returns the terminate message for all containers of a pod
+func GetPodTerminateMessage(pod *corev1api.Pod) string {
+	message := ""
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.State.Terminated != nil {
+			if containerStatus.State.Terminated.Message != "" {
+				message += containerStatus.State.Terminated.Message + "/"
+			}
+		}
+	}
+
+	return message
+}
+
+func getPodLogReader(ctx context.Context, podGetter corev1client.CoreV1Interface, pod string, namespace string, logOptions *corev1api.PodLogOptions) (io.ReadCloser, error) {
+	request := podGetter.Pods(namespace).GetLogs(pod, logOptions)
+	return request.Stream(ctx)
+}
+
+var podLogReaderGetter = getPodLogReader
+
+// CollectPodLogs collects logs of the specified container of a pod and write to the output
+func CollectPodLogs(ctx context.Context, podGetter corev1client.CoreV1Interface, pod string, namespace string, container string, output io.Writer) error {
+	logIndicator := fmt.Sprintf("***************************begin pod logs[%s/%s]***************************\n", pod, container)
+
+	if _, err := output.Write([]byte(logIndicator)); err != nil {
+		return errors.Wrap(err, "error to write begin pod log indicator")
+	}
+
+	logOptions := &corev1api.PodLogOptions{
+		Container: container,
+	}
+
+	if input, err := podLogReaderGetter(ctx, podGetter, pod, namespace, logOptions); err != nil {
+		logIndicator = fmt.Sprintf("No present log retrieved, err: %v\n", err)
+	} else {
+		if _, err := io.Copy(output, input); err != nil {
+			return errors.Wrap(err, "error to copy input")
+		}
+
+		logIndicator = ""
+	}
+
+	logIndicator += fmt.Sprintf("***************************end pod logs[%s/%s]***************************\n", pod, container)
+	if _, err := output.Write([]byte(logIndicator)); err != nil {
+		return errors.Wrap(err, "error to write end pod log indicator")
+	}
+
+	return nil
 }
