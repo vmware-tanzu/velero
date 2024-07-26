@@ -30,10 +30,12 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
+	iba "github.com/vmware-tanzu/velero/pkg/itemblock/actions"
 	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	ria "github.com/vmware-tanzu/velero/pkg/restore/actions"
 	csiria "github.com/vmware-tanzu/velero/pkg/restore/actions/csi"
+	"github.com/vmware-tanzu/velero/pkg/util/actionhelpers"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -171,6 +173,18 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemActionV2(
 					"velero.io/csi-volumesnapshotclass-restorer",
 					newVolumeSnapshotClassRestoreItemAction,
+				).
+				RegisterItemBlockAction(
+					"velero.io/pvc",
+					newPVCItemBlockAction(f),
+				).
+				RegisterItemBlockAction(
+					"velero.io/pod",
+					newPodItemBlockAction,
+				).
+				RegisterItemBlockAction(
+					"velero.io/service-account",
+					newServiceAccountItemBlockAction(f),
 				)
 
 			if !features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag) {
@@ -211,7 +225,7 @@ func newServiceAccountBackupItemAction(f client.Factory) plugincommon.HandlerIni
 
 		action, err := bia.NewServiceAccountAction(
 			logger,
-			bia.NewClusterRoleBindingListerMap(clientset),
+			actionhelpers.NewClusterRoleBindingListerMap(clientset),
 			discoveryHelper)
 		if err != nil {
 			return nil, err
@@ -430,4 +444,39 @@ func newVolumeSnapshotContentRestoreItemAction(logger logrus.FieldLogger) (inter
 
 func newVolumeSnapshotClassRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return csiria.NewVolumeSnapshotClassRestoreItemAction(logger)
+}
+
+// ItemBlockAction plugins
+
+func newPVCItemBlockAction(f client.Factory) plugincommon.HandlerInitializer {
+	return iba.NewPVCAction(f)
+}
+
+func newPodItemBlockAction(logger logrus.FieldLogger) (interface{}, error) {
+	return iba.NewPodAction(logger), nil
+}
+
+func newServiceAccountItemBlockAction(f client.Factory) plugincommon.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		// TODO(ncdc): consider a k8s style WantsKubernetesClientSet initialization approach
+		clientset, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), logger)
+		if err != nil {
+			return nil, err
+		}
+
+		action, err := iba.NewServiceAccountAction(
+			logger,
+			actionhelpers.NewClusterRoleBindingListerMap(clientset),
+			discoveryHelper)
+		if err != nil {
+			return nil, err
+		}
+
+		return action, nil
+	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,13 +28,13 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/actionhelpers"
 )
 
-// ServiceAccountAction implements ItemAction.
+// ServiceAccountAction implements ItemBlockAction.
 type ServiceAccountAction struct {
 	log                 logrus.FieldLogger
 	clusterRoleBindings []actionhelpers.ClusterRoleBinding
 }
 
-// NewServiceAccountAction creates a new ItemAction for service accounts.
+// NewServiceAccountAction creates a new ItemBlockAction for service accounts.
 func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingListers map[string]actionhelpers.ClusterRoleBindingLister, discoveryHelper velerodiscovery.Helper) (*ServiceAccountAction, error) {
 	crbs, err := actionhelpers.ClusterRoleBindingsForAction(clusterRoleBindingListers, discoveryHelper)
 	if err != nil {
@@ -54,17 +54,20 @@ func (a *ServiceAccountAction) AppliesTo() (velero.ResourceSelector, error) {
 	}, nil
 }
 
-// Execute checks for any ClusterRoleBindings that have this service account as a subject, and
-// adds the ClusterRoleBinding and associated ClusterRole to the list of additional items to
-// be backed up.
-func (a *ServiceAccountAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
-	a.log.Info("Running ServiceAccountAction")
-	defer a.log.Info("Done running ServiceAccountAction")
+// GetRelatedItems checks for any ClusterRoleBindings that have this service account as a subject, and
+// returns the ClusterRoleBinding and associated ClusterRole.
+func (a *ServiceAccountAction) GetRelatedItems(item runtime.Unstructured, backup *v1.Backup) ([]velero.ResourceIdentifier, error) {
+	a.log.Info("Running ServiceAccount ItemBlockAction")
+	defer a.log.Info("Done running ServiceAccount ItemBlockAction")
 
 	objectMeta, err := meta.Accessor(item)
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
-	return item, actionhelpers.RelatedItemsForServiceAccount(objectMeta, a.clusterRoleBindings, a.log), nil
+	return actionhelpers.RelatedItemsForServiceAccount(objectMeta, a.clusterRoleBindings, a.log), nil
+}
+
+func (a *ServiceAccountAction) Name() string {
+	return "ServiceAccountItemBlockAction"
 }

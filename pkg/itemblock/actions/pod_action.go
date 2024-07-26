@@ -27,12 +27,12 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/actionhelpers"
 )
 
-// PodAction implements ItemAction.
+// PodAction implements ItemBlockAction.
 type PodAction struct {
 	log logrus.FieldLogger
 }
 
-// NewPodAction creates a new ItemAction for pods.
+// NewPodAction creates a new ItemBlockAction for pods.
 func NewPodAction(logger logrus.FieldLogger) *PodAction {
 	return &PodAction{log: logger}
 }
@@ -44,16 +44,20 @@ func (a *PodAction) AppliesTo() (velero.ResourceSelector, error) {
 	}, nil
 }
 
-// Execute scans the pod's spec.volumes for persistentVolumeClaim volumes and returns a
+// GetRelatedItems scans the pod's spec.volumes for persistentVolumeClaim volumes and returns a
 // ResourceIdentifier list containing references to all of the persistentVolumeClaim volumes used by
-// the pod. This ensures that when a pod is backed up, all referenced PVCs are backed up too.
-func (a *PodAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
-	a.log.Info("Executing podAction")
-	defer a.log.Info("Done executing podAction")
+// the pod. This ensures that when a pod is backed up, all referenced PVCs are backed up along with the pod.
+func (a *PodAction) GetRelatedItems(item runtime.Unstructured, backup *v1.Backup) ([]velero.ResourceIdentifier, error) {
+	a.log.Info("Executing pod ItemBlockAction")
+	defer a.log.Info("Done executing pod ItemBlockAction")
 
 	pod := new(corev1api.Pod)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.UnstructuredContent(), pod); err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
-	return item, actionhelpers.RelatedItemsForPod(pod, a.log), nil
+	return actionhelpers.RelatedItemsForPod(pod, a.log), nil
+}
+
+func (a *PodAction) Name() string {
+	return "PodItemBlockAction"
 }
