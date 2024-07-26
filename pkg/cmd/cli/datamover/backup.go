@@ -207,7 +207,8 @@ func (s *dataMoverBackup) run() {
 		}
 	}()
 
-	s.runDataPath()
+	// TODOOO: call s.runDataPath()
+	time.Sleep(time.Duration(1<<63 - 1))
 }
 
 func (s *dataMoverBackup) runDataPath() {
