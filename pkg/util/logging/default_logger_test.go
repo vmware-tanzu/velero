@@ -34,7 +34,7 @@ func TestDefaultLogger(t *testing.T) {
 		assert.Equal(t, os.Stdout, logger.Out)
 
 		for _, level := range logrus.AllLevels {
-			assert.Equal(t, DefaultHooks(), logger.Hooks[level])
+			assert.Equal(t, DefaultHooks(false), logger.Hooks[level])
 		}
 	}
 }
