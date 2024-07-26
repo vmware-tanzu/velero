@@ -67,16 +67,12 @@ jobs:
           - 1.27.10
           - 1.28.6
           - 1.29.1
-        focus:
-          # tests to focus on, use `|` to concatenate multiple regexes to run on the same job
-          # ordered according to e2e_suite_test.go order
-          - Basic\]\[ClusterResource
-          - ResourceFiltering
-          - ResourceModifier|Backups|PrivilegesMgmt\]\[SSR
-          - Schedule\]\[OrderedResources
-          - NamespaceMapping\]\[Single\]\[Restic|NamespaceMapping\]\[Multiple\]\[Restic
-          - Basic\]\[Nodeport
-          - Basic\]\[StorageClass
+        labels:
+          # labels are used to filter running E2E cases
+          - Basic && (ClusterResource || NodePort || StorageClass)
+          - ResourceFiltering && !Restic
+          - ResourceModifier || (Backups && BackupsSync) || PrivilegesMgmt || OrderedResources
+          - (NamespaceMapping && Single && Restic) || (NamespaceMapping && Multiple && Restic)
       fail-fast: false
     steps:
       - name: Set up Go
@@ -128,13 +124,18 @@ jobs:
           curl -LO https://dl.k8s.io/release/v${{ matrix.k8s }}/bin/linux/amd64/kubectl
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-          GOPATH=~/go CLOUD_PROVIDER=kind \
-              OBJECT_STORE_PROVIDER=aws BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
-              CREDS_FILE=/tmp/credential BSL_BUCKET=bucket \
-              ADDITIONAL_OBJECT_STORE_PROVIDER=aws ADDITIONAL_BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
-              ADDITIONAL_CREDS_FILE=/tmp/credential ADDITIONAL_BSL_BUCKET=additional-bucket \
-              GINKGO_FOCUS='${{ matrix.focus }}' VELERO_IMAGE=velero:pr-test \
-              GINKGO_SKIP='SKIP_KIND|pv-backup|Restic|Snapshot|LongTime' \
+          GOPATH=~/go \
+              CLOUD_PROVIDER=kind \
+              OBJECT_STORE_PROVIDER=aws \
+              BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
+              CREDS_FILE=/tmp/credential \
+              BSL_BUCKET=bucket \
+              ADDITIONAL_OBJECT_STORE_PROVIDER=aws \
+              ADDITIONAL_BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
+              ADDITIONAL_CREDS_FILE=/tmp/credential \
+              ADDITIONAL_BSL_BUCKET=additional-bucket \
+              VELERO_IMAGE=velero:pr-test \
+              GINKGO_LABELS="${{ matrix.labels }}" \
               make -C test/ run-e2e
         timeout-minutes: 30
       - name: Upload debug bundle
