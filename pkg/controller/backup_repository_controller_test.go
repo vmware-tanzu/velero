@@ -21,7 +21,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -29,6 +31,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	repomokes "github.com/vmware-tanzu/velero/pkg/repository/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+
+	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 const testMaintenanceFrequency = 10 * time.Minute
@@ -43,6 +47,7 @@ func mockBackupRepoReconciler(t *testing.T, rr *velerov1api.BackupRepository, mo
 		velerotest.NewLogger(),
 		velerotest.NewFakeControllerRuntimeClient(t),
 		testMaintenanceFrequency,
+		"fake-repo-config",
 		mgr,
 	)
 }
@@ -243,6 +248,7 @@ func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
 				velerotest.NewLogger(),
 				velerotest.NewFakeControllerRuntimeClient(t),
 				test.userDefinedFreq,
+				"",
 				&mgr,
 			)
 
@@ -370,10 +376,112 @@ func TestNeedInvalidBackupRepo(t *testing.T) {
 				velerov1api.DefaultNamespace,
 				velerotest.NewLogger(),
 				velerotest.NewFakeControllerRuntimeClient(t),
-				time.Duration(0), nil)
+				time.Duration(0), "", nil)
 
 			need := reconciler.needInvalidBackupRepo(test.oldBSL, test.newBSL)
 			assert.Equal(t, test.expect, need)
+		})
+	}
+}
+
+func TestGetBackupRepositoryConfig(t *testing.T) {
+	configWithNoData := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "config-1",
+			Namespace: velerov1api.DefaultNamespace,
+		},
+	}
+
+	configWithWrongData := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "config-1",
+			Namespace: velerov1api.DefaultNamespace,
+		},
+		Data: map[string]string{
+			"fake-repo-type": "",
+		},
+	}
+
+	configWithData := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "config-1",
+			Namespace: velerov1api.DefaultNamespace,
+		},
+		Data: map[string]string{
+			"fake-repo-type":   "{\"cacheLimitMB\": 1000, \"enableCompression\": true}",
+			"fake-repo-type-1": "{\"cacheLimitMB\": 1, \"enableCompression\": false}",
+		},
+	}
+
+	tests := []struct {
+		name           string
+		congiName      string
+		repoName       string
+		repoType       string
+		kubeClientObj  []runtime.Object
+		expectedErr    string
+		expectedResult map[string]string
+	}{
+		{
+			name: "empty configName",
+		},
+		{
+			name:        "get error",
+			congiName:   "config-1",
+			expectedErr: "error getting configMap config-1: configmaps \"config-1\" not found",
+		},
+		{
+			name:      "no config for repo",
+			congiName: "config-1",
+			repoName:  "fake-repo",
+			repoType:  "fake-repo-type",
+			kubeClientObj: []runtime.Object{
+				configWithNoData,
+			},
+		},
+		{
+			name:      "unmarshall error",
+			congiName: "config-1",
+			repoName:  "fake-repo",
+			repoType:  "fake-repo-type",
+			kubeClientObj: []runtime.Object{
+				configWithWrongData,
+			},
+			expectedErr: "error unmarshalling config data from config-1 for repo fake-repo, repo type fake-repo-type: unexpected end of JSON input",
+		},
+		{
+			name:      "succeed",
+			congiName: "config-1",
+			repoName:  "fake-repo",
+			repoType:  "fake-repo-type",
+			kubeClientObj: []runtime.Object{
+				configWithData,
+			},
+			expectedResult: map[string]string{
+				"cacheLimitMB":      "1000",
+				"enableCompression": "true",
+			},
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	corev1.AddToScheme(scheme)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClientBuilder := clientFake.NewClientBuilder()
+			fakeClientBuilder = fakeClientBuilder.WithScheme(scheme)
+
+			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
+
+			result, err := getBackupRepositoryConfig(context.Background(), fakeClient, test.congiName, velerov1api.DefaultNamespace, test.repoName, test.repoType, velerotest.NewLogger())
+
+			if test.expectedErr != "" {
+				assert.EqualError(t, err, test.expectedErr)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, test.expectedResult, result)
+			}
 		})
 	}
 }
