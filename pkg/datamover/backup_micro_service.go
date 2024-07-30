@@ -127,7 +127,7 @@ func (r *BackupMicroService) Init() error {
 	return err
 }
 
-var waitDuTimeout time.Duration = time.Minute * 2
+var waitControllerTimeout time.Duration = time.Minute * 2
 
 func (r *BackupMicroService) RunCancelableDataPath(ctx context.Context) (string, error) {
 	log := r.logger.WithFields(logrus.Fields{
@@ -135,7 +135,7 @@ func (r *BackupMicroService) RunCancelableDataPath(ctx context.Context) (string,
 	})
 
 	du := &velerov2alpha1api.DataUpload{}
-	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, waitDuTimeout, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, waitControllerTimeout, true, func(ctx context.Context) (bool, error) {
 		err := r.client.Get(ctx, types.NamespacedName{
 			Namespace: r.namespace,
 			Name:      r.dataUploadName,
@@ -313,7 +313,7 @@ func (r *BackupMicroService) closeDataPath(ctx context.Context, duName string) {
 func (r *BackupMicroService) cancelDataUpload(du *velerov2alpha1api.DataUpload) {
 	r.logger.WithField("DataUpload", du.Name).Info("Data upload is being canceled")
 
-	r.eventRecorder.Event(du, false, "Canceling", "Canceing for data upload %s", du.Name)
+	r.eventRecorder.Event(du, false, "Canceling", "Canceling for data upload %s", du.Name)
 
 	fsBackup := r.dataPathMgr.GetAsyncBR(du.Name)
 	if fsBackup == nil {
