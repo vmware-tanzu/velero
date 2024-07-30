@@ -14,6 +14,7 @@ limitations under the License.
 package datamover
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -37,6 +38,12 @@ func NewCommand(f client.Factory) *cobra.Command {
 	)
 
 	return command
+}
+
+type dataPathService interface {
+	Init() error
+	RunCancelableDataPath(context.Context) (string, error)
+	Shutdown()
 }
 
 var funcExit = os.Exit
