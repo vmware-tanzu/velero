@@ -38,3 +38,16 @@ func TestDefaultLogger(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultMergeLogger(t *testing.T) {
+	formatFlag := NewFormatFlag()
+
+	for _, testFormat := range formatFlag.AllowedValues() {
+		formatFlag.Set(testFormat)
+		logger := DefaultMergeLogger(logrus.InfoLevel, formatFlag.Parse())
+		assert.Equal(t, logrus.InfoLevel, logger.Level)
+		assert.Equal(t, os.Stdout, logger.Out)
+
+		assert.Equal(t, DefaultHooks(true), logger.Hooks[ListeningLevel])
+	}
+}

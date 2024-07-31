@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -56,6 +57,7 @@ import (
 type DataDownloadReconciler struct {
 	client            client.Client
 	kubeClient        kubernetes.Interface
+	mgr               manager.Manager
 	logger            logrus.FieldLogger
 	credentialGetter  *credentials.CredentialGetter
 	fileSystem        filesystem.Interface
@@ -68,11 +70,12 @@ type DataDownloadReconciler struct {
 	metrics           *metrics.ServerMetrics
 }
 
-func NewDataDownloadReconciler(client client.Client, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
+func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
 	repoEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter, nodeName string, preparingTimeout time.Duration, logger logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:            client,
 		kubeClient:        kubeClient,
+		mgr:               mgr,
 		logger:            logger.WithField("controller", "DataDownload"),
 		credentialGetter:  credentialGetter,
 		fileSystem:        filesystem.NewFileSystem(),
@@ -234,9 +237,9 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, nil
 		}
 
-		fsRestore := r.dataPathMgr.GetAsyncBR(dd.Name)
+		asyncBR := r.dataPathMgr.GetAsyncBR(dd.Name)
 
-		if fsRestore != nil {
+		if asyncBR != nil {
 			log.Info("Cancellable data path is already started")
 			return ctrl.Result{}, nil
 		}
@@ -259,7 +262,8 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			OnProgress:  r.OnDataDownloadProgress,
 		}
 
-		fsRestore, err = r.dataPathMgr.CreateFileSystemBR(dd.Name, dataUploadDownloadRequestor, ctx, r.client, dd.Namespace, callbacks, log)
+		asyncBR, err = r.dataPathMgr.CreateMicroServiceBRWatcher(ctx, r.client, r.kubeClient, r.mgr, datapath.TaskTypeRestore,
+			dd.Name, dd.Namespace, result.ByPod.HostingPod.Name, result.ByPod.HostingContainer, dd.Name, callbacks, false, log)
 		if err != nil {
 			if err == datapath.ConcurrentLimitExceed {
 				log.Info("Data path instance is concurrent limited requeue later")
@@ -279,7 +283,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		log.Info("Data download is marked as in progress")
 
-		reconcileResult, err := r.runCancelableDataPath(ctx, fsRestore, dd, result, log)
+		reconcileResult, err := r.runCancelableDataPath(ctx, asyncBR, dd, result, log)
 		if err != nil {
 			log.Errorf("Failed to run cancelable data path for %s with err %v", dd.Name, err)
 			r.closeDataPath(ctx, dd.Name)
@@ -289,8 +293,8 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Info("Data download is in progress")
 		if dd.Spec.Cancel {
 			log.Info("Data download is being canceled")
-			fsRestore := r.dataPathMgr.GetAsyncBR(dd.Name)
-			if fsRestore == nil {
+			asyncBR := r.dataPathMgr.GetAsyncBR(dd.Name)
+			if asyncBR == nil {
 				if r.nodeName == dd.Status.Node {
 					r.OnDataDownloadCancelled(ctx, dd.GetNamespace(), dd.GetName())
 				} else {
@@ -306,7 +310,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				log.WithError(err).Error("error updating data download status")
 				return ctrl.Result{}, err
 			}
-			fsRestore.Cancel()
+			asyncBR.Cancel()
 			return ctrl.Result{}, nil
 		}
 
@@ -327,33 +331,20 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 }
 
-func (r *DataDownloadReconciler) runCancelableDataPath(ctx context.Context, fsRestore datapath.AsyncBR, dd *velerov2alpha1api.DataDownload, res *exposer.ExposeResult, log logrus.FieldLogger) (reconcile.Result, error) {
-	path, err := exposer.GetPodVolumeHostPath(ctx, res.ByPod.HostingPod, res.ByPod.VolumeName, r.client, r.fileSystem, log)
-	if err != nil {
-		return r.errorOut(ctx, dd, err, "error exposing host path for pod volume", log)
+func (r *DataDownloadReconciler) runCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, dd *velerov2alpha1api.DataDownload, res *exposer.ExposeResult, log logrus.FieldLogger) (reconcile.Result, error) {
+	if err := asyncBR.Init(ctx, nil); err != nil {
+		return r.errorOut(ctx, dd, err, "error to initialize asyncBR", log)
 	}
 
-	log.WithField("path", path.ByPath).Debug("Found host path")
+	log.Infof("async restore init for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName)
 
-	if err := fsRestore.Init(ctx, &datapath.FSBRInitParam{
-		BSLName:           dd.Spec.BackupStorageLocation,
-		SourceNamespace:   dd.Spec.SourceNamespace,
-		UploaderType:      datamover.GetUploaderType(dd.Spec.DataMover),
-		RepositoryType:    velerov1api.BackupRepositoryTypeKopia,
-		RepoIdentifier:    "",
-		RepositoryEnsurer: r.repositoryEnsurer,
-		CredentialGetter:  r.credentialGetter,
-	}); err != nil {
-		return r.errorOut(ctx, dd, err, "error to initialize data path", log)
+	if err := asyncBR.StartRestore(dd.Spec.SnapshotID, datapath.AccessPoint{
+		ByPath: res.ByPod.VolumeName,
+	}, dd.Spec.DataMoverConfig); err != nil {
+		return r.errorOut(ctx, dd, err, fmt.Sprintf("error starting async restore for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName), log)
 	}
 
-	log.WithField("path", path.ByPath).Info("fs init")
-
-	if err := fsRestore.StartRestore(dd.Spec.SnapshotID, path, dd.Spec.DataMoverConfig); err != nil {
-		return r.errorOut(ctx, dd, err, fmt.Sprintf("error starting data path %s restore", path.ByPath), log)
-	}
-
-	log.WithField("path", path.ByPath).Info("Async fs restore data path started")
+	log.Info("Async restore started for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName)
 	return ctrl.Result{}, nil
 }
 
@@ -561,7 +552,7 @@ func (r *DataDownloadReconciler) findSnapshotRestoreForPod(ctx context.Context, 
 			log.WithError(err).Warn("failed to cancel datadownload, and it will wait for prepare timeout")
 			return []reconcile.Request{}
 		}
-		log.Info("Exposed pod is in abnormal status, and datadownload is marked as cancel")
+		log.Infof("Exposed pod is in abnormal status(reason %s) and datadownload is marked as cancel", reason)
 	} else {
 		return []reconcile.Request{}
 	}
@@ -754,9 +745,9 @@ func (r *DataDownloadReconciler) getTargetPVC(ctx context.Context, dd *velerov2a
 }
 
 func (r *DataDownloadReconciler) closeDataPath(ctx context.Context, ddName string) {
-	fsBackup := r.dataPathMgr.GetAsyncBR(ddName)
-	if fsBackup != nil {
-		fsBackup.Close(ctx)
+	asyncBR := r.dataPathMgr.GetAsyncBR(ddName)
+	if asyncBR != nil {
+		asyncBR.Close(ctx)
 	}
 
 	r.dataPathMgr.RemoveAsyncBR(ddName)
