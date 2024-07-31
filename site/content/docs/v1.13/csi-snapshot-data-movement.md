@@ -121,6 +121,24 @@ oc annotate namespace <velero namespace> openshift.io/node-selector=""
 oc create -n <velero namespace> -f ds.yaml
 ```
 
+**OpenShift on IBM Cloud**
+
+
+Update the host path for volumes in the node-agent DaemonSet in the Velero namespace from `/var/lib/kubelet/pods` to
+`/var/data/kubelet/pods`.
+
+```yaml
+hostPath:
+  path: /var/lib/kubelet/pods
+```
+
+to
+
+```yaml
+hostPath:
+  path: /var/data/kubet/pods
+```
+
 **VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS)**  
 
 You need to enable the `Allow Privileged` option in your plan configuration so that Velero is able to mount the hostpath.  
