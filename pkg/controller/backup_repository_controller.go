@@ -246,7 +246,7 @@ func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 
 	config, err := getBackupRepositoryConfig(ctx, r, r.backukpRepoConfig, r.namespace, req.Name, req.Spec.RepositoryType, log)
 	if err != nil {
-		log.WithError(err).Warnf("Failed to get repo config from %s for repo %s, repo config is ignored", r.backukpRepoConfig, req.Name)
+		log.WithError(err).Warn("Failed to get repo config, repo config is ignored")
 	} else if config != nil {
 		log.Infof("Init repo with config %v", config)
 	}

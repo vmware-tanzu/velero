@@ -452,11 +452,11 @@ func TestGetStorageVariables(t *testing.T) {
 				udmrepo.StoreOptionCacheLimit: "1000",
 			},
 			expected: map[string]string{
-				"fspath":     "fake-path",
-				"bucket":     "",
-				"prefix":     "fake-prefix/fake-repo-type/",
-				"region":     "",
-				"cacheLimit": "1000",
+				"fspath":       "fake-path",
+				"bucket":       "",
+				"prefix":       "fake-prefix/fake-repo-type/",
+				"region":       "",
+				"cacheLimitMB": "1000",
 			},
 		},
 	}

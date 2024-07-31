@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	defaultCacheLimitMB    = 2000
+	defaultCacheLimitMB    = 5000
 	maxCacheDurationSecond = 30
 )
 
@@ -68,7 +68,7 @@ func SetupNewRepositoryOptions(ctx context.Context, flags map[string]string) rep
 func SetupConnectOptions(ctx context.Context, repoOptions udmrepo.RepoOptions) repo.ConnectOptions {
 	cacheLimit := optionalHaveIntWithDefault(ctx, udmrepo.StoreOptionCacheLimit, repoOptions.StorageOptions, defaultCacheLimitMB) << 20
 
-	// 80% for data cache and 20% for metadata cahce and align to KB
+	// 80% for data cache and 20% for metadata cache and align to KB
 	dataCacheLimit := (cacheLimit / 5 * 4) >> 10
 	metadataCacheLimit := (cacheLimit / 5) >> 10
 
