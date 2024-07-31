@@ -27,6 +27,7 @@ import (
 
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/framework/backupitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
+	ibav1 "github.com/vmware-tanzu/velero/pkg/plugin/framework/itemblockaction/v1"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/framework/restoreitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
@@ -90,6 +91,13 @@ type Server interface {
 	// RegisterDeleteItemActions registers multiple Delete item actions.
 	RegisterDeleteItemActions(map[string]common.HandlerInitializer) Server
 
+	// RegisterItemBlockAction registers a ItemBlock action. Accepted format
+	// for the plugin name is <DNS subdomain>/<non-empty name>.
+	RegisterItemBlockAction(pluginName string, initializer common.HandlerInitializer) Server
+
+	// RegisterItemBlockActions registers multiple ItemBlock actions.
+	RegisterItemBlockActions(map[string]common.HandlerInitializer) Server
+
 	// Server runs the plugin server.
 	Serve()
 }
@@ -106,6 +114,7 @@ type server struct {
 	restoreItemAction   *RestoreItemActionPlugin
 	restoreItemActionV2 *riav2.RestoreItemActionPlugin
 	deleteItemAction    *DeleteItemActionPlugin
+	itemBlockAction     *ibav1.ItemBlockActionPlugin
 }
 
 // NewServer returns a new Server
@@ -122,6 +131,7 @@ func NewServer() Server {
 		restoreItemAction:   NewRestoreItemActionPlugin(common.ServerLogger(log)),
 		restoreItemActionV2: riav2.NewRestoreItemActionPlugin(common.ServerLogger(log)),
 		deleteItemAction:    NewDeleteItemActionPlugin(common.ServerLogger(log)),
+		itemBlockAction:     ibav1.NewItemBlockActionPlugin(common.ServerLogger(log)),
 	}
 }
 
@@ -217,6 +227,18 @@ func (s *server) RegisterDeleteItemActions(m map[string]common.HandlerInitialize
 	return s
 }
 
+func (s *server) RegisterItemBlockAction(name string, initializer common.HandlerInitializer) Server {
+	s.itemBlockAction.Register(name, initializer)
+	return s
+}
+
+func (s *server) RegisterItemBlockActions(m map[string]common.HandlerInitializer) Server {
+	for name := range m {
+		s.RegisterItemBlockAction(name, m[name])
+	}
+	return s
+}
+
 // getNames returns a list of PluginIdentifiers registered with plugin.
 func getNames(command string, kind common.PluginKind, plugin Interface) []PluginIdentifier {
 	var pluginIdentifiers []PluginIdentifier
@@ -251,6 +273,7 @@ func (s *server) Serve() {
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindRestoreItemAction, s.restoreItemAction)...)
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindRestoreItemActionV2, s.restoreItemActionV2)...)
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindDeleteItemAction, s.deleteItemAction)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, common.PluginKindItemBlockAction, s.itemBlockAction)...)
 
 	pluginLister := NewPluginLister(pluginIdentifiers...)
 
@@ -265,6 +288,7 @@ func (s *server) Serve() {
 			string(common.PluginKindRestoreItemAction):   s.restoreItemAction,
 			string(common.PluginKindRestoreItemActionV2): s.restoreItemActionV2,
 			string(common.PluginKindDeleteItemAction):    s.deleteItemAction,
+			string(common.PluginKindItemBlockAction):     s.itemBlockAction,
 		},
 		GRPCServer: plugin.DefaultGRPCServer,
 	})

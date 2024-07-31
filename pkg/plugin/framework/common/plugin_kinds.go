@@ -47,6 +47,9 @@ const (
 	// PluginKindDeleteItemAction represents a delete item action plugin.
 	PluginKindDeleteItemAction PluginKind = "DeleteItemAction"
 
+	// PluginKindItemBlockAction represents a v1 ItemBlock action plugin.
+	PluginKindItemBlockAction PluginKind = "ItemBlockAction"
+
 	// PluginKindPluginLister represents a plugin lister plugin.
 	PluginKindPluginLister PluginKind = "PluginLister"
 )
@@ -70,5 +73,6 @@ func AllPluginKinds() map[string]PluginKind {
 	allPluginKinds[PluginKindRestoreItemAction.String()] = PluginKindRestoreItemAction
 	allPluginKinds[PluginKindRestoreItemActionV2.String()] = PluginKindRestoreItemActionV2
 	allPluginKinds[PluginKindDeleteItemAction.String()] = PluginKindDeleteItemAction
+	allPluginKinds[PluginKindItemBlockAction.String()] = PluginKindItemBlockAction
 	return allPluginKinds
 }
