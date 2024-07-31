@@ -682,7 +682,7 @@ func TestPeekExpose(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				backupPodUrecoverable,
 			},
-			err: "Pod is in abnormal state Failed",
+			err: "Pod is in abnormal state [Failed], message []",
 		},
 		{
 			name:        "succeed",

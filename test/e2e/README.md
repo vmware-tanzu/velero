@@ -157,9 +157,9 @@ Basic examples:
     BSL_CONFIG="resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID" BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> CREDS_FILE=/path/to/azure-creds CLOUD_PROVIDER=azure make test-e2e
     ```
     Please refer to `velero-plugin-for-microsoft-azure` documentation for instruction to [set up permissions for Velero](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#set-permissions-for-velero) and to [set up azure storage account and blob container](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup-azure-storage-account-and-blob-container)
-1. Run Ginko-focused Restore Multi-API Groups tests using Minio as the backup storage location: 
+1. Run Multi-API group and version tests using MinIO as the backup storage location: 
    ```bash
-   BSL_CONFIG="region=minio,s3ForcePathStyle=\"true\",s3Url=<ip address>:9000" BSL_PREFIX=<prefix> BSL_BUCKET=<bucket> CREDS_FILE=<absolute path to minio credentials file> CLOUD_PROVIDER=kind OBJECT_STORE_PROVIDER=aws VELERO_NAMESPACE="velero" GINKGO_FOCUS="API group versions" make test-e2e
+   BSL_CONFIG="region=minio,s3ForcePathStyle=\"true\",s3Url=<ip address>:9000" BSL_PREFIX=<prefix> BSL_BUCKET=<bucket> CREDS_FILE=<absolute path to minio credentials file> CLOUD_PROVIDER=kind OBJECT_STORE_PROVIDER=aws VELERO_NAMESPACE="velero" GINKGO_LABELS="APIGroup && APIVersion" make test-e2e
    ```
 1. Run Velero tests in a kind cluster with AWS (or Minio) as the storage provider and use Microsoft Azure as the storage provider for an additional Backup Storage Location:
     ```bash
@@ -208,60 +208,66 @@ Migration examples:
     ```
 
 
-1. Datamover tests:
+1. Data mover tests:
 
-    The example shows all essential `make` variables for a Datamover test which is migrate from a AKS cluster to a EKS cluster. 
+    The example shows all essential `make` variables for a data mover test which is migrate from a AKS cluster to a EKS cluster. 
 
     Note: STANDBY_CLUSTER_CLOUD_PROVIDER and STANDBY_CLUSTER_OBJECT_STORE_PROVIDER is essential here, it is for identify plugins to be installed on target cluster, since DEFAULT cluster's provider is different from STANDBY cluster, plugins are different as well.
     ```bash
+    CLOUD_PROVIDER=azure \
+    DEFAULT_CLUSTER=<AKS_CLUSTER_KUBECONFIG_CONTEXT> \
+    STANDBY_CLUSTER=<EKS_CLUSTER_KUBECONFIG_CONTEXT> \ 
+    FEATURES=EnableCSI \
+    OBJECT_STORE_PROVIDER=aws \
+    CREDS_FILE=<AWS_CREDENTIAL_FILE> \ 
+    BSL_CONFIG=region=<AWS_REGION> \ 
+    BSL_BUCKET=<S3_BUCKET> \ 
+    BSL_PREFIX=<S3_BUCKET_PREFIC> \ 
+    VSL_CONFIG=region=<AWS_REGION> \ 
+    SNAPSHOT_MOVE_DATA=true \ 
+    STANDBY_CLUSTER_CLOUD_PROVIDER=aws \ 
+    STANDBY_CLUSTER_OBJECT_STORE_PROVIDER=aws \
+    GINKGO_LABELS="Migration" \
     make test-e2e
-      CLOUD_PROVIDER=azure \
-      DEFAULT_CLUSTER=<AKS_CLUSTER_KUBECONFIG_CONTEXT> \
-      STANDBY_CLUSTER=<EKS_CLUSTER_KUBECONFIG_CONTEXT> \ 
-      FEATURES=EnableCSI \
-      OBJECT_STORE_PROVIDER=aws \
-      CREDS_FILE=<AWS_CREDENTIAL_FILE> \ 
-      BSL_CONFIG=region=<AWS_REGION> \ 
-      BSL_BUCKET=<S3_BUCKET> \ 
-      BSL_PREFIX=<S3_BUCKET_PREFIC> \ 
-      VSL_CONFIG=region=<AWS_REGION> \ 
-      SNAPSHOT_MOVE_DATA=true \ 
-      STANDBY_CLUSTER_CLOUD_PROVIDER=aws \ 
-      STANDBY_CLUSTER_OBJECT_STORE_PROVIDER=aws \
-      GINKGO_FOCUS=Migration
     ```
 
 ## Filtering tests
 
-Velero E2E tests uses [Ginkgo](https://onsi.github.io/ginkgo/) testing framework which allows a subset of the tests to be run using the [`-focus` and `-skip`](https://onsi.github.io/ginkgo/#focused-specs) flags to ginkgo.
+In release-1.15, Velero bumps the [Ginkgo](https://onsi.github.io/ginkgo/) version to [v2](https://onsi.github.io/ginkgo/MIGRATING_TO_V2).
+Velero E2E start to use [labels](https://onsi.github.io/ginkgo/#spec-labels) to filter cases instead of [`-focus` and `-skip`](https://onsi.github.io/ginkgo/#focused-specs) parameters.
 
-For filtering tests, using `make` variables `GINKGO_FOCUS` and `GINKGO_SKIP`  :
-1. `GINKGO_FOCUS`: Dot-separated list of labels to be included for Ginkgo description-based filtering. Optional. The `-focus` flag is passed to ginkgo using the `GINKGO_FOCUS` `make` variable. This can be used to focus on specific tests. 
-1. `GINKGO_SKIP`: Dot-separated list of labels to be excluded for Ginkgo description-based filtering.Optional. The `-skip ` flag is passed to ginkgo using the `GINKGO_SKIP` `make` variable. This can be used to skip specific tests.
+Both `make run-e2e` and `make run-perf` CLI support using parameter `GINKGO_LABELS` to filter test cases.
 
-
-
-`GINKGO_FOCUS`/`GINKGO_SKIP` can be interpreted into multiple `-focus`/`-skip ` describe in [Description-Based Filtering](https://onsi.github.io/ginkgo/#description-based-filtering:~:text=Description%2DBased%20Filtering) by dot-separated format for test execution management please refer to examples below.:
+`GINKGO_LABELS` is interpreted into `ginkgo run` CLI's parameter [`--label-filter`](https://onsi.github.io/ginkgo/#spec-labels).
 
 
-For example, E2E tests can be run with specific cases to be included and/or excluded using the commands below:
+### Examples
+E2E tests can be run with specific cases to be included and/or excluded using the commands below:
 1. Run Velero tests with specific cases to be included:
     ```bash
+    GINKGO_LABELS="Basic && Restic" \
+    CLOUD_PROVIDER=aws \
+    BSL_BUCKET=example-bucket \
+    CREDS_FILE=/path/to/aws-creds \
     make test-e2e \
-      GINKGO_FOCUS =Basic\][\Restic  \
-      CLOUD_PROVIDER=aws BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> BSL_PREFIX=<PREFIX_UNDER_BUCKET> CREDS_FILE=/path/to/aws-creds
     ```
-    In this example, only case  `[Basic][Restic]` is included.
+    In this example, only case have both `Basic` and `Restic` labels are included.
 
 1. Run Velero tests with specific cases to be excluded:
     ```bash
-    make test-e2e \
-      GINKGO_SKIP=Scale.Schedule.TTL.Upgrade\]\[Restic.Migration\][\Restic  \
-      CLOUD_PROVIDER=aws BSL_BUCKET=<BUCKET_FOR_E2E_TEST_BACKUP> BSL_PREFIX=<PREFIX_UNDER_BUCKET> CREDS_FILE=/path/to/aws-creds
+    GINKGO_LABELS="!(Scale || Schedule || TTL || (Upgrade && Restic) || (Migration && Restic))" \
+    CLOUD_PROVIDER=aws \
+    BSL_BUCKET=example-bucket \
+    CREDS_FILE=/path/to/aws-creds \
+    make test-e2e
     ```
-    In this example, case `Scale`, `Schedule`, `TTL`, `[Upgrade][Restic]` and `[Migration][Restic]` will be skipped.
-
-
+    In this example, cases are labelled as 
+    * `Scale`
+    * `Schedule`
+    * `TTL`
+    * `Upgrade` and `Restic`
+    * `Migration` and `Restic` 
+    will be skipped.
 
 ## Full Tests execution
 
