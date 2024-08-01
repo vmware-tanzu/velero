@@ -136,7 +136,7 @@ to
 
 ```yaml
 hostPath:
-  path: /var/data/kubet/pods
+  path: /var/data/kubelet/pods
 ```
 
 **VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS)**  
