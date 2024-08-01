@@ -29,6 +29,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/framework/backupitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
+	ibav1 "github.com/vmware-tanzu/velero/pkg/plugin/framework/itemblockaction/v1"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/framework/restoreitemaction/v2"
 )
 
@@ -78,6 +79,7 @@ func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 			string(common.PluginKindRestoreItemAction):   framework.NewRestoreItemActionPlugin(common.ClientLogger(b.clientLogger)),
 			string(common.PluginKindRestoreItemActionV2): riav2.NewRestoreItemActionPlugin(common.ClientLogger(b.clientLogger)),
 			string(common.PluginKindDeleteItemAction):    framework.NewDeleteItemActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindItemBlockAction):     ibav1.NewItemBlockActionPlugin(common.ClientLogger(b.clientLogger)),
 		},
 		Logger: b.pluginLogger,
 		Cmd:    exec.Command(b.commandName, b.commandArgs...), //nolint:gosec // Internal call. No need to check the command line.

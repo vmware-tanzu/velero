@@ -248,7 +248,11 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	backupStore, err := r.backupStoreGetter.Get(location, pluginManager, log)
 	if err != nil {
-		return ctrl.Result{}, errors.Wrap(err, "error getting the backup store")
+		_, patchErr := r.patchDeleteBackupRequest(ctx, dbr, func(r *velerov1api.DeleteBackupRequest) {
+			r.Status.Phase = velerov1api.DeleteBackupRequestPhaseProcessed
+			r.Status.Errors = append(r.Status.Errors, fmt.Sprintf("cannot delete backup because backup storage location %s is currently unavailable, error: %s", location.Name, err.Error()))
+		})
+		return ctrl.Result{}, patchErr
 	}
 
 	actions, err := pluginManager.GetDeleteItemActions()
