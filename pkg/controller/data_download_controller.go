@@ -336,7 +336,7 @@ func (r *DataDownloadReconciler) runCancelableDataPath(ctx context.Context, asyn
 		return r.errorOut(ctx, dd, err, "error to initialize asyncBR", log)
 	}
 
-	log.Infof("async restore init for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName)
+	log.Infof("async restore init for pod %s, volume %s", res.ByPod.HostingPod.Name, res.ByPod.VolumeName)
 
 	if err := asyncBR.StartRestore(dd.Spec.SnapshotID, datapath.AccessPoint{
 		ByPath: res.ByPod.VolumeName,
@@ -344,7 +344,7 @@ func (r *DataDownloadReconciler) runCancelableDataPath(ctx context.Context, asyn
 		return r.errorOut(ctx, dd, err, fmt.Sprintf("error starting async restore for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName), log)
 	}
 
-	log.Info("Async restore started for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName)
+	log.Infof("Async restore started for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName)
 	return ctrl.Result{}, nil
 }
 

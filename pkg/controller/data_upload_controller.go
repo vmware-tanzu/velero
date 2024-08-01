@@ -347,7 +347,7 @@ func (r *DataUploadReconciler) runCancelableDataUpload(ctx context.Context, asyn
 		return r.errorOut(ctx, du, err, "error to initialize asyncBR", log)
 	}
 
-	log.Infof("async backup init for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName)
+	log.Infof("async backup init for pod %s, volume %s", res.ByPod.HostingPod.Name, res.ByPod.VolumeName)
 
 	if err := asyncBR.StartBackup(datapath.AccessPoint{
 		ByPath: res.ByPod.VolumeName,
@@ -355,7 +355,7 @@ func (r *DataUploadReconciler) runCancelableDataUpload(ctx context.Context, asyn
 		return r.errorOut(ctx, du, err, fmt.Sprintf("error starting async backup for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName), log)
 	}
 
-	log.Info("Async backup started for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName)
+	log.Infof("Async backup started for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName)
 	return ctrl.Result{}, nil
 }
 
