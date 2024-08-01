@@ -349,7 +349,9 @@ func (r *DataDownloadReconciler) runCancelableDataPath(ctx context.Context, asyn
 }
 
 func (r *DataDownloadReconciler) OnDataDownloadCompleted(ctx context.Context, namespace string, ddName string, result datapath.Result) {
-	defer r.closeDataPath(ctx, ddName)
+	defer func() {
+		go r.closeDataPath(ctx, ddName)
+	}()
 
 	log := r.logger.WithField("datadownload", ddName)
 	log.Info("Async fs restore data path completed")
@@ -382,7 +384,9 @@ func (r *DataDownloadReconciler) OnDataDownloadCompleted(ctx context.Context, na
 }
 
 func (r *DataDownloadReconciler) OnDataDownloadFailed(ctx context.Context, namespace string, ddName string, err error) {
-	defer r.closeDataPath(ctx, ddName)
+	defer func() {
+		go r.closeDataPath(ctx, ddName)
+	}()
 
 	log := r.logger.WithField("datadownload", ddName)
 
@@ -399,7 +403,9 @@ func (r *DataDownloadReconciler) OnDataDownloadFailed(ctx context.Context, names
 }
 
 func (r *DataDownloadReconciler) OnDataDownloadCancelled(ctx context.Context, namespace string, ddName string) {
-	defer r.closeDataPath(ctx, ddName)
+	defer func() {
+		go r.closeDataPath(ctx, ddName)
+	}()
 
 	log := r.logger.WithField("datadownload", ddName)
 

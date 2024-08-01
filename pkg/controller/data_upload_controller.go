@@ -360,7 +360,9 @@ func (r *DataUploadReconciler) runCancelableDataUpload(ctx context.Context, asyn
 }
 
 func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namespace string, duName string, result datapath.Result) {
-	defer r.closeDataPath(ctx, duName)
+	defer func() {
+		go r.closeDataPath(ctx, duName)
+	}()
 
 	log := r.logger.WithField("dataupload", duName)
 
@@ -404,7 +406,9 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 }
 
 func (r *DataUploadReconciler) OnDataUploadFailed(ctx context.Context, namespace, duName string, err error) {
-	defer r.closeDataPath(ctx, duName)
+	defer func() {
+		go r.closeDataPath(ctx, duName)
+	}()
 
 	log := r.logger.WithField("dataupload", duName)
 
@@ -421,7 +425,9 @@ func (r *DataUploadReconciler) OnDataUploadFailed(ctx context.Context, namespace
 }
 
 func (r *DataUploadReconciler) OnDataUploadCancelled(ctx context.Context, namespace string, duName string) {
-	defer r.closeDataPath(ctx, duName)
+	defer func() {
+		go r.closeDataPath(ctx, duName)
+	}()
 
 	log := r.logger.WithField("dataupload", duName)
 
