@@ -33,7 +33,7 @@ import (
 
 const testMaintenanceFrequency = 10 * time.Minute
 
-func mockBackupRepoReconciler(t *testing.T, rr *velerov1api.BackupRepository, mockOn string, arg interface{}, ret interface{}) *BackupRepoReconciler {
+func mockBackupRepoReconciler(t *testing.T, mockOn string, arg interface{}, ret interface{}) *BackupRepoReconciler {
 	mgr := &repomokes.Manager{}
 	if mockOn != "" {
 		mgr.On(mockOn, arg).Return(ret)
@@ -61,7 +61,7 @@ func mockBackupRepositoryCR() *velerov1api.BackupRepository {
 
 func TestPatchBackupRepository(t *testing.T) {
 	rr := mockBackupRepositoryCR()
-	reconciler := mockBackupRepoReconciler(t, rr, "", nil, nil)
+	reconciler := mockBackupRepoReconciler(t, "", nil, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	err = reconciler.patchBackupRepository(context.Background(), rr, repoReady())
@@ -77,7 +77,7 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	rr.Spec.BackupStorageLocation = "default"
 	rr.Spec.ResticIdentifier = "fake-identifier"
 	rr.Spec.VolumeNamespace = "volume-ns-1"
-	reconciler := mockBackupRepoReconciler(t, rr, "PrepareRepo", rr, nil)
+	reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	locations := &velerov1api.BackupStorageLocation{
@@ -100,7 +100,7 @@ func TestCheckNotReadyRepo(t *testing.T) {
 
 func TestRunMaintenanceIfDue(t *testing.T) {
 	rr := mockBackupRepositoryCR()
-	reconciler := mockBackupRepoReconciler(t, rr, "PruneRepo", rr, nil)
+	reconciler := mockBackupRepoReconciler(t, "PruneRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	lastTm := rr.Status.LastMaintenanceTime
@@ -118,7 +118,7 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 func TestInitializeRepo(t *testing.T) {
 	rr := mockBackupRepositoryCR()
 	rr.Spec.BackupStorageLocation = "default"
-	reconciler := mockBackupRepoReconciler(t, rr, "PrepareRepo", rr, nil)
+	reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	locations := &velerov1api.BackupStorageLocation{
@@ -189,7 +189,7 @@ func TestBackupRepoReconcile(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			reconciler := mockBackupRepoReconciler(t, test.repo, "", test.repo, nil)
+			reconciler := mockBackupRepoReconciler(t, "", test.repo, nil)
 			err := reconciler.Client.Create(context.TODO(), test.repo)
 			assert.NoError(t, err)
 			_, err = reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: test.repo.Name}})
