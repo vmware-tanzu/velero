@@ -1,7 +1,7 @@
 # Backup Restore Status Patch Retrying Configuration
 
 ## Abstract
-When a restore completes, we want to ensure that the restore custom resource progress to the correct status.
+When a backup/restore completes, we want to ensure that the restore custom resource progress to the correct status.
 If a patch call fails to update status to completion, it should be retried up to a certain time limit.
 
 This design proposes a way to configure timeout for this retry time limit.
