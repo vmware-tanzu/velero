@@ -25,12 +25,17 @@ This can lead to incorrect decisions for other components that rely on the backu
 
 
 ## High-Level Design
-We will add retries with timeout to existing patch calls that moves a backup/restore from InProgress to a final status such as
+We will add retries with timeout to existing patch calls that moves a backup/restore from InProgress to a different status phase such as
+- FailedValidation (final)
+- Failed (final)
+- WaitingForPluginOperations
+- WaitingForPluginOperationsPartiallyFailed
+- Finalizing
+- FinalizingPartiallyFailed
+
+and from above non final phases to
 - Completed
 - PartiallyFailed
-- Failed
-- FailedValidation
-
 
 ## Detailed Design
 Relevant reconcilers will have `resourceTimeout   time.Duration` added to its struct and to parameters of New[Backup|Restore]XReconciler functions.
