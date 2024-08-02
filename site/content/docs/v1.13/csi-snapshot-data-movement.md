@@ -142,13 +142,15 @@ hostPath:
 and
 
 ```yaml
-mountPath: /var/lib/kubelet/plugins
+- name: host-plugins
+  mountPath: /var/lib/kubelet/plugins
 ```
 
 to
 
 ```yaml
-mountPath: /var/data/kubelet/plugins
+- name: host-plugins
+  mountPath: /var/data/kubelet/plugins
 ```
 
 **VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS)**  
