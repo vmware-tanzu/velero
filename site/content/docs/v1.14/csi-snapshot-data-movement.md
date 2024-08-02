@@ -1,4 +1,4 @@
----
+`---
 title: "CSI Snapshot Data Movement"
 layout: docs
 ---
@@ -124,19 +124,31 @@ oc create -n <velero namespace> -f ds.yaml
 **OpenShift on IBM Cloud**
 
 
-Update the host path for volumes in the node-agent DaemonSet in the Velero namespace from `/var/lib/kubelet/pods` to
-`/var/data/kubelet/pods`.
+Update the host path and mount path for volumes in the node-agent DaemonSet in the Velero namespace from `/var/lib/kubelet/plugins` to
+`/var/data/kubelet/plugins`.
 
 ```yaml
 hostPath:
-  path: /var/lib/kubelet/pods
+  path: /var/lib/kubelet/plugins
 ```
 
 to
 
 ```yaml
 hostPath:
-  path: /var/data/kubelet/pods
+  path: /var/data/kubelet/plugins
+```
+
+and
+
+```yaml
+mountPath: /var/lib/kubelet/plugins
+```
+
+to
+
+```yaml
+mountPath: /var/data/kubelet/plugins
 ```
 
 **VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS)**  
