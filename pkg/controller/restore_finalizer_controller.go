@@ -311,7 +311,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 					// We are handling a common but specific scenario where a PVC is in a pending state and uses a storage class with
 					// VolumeBindingMode set to WaitForFirstConsumer. In this case, the PV patch step is skipped to avoid
 					// failures due to the PVC not being bound, which could cause a timeout and result in a failed restore.
-					if pvc != nil && pvc.Status.Phase == v1.ClaimPending {
+					if pvc.Status.Phase == v1.ClaimPending {
 						// check if storage class used has VolumeBindingMode as WaitForFirstConsumer
 						scName := *pvc.Spec.StorageClassName
 						sc := &storagev1api.StorageClass{}
