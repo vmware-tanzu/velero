@@ -46,6 +46,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
+	"github.com/vmware-tanzu/velero/pkg/itemblock"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -88,8 +89,8 @@ type FileForArchive struct {
 // If finalize is true, then it returns the bytes instead of writing them to the tarWriter
 // In addition to the error return, backupItem also returns a bool indicating whether the item
 // was actually backed up.
-func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool) (bool, []FileForArchive, error) {
-	selectedForBackup, files, err := ib.backupItemInternal(logger, obj, groupResource, preferredGVR, mustInclude, finalize)
+func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool, itemBlock *BackupItemBlock) (bool, []FileForArchive, error) {
+	selectedForBackup, files, err := ib.backupItemInternal(logger, obj, groupResource, preferredGVR, mustInclude, finalize, itemBlock)
 	// return if not selected, an error occurred, there are no files to add, or for finalize
 	if !selectedForBackup || err != nil || len(files) == 0 || finalize {
 		return selectedForBackup, files, err
@@ -106,7 +107,49 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 	return true, []FileForArchive{}, nil
 }
 
-func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool) (bool, []FileForArchive, error) {
+func (ib *itemBackupper) itemInclusionChecks(log logrus.FieldLogger, mustInclude bool, metadata metav1.Object, obj runtime.Unstructured, groupResource schema.GroupResource) bool {
+	if mustInclude {
+		log.Infof("Skipping the exclusion checks for this resource")
+	} else {
+		if metadata.GetLabels()[velerov1api.ExcludeFromBackupLabel] == "true" {
+			log.Infof("Excluding item because it has label %s=true", velerov1api.ExcludeFromBackupLabel)
+			ib.trackSkippedPV(obj, groupResource, "", fmt.Sprintf("item has label %s=true", velerov1api.ExcludeFromBackupLabel), log)
+			return false
+		}
+		// NOTE: we have to re-check namespace & resource includes/excludes because it's possible that
+		// backupItem can be invoked by a custom action.
+		namespace := metadata.GetNamespace()
+		if namespace != "" && !ib.backupRequest.NamespaceIncludesExcludes.ShouldInclude(namespace) {
+			log.Info("Excluding item because namespace is excluded")
+			return false
+		}
+
+		// NOTE: we specifically allow namespaces to be backed up even if it's excluded.
+		// This check is more permissive for cluster resources to let those passed in by
+		// plugins' additional items to get involved.
+		// Only expel cluster resource when it's specifically listed in the excluded list here.
+		if namespace == "" && groupResource != kuberesource.Namespaces &&
+			ib.backupRequest.ResourceIncludesExcludes.ShouldExclude(groupResource.String()) {
+			log.Info("Excluding item because resource is cluster-scoped and is excluded by cluster filter.")
+			return false
+		}
+
+		// Only check namespace-scoped resource to avoid expelling cluster resources
+		// are not specified in included list.
+		if namespace != "" && !ib.backupRequest.ResourceIncludesExcludes.ShouldInclude(groupResource.String()) {
+			log.Info("Excluding item because resource is excluded")
+			return false
+		}
+	}
+
+	if metadata.GetDeletionTimestamp() != nil {
+		log.Info("Skipping item because it's being deleted.")
+		return false
+	}
+	return true
+}
+
+func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool, itemBlock *BackupItemBlock) (bool, []FileForArchive, error) {
 	var itemFiles []FileForArchive
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
@@ -122,41 +165,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		"namespace": namespace,
 	})
 
-	if mustInclude {
-		log.Infof("Skipping the exclusion checks for this resource")
-	} else {
-		if metadata.GetLabels()[velerov1api.ExcludeFromBackupLabel] == "true" {
-			log.Infof("Excluding item because it has label %s=true", velerov1api.ExcludeFromBackupLabel)
-			ib.trackSkippedPV(obj, groupResource, "", fmt.Sprintf("item has label %s=true", velerov1api.ExcludeFromBackupLabel), log)
-			return false, itemFiles, nil
-		}
-		// NOTE: we have to re-check namespace & resource includes/excludes because it's possible that
-		// backupItem can be invoked by a custom action.
-		if namespace != "" && !ib.backupRequest.NamespaceIncludesExcludes.ShouldInclude(namespace) {
-			log.Info("Excluding item because namespace is excluded")
-			return false, itemFiles, nil
-		}
-
-		// NOTE: we specifically allow namespaces to be backed up even if it's excluded.
-		// This check is more permissive for cluster resources to let those passed in by
-		// plugins' additional items to get involved.
-		// Only expel cluster resource when it's specifically listed in the excluded list here.
-		if namespace == "" && groupResource != kuberesource.Namespaces &&
-			ib.backupRequest.ResourceIncludesExcludes.ShouldExclude(groupResource.String()) {
-			log.Info("Excluding item because resource is cluster-scoped and is excluded by cluster filter.")
-			return false, itemFiles, nil
-		}
-
-		// Only check namespace-scoped resource to avoid expelling cluster resources
-		// are not specified in included list.
-		if namespace != "" && !ib.backupRequest.ResourceIncludesExcludes.ShouldInclude(groupResource.String()) {
-			log.Info("Excluding item because resource is excluded")
-			return false, itemFiles, nil
-		}
-	}
-
-	if metadata.GetDeletionTimestamp() != nil {
-		log.Info("Skipping item because it's being deleted.")
+	if !ib.itemInclusionChecks(log, mustInclude, metadata, obj, groupResource) {
 		return false, itemFiles, nil
 	}
 
@@ -180,10 +189,6 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		pvbVolumes []string
 	)
 
-	log.Debug("Executing pre hooks")
-	if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePre, ib.hookTracker); err != nil {
-		return false, itemFiles, err
-	}
 	if optedOut, podName := ib.podVolumeSnapshotTracker.OptedoutByPod(namespace, name); optedOut {
 		ib.trackSkippedPV(obj, groupResource, podVolumeApproach, fmt.Sprintf("opted out due to annotation in pod %s", podName), log)
 	}
@@ -231,15 +236,9 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	// the group version of the object.
 	versionPath := resourceVersion(obj)
 
-	updatedObj, additionalItemFiles, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata, finalize)
+	updatedObj, additionalItemFiles, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata, finalize, itemBlock)
 	if err != nil {
 		backupErrs = append(backupErrs, err)
-
-		// if there was an error running actions, execute post hooks and return
-		log.Debug("Executing post hooks")
-		if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePost, ib.hookTracker); err != nil {
-			backupErrs = append(backupErrs, err)
-		}
 		return false, itemFiles, kubeerrs.NewAggregate(backupErrs)
 	}
 
@@ -292,11 +291,6 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 				}
 			}
 		}
-	}
-
-	log.Debug("Executing post hooks")
-	if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePost, ib.hookTracker); err != nil {
-		backupErrs = append(backupErrs, err)
 	}
 
 	if len(backupErrs) != 0 {
@@ -353,6 +347,7 @@ func (ib *itemBackupper) executeActions(
 	name, namespace string,
 	metadata metav1.Object,
 	finalize bool,
+	itemBlock *BackupItemBlock,
 ) (runtime.Unstructured, []FileForArchive, error) {
 	var itemFiles []FileForArchive
 	for _, action := range ib.backupRequest.ResolvedActions {
@@ -451,35 +446,54 @@ func (ib *itemBackupper) executeActions(
 		}
 
 		for _, additionalItem := range additionalItemIdentifiers {
-			gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
-			if err != nil {
-				return nil, itemFiles, err
+			var itemList []itemblock.ItemBlockItem
+
+			// get item content from itemBlock if it's there to avoid the additional APIServer call
+			// We could have multiple versions to back up if EnableAPIGroupVersions is set
+			if itemBlock != nil {
+				itemList = itemBlock.FindItem(additionalItem.GroupResource, additionalItem.Namespace, additionalItem.Name)
+			}
+			// if item is not in itemblock, pull it from the cluster
+			if len(itemList) == 0 {
+				log.Infof("Additional Item %s %s/%s not found in ItemBlock, getting from cluster", additionalItem.GroupResource, additionalItem.Namespace, additionalItem.Name)
+
+				gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
+				if err != nil {
+					return nil, itemFiles, err
+				}
+
+				client, err := ib.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), resource, additionalItem.Namespace)
+				if err != nil {
+					return nil, itemFiles, err
+				}
+
+				item, err := client.Get(additionalItem.Name, metav1.GetOptions{})
+
+				if apierrors.IsNotFound(err) {
+					log.WithFields(logrus.Fields{
+						"groupResource": additionalItem.GroupResource,
+						"namespace":     additionalItem.Namespace,
+						"name":          additionalItem.Name,
+					}).Warnf("Additional item was not found in Kubernetes API, can't back it up")
+					continue
+				}
+				if err != nil {
+					return nil, itemFiles, errors.WithStack(err)
+				}
+				itemList = append(itemList, itemblock.ItemBlockItem{
+					Gr:           additionalItem.GroupResource,
+					Item:         item,
+					PreferredGVR: gvr,
+				})
 			}
 
-			client, err := ib.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), resource, additionalItem.Namespace)
-			if err != nil {
-				return nil, itemFiles, err
+			for _, item := range itemList {
+				_, additionalItemFiles, err := ib.backupItem(log, item.Item, additionalItem.GroupResource, item.PreferredGVR, mustInclude, finalize, itemBlock)
+				if err != nil {
+					return nil, itemFiles, err
+				}
+				itemFiles = append(itemFiles, additionalItemFiles...)
 			}
-
-			item, err := client.Get(additionalItem.Name, metav1.GetOptions{})
-
-			if apierrors.IsNotFound(err) {
-				log.WithFields(logrus.Fields{
-					"groupResource": additionalItem.GroupResource,
-					"namespace":     additionalItem.Namespace,
-					"name":          additionalItem.Name,
-				}).Warnf("Additional item was not found in Kubernetes API, can't back it up")
-				continue
-			}
-			if err != nil {
-				return nil, itemFiles, errors.WithStack(err)
-			}
-
-			_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
-			if err != nil {
-				return nil, itemFiles, err
-			}
-			itemFiles = append(itemFiles, additionalItemFiles...)
 		}
 	}
 	return obj, itemFiles, nil

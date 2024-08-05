@@ -618,6 +618,11 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	if err != nil {
 		return err
 	}
+	backupLog.Info("Getting ItemBlock actions")
+	ibActions, err := pluginManager.GetItemBlockActions()
+	if err != nil {
+		return err
+	}
 	backupLog.Info("Setting up backup store to check for backup existence")
 	backupStore, err := b.backupStoreGetter.Get(backup.StorageLocation, pluginManager, backupLog)
 	if err != nil {
@@ -635,9 +640,10 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	}
 
 	backupItemActionsResolver := framework.NewBackupItemActionResolverV2(actions)
+	itemBlockActionResolver := framework.NewItemBlockActionResolver(ibActions)
 
 	var fatalErrs []error
-	if err := b.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver, pluginManager); err != nil {
+	if err := b.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver, itemBlockActionResolver, pluginManager); err != nil {
 		fatalErrs = append(fatalErrs, err)
 	}
 

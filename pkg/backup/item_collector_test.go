@@ -65,13 +65,15 @@ func TestSortCoreGroup(t *testing.T) {
 func TestSortOrderedResource(t *testing.T) {
 	log := logrus.StandardLogger()
 	podResources := []*kubernetesResource{
+		{namespace: "ns1", name: "pod3"},
 		{namespace: "ns1", name: "pod1"},
 		{namespace: "ns1", name: "pod2"},
 	}
 	order := []string{"ns1/pod2", "ns1/pod1"}
 	expectedResources := []*kubernetesResource{
-		{namespace: "ns1", name: "pod2"},
-		{namespace: "ns1", name: "pod1"},
+		{namespace: "ns1", name: "pod2", orderedResource: true},
+		{namespace: "ns1", name: "pod1", orderedResource: true},
+		{namespace: "ns1", name: "pod3"},
 	}
 	sortedResources := sortResourcesByOrder(log, podResources, order)
 	assert.Equal(t, expectedResources, sortedResources)
@@ -80,11 +82,13 @@ func TestSortOrderedResource(t *testing.T) {
 	pvResources := []*kubernetesResource{
 		{name: "pv1"},
 		{name: "pv2"},
+		{name: "pv3"},
 	}
 	pvOrder := []string{"pv5", "pv2", "pv1"}
 	expectedPvResources := []*kubernetesResource{
-		{name: "pv2"},
-		{name: "pv1"},
+		{name: "pv2", orderedResource: true},
+		{name: "pv1", orderedResource: true},
+		{name: "pv3"},
 	}
 	sortedPvResources := sortResourcesByOrder(log, pvResources, pvOrder)
 	assert.Equal(t, expectedPvResources, sortedPvResources)
