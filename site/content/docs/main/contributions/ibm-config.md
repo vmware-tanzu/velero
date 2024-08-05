@@ -76,6 +76,12 @@ Additionally, you can specify `--use-node-agent` to enable [File System Backup][
 
 (Optional) Specify [CPU and memory resource requests and limits][15] for the Velero/node-agent pods.
 
+Once the installation is complete, remove the default `VolumeSnapshotLocation` that was created by `velero install`, since it's specific to AWS and won't work for IBM Cloud:
+
+```bash
+kubectl -n velero delete volumesnapshotlocation.velero.io default
+```
+
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
 ## Installing the nginx example (optional)
