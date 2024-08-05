@@ -1148,9 +1148,15 @@ func markDataUploadsCancel(ctx context.Context, client ctrlclient.Client, backup
 			du.Status.Phase == velerov2alpha1api.DataUploadPhaseNew ||
 			du.Status.Phase == "" {
 			err := controller.UpdateDataUploadWithRetry(ctx, client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, log.WithField("dataupload", du.Name),
-				func(dataUpload *velerov2alpha1api.DataUpload) {
+				func(dataUpload *velerov2alpha1api.DataUpload) bool {
+					if dataUpload.Spec.Cancel {
+						return false
+					}
+
 					dataUpload.Spec.Cancel = true
-					dataUpload.Status.Message = fmt.Sprintf("found a dataupload with status %q during the velero server starting, mark it as cancel", du.Status.Phase)
+					dataUpload.Status.Message = fmt.Sprintf("Dataupload is in status %q during the velero server starting, mark it as cancel", du.Status.Phase)
+
+					return true
 				})
 
 			if err != nil {
@@ -1183,9 +1189,15 @@ func markDataDownloadsCancel(ctx context.Context, client ctrlclient.Client, rest
 			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseNew ||
 			dd.Status.Phase == "" {
 			err := controller.UpdateDataDownloadWithRetry(ctx, client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, log.WithField("datadownload", dd.Name),
-				func(dataDownload *velerov2alpha1api.DataDownload) {
+				func(dataDownload *velerov2alpha1api.DataDownload) bool {
+					if dataDownload.Spec.Cancel {
+						return false
+					}
+
 					dataDownload.Spec.Cancel = true
-					dataDownload.Status.Message = fmt.Sprintf("found a datadownload with status %q during the velero server starting, mark it as cancel", dd.Status.Phase)
+					dataDownload.Status.Message = fmt.Sprintf("Datadownload is in status %q during the velero server starting, mark it as cancel", dd.Status.Phase)
+
+					return true
 				})
 
 			if err != nil {

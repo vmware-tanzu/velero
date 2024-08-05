@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -67,6 +68,7 @@ type DataUploadReconciler struct {
 	client              client.Client
 	kubeClient          kubernetes.Interface
 	csiSnapshotClient   snapshotter.SnapshotV1Interface
+	mgr                 manager.Manager
 	repoEnsurer         *repository.Ensurer
 	Clock               clocks.WithTickerAndDelayedExecution
 	credentialGetter    *credentials.CredentialGetter
@@ -80,11 +82,12 @@ type DataUploadReconciler struct {
 	metrics             *metrics.ServerMetrics
 }
 
-func NewDataUploadReconciler(client client.Client, kubeClient kubernetes.Interface, csiSnapshotClient snapshotter.SnapshotV1Interface,
+func NewDataUploadReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, csiSnapshotClient snapshotter.SnapshotV1Interface,
 	dataPathMgr *datapath.Manager, loadAffinity *nodeagent.LoadAffinity, repoEnsurer *repository.Ensurer, clock clocks.WithTickerAndDelayedExecution,
 	cred *credentials.CredentialGetter, nodeName string, fs filesystem.Interface, preparingTimeout time.Duration, log logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:              client,
+		mgr:                 mgr,
 		kubeClient:          kubeClient,
 		csiSnapshotClient:   csiSnapshotClient,
 		Clock:               clock,
@@ -150,9 +153,17 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	} else if controllerutil.ContainsFinalizer(du, DataUploadDownloadFinalizer) && !du.Spec.Cancel && !isDataUploadInFinalState(du) {
 		// when delete cr we need to clear up internal resources created by Velero, here we use the cancel mechanism
 		// to help clear up resources instead of clear them directly in case of some conflict with Expose action
-		if err := UpdateDataUploadWithRetry(ctx, r.client, req.NamespacedName, log, func(dataUpload *velerov2alpha1api.DataUpload) {
+		log.Warnf("Cancel du under phase %s because it is being deleted", du.Status.Phase)
+
+		if err := UpdateDataUploadWithRetry(ctx, r.client, req.NamespacedName, log, func(dataUpload *velerov2alpha1api.DataUpload) bool {
+			if dataUpload.Spec.Cancel {
+				return false
+			}
+
 			dataUpload.Spec.Cancel = true
-			dataUpload.Status.Message = fmt.Sprintf("found a dataupload %s/%s is being deleted, mark it as cancel", du.Namespace, du.Name)
+			dataUpload.Status.Message = "Cancel dataupload because it is being deleted"
+
+			return true
 		}); err != nil {
 			log.Errorf("failed to set cancel flag with error %s for %s/%s", err.Error(), du.Namespace, du.Name)
 			return ctrl.Result{}, err
@@ -599,9 +610,15 @@ func (r *DataUploadReconciler) findDataUploadForPod(ctx context.Context, podObj 
 		}
 	} else if unrecoverable, reason := kube.IsPodUnrecoverable(pod, log); unrecoverable { // let the abnormal backup pod failed early
 		err := UpdateDataUploadWithRetry(context.Background(), r.client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, r.logger.WithField("dataupload", du.Name),
-			func(dataUpload *velerov2alpha1api.DataUpload) {
+			func(dataUpload *velerov2alpha1api.DataUpload) bool {
+				if dataUpload.Spec.Cancel {
+					return false
+				}
+
 				dataUpload.Spec.Cancel = true
-				dataUpload.Status.Message = fmt.Sprintf("dataupload mark as cancel to failed early for exposing pod %s/%s is in abnormal status for reason %s", pod.Namespace, pod.Name, reason)
+				dataUpload.Status.Message = fmt.Sprintf("Cancel dataupload because the exposing pod %s/%s is in abnormal status for reason %s", pod.Namespace, pod.Name, reason)
+
+				return true
 			})
 
 		if err != nil {
@@ -620,75 +637,6 @@ func (r *DataUploadReconciler) findDataUploadForPod(ctx context.Context, podObj 
 		},
 	}
 	return []reconcile.Request{request}
-}
-
-func (r *DataUploadReconciler) FindDataUploadsByPod(ctx context.Context, cli client.Client, ns string) ([]velerov2alpha1api.DataUpload, error) {
-	pods := &corev1.PodList{}
-	var dataUploads []velerov2alpha1api.DataUpload
-	if err := cli.List(ctx, pods, &client.ListOptions{Namespace: ns}); err != nil {
-		r.logger.WithError(errors.WithStack(err)).Error("failed to list pods on current node")
-		return nil, errors.Wrapf(err, "failed to list pods on current node")
-	}
-
-	for _, pod := range pods.Items {
-		if pod.Spec.NodeName != r.nodeName {
-			r.logger.Debugf("Pod %s related data upload will not handled by %s nodes", pod.GetName(), r.nodeName)
-			continue
-		}
-		du, err := findDataUploadByPod(cli, pod)
-		if err != nil {
-			r.logger.WithError(errors.WithStack(err)).Error("failed to get dataUpload by pod")
-			continue
-		} else if du != nil {
-			dataUploads = append(dataUploads, *du)
-		}
-	}
-	return dataUploads, nil
-}
-
-func (r *DataUploadReconciler) findAcceptDataUploadsByNodeLabel(ctx context.Context, cli client.Client, ns string) ([]velerov2alpha1api.DataUpload, error) {
-	dataUploads := &velerov2alpha1api.DataUploadList{}
-	if err := cli.List(ctx, dataUploads, &client.ListOptions{Namespace: ns}); err != nil {
-		r.logger.WithError(errors.WithStack(err)).Error("failed to list datauploads")
-		return nil, errors.Wrapf(err, "failed to list datauploads")
-	}
-
-	var result []velerov2alpha1api.DataUpload
-	for _, du := range dataUploads.Items {
-		if du.Status.Phase != velerov2alpha1api.DataUploadPhaseAccepted {
-			continue
-		}
-		if du.Labels[acceptNodeLabelKey] == r.nodeName {
-			result = append(result, du)
-		}
-	}
-	return result, nil
-}
-
-func (r *DataUploadReconciler) CancelAcceptedDataupload(ctx context.Context, cli client.Client, ns string) {
-	r.logger.Infof("Reset accepted dataupload for node %s", r.nodeName)
-	dataUploads, err := r.findAcceptDataUploadsByNodeLabel(ctx, cli, ns)
-	if err != nil {
-		r.logger.WithError(err).Error("failed to find dataupload")
-		return
-	}
-
-	for _, du := range dataUploads {
-		if du.Spec.Cancel {
-			continue
-		}
-		err = UpdateDataUploadWithRetry(ctx, cli, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, r.logger.WithField("dataupload", du.Name),
-			func(dataUpload *velerov2alpha1api.DataUpload) {
-				dataUpload.Spec.Cancel = true
-				dataUpload.Status.Message = fmt.Sprintf("found a dataupload with status %q during the node-agent starting, mark it as cancel", du.Status.Phase)
-			})
-
-		r.logger.WithField("dataupload", du.GetName()).Warn(du.Status.Message)
-		if err != nil {
-			r.logger.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", du.GetName())
-			continue
-		}
-	}
 }
 
 func (r *DataUploadReconciler) prepareDataUpload(du *velerov2alpha1api.DataUpload) {
@@ -902,54 +850,145 @@ func isDataUploadInFinalState(du *velerov2alpha1api.DataUpload) bool {
 		du.Status.Phase == velerov2alpha1api.DataUploadPhaseCompleted
 }
 
-func UpdateDataUploadWithRetry(ctx context.Context, client client.Client, namespacedName types.NamespacedName, log *logrus.Entry, updateFunc func(dataUpload *velerov2alpha1api.DataUpload)) error {
-	return wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (done bool, err error) {
+func UpdateDataUploadWithRetry(ctx context.Context, client client.Client, namespacedName types.NamespacedName, log *logrus.Entry, updateFunc func(*velerov2alpha1api.DataUpload) bool) error {
+	return wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		du := &velerov2alpha1api.DataUpload{}
 		if err := client.Get(ctx, namespacedName, du); err != nil {
 			return false, errors.Wrap(err, "getting DataUpload")
 		}
 
-		updateFunc(du)
-		updateErr := client.Update(ctx, du)
-		if updateErr != nil {
-			if apierrors.IsConflict(updateErr) {
-				log.Warnf("failed to update dataupload for %s/%s and will retry it", du.Namespace, du.Name)
-				return false, nil
+		if updateFunc(du) {
+			err := client.Update(ctx, du)
+			if err != nil {
+				if apierrors.IsConflict(err) {
+					log.Warnf("failed to update dataupload for %s/%s and will retry it", du.Namespace, du.Name)
+					return false, nil
+				} else {
+					return false, errors.Wrapf(err, "error updating dataupload with error %s/%s", du.Namespace, du.Name)
+				}
 			}
-			log.Errorf("failed to update dataupload with error %s for %s/%s", updateErr.Error(), du.Namespace, du.Name)
-			return false, err
 		}
+
 		return true, nil
 	})
 }
 
-func (r *DataUploadReconciler) AttemptDataUploadResume(ctx context.Context, cli client.Client, logger *logrus.Entry, ns string) error {
-	if dataUploads, err := r.FindDataUploadsByPod(ctx, cli, ns); err != nil {
-		return errors.Wrap(err, "failed to find data uploads")
-	} else {
-		for _, du := range dataUploads {
-			if du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared {
-				// keep doing nothing let controller re-download the data
-				// the Prepared CR could be still handled by dataupload controller after node-agent restart
-				logger.WithField("dataupload", du.GetName()).Debug("find a dataupload with status prepared")
-			} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
-				err = UpdateDataUploadWithRetry(ctx, cli, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, logger.WithField("dataupload", du.Name),
-					func(dataUpload *velerov2alpha1api.DataUpload) {
-						dataUpload.Spec.Cancel = true
-						dataUpload.Status.Message = fmt.Sprintf("found a dataupload with status %q during the node-agent starting, mark it as cancel", du.Status.Phase)
-					})
+var funcResumeCancellableDataBackup = (*DataUploadReconciler).resumeCancellableDataPath
 
-				if err != nil {
-					logger.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q into canceled", du.GetName())
-					continue
-				}
-				logger.WithField("dataupload", du.GetName()).Debug("mark dataupload into canceled")
+func (r *DataUploadReconciler) AttemptDataUploadResume(ctx context.Context, cli client.Client, logger *logrus.Entry, ns string) error {
+	dataUploads := &velerov2alpha1api.DataUploadList{}
+	if err := cli.List(ctx, dataUploads, &client.ListOptions{Namespace: ns}); err != nil {
+		r.logger.WithError(errors.WithStack(err)).Error("failed to list datauploads")
+		return errors.Wrapf(err, "error to list datauploads")
+	}
+
+	for i := range dataUploads.Items {
+		du := &dataUploads.Items[i]
+		if du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared {
+			// keep doing nothing let controller re-download the data
+			// the Prepared CR could be still handled by dataupload controller after node-agent restart
+			logger.WithField("dataupload", du.GetName()).Debug("find a dataupload with status prepared")
+		} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
+			if du.Status.Node != r.nodeName {
+				logger.WithField("du", du.Name).WithField("current node", r.nodeName).Infof("DU should be resumed by another node %s", du.Status.Node)
+				continue
+			}
+
+			err := funcResumeCancellableDataBackup(r, ctx, du, logger)
+			if err == nil {
+				continue
+			}
+
+			logger.WithField("dataupload", du.GetName()).WithError(err).Warn("Failed to resume data path for du, have to cancel it")
+
+			resumeErr := err
+			err = UpdateDataUploadWithRetry(ctx, cli, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, logger.WithField("dataupload", du.Name),
+				func(dataUpload *velerov2alpha1api.DataUpload) bool {
+					if dataUpload.Spec.Cancel {
+						return false
+					}
+
+					dataUpload.Spec.Cancel = true
+					dataUpload.Status.Message = fmt.Sprintf("Resume InProgress dataupload failed with error %v, mark it as cancel", resumeErr)
+
+					return true
+				})
+			if err != nil {
+				logger.WithField("dataupload", du.GetName()).WithError(errors.WithStack(err)).Error("Failed to trigger dataupload cancel")
+			}
+		} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted {
+			r.logger.WithField("dataupload", du.GetName()).Warn("Cancel du under Accepted phase")
+
+			err := UpdateDataUploadWithRetry(ctx, cli, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, r.logger.WithField("dataupload", du.Name),
+				func(dataUpload *velerov2alpha1api.DataUpload) bool {
+					if dataUpload.Spec.Cancel {
+						return false
+					}
+
+					dataUpload.Spec.Cancel = true
+					dataUpload.Status.Message = "Dataupload is in Accepted status during the node-agent starting, mark it as cancel"
+
+					return true
+				})
+			if err != nil {
+				r.logger.WithField("dataupload", du.GetName()).WithError(errors.WithStack(err)).Error("Failed to trigger dataupload cancel")
 			}
 		}
 	}
 
-	//If the data upload is in Accepted status, the volume snapshot may be deleted and the exposed pod may not be created
-	// so we need to mark the data upload as canceled for it may not be recoverable
-	r.CancelAcceptedDataupload(ctx, cli, ns)
+	return nil
+}
+
+func (r *DataUploadReconciler) resumeCancellableDataPath(ctx context.Context, du *velerov2alpha1api.DataUpload, log logrus.FieldLogger) error {
+	log.Info("Resume cancelable dataUpload")
+
+	ep, ok := r.snapshotExposerList[du.Spec.SnapshotType]
+	if !ok {
+		return errors.Errorf("error to find exposer for du %s", du.Name)
+	}
+
+	waitExposePara := r.setupWaitExposePara(du)
+	res, err := ep.GetExposed(ctx, getOwnerObject(du), du.Spec.OperationTimeout.Duration, waitExposePara)
+	if err != nil {
+		return errors.Wrapf(err, "error to get exposed snapshot for du %s", du.Name)
+	}
+
+	if res == nil {
+		return errors.Errorf("expose info missed for du %s", du.Name)
+	}
+
+	callbacks := datapath.Callbacks{
+		OnCompleted: r.OnDataUploadCompleted,
+		OnFailed:    r.OnDataUploadFailed,
+		OnCancelled: r.OnDataUploadCancelled,
+		OnProgress:  r.OnDataUploadProgress,
+	}
+
+	asyncBR, err := r.dataPathMgr.CreateMicroServiceBRWatcher(ctx, r.client, r.kubeClient, r.mgr, datapath.TaskTypeBackup, du.Name, du.Namespace, res.ByPod.HostingPod.Name, res.ByPod.HostingContainer, du.Name, callbacks, true, log)
+	if err != nil {
+		return errors.Wrapf(err, "error to create asyncBR watcher for du %s", du.Name)
+	}
+
+	resumeComplete := false
+	defer func() {
+		if !resumeComplete {
+			r.closeDataPath(ctx, du.Name)
+		}
+	}()
+
+	if err := asyncBR.Init(ctx, nil); err != nil {
+		return errors.Wrapf(err, "error to init asyncBR watcher for du %s", du.Name)
+	}
+
+	if err := asyncBR.StartBackup(datapath.AccessPoint{
+		ByPath: res.ByPod.VolumeName,
+	}, du.Spec.DataMoverConfig, nil); err != nil {
+		return errors.Wrapf(err, "error to resume asyncBR watche for du %s", du.Name)
+	}
+
+	resumeComplete = true
+
+	log.Infof("asyncBR is resumed for du %s", du.Name)
+
 	return nil
 }

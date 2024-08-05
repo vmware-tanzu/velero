@@ -292,17 +292,27 @@ func (s *nodeAgentServer) run() {
 	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
 		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
 	}
-	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, loadAffinity, repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
-	s.attemptDataUploadResume(dataUploadReconciler)
+	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, loadAffinity, repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.kubeClient, s.dataPathMgr, repoEnsurer, credentialGetter, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
-	s.attemptDataDownloadResume(dataDownloadReconciler)
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, repoEnsurer, credentialGetter, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}
+
+	go func() {
+		s.mgr.GetCache().WaitForCacheSync(s.ctx)
+
+		if err := dataUploadReconciler.AttemptDataUploadResume(s.ctx, s.mgr.GetClient(), s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data upload resume")
+		}
+
+		if err := dataDownloadReconciler.AttemptDataDownloadResume(s.ctx, s.mgr.GetClient(), s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data download resume")
+		}
+	}()
 
 	s.logger.Info("Controllers starting...")
 
@@ -371,31 +381,6 @@ func (s *nodeAgentServer) markInProgressCRsFailed() {
 	s.markInProgressPVBsFailed(client)
 
 	s.markInProgressPVRsFailed(client)
-}
-
-func (s *nodeAgentServer) attemptDataUploadResume(r *controller.DataUploadReconciler) {
-	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
-	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
-	if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
-		return
-	}
-	if err := r.AttemptDataUploadResume(s.ctx, client, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data upload resume")
-	}
-}
-
-func (s *nodeAgentServer) attemptDataDownloadResume(r *controller.DataDownloadReconciler) {
-	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
-	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
-	if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
-		return
-	}
-
-	if err := r.AttemptDataDownloadResume(s.ctx, client, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data download resume")
-	}
 }
 
 func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {
