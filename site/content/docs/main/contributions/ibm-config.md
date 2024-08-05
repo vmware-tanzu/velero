@@ -65,8 +65,9 @@ velero install \
     --provider aws \
     --bucket <YOUR_BUCKET> \
     --secret-file ./credentials-velero \
+    --plugins velero/velero-plugin-for-aws:v1.10.0\
     --use-volume-snapshots=false \
-    --backup-location-config region=<YOUR_REGION>,s3ForcePathStyle="true",s3Url=<YOUR_URL_ACCESS_POINT>
+    --backup-location-config region=<YOUR_REGION>,s3ForcePathStyle="true",s3Url=<YOUR_URL_ACCESS_POINT>,checksumAlgorithm=""
 ```
 
 Velero does not have a volume snapshot plugin for IBM Cloud, so creating volume snapshots is disabled.
@@ -74,12 +75,6 @@ Velero does not have a volume snapshot plugin for IBM Cloud, so creating volume 
 Additionally, you can specify `--use-node-agent` to enable [File System Backup][16], and `--wait` to wait for the deployment to be ready.
 
 (Optional) Specify [CPU and memory resource requests and limits][15] for the Velero/node-agent pods.
-
-Once the installation is complete, remove the default `VolumeSnapshotLocation` that was created by `velero install`, since it's specific to AWS and won't work for IBM Cloud:
-
-```bash
-kubectl -n velero delete volumesnapshotlocation.velero.io default
-```
 
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
