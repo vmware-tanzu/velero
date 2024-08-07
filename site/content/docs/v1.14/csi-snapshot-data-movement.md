@@ -41,7 +41,7 @@ velero install --use-node-agent
 ### Configure Node Agent DaemonSet spec
 
 After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the node-agent DaemonSet spec. 
-The steps in this section are only needed if you are installing on RancherOS, Nutanix, OpenShift, VMware Tanzu Kubernetes Grid 
+The steps in this section are only needed if you are installing on RancherOS, Nutanix, OpenShift, OpenShift on IBM Cloud, VMware Tanzu Kubernetes Grid 
 Integrated Edition (formerly VMware Enterprise PKS), or Microsoft Azure.  
 
 
@@ -119,6 +119,38 @@ Or the ds needs to be deleted and recreated:
 oc get ds node-agent -o yaml -n <velero namespace> > ds.yaml
 oc annotate namespace <velero namespace> openshift.io/node-selector=""
 oc create -n <velero namespace> -f ds.yaml
+```
+
+**OpenShift on IBM Cloud**
+
+
+Update the host path and mount path for volumes in the node-agent DaemonSet in the Velero namespace from `/var/lib/kubelet/plugins` to
+`/var/data/kubelet/plugins`.
+
+```yaml
+hostPath:
+  path: /var/lib/kubelet/plugins
+```
+
+to
+
+```yaml
+hostPath:
+  path: /var/data/kubelet/plugins
+```
+
+and
+
+```yaml
+- name: host-plugins
+  mountPath: /var/lib/kubelet/plugins
+```
+
+to
+
+```yaml
+- name: host-plugins
+  mountPath: /var/data/kubelet/plugins
 ```
 
 **VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS)**  
