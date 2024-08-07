@@ -53,6 +53,10 @@ func NewCommand(f client.Factory) *cobra.Command {
 					newPodBackupItemAction,
 				).
 				RegisterBackupItemAction(
+					"velero.io/ingress",
+					newIngressBackupItemAction,
+				).
+				RegisterBackupItemAction(
 					"velero.io/service-account",
 					newServiceAccountBackupItemAction(f),
 				).
@@ -87,6 +91,10 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction(
 					"velero.io/add-pv-from-pvc",
 					newAddPVFromPVCRestoreItemAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/add-ingressclass-from-ing",
+					newAddIngressClassFromIngAction,
 				).
 				RegisterRestoreItemAction(
 					"velero.io/change-storage-class",
@@ -196,6 +204,10 @@ func newPodBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return bia.NewPodAction(logger), nil
 }
 
+func newIngressBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return bia.NewIngressAction(logger), nil
+}
+
 func newServiceAccountBackupItemAction(f client.Factory) plugincommon.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
 		// TODO(ncdc): consider a k8s style WantsKubernetesClientSet initialization approach
@@ -288,6 +300,10 @@ func newAddPVCFromPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, 
 
 func newAddPVFromPVCRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return ria.NewAddPVFromPVCAction(logger), nil
+}
+
+func newAddIngressClassFromIngAction(logger logrus.FieldLogger) (interface{}, error) {
+	return ria.NewAddIngressClassFromIngAction(logger), nil
 }
 
 func newCRDV1PreserveUnknownFieldsItemAction(logger logrus.FieldLogger) (interface{}, error) {
