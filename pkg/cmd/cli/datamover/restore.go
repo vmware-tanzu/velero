@@ -198,8 +198,7 @@ func (s *dataMoverRestore) run() {
 		}
 	}()
 
-	// TODOOO: call s.runDataPath()
-	time.Sleep(time.Duration(1<<63 - 1))
+	s.runDataPath()
 }
 
 func (s *dataMoverRestore) runDataPath() {
