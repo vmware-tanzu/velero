@@ -112,6 +112,12 @@ func (d *DataDownloadBuilder) ObjectMeta(opts ...ObjectMetaOpt) *DataDownloadBui
 	return d
 }
 
+// Labels sets the DataDownload's Labels.
+func (d *DataDownloadBuilder) Labels(labels map[string]string) *DataDownloadBuilder {
+	d.object.Labels = labels
+	return d
+}
+
 // StartTimestamp sets the DataDownload's StartTimestamp.
 func (d *DataDownloadBuilder) StartTimestamp(startTime *metav1.Time) *DataDownloadBuilder {
 	d.object.Status.StartTimestamp = startTime

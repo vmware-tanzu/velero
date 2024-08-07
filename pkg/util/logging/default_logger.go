@@ -43,6 +43,13 @@ func DefaultLogger(level logrus.Level, format Format) *logrus.Logger {
 	return createLogger(level, format, false)
 }
 
+// DefaultLogger returns a Logger with the default properties
+// and hooks, and also a hook to support log merge.
+// The desired output format is passed as a LogFormat Enum.
+func DefaultMergeLogger(level logrus.Level, format Format) *logrus.Logger {
+	return createLogger(level, format, true)
+}
+
 func createLogger(level logrus.Level, format Format, merge bool) *logrus.Logger {
 	logger := logrus.New()
 

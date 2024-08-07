@@ -264,14 +264,6 @@ func TestDataDownloadReconcile(t *testing.T) {
 			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
 		},
 		{
-			name:              "Error getting volume directory name for pvc in pod",
-			dd:                dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
-			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			notNilExpose:      true,
-			mockClose:         true,
-			expectedStatusMsg: "error identifying unique volume path on host",
-		},
-		{
 			name:              "Unable to update status to in progress for data download",
 			dd:                dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
 			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
@@ -404,17 +396,18 @@ func TestDataDownloadReconcile(t *testing.T) {
 				r.dataPathMgr = datapath.NewManager(1)
 			}
 
-			datapath.FSBRCreator = func(string, string, kbclient.Client, string, datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
-				fsBR := datapathmockes.NewAsyncBR(t)
+			datapath.MicroServiceBRWatcherCreator = func(kbclient.Client, kubernetes.Interface, manager.Manager, string, string,
+				string, string, string, string, datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
+				asyncBR := datapathmockes.NewAsyncBR(t)
 				if test.mockCancel {
-					fsBR.On("Cancel").Return()
+					asyncBR.On("Cancel").Return()
 				}
 
 				if test.mockClose {
-					fsBR.On("Close", mock.Anything).Return()
+					asyncBR.On("Close", mock.Anything).Return()
 				}
 
-				return fsBR
+				return asyncBR
 			}
 
 			if test.isExposeErr || test.isGetExposeErr || test.isPeekExposeErr || test.isNilExposer || test.notNilExpose {
@@ -445,7 +438,8 @@ func TestDataDownloadReconcile(t *testing.T) {
 
 			if test.needCreateFSBR {
 				if fsBR := r.dataPathMgr.GetAsyncBR(test.dd.Name); fsBR == nil {
-					_, err := r.dataPathMgr.CreateFileSystemBR(test.dd.Name, pVBRRequestor, ctx, r.client, velerov1api.DefaultNamespace, datapath.Callbacks{OnCancelled: r.OnDataDownloadCancelled}, velerotest.NewLogger())
+					_, err := r.dataPathMgr.CreateMicroServiceBRWatcher(ctx, r.client, nil, nil, datapath.TaskTypeRestore, test.dd.Name, pVBRRequestor,
+						velerov1api.DefaultNamespace, "", "", datapath.Callbacks{OnCancelled: r.OnDataDownloadCancelled}, false, velerotest.NewLogger())
 					require.NoError(t, err)
 				}
 			}

@@ -104,7 +104,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 			logLevel := logLevelFlag.Parse()
 			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))
 
-			logger := logging.DefaultLogger(logLevel, formatFlag.Parse())
+			logger := logging.DefaultMergeLogger(logLevel, formatFlag.Parse())
 			logger.Infof("Starting Velero node-agent server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
 
 			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
