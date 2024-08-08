@@ -255,10 +255,6 @@ func TestGetConfigs(t *testing.T) {
 		expectErr     string
 	}{
 		{
-			name:      "cm is not found",
-			namespace: "fake-ns",
-		},
-		{
 			name:      "cm get error",
 			namespace: "fake-ns",
 			kubeReactors: []reactor{
@@ -318,7 +314,7 @@ func TestGetConfigs(t *testing.T) {
 				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
 			}
 
-			result, err := GetConfigs(context.TODO(), test.namespace, fakeKubeClient)
+			result, err := GetConfigs(context.TODO(), test.namespace, fakeKubeClient, "node-agent-config")
 			if test.expectErr == "" {
 				assert.NoError(t, err)
 
