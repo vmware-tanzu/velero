@@ -130,7 +130,7 @@ func (d *DataDownloadBuilder) CompletionTimestamp(completionTimestamp *metav1.Ti
 	return d
 }
 
-// Labels sets the DataDownload's Progress.
+// Progress sets the DataDownload's Progress.
 func (d *DataDownloadBuilder) Progress(progress shared.DataMoveOperationProgress) *DataDownloadBuilder {
 	d.object.Status.Progress = progress
 	return d

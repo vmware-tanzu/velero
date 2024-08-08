@@ -968,7 +968,7 @@ func (r *DataUploadReconciler) resumeCancellableDataPath(ctx context.Context, du
 	if err := asyncBR.StartBackup(datapath.AccessPoint{
 		ByPath: res.ByPod.VolumeName,
 	}, du.Spec.DataMoverConfig, nil); err != nil {
-		return errors.Wrapf(err, "error to resume asyncBR watche for du %s", du.Name)
+		return errors.Wrapf(err, "error to resume asyncBR watcher for du %s", du.Name)
 	}
 
 	resumeComplete = true

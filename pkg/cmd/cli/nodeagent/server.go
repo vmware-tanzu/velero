@@ -312,6 +312,8 @@ func (s *nodeAgentServer) run() {
 		if err := dataDownloadReconciler.AttemptDataDownloadResume(s.ctx, s.mgr.GetClient(), s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data download resume")
 		}
+
+		s.logger.Info("Attempt complete to resume dataUploads and dataDownloads")
 	}()
 
 	s.logger.Info("Controllers starting...")

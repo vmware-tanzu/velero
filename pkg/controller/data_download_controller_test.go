@@ -1135,7 +1135,7 @@ func TestResumeCancellableRestore(t *testing.T) {
 			mockStart:       true,
 			mockClose:       true,
 			startWatcherErr: errors.New("fake-start-watcher-error"),
-			expectedError:   fmt.Sprintf("error to resume asyncBR watche for dd %s: fake-start-watcher-error", dataDownloadName),
+			expectedError:   fmt.Sprintf("error to resume asyncBR watcher for dd %s: fake-start-watcher-error", dataDownloadName),
 		},
 		{
 			name: "succeed",

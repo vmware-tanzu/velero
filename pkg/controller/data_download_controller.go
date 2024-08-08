@@ -864,7 +864,7 @@ func (r *DataDownloadReconciler) resumeCancellableDataPath(ctx context.Context, 
 	if err := asyncBR.StartRestore(dd.Spec.SnapshotID, datapath.AccessPoint{
 		ByPath: res.ByPod.VolumeName,
 	}, nil); err != nil {
-		return errors.Wrapf(err, "error to resume asyncBR watche for dd %s", dd.Name)
+		return errors.Wrapf(err, "error to resume asyncBR watcher for dd %s", dd.Name)
 	}
 
 	resumeComplete = true

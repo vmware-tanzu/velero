@@ -133,7 +133,7 @@ func (d *DataUploadBuilder) Labels(labels map[string]string) *DataUploadBuilder 
 	return d
 }
 
-// Labels sets the DataUpload's Progress.
+// Progress sets the DataUpload's Progress.
 func (d *DataUploadBuilder) Progress(progress shared.DataMoveOperationProgress) *DataUploadBuilder {
 	d.object.Status.Progress = progress
 	return d
