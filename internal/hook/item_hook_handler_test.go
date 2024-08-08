@@ -491,10 +491,9 @@ func TestHandleHooks(t *testing.T) {
 
 			if test.expectedError != nil {
 				require.EqualError(t, err, test.expectedError.Error())
-				return
+			} else {
+				require.NoError(t, err)
 			}
-
-			require.NoError(t, err)
 		})
 	}
 }
@@ -1383,9 +1382,9 @@ func TestGetRestoreHooksFromSpec(t *testing.T) {
 			assert.Equal(t, tc.expected, actual)
 			if tc.expectedError != nil {
 				require.EqualError(t, err, tc.expectedError.Error())
-				return
+			} else {
+				require.NoError(t, err)
 			}
-			require.NoError(t, err)
 		})
 	}
 }
