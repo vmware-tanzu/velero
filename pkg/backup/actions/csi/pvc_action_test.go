@@ -176,7 +176,6 @@ func TestExecute(t *testing.T) {
 					var vsList v1.VolumeSnapshotList
 					err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 						err = pvcBIA.crClient.List(ctx, &vsList, &crclient.ListOptions{Namespace: tc.pvc.Namespace})
-						//nolint:testifylint // false-positive
 						assert.NoError(t, err)
 						if err != nil || len(vsList.Items) == 0 {
 							//lint:ignore nilerr reason
