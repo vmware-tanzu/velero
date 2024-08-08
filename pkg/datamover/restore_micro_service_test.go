@@ -134,9 +134,9 @@ func TestOnDataDownloadCompleted(t *testing.T) {
 
 			result := <-bs.resultSignal
 			if test.marshalErr != nil {
-				assert.EqualError(t, result.err, test.expectedErr)
+				require.EqualError(t, result.err, test.expectedErr)
 			} else {
-				assert.NoError(t, result.err)
+				require.NoError(t, result.err)
 				assert.Equal(t, test.expectedEventReason, bt.EventReason())
 				assert.Equal(t, test.expectedEventMsg, bt.EventMessage())
 			}
