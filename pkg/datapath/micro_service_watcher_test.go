@@ -102,7 +102,7 @@ func TestReEnsureThisPod(t *testing.T) {
 				log:       velerotest.NewLogger(),
 			}
 
-			err := ms.reEnsureThisPod()
+			err := ms.reEnsureThisPod(context.Background())
 			if test.expectErr != "" {
 				assert.EqualError(t, err, test.expectErr)
 			} else {

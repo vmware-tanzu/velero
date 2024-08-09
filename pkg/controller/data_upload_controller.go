@@ -230,9 +230,9 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			// we don't want to update CR into cancel status forcely as it may conflict with CR update in Expose action
 			// we could retry when the CR requeue in periodcally
 			log.Debugf("Data upload is been canceled %s in Phase %s", du.GetName(), du.Status.Phase)
-			r.TryCancelDataUpload(ctx, du, "")
+			r.tryCancelAcceptedDataUpload(ctx, du, "")
 		} else if peekErr := ep.PeekExposed(ctx, getOwnerObject(du)); peekErr != nil {
-			r.TryCancelDataUpload(ctx, du, fmt.Sprintf("found a dataupload %s/%s with expose error: %s. mark it as cancel", du.Namespace, du.Name, peekErr))
+			r.tryCancelAcceptedDataUpload(ctx, du, fmt.Sprintf("found a dataupload %s/%s with expose error: %s. mark it as cancel", du.Namespace, du.Name, peekErr))
 			log.Errorf("Cancel du %s/%s because of expose error %s", du.Namespace, du.Name, peekErr)
 		} else if du.Status.StartTimestamp != nil {
 			if time.Since(du.Status.StartTimestamp.Time) >= r.preparingTimeout {
@@ -283,21 +283,35 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				return r.errorOut(ctx, du, err, "error to create data path", log)
 			}
 		}
+
+		if err := r.initCancelableDataPath(ctx, asyncBR, res, log); err != nil {
+			log.WithError(err).Warnf("Failed to init cancelable data path for %s, will close and retry", du.Name)
+
+			r.closeDataPath(ctx, du.Name)
+			return r.errorOut(ctx, du, err, "error initializing data path", log)
+		}
+
 		// Update status to InProgress
 		original := du.DeepCopy()
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseInProgress
 		du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if err := r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
-			return r.errorOut(ctx, du, err, "error updating dataupload status", log)
+			log.WithError(err).Warnf("Failed to update dataupload %s to InProgress, will data path close and retry", du.Name)
+
+			r.closeDataPath(ctx, du.Name)
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 		}
 
 		log.Info("Data upload is marked as in progress")
-		result, err := r.runCancelableDataUpload(ctx, asyncBR, du, res, log)
-		if err != nil {
-			log.Errorf("Failed to run cancelable data path for %s with err %v", du.Name, err)
+
+		if err := r.startCancelableDataPath(asyncBR, du, res, log); err != nil {
+			log.WithError(err).Errorf("Failed to start cancelable data path for %s", du.Name)
 			r.closeDataPath(ctx, du.Name)
+
+			return r.errorOut(ctx, du, err, "error starting data path", log)
 		}
-		return result, err
+
+		return ctrl.Result{}, nil
 	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
 		log.Info("Data upload is in progress")
 		if du.Spec.Cancel {
@@ -340,29 +354,33 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 }
 
-func (r *DataUploadReconciler) runCancelableDataUpload(ctx context.Context, asyncBR datapath.AsyncBR, du *velerov2alpha1api.DataUpload, res *exposer.ExposeResult, log logrus.FieldLogger) (reconcile.Result, error) {
-	log.Info("Run cancelable dataUpload")
+func (r *DataUploadReconciler) initCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, res *exposer.ExposeResult, log logrus.FieldLogger) error {
+	log.Info("Init cancelable dataUpload")
 
 	if err := asyncBR.Init(ctx, nil); err != nil {
-		return r.errorOut(ctx, du, err, "error to initialize asyncBR", log)
+		return errors.Wrap(err, "error initializing asyncBR")
 	}
 
 	log.Infof("async backup init for pod %s, volume %s", res.ByPod.HostingPod.Name, res.ByPod.VolumeName)
 
+	return nil
+}
+
+func (r *DataUploadReconciler) startCancelableDataPath(asyncBR datapath.AsyncBR, du *velerov2alpha1api.DataUpload, res *exposer.ExposeResult, log logrus.FieldLogger) error {
+	log.Info("Start cancelable dataUpload")
+
 	if err := asyncBR.StartBackup(datapath.AccessPoint{
 		ByPath: res.ByPod.VolumeName,
 	}, du.Spec.DataMoverConfig, nil); err != nil {
-		return r.errorOut(ctx, du, err, fmt.Sprintf("error starting async backup for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName), log)
+		return errors.Wrapf(err, "error starting async backup for pod %s, volume %s", res.ByPod.HostingPod.Name, res.ByPod.VolumeName)
 	}
 
-	log.Infof("Async backup started for pod %s, volume %s", res.ByPod.HostingPod, res.ByPod.VolumeName)
-	return ctrl.Result{}, nil
+	log.Info("Async backup started for pod %s, volume %s", res.ByPod.HostingPod.Name, res.ByPod.VolumeName)
+	return nil
 }
 
 func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namespace string, duName string, result datapath.Result) {
-	defer func() {
-		go r.closeDataPath(ctx, duName)
-	}()
+	defer r.dataPathMgr.RemoveAsyncBR(duName)
 
 	log := r.logger.WithField("dataupload", duName)
 
@@ -406,9 +424,7 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 }
 
 func (r *DataUploadReconciler) OnDataUploadFailed(ctx context.Context, namespace, duName string, err error) {
-	defer func() {
-		go r.closeDataPath(ctx, duName)
-	}()
+	defer r.dataPathMgr.RemoveAsyncBR(duName)
 
 	log := r.logger.WithField("dataupload", duName)
 
@@ -418,16 +434,12 @@ func (r *DataUploadReconciler) OnDataUploadFailed(ctx context.Context, namespace
 	if getErr := r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, &du); getErr != nil {
 		log.WithError(getErr).Warn("Failed to get dataupload on failure")
 	} else {
-		if _, errOut := r.errorOut(ctx, &du, err, "data path backup failed", log); err != nil {
-			log.WithError(err).Warnf("Failed to patch dataupload with err %v", errOut)
-		}
+		r.errorOut(ctx, &du, err, "data path backup failed", log)
 	}
 }
 
 func (r *DataUploadReconciler) OnDataUploadCancelled(ctx context.Context, namespace string, duName string) {
-	defer func() {
-		go r.closeDataPath(ctx, duName)
-	}()
+	defer r.dataPathMgr.RemoveAsyncBR(duName)
 
 	log := r.logger.WithField("dataupload", duName)
 
@@ -453,17 +465,19 @@ func (r *DataUploadReconciler) OnDataUploadCancelled(ctx context.Context, namesp
 	}
 }
 
-// TryCancelDataUpload clear up resources only when update success
-func (r *DataUploadReconciler) TryCancelDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload, message string) {
+func (r *DataUploadReconciler) tryCancelAcceptedDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload, message string) {
 	log := r.logger.WithField("dataupload", du.Name)
-	log.Warn("Async fs backup data path canceled")
+	log.Warn("Accepted data upload is canceled")
 	succeeded, err := r.exclusiveUpdateDataUpload(ctx, du, func(dataUpload *velerov2alpha1api.DataUpload) {
 		dataUpload.Status.Phase = velerov2alpha1api.DataUploadPhaseCanceled
 		if dataUpload.Status.StartTimestamp.IsZero() {
 			dataUpload.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		}
 		dataUpload.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
-		dataUpload.Status.Message = message
+
+		if message != "" {
+			dataUpload.Status.Message = message
+		}
 	})
 
 	if err != nil {
@@ -478,7 +492,6 @@ func (r *DataUploadReconciler) TryCancelDataUpload(ctx context.Context, du *vele
 	r.metrics.RegisterDataUploadCancel(r.nodeName)
 	// cleans up any objects generated during the snapshot expose
 	r.cleanUp(ctx, du, log)
-	r.closeDataPath(ctx, du.Name)
 }
 
 func (r *DataUploadReconciler) cleanUp(ctx context.Context, du *velerov2alpha1api.DataUpload, log *logrus.Entry) {
@@ -692,7 +705,7 @@ func (r *DataUploadReconciler) errorOut(ctx context.Context, du *velerov2alpha1a
 		}
 		se.CleanUp(ctx, getOwnerObject(du), volumeSnapshotName, du.Spec.SourceNamespace)
 	} else {
-		err = errors.Wrapf(err, "failed to clean up exposed snapshot with could not find %s snapshot exposer", du.Spec.SnapshotType)
+		log.Warnf("failed to clean up exposed snapshot could not find %s snapshot exposer", du.Spec.SnapshotType)
 	}
 
 	return ctrl.Result{}, r.updateStatusToFailed(ctx, du, err, msg, log)

@@ -192,6 +192,10 @@ func TestDataDownloadReconcile(t *testing.T) {
 		isFSBRRestoreErr  bool
 		notNilExpose      bool
 		notMockCleanUp    bool
+		mockInit          bool
+		mockInitErr       error
+		mockStart         bool
+		mockStartErr      error
 		mockCancel        bool
 		mockClose         bool
 		expected          *velerov2alpha1api.DataDownload
@@ -264,13 +268,36 @@ func TestDataDownloadReconcile(t *testing.T) {
 			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
 		},
 		{
-			name:              "Unable to update status to in progress for data download",
+			name:              "data path init error",
 			dd:                dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
 			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			needErrs:          []bool{false, false, false, true},
+			mockInit:          true,
+			mockInitErr:       errors.New("fake-data-path-init-error"),
+			mockClose:         true,
 			notNilExpose:      true,
-			notMockCleanUp:    true,
-			expectedStatusMsg: "Patch error",
+			expectedStatusMsg: "error initializing asyncBR: fake-data-path-init-error",
+		},
+		{
+			name:           "Unable to update status to in progress for data download",
+			dd:             dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
+			targetPVC:      builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			needErrs:       []bool{false, false, false, true},
+			mockInit:       true,
+			mockClose:      true,
+			notNilExpose:   true,
+			notMockCleanUp: true,
+			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
+		},
+		{
+			name:              "data path start error",
+			dd:                dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
+			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			mockInit:          true,
+			mockStart:         true,
+			mockStartErr:      errors.New("fake-data-path-start-error"),
+			mockClose:         true,
+			notNilExpose:      true,
+			expectedStatusMsg: "error starting async restore for pod test-name, volume test-pvc: fake-data-path-start-error",
 		},
 		{
 			name:              "accept DataDownload error",
@@ -399,6 +426,14 @@ func TestDataDownloadReconcile(t *testing.T) {
 			datapath.MicroServiceBRWatcherCreator = func(kbclient.Client, kubernetes.Interface, manager.Manager, string, string,
 				string, string, string, string, datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
 				asyncBR := datapathmockes.NewAsyncBR(t)
+				if test.mockInit {
+					asyncBR.On("Init", mock.Anything, mock.Anything).Return(test.mockInitErr)
+				}
+
+				if test.mockStart {
+					asyncBR.On("StartRestore", mock.Anything, mock.Anything, mock.Anything).Return(test.mockStartErr)
+				}
+
 				if test.mockCancel {
 					asyncBR.On("Cancel").Return()
 				}
@@ -486,6 +521,10 @@ func TestDataDownloadReconcile(t *testing.T) {
 				}
 			} else {
 				assert.True(t, true, apierrors.IsNotFound(err))
+			}
+
+			if !test.needCreateFSBR {
+				assert.Nil(t, r.dataPathMgr.GetAsyncBR(test.dd.Name))
 			}
 
 			t.Logf("%s: \n %v \n", test.name, dd)
@@ -845,7 +884,7 @@ func TestTryCancelDataDownload(t *testing.T) {
 		err = r.client.Create(ctx, test.dd)
 		require.NoError(t, err)
 
-		r.TryCancelDataDownload(ctx, test.dd, "")
+		r.tryCancelAcceptedDataDownload(ctx, test.dd, "")
 
 		if test.expectedErr == "" {
 			assert.NoError(t, err)

@@ -223,6 +223,7 @@ func (s *dataMoverRestore) runDataPath() {
 	result, err := dpService.RunCancelableDataPath(s.ctx)
 	if err != nil {
 		s.cancelFunc()
+		dpService.Shutdown()
 		funcExitWithMessage(s.logger, false, "Failed to run data path service for DataDownload %s: %v", s.config.ddName, err)
 		return
 	}

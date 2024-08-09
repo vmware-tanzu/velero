@@ -122,7 +122,7 @@ func (r *RestoreMicroService) RunCancelableDataPath(ctx context.Context) (string
 	})
 
 	dd := &velerov2alpha1api.DataDownload{}
-	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, waitControllerTimeout, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextCancel(ctx, 500*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 		err := r.client.Get(ctx, types.NamespacedName{
 			Namespace: r.namespace,
 			Name:      r.dataDownloadName,
@@ -214,8 +214,6 @@ func (r *RestoreMicroService) Shutdown() {
 }
 
 func (r *RestoreMicroService) OnDataDownloadCompleted(ctx context.Context, namespace string, ddName string, result datapath.Result) {
-	defer r.closeDataPath(ctx, ddName)
-
 	log := r.logger.WithField("datadownload", ddName)
 
 	restoreBytes, err := funcMarshal(result.Restore)
@@ -235,8 +233,6 @@ func (r *RestoreMicroService) OnDataDownloadCompleted(ctx context.Context, names
 }
 
 func (r *RestoreMicroService) OnDataDownloadFailed(ctx context.Context, namespace string, ddName string, err error) {
-	defer r.closeDataPath(ctx, ddName)
-
 	log := r.logger.WithField("datadownload", ddName)
 	log.WithError(err).Error("Async fs restore data path failed")
 
@@ -247,8 +243,6 @@ func (r *RestoreMicroService) OnDataDownloadFailed(ctx context.Context, namespac
 }
 
 func (r *RestoreMicroService) OnDataDownloadCancelled(ctx context.Context, namespace string, ddName string) {
-	defer r.closeDataPath(ctx, ddName)
-
 	log := r.logger.WithField("datadownload", ddName)
 	log.Warn("Async fs restore data path canceled")
 
@@ -284,7 +278,7 @@ func (r *RestoreMicroService) closeDataPath(ctx context.Context, ddName string) 
 func (r *RestoreMicroService) cancelDataDownload(dd *velerov2alpha1api.DataDownload) {
 	r.logger.WithField("DataDownload", dd.Name).Info("Data download is being canceled")
 
-	r.eventRecorder.Event(dd, false, "Canceling", "Canceling for data download %s", dd.Name)
+	r.eventRecorder.Event(dd, false, datapath.EventReasonCancelling, "Canceling for data download %s", dd.Name)
 
 	fsBackup := r.dataPathMgr.GetAsyncBR(dd.Name)
 	if fsBackup == nil {
