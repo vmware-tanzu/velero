@@ -1,7 +1,7 @@
 # Backup Restore Status Patch Retrying Configuration
 
 ## Abstract
-When a backup/restore completes, we want to ensure that the restore custom resource progress to the correct status.
+When a backup/restore completes, we want to ensure that the custom resource progresses to the correct status.
 If a patch call fails to update status to completion, it should be retried up to a certain time limit.
 
 This design proposes a way to configure timeout for this retry time limit.
@@ -105,5 +105,3 @@ Retry should only trigger a restore or backup that is already in progress and no
 ## Implementation
 There is a past implementation in [#7845](https://github.com/vmware-tanzu/velero/pull/7845/) where implementation for this design will be based upon.
 
-## Open Issues
-A discussion of issues relating to this proposal for which the author does not know the solution. This section may be omitted if there are none.
