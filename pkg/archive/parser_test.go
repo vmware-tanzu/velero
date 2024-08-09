@@ -112,7 +112,7 @@ func TestParse(t *testing.T) {
 			if tc.wantErrMsg != nil {
 				assert.ErrorIs(t, err, tc.wantErrMsg, "Error should be: %v, got: %v", tc.wantErrMsg, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.want, res)
 			}
 		})
@@ -226,7 +226,7 @@ func TestParseGroupVersions(t *testing.T) {
 			if tc.wantErrMsg != nil {
 				assert.ErrorIs(t, err, tc.wantErrMsg, "Error should be: %v, got: %v", tc.wantErrMsg, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.want, res)
 			}
 		})

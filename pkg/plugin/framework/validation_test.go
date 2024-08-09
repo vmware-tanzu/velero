@@ -19,19 +19,19 @@ package framework
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateConfigKeys(t *testing.T) {
-	assert.NoError(t, validateConfigKeys(nil))
-	assert.NoError(t, validateConfigKeys(map[string]string{}))
-	assert.NoError(t, validateConfigKeys(map[string]string{"foo": "bar"}, "foo"))
-	assert.NoError(t, validateConfigKeys(map[string]string{"foo": "bar", "bar": "baz"}, "foo", "bar"))
+	require.NoError(t, validateConfigKeys(nil))
+	require.NoError(t, validateConfigKeys(map[string]string{}))
+	require.NoError(t, validateConfigKeys(map[string]string{"foo": "bar"}, "foo"))
+	require.NoError(t, validateConfigKeys(map[string]string{"foo": "bar", "bar": "baz"}, "foo", "bar"))
 
-	assert.Error(t, validateConfigKeys(map[string]string{"foo": "bar"}))
-	assert.Error(t, validateConfigKeys(map[string]string{"foo": "bar"}, "Foo"))
-	assert.Error(t, validateConfigKeys(map[string]string{"foo": "bar", "boo": ""}, "foo"))
+	require.Error(t, validateConfigKeys(map[string]string{"foo": "bar"}))
+	require.Error(t, validateConfigKeys(map[string]string{"foo": "bar"}, "Foo"))
+	require.Error(t, validateConfigKeys(map[string]string{"foo": "bar", "boo": ""}, "foo"))
 
-	assert.NoError(t, ValidateObjectStoreConfigKeys(map[string]string{"bucket": "foo"}))
-	assert.Error(t, ValidateVolumeSnapshotterConfigKeys(map[string]string{"bucket": "foo"}))
+	require.NoError(t, ValidateObjectStoreConfigKeys(map[string]string{"bucket": "foo"}))
+	require.Error(t, ValidateVolumeSnapshotterConfigKeys(map[string]string{"bucket": "foo"}))
 }

@@ -124,7 +124,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				}
 
 				for _, itm := range test.informerBackups {
-					assert.NoError(t, r.kbClient.Create(context.Background(), itm))
+					require.NoError(t, r.kbClient.Create(context.Background(), itm))
 				}
 			}
 
@@ -179,7 +179,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 			)
 
 			if test.restore != nil {
-				assert.NoError(t, fakeClient.Create(context.Background(), test.restore))
+				require.NoError(t, fakeClient.Create(context.Background(), test.restore))
 			}
 
 			r := NewRestoreReconciler(
@@ -505,7 +505,7 @@ func TestRestoreReconcile(t *testing.T) {
 				require.NoError(t, r.kbClient.Create(context.Background(), test.location))
 			}
 			if test.backup != nil {
-				assert.NoError(t, r.kbClient.Create(context.Background(), test.backup))
+				require.NoError(t, r.kbClient.Create(context.Background(), test.backup))
 			}
 
 			if test.restore != nil {

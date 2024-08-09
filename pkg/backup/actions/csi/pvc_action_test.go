@@ -27,6 +27,7 @@ import (
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	v1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -175,8 +176,8 @@ func TestExecute(t *testing.T) {
 					var vsList v1.VolumeSnapshotList
 					err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 						err = pvcBIA.crClient.List(ctx, &vsList, &crclient.ListOptions{Namespace: tc.pvc.Namespace})
-
-						require.NoError(t, err)
+						//nolint:testifylint // false-positive
+						assert.NoError(t, err)
 						if err != nil || len(vsList.Items) == 0 {
 							//lint:ignore nilerr reason
 							return false, nil // ignore
@@ -184,7 +185,7 @@ func TestExecute(t *testing.T) {
 						return true, nil
 					})
 
-					require.NoError(t, err)
+					assert.NoError(t, err)
 					vscName := "testVSC"
 					readyToUse := true
 					vsList.Items[0].Status = &v1.VolumeSnapshotStatus{
@@ -192,12 +193,12 @@ func TestExecute(t *testing.T) {
 						ReadyToUse:                     &readyToUse,
 					}
 					err = pvcBIA.crClient.Update(context.Background(), &vsList.Items[0])
-					require.NoError(t, err)
+					assert.NoError(t, err)
 
 					handleName := "testHandle"
 					vsc := builder.ForVolumeSnapshotContent("testVSC").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &handleName}).Result()
 					err = pvcBIA.crClient.Create(context.Background(), vsc)
-					require.NoError(t, err)
+					assert.NoError(t, err)
 				}()
 			}
 

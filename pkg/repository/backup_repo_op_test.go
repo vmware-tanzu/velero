@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/stretchr/testify/assert"
-
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -160,9 +158,9 @@ func TestGetBackupRepository(t *testing.T) {
 			}
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}

@@ -120,7 +120,7 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 			pod := new(corev1api.Pod)
 			hookPodContainerNotSame := false
 			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(test.item, pod); err != nil {
-				assert.Error(t, err)
+				require.Error(t, err)
 			}
 			if (len(pod.Spec.Containers) > 0) && (pod.Spec.Containers[0].Name != test.hook.Container) {
 				hookPodContainerNotSame = true
@@ -130,9 +130,9 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 			err := e.ExecutePodCommand(velerotest.NewLogger(), test.item, test.podNamespace, test.podName, test.hookName, test.hook)
 
 			if hookPodContainerNotSame && test.hook.Container == pod.Spec.Containers[0].Name {
-				assert.Error(t, fmt.Errorf("hook exec container is overwritten"))
+				require.Error(t, fmt.Errorf("hook exec container is overwritten"))
 			}
-			assert.Error(t, err)
+			require.Error(t, err)
 		})
 	}
 }
@@ -236,7 +236,7 @@ func TestExecutePodCommand(t *testing.T) {
 
 			err = podCommandExecutor.ExecutePodCommand(velerotest.NewLogger(), pod, "namespace", "name", "hookName", &hook)
 			if test.expectedError != "" {
-				assert.EqualError(t, err, test.expectedError)
+				require.EqualError(t, err, test.expectedError)
 				return
 			}
 
@@ -257,10 +257,10 @@ func TestEnsureContainerExists(t *testing.T) {
 	}
 
 	err := ensureContainerExists(pod, "bar")
-	assert.EqualError(t, err, `no such container: "bar"`)
+	require.EqualError(t, err, `no such container: "bar"`)
 
 	err = ensureContainerExists(pod, "foo")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestPodCompeted(t *testing.T) {

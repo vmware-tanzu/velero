@@ -68,7 +68,7 @@ func TestRestartableGetBackupItemAction(t *testing.T) {
 			r := NewRestartableBackupItemAction(name, p)
 			a, err := r.getBackupItemAction()
 			if tc.expectedError != "" {
-				assert.EqualError(t, err, tc.expectedError)
+				require.EqualError(t, err, tc.expectedError)
 				return
 			}
 			require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestRestartableBackupItemActionGetDelegate(t *testing.T) {
 	r := NewRestartableBackupItemAction(name, p)
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
-	assert.EqualError(t, err, "reset error")
+	require.EqualError(t, err, "reset error")
 
 	// Happy path
 	p.On("ResetIfNeeded").Return(nil)
@@ -97,7 +97,7 @@ func TestRestartableBackupItemActionGetDelegate(t *testing.T) {
 	p.On("GetByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, a)
 }
 

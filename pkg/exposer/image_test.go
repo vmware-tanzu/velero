@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -261,7 +262,7 @@ func TestGetInheritedPodInfo(t *testing.T) {
 			info, err := getInheritedPodInfo(context.Background(), fakeKubeClient, test.namespace)
 
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.True(t, reflect.DeepEqual(info, test.result))
 			} else {
 				assert.EqualError(t, err, test.expectErr)

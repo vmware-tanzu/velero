@@ -25,6 +25,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -110,12 +111,12 @@ func TestDeleteOldMaintenanceJobs(t *testing.T) {
 
 	// Call the function
 	err := deleteOldMaintenanceJobs(cli, repo, keep)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Get the remaining jobs
 	jobList := &batchv1.JobList{}
 	err = cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// We expect the number of jobs to be equal to 'keep'
 	assert.Len(t, jobList.Items, keep)
@@ -172,9 +173,9 @@ func TestWaitForJobComplete(t *testing.T) {
 
 			// Check if the error matches the expectation
 			if tc.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -216,7 +217,7 @@ func TestGetMaintenanceResultFromJob(t *testing.T) {
 	result, err := getMaintenanceResultFromJob(cli, job)
 
 	// Check if the result and error match the expectation
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "test message", result)
 }
 
@@ -258,7 +259,7 @@ func TestGetLatestMaintenanceJob(t *testing.T) {
 
 	// Call the function
 	job, err := getLatestMaintenanceJob(cli, "default")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// We expect the returned job to be the newer job
 	assert.Equal(t, newerJob.Name, job.Name)
@@ -354,10 +355,10 @@ func TestBuildMaintenanceJob(t *testing.T) {
 
 			// Check the error
 			if tc.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, job)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, job)
 				assert.Contains(t, job.Name, tc.expectedJobName)
 				assert.Equal(t, param.BackupRepo.Namespace, job.Namespace)
