@@ -58,6 +58,7 @@ func mockBackupFinalizerReconciler(fakeClient kbclient.Client, fakeGlobalClient 
 		NewFakeSingleObjectBackupStoreGetter(backupStore),
 		logrus.StandardLogger(),
 		metrics.NewServerMetrics(),
+		10*time.Minute,
 	), backupper
 }
 func TestBackupFinalizerReconcile(t *testing.T) {

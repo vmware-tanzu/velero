@@ -234,7 +234,7 @@ func (r *restoreFinalizerReconciler) finishProcessing(restorePhase velerov1api.R
 	}
 	restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 
-	return kubeutil.PatchResource(original, restore, r.Client)
+	return kubeutil.PatchResourceWithRetriesOnErrors(r.resourceTimeout, original, restore, r.Client)
 }
 
 // finalizerContext includes all the dependencies required by finalization tasks and
