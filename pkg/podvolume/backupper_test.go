@@ -309,21 +309,37 @@ func TestBackupPodVolumes(t *testing.T) {
 	corev1api.AddToScheme(scheme)
 
 	tests := []struct {
-		name            string
-		bsl             string
-		uploaderType    string
-		volumes         []string
-		sourcePod       *corev1api.Pod
-		kubeClientObj   []runtime.Object
-		ctlClientObj    []runtime.Object
-		veleroClientObj []runtime.Object
-		veleroReactors  []reactor
-		runtimeScheme   *runtime.Scheme
-		pvbs            int
-		errs            []string
+		name                  string
+		bsl                   string
+		uploaderType          string
+		volumes               []string
+		sourcePod             *corev1api.Pod
+		kubeClientObj         []runtime.Object
+		ctlClientObj          []runtime.Object
+		veleroClientObj       []runtime.Object
+		veleroReactors        []reactor
+		runtimeScheme         *runtime.Scheme
+		pvbs                  int
+		mockGetRepositoryType bool
+		errs                  []string
 	}{
 		{
 			name: "empty volume list",
+		},
+		{
+			name: "wrong uploader type",
+			volumes: []string{
+				"fake-volume-1",
+				"fake-volume-2",
+			},
+			sourcePod: createPodObj(true, false, false, 2),
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+			},
+			uploaderType: "fake-uploader-type",
+			errs: []string{
+				"invalid uploader type 'fake-uploader-type', valid upload types are: 'restic', 'kopia'",
+			},
 		},
 		{
 			name: "pod is not running",
@@ -348,7 +364,8 @@ func TestBackupPodVolumes(t *testing.T) {
 				"fake-volume-1",
 				"fake-volume-2",
 			},
-			sourcePod: createPodObj(true, false, false, 2),
+			sourcePod:    createPodObj(true, false, false, 2),
+			uploaderType: "kopia",
 			errs: []string{
 				"daemonset pod not found in running state in node fake-node-name",
 			},
@@ -363,9 +380,10 @@ func TestBackupPodVolumes(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				createNodeAgentPodObj(true),
 			},
-			uploaderType: "fake-uploader-type",
+			uploaderType:          "kopia",
+			mockGetRepositoryType: true,
 			errs: []string{
-				"empty repository type, uploader fake-uploader-type",
+				"empty repository type, uploader kopia",
 			},
 		},
 		{
@@ -541,6 +559,12 @@ func TestBackupPodVolumes(t *testing.T) {
 			bp, err := factory.NewBackupper(ctx, backupObj, test.uploaderType)
 
 			require.NoError(t, err)
+
+			if test.mockGetRepositoryType {
+				funcGetRepositoryType = func(string) string { return "" }
+			} else {
+				funcGetRepositoryType = getRepositoryType
+			}
 
 			pvbs, _, errs := bp.BackupPodVolumes(backupObj, test.sourcePod, test.volumes, nil, velerotest.NewLogger())
 

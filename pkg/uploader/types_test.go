@@ -1,34 +1,47 @@
 package uploader
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestValidateUploaderType(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
-		wantErr bool
+		wantErr string
+		wantMsg string
 	}{
 		{
 			"'restic' is a valid type",
 			"restic",
-			false,
+			"",
+			"Uploader 'restic' is deprecated, don't use it for new backups, otherwise the backups won't be available for restore when this functionality is removed in a future version of Velero",
 		},
 		{
 			"'   kopia  ' is a valid type (space will be trimmed)",
 			"   kopia  ",
-			false,
+			"",
+			"",
 		},
 		{
 			"'anything_else' is invalid",
 			"anything_else",
-			true,
+			"invalid uploader type 'anything_else', valid upload types are: 'restic', 'kopia'",
+			"",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ValidateUploaderType(tt.input); (err != nil) != tt.wantErr {
-				t.Errorf("ValidateUploaderType(), input = '%s' error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			msg, err := ValidateUploaderType(tt.input)
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
 			}
+
+			assert.Equal(t, tt.wantMsg, msg)
 		})
 	}
 }
