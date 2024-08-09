@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -382,9 +382,8 @@ func TestServiceAccountActionExecute(t *testing.T) {
 				clusterRoleBindings: newV1ClusterRoleBindingList(test.crbs),
 			}
 
-			res, additional, err := action.Execute(test.serviceAccount, nil)
+			additional, err := action.GetRelatedItems(test.serviceAccount, nil)
 
-			assert.Equal(t, test.serviceAccount, res)
 			assert.NoError(t, err)
 
 			// ensure slices are ordered for valid comparison
@@ -589,9 +588,8 @@ func TestServiceAccountActionExecuteOnBeta1(t *testing.T) {
 				clusterRoleBindings: newV1beta1ClusterRoleBindingList(test.crbs),
 			}
 
-			res, additional, err := action.Execute(test.serviceAccount, nil)
+			additional, err := action.GetRelatedItems(test.serviceAccount, nil)
 
-			assert.Equal(t, test.serviceAccount, res)
 			assert.NoError(t, err)
 
 			// ensure slices are ordered for valid comparison

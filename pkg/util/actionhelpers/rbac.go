@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package actions
+package actionhelpers
 
 import (
 	"context"
@@ -35,42 +35,42 @@ type ClusterRoleBindingLister interface {
 }
 
 // noopClusterRoleBindingLister exists to handle clusters where RBAC is disabled.
-type noopClusterRoleBindingLister struct {
+type NoopClusterRoleBindingLister struct {
 }
 
-func (noop noopClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
+func (noop NoopClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
 	return []ClusterRoleBinding{}, nil
 }
 
-type v1ClusterRoleBindingLister struct {
+type V1ClusterRoleBindingLister struct {
 	client rbacclient.ClusterRoleBindingInterface
 }
 
-func (v1 v1ClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
+func (v1 V1ClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
 	crbList, err := v1.client.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 	var crbs []ClusterRoleBinding
 	for _, crb := range crbList.Items {
-		crbs = append(crbs, v1ClusterRoleBinding{crb: crb})
+		crbs = append(crbs, V1ClusterRoleBinding{Crb: crb})
 	}
 
 	return crbs, nil
 }
 
-type v1beta1ClusterRoleBindingLister struct {
+type V1beta1ClusterRoleBindingLister struct {
 	client rbacbetaclient.ClusterRoleBindingInterface
 }
 
-func (v1beta1 v1beta1ClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
+func (v1beta1 V1beta1ClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
 	crbList, err := v1beta1.client.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 	var crbs []ClusterRoleBinding
 	for _, crb := range crbList.Items {
-		crbs = append(crbs, v1beta1ClusterRoleBinding{crb: crb})
+		crbs = append(crbs, V1beta1ClusterRoleBinding{Crb: crb})
 	}
 
 	return crbs, nil
@@ -81,9 +81,9 @@ func (v1beta1 v1beta1ClusterRoleBindingLister) List() ([]ClusterRoleBinding, err
 // Necessary so that callers to the ClusterRoleBindingLister interfaces don't need the kubernetes.Interface.
 func NewClusterRoleBindingListerMap(clientset kubernetes.Interface) map[string]ClusterRoleBindingLister {
 	return map[string]ClusterRoleBindingLister{
-		rbac.SchemeGroupVersion.Version:     v1ClusterRoleBindingLister{client: clientset.RbacV1().ClusterRoleBindings()},
-		rbacbeta.SchemeGroupVersion.Version: v1beta1ClusterRoleBindingLister{client: clientset.RbacV1beta1().ClusterRoleBindings()},
-		"":                                  noopClusterRoleBindingLister{},
+		rbac.SchemeGroupVersion.Version:     V1ClusterRoleBindingLister{client: clientset.RbacV1().ClusterRoleBindings()},
+		rbacbeta.SchemeGroupVersion.Version: V1beta1ClusterRoleBindingLister{client: clientset.RbacV1beta1().ClusterRoleBindings()},
+		"":                                  NoopClusterRoleBindingLister{},
 	}
 }
 
@@ -97,21 +97,21 @@ type ClusterRoleBinding interface {
 	RoleRefName() string
 }
 
-type v1ClusterRoleBinding struct {
-	crb rbac.ClusterRoleBinding
+type V1ClusterRoleBinding struct {
+	Crb rbac.ClusterRoleBinding
 }
 
-func (c v1ClusterRoleBinding) Name() string {
-	return c.crb.Name
+func (c V1ClusterRoleBinding) Name() string {
+	return c.Crb.Name
 }
 
-func (c v1ClusterRoleBinding) RoleRefName() string {
-	return c.crb.RoleRef.Name
+func (c V1ClusterRoleBinding) RoleRefName() string {
+	return c.Crb.RoleRef.Name
 }
 
-func (c v1ClusterRoleBinding) ServiceAccountSubjects(namespace string) []string {
+func (c V1ClusterRoleBinding) ServiceAccountSubjects(namespace string) []string {
 	var saSubjects []string
-	for _, s := range c.crb.Subjects {
+	for _, s := range c.Crb.Subjects {
 		if s.Kind == rbac.ServiceAccountKind && s.Namespace == namespace {
 			saSubjects = append(saSubjects, s.Name)
 		}
@@ -119,21 +119,21 @@ func (c v1ClusterRoleBinding) ServiceAccountSubjects(namespace string) []string 
 	return saSubjects
 }
 
-type v1beta1ClusterRoleBinding struct {
-	crb rbacbeta.ClusterRoleBinding
+type V1beta1ClusterRoleBinding struct {
+	Crb rbacbeta.ClusterRoleBinding
 }
 
-func (c v1beta1ClusterRoleBinding) Name() string {
-	return c.crb.Name
+func (c V1beta1ClusterRoleBinding) Name() string {
+	return c.Crb.Name
 }
 
-func (c v1beta1ClusterRoleBinding) RoleRefName() string {
-	return c.crb.RoleRef.Name
+func (c V1beta1ClusterRoleBinding) RoleRefName() string {
+	return c.Crb.RoleRef.Name
 }
 
-func (c v1beta1ClusterRoleBinding) ServiceAccountSubjects(namespace string) []string {
+func (c V1beta1ClusterRoleBinding) ServiceAccountSubjects(namespace string) []string {
 	var saSubjects []string
-	for _, s := range c.crb.Subjects {
+	for _, s := range c.Crb.Subjects {
 		if s.Kind == rbac.ServiceAccountKind && s.Namespace == namespace {
 			saSubjects = append(saSubjects, s.Name)
 		}
