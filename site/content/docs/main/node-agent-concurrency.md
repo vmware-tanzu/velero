@@ -8,7 +8,7 @@ Varying from the data size, data complexity, resource availability, the tasks ma
 
 Node-agent concurrency configurations allow you to configure the concurrent number of node-agent loads per node. When the resources are sufficient in nodes, you can set a large concurrent number, so as to reduce the backup/restore time; otherwise, the concurrency should be reduced, otherwise, the backup/restore may encounter problems, i.e., time lagging, hang or OOM kill.  
 
-To set Node-agent concurrency configurations, a configMap named ```node-agent-config``` should be created manually. The configMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one configMap in each namespace which applies to node-agent in that namespace only.  
+To set Node-agent concurrency configurations, a configMap should be created manually. The configMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one configMap in each namespace which applies to node-agent in that namespace only. The name of the configMap should be specified in the node-agent server parameter ```--node-agent-config```.  
 Node-agent server checks these configurations at startup time. Therefore, you could edit this configMap any time, but in order to make the changes effective, node-agent server needs to be restarted.  
 
 ### Global concurrent number
@@ -32,7 +32,7 @@ At least one node is expected to have a label with the specified ```RuledConfigs
 If one node falls into more than one rules, e.g., if node1 also has the label ```beta.kubernetes.io/instance-type=Standard_B4ms```, the smallest number (3) will be used.  
 
 ### Sample
-A sample of the complete ```node-agent-config``` configMap is as below:
+A sample of the complete configMap is as below:
 ```json
 {
     "loadConcurrency": {
@@ -61,6 +61,20 @@ A sample of the complete ```node-agent-config``` configMap is as below:
 To create the configMap, save something like the above sample to a json file and then run below command:
 ```
 kubectl create cm node-agent-config -n velero --from-file=<json file name>
+```
+To provide the configMap to node-agent, edit the node-agent daemonset and add the ```- --node-agent-config``` argument to the spec:
+1. Open the node-agent daemonset spec  
+```
+kubectl edit ds node-agent -n velero
+```
+2. Add ```- --node-agent-config``` to ```spec.template.spec.containers```  
+```
+spec:
+  template:
+    spec:
+      containers:
+      - args:
+        - --node-agent-config=<configMap name>
 ```
 
 
