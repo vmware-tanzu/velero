@@ -29,11 +29,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gertd/go-pluralize"
 	"github.com/google/uuid"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1079,6 +1081,60 @@ func (ctx *restoreContext) getResource(groupResource schema.GroupResource, obj *
 	return u, nil
 }
 
+var pluralizeClient = pluralize.NewClient()
+
+func (ctx *restoreContext) getSubResourceStatusEnabled(obj *unstructured.Unstructured, groupResource schema.GroupResource) (bool, error) {
+	var result = true
+	crdGVR := schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Resource: "customresourcedefinitions",
+		Version:  "v1",
+	}
+	crdUnstructured := &unstructured.Unstructured{}
+	crdUnstructured.SetAPIVersion(crdGVR.GroupVersion().String())
+	crdUnstructured.SetKind(crdGVR.Resource)
+	crdGR := crdGVR.GroupResource()
+	resourceClient, err := ctx.getResourceClient(crdGR, crdUnstructured, "")
+
+	name := fmt.Sprintf("%s.%s", pluralizeClient.Plural(strings.ToLower(obj.GetKind())), obj.GetObjectKind().GroupVersionKind().Group)
+	available, err := ctx.crdAvailable(name, resourceClient)
+	if err != nil {
+		ctx.log.Errorf("check crd available name=%s err=%s", name, err)
+		return result, err
+	}
+	if !available {
+		return result, nil
+	}
+
+	if !ctx.disableInformerCache {
+		crdUnstructured, err = ctx.getResource(crdGR, crdUnstructured, "", name)
+	} else {
+		crdUnstructured, err = resourceClient.Get(name, metav1.GetOptions{})
+	}
+	if err != nil {
+		ctx.log.Errorf("get crd resource failed disableInformerCache=%v err=%s", ctx.disableInformerCache, err)
+		return result, err
+	}
+	data, err := crdUnstructured.MarshalJSON()
+	if err != nil {
+		return result, err
+	}
+	crd := &apiextv1.CustomResourceDefinition{}
+	if err := json.Unmarshal(data, crd); err != nil {
+		return result, err
+	}
+	for _, v := range crd.Spec.Versions {
+		if v.Name != obj.GroupVersionKind().Version {
+			continue
+		}
+		subresource := v.Subresources
+		if subresource == nil || subresource.Status == nil {
+			return false, nil
+		}
+	}
+	return result, nil
+}
+
 func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupResource schema.GroupResource, namespace string) (results.Result, results.Result, bool) {
 	warnings, errs := results.Result{}, results.Result{}
 	// itemExists bool is used to determine whether to include this item in the "wait for additional items" list
@@ -1294,9 +1350,14 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 	}
 
+	statusEnabled, err := ctx.getSubResourceStatusEnabled(obj, groupResource)
+	if err != nil {
+		ctx.log.Infof("check subResource status is enabled: %s", err)
+		// TODO:
+	}
 	objStatus, statusFieldExists, statusFieldErr := unstructured.NestedFieldCopy(obj.Object, "status")
 	// Clear out non-core metadata fields and status.
-	if obj, err = resetMetadataAndStatus(obj); err != nil {
+	if obj, err = resetMetadataAndStatus(obj, statusEnabled); err != nil {
 		errs.Add(namespace, err)
 		return warnings, errs, itemExists
 	}
@@ -1535,7 +1596,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		itemStatus.itemExists = itemExists
 		ctx.restoredItems[itemKey] = itemStatus
 		// Remove insubstantial metadata.
-		fromCluster, err = resetMetadataAndStatus(fromCluster)
+		fromCluster, err = resetMetadataAndStatus(fromCluster, statusEnabled)
 		if err != nil {
 			ctx.log.Infof("Error trying to reset metadata for %s: %v", kube.NamespaceAndName(obj), err)
 			warnings.Add(namespace, err)
@@ -2080,12 +2141,14 @@ func resetStatus(obj *unstructured.Unstructured) {
 	unstructured.RemoveNestedField(obj.UnstructuredContent(), "status")
 }
 
-func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func resetMetadataAndStatus(obj *unstructured.Unstructured, statusEnabled bool) (*unstructured.Unstructured, error) {
 	_, err := resetMetadata(obj)
 	if err != nil {
 		return nil, err
 	}
-	resetStatus(obj)
+	if statusEnabled {
+		resetStatus(obj)
+	}
 	return obj, nil
 }
 
