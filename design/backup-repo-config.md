@@ -86,18 +86,6 @@ For any reason, if the configMap doesn't effect, nothing is specified to the bac
 The BackupRepository configMap supports backup repository type specific configurations, even though users can only specify one configMap.  
 So in the configMap struct, multiple entries are supported, indexed by the backup repository type. During the backup repository creation, the configMap is searched by the repository type.  
 
-Below are the struct for the configMap:  
-``` golang
-type RepoConfig struct {
-	CacheLimitMB int `json:"cacheLimitMB,omitempty"`
-	EnableCompression int `json:"enableCompression,omitempty"`
-}
-
-type RepoConfigs struct {
-	Configs map[string]RepoConfig `json:"configs"`
-}
-```
-
 ### Configurations
 
 With the above mechanisms, any kind of configuration could be added. Here list the configurations defined at present:  
@@ -105,23 +93,7 @@ With the above mechanisms, any kind of configuration could be added. Here list t
 ```enableCompression```: specifies to enable/disable compression for a backup repsotiory. Most of the backup repositories support the data compression feature, if it is not supported by a backup repository, this parameter is ignored. Most of the backup repositories support to dynamically enable/disable compression, so this parameter is defined to be used whenever creating a write connection to the backup repository, if the dynamically changing is not supported, this parameter will be hornored only when initializing the backup repository. For Kopia repository, this parameter is supported and can be dynamically modified.  
 
 ### Sample
-Below is an example of the BackupRepository configMap with the configurations:  
-json format:  
-```json
-{
-  "configs": {
-    "repo-type-1": {
-      "cacheLimitMB": 2048,
-      "enableCompression": true    
-    },
-    "repo-type-2": {
-      "cacheLimitMB": 1024,
-      "enableCompression": false    
-    }
-  }
-}
-```  
-yaml format:  
+Below is an example of the BackupRepository configMap with the configurations:     
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -129,24 +101,19 @@ metadata:
   name: <config-name>
   namespace: velero
 data:
-  configs: |
+  <repository-type-1>: |
     {
-      "repo-type-1": {
-        "cacheLimitMB": 2048,
-        "enableCompression": true    
-      },
-      "repo-type-2": {
-        "cacheLimitMB": 1024,
-        "enableCompression": false    
-      }
-    }    
+      "cacheLimitMB": 2048,
+      "enableCompression": true    
+    }
+  <repository-type-2>: |
+    {
+      "cacheLimitMB": 1,
+      "enableCompression": false    
+    }        
 ```
 
 To create the configMap, users need to save something like the above sample to a file and then run below commands:  
-```
-kubectl create cm <config-name> -n velero --from-file=<json file name>
-```  
-Or
 ```
 kubectl apply -f <yaml file name>
 ```  

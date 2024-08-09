@@ -98,6 +98,21 @@ func optionalHaveBase64(ctx context.Context, key string, flags map[string]string
 	return nil
 }
 
+func optionalHaveIntWithDefault(ctx context.Context, key string, flags map[string]string, defValue int64) int64 {
+	if value, exist := flags[key]; exist {
+		if value != "" {
+			ret, err := strconv.ParseInt(value, 10, 64)
+			if err == nil {
+				return ret
+			}
+
+			backendLog()(ctx).Errorf("Ignore %s, value [%s] is invalid, err %v", key, value, err)
+		}
+	}
+
+	return defValue
+}
+
 func backendLog() func(ctx context.Context) logging.Logger {
 	return logging.Module("kopialib-bd")
 }
