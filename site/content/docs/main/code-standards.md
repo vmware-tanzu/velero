@@ -38,6 +38,8 @@ changelog.
 
 Add that to the PR.
 
+A command to do this is `make new-changelog CHANGELOG_BODY="Changes you have made"`
+
 If a PR does not warrant a changelog, the CI check for a changelog can be skipped by applying a `changelog-not-required` label on the PR. If you are making a PR on a release branch, you should still make a new file in the `changelogs/unreleased` folder on the release branch for your change. 
 
 ## Copyright header
