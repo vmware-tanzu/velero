@@ -1,4 +1,5 @@
-FROM quay.io/konveyor/builder:ubi9-latest AS builder
+FROM --platform=$BUILDPLATFORM quay.io/konveyor/builder:ubi9-latest AS builder
+ARG BUILDPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -11,7 +12,8 @@ WORKDIR /go/src/github.com/vmware-tanzu/velero
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -mod=mod -ldflags '-extldflags "-static" -X github.com/vmware-tanzu/velero/pkg/buildinfo.Version=konveyor-dev' -o /go/src/velero github.com/vmware-tanzu/velero/cmd/velero
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -mod=mod -ldflags '-extldflags "-static"' -o /go/src/velero-helper github.com/vmware-tanzu/velero/cmd/velero-helper
 
-FROM quay.io/konveyor/builder:ubi9-latest AS restic-builder
+FROM --platform=$BUILDPLATFORM quay.io/konveyor/builder:ubi9-latest AS restic-builder
+ARG BUILDPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
 
