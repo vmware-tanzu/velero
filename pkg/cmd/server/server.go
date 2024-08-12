@@ -288,8 +288,10 @@ type server struct {
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
-	if err := uploader.ValidateUploaderType(config.uploaderType); err != nil {
+	if msg, err := uploader.ValidateUploaderType(config.uploaderType); err != nil {
 		return nil, err
+	} else if msg != "" {
+		logger.Warn(msg)
 	}
 
 	if config.clientQPS < 0.0 {

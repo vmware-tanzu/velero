@@ -364,8 +364,10 @@ func (o *Options) Validate(c *cobra.Command, args []string, f client.Factory) er
 		return err
 	}
 
-	if err := uploader.ValidateUploaderType(o.UploaderType); err != nil {
+	if msg, err := uploader.ValidateUploaderType(o.UploaderType); err != nil {
 		return err
+	} else if msg != "" {
+		fmt.Printf("⚠️  %s\n", msg)
 	}
 
 	// If we're only installing CRDs, we can skip the rest of the validation.
