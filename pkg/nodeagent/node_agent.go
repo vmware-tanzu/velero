@@ -63,12 +63,23 @@ type RuledConfigs struct {
 	Number int `json:"number"`
 }
 
+type BackupPVC struct {
+	// StorageClass is the name of storage class to be used by the backupPVC
+	StorageClass string `json:"storageClass,omitempty"`
+
+	// ReadOnly sets the backupPVC's access mode as read only
+	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
 type Configs struct {
 	// LoadConcurrency is the config for data path load concurrency per node.
 	LoadConcurrency *LoadConcurrency `json:"loadConcurrency,omitempty"`
 
 	// LoadAffinity is the config for data path load affinity.
 	LoadAffinity []*LoadAffinity `json:"loadAffinity,omitempty"`
+
+	// BackupPVCConfig is the config for backupPVC (intermediate PVC) of snapshot data movement
+	BackupPVCConfig map[string]BackupPVC `json:"backupPVC,omitempty"`
 }
 
 // IsRunning checks if the node agent daemonset is running properly. If not, return the error found
