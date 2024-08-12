@@ -140,6 +140,7 @@ type serverConfig struct {
 	disableInformerCache                                                    bool
 	scheduleSkipImmediately                                                 bool
 	maintenanceCfg                                                          repository.MaintenanceConfig
+	backukpRepoConfig                                                       string
 }
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -252,6 +253,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().StringVar(&config.maintenanceCfg.MemRequest, "maintenance-job-mem-request", config.maintenanceCfg.MemRequest, "Memory request for maintenance job. Default is no limit.")
 	command.Flags().StringVar(&config.maintenanceCfg.CPULimit, "maintenance-job-cpu-limit", config.maintenanceCfg.CPULimit, "CPU limit for maintenance job. Default is no limit.")
 	command.Flags().StringVar(&config.maintenanceCfg.MemLimit, "maintenance-job-mem-limit", config.maintenanceCfg.MemLimit, "Memory limit for maintenance job. Default is no limit.")
+
+	command.Flags().StringVar(&config.backukpRepoConfig, "backup-repository-config", config.backukpRepoConfig, "The name of configMap containing backup repository configurations.")
 
 	// maintenance job log setting inherited from velero server
 	config.maintenanceCfg.FormatFlag = config.formatFlag
@@ -878,7 +881,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	if _, ok := enabledRuntimeControllers[controller.BackupRepo]; ok {
-		if err := controller.NewBackupRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.repoMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
+		if err := controller.NewBackupRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.repoMaintenanceFrequency, s.config.backukpRepoConfig, s.repoManager).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupRepo)
 		}
 	}
