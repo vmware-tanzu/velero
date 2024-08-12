@@ -32,11 +32,9 @@ import (
 const (
 	credentialsSecretName = "velero-repo-credentials"
 	credentialsKey        = "repository-password"
-
-	encryptionKey = "static-passw0rd"
 )
 
-func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespace string) error {
+func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespace, encryptionKey string) error {
 	_, err := secretClient.Secrets(namespace).Get(context.TODO(), credentialsSecretName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.WithStack(err)

@@ -113,6 +113,8 @@ const (
 
 	defaultMaxConcurrentK8SConnections = 30
 	defaultDisableInformerCache        = false
+
+	defaultEncryptionKey = "static-passw0rd"
 )
 
 type serverConfig struct {
@@ -135,6 +137,7 @@ type serverConfig struct {
 	itemOperationSyncFrequency                                              time.Duration
 	defaultVolumesToFsBackup                                                bool
 	uploaderType                                                            string
+	encryptionKey                                                           string
 	maxConcurrentK8SConnections                                             int
 	defaultSnapshotMoveData                                                 bool
 	disableInformerCache                                                    bool
@@ -171,6 +174,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			defaultSnapshotMoveData:        false,
 			disableInformerCache:           defaultDisableInformerCache,
 			scheduleSkipImmediately:        false,
+			encryptionKey:                  defaultEncryptionKey,
 			maintenanceCfg: repository.MaintenanceConfig{
 				KeepLatestMaitenanceJobs: repository.DefaultKeepLatestMaitenanceJobs,
 			},
@@ -252,7 +256,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().StringVar(&config.maintenanceCfg.MemRequest, "maintenance-job-mem-request", config.maintenanceCfg.MemRequest, "Memory request for maintenance job. Default is no limit.")
 	command.Flags().StringVar(&config.maintenanceCfg.CPULimit, "maintenance-job-cpu-limit", config.maintenanceCfg.CPULimit, "CPU limit for maintenance job. Default is no limit.")
 	command.Flags().StringVar(&config.maintenanceCfg.MemLimit, "maintenance-job-mem-limit", config.maintenanceCfg.MemLimit, "Memory limit for maintenance job. Default is no limit.")
-
+	command.Flags().StringVar(&config.encryptionKey, "encryptionKey", config.encryptionKey, "encryptionKey. Default is no static-passw0rd.")
 	// maintenance job log setting inherited from velero server
 	config.maintenanceCfg.FormatFlag = config.formatFlag
 	config.maintenanceCfg.LogLevelFlag = logLevelFlag
@@ -551,7 +555,8 @@ func (s *server) veleroResourcesExist() error {
 	s.logger.Info("Checking existence of Velero custom resource definitions")
 
 	// add more group versions whenever available
-	gvResources := map[string]sets.Set[string]{
+	gvResources := map[string]sets.Set[string]
+	{
 		velerov1api.SchemeGroupVersion.String():       velerov1api.CustomResourceKinds(),
 		velerov2alpha1api.SchemeGroupVersion.String(): velerov2alpha1api.CustomResourceKinds(),
 	}
@@ -657,7 +662,7 @@ func (s *server) checkNodeAgent() {
 
 func (s *server) initRepoManager() error {
 	// ensure the repo key secret is set up
-	if err := repokey.EnsureCommonRepositoryKey(s.kubeClient.CoreV1(), s.namespace); err != nil {
+	if err := repokey.EnsureCommonRepositoryKey(s.kubeClient.CoreV1(), s.namespace, s.config.encryptionKey); err != nil {
 		return err
 	}
 
