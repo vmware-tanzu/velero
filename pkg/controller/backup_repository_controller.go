@@ -19,6 +19,8 @@ package controller
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -38,6 +40,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+
+	corev1api "k8s.io/api/core/v1"
 )
 
 const (
@@ -51,17 +55,19 @@ type BackupRepoReconciler struct {
 	logger               logrus.FieldLogger
 	clock                clocks.WithTickerAndDelayedExecution
 	maintenanceFrequency time.Duration
+	backukpRepoConfig    string
 	repositoryManager    repository.Manager
 }
 
 func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client,
-	maintenanceFrequency time.Duration, repositoryManager repository.Manager) *BackupRepoReconciler {
+	maintenanceFrequency time.Duration, backukpRepoConfig string, repositoryManager repository.Manager) *BackupRepoReconciler {
 	c := &BackupRepoReconciler{
 		client,
 		namespace,
 		logger,
 		clocks.RealClock{},
 		maintenanceFrequency,
+		backukpRepoConfig,
 		repositoryManager,
 	}
 
@@ -223,7 +229,7 @@ func (r *BackupRepoReconciler) getIdentiferByBSL(ctx context.Context, req *veler
 }
 
 func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
-	log.Info("Initializing backup repository")
+	log.WithField("repoConfig", r.backukpRepoConfig).Info("Initializing backup repository")
 
 	// confirm the repo's BackupStorageLocation is valid
 	repoIdentifier, err := r.getIdentiferByBSL(ctx, req)
@@ -238,6 +244,13 @@ func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 		})
 	}
 
+	config, err := getBackupRepositoryConfig(ctx, r, r.backukpRepoConfig, r.namespace, req.Name, req.Spec.RepositoryType, log)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get repo config, repo config is ignored")
+	} else if config != nil {
+		log.Infof("Init repo with config %v", config)
+	}
+
 	// defaulting - if the patch fails, return an error so the item is returned to the queue
 	if err := r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
 		rr.Spec.ResticIdentifier = repoIdentifier
@@ -245,6 +258,8 @@ func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 		if rr.Spec.MaintenanceFrequency.Duration <= 0 {
 			rr.Spec.MaintenanceFrequency = metav1.Duration{Duration: r.getRepositoryMaintenanceFrequency(req)}
 		}
+
+		rr.Spec.RepositoryConfig = config
 	}); err != nil {
 		return err
 	}
@@ -365,4 +380,36 @@ func (r *BackupRepoReconciler) patchBackupRepository(ctx context.Context, req *v
 		return errors.Wrap(err, "error patching BackupRepository")
 	}
 	return nil
+}
+
+func getBackupRepositoryConfig(ctx context.Context, ctrlClient client.Client, configName, namespace, repoName, repoType string, log logrus.FieldLogger) (map[string]string, error) {
+	if configName == "" {
+		return nil, nil
+	}
+
+	loc := &corev1api.ConfigMap{}
+	if err := ctrlClient.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      configName,
+	}, loc); err != nil {
+		return nil, errors.Wrapf(err, "error getting configMap %s", configName)
+	}
+
+	jsonData, found := loc.Data[repoType]
+	if !found {
+		log.Info("No data for repo type %s in config map %s", repoType, configName)
+		return nil, nil
+	}
+
+	var unmarshalled map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonData), &unmarshalled); err != nil {
+		return nil, errors.Wrapf(err, "error unmarshalling config data from %s for repo %s, repo type %s", configName, repoName, repoType)
+	}
+
+	result := map[string]string{}
+	for k, v := range unmarshalled {
+		result[k] = fmt.Sprintf("%v", v)
+	}
+
+	return result, nil
 }

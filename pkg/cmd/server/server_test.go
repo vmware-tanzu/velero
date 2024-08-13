@@ -203,6 +203,13 @@ func Test_newServer(t *testing.T) {
 	}, logger)
 	assert.Error(t, err)
 
+	// invalid clientQPS Restic uploader
+	_, err = newServer(factory, serverConfig{
+		uploaderType: uploader.ResticType,
+		clientQPS:    -1,
+	}, logger)
+	assert.Error(t, err)
+
 	// invalid clientBurst
 	factory.On("SetClientQPS", mock.Anything).Return()
 	_, err = newServer(factory, serverConfig{

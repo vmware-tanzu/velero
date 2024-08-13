@@ -63,6 +63,8 @@ const (
 	StoreOptionGenRetentionPeriod = "retentionPeriod"
 	StoreOptionGenReadOnly        = "readOnly"
 
+	StoreOptionCacheLimit = "cacheLimitMB"
+
 	ThrottleOptionReadOps       = "readOPS"
 	ThrottleOptionWriteOps      = "writeOPS"
 	ThrottleOptionListOps       = "listOPS"
