@@ -41,7 +41,6 @@ import (
 
 	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
@@ -50,9 +49,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
-	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
-	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
@@ -69,11 +66,8 @@ type DataUploadReconciler struct {
 	kubeClient          kubernetes.Interface
 	csiSnapshotClient   snapshotter.SnapshotV1Interface
 	mgr                 manager.Manager
-	repoEnsurer         *repository.Ensurer
 	Clock               clocks.WithTickerAndDelayedExecution
-	credentialGetter    *credentials.CredentialGetter
 	nodeName            string
-	fileSystem          filesystem.Interface
 	logger              logrus.FieldLogger
 	snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
 	dataPathMgr         *datapath.Manager
@@ -83,19 +77,16 @@ type DataUploadReconciler struct {
 }
 
 func NewDataUploadReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, csiSnapshotClient snapshotter.SnapshotV1Interface,
-	dataPathMgr *datapath.Manager, loadAffinity *nodeagent.LoadAffinity, repoEnsurer *repository.Ensurer, clock clocks.WithTickerAndDelayedExecution,
-	cred *credentials.CredentialGetter, nodeName string, fs filesystem.Interface, preparingTimeout time.Duration, log logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataUploadReconciler {
+	dataPathMgr *datapath.Manager, loadAffinity *nodeagent.LoadAffinity, clock clocks.WithTickerAndDelayedExecution, nodeName string, preparingTimeout time.Duration,
+	log logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:              client,
 		mgr:                 mgr,
 		kubeClient:          kubeClient,
 		csiSnapshotClient:   csiSnapshotClient,
 		Clock:               clock,
-		credentialGetter:    cred,
 		nodeName:            nodeName,
-		fileSystem:          fs,
 		logger:              log,
-		repoEnsurer:         repoEnsurer,
 		snapshotExposerList: map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(kubeClient, csiSnapshotClient, log)},
 		dataPathMgr:         dataPathMgr,
 		loadAffinity:        loadAffinity,
@@ -293,7 +284,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		if err := r.initCancelableDataPath(ctx, asyncBR, res, log); err != nil {
-			log.WithError(err).Warnf("Failed to init cancelable data path for %s, will close and retry", du.Name)
+			log.WithError(err).Errorf("Failed to init cancelable data path for %s", du.Name)
 
 			r.closeDataPath(ctx, du.Name)
 			return r.errorOut(ctx, du, err, "error initializing data path", log)
@@ -383,7 +374,7 @@ func (r *DataUploadReconciler) startCancelableDataPath(asyncBR datapath.AsyncBR,
 		return errors.Wrapf(err, "error starting async backup for pod %s, volume %s", res.ByPod.HostingPod.Name, res.ByPod.VolumeName)
 	}
 
-	log.Info("Async backup started for pod %s, volume %s", res.ByPod.HostingPod.Name, res.ByPod.VolumeName)
+	log.Infof("Async backup started for pod %s, volume %s", res.ByPod.HostingPod.Name, res.ByPod.VolumeName)
 	return nil
 }
 
@@ -442,7 +433,7 @@ func (r *DataUploadReconciler) OnDataUploadFailed(ctx context.Context, namespace
 	if getErr := r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, &du); getErr != nil {
 		log.WithError(getErr).Warn("Failed to get dataupload on failure")
 	} else {
-		r.errorOut(ctx, &du, err, "data path backup failed", log)
+		_, _ = r.errorOut(ctx, &du, err, "data path backup failed", log)
 	}
 }
 
@@ -502,7 +493,7 @@ func (r *DataUploadReconciler) tryCancelAcceptedDataUpload(ctx context.Context, 
 	r.cleanUp(ctx, du, log)
 }
 
-func (r *DataUploadReconciler) cleanUp(ctx context.Context, du *velerov2alpha1api.DataUpload, log *logrus.Entry) {
+func (r *DataUploadReconciler) cleanUp(ctx context.Context, du *velerov2alpha1api.DataUpload, log logrus.FieldLogger) {
 	ep, ok := r.snapshotExposerList[du.Spec.SnapshotType]
 	if !ok {
 		log.WithError(fmt.Errorf("%v type of snapshot exposer is not exist", du.Spec.SnapshotType)).
@@ -650,7 +641,7 @@ func (r *DataUploadReconciler) errorOut(ctx context.Context, du *velerov2alpha1a
 		}
 		se.CleanUp(ctx, getOwnerObject(du), volumeSnapshotName, du.Spec.SourceNamespace)
 	} else {
-		log.Warnf("failed to clean up exposed snapshot could not find %s snapshot exposer", du.Spec.SnapshotType)
+		log.Errorf("failed to clean up exposed snapshot could not find %s snapshot exposer", du.Spec.SnapshotType)
 	}
 
 	return ctrl.Result{}, r.updateStatusToFailed(ctx, du, err, msg, log)
@@ -894,6 +885,7 @@ func (r *DataUploadReconciler) AttemptDataUploadResume(ctx context.Context, cli 
 
 			err := funcResumeCancellableDataBackup(r, ctx, du, logger)
 			if err == nil {
+				logger.WithField("du", du.Name).WithField("current node", r.nodeName).Info("Completed to resume in progress DU")
 				continue
 			}
 

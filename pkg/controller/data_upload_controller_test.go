@@ -47,7 +47,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -229,24 +228,9 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 
 	fakeSnapshotClient := snapshotFake.NewSimpleClientset(vsObject, vscObj)
 	fakeKubeClient := clientgofake.NewSimpleClientset(daemonSet)
-	fakeFS := velerotest.NewFakeFileSystem()
-	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", "", dataUploadName)
-	_, err = fakeFS.Create(pathGlob)
-	if err != nil {
-		return nil, err
-	}
 
-	credentialFileStore, err := credentials.NewNamespacedFileStore(
-		fakeClient,
-		velerov1api.DefaultNamespace,
-		"/tmp/credentials",
-		fakeFS,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return NewDataUploadReconciler(fakeClient, nil, fakeKubeClient, fakeSnapshotClient.SnapshotV1(), dataPathMgr, nil, nil,
-		testclocks.NewFakeClock(now), &credentials.CredentialGetter{FromFile: credentialFileStore}, "test-node", fakeFS, time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
+	return NewDataUploadReconciler(fakeClient, nil, fakeKubeClient, fakeSnapshotClient.SnapshotV1(), dataPathMgr, nil,
+		testclocks.NewFakeClock(now), "test-node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
 }
 
 func dataUploadBuilder() *builder.DataUploadBuilder {
@@ -626,7 +610,6 @@ func TestReconcile(t *testing.T) {
 			if !testCreateFsBR && du.Status.Phase != velerov2alpha1api.DataUploadPhaseInProgress {
 				assert.Nil(t, r.dataPathMgr.GetAsyncBR(test.du.Name))
 			}
-
 		})
 	}
 }

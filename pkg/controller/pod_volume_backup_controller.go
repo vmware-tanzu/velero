@@ -202,7 +202,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 func (r *PodVolumeBackupReconciler) OnDataPathCompleted(ctx context.Context, namespace string, pvbName string, result datapath.Result) {
-	defer r.closeDataPath(ctx, pvbName)
+	defer r.dataPathMgr.RemoveAsyncBR(pvbName)
 
 	log := r.logger.WithField("pvb", pvbName)
 
@@ -240,7 +240,7 @@ func (r *PodVolumeBackupReconciler) OnDataPathCompleted(ctx context.Context, nam
 }
 
 func (r *PodVolumeBackupReconciler) OnDataPathFailed(ctx context.Context, namespace, pvbName string, err error) {
-	defer r.closeDataPath(ctx, pvbName)
+	defer r.dataPathMgr.RemoveAsyncBR(pvbName)
 
 	log := r.logger.WithField("pvb", pvbName)
 
@@ -255,7 +255,7 @@ func (r *PodVolumeBackupReconciler) OnDataPathFailed(ctx context.Context, namesp
 }
 
 func (r *PodVolumeBackupReconciler) OnDataPathCancelled(ctx context.Context, namespace string, pvbName string) {
-	defer r.closeDataPath(ctx, pvbName)
+	defer r.dataPathMgr.RemoveAsyncBR(pvbName)
 
 	log := r.logger.WithField("pvb", pvbName)
 

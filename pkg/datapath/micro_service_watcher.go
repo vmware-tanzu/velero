@@ -103,8 +103,6 @@ func newMicroServiceBRWatcher(client client.Client, kubeClient kubernetes.Interf
 }
 
 func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) error {
-	succeeded := false
-
 	eventInformer, err := ms.mgr.GetCache().GetInformer(ctx, &v1.Event{})
 	if err != nil {
 		return errors.Wrap(err, "error getting event informer")
@@ -135,18 +133,9 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) er
 			},
 		},
 	)
-
 	if err != nil {
 		return errors.Wrap(err, "error registering event handler")
 	}
-
-	defer func() {
-		if !succeeded {
-			if err := eventInformer.RemoveEventHandler(eventHandler); err != nil {
-				ms.log.WithError(err).Warn("Failed to remove event handler")
-			}
-		}
-	}()
 
 	podHandler, err := podInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -162,18 +151,9 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) er
 			},
 		},
 	)
-
 	if err != nil {
 		return errors.Wrap(err, "error registering pod handler")
 	}
-
-	defer func() {
-		if !succeeded {
-			if err := podInformer.RemoveEventHandler(podHandler); err != nil {
-				ms.log.WithError(err).Warn("Failed to remove pod handler")
-			}
-		}
-	}()
 
 	if err := ms.reEnsureThisPod(ctx); err != nil {
 		return err
@@ -193,10 +173,7 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) er
 			"thisPod":  ms.thisPod,
 		}).Info("MicroServiceBR is initialized")
 
-	succeeded = true
-
 	return nil
-
 }
 
 func (ms *microServiceBRWatcher) Close(ctx context.Context) {
@@ -301,7 +278,7 @@ func (ms *microServiceBRWatcher) startWatch() {
 		}
 
 		if lastPod == nil {
-			ms.log.Warn("Watch loop is cancelled on waiting data path pod")
+			ms.log.Warn("Watch loop is canceled on waiting data path pod")
 			return
 		}
 
@@ -309,7 +286,7 @@ func (ms *microServiceBRWatcher) startWatch() {
 		for !ms.startedFromEvent || !ms.terminatedFromEvent {
 			select {
 			case <-ms.ctx.Done():
-				ms.log.Warn("Watch loop is cancelled on waiting final event")
+				ms.log.Warn("Watch loop is canceled on waiting final event")
 				return
 			case <-time.After(eventWaitTimeout):
 				break epilogLoop
@@ -373,7 +350,7 @@ func (ms *microServiceBRWatcher) onEvent(evt *v1.Event) {
 	case EventReasonCancelling:
 		ms.log.Infof("Received data path canceling message: %s", evt.Message)
 	default:
-		ms.log.Infof("Received event for data path %s,reason: %s, message: %s", ms.taskName, evt.Reason, evt.Message)
+		ms.log.Infof("Received event for data path %s, reason: %s, message: %s", ms.taskName, evt.Reason, evt.Message)
 	}
 }
 
