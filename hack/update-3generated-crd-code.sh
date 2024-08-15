@@ -30,23 +30,6 @@ if ! command -v controller-gen > /dev/null; then
   exit 1
 fi
 
-# get code-generation tools (for now keep in GOPATH since they're not fully modules-compatible yet)
-mkdir -p ${GOPATH}/src/k8s.io
-pushd ${GOPATH}/src/k8s.io
-git clone -b v0.22.2 https://github.com/kubernetes/code-generator
-popd
-
-${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
-  all \
-  github.com/vmware-tanzu/velero/pkg/generated \
-  github.com/vmware-tanzu/velero/pkg/apis \
-  "velero:v1,v2alpha1" \
-  --go-header-file ./hack/boilerplate.go.txt \
-  --output-base ../../.. \
-  $@
-
-# Generate apiextensions.k8s.io/v1
-
 # Generate CRD for v1.
 controller-gen \
   crd:crdVersions=v1 \
