@@ -67,6 +67,9 @@ type CSISnapshotExposeParam struct {
 
 	// Affinity specifies the node affinity of the backup pod
 	Affinity *nodeagent.LoadAffinity
+
+	// BackupPVCConfig is the config for backupPVC (intermediate PVC) of snapshot data movement
+	BackupPVCConfig map[string]nodeagent.BackupPVC
 }
 
 // CSISnapshotExposeWaitParam define the input param for WaitExposed of CSI snapshots
@@ -163,7 +166,17 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		curLog.WithField("vs name", volumeSnapshot.Name).Warnf("The snapshot doesn't contain a valid restore size, use source volume's size %v", volumeSize)
 	}
 
-	backupPVC, err := e.createBackupPVC(ctx, ownerObject, backupVS.Name, csiExposeParam.StorageClass, csiExposeParam.AccessMode, volumeSize)
+	// check if there is a mapping for source pvc storage class in backupPVC config
+	// if the mapping exists then use the values(storage class, readOnly accessMode)
+	// for backupPVC (intermediate PVC in snapshot data movement) object creation
+	backupPVCStorageClass := csiExposeParam.StorageClass
+	backupPVCReadOnly := false
+	if value, exists := csiExposeParam.BackupPVCConfig[csiExposeParam.StorageClass]; exists {
+		backupPVCStorageClass = value.StorageClass
+		backupPVCReadOnly = value.ReadOnly
+	}
+
+	backupPVC, err := e.createBackupPVC(ctx, ownerObject, backupVS.Name, backupPVCStorageClass, csiExposeParam.AccessMode, volumeSize, backupPVCReadOnly)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pvc")
 	}
@@ -347,12 +360,18 @@ func (e *csiSnapshotExposer) createBackupVSC(ctx context.Context, ownerObject co
 	return e.csiSnapshotClient.VolumeSnapshotContents().Create(ctx, vsc, metav1.CreateOptions{})
 }
 
-func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject corev1.ObjectReference, backupVS, storageClass, accessMode string, resource resource.Quantity) (*corev1.PersistentVolumeClaim, error) {
+func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject corev1.ObjectReference, backupVS, storageClass, accessMode string, resource resource.Quantity, readOnly bool) (*corev1.PersistentVolumeClaim, error) {
 	backupPVCName := ownerObject.Name
 
 	volumeMode, err := getVolumeModeByAccessMode(accessMode)
 	if err != nil {
 		return nil, err
+	}
+
+	pvcAccessMode := corev1.ReadWriteOnce
+
+	if readOnly {
+		pvcAccessMode = corev1.ReadOnlyMany
 	}
 
 	dataSource := &corev1.TypedLocalObjectReference{
@@ -377,7 +396,7 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
+				pvcAccessMode,
 			},
 			StorageClassName: &storageClass,
 			VolumeMode:       &volumeMode,

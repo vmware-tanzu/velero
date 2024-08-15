@@ -18,9 +18,12 @@ package exposer
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
+
+	"k8s.io/utils/pointer"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/fake"
@@ -818,6 +821,150 @@ func TestToSystemAffinity(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			affinity := toSystemAffinity(test.loadAffinity)
 			assert.True(t, reflect.DeepEqual(affinity, test.expected))
+		})
+	}
+}
+
+func Test_csiSnapshotExposer_createBackupPVC(t *testing.T) {
+	backup := &velerov1.Backup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: velerov1.SchemeGroupVersion.String(),
+			Kind:       "Backup",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			UID:       "fake-uid",
+		},
+	}
+
+	dataSource := &corev1.TypedLocalObjectReference{
+		APIGroup: &snapshotv1api.SchemeGroupVersion.Group,
+		Kind:     "VolumeSnapshot",
+		Name:     "fake-snapshot",
+	}
+	volumeMode := corev1.PersistentVolumeFilesystem
+
+	backupPVC := corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: backup.APIVersion,
+					Kind:       backup.Kind,
+					Name:       backup.Name,
+					UID:        backup.UID,
+					Controller: pointer.BoolPtr(true),
+				},
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
+			},
+			VolumeMode:       &volumeMode,
+			DataSource:       dataSource,
+			DataSourceRef:    nil,
+			StorageClassName: pointer.String("fake-storage-class"),
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
+
+	backupPVCReadOnly := corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: backup.APIVersion,
+					Kind:       backup.Kind,
+					Name:       backup.Name,
+					UID:        backup.UID,
+					Controller: pointer.BoolPtr(true),
+				},
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadOnlyMany,
+			},
+			VolumeMode:       &volumeMode,
+			DataSource:       dataSource,
+			DataSourceRef:    nil,
+			StorageClassName: pointer.String("fake-storage-class"),
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name              string
+		ownerBackup       *velerov1.Backup
+		backupVS          string
+		storageClass      string
+		accessMode        string
+		resource          resource.Quantity
+		readOnly          bool
+		kubeClientObj     []runtime.Object
+		snapshotClientObj []runtime.Object
+		want              *corev1.PersistentVolumeClaim
+		wantErr           assert.ErrorAssertionFunc
+	}{
+		{
+			name:         "backupPVC gets created successfully with parameters from source PVC",
+			ownerBackup:  backup,
+			backupVS:     "fake-snapshot",
+			storageClass: "fake-storage-class",
+			accessMode:   AccessModeFileSystem,
+			resource:     resource.MustParse("1Gi"),
+			readOnly:     false,
+			want:         &backupPVC,
+			wantErr:      assert.NoError,
+		},
+		{
+			name:         "backupPVC gets created successfully with parameters from source PVC but accessMode from backupPVC Config as read only",
+			ownerBackup:  backup,
+			backupVS:     "fake-snapshot",
+			storageClass: "fake-storage-class",
+			accessMode:   AccessModeFileSystem,
+			resource:     resource.MustParse("1Gi"),
+			readOnly:     true,
+			want:         &backupPVCReadOnly,
+			wantErr:      assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(tt.kubeClientObj...)
+			fakeSnapshotClient := snapshotFake.NewSimpleClientset(tt.snapshotClientObj...)
+			e := &csiSnapshotExposer{
+				kubeClient:        fakeKubeClient,
+				csiSnapshotClient: fakeSnapshotClient.SnapshotV1(),
+				log:               velerotest.NewLogger(),
+			}
+			var ownerObject corev1.ObjectReference
+			if tt.ownerBackup != nil {
+				ownerObject = corev1.ObjectReference{
+					Kind:       tt.ownerBackup.Kind,
+					Namespace:  tt.ownerBackup.Namespace,
+					Name:       tt.ownerBackup.Name,
+					UID:        tt.ownerBackup.UID,
+					APIVersion: tt.ownerBackup.APIVersion,
+				}
+			}
+			got, err := e.createBackupPVC(context.Background(), ownerObject, tt.backupVS, tt.storageClass, tt.accessMode, tt.resource, tt.readOnly)
+			if !tt.wantErr(t, err, fmt.Sprintf("createBackupPVC(%v, %v, %v, %v, %v, %v)", ownerObject, tt.backupVS, tt.storageClass, tt.accessMode, tt.resource, tt.readOnly)) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "createBackupPVC(%v, %v, %v, %v, %v, %v)", ownerObject, tt.backupVS, tt.storageClass, tt.accessMode, tt.resource, tt.readOnly)
 		})
 	}
 }
