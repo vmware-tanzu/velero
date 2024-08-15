@@ -1079,7 +1079,7 @@ func TestAttemptDataDownloadResume(t *testing.T) {
 			funcResumeCancellableDataBackup = dt.resumeCancellableDataPath
 
 			// Run the test
-			err = r.AttemptDataDownloadResume(ctx, r.client, r.logger.WithField("name", test.name), test.dd.Namespace)
+			err = r.AttemptDataDownloadResume(ctx, r.logger.WithField("name", test.name), test.dd.Namespace)
 
 			if test.expectedError != "" {
 				assert.EqualError(t, err, test.expectedError)

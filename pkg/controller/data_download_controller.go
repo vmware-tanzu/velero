@@ -767,9 +767,9 @@ func UpdateDataDownloadWithRetry(ctx context.Context, client client.Client, name
 
 var funcResumeCancellableDataRestore = (*DataDownloadReconciler).resumeCancellableDataPath
 
-func (r *DataDownloadReconciler) AttemptDataDownloadResume(ctx context.Context, cli client.Client, logger *logrus.Entry, ns string) error {
+func (r *DataDownloadReconciler) AttemptDataDownloadResume(ctx context.Context, logger *logrus.Entry, ns string) error {
 	dataDownloads := &velerov2alpha1api.DataDownloadList{}
-	if err := cli.List(ctx, dataDownloads, &client.ListOptions{Namespace: ns}); err != nil {
+	if err := r.client.List(ctx, dataDownloads, &client.ListOptions{Namespace: ns}); err != nil {
 		r.logger.WithError(errors.WithStack(err)).Error("failed to list datadownloads")
 		return errors.Wrapf(err, "error to list datadownloads")
 	}
@@ -795,7 +795,7 @@ func (r *DataDownloadReconciler) AttemptDataDownloadResume(ctx context.Context, 
 			logger.WithField("datadownload", dd.GetName()).WithError(err).Warn("Failed to resume data path for dd, have to cancel it")
 
 			resumeErr := err
-			err = UpdateDataDownloadWithRetry(ctx, cli, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, logger.WithField("datadownload", dd.Name),
+			err = UpdateDataDownloadWithRetry(ctx, r.client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, logger.WithField("datadownload", dd.Name),
 				func(dataDownload *velerov2alpha1api.DataDownload) bool {
 					if dataDownload.Spec.Cancel {
 						return false
@@ -812,7 +812,7 @@ func (r *DataDownloadReconciler) AttemptDataDownloadResume(ctx context.Context, 
 		} else if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted {
 			r.logger.WithField("datadownload", dd.GetName()).Warn("Cancel dd under Accepted phase")
 
-			err := UpdateDataDownloadWithRetry(ctx, cli, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name},
+			err := UpdateDataDownloadWithRetry(ctx, r.client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name},
 				r.logger.WithField("datadownload", dd.Name), func(dataDownload *velerov2alpha1api.DataDownload) bool {
 					if dataDownload.Spec.Cancel {
 						return false

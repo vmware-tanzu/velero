@@ -61,6 +61,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+
+	cacheutil "k8s.io/client-go/tools/cache"
 )
 
 var (
@@ -309,14 +311,17 @@ func (s *nodeAgentServer) run() {
 	}
 
 	go func() {
-		s.mgr.GetCache().WaitForCacheSync(s.ctx)
-
-		if err := dataUploadReconciler.AttemptDataUploadResume(s.ctx, s.mgr.GetClient(), s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
-			s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data upload resume")
+		if err := s.waitCacheForResume(); err != nil {
+			s.logger.WithError(err).Error("Failed to wait cache for resume, will not resume DU/DD")
+			return
 		}
 
-		if err := dataDownloadReconciler.AttemptDataDownloadResume(s.ctx, s.mgr.GetClient(), s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
-			s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data download resume")
+		if err := dataUploadReconciler.AttemptDataUploadResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt data upload resume")
+		}
+
+		if err := dataDownloadReconciler.AttemptDataDownloadResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt data download resume")
 		}
 	}()
 
@@ -325,6 +330,29 @@ func (s *nodeAgentServer) run() {
 	if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		s.logger.Fatal("Problem starting manager", err)
 	}
+}
+
+func (s *nodeAgentServer) waitCacheForResume() error {
+	podInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &v1.Pod{})
+	if err != nil {
+		return errors.Wrap(err, "error getting pod informer")
+	}
+
+	duInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov2alpha1api.DataUpload{})
+	if err != nil {
+		return errors.Wrap(err, "error getting du informer")
+	}
+
+	ddInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov2alpha1api.DataDownload{})
+	if err != nil {
+		return errors.Wrap(err, "error getting dd informer")
+	}
+
+	if !cacheutil.WaitForCacheSync(s.ctx.Done(), podInformer.HasSynced, duInformer.HasSynced, ddInformer.HasSynced) {
+		return errors.New("error waiting informer synced")
+	}
+
+	return nil
 }
 
 // validatePodVolumesHostPath validates that the pod volumes path contains a

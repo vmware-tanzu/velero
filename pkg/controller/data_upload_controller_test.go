@@ -1127,7 +1127,7 @@ func TestAttemptDataUploadResume(t *testing.T) {
 			funcResumeCancellableDataBackup = dt.resumeCancellableDataPath
 
 			// Run the test
-			err = r.AttemptDataUploadResume(ctx, r.client, r.logger.WithField("name", test.name), test.du.Namespace)
+			err = r.AttemptDataUploadResume(ctx, r.logger.WithField("name", test.name), test.du.Namespace)
 
 			if test.expectedError != "" {
 				assert.EqualError(t, err, test.expectedError)

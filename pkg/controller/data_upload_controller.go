@@ -867,9 +867,9 @@ func UpdateDataUploadWithRetry(ctx context.Context, client client.Client, namesp
 
 var funcResumeCancellableDataBackup = (*DataUploadReconciler).resumeCancellableDataPath
 
-func (r *DataUploadReconciler) AttemptDataUploadResume(ctx context.Context, cli client.Client, logger *logrus.Entry, ns string) error {
+func (r *DataUploadReconciler) AttemptDataUploadResume(ctx context.Context, logger *logrus.Entry, ns string) error {
 	dataUploads := &velerov2alpha1api.DataUploadList{}
-	if err := cli.List(ctx, dataUploads, &client.ListOptions{Namespace: ns}); err != nil {
+	if err := r.client.List(ctx, dataUploads, &client.ListOptions{Namespace: ns}); err != nil {
 		r.logger.WithError(errors.WithStack(err)).Error("failed to list datauploads")
 		return errors.Wrapf(err, "error to list datauploads")
 	}
@@ -895,7 +895,7 @@ func (r *DataUploadReconciler) AttemptDataUploadResume(ctx context.Context, cli 
 			logger.WithField("dataupload", du.GetName()).WithError(err).Warn("Failed to resume data path for du, have to cancel it")
 
 			resumeErr := err
-			err = UpdateDataUploadWithRetry(ctx, cli, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, logger.WithField("dataupload", du.Name),
+			err = UpdateDataUploadWithRetry(ctx, r.client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, logger.WithField("dataupload", du.Name),
 				func(dataUpload *velerov2alpha1api.DataUpload) bool {
 					if dataUpload.Spec.Cancel {
 						return false
@@ -912,7 +912,7 @@ func (r *DataUploadReconciler) AttemptDataUploadResume(ctx context.Context, cli 
 		} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted {
 			r.logger.WithField("dataupload", du.GetName()).Warn("Cancel du under Accepted phase")
 
-			err := UpdateDataUploadWithRetry(ctx, cli, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, r.logger.WithField("dataupload", du.Name),
+			err := UpdateDataUploadWithRetry(ctx, r.client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, r.logger.WithField("dataupload", du.Name),
 				func(dataUpload *velerov2alpha1api.DataUpload) bool {
 					if dataUpload.Spec.Cancel {
 						return false
