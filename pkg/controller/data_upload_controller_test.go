@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/fake"
 	"github.com/pkg/errors"
@@ -229,7 +231,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 	fakeSnapshotClient := snapshotFake.NewSimpleClientset(vsObject, vscObj)
 	fakeKubeClient := clientgofake.NewSimpleClientset(daemonSet)
 
-	return NewDataUploadReconciler(fakeClient, nil, fakeKubeClient, fakeSnapshotClient.SnapshotV1(), dataPathMgr, nil,
+	return NewDataUploadReconciler(fakeClient, nil, fakeKubeClient, fakeSnapshotClient.SnapshotV1(), dataPathMgr, nil, map[string]nodeagent.BackupPVC{},
 		testclocks.NewFakeClock(now), "test-node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
 }
 
