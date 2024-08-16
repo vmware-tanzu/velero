@@ -18,6 +18,8 @@ package backend
 
 import (
 	"context"
+	"os"
+	"slices"
 	"time"
 
 	"github.com/kopia/kopia/repo"
@@ -47,16 +49,28 @@ func setupLimits(ctx context.Context, flags map[string]string) throttling.Limits
 	}
 }
 
+// Helper function to choose between environment variable and default kopia algorithm value
+func getKopiaAlgorithm(key, envKey string, flags map[string]string, supportedAlgorithms []string, defaultValue string) string {
+	algorithm := os.Getenv(envKey)
+	if len(algorithm) > 0 {
+		if slices.Contains(supportedAlgorithms, algorithm) {
+			return algorithm
+		}
+	}
+
+	return optionalHaveStringWithDefault(key, flags, defaultValue)
+}
+
 // SetupNewRepositoryOptions setups the options when creating a new Kopia repository
 func SetupNewRepositoryOptions(ctx context.Context, flags map[string]string) repo.NewRepositoryOptions {
 	return repo.NewRepositoryOptions{
 		BlockFormat: format.ContentFormat{
-			Hash:       optionalHaveStringWithDefault(udmrepo.StoreOptionGenHashAlgo, flags, hashing.DefaultAlgorithm),
-			Encryption: optionalHaveStringWithDefault(udmrepo.StoreOptionGenEncryptAlgo, flags, encryption.DefaultAlgorithm),
+			Hash:       getKopiaAlgorithm(udmrepo.StoreOptionGenHashAlgo, "KOPIA_HASHING_ALGORITHM", flags, hashing.SupportedAlgorithms(), hashing.DefaultAlgorithm),
+			Encryption: getKopiaAlgorithm(udmrepo.StoreOptionGenEncryptAlgo, "KOPIA_ENCRYPTION_ALGORITHM", flags, encryption.SupportedAlgorithms(false), encryption.DefaultAlgorithm),
 		},
 
 		ObjectFormat: format.ObjectFormat{
-			Splitter: optionalHaveStringWithDefault(udmrepo.StoreOptionGenSplitAlgo, flags, splitter.DefaultAlgorithm),
+			Splitter: getKopiaAlgorithm(udmrepo.StoreOptionGenSplitAlgo, "KOPIA_SPLITTER_ALGORITHM", flags, splitter.SupportedAlgorithms(), splitter.DefaultAlgorithm),
 		},
 
 		RetentionMode:   blob.RetentionMode(optionalHaveString(udmrepo.StoreOptionGenRetentionMode, flags)),
