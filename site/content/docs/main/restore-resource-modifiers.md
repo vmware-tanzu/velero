@@ -58,7 +58,7 @@ resourceModifierRules:
 - copy
 - test (covered below)
 
-### Limitations of Resource Modifierss
+### Limitations of Resource Modifiers
 
 Resource modifiers cannot patch the status field of a resource. The patch will not be taken into account when doing so.
 However, resource modifiers patch can use values from the status field of a resource to patch other fields.
