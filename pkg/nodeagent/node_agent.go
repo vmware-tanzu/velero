@@ -34,8 +34,7 @@ import (
 
 const (
 	// daemonSet is the name of the Velero node agent daemonset.
-	daemonSet  = "node-agent"
-	configName = "node-agent-config"
+	daemonSet = "node-agent"
 )
 
 var (
@@ -132,14 +131,10 @@ func GetPodSpec(ctx context.Context, kubeClient kubernetes.Interface, namespace 
 	return &ds.Spec.Template.Spec, nil
 }
 
-func GetConfigs(ctx context.Context, namespace string, kubeClient kubernetes.Interface) (*Configs, error) {
+func GetConfigs(ctx context.Context, namespace string, kubeClient kubernetes.Interface, configName string) (*Configs, error) {
 	cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, configName, metav1.GetOptions{})
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		} else {
-			return nil, errors.Wrapf(err, "error to get node agent configs %s", configName)
-		}
+		return nil, errors.Wrapf(err, "error to get node agent configs %s", configName)
 	}
 
 	if cm.Data == nil {

@@ -11,12 +11,12 @@ Velero data movement backup supports to constrain the nodes where it runs. This 
 - Constrain the data movement backup to run in specific nodes because these nodes have more resources than others  
 - Constrain the data movement backup to run in specific nodes because the storage allows volume/snapshot provisions in these nodes only  
 
-Velero introduces a new section in ```node-agent-config``` configMap, called ```loadAffinity```, through which you can specify the nodes to/not to run data movement backups, in the affinity and anti-affinity flavors.  
-If it is not there, ```node-agent-config``` should be created manually. The configMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one configMap in each namespace which applies to node-agent in that namespace only.  
+Velero introduces a new section in the node-agent configMap, called ```loadAffinity```, through which you can specify the nodes to/not to run data movement backups, in the affinity and anti-affinity flavors.  
+If it is not there, a configMap should be created manually. The configMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one configMap in each namespace which applies to node-agent in that namespace only. The name of the configMap should be specified in the node-agent server parameter ```--node-agent-config```.  
 Node-agent server checks these configurations at startup time. Therefore, you could edit this configMap any time, but in order to make the changes effective, node-agent server needs to be restarted.  
 
 ### Sample
-Here is a sample of the ```node-agent-config``` configMap with ```loadAffinity```:
+Here is a sample of the configMap with ```loadAffinity```:
 ```json
 {
     "loadAffinity": [
@@ -48,6 +48,21 @@ Here is a sample of the ```node-agent-config``` configMap with ```loadAffinity``
 To create the configMap, save something like the above sample to a json file and then run below command:
 ```
 kubectl create cm node-agent-config -n velero --from-file=<json file name>
+```
+
+To provide the configMap to node-agent, edit the node-agent daemonset and add the ```- --node-agent-config``` argument to the spec:
+1. Open the node-agent daemonset spec  
+```
+kubectl edit ds node-agent -n velero
+```
+2. Add ```- --node-agent-config``` to ```spec.template.spec.containers```  
+```
+spec:
+  template:
+    spec:
+      containers:
+      - args:
+        - --node-agent-config=<configMap name>
 ```
 
 ### Affinity
