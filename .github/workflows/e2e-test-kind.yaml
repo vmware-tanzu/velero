@@ -6,28 +6,31 @@ on:
     paths-ignore:
       - "site/**"
       - "design/**"
+permissions:
+  contents: read
+
 jobs:
   # Build the Velero CLI and image once for all Kubernetes versions, and cache it so the fan-out workers can get it.
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
           go-version-file: 'go.mod'
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
         id: cli-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         with:
           path: ./_output/bin/linux/amd64/velero
           # The cache key a combination of the current PR number and the commit SHA
           key: velero-cli-${{ github.event.pull_request.number }}-${{ github.sha }}
       - name: Fetch built image
         id: image-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         with:
           path: ./velero.tar
           # The cache key a combination of the current PR number and the commit SHA
@@ -66,27 +69,27 @@ jobs:
       fail-fast: false
     steps:
       - name: Check out the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
           go-version-file: 'go.mod'
       - name: Install MinIO
         run:
           docker run -d --rm -p 9000:9000 -e "MINIO_ACCESS_KEY=minio" -e "MINIO_SECRET_KEY=minio123" -e "MINIO_DEFAULT_BUCKETS=bucket,additional-bucket" bitnami/minio:2021.6.17-debian-10-r7
-      - uses: engineerd/setup-kind@v0.5.0
+      - uses: engineerd/setup-kind@aa272fe2a7309878ffc2a81c56cfe3ef108ae7d0 # v0.5.0
         with:
           version: "v0.21.0"
           image: "kindest/node:v${{ matrix.k8s }}"
       - name: Fetch built CLI
         id: cli-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         with:
           path: ./_output/bin/linux/amd64/velero
           key: velero-cli-${{ github.event.pull_request.number }}-${{ github.sha }}
       - name: Fetch built Image
         id: image-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         with:
           path: ./velero.tar
           key: velero-image-${{ github.event.pull_request.number }}-${{ github.sha }}
@@ -121,7 +124,7 @@ jobs:
         timeout-minutes: 30
       - name: Upload debug bundle
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # v4.3.6
         with:
           name: DebugBundle
           path: /home/runner/work/velero/velero/test/e2e/debug-bundle*

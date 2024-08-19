@@ -4,6 +4,9 @@ name: Pull Request Changelog Check
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
+permissions:
+  contents: read
+
 jobs:
 
   build:
@@ -12,7 +15,7 @@ jobs:
     steps:
 
     - name: Check out the code
-      uses: actions/checkout@v4
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
     - name: Changelog check
       if: ${{ !(contains(github.event.pull_request.labels.*.name, 'kind/changelog-not-required') || contains(github.event.pull_request.labels.*.name, 'Design') || contains(github.event.pull_request.labels.*.name, 'Website') || contains(github.event.pull_request.labels.*.name, 'Documentation'))}}

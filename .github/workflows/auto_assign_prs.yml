@@ -7,13 +7,19 @@ on:
   pull_request_target:
     types: [opened, reopened, ready_for_review]
 
+permissions:
+  contents: read
+
 jobs:
   # Automatically assigns reviewers and owner
   add-reviews:
+    permissions:
+      contents: read  # for kentaro-m/auto-assign-action to fetch config file
+      pull-requests: write  # for kentaro-m/auto-assign-action to assign PR reviewers
     runs-on: ubuntu-latest
     steps:
       - name: Set the author of a PR as the assignee
-        uses: kentaro-m/auto-assign-action@v2.0.0
+        uses: kentaro-m/auto-assign-action@f4648c0a9fdb753479e9e75fc251f507ce17bb7e # v2.0.0
         with:
           configuration-path: ".github/auto-assignees.yml"
           repo-token: "${{ secrets.GITHUB_TOKEN }}"

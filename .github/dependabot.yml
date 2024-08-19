@@ -19,3 +19,30 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: "weekly"
+    labels:
+      - "Dependencies"
+      - "docker"
+      - "kind/changelog-not-required"
+
+  - package-ecosystem: docker
+    directory: /hack/build-image
+    schedule:
+      interval: "weekly"
+    labels:
+      - "Dependencies"
+      - "docker"
+      - "kind/changelog-not-required"
+
+  - package-ecosystem: docker
+    directory: /site
+    schedule:
+      interval: "weekly"
+    labels:
+      - "Dependencies"
+      - "docker"
+      - "kind/changelog-not-required"

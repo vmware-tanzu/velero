@@ -6,13 +6,16 @@ on:
     paths:
     - 'hack/build-image/Dockerfile'
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       with:
         # The default value is "1" which fetches only a single commit. If we merge PR without squash or rebase,
         # there are at least two commits: the first one is the merge commit and the second one is the real commit

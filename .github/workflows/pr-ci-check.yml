@@ -1,5 +1,8 @@
 name: Pull Request CI Check
 on: [pull_request]
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Run CI
@@ -8,15 +11,15 @@ jobs:
       fail-fast: false
     steps:
       - name: Check out the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
           go-version-file: 'go.mod'
       - name: Make ci
         run: make ci
       - name: Upload test coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673 # v4.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.out
