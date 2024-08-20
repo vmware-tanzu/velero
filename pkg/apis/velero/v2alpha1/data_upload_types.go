@@ -144,6 +144,11 @@ type DataUploadStatus struct {
 	// Node is name of the node where the DataUpload is processed.
 	// +optional
 	Node string `json:"node,omitempty"`
+
+	// ElapsedTransferTime is the total amount of time it took to complete
+	// this DataUpload (completion time - start time).
+	// +optional
+	ElapsedTransferTime metav1.Duration `json:"elapsedTransferTime,omitempty"`
 }
 
 // TODO(2.0) After converting all resources to use the runttime-controller client,
@@ -160,6 +165,7 @@ type DataUploadStatus struct {
 // +kubebuilder:printcolumn:name="Storage Location",type="string",JSONPath=".spec.backupStorageLocation",description="Name of the Backup Storage Location where this backup should be stored"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Time duration since this DataUpload was created"
 // +kubebuilder:printcolumn:name="Node",type="string",JSONPath=".status.node",description="Name of the node where the DataUpload is processed"
+// +kubebuilder:printcolumn:name="Elapsed Time",type="string",JSONPath=".status.elapsedTransferTime",description="Elapsed time of actual transfer, eventually 'completion time' - 'start time'."
 
 // DataUpload acts as the protocol between data mover plugins and data mover controller for the datamover backup operation
 type DataUpload struct {
