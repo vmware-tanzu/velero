@@ -113,7 +113,7 @@ func init() {
 //   cases can be executed as expected successful result.
 
 var _ = Describe("Velero tests with various CRD API group versions",
-	Label("APIGroup", "APIVersion", "SKIP_KIND"), APIGroupVersionsTest)
+	Label("APIGroup", "APIVersion", "SKIP_KIND", "LongTime"), APIGroupVersionsTest)
 var _ = Describe("CRD of apiextentions v1beta1 should be B/R successfully from cluster(k8s version < 1.22) to cluster(k8s version >= 1.22)",
 	Label("APIGroup", "APIExtensions", "SKIP_KIND"), APIExtensionsVersionsTest)
 
@@ -197,9 +197,9 @@ var _ = Describe("Backups in object storage are synced to a new Velero and delet
 var _ = Describe("Backup will be created periodically by schedule defined by a Cron expression",
 	Label("Schedule", "BR", "Pause", "LongTime"), ScheduleBackupTest)
 var _ = Describe("Backup resources should follow the specific order in schedule",
-	Label("Schedule", "OrderedResources"), ScheduleOrderedResources)
+	Label("Schedule", "OrderedResources", "LongTime"), ScheduleOrderedResources)
 var _ = Describe("Schedule controller wouldn't create a new backup when it still has pending or InProgress backup",
-	Label("Schedule", "BackupCreation", "SKIP_KIND"), ScheduleBackupCreationTest)
+	Label("Schedule", "BackupCreation", "SKIP_KIND", "LongTime"), ScheduleBackupCreationTest)
 
 var _ = Describe("Velero test on ssr object when controller namespace mix-ups",
 	Label("PrivilegesMgmt", "SSR"), SSRTest)

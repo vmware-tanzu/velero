@@ -167,7 +167,7 @@ run-e2e: ginkgo
 			(echo "Cloud provider for target cloud/plugin provider is required, please rerun with CLOUD_PROVIDER=<aws,azure,kind,vsphere>"; exit 1)
 	@$(GINKGO) run \
 		-v \
-		--junit-report report.xml \
+		--junit-report e2e/report.xml \
 		--label-filter="$(GINKGO_LABELS)" \
 		--timeout=5h \
 		./e2e \
@@ -207,7 +207,7 @@ run-perf: ginkgo
 			(echo "Cloud provider for target cloud/plugin provider is required, please rerun with CLOUD_PROVIDER=<aws,azure,kind,vsphere>"; exit 1)
 	@$(GINKGO) run \
 		-v \
-		--junit-report report.xml \
+		--junit-report perf/report.xml \
 		--label-filter="$(GINKGO_LABELS)" \
 		--timeout=5h \
 		./perf \
