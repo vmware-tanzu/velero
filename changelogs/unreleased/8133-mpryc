@@ -1,0 +1,1 @@
+Fix issue #8132, race condition leading to conflicts on patching managed fields
