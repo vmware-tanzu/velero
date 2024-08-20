@@ -491,8 +491,11 @@ For Velero built-in data mover, it uses Kubernetes' scheduler to mount a snapsho
 For the backup, you can intervene this scheduling process through [Data Movement Backup Node Selection][15], so that you can decide which node(s) should/should not run the data movement backup for various purposes.  
 For the restore, this is not supported because sometimes the data movement restore must run in the same node where the restored workload pod is scheduled.  
 
+### BackupPVC Configuration
 
-
+The `BackupPVC` serves as an intermediate Persistent Volume Claim (PVC) utilized during data movement backup operations, providing efficient access to data.
+In complex storage environments, optimizing `BackupPVC` configurations can significantly enhance the performance of backup operations. [This document][16] outlines
+advanced configuration options for `BackupPVC`, allowing users to fine-tune access modes and storage class settings based on their storage provider's capabilities.
 
 [1]: https://github.com/vmware-tanzu/velero/pull/5968
 [2]: csi.md
@@ -509,3 +512,5 @@ For the restore, this is not supported because sometimes the data movement resto
 [13]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
 [14]: node-agent-concurrency.md
 [15]: data-movement-backup-node-selection.md
+[16]: data-movement-backup-pvc-configuration.md
+
