@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -38,8 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
 
 	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -71,31 +70,49 @@ type DataUploadReconciler struct {
 	logger              logrus.FieldLogger
 	snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
 	dataPathMgr         *datapath.Manager
-	loadAffinity        *nodeagent.LoadAffinity
+	loadAffinity        *kube.LoadAffinity
 	backupPVCConfig     map[string]nodeagent.BackupPVC
 	podResources        corev1.ResourceRequirements
 	preparingTimeout    time.Duration
 	metrics             *metrics.ServerMetrics
 }
 
-func NewDataUploadReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, csiSnapshotClient snapshotter.SnapshotV1Interface,
-	dataPathMgr *datapath.Manager, loadAffinity *nodeagent.LoadAffinity, backupPVCConfig map[string]nodeagent.BackupPVC, podResources corev1.ResourceRequirements,
-	clock clocks.WithTickerAndDelayedExecution, nodeName string, preparingTimeout time.Duration, log logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataUploadReconciler {
+func NewDataUploadReconciler(
+	client client.Client,
+	mgr manager.Manager,
+	kubeClient kubernetes.Interface,
+	csiSnapshotClient snapshotter.SnapshotV1Interface,
+	dataPathMgr *datapath.Manager,
+	loadAffinity *kube.LoadAffinity,
+	backupPVCConfig map[string]nodeagent.BackupPVC,
+	podResources corev1.ResourceRequirements,
+	clock clocks.WithTickerAndDelayedExecution,
+	nodeName string,
+	preparingTimeout time.Duration,
+	log logrus.FieldLogger,
+	metrics *metrics.ServerMetrics,
+) *DataUploadReconciler {
 	return &DataUploadReconciler{
-		client:              client,
-		mgr:                 mgr,
-		kubeClient:          kubeClient,
-		csiSnapshotClient:   csiSnapshotClient,
-		Clock:               clock,
-		nodeName:            nodeName,
-		logger:              log,
-		snapshotExposerList: map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(kubeClient, csiSnapshotClient, log)},
-		dataPathMgr:         dataPathMgr,
-		loadAffinity:        loadAffinity,
-		backupPVCConfig:     backupPVCConfig,
-		podResources:        podResources,
-		preparingTimeout:    preparingTimeout,
-		metrics:             metrics,
+		client:            client,
+		mgr:               mgr,
+		kubeClient:        kubeClient,
+		csiSnapshotClient: csiSnapshotClient,
+		Clock:             clock,
+		nodeName:          nodeName,
+		logger:            log,
+		snapshotExposerList: map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{
+			velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(
+				kubeClient,
+				csiSnapshotClient,
+				log,
+			),
+		},
+		dataPathMgr:      dataPathMgr,
+		loadAffinity:     loadAffinity,
+		backupPVCConfig:  backupPVCConfig,
+		podResources:     podResources,
+		preparingTimeout: preparingTimeout,
+		metrics:          metrics,
 	}
 }
 

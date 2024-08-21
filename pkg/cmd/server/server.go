@@ -469,7 +469,20 @@ func (s *server) initRepoManager() error {
 	s.repoLocker = repository.NewRepoLocker()
 	s.repoEnsurer = repository.NewEnsurer(s.mgr.GetClient(), s.logger, s.config.ResourceTimeout)
 
-	s.repoManager = repository.NewManager(s.namespace, s.mgr.GetClient(), s.repoLocker, s.repoEnsurer, s.credentialFileStore, s.credentialSecretStore, s.config.MaintenanceCfg, s.logger)
+	s.repoManager = repository.NewManager(
+		s.namespace,
+		s.mgr.GetClient(),
+		s.repoLocker,
+		s.repoEnsurer,
+		s.credentialFileStore,
+		s.credentialSecretStore,
+		s.config.RepoMaintenanceJobConfig,
+		s.config.PodResources,
+		s.config.KeepLatestMaintenanceJobs,
+		s.logger,
+		s.logLevel,
+		s.config.LogFormat,
+	)
 
 	return nil
 }
@@ -683,7 +696,14 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	if _, ok := enabledRuntimeControllers[constant.ControllerBackupRepo]; ok {
-		if err := controller.NewBackupRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.RepoMaintenanceFrequency, s.config.BackukpRepoConfig, s.repoManager).SetupWithManager(s.mgr); err != nil {
+		if err := controller.NewBackupRepoReconciler(
+			s.namespace,
+			s.logger,
+			s.mgr.GetClient(),
+			s.config.RepoMaintenanceFrequency,
+			s.config.BackupRepoConfig,
+			s.repoManager,
+		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupRepo)
 		}
 	}
