@@ -27,6 +27,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/volume"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -39,7 +40,15 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
-func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *velerov1api.Restore, podVolumeRestores []velerov1api.PodVolumeRestore, details bool, insecureSkipTLSVerify bool, caCertFile string) string {
+func DescribeRestore(
+	ctx context.Context,
+	kbClient kbclient.Client,
+	restore *velerov1api.Restore,
+	podVolumeRestores []velerov1api.PodVolumeRestore,
+	details bool,
+	insecureSkipTLSVerify bool,
+	caCertFile string,
+) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(restore.ObjectMeta)
 
@@ -195,6 +204,11 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 
 		d.Println()
 		d.Printf("Preserve Service NodePorts:\t%s\n", BoolPointerString(restore.Spec.PreserveNodePorts, "false", "true", "auto"))
+
+		if restore.Spec.ResourceModifier != nil {
+			d.Println()
+			DescribeResourceModifier(d, restore.Spec.ResourceModifier)
+		}
 
 		describeUploaderConfigForRestore(d, restore.Spec)
 
@@ -471,4 +485,11 @@ func describeRestoreResourceList(ctx context.Context, kbClient kbclient.Client, 
 	for _, gvk := range gvks {
 		d.Printf("\t%s:\n\t\t- %s\n", gvk, strings.Join(resourceList[gvk], "\n\t\t- "))
 	}
+}
+
+// DescribeResourceModifier describes resource policies in human-readable format
+func DescribeResourceModifier(d *Describer, resModifier *v1.TypedLocalObjectReference) {
+	d.Printf("Resource modifier:\n")
+	d.Printf("\tType:\t%s\n", resModifier.Kind)
+	d.Printf("\tName:\t%s\n", resModifier.Name)
 }
