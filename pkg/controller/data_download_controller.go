@@ -60,12 +60,13 @@ type DataDownloadReconciler struct {
 	restoreExposer   exposer.GenericRestoreExposer
 	nodeName         string
 	dataPathMgr      *datapath.Manager
+	podResources     v1.ResourceRequirements
 	preparingTimeout time.Duration
 	metrics          *metrics.ServerMetrics
 }
 
 func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
-	nodeName string, preparingTimeout time.Duration, logger logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataDownloadReconciler {
+	podResources v1.ResourceRequirements, nodeName string, preparingTimeout time.Duration, logger logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:           client,
 		kubeClient:       kubeClient,
@@ -75,6 +76,7 @@ func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeCl
 		nodeName:         nodeName,
 		restoreExposer:   exposer.NewGenericRestoreExposer(kubeClient, logger),
 		dataPathMgr:      dataPathMgr,
+		podResources:     podResources,
 		preparingTimeout: preparingTimeout,
 		metrics:          metrics,
 	}
@@ -179,7 +181,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// Expose() will trigger to create one pod whose volume is restored by a given volume snapshot,
 		// but the pod maybe is not in the same node of the current controller, so we need to return it here.
 		// And then only the controller who is in the same node could do the rest work.
-		err = r.restoreExposer.Expose(ctx, getDataDownloadOwnerObject(dd), dd.Spec.TargetVolume.PVC, dd.Spec.TargetVolume.Namespace, hostingPodLabels, dd.Spec.OperationTimeout.Duration)
+		err = r.restoreExposer.Expose(ctx, getDataDownloadOwnerObject(dd), dd.Spec.TargetVolume.PVC, dd.Spec.TargetVolume.Namespace, hostingPodLabels, r.podResources, dd.Spec.OperationTimeout.Duration)
 		if err != nil {
 			if err := r.client.Get(ctx, req.NamespacedName, dd); err != nil {
 				if !apierrors.IsNotFound(err) {

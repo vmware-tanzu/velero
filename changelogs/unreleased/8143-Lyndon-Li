@@ -1,0 +1,1 @@
+Fix issue #8134, allow to config resource request/limit for data mover micro service pods

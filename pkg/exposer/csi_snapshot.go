@@ -70,6 +70,9 @@ type CSISnapshotExposeParam struct {
 
 	// BackupPVCConfig is the config for backupPVC (intermediate PVC) of snapshot data movement
 	BackupPVCConfig map[string]nodeagent.BackupPVC
+
+	// Resources defines the resource requirements of the hosting pod
+	Resources corev1.ResourceRequirements
 }
 
 // CSISnapshotExposeWaitParam define the input param for WaitExposed of CSI snapshots
@@ -191,7 +194,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		}
 	}()
 
-	backupPod, err := e.createBackupPod(ctx, ownerObject, backupPVC, csiExposeParam.OperationTimeout, csiExposeParam.HostingPodLabels, csiExposeParam.Affinity)
+	backupPod, err := e.createBackupPod(ctx, ownerObject, backupPVC, csiExposeParam.OperationTimeout, csiExposeParam.HostingPodLabels, csiExposeParam.Affinity, csiExposeParam.Resources)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
 	}
@@ -423,7 +426,7 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 }
 
 func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject corev1.ObjectReference, backupPVC *corev1.PersistentVolumeClaim, operationTimeout time.Duration,
-	label map[string]string, affinity *nodeagent.LoadAffinity) (*corev1.Pod, error) {
+	label map[string]string, affinity *nodeagent.LoadAffinity, resources corev1.ResourceRequirements) (*corev1.Pod, error) {
 	podName := ownerObject.Name
 
 	containerName := string(ownerObject.UID)
@@ -513,6 +516,7 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 					VolumeMounts:  volumeMounts,
 					VolumeDevices: volumeDevices,
 					Env:           podInfo.env,
+					Resources:     resources,
 				},
 			},
 			ServiceAccountName:            podInfo.serviceAccount,
