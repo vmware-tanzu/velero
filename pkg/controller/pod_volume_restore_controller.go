@@ -265,7 +265,7 @@ func getInitContainerIndex(pod *corev1api.Pod) int {
 }
 
 func (c *PodVolumeRestoreReconciler) OnDataPathCompleted(ctx context.Context, namespace string, pvrName string, result datapath.Result) {
-	defer c.closeDataPath(ctx, pvrName)
+	defer c.dataPathMgr.RemoveAsyncBR(pvrName)
 
 	log := c.logger.WithField("pvr", pvrName)
 
@@ -325,7 +325,7 @@ func (c *PodVolumeRestoreReconciler) OnDataPathCompleted(ctx context.Context, na
 }
 
 func (c *PodVolumeRestoreReconciler) OnDataPathFailed(ctx context.Context, namespace string, pvrName string, err error) {
-	defer c.closeDataPath(ctx, pvrName)
+	defer c.dataPathMgr.RemoveAsyncBR(pvrName)
 
 	log := c.logger.WithField("pvr", pvrName)
 
@@ -340,7 +340,7 @@ func (c *PodVolumeRestoreReconciler) OnDataPathFailed(ctx context.Context, names
 }
 
 func (c *PodVolumeRestoreReconciler) OnDataPathCancelled(ctx context.Context, namespace string, pvrName string) {
-	defer c.closeDataPath(ctx, pvrName)
+	defer c.dataPathMgr.RemoveAsyncBR(pvrName)
 
 	log := c.logger.WithField("pvr", pvrName)
 

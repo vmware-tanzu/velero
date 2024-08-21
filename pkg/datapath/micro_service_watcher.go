@@ -46,11 +46,12 @@ const (
 
 	ErrCancelled = "data path is canceled"
 
-	EventReasonStarted   = "Data-Path-Started"
-	EventReasonCompleted = "Data-Path-Completed"
-	EventReasonFailed    = "Data-Path-Failed"
-	EventReasonCancelled = "Data-Path-Canceled"
-	EventReasonProgress  = "Data-Path-Progress"
+	EventReasonStarted    = "Data-Path-Started"
+	EventReasonCompleted  = "Data-Path-Completed"
+	EventReasonFailed     = "Data-Path-Failed"
+	EventReasonCancelled  = "Data-Path-Canceled"
+	EventReasonProgress   = "Data-Path-Progress"
+	EventReasonCancelling = "Data-Path-Canceling"
 )
 
 type microServiceBRWatcher struct {
@@ -76,6 +77,7 @@ type microServiceBRWatcher struct {
 	podInformer         ctrlcache.Informer
 	eventHandler        cache.ResourceEventHandlerRegistration
 	podHandler          cache.ResourceEventHandlerRegistration
+	watcherLock         sync.Mutex
 }
 
 func newMicroServiceBRWatcher(client client.Client, kubeClient kubernetes.Interface, mgr manager.Manager, taskType string, taskName string, namespace string,
@@ -101,8 +103,6 @@ func newMicroServiceBRWatcher(client client.Client, kubeClient kubernetes.Interf
 }
 
 func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) error {
-	succeeded := false
-
 	eventInformer, err := ms.mgr.GetCache().GetInformer(ctx, &v1.Event{})
 	if err != nil {
 		return errors.Wrap(err, "error getting event informer")
@@ -121,8 +121,6 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) er
 					return
 				}
 
-				ms.log.Infof("Pushed adding event %s/%s, message %s for object %v", evt.Namespace, evt.Name, evt.Message, evt.InvolvedObject)
-
 				ms.eventCh <- evt
 			},
 			UpdateFunc: func(_, obj interface{}) {
@@ -131,24 +129,13 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) er
 					return
 				}
 
-				ms.log.Infof("Pushed updating event %s/%s, message %s for object %v", evt.Namespace, evt.Name, evt.Message, evt.InvolvedObject)
-
 				ms.eventCh <- evt
 			},
 		},
 	)
-
 	if err != nil {
 		return errors.Wrap(err, "error registering event handler")
 	}
-
-	defer func() {
-		if !succeeded {
-			if err := eventInformer.RemoveEventHandler(eventHandler); err != nil {
-				ms.log.WithError(err).Warn("Failed to remove event handler")
-			}
-		}
-	}()
 
 	podHandler, err := podInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -164,25 +151,13 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) er
 			},
 		},
 	)
-
 	if err != nil {
 		return errors.Wrap(err, "error registering pod handler")
 	}
 
-	defer func() {
-		if !succeeded {
-			if err := podInformer.RemoveEventHandler(podHandler); err != nil {
-				ms.log.WithError(err).Warn("Failed to remove pod handler")
-			}
-		}
-	}()
-
-	ms.log.WithFields(
-		logrus.Fields{
-			"taskType": ms.taskType,
-			"taskName": ms.taskName,
-			"thisPod":  ms.thisPod,
-		}).Info("MicroServiceBR is initialized")
+	if err := ms.reEnsureThisPod(ctx); err != nil {
+		return err
+	}
 
 	ms.eventInformer = eventInformer
 	ms.podInformer = podInformer
@@ -191,7 +166,12 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) er
 
 	ms.ctx, ms.cancel = context.WithCancel(ctx)
 
-	succeeded = true
+	ms.log.WithFields(
+		logrus.Fields{
+			"taskType": ms.taskType,
+			"taskName": ms.taskName,
+			"thisPod":  ms.thisPod,
+		}).Info("MicroServiceBR is initialized")
 
 	return nil
 }
@@ -199,34 +179,40 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) er
 func (ms *microServiceBRWatcher) Close(ctx context.Context) {
 	if ms.cancel != nil {
 		ms.cancel()
-		ms.cancel = nil
 	}
 
 	ms.log.WithField("taskType", ms.taskType).WithField("taskName", ms.taskName).Info("Closing MicroServiceBR")
 
 	ms.wgWatcher.Wait()
 
-	if ms.eventInformer != nil && ms.eventHandler != nil {
-		if err := ms.eventInformer.RemoveEventHandler(ms.eventHandler); err != nil {
-			ms.log.WithError(err).Warn("Failed to remove event handler")
-		}
-	}
-
-	if ms.podInformer != nil && ms.podHandler != nil {
-		if err := ms.podInformer.RemoveEventHandler(ms.podHandler); err != nil {
-			ms.log.WithError(err).Warn("Failed to remove pod handler")
-		}
-	}
+	ms.close()
 
 	ms.log.WithField("taskType", ms.taskType).WithField("taskName", ms.taskName).Info("MicroServiceBR is closed")
 }
 
-func (ms *microServiceBRWatcher) StartBackup(source AccessPoint, uploaderConfig map[string]string, param interface{}) error {
-	ms.log.Infof("Start watching backup ms for source %v", source)
+func (ms *microServiceBRWatcher) close() {
+	ms.watcherLock.Lock()
+	defer ms.watcherLock.Unlock()
 
-	if err := ms.reEnsureThisPod(); err != nil {
-		return err
+	if ms.eventHandler != nil {
+		if err := ms.eventInformer.RemoveEventHandler(ms.eventHandler); err != nil {
+			ms.log.WithError(err).Warn("Failed to remove event handler")
+		}
+
+		ms.eventHandler = nil
 	}
+
+	if ms.podHandler != nil {
+		if err := ms.podInformer.RemoveEventHandler(ms.podHandler); err != nil {
+			ms.log.WithError(err).Warn("Failed to remove pod handler")
+		}
+
+		ms.podHandler = nil
+	}
+}
+
+func (ms *microServiceBRWatcher) StartBackup(source AccessPoint, uploaderConfig map[string]string, param interface{}) error {
+	ms.log.Infof("Start watching backup ms for source %v", source.ByPath)
 
 	ms.startWatch()
 
@@ -234,20 +220,16 @@ func (ms *microServiceBRWatcher) StartBackup(source AccessPoint, uploaderConfig 
 }
 
 func (ms *microServiceBRWatcher) StartRestore(snapshotID string, target AccessPoint, uploaderConfigs map[string]string) error {
-	ms.log.Infof("Start watching restore ms to target %v, from snapshot %s", target, snapshotID)
-
-	if err := ms.reEnsureThisPod(); err != nil {
-		return err
-	}
+	ms.log.Infof("Start watching restore ms to target %s, from snapshot %s", target.ByPath, snapshotID)
 
 	ms.startWatch()
 
 	return nil
 }
 
-func (ms *microServiceBRWatcher) reEnsureThisPod() error {
+func (ms *microServiceBRWatcher) reEnsureThisPod(ctx context.Context) error {
 	thisPod := &v1.Pod{}
-	if err := ms.client.Get(ms.ctx, types.NamespacedName{
+	if err := ms.client.Get(ctx, types.NamespacedName{
 		Namespace: ms.namespace,
 		Name:      ms.thisPod,
 	}, thisPod); err != nil {
@@ -275,6 +257,11 @@ func (ms *microServiceBRWatcher) startWatch() {
 	go func() {
 		ms.log.Info("Start watching data path pod")
 
+		defer func() {
+			ms.close()
+			ms.wgWatcher.Done()
+		}()
+
 		var lastPod *v1.Pod
 
 	watchLoop:
@@ -291,14 +278,16 @@ func (ms *microServiceBRWatcher) startWatch() {
 		}
 
 		if lastPod == nil {
-			ms.log.Warn("Data path pod watch loop is canceled")
-			ms.wgWatcher.Done()
+			ms.log.Warn("Watch loop is canceled on waiting data path pod")
 			return
 		}
 
 	epilogLoop:
 		for !ms.startedFromEvent || !ms.terminatedFromEvent {
 			select {
+			case <-ms.ctx.Done():
+				ms.log.Warn("Watch loop is canceled on waiting final event")
+				return
 			case <-time.After(eventWaitTimeout):
 				break epilogLoop
 			case evt := <-ms.eventCh:
@@ -339,8 +328,6 @@ func (ms *microServiceBRWatcher) startWatch() {
 		}
 
 		logger.Info("Complete callback on data path pod termination")
-
-		ms.wgWatcher.Done()
 	}()
 }
 
@@ -348,20 +335,22 @@ func (ms *microServiceBRWatcher) onEvent(evt *v1.Event) {
 	switch evt.Reason {
 	case EventReasonStarted:
 		ms.startedFromEvent = true
-		ms.log.Infof("Received data path start message %s", evt.Message)
+		ms.log.Infof("Received data path start message: %s", evt.Message)
 	case EventReasonProgress:
 		ms.callbacks.OnProgress(ms.ctx, ms.namespace, ms.taskName, funcGetProgressFromMessage(evt.Message, ms.log))
 	case EventReasonCompleted:
-		ms.log.Infof("Received data path completed message %v", funcGetResultFromMessage(ms.taskType, evt.Message, ms.log))
+		ms.log.Infof("Received data path completed message: %v", funcGetResultFromMessage(ms.taskType, evt.Message, ms.log))
 		ms.terminatedFromEvent = true
 	case EventReasonCancelled:
-		ms.log.Infof("Received data path canceled message %s", evt.Message)
+		ms.log.Infof("Received data path canceled message: %s", evt.Message)
 		ms.terminatedFromEvent = true
 	case EventReasonFailed:
-		ms.log.Infof("Received data path failed message %s", evt.Message)
+		ms.log.Infof("Received data path failed message: %s", evt.Message)
 		ms.terminatedFromEvent = true
+	case EventReasonCancelling:
+		ms.log.Infof("Received data path canceling message: %s", evt.Message)
 	default:
-		ms.log.Debugf("Received event for data mover %s.[reason %s, message %s]", ms.taskName, evt.Reason, evt.Message)
+		ms.log.Infof("Received event for data path %s, reason: %s, message: %s", ms.taskName, evt.Reason, evt.Message)
 	}
 }
 

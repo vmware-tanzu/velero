@@ -172,7 +172,10 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 	backupPVCStorageClass := csiExposeParam.StorageClass
 	backupPVCReadOnly := false
 	if value, exists := csiExposeParam.BackupPVCConfig[csiExposeParam.StorageClass]; exists {
-		backupPVCStorageClass = value.StorageClass
+		if value.StorageClass != "" {
+			backupPVCStorageClass = value.StorageClass
+		}
+
 		backupPVCReadOnly = value.ReadOnly
 	}
 

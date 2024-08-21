@@ -301,12 +301,12 @@ func TestRunCancelableDataPath(t *testing.T) {
 	}{
 		{
 			name:        "no du",
-			ctx:         context.Background(),
+			ctx:         ctxTimeout,
 			expectedErr: "error waiting for du: context deadline exceeded",
 		},
 		{
 			name:          "du not in in-progress",
-			ctx:           context.Background(),
+			ctx:           ctxTimeout,
 			kubeClientObj: []runtime.Object{du},
 			expectedErr:   "error waiting for du: context deadline exceeded",
 		},
@@ -411,8 +411,6 @@ func TestRunCancelableDataPath(t *testing.T) {
 
 				return fsBR
 			}
-
-			waitControllerTimeout = time.Second
 
 			if test.result != nil {
 				go func() {

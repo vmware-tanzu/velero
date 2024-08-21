@@ -127,15 +127,13 @@ func (r *BackupMicroService) Init() error {
 	return err
 }
 
-var waitControllerTimeout time.Duration = time.Minute * 2
-
 func (r *BackupMicroService) RunCancelableDataPath(ctx context.Context) (string, error) {
 	log := r.logger.WithFields(logrus.Fields{
 		"dataupload": r.dataUploadName,
 	})
 
 	du := &velerov2alpha1api.DataUpload{}
-	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, waitControllerTimeout, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextCancel(ctx, 500*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 		err := r.client.Get(ctx, types.NamespacedName{
 			Namespace: r.namespace,
 			Name:      r.dataUploadName,
@@ -241,8 +239,6 @@ func (r *BackupMicroService) Shutdown() {
 var funcMarshal = json.Marshal
 
 func (r *BackupMicroService) OnDataUploadCompleted(ctx context.Context, namespace string, duName string, result datapath.Result) {
-	defer r.closeDataPath(ctx, duName)
-
 	log := r.logger.WithField("dataupload", duName)
 
 	backupBytes, err := funcMarshal(result.Backup)
@@ -262,8 +258,6 @@ func (r *BackupMicroService) OnDataUploadCompleted(ctx context.Context, namespac
 }
 
 func (r *BackupMicroService) OnDataUploadFailed(ctx context.Context, namespace string, duName string, err error) {
-	defer r.closeDataPath(ctx, duName)
-
 	log := r.logger.WithField("dataupload", duName)
 	log.WithError(err).Error("Async fs backup data path failed")
 
@@ -274,8 +268,6 @@ func (r *BackupMicroService) OnDataUploadFailed(ctx context.Context, namespace s
 }
 
 func (r *BackupMicroService) OnDataUploadCancelled(ctx context.Context, namespace string, duName string) {
-	defer r.closeDataPath(ctx, duName)
-
 	log := r.logger.WithField("dataupload", duName)
 	log.Warn("Async fs backup data path canceled")
 
@@ -296,8 +288,6 @@ func (r *BackupMicroService) OnDataUploadProgress(ctx context.Context, namespace
 		return
 	}
 
-	log.Infof("Sending event for progress %v (%s)", progress, string(progressBytes))
-
 	r.eventRecorder.Event(r.dataUpload, false, datapath.EventReasonProgress, string(progressBytes))
 }
 
@@ -313,7 +303,7 @@ func (r *BackupMicroService) closeDataPath(ctx context.Context, duName string) {
 func (r *BackupMicroService) cancelDataUpload(du *velerov2alpha1api.DataUpload) {
 	r.logger.WithField("DataUpload", du.Name).Info("Data upload is being canceled")
 
-	r.eventRecorder.Event(du, false, "Canceling", "Canceling for data upload %s", du.Name)
+	r.eventRecorder.Event(du, false, datapath.EventReasonCancelling, "Canceling for data upload %s", du.Name)
 
 	fsBackup := r.dataPathMgr.GetAsyncBR(du.Name)
 	if fsBackup == nil {

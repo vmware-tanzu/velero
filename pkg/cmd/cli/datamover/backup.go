@@ -224,6 +224,7 @@ func (s *dataMoverBackup) runDataPath() {
 
 	err = dpService.Init()
 	if err != nil {
+		dpService.Shutdown()
 		s.cancelFunc()
 		funcExitWithMessage(s.logger, false, "Failed to init data path service for DataUpload %s: %v", s.config.duName, err)
 		return
@@ -233,6 +234,7 @@ func (s *dataMoverBackup) runDataPath() {
 
 	result, err := dpService.RunCancelableDataPath(s.ctx)
 	if err != nil {
+		dpService.Shutdown()
 		s.cancelFunc()
 		funcExitWithMessage(s.logger, false, "Failed to run data path service for DataUpload %s: %v", s.config.duName, err)
 		return
