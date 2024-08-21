@@ -254,12 +254,12 @@ func TestRunCancelableRestore(t *testing.T) {
 	}{
 		{
 			name:        "no dd",
-			ctx:         context.Background(),
+			ctx:         ctxTimeout,
 			expectedErr: "error waiting for dd: context deadline exceeded",
 		},
 		{
 			name:          "dd not in in-progress",
-			ctx:           context.Background(),
+			ctx:           ctxTimeout,
 			kubeClientObj: []runtime.Object{dd},
 			expectedErr:   "error waiting for dd: context deadline exceeded",
 		},
@@ -364,8 +364,6 @@ func TestRunCancelableRestore(t *testing.T) {
 
 				return fsBR
 			}
-
-			waitControllerTimeout = time.Second
 
 			if test.result != nil {
 				go func() {

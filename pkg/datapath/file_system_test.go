@@ -96,6 +96,7 @@ func TestAsyncBackup(t *testing.T) {
 			fs := newFileSystemBR("job-1", "test", nil, "velero", Callbacks{}, velerotest.NewLogger()).(*fileSystemBR)
 			mockProvider := providerMock.NewProvider(t)
 			mockProvider.On("RunBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.result.Backup.SnapshotID, test.result.Backup.EmptySnapshot, test.err)
+			mockProvider.On("Close", mock.Anything).Return(nil)
 			fs.uploaderProv = mockProvider
 			fs.initialized = true
 			fs.callbacks = test.callbacks
@@ -179,6 +180,7 @@ func TestAsyncRestore(t *testing.T) {
 			fs := newFileSystemBR("job-1", "test", nil, "velero", Callbacks{}, velerotest.NewLogger()).(*fileSystemBR)
 			mockProvider := providerMock.NewProvider(t)
 			mockProvider.On("RunRestore", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.err)
+			mockProvider.On("Close", mock.Anything).Return(nil)
 			fs.uploaderProv = mockProvider
 			fs.initialized = true
 			fs.callbacks = test.callbacks

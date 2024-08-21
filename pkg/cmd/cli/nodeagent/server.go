@@ -61,6 +61,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+
+	cacheutil "k8s.io/client-go/tools/cache"
 )
 
 var (
@@ -300,28 +302,29 @@ func (s *nodeAgentServer) run() {
 		backupPVCConfig = s.dataPathConfigs.BackupPVCConfig
 	}
 
-	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, loadAffinity, backupPVCConfig, repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, loadAffinity, backupPVCConfig, clock.RealClock{}, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, repoEnsurer, credentialGetter, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}
 
 	go func() {
-		s.mgr.GetCache().WaitForCacheSync(s.ctx)
-
-		if err := dataUploadReconciler.AttemptDataUploadResume(s.ctx, s.mgr.GetClient(), s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
-			s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data upload resume")
+		if err := s.waitCacheForResume(); err != nil {
+			s.logger.WithError(err).Error("Failed to wait cache for resume, will not resume DU/DD")
+			return
 		}
 
-		if err := dataDownloadReconciler.AttemptDataDownloadResume(s.ctx, s.mgr.GetClient(), s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
-			s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data download resume")
+		if err := dataUploadReconciler.AttemptDataUploadResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt data upload resume")
 		}
 
-		s.logger.Info("Attempt complete to resume dataUploads and dataDownloads")
+		if err := dataDownloadReconciler.AttemptDataDownloadResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt data download resume")
+		}
 	}()
 
 	s.logger.Info("Controllers starting...")
@@ -329,6 +332,29 @@ func (s *nodeAgentServer) run() {
 	if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		s.logger.Fatal("Problem starting manager", err)
 	}
+}
+
+func (s *nodeAgentServer) waitCacheForResume() error {
+	podInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &v1.Pod{})
+	if err != nil {
+		return errors.Wrap(err, "error getting pod informer")
+	}
+
+	duInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov2alpha1api.DataUpload{})
+	if err != nil {
+		return errors.Wrap(err, "error getting du informer")
+	}
+
+	ddInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov2alpha1api.DataDownload{})
+	if err != nil {
+		return errors.Wrap(err, "error getting dd informer")
+	}
+
+	if !cacheutil.WaitForCacheSync(s.ctx.Done(), podInformer.HasSynced, duInformer.HasSynced, ddInformer.HasSynced) {
+		return errors.New("error waiting informer synced")
+	}
+
+	return nil
 }
 
 // validatePodVolumesHostPath validates that the pod volumes path contains a
