@@ -50,7 +50,7 @@ pkg/util/kube/client.go
 ```go
 // PatchResourceWithRetries patches the original resource with the updated resource, retrying when the provided retriable function returns true.
 func PatchResourceWithRetries(maxDuration time.Duration, original, updated client.Object, kbClient client.Client, retriable func(error) bool) error {
-	return veleroPkgClient.RetriesPhasePatchFunc(maxDuration, func() error { return PatchResource(original, updated, kbClient) }, retriable)
+	return veleroPkgClient.RetryOnRetriableMaxBackOff(maxDuration, func() error { return PatchResource(original, updated, kbClient) }, retriable)
 }
 
 // PatchResourceWithRetriesOnErrors patches the original resource with the updated resource, retrying when the operation returns an error.
@@ -81,14 +81,14 @@ func CapBackoff(cap time.Duration) wait.Backoff {
 	}
 }
 
-// RetriesPhasePatchFunc accepts a patch function param, retrying when the provided retriable function returns true.
-func RetriesPhasePatchFunc(maxDuration time.Duration, fn func() error, retriable func(error) bool) error {
+// RetryOnRetriableMaxBackOff accepts a patch function param, retrying when the provided retriable function returns true.
+func RetryOnRetriableMaxBackOff(maxDuration time.Duration, fn func() error, retriable func(error) bool) error {
 	return retry.OnError(CapBackoff(maxDuration), func(err error) bool { return retriable(err) }, fn)
 }
 
-// RetriesPhasePatchFuncOnErrors accepts a patch function param, retrying when the error is not nil.
-func RetriesPhasePatchFuncOnErrors(maxDuration time.Duration, fn func() error) error {
-	return RetriesPhasePatchFunc(maxDuration, fn, func(err error) bool { return err != nil })
+// RetryOnErrorMaxBackOff accepts a patch function param, retrying when the error is not nil.
+func RetryOnErrorMaxBackOff(maxDuration time.Duration, fn func() error) error {
+	return RetryOnRetriableMaxBackOff(maxDuration, fn, func(err error) bool { return err != nil })
 }
 ```
 
