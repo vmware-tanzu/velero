@@ -194,7 +194,7 @@ type PodResources struct {
 ```
 The string values must mactch Kubernetes Quantity expressions; for each resource, the "request" value must not be larger than the "limit" value. Otherwise, if any one of the values fail, all the resource configurations will be ignored.  
 
-The configurations are loaded node-agent at start time, so users can change the values in the configMap any time, but the changes won't effect until node-agent restarts.    
+The configurations are loaded by node-agent at start time, so users can change the values in the configMap any time, but the changes won't effect until node-agent restarts.    
 
 
 ## node-agent
