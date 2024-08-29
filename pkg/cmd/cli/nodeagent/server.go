@@ -60,6 +60,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	cacheutil "k8s.io/client-go/tools/cache"
@@ -295,19 +296,31 @@ func (s *nodeAgentServer) run() {
 	var loadAffinity *nodeagent.LoadAffinity
 	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
 		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
+		s.logger.Infof("Using customized loadAffinity %v", loadAffinity)
 	}
 
 	var backupPVCConfig map[string]nodeagent.BackupPVC
 	if s.dataPathConfigs != nil && s.dataPathConfigs.BackupPVCConfig != nil {
 		backupPVCConfig = s.dataPathConfigs.BackupPVCConfig
+		s.logger.Infof("Using customized backupPVC config %v", backupPVCConfig)
 	}
 
-	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, loadAffinity, backupPVCConfig, clock.RealClock{}, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	podResources := v1.ResourceRequirements{}
+	if s.dataPathConfigs != nil && s.dataPathConfigs.PodResources != nil {
+		if res, err := kube.ParseResourceRequirements(s.dataPathConfigs.PodResources.CPURequest, s.dataPathConfigs.PodResources.MemoryRequest, s.dataPathConfigs.PodResources.CPULimit, s.dataPathConfigs.PodResources.MemoryLimit); err != nil {
+			s.logger.WithError(err).Warn("Pod resource requirements are invalid, ignore")
+		} else {
+			podResources = res
+			s.logger.Infof("Using customized pod resource requirements %v", s.dataPathConfigs.PodResources)
+		}
+	}
+
+	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, loadAffinity, backupPVCConfig, podResources, clock.RealClock{}, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}

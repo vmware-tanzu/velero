@@ -70,6 +70,13 @@ type BackupPVC struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
+type PodResources struct {
+	CPURequest    string `json:"cpuRequest,omitempty"`
+	MemoryRequest string `json:"memoryRequest,omitempty"`
+	CPULimit      string `json:"cpuLimit,omitempty"`
+	MemoryLimit   string `json:"memoryLimit,omitempty"`
+}
+
 type Configs struct {
 	// LoadConcurrency is the config for data path load concurrency per node.
 	LoadConcurrency *LoadConcurrency `json:"loadConcurrency,omitempty"`
@@ -79,6 +86,9 @@ type Configs struct {
 
 	// BackupPVCConfig is the config for backupPVC (intermediate PVC) of snapshot data movement
 	BackupPVCConfig map[string]BackupPVC `json:"backupPVC,omitempty"`
+
+	// PodResources is the resource config for various types of pods launched by node-agent, i.e., data mover pods.
+	PodResources *PodResources `json:"podResources,omitempty"`
 }
 
 // IsRunning checks if the node agent daemonset is running properly. If not, return the error found

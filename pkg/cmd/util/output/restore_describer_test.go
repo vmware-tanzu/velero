@@ -2,15 +2,16 @@ package output
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 	"text/tabwriter"
 	"time"
 
-	"github.com/vmware-tanzu/velero/internal/volume"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
@@ -388,4 +389,29 @@ CSI Snapshot Restores:
 			assert.Equal(t, tc.expect, d.buf.String())
 		})
 	}
+}
+
+func TestDescribeResourceModifier(t *testing.T) {
+	d := &Describer{
+		Prefix: "",
+		out:    &tabwriter.Writer{},
+		buf:    &bytes.Buffer{},
+	}
+
+	d.out.Init(d.buf, 0, 8, 2, ' ', 0)
+
+	DescribeResourceModifier(d, &v1.TypedLocalObjectReference{
+		APIGroup: &v1.SchemeGroupVersion.Group,
+		Kind:     "ConfigMap",
+		Name:     "resourceModifier",
+	})
+	d.out.Flush()
+
+	expectOutput := `Resource modifier:
+  Type:  ConfigMap
+  Name:  resourceModifier
+`
+
+	fmt.Println(d.buf.String())
+	require.Equal(t, expectOutput, d.buf.String())
 }

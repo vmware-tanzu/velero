@@ -73,13 +73,14 @@ type DataUploadReconciler struct {
 	dataPathMgr         *datapath.Manager
 	loadAffinity        *nodeagent.LoadAffinity
 	backupPVCConfig     map[string]nodeagent.BackupPVC
+	podResources        corev1.ResourceRequirements
 	preparingTimeout    time.Duration
 	metrics             *metrics.ServerMetrics
 }
 
 func NewDataUploadReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, csiSnapshotClient snapshotter.SnapshotV1Interface,
-	dataPathMgr *datapath.Manager, loadAffinity *nodeagent.LoadAffinity, backupPVCConfig map[string]nodeagent.BackupPVC, clock clocks.WithTickerAndDelayedExecution,
-	nodeName string, preparingTimeout time.Duration, log logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataUploadReconciler {
+	dataPathMgr *datapath.Manager, loadAffinity *nodeagent.LoadAffinity, backupPVCConfig map[string]nodeagent.BackupPVC, podResources corev1.ResourceRequirements,
+	clock clocks.WithTickerAndDelayedExecution, nodeName string, preparingTimeout time.Duration, log logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:              client,
 		mgr:                 mgr,
@@ -92,6 +93,7 @@ func NewDataUploadReconciler(client client.Client, mgr manager.Manager, kubeClie
 		dataPathMgr:         dataPathMgr,
 		loadAffinity:        loadAffinity,
 		backupPVCConfig:     backupPVCConfig,
+		podResources:        podResources,
 		preparingTimeout:    preparingTimeout,
 		metrics:             metrics,
 	}
@@ -795,6 +797,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			VolumeSize:       pvc.Spec.Resources.Requests[corev1.ResourceStorage],
 			Affinity:         r.loadAffinity,
 			BackupPVCConfig:  r.backupPVCConfig,
+			Resources:        r.podResources,
 		}, nil
 	}
 	return nil, nil
