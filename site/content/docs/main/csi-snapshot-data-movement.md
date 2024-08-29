@@ -31,7 +31,7 @@ Velero built-in data mover restores both volume data and metadata, so the data m
 
 ### Install Velero Node Agent
 
-Velero Node Agent is a Kubernetes daemonset that hosts Velero data movement controllers and launch data mover pods. 
+Velero Node Agent is a Kubernetes daemonset that hosts Velero data movement controllers and launches data mover pods. 
 If you are using Velero built-in data mover, Node Agent must be installed. To install Node Agent, use the `--use-node-agent` flag. 
 
 ```
@@ -248,7 +248,7 @@ Velero backs up resources for CSI snapshot data movement backup in the same way 
 - Velero built-in data mover launches a data mover pod to transfer the data from the provisioned volume to the backup storage.  
 - When the data transfer completes or any error happens, Velero built-in data mover sets the `DataUpload` CR to the terminal state, either `Completed` or `Failed`.  
 - Velero built-in data mover also monitors the cancellation request to the `DataUpload` CR, once that happens, it cancels its ongoing activities, cleans up the intermediate resources and set the `DataUpload` CR to `Cancelled`.  
-- Throughout the data transfer, Velero built-in data mover monitors the status of the data mover pod and delete it after `DataUpload` CR is set to the terminal state.    
+- Throughout the data transfer, Velero built-in data mover monitors the status of the data mover pod and deletes it after `DataUpload` CR is set to the terminal state.    
 
 ### Restore
 
@@ -268,7 +268,7 @@ Velero restores resources for CSI snapshot data movement restore in the same way
 - After the volume is provisioned, Velero built-in data mover starts a data mover pod to transfer the data from the backup storage according to the backup storage location defined by users.  
 - When the data transfer completes or any error happens, Velero built-in data mover sets the `DataDownload` CR to the terminal state, either `Completed` or `Failed`.  
 - Velero built-in data mover also monitors the cancellation request to the `DataDownload` CR, once that happens, it cancels its ongoing activities, cleans up the intermediate resources and set the `DataDownload` CR to `Cancelled`.  
-- Throughout the data transfer, Velero built-in data mover monitors the status of the data mover pod and delete it after `DataDownload` CR is set to the terminal state.  
+- Throughout the data transfer, Velero built-in data mover monitors the status of the data mover pod and deletes it after `DataDownload` CR is set to the terminal state.  
 
 ### Backup Deletion
 When a backup is created, a snapshot is saved into the repository for the volume data. The snapshot is a reference to the volume data saved in the repository.  
@@ -302,8 +302,8 @@ kubectl -n velero get datadownloads -l velero.io/restore-name=YOUR_RESTORE_NAME 
 ```
 
 ### Restart and resume
-When Velero server is restarted, if the resource backup/restore has completed, so the backup/restore has excceds `InProgress` status and is waiting for the completion of the data movements, Velero will recapture the status of the running data movements and resume the execution.  
-When node-agent is restarted, if the `DataUpload`/`DataDownload` is in `InProgress` status, Velero recapture the status of the running data mover pod and resume the execution.  
+When Velero server is restarted, if the resource backup/restore has completed, so the backup/restore has excceded `InProgress` status and is waiting for the completion of the data movements, Velero will recapture the status of the running data movements and resume the execution.  
+When node-agent is restarted, if the `DataUpload`/`DataDownload` is in `InProgress` status, Velero recaptures the status of the running data mover pod and resume the execution.  
 When node-agent is restarted, if the `DataUpload`/`DataDownload` is in `New` or `Prepared` status, the data mover pod has not started, Velero processes it as normal cases, or the restart doesn't affect the execution.  
 
 ### Cancellation
