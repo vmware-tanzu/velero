@@ -70,7 +70,7 @@ RUN mkdir -p /output/usr/bin && \
     go clean -modcache -cache
 
 # Velero image packing section
-FROM paketobuildpacks/run-jammy-tiny:latest
+FROM gcr.io/distroless/base-debian12:latest
 
 LABEL maintainer="Xun Jiang <jxun@vmware.com>"
 
