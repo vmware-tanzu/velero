@@ -641,6 +641,16 @@ Both the uploader and repository consume remarkable CPU/memory during the backup
 Velero node-agent uses [BestEffort as the QoS][14] for node-agent pods (so no CPU/memory request/limit is set), so that backups/restores wouldn't fail due to resource throttling in any cases.  
 If you want to constraint the CPU/memory usage, you need to [customize the resource limits][15]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][16] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.   
 
+For Kopia path, some memory is preserved by the node-agent to avoid frequent memory allocations, therefore, after you run a file-system backup/restore, you won't see node-agent releases all the memory until it restarts. There is a limit for the memory preservation, so the memory won't increase all the time. The limit varies from the number of CPU cores in the cluster nodes, as calculated below:  
+```
+preservedMemoryInOneNode = 128M + 24M * numOfCPUCores
+```  
+The memory perservation only happens in the nodes where backups/restores ever occur. Assuming file-system backups/restores occur in ever worker node and you have equal CPU cores in each node, the maximum possibly preserved memory in your cluster is:
+```
+totalPreservedMemory = (128M + 24M * numOfCPUCores) * numOfWorkerNodes
+```  
+However, whether and when this limit is reached is related to the data you are backing up/restoring.  
+
 During the restore, the repository may also cache data/metadata so as to reduce the network footprint and speed up the restore. The repository uses its own policy to store and clean up the cache.  
 For Kopia repository, the cache is stored in the node-agent pod's root file system. Velero allows you to configure a limit of the cache size so that the node-agent pod won't be evicted due to running out of the ephemeral storage. For more details, check [Backup Repository Configuration][18].  
 
