@@ -1386,6 +1386,7 @@ func TestMakePodPVCAttachment(t *testing.T) {
 		name                 string
 		volumeName           string
 		volumeMode           corev1api.PersistentVolumeMode
+		readOnly             bool
 		expectedVolumeMount  []corev1api.VolumeMount
 		expectedVolumeDevice []corev1api.VolumeDevice
 		expectedVolumePath   string
@@ -1393,10 +1394,12 @@ func TestMakePodPVCAttachment(t *testing.T) {
 		{
 			name:       "no volume mode specified",
 			volumeName: "volume-1",
+			readOnly:   true,
 			expectedVolumeMount: []corev1api.VolumeMount{
 				{
 					Name:      "volume-1",
 					MountPath: "/volume-1",
+					ReadOnly:  true,
 				},
 			},
 			expectedVolumePath: "/volume-1",
@@ -1405,10 +1408,12 @@ func TestMakePodPVCAttachment(t *testing.T) {
 			name:       "fs mode specified",
 			volumeName: "volume-2",
 			volumeMode: corev1api.PersistentVolumeFilesystem,
+			readOnly:   true,
 			expectedVolumeMount: []corev1api.VolumeMount{
 				{
 					Name:      "volume-2",
 					MountPath: "/volume-2",
+					ReadOnly:  true,
 				},
 			},
 			expectedVolumePath: "/volume-2",
@@ -1425,6 +1430,20 @@ func TestMakePodPVCAttachment(t *testing.T) {
 			},
 			expectedVolumePath: "/volume-3",
 		},
+		{
+			name:       "fs mode specified with readOnly as false",
+			volumeName: "volume-4",
+			readOnly:   false,
+			volumeMode: corev1api.PersistentVolumeFilesystem,
+			expectedVolumeMount: []corev1api.VolumeMount{
+				{
+					Name:      "volume-4",
+					MountPath: "/volume-4",
+					ReadOnly:  false,
+				},
+			},
+			expectedVolumePath: "/volume-4",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1434,11 +1453,14 @@ func TestMakePodPVCAttachment(t *testing.T) {
 				volMode = &tc.volumeMode
 			}
 
-			mount, device, path := MakePodPVCAttachment(tc.volumeName, volMode)
+			mount, device, path := MakePodPVCAttachment(tc.volumeName, volMode, tc.readOnly)
 
 			assert.Equal(t, tc.expectedVolumeMount, mount)
 			assert.Equal(t, tc.expectedVolumeDevice, device)
 			assert.Equal(t, tc.expectedVolumePath, path)
+			if tc.expectedVolumeMount != nil {
+				assert.Equal(t, tc.expectedVolumeMount[0].ReadOnly, tc.readOnly)
+			}
 		})
 	}
 }

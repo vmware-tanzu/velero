@@ -155,15 +155,17 @@ func TestExpose(t *testing.T) {
 	}
 
 	tests := []struct {
-		name               string
-		snapshotClientObj  []runtime.Object
-		kubeClientObj      []runtime.Object
-		ownerBackup        *velerov1.Backup
-		exposeParam        CSISnapshotExposeParam
-		snapReactors       []reactor
-		kubeReactors       []reactor
-		err                string
-		expectedVolumeSize *resource.Quantity
+		name                          string
+		snapshotClientObj             []runtime.Object
+		kubeClientObj                 []runtime.Object
+		ownerBackup                   *velerov1.Backup
+		exposeParam                   CSISnapshotExposeParam
+		snapReactors                  []reactor
+		kubeReactors                  []reactor
+		err                           string
+		expectedVolumeSize            *resource.Quantity
+		expectedReadOnlyPVC           bool
+		expectedBackupPVCStorageClass string
 	}{
 		{
 			name:        "wait vs ready fail",
@@ -390,6 +392,84 @@ func TestExpose(t *testing.T) {
 			},
 			expectedVolumeSize: resource.NewQuantity(567890, ""),
 		},
+		{
+			name:        "backupPod mounts read only backupPVC",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				StorageClass:     "fake-sc",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				BackupPVCConfig: map[string]nodeagent.BackupPVC{
+					"fake-sc": {
+						StorageClass: "fake-sc-read-only",
+						ReadOnly:     true,
+					},
+				},
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectedReadOnlyPVC: true,
+		},
+		{
+			name:        "backupPod mounts read only backupPVC and storageClass specified in backupPVC config",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				StorageClass:     "fake-sc",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				BackupPVCConfig: map[string]nodeagent.BackupPVC{
+					"fake-sc": {
+						StorageClass: "fake-sc-read-only",
+						ReadOnly:     true,
+					},
+				},
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectedReadOnlyPVC:           true,
+			expectedBackupPVCStorageClass: "fake-sc-read-only",
+		},
+		{
+			name:        "backupPod mounts backupPVC with storageClass specified in backupPVC config",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				StorageClass:     "fake-sc",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				BackupPVCConfig: map[string]nodeagent.BackupPVC{
+					"fake-sc": {
+						StorageClass: "fake-sc-read-only",
+					},
+				},
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectedBackupPVCStorageClass: "fake-sc-read-only",
+		},
 	}
 
 	for _, test := range tests {
@@ -451,6 +531,20 @@ func TestExpose(t *testing.T) {
 					assert.Equal(t, *test.expectedVolumeSize, backupPVC.Spec.Resources.Requests[corev1.ResourceStorage])
 				} else {
 					assert.Equal(t, *resource.NewQuantity(restoreSize, ""), backupPVC.Spec.Resources.Requests[corev1.ResourceStorage])
+				}
+
+				if test.expectedReadOnlyPVC {
+					gotReadOnlyAccessMode := false
+					for _, accessMode := range backupPVC.Spec.AccessModes {
+						if accessMode == corev1.ReadOnlyMany {
+							gotReadOnlyAccessMode = true
+						}
+					}
+					assert.Equal(t, test.expectedReadOnlyPVC, gotReadOnlyAccessMode)
+				}
+
+				if test.expectedBackupPVCStorageClass != "" {
+					assert.Equal(t, test.expectedBackupPVCStorageClass, *backupPVC.Spec.StorageClassName)
 				}
 			} else {
 				assert.EqualError(t, err, test.err)

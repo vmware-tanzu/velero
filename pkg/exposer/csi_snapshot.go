@@ -438,7 +438,7 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 	}
 
 	var gracePeriod int64 = 0
-	volumeMounts, volumeDevices, volumePath := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode)
+	volumeMounts, volumeDevices, volumePath := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode, true)
 	volumeMounts = append(volumeMounts, podInfo.volumeMounts...)
 
 	volumes := []corev1.Volume{{
@@ -446,6 +446,7 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 		VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 				ClaimName: backupPVC.Name,
+				ReadOnly:  true,
 			},
 		},
 	}}
