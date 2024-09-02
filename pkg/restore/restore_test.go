@@ -3989,7 +3989,7 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 			vs:             builder.ForVolumeSnapshot("velero", "test").SourcePVC("test").Result(),
 			expectedResult: false,
 		},
-		
+
 		{
 			name: "Find VS, expect true.",
 			obj: &unstructured.Unstructured{
