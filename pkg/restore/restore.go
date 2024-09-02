@@ -1952,8 +1952,8 @@ func hasCSIVolumeSnapshot(ctx *restoreContext, unstructuredPV *unstructured.Unst
 	}
 
 	for _, vs := range ctx.csiVolumeSnapshots {
-		// In some error cases, the VSs' source PVC could be nil. Skip them.
-		if vs.Spec.Source.PersistentVolumeClaimName == nil {
+		// In some error cases, the VSs' source PVC could be nil or PVs ClaimRef could be nil. Skip them.
+		if vs.Spec.Source.PersistentVolumeClaimName == nil ||  pv.Spec.ClaimRef == nil {
 			continue
 		}
 

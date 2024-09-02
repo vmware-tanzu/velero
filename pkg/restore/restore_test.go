@@ -3963,11 +3963,33 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 						"namespace": "default",
 						"name":      "test",
 					},
+					"spec": map[string]interface{}{
+						"claimRef": map[string]interface{}{
+							"namespace": "velero",
+							"name":      "test",
+						},
+					},
 				},
 			},
 			vs:             builder.ForVolumeSnapshot("velero", "test").Result(),
 			expectedResult: false,
 		},
+		{
+			name: "PVs claimref is nil, expect false.",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "PersistentVolume",
+					"apiVersion": "v1",
+					"metadata": map[string]interface{}{
+						"namespace": "velero",
+						"name":      "test",
+					},
+				},
+			},
+			vs:             builder.ForVolumeSnapshot("velero", "test").SourcePVC("test").Result(),
+			expectedResult: false,
+		},
+		
 		{
 			name: "Find VS, expect true.",
 			obj: &unstructured.Unstructured{
