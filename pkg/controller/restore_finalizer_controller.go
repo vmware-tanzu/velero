@@ -45,10 +45,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
-const (
-	PVPatchMaximumDuration = 10 * time.Minute
-)
-
 type restoreFinalizerReconciler struct {
 	client.Client
 	namespace         string
@@ -59,6 +55,7 @@ type restoreFinalizerReconciler struct {
 	clock             clock.WithTickerAndDelayedExecution
 	crClient          client.Client
 	multiHookTracker  *hook.MultiHookTracker
+	resourceTimeout   time.Duration
 }
 
 func NewRestoreFinalizerReconciler(
@@ -70,6 +67,7 @@ func NewRestoreFinalizerReconciler(
 	metrics *metrics.ServerMetrics,
 	crClient client.Client,
 	multiHookTracker *hook.MultiHookTracker,
+	resourceTimeout time.Duration,
 ) *restoreFinalizerReconciler {
 	return &restoreFinalizerReconciler{
 		Client:            client,
@@ -81,6 +79,7 @@ func NewRestoreFinalizerReconciler(
 		clock:             &clock.RealClock{},
 		crClient:          crClient,
 		multiHookTracker:  multiHookTracker,
+		resourceTimeout:   resourceTimeout,
 	}
 }
 
@@ -163,6 +162,7 @@ func (r *restoreFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		volumeInfo:       volumeInfo,
 		restoredPVCList:  restoredPVCList,
 		multiHookTracker: r.multiHookTracker,
+		resourceTimeout:  r.resourceTimeout,
 	}
 	warnings, errs := finalizerCtx.execute()
 
@@ -246,6 +246,7 @@ type finalizerContext struct {
 	volumeInfo       []*volume.BackupVolumeInfo
 	restoredPVCList  map[string]struct{}
 	multiHookTracker *hook.MultiHookTracker
+	resourceTimeout  time.Duration
 }
 
 func (ctx *finalizerContext) execute() (results.Result, results.Result) { //nolint:unparam //temporarily ignore the lint report: result 0 is always nil (unparam)
@@ -268,6 +269,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 
 	var pvWaitGroup sync.WaitGroup
 	var resultLock sync.Mutex
+
 	maxConcurrency := 3
 	semaphore := make(chan struct{}, maxConcurrency)
 
@@ -294,7 +296,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 				log := ctx.logger.WithField("PVC", volInfo.PVCName).WithField("PVCNamespace", restoredNamespace)
 				log.Debug("patching dynamic PV is in progress")
 
-				err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, PVPatchMaximumDuration, true, func(context.Context) (bool, error) {
+				err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, ctx.resourceTimeout, true, func(context.Context) (bool, error) {
 					// wait for PVC to be bound
 					pvc := &v1.PersistentVolumeClaim{}
 					err := ctx.crClient.Get(context.Background(), client.ObjectKey{Name: volInfo.PVCName, Namespace: restoredNamespace}, pvc)
@@ -309,7 +311,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 					// We are handling a common but specific scenario where a PVC is in a pending state and uses a storage class with
 					// VolumeBindingMode set to WaitForFirstConsumer. In this case, the PV patch step is skipped to avoid
 					// failures due to the PVC not being bound, which could cause a timeout and result in a failed restore.
-					if pvc != nil && pvc.Status.Phase == v1.ClaimPending {
+					if pvc.Status.Phase == v1.ClaimPending {
 						// check if storage class used has VolumeBindingMode as WaitForFirstConsumer
 						scName := *pvc.Spec.StorageClassName
 						sc := &storagev1api.StorageClass{}

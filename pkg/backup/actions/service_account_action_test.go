@@ -31,21 +31,22 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/actionhelpers"
 )
 
-func newV1ClusterRoleBindingList(rbacCRBList []rbac.ClusterRoleBinding) []ClusterRoleBinding {
-	var crbs []ClusterRoleBinding
+func newV1ClusterRoleBindingList(rbacCRBList []rbac.ClusterRoleBinding) []actionhelpers.ClusterRoleBinding {
+	var crbs []actionhelpers.ClusterRoleBinding
 	for _, c := range rbacCRBList {
-		crbs = append(crbs, v1ClusterRoleBinding{crb: c})
+		crbs = append(crbs, actionhelpers.V1ClusterRoleBinding{Crb: c})
 	}
 
 	return crbs
 }
 
-func newV1beta1ClusterRoleBindingList(rbacCRBList []rbacbeta.ClusterRoleBinding) []ClusterRoleBinding {
-	var crbs []ClusterRoleBinding
+func newV1beta1ClusterRoleBindingList(rbacCRBList []rbacbeta.ClusterRoleBinding) []actionhelpers.ClusterRoleBinding {
+	var crbs []actionhelpers.ClusterRoleBinding
 	for _, c := range rbacCRBList {
-		crbs = append(crbs, v1beta1ClusterRoleBinding{crb: c})
+		crbs = append(crbs, actionhelpers.V1beta1ClusterRoleBinding{Crb: c})
 	}
 
 	return crbs
@@ -55,10 +56,10 @@ type FakeV1ClusterRoleBindingLister struct {
 	v1crbs []rbac.ClusterRoleBinding
 }
 
-func (f FakeV1ClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
-	var crbs []ClusterRoleBinding
+func (f FakeV1ClusterRoleBindingLister) List() ([]actionhelpers.ClusterRoleBinding, error) {
+	var crbs []actionhelpers.ClusterRoleBinding
 	for _, c := range f.v1crbs {
-		crbs = append(crbs, v1ClusterRoleBinding{crb: c})
+		crbs = append(crbs, actionhelpers.V1ClusterRoleBinding{Crb: c})
 	}
 	return crbs, nil
 }
@@ -67,10 +68,10 @@ type FakeV1beta1ClusterRoleBindingLister struct {
 	v1beta1crbs []rbacbeta.ClusterRoleBinding
 }
 
-func (f FakeV1beta1ClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
-	var crbs []ClusterRoleBinding
+func (f FakeV1beta1ClusterRoleBindingLister) List() ([]actionhelpers.ClusterRoleBinding, error) {
+	var crbs []actionhelpers.ClusterRoleBinding
 	for _, c := range f.v1beta1crbs {
-		crbs = append(crbs, v1beta1ClusterRoleBinding{crb: c})
+		crbs = append(crbs, actionhelpers.V1beta1ClusterRoleBinding{Crb: c})
 	}
 	return crbs, nil
 }
@@ -93,21 +94,21 @@ func TestNewServiceAccountAction(t *testing.T) {
 	tests := []struct {
 		name         string
 		version      string
-		expectedCRBs []ClusterRoleBinding
+		expectedCRBs []actionhelpers.ClusterRoleBinding
 	}{
 		{
 			name:    "rbac v1 API instantiates an saAction",
 			version: rbac.SchemeGroupVersion.Version,
-			expectedCRBs: []ClusterRoleBinding{
-				v1ClusterRoleBinding{
-					crb: rbac.ClusterRoleBinding{
+			expectedCRBs: []actionhelpers.ClusterRoleBinding{
+				actionhelpers.V1ClusterRoleBinding{
+					Crb: rbac.ClusterRoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "v1crb-1",
 						},
 					},
 				},
-				v1ClusterRoleBinding{
-					crb: rbac.ClusterRoleBinding{
+				actionhelpers.V1ClusterRoleBinding{
+					Crb: rbac.ClusterRoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "v1crb-2",
 						},
@@ -118,16 +119,16 @@ func TestNewServiceAccountAction(t *testing.T) {
 		{
 			name:    "rbac v1beta1 API instantiates an saAction",
 			version: rbacbeta.SchemeGroupVersion.Version,
-			expectedCRBs: []ClusterRoleBinding{
-				v1beta1ClusterRoleBinding{
-					crb: rbacbeta.ClusterRoleBinding{
+			expectedCRBs: []actionhelpers.ClusterRoleBinding{
+				actionhelpers.V1beta1ClusterRoleBinding{
+					Crb: rbacbeta.ClusterRoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "v1beta1crb-1",
 						},
 					},
 				},
-				v1beta1ClusterRoleBinding{
-					crb: rbacbeta.ClusterRoleBinding{
+				actionhelpers.V1beta1ClusterRoleBinding{
+					Crb: rbacbeta.ClusterRoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "v1beta1crb-2",
 						},
@@ -138,7 +139,7 @@ func TestNewServiceAccountAction(t *testing.T) {
 		{
 			name:         "no RBAC API instantiates an saAction with empty slice",
 			version:      "",
-			expectedCRBs: []ClusterRoleBinding{},
+			expectedCRBs: []actionhelpers.ClusterRoleBinding{},
 		},
 	}
 	// Set up all of our fakes outside the test loop
@@ -171,10 +172,10 @@ func TestNewServiceAccountAction(t *testing.T) {
 		},
 	}
 
-	clusterRoleBindingListers := map[string]ClusterRoleBindingLister{
+	clusterRoleBindingListers := map[string]actionhelpers.ClusterRoleBindingLister{
 		rbac.SchemeGroupVersion.Version:     FakeV1ClusterRoleBindingLister{v1crbs: v1crbs},
 		rbacbeta.SchemeGroupVersion.Version: FakeV1beta1ClusterRoleBindingLister{v1beta1crbs: v1beta1crbs},
-		"":                                  noopClusterRoleBindingLister{},
+		"":                                  actionhelpers.NoopClusterRoleBindingLister{},
 	}
 
 	for _, test := range tests {

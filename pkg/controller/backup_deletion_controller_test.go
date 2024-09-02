@@ -122,16 +122,16 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 				},
 			},
 		}
-		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
+		dbr := defaultTestDbr()
+		td := setupBackupDeletionControllerTest(t, dbr, location, backup)
 		td.controller.backupStoreGetter = &fakeErrorBackupStoreGetter{}
 		_, err := td.controller.Reconcile(ctx, td.req)
 		require.NoError(t, err)
 		res := &velerov1api.DeleteBackupRequest{}
-		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
-		require.NoError(t, err)
+		td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
 		assert.Len(t, res.Status.Errors, 1)
-		assert.True(t, strings.HasPrefix(res.Status.Errors[0], fmt.Sprintf("cannot delete backup because backup storage location %s is currently unavailable", location.Name)))
+		assert.True(t, strings.HasPrefix(res.Status.Errors[0], "error getting the backup store"))
 	})
 
 	t.Run("missing spec.backupName", func(t *testing.T) {

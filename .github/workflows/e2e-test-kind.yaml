@@ -11,11 +11,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
-        id: go
+          go-version-file: 'go.mod'
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
         id: cli-cache
@@ -31,17 +32,6 @@ jobs:
           path: ./velero.tar
           # The cache key a combination of the current PR number and the commit SHA
           key: velero-image-${{ github.event.pull_request.number }}-${{ github.sha }}
-      - name: Fetch cached go modules
-        uses: actions/cache@v4
-        if: steps.cli-cache.outputs.cache-hit != 'true'
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - name: Check out the code
-        uses: actions/checkout@v4
-        if: steps.cli-cache.outputs.cache-hit != 'true' || steps.image-cache.outputs.cache-hit != 'true'
       # If no binaries were built for this PR, build it now.
       - name: Build Velero CLI
         if: steps.cli-cache.outputs.cache-hit != 'true'
@@ -67,25 +57,20 @@ jobs:
           - 1.27.10
           - 1.28.6
           - 1.29.1
-        focus:
-          # tests to focus on, use `|` to concatenate multiple regexes to run on the same job
-          # ordered according to e2e_suite_test.go order
-          - Basic\]\[ClusterResource
-          - ResourceFiltering
-          - ResourceModifier|Backups|PrivilegesMgmt\]\[SSR
-          - Schedule\]\[OrderedResources
-          - NamespaceMapping\]\[Single\]\[Restic|NamespaceMapping\]\[Multiple\]\[Restic
-          - Basic\]\[Nodeport
-          - Basic\]\[StorageClass
+        labels:
+          # labels are used to filter running E2E cases
+          - Basic && (ClusterResource || NodePort || StorageClass)
+          - ResourceFiltering && !Restic
+          - ResourceModifier || (Backups && BackupsSync) || PrivilegesMgmt || OrderedResources
+          - (NamespaceMapping && Single && Restic) || (NamespaceMapping && Multiple && Restic)
       fail-fast: false
     steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
-        id: go
-      - name: Check out the code
-        uses: actions/checkout@v4
+          go-version-file: 'go.mod'
       - name: Install MinIO
         run:
           docker run -d --rm -p 9000:9000 -e "MINIO_ACCESS_KEY=minio" -e "MINIO_SECRET_KEY=minio123" -e "MINIO_DEFAULT_BUCKETS=bucket,additional-bucket" bitnami/minio:2021.6.17-debian-10-r7
@@ -108,14 +93,6 @@ jobs:
       - name: Load Velero Image
         run:
           kind load image-archive velero.tar
-      # always try to fetch the cached go modules as the e2e test needs it either
-      - name: Fetch cached go modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
       - name: Run E2E test
         run: |
           cat << EOF > /tmp/credential
@@ -128,13 +105,18 @@ jobs:
           curl -LO https://dl.k8s.io/release/v${{ matrix.k8s }}/bin/linux/amd64/kubectl
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-          GOPATH=~/go CLOUD_PROVIDER=kind \
-              OBJECT_STORE_PROVIDER=aws BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
-              CREDS_FILE=/tmp/credential BSL_BUCKET=bucket \
-              ADDITIONAL_OBJECT_STORE_PROVIDER=aws ADDITIONAL_BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
-              ADDITIONAL_CREDS_FILE=/tmp/credential ADDITIONAL_BSL_BUCKET=additional-bucket \
-              GINKGO_FOCUS='${{ matrix.focus }}' VELERO_IMAGE=velero:pr-test \
-              GINKGO_SKIP='SKIP_KIND|pv-backup|Restic|Snapshot|LongTime' \
+          GOPATH=~/go \
+              CLOUD_PROVIDER=kind \
+              OBJECT_STORE_PROVIDER=aws \
+              BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
+              CREDS_FILE=/tmp/credential \
+              BSL_BUCKET=bucket \
+              ADDITIONAL_OBJECT_STORE_PROVIDER=aws \
+              ADDITIONAL_BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
+              ADDITIONAL_CREDS_FILE=/tmp/credential \
+              ADDITIONAL_BSL_BUCKET=additional-bucket \
+              VELERO_IMAGE=velero:pr-test \
+              GINKGO_LABELS="${{ matrix.labels }}" \
               make -C test/ run-e2e
         timeout-minutes: 30
       - name: Upload debug bundle

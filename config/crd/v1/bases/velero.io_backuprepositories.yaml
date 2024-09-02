@@ -54,6 +54,13 @@ spec:
                 description: MaintenanceFrequency is how often maintenance should
                   be run.
                 type: string
+              repositoryConfig:
+                additionalProperties:
+                  type: string
+                description: RepositoryConfig is for repository-specific configuration
+                  fields.
+                nullable: true
+                type: object
               repositoryType:
                 description: RepositoryType indicates the type of the backend repository
                 enum:

@@ -31,6 +31,7 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	corev1api "k8s.io/api/core/v1"
 	clientTesting "k8s.io/client-go/testing"
 )
@@ -74,7 +75,17 @@ func TestRestoreExpose(t *testing.T) {
 			Kind:       "DaemonSet",
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
-		Spec: appsv1.DaemonSetSpec{},
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image: "fake-image",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	tests := []struct {
@@ -169,7 +180,7 @@ func TestRestoreExpose(t *testing.T) {
 				}
 			}
 
-			err := exposer.Expose(context.Background(), ownerObject, test.targetPVCName, test.sourceNamespace, map[string]string{}, time.Millisecond)
+			err := exposer.Expose(context.Background(), ownerObject, test.targetPVCName, test.sourceNamespace, map[string]string{}, corev1.ResourceRequirements{}, time.Millisecond)
 			assert.EqualError(t, err, test.err)
 		})
 	}
@@ -456,7 +467,7 @@ func TestRestorePeekExpose(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				restorePodUrecoverable,
 			},
-			err: "Pod is in abnormal state Failed",
+			err: "Pod is in abnormal state [Failed], message []",
 		},
 		{
 			name:         "succeed",

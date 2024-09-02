@@ -29,6 +29,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/restartabletest"
 	biav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v1"
 	biav2cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/backupitemaction/v2"
+	ibav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/itemblockaction/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
 	riav1cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/restoreitemaction/v1"
 	riav2cli "github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/restoreitemaction/v2"
@@ -249,6 +250,23 @@ func TestGetRestoreItemActionV2(t *testing.T) {
 		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
 			return &riav2cli.RestartableRestoreItemAction{
 				Key:                 process.KindAndName{Kind: common.PluginKindRestoreItemActionV2, Name: name},
+				SharedPluginProcess: sharedPluginProcess,
+			}
+		},
+		false,
+	)
+}
+
+func TestGetItemBlockAction(t *testing.T) {
+	getPluginTest(t,
+		common.PluginKindItemBlockAction,
+		"velero.io/pod",
+		func(m Manager, name string) (interface{}, error) {
+			return m.GetItemBlockAction(name)
+		},
+		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+			return &ibav1cli.RestartableItemBlockAction{
+				Key:                 process.KindAndName{Kind: common.PluginKindItemBlockAction, Name: name},
 				SharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -784,6 +802,98 @@ func TestGetDeleteItemActions(t *testing.T) {
 	}
 }
 
+func TestGetItemBlockActions(t *testing.T) {
+	tests := []struct {
+		name                       string
+		names                      []string
+		newRestartableProcessError error
+		expectedError              string
+	}{
+		{
+			name:  "No items",
+			names: []string{},
+		},
+		{
+			name:                       "Error getting restartable process",
+			names:                      []string{"velero.io/a", "velero.io/b", "velero.io/c"},
+			newRestartableProcessError: errors.Errorf("NewRestartableProcess"),
+			expectedError:              "NewRestartableProcess",
+		},
+		{
+			name:  "Happy path",
+			names: []string{"velero.io/a", "velero.io/b", "velero.io/c"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := test.NewLogger()
+			logLevel := logrus.InfoLevel
+
+			registry := &mockRegistry{}
+			defer registry.AssertExpectations(t)
+
+			m := NewManager(logger, logLevel, registry).(*manager)
+			factory := &mockRestartableProcessFactory{}
+			defer factory.AssertExpectations(t)
+			m.restartableProcessFactory = factory
+
+			pluginKind := common.PluginKindItemBlockAction
+			var pluginIDs []framework.PluginIdentifier
+			for i := range tc.names {
+				pluginID := framework.PluginIdentifier{
+					Command: "/command",
+					Kind:    pluginKind,
+					Name:    tc.names[i],
+				}
+				pluginIDs = append(pluginIDs, pluginID)
+			}
+			registry.On("List", pluginKind).Return(pluginIDs)
+
+			var expectedActions []interface{}
+			for i := range pluginIDs {
+				pluginID := pluginIDs[i]
+				pluginName := pluginID.Name
+
+				registry.On("Get", pluginKind, pluginName).Return(pluginID, nil)
+
+				restartableProcess := &restartabletest.MockRestartableProcess{}
+				defer restartableProcess.AssertExpectations(t)
+
+				expected := &ibav1cli.RestartableItemBlockAction{
+					Key:                 process.KindAndName{Kind: pluginKind, Name: pluginName},
+					SharedPluginProcess: restartableProcess,
+				}
+
+				if tc.newRestartableProcessError != nil {
+					// Test 1: error getting restartable process
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("NewRestartableProcess")).Once()
+					break
+				}
+
+				// Test 2: happy path
+				if i == 0 {
+					factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()
+				}
+
+				expectedActions = append(expectedActions, expected)
+			}
+
+			itemBlockActions, err := m.GetItemBlockActions()
+			if tc.newRestartableProcessError != nil {
+				assert.Nil(t, itemBlockActions)
+				assert.EqualError(t, err, "NewRestartableProcess")
+			} else {
+				require.NoError(t, err)
+				var actual []interface{}
+				for i := range itemBlockActions {
+					actual = append(actual, itemBlockActions[i])
+				}
+				assert.Equal(t, expectedActions, actual)
+			}
+		})
+	}
+}
+
 func TestSanitizeName(t *testing.T) {
 	tests := []struct {
 		name, pluginName, expectedName string
@@ -813,7 +923,7 @@ func TestSanitizeName(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			sanitizedName := sanitizeName(tc.pluginName)
-			assert.Equal(t, sanitizedName, tc.expectedName)
+			assert.Equal(t, tc.expectedName, sanitizedName)
 		})
 	}
 }

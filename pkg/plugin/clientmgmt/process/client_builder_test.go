@@ -29,6 +29,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/framework/backupitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
+	ibav1 "github.com/vmware-tanzu/velero/pkg/plugin/framework/itemblockaction/v1"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/framework/restoreitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/test"
 )
@@ -37,7 +38,7 @@ func TestNewClientBuilder(t *testing.T) {
 	logger := test.NewLogger()
 	logLevel := logrus.InfoLevel
 	cb := newClientBuilder("velero", logger, logLevel)
-	assert.Equal(t, cb.commandName, "velero")
+	assert.Equal(t, "velero", cb.commandName)
 	assert.Equal(t, []string{"--log-level", "info"}, cb.commandArgs)
 	assert.Equal(t, newLogrusAdapter(logger, logLevel), cb.pluginLogger)
 
@@ -70,6 +71,7 @@ func TestClientConfig(t *testing.T) {
 			string(common.PluginKindRestoreItemAction):   framework.NewRestoreItemActionPlugin(common.ClientLogger(logger)),
 			string(common.PluginKindRestoreItemActionV2): riav2.NewRestoreItemActionPlugin(common.ClientLogger(logger)),
 			string(common.PluginKindDeleteItemAction):    framework.NewDeleteItemActionPlugin(common.ClientLogger(logger)),
+			string(common.PluginKindItemBlockAction):     ibav1.NewItemBlockActionPlugin(common.ClientLogger(logger)),
 		},
 		Logger: cb.pluginLogger,
 		Cmd:    exec.Command(cb.commandName, cb.commandArgs...),

@@ -34,8 +34,7 @@ import (
 
 const (
 	// daemonSet is the name of the Velero node agent daemonset.
-	daemonSet  = "node-agent"
-	configName = "node-agent-config"
+	daemonSet = "node-agent"
 )
 
 var (
@@ -63,12 +62,33 @@ type RuledConfigs struct {
 	Number int `json:"number"`
 }
 
+type BackupPVC struct {
+	// StorageClass is the name of storage class to be used by the backupPVC
+	StorageClass string `json:"storageClass,omitempty"`
+
+	// ReadOnly sets the backupPVC's access mode as read only
+	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+type PodResources struct {
+	CPURequest    string `json:"cpuRequest,omitempty"`
+	MemoryRequest string `json:"memoryRequest,omitempty"`
+	CPULimit      string `json:"cpuLimit,omitempty"`
+	MemoryLimit   string `json:"memoryLimit,omitempty"`
+}
+
 type Configs struct {
 	// LoadConcurrency is the config for data path load concurrency per node.
 	LoadConcurrency *LoadConcurrency `json:"loadConcurrency,omitempty"`
 
 	// LoadAffinity is the config for data path load affinity.
 	LoadAffinity []*LoadAffinity `json:"loadAffinity,omitempty"`
+
+	// BackupPVCConfig is the config for backupPVC (intermediate PVC) of snapshot data movement
+	BackupPVCConfig map[string]BackupPVC `json:"backupPVC,omitempty"`
+
+	// PodResources is the resource config for various types of pods launched by node-agent, i.e., data mover pods.
+	PodResources *PodResources `json:"podResources,omitempty"`
 }
 
 // IsRunning checks if the node agent daemonset is running properly. If not, return the error found
@@ -121,14 +141,10 @@ func GetPodSpec(ctx context.Context, kubeClient kubernetes.Interface, namespace 
 	return &ds.Spec.Template.Spec, nil
 }
 
-func GetConfigs(ctx context.Context, namespace string, kubeClient kubernetes.Interface) (*Configs, error) {
+func GetConfigs(ctx context.Context, namespace string, kubeClient kubernetes.Interface, configName string) (*Configs, error) {
 	cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, configName, metav1.GetOptions{})
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		} else {
-			return nil, errors.Wrapf(err, "error to get node agent configs %s", configName)
-		}
+		return nil, errors.Wrapf(err, "error to get node agent configs %s", configName)
 	}
 
 	if cm.Data == nil {

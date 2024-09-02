@@ -28,6 +28,7 @@ Cons:
 - It access the file system from the mounted hostpath directory, so Velero Node Agent pods need to run as root user and even under privileged mode in some environments.  
 
 **NOTE:** hostPath volumes are not supported, but the [local volume type][5] is supported.  
+**NOTE:** restic is under the deprecation process by following [Velero Deprecation Policy][17], for more details, see the Restic Deprecation section.
 
 ## Setup File System Backup
 
@@ -641,7 +642,40 @@ Velero node-agent uses [BestEffort as the QoS][14] for node-agent pods (so no CP
 If you want to constraint the CPU/memory usage, you need to [customize the resource limits][15]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][16] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.   
 
 During the restore, the repository may also cache data/metadata so as to reduce the network footprint and speed up the restore. The repository uses its own policy to store and clean up the cache.  
-For Kopia repository, the cache is stored in the node-agent pod's root file system and the cleanup is triggered for the data/metadata that are older than 10 minutes (not configurable at present). So you should prepare enough disk space, otherwise, the node-agent pod may be evicted due to running out of the ephemeral storage.  
+For Kopia repository, the cache is stored in the node-agent pod's root file system. Velero allows you to configure a limit of the cache size so that the node-agent pod won't be evicted due to running out of the ephemeral storage. For more details, check [Backup Repository Configuration][18].  
+
+## Restic Deprecation  
+
+According to the [Velero Deprecation Policy][17], restic path is being deprecated starting from v1.15, specifically:
+- For 1.15 and 1.16, if restic path is used by a backup, the backup still creates and succeeds but you will see warnings
+- For 1.17 and 1.18, backups with restic path are disabled, but you are still allowed to restore from your previous restic backups
+- From 1.19, both backups and restores with restic path will be disabled, you are not able to use 1.19 or higher to restore your restic backup data
+
+For 1.15 and 1.16, you will see below warnings if `--uploader-type=restic` is used in Velero installation:  
+In the output of installation:  
+```
+⚠️  Uploader 'restic' is deprecated, don't use it for new backups, otherwise the backups won't be available for restore when this functionality is removed in a future version of Velero
+```  
+In Velero server log:  
+```
+level=warning msg="Uploader 'restic' is deprecated, don't use it for new backups, otherwise the backups won't be available for restore when this functionality is removed in a future version of Velero
+```  
+In the output of `velero backup describe` command for a backup with fs-backup:  
+```  
+  Namespaces:
+    <namespace>:   resource: /pods name: <pod name> message: /Uploader 'restic' is deprecated, don't use it for new backups, otherwise the backups won't be available for restore when this functionality is removed in a future version of Velero
+```
+
+And you will see below warnings you upgrade from v1.9 or lower to 1.15 or 1.16:
+In Velero server log:  
+```
+level=warning msg="Uploader 'restic' is deprecated, don't use it for new backups, otherwise the backups won't be available for restore when this functionality is removed in a future version of Velero
+```  
+In the output of `velero backup describe` command for a backup with fs-backup:  
+```  
+  Namespaces:
+    <namespace>:   resource: /pods name: <pod name> message: /Uploader 'restic' is deprecated, don't use it for new backups, otherwise the backups won't be available for restore when this functionality is removed in a future version of Velero
+```
 
 
 [1]: https://github.com/restic/restic
@@ -660,3 +694,5 @@ For Kopia repository, the cache is stored in the node-agent pod's root file syst
 [14]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
 [15]: customize-installation.md#customize-resource-requests-and-limits
 [16]: performance-guidance.md
+[17]: https://github.com/vmware-tanzu/velero/blob/main/GOVERNANCE.md#deprecation-policy
+[18]: backup-repository-configuration.md

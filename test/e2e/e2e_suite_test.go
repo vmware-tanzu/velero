@@ -26,7 +26,6 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/reporters"
 	. "github.com/onsi/gomega"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
@@ -113,79 +112,126 @@ func init() {
 //   caused by no expected snapshot found. If we use retain as reclaim policy, then this label can be ignored, all test
 //   cases can be executed as expected successful result.
 
-var _ = Describe("[APIGroup][APIVersion][SKIP_KIND] Velero tests with various CRD API group versions", APIGropuVersionsTest)
-var _ = Describe("[APIGroup][APIExtensions][SKIP_KIND] CRD of apiextentions v1beta1 should be B/R successfully from cluster(k8s version < 1.22) to cluster(k8s version >= 1.22)", APIExtensionsVersionsTest)
+var _ = Describe("Velero tests with various CRD API group versions",
+	Label("APIGroup", "APIVersion", "SKIP_KIND", "LongTime"), APIGroupVersionsTest)
+var _ = Describe("CRD of apiextentions v1beta1 should be B/R successfully from cluster(k8s version < 1.22) to cluster(k8s version >= 1.22)",
+	Label("APIGroup", "APIExtensions", "SKIP_KIND"), APIExtensionsVersionsTest)
 
-// Test backup and restore of Kibishi using restic
-var _ = Describe("[Basic][Restic] Velero tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupRestoreWithRestic)
+// Test backup and restore of Kibishii using restic
+var _ = Describe("Velero tests on cluster using the plugin provider for object storage and Restic for volume backups",
+	Label("Basic", "Restic"), BackupRestoreWithRestic)
 
-var _ = Describe("[Basic][Snapshot][SkipVanillaZfs] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreWithSnapshots)
+var _ = Describe("Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups",
+	Label("Basic", "Snapshot", "SkipVanillaZfs"), BackupRestoreWithSnapshots)
 
-var _ = Describe("[Basic][Snapshot][RetainPV] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreRetainedPVWithSnapshots)
+var _ = Describe("Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups",
+	Label("Basic", "Snapshot", "RetainPV"), BackupRestoreRetainedPVWithSnapshots)
 
-var _ = Describe("[Basic][Restic][RetainPV] Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupRestoreRetainedPVWithRestic)
+var _ = Describe("Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups",
+	Label("Basic", "Restic", "RetainPV"), BackupRestoreRetainedPVWithRestic)
 
-var _ = Describe("[Basic][ClusterResource] Backup/restore of cluster resources", ResourcesCheckTest)
+var _ = Describe("Backup/restore of cluster resources",
+	Label("Basic", "ClusterResource"), ResourcesCheckTest)
 
-var _ = Describe("[Scale][LongTime] Backup/restore of 2500 namespaces", MultiNSBackupRestore)
+var _ = Describe("Service NodePort reservation during restore is configurable",
+	Label("Basic", "NodePort"), NodePortTest)
 
-// Upgrade test by Kibishi using restic
-var _ = Describe("[Upgrade][Restic] Velero upgrade tests on cluster using the plugin provider for object storage and Restic for volume backups", BackupUpgradeRestoreWithRestic)
-var _ = Describe("[Upgrade][Snapshot][SkipVanillaZfs] Velero upgrade tests on cluster using the plugin provider for object storage and snapshots for volume backups", BackupUpgradeRestoreWithSnapshots)
+var _ = Describe("Storage class of persistent volumes and persistent volume claims can be changed during restores",
+	Label("Basic", "StorageClass"), StorageClasssChangingTest)
+
+var _ = Describe("Node selectors of persistent volume claims can be changed during restores",
+	Label("Basic", "SelectedNode", "SKIP_KIND"), PVCSelectedNodeChangingTest)
+
+var _ = Describe("Backup/restore of 2500 namespaces",
+	Label("Scale", "LongTime"), MultiNSBackupRestore)
+
+// Upgrade test by Kibishii using Restic
+var _ = Describe("Velero upgrade tests on cluster using the plugin provider for object storage and Restic for volume backups",
+	Label("Upgrade", "Restic"), BackupUpgradeRestoreWithRestic)
+var _ = Describe("Velero upgrade tests on cluster using the plugin provider for object storage and snapshots for volume backups",
+	Label("Upgrade", "Snapshot", "SkipVanillaZfs"), BackupUpgradeRestoreWithSnapshots)
 
 // test filter objects by namespace, type, or labels when backup or restore.
-var _ = Describe("[ResourceFiltering][ExcludeFromBackup] Resources with the label velero.io/exclude-from-backup=true are not included in backup", ExcludeFromBackupTest)
-var _ = Describe("[ResourceFiltering][ExcludeNamespaces][Backup] Velero test on exclude namespace from the cluster backup", BackupWithExcludeNamespaces)
-var _ = Describe("[ResourceFiltering][ExcludeNamespaces][Restore] Velero test on exclude namespace from the cluster restore", RestoreWithExcludeNamespaces)
-var _ = Describe("[ResourceFiltering][ExcludeResources][Backup] Velero test on exclude resources from the cluster backup", BackupWithExcludeResources)
-var _ = Describe("[ResourceFiltering][ExcludeResources][Restore] Velero test on exclude resources from the cluster restore", RestoreWithExcludeResources)
-var _ = Describe("[ResourceFiltering][IncludeNamespaces][Backup] Velero test on include namespace from the cluster backup", BackupWithIncludeNamespaces)
-var _ = Describe("[ResourceFiltering][IncludeNamespaces][Restore] Velero test on include namespace from the cluster restore", RestoreWithIncludeNamespaces)
-var _ = Describe("[ResourceFiltering][IncludeResources][Backup] Velero test on include resources from the cluster backup", BackupWithIncludeResources)
-var _ = Describe("[ResourceFiltering][IncludeResources][Restore] Velero test on include resources from the cluster restore", RestoreWithIncludeResources)
-var _ = Describe("[ResourceFiltering][LabelSelector] Velero test on backup include resources matching the label selector", BackupWithLabelSelector)
-var _ = Describe("[ResourceFiltering][ResourcePolicies][Restic] Velero test on skip backup of volume by resource policies", ResourcePoliciesTest)
+var _ = Describe("Resources with the label velero.io/exclude-from-backup=true are not included in backup",
+	Label("ResourceFiltering", "ExcludeFromBackup"), ExcludeFromBackupTest)
+var _ = Describe("Velero test on exclude namespace from the cluster backup",
+	Label("ResourceFiltering", "ExcludeNamespaces", "Backup"), BackupWithExcludeNamespaces)
+var _ = Describe("Velero test on exclude namespace from the cluster restore",
+	Label("ResourceFiltering", "ExcludeNamespaces", "Restore"), RestoreWithExcludeNamespaces)
+var _ = Describe("Velero test on exclude resources from the cluster backup",
+	Label("ResourceFiltering", "ExcludeResources", "Backup"), BackupWithExcludeResources)
+var _ = Describe("Velero test on exclude resources from the cluster restore",
+	Label("ResourceFiltering", "ExcludeResources", "Restore"), RestoreWithExcludeResources)
+var _ = Describe("Velero test on include namespace from the cluster backup",
+	Label("ResourceFiltering", "IncludeNamespaces", "Backup"), BackupWithIncludeNamespaces)
+var _ = Describe("Velero test on include namespace from the cluster restore",
+	Label("ResourceFiltering", "IncludeNamespaces", "Restore"), RestoreWithIncludeNamespaces)
+var _ = Describe("Velero test on include resources from the cluster backup",
+	Label("ResourceFiltering", "IncludeResources", "Backup"), BackupWithIncludeResources)
+var _ = Describe("Velero test on include resources from the cluster restore",
+	Label("ResourceFiltering", "IncludeResources", "Restore"), RestoreWithIncludeResources)
+var _ = Describe("Velero test on backup include resources matching the label selector",
+	Label("ResourceFiltering", "LabelSelector"), BackupWithLabelSelector)
+var _ = Describe("Velero test on skip backup of volume by resource policies",
+	Label("ResourceFiltering", "ResourcePolicies", "Restic"), ResourcePoliciesTest)
 
 // backup VolumeInfo test
-var _ = Describe("[BackupVolumeInfo][SkippedVolume]", SkippedVolumeInfoTest)
-var _ = Describe("[BackupVolumeInfo][FilesystemUpload]", FilesystemUploadVolumeInfoTest)
-var _ = Describe("[BackupVolumeInfo][CSIDataMover]", CSIDataMoverVolumeInfoTest)
-var _ = Describe("[BackupVolumeInfo][CSISnapshot]", CSISnapshotVolumeInfoTest)
-var _ = Describe("[BackupVolumeInfo][NativeSnapshot]", NativeSnapshotVolumeInfoTest)
+var _ = Describe("", Label("BackupVolumeInfo", "SkippedVolume"), SkippedVolumeInfoTest)
+var _ = Describe("", Label("BackupVolumeInfo", "FilesystemUpload"), FilesystemUploadVolumeInfoTest)
+var _ = Describe("", Label("BackupVolumeInfo", "CSIDataMover"), CSIDataMoverVolumeInfoTest)
+var _ = Describe("", Label("BackupVolumeInfo", "CSISnapshot"), CSISnapshotVolumeInfoTest)
+var _ = Describe("", Label("BackupVolumeInfo", "NativeSnapshot"), NativeSnapshotVolumeInfoTest)
 
-var _ = Describe("[ResourceModifier][Restore] Velero test on resource modifiers from the cluster restore", ResourceModifiersTest)
+var _ = Describe("Velero test on resource modifiers from the cluster restore",
+	Label("ResourceModifier", "Restore"), ResourceModifiersTest)
 
-var _ = Describe("[Backups][Deletion][Restic] Velero tests of Restic backup deletion", BackupDeletionWithRestic)
-var _ = Describe("[Backups][Deletion][Snapshot][SkipVanillaZfs] Velero tests of snapshot backup deletion", BackupDeletionWithSnapshots)
-var _ = Describe("[Backups][TTL][LongTime][Snapshot][SkipVanillaZfs] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", TTLTest)
-var _ = Describe("[Backups][BackupsSync] Backups in object storage are synced to a new Velero and deleted backups in object storage are synced to be deleted in Velero", BackupsSyncTest)
+var _ = Describe("Velero tests of Restic backup deletion",
+	Label("Backups", "Deletion", "Restic"), BackupDeletionWithRestic)
+var _ = Describe("Velero tests of snapshot backup deletion",
+	Label("Backups", "Deletion", "Snapshot", "SkipVanillaZfs"), BackupDeletionWithSnapshots)
+var _ = Describe("Local backups and Restic repos will be deleted once the corresponding backup storage location is deleted",
+	Label("Backups", "TTL", "LongTime", "Snapshot", "SkipVanillaZfs"), TTLTest)
+var _ = Describe("Backups in object storage are synced to a new Velero and deleted backups in object storage are synced to be deleted in Velero",
+	Label("Backups", "BackupsSync"), BackupsSyncTest)
 
-var _ = Describe("[Schedule][BR][Pause][LongTime] Backup will be created periodly by schedule defined by a Cron expression", ScheduleBackupTest)
-var _ = Describe("[Schedule][OrderedResources] Backup resources should follow the specific order in schedule", ScheduleOrderedResources)
-var _ = Describe("[Schedule][BackupCreation][SKIP_KIND] Schedule controller wouldn't create a new backup when it still has pending or InProgress backup", ScheduleBackupCreationTest)
+var _ = Describe("Backup will be created periodically by schedule defined by a Cron expression",
+	Label("Schedule", "BR", "Pause", "LongTime"), ScheduleBackupTest)
+var _ = Describe("Backup resources should follow the specific order in schedule",
+	Label("Schedule", "OrderedResources", "LongTime"), ScheduleOrderedResources)
+var _ = Describe("Schedule controller wouldn't create a new backup when it still has pending or InProgress backup",
+	Label("Schedule", "BackupCreation", "SKIP_KIND", "LongTime"), ScheduleBackupCreationTest)
 
-var _ = Describe("[PrivilegesMgmt][SSR] Velero test on ssr object when controller namespace mix-ups", SSRTest)
+var _ = Describe("Velero test on ssr object when controller namespace mix-ups",
+	Label("PrivilegesMgmt", "SSR"), SSRTest)
 
-var _ = Describe("[BSL][Deletion][Snapshot][SkipVanillaZfs] Local backups will be deleted once the corresponding backup storage location is deleted", BslDeletionWithSnapshots)
-var _ = Describe("[BSL][Deletion][Restic] Local backups and restic repos will be deleted once the corresponding backup storage location is deleted", BslDeletionWithRestic)
+var _ = Describe("Local backups will be deleted once the corresponding backup storage location is deleted",
+	Label("BSL", "Deletion", "Snapshot", "SkipVanillaZfs"), BslDeletionWithSnapshots)
+var _ = Describe("Local backups and Restic repos will be deleted once the corresponding backup storage location is deleted",
+	Label("BSL", "Deletion", "Restic"), BslDeletionWithRestic)
 
-var _ = Describe("[Migration][Restic] Migrate resources between clusters by Restic", MigrationWithRestic)
-var _ = Describe("[Migration][Snapshot][SkipVanillaZfs] Migrate resources between clusters by snapshot", MigrationWithSnapshots)
+var _ = Describe("Migrate resources between clusters by Restic",
+	Label("Migration", "Restic"), MigrationWithRestic)
+var _ = Describe("Migrate resources between clusters by snapshot",
+	Label("Migration", "Snapshot", "SkipVanillaZfs"), MigrationWithSnapshots)
 
-var _ = Describe("[NamespaceMapping][Single][Restic] Backup resources should follow the specific order in schedule", OneNamespaceMappingResticTest)
-var _ = Describe("[NamespaceMapping][Multiple][Restic] Backup resources should follow the specific order in schedule", MultiNamespacesMappingResticTest)
-var _ = Describe("[NamespaceMapping][Single][Snapshot][SkipVanillaZfs] Backup resources should follow the specific order in schedule", OneNamespaceMappingSnapshotTest)
-var _ = Describe("[NamespaceMapping][Multiple][Snapshot]SkipVanillaZfs] Backup resources should follow the specific order in schedule", MultiNamespacesMappingSnapshotTest)
+var _ = Describe("Backup resources should follow the specific order in schedule",
+	Label("NamespaceMapping", "Single", "Restic"), OneNamespaceMappingResticTest)
+var _ = Describe("Backup resources should follow the specific order in schedule",
+	Label("NamespaceMapping", "Multiple", "Restic"), MultiNamespacesMappingResticTest)
+var _ = Describe("Backup resources should follow the specific order in schedule",
+	Label("NamespaceMapping", "Single", "Snapshot", "SkipVanillaZfs"), OneNamespaceMappingSnapshotTest)
+var _ = Describe("Backup resources should follow the specific order in schedule",
+	Label("NamespaceMapping", "Multiple", "Snapshot", "SkipVanillaZfs"), MultiNamespacesMappingSnapshotTest)
 
-var _ = Describe("Backup resources should follow the specific order in schedule", Label("pv-backup", "Opt-In"), OptInPVBackupTest)
-var _ = Describe("Backup resources should follow the specific order in schedule", Label("pv-backup", "Opt-Out"), OptOutPVBackupTest)
+var _ = Describe("Backup resources should follow the specific order in schedule",
+	Label("PVBackup", "OptIn"), OptInPVBackupTest)
+var _ = Describe("Backup resources should follow the specific order in schedule",
+	Label("PVBackup", "OptOut"), OptOutPVBackupTest)
 
-var _ = Describe("[Basic][Nodeport] Service nodeport reservation during restore is configurable", NodePortTest)
-var _ = Describe("[Basic][StorageClass] Storage class of persistent volumes and persistent volume claims can be changed during restores", StorageClasssChangingTest)
-var _ = Describe("[Basic][SelectedNode][SKIP_KIND] Node selectors of persistent volume claims can be changed during restores", PVCSelectedNodeChangingTest)
-
-var _ = Describe("[UploaderConfig][ParallelFilesUpload] Velero test on parallel files upload", ParallelFilesUploadTest)
-var _ = Describe("[UploaderConfig][ParallelFilesDownload] Velero test on parallel files download", ParallelFilesDownloadTest)
+var _ = Describe("Velero test on parallel files upload",
+	Label("UploaderConfig", "ParallelFilesUpload"), ParallelFilesUploadTest)
+var _ = Describe("Velero test on parallel files download",
+	Label("UploaderConfig", "ParallelFilesDownload"), ParallelFilesDownloadTest)
 
 func GetKubeconfigContext() error {
 	var err error
@@ -245,8 +291,7 @@ func TestE2e(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	junitReporter := reporters.NewJUnitReporter("report.xml")
-	RunSpecsWithDefaultAndCustomReporters(t, "E2e Suite", []Reporter{junitReporter})
+	RunSpecs(t, "E2e Suite")
 }
 
 var _ = BeforeSuite(func() {

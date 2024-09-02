@@ -20,7 +20,6 @@ import (
 	"compress/gzip"
 	"io"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -49,8 +48,8 @@ func TestDualModeLogger(t *testing.T) {
 	logStr, err := readLogString(logFile)
 	require.NoError(t, err)
 
-	assert.True(t, strings.Contains(logStr, logMsgExpect))
-	assert.False(t, strings.Contains(logStr, logMsgUnexpect))
+	assert.Contains(t, logStr, logMsgExpect)
+	assert.NotContains(t, logStr, logMsgUnexpect)
 
 	logger.Dispose(velerotest.NewLogger())
 

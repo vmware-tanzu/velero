@@ -176,6 +176,27 @@ Below diagram shows how VGDP logs are redirected:
 
 This log redirecting mechanism is thread safe since the hook acquires the write lock before writing the log buffer, so it guarantees that in the node-agent log there is no corruptions after redirecting the log, and the redirected logs and the original node-agent logs are not projected into each other.     
 
+### Resource Control
+The CPU/memory resource of backupPod/restorePod is configurable, which means users are allowed to configure resources per volume backup/restore.  
+By default, the [Best Effort policy][5] is used, and users are allowed to change it through the ```node-agent-config``` configMap. Specifically, we add below structures to the configMap:  
+``` 
+type Configs struct {
+	// PodResources is the resource config for various types of pods launched by node-agent, i.e., data mover pods.
+	PodResources *PodResources `json:"podResources,omitempty"`
+}
+
+type PodResources struct {
+	CPURequest    string `json:"cpuRequest,omitempty"`
+	MemoryRequest string `json:"memoryRequest,omitempty"`
+	CPULimit      string `json:"cpuLimit,omitempty"`
+	MemoryLimit   string `json:"memoryLimit,omitempty"`
+}
+```
+The string values must mactch Kubernetes Quantity expressions; for each resource, the "request" value must not be larger than the "limit" value. Otherwise, if any one of the values fail, all the resource configurations will be ignored.  
+
+The configurations are loaded by node-agent at start time, so users can change the values in the configMap any time, but the changes won't effect until node-agent restarts.    
+
+
 ## node-agent
 node-agent is still required. Even though VGDP is now not running inside node-agent, node-agent still hosts the data mover controller which reconciles DUCR/DDCR and operates DUCR/DDCR in other steps before the VGDP instance is started, i.e., Accept, Expose, etc.  
 Privileged mode and root user are not required for node-agent anymore by Volume Snapshot Data Movement, however, they are still required by PVB(PodVolumeBackup) and PVR(PodVolumeRestore). Therefore, we will keep the node-agent deamonset as is, for any users who don't use PVB/PVR and have concern about the privileged mode/root user, they need to manually modify the deamonset spec to remove the dependencies.  
@@ -198,4 +219,5 @@ CLI is not changed.
 [2]: ../volume-snapshot-data-movement/volume-snapshot-data-movement.md
 [3]: https://kubernetes.io/blog/2022/09/02/cosi-kubernetes-object-storage-management/
 [4]: ../Implemented/node-agent-concurrency.md
+[5]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
 

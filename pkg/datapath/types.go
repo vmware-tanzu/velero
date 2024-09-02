@@ -50,8 +50,8 @@ type Callbacks struct {
 
 // AccessPoint represents an access point that has been exposed to a data path instance
 type AccessPoint struct {
-	ByPath  string
-	VolMode uploader.PersistentVolumeMode
+	ByPath  string                        `json:"byPath"`
+	VolMode uploader.PersistentVolumeMode `json:"volumeMode"`
 }
 
 // AsyncBR is the interface for asynchronous data path methods

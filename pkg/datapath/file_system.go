@@ -18,6 +18,7 @@ package datapath
 
 import (
 	"context"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -66,6 +67,8 @@ type fileSystemBR struct {
 	callbacks      Callbacks
 	jobName        string
 	requestorType  string
+	wgDataPath     sync.WaitGroup
+	dataPathLock   sync.Mutex
 }
 
 func newFileSystemBR(jobName string, requestorType string, client client.Client, namespace string, callbacks Callbacks, log logrus.FieldLogger) AsyncBR {
@@ -75,6 +78,7 @@ func newFileSystemBR(jobName string, requestorType string, client client.Client,
 		client:        client,
 		namespace:     namespace,
 		callbacks:     callbacks,
+		wgDataPath:    sync.WaitGroup{},
 		log:           log,
 	}
 
@@ -134,6 +138,23 @@ func (fs *fileSystemBR) Init(ctx context.Context, param interface{}) error {
 }
 
 func (fs *fileSystemBR) Close(ctx context.Context) {
+	if fs.cancel != nil {
+		fs.cancel()
+	}
+
+	fs.log.WithField("user", fs.jobName).Info("Closing FileSystemBR")
+
+	fs.wgDataPath.Wait()
+
+	fs.close(ctx)
+
+	fs.log.WithField("user", fs.jobName).Info("FileSystemBR is closed")
+}
+
+func (fs *fileSystemBR) close(ctx context.Context) {
+	fs.dataPathLock.Lock()
+	defer fs.dataPathLock.Unlock()
+
 	if fs.uploaderProv != nil {
 		if err := fs.uploaderProv.Close(ctx); err != nil {
 			fs.log.Errorf("failed to close uploader provider with error %v", err)
@@ -141,13 +162,6 @@ func (fs *fileSystemBR) Close(ctx context.Context) {
 
 		fs.uploaderProv = nil
 	}
-
-	if fs.cancel != nil {
-		fs.cancel()
-		fs.cancel = nil
-	}
-
-	fs.log.WithField("user", fs.jobName).Info("FileSystemBR is closed")
 }
 
 func (fs *fileSystemBR) StartBackup(source AccessPoint, uploaderConfig map[string]string, param interface{}) error {
@@ -155,9 +169,18 @@ func (fs *fileSystemBR) StartBackup(source AccessPoint, uploaderConfig map[strin
 		return errors.New("file system data path is not initialized")
 	}
 
+	fs.wgDataPath.Add(1)
+
 	backupParam := param.(*FSBRStartParam)
 
 	go func() {
+		fs.log.Info("Start data path backup")
+
+		defer func() {
+			fs.close(context.Background())
+			fs.wgDataPath.Done()
+		}()
+
 		snapshotID, emptySnapshot, err := fs.uploaderProv.RunBackup(fs.ctx, source.ByPath, backupParam.RealSource, backupParam.Tags, backupParam.ForceFull,
 			backupParam.ParentSnapshot, source.VolMode, uploaderConfig, fs)
 
@@ -182,7 +205,16 @@ func (fs *fileSystemBR) StartRestore(snapshotID string, target AccessPoint, uplo
 		return errors.New("file system data path is not initialized")
 	}
 
+	fs.wgDataPath.Add(1)
+
 	go func() {
+		fs.log.Info("Start data path restore")
+
+		defer func() {
+			fs.close(context.Background())
+			fs.wgDataPath.Done()
+		}()
+
 		err := fs.uploaderProv.RunRestore(fs.ctx, snapshotID, target.ByPath, target.VolMode, uploaderConfigs, fs)
 
 		if err == provider.ErrorCanceled {

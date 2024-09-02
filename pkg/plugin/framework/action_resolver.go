@@ -27,6 +27,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	biav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v1"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
+	ibav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/itemblockaction/v1"
 	riav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v1"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
@@ -270,6 +271,41 @@ func (recv DeleteItemActionResolver) ResolveActions(helper discovery.Helper, log
 		}
 		res := DeleteItemResolvedAction{
 			DeleteItemAction: action,
+			resolvedAction: resolvedAction{
+				ResourceIncludesExcludes:  resources,
+				NamespaceIncludesExcludes: namespaces,
+				Selector:                  selector,
+			},
+		}
+		resolved = append(resolved, res)
+	}
+	return resolved, nil
+}
+
+type ItemBlockResolvedAction struct {
+	ibav1.ItemBlockAction
+	resolvedAction
+}
+
+type ItemBlockActionResolver struct {
+	actions []ibav1.ItemBlockAction
+}
+
+func NewItemBlockActionResolver(actions []ibav1.ItemBlockAction) ItemBlockActionResolver {
+	return ItemBlockActionResolver{
+		actions: actions,
+	}
+}
+
+func (recv ItemBlockActionResolver) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]ItemBlockResolvedAction, error) {
+	var resolved []ItemBlockResolvedAction
+	for _, action := range recv.actions {
+		resources, namespaces, selector, err := resolveAction(helper, action)
+		if err != nil {
+			return nil, err
+		}
+		res := ItemBlockResolvedAction{
+			ItemBlockAction: action,
 			resolvedAction: resolvedAction{
 				ResourceIncludesExcludes:  resources,
 				NamespaceIncludesExcludes: namespaces,

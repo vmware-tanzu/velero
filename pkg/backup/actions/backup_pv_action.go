@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/vmware-tanzu/velero/pkg/util/actionhelpers"
 )
 
 // PVCAction inspects a PersistentVolumeClaim for the PersistentVolume
@@ -51,7 +51,7 @@ func (a *PVCAction) AppliesTo() (velero.ResourceSelector, error) {
 func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	a.log.Info("Executing PVCAction")
 
-	var pvc corev1api.PersistentVolumeClaim
+	pvc := new(corev1api.PersistentVolumeClaim)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.UnstructuredContent(), &pvc); err != nil {
 		return nil, nil, errors.Wrap(err, "unable to convert unstructured item to persistent volume claim")
 	}
@@ -60,10 +60,6 @@ func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 		return item, nil, nil
 	}
 
-	pv := velero.ResourceIdentifier{
-		GroupResource: kuberesource.PersistentVolumes,
-		Name:          pvc.Spec.VolumeName,
-	}
 	// remove dataSource if exists from prior restored CSI volumes
 	if pvc.Spec.DataSource != nil {
 		pvc.Spec.DataSource = nil
@@ -94,5 +90,5 @@ func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 		return nil, nil, errors.Wrap(err, "unable to convert pvc to unstructured item")
 	}
 
-	return &unstructured.Unstructured{Object: pvcMap}, []velero.ResourceIdentifier{pv}, nil
+	return &unstructured.Unstructured{Object: pvcMap}, actionhelpers.RelatedItemsForPVC(pvc, a.log), nil
 }

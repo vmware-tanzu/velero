@@ -12,7 +12,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
-        id: go
       - name: Linter check
         uses: golangci/golangci-lint-action@v6
         with:

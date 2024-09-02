@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/vmware-tanzu/velero/pkg/util/actionhelpers"
 )
 
 // PodAction implements ItemAction.
@@ -55,32 +55,5 @@ func (a *PodAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.UnstructuredContent(), pod); err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
-
-	var additionalItems []velero.ResourceIdentifier
-	if pod.Spec.PriorityClassName != "" {
-		a.log.Infof("Adding priorityclass %s to additionalItems", pod.Spec.PriorityClassName)
-		additionalItems = append(additionalItems, velero.ResourceIdentifier{
-			GroupResource: kuberesource.PriorityClasses,
-			Name:          pod.Spec.PriorityClassName,
-		})
-	}
-
-	if len(pod.Spec.Volumes) == 0 {
-		a.log.Info("pod has no volumes")
-		return item, additionalItems, nil
-	}
-
-	for _, volume := range pod.Spec.Volumes {
-		if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName != "" {
-			a.log.Infof("Adding pvc %s to additionalItems", volume.PersistentVolumeClaim.ClaimName)
-
-			additionalItems = append(additionalItems, velero.ResourceIdentifier{
-				GroupResource: kuberesource.PersistentVolumeClaims,
-				Namespace:     pod.Namespace,
-				Name:          volume.PersistentVolumeClaim.ClaimName,
-			})
-		}
-	}
-
-	return item, additionalItems, nil
+	return item, actionhelpers.RelatedItemsForPod(pod, a.log), nil
 }

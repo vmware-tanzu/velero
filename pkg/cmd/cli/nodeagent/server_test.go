@@ -17,13 +17,12 @@ package nodeagent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,28 +122,36 @@ func Test_getDataPathConfigs(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		getFunc       func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error)
+		getFunc       func(context.Context, string, kubernetes.Interface, string) (*nodeagent.Configs, error)
+		configMapName string
 		expectConfigs *nodeagent.Configs
 		expectLog     string
 	}{
 		{
-			name: "failed to get configs",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return nil, errors.New("fake-get-error")
-			},
-			expectLog: "Failed to get node agent configs",
+			name:      "no config specified",
+			expectLog: "No node-agent configMap is specified",
 		},
 		{
-			name: "configs cm not found",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
-				return nil, nil
+			name:          "failed to get configs",
+			configMapName: "node-agent-config",
+			getFunc: func(context.Context, string, kubernetes.Interface, string) (*nodeagent.Configs, error) {
+				return nil, errors.New("fake-get-error")
 			},
-			expectLog: "Node agent configs are not found",
+			expectLog: "Failed to get node agent configs from configMap node-agent-config, ignore it",
+		},
+		{
+			name:          "configs cm not found",
+			configMapName: "node-agent-config",
+			getFunc: func(context.Context, string, kubernetes.Interface, string) (*nodeagent.Configs, error) {
+				return nil, errors.New("fake-not-found-error")
+			},
+			expectLog: "Failed to get node agent configs from configMap node-agent-config, ignore it",
 		},
 
 		{
-			name: "succeed",
-			getFunc: func(context.Context, string, kubernetes.Interface) (*nodeagent.Configs, error) {
+			name:          "succeed",
+			configMapName: "node-agent-config",
+			getFunc: func(context.Context, string, kubernetes.Interface, string) (*nodeagent.Configs, error) {
 				return configs, nil
 			},
 			expectConfigs: configs,
@@ -156,6 +163,9 @@ func Test_getDataPathConfigs(t *testing.T) {
 			logBuffer := ""
 
 			s := &nodeAgentServer{
+				config: nodeAgentServerConfig{
+					nodeAgentConfig: test.configMapName,
+				},
 				logger: testutil.NewSingleLogger(&logBuffer),
 			}
 
@@ -166,7 +176,7 @@ func Test_getDataPathConfigs(t *testing.T) {
 			if test.expectLog == "" {
 				assert.Equal(t, "", logBuffer)
 			} else {
-				assert.True(t, strings.Contains(logBuffer, test.expectLog))
+				assert.Contains(t, logBuffer, test.expectLog)
 			}
 		})
 	}
@@ -384,7 +394,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			if test.expectLog == "" {
 				assert.Equal(t, "", logBuffer)
 			} else {
-				assert.True(t, strings.Contains(logBuffer, test.expectLog))
+				assert.Contains(t, logBuffer, test.expectLog)
 			}
 		})
 	}

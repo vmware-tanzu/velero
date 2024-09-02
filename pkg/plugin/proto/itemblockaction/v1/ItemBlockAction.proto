@@ -1,0 +1,29 @@
+syntax = "proto3";
+package v1;
+option go_package = "github.com/vmware-tanzu/velero/pkg/plugin/generated/itemblockaction/v1";
+
+import "Shared.proto";
+
+
+service ItemBlockAction {
+    rpc AppliesTo(ItemBlockActionAppliesToRequest) returns (ItemBlockActionAppliesToResponse);
+    rpc GetRelatedItems(ItemBlockActionGetRelatedItemsRequest) returns (ItemBlockActionGetRelatedItemsResponse);
+}
+
+message ItemBlockActionAppliesToRequest {
+    string plugin = 1;
+}
+
+message ItemBlockActionAppliesToResponse {
+    generated.ResourceSelector ResourceSelector = 1;
+}
+
+message ItemBlockActionGetRelatedItemsRequest {
+    string plugin = 1;
+    bytes item = 2;
+    bytes backup = 3;
+}
+
+message ItemBlockActionGetRelatedItemsResponse {
+    repeated generated.ResourceIdentifier relatedItems = 1;
+}

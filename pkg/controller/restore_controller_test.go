@@ -613,12 +613,6 @@ func TestRestoreReconcile(t *testing.T) {
 				},
 			}
 
-			if test.restore.Spec.ScheduleName != "" && test.backup != nil {
-				expected.Spec = SpecPatch{
-					BackupName: test.backup.Name,
-				}
-			}
-
 			if test.expectedStartTime != nil {
 				expected.Status.StartTimestamp = test.expectedStartTime
 			}

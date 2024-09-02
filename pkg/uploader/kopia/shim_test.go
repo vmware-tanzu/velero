@@ -28,6 +28,7 @@ import (
 	"github.com/kopia/kopia/repo/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/mocks"
@@ -109,7 +110,7 @@ func TestOpenObject(t *testing.T) {
 			ctx := context.Background()
 			reader, err := NewShimRepo(tc.backupRepo).OpenObject(ctx, object.ID{})
 			if tc.isOpenObjectError {
-				assert.Contains(t, err.Error(), "failed to open object")
+				require.ErrorContains(t, err, "failed to open object")
 			} else if tc.isReaderNil {
 				assert.Nil(t, reader)
 			} else {
@@ -151,7 +152,7 @@ func TestFindManifests(t *testing.T) {
 			ctx := context.Background()
 			_, err := NewShimRepo(tc.backupRepo).FindManifests(ctx, map[string]string{})
 			if tc.isGetManifestError {
-				assert.Contains(t, err.Error(), "failed")
+				require.ErrorContains(t, err, "failed")
 			} else {
 				assert.NoError(t, err)
 			}

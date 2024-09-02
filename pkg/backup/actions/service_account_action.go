@@ -19,40 +19,24 @@ package actions
 import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
-	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/vmware-tanzu/velero/pkg/util/actionhelpers"
 )
 
 // ServiceAccountAction implements ItemAction.
 type ServiceAccountAction struct {
 	log                 logrus.FieldLogger
-	clusterRoleBindings []ClusterRoleBinding
+	clusterRoleBindings []actionhelpers.ClusterRoleBinding
 }
 
 // NewServiceAccountAction creates a new ItemAction for service accounts.
-func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingListers map[string]ClusterRoleBindingLister, discoveryHelper velerodiscovery.Helper) (*ServiceAccountAction, error) {
-	// Look up the supported RBAC version
-	var supportedAPI metav1.GroupVersionForDiscovery
-	for _, ag := range discoveryHelper.APIGroups() {
-		if ag.Name == rbac.GroupName {
-			supportedAPI = ag.PreferredVersion
-			break
-		}
-	}
-
-	crbLister := clusterRoleBindingListers[supportedAPI.Version]
-
-	// This should be safe because the List call will return a 0-item slice
-	// if there's no matching API version.
-	crbs, err := crbLister.List()
+func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingListers map[string]actionhelpers.ClusterRoleBindingLister, discoveryHelper velerodiscovery.Helper) (*ServiceAccountAction, error) {
+	crbs, err := actionhelpers.ClusterRoleBindingsForAction(clusterRoleBindingListers, discoveryHelper)
 	if err != nil {
 		return nil, err
 	}
@@ -82,40 +66,5 @@ func (a *ServiceAccountAction) Execute(item runtime.Unstructured, backup *v1.Bac
 		return nil, nil, errors.WithStack(err)
 	}
 
-	var (
-		namespace = objectMeta.GetNamespace()
-		name      = objectMeta.GetName()
-		bindings  = sets.NewString()
-		roles     = sets.NewString()
-	)
-
-	for _, crb := range a.clusterRoleBindings {
-		for _, s := range crb.ServiceAccountSubjects(namespace) {
-			if s == name {
-				a.log.Infof("Adding clusterrole %s and clusterrolebinding %s to additionalItems since serviceaccount %s/%s is a subject",
-					crb.RoleRefName(), crb.Name(), namespace, name)
-
-				bindings.Insert(crb.Name())
-				roles.Insert(crb.RoleRefName())
-				break
-			}
-		}
-	}
-
-	var additionalItems []velero.ResourceIdentifier
-	for binding := range bindings {
-		additionalItems = append(additionalItems, velero.ResourceIdentifier{
-			GroupResource: kuberesource.ClusterRoleBindings,
-			Name:          binding,
-		})
-	}
-
-	for role := range roles {
-		additionalItems = append(additionalItems, velero.ResourceIdentifier{
-			GroupResource: kuberesource.ClusterRoles,
-			Name:          role,
-		})
-	}
-
-	return item, additionalItems, nil
+	return item, actionhelpers.RelatedItemsForServiceAccount(objectMeta, a.clusterRoleBindings, a.log), nil
 }

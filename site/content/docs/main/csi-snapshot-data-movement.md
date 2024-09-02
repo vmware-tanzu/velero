@@ -41,7 +41,7 @@ velero install --use-node-agent
 ### Configure Node Agent DaemonSet spec
 
 After installation, some PaaS/CaaS platforms based on Kubernetes also require modifications the node-agent DaemonSet spec. 
-The steps in this section are only needed if you are installing on RancherOS, Nutanix, OpenShift, VMware Tanzu Kubernetes Grid 
+The steps in this section are only needed if you are installing on RancherOS, Nutanix, OpenShift, OpenShift on IBM Cloud, VMware Tanzu Kubernetes Grid 
 Integrated Edition (formerly VMware Enterprise PKS), or Microsoft Azure.  
 
 
@@ -119,6 +119,38 @@ Or the ds needs to be deleted and recreated:
 oc get ds node-agent -o yaml -n <velero namespace> > ds.yaml
 oc annotate namespace <velero namespace> openshift.io/node-selector=""
 oc create -n <velero namespace> -f ds.yaml
+```
+
+**OpenShift on IBM Cloud**
+
+
+Update the host path and mount path for volumes in the node-agent DaemonSet in the Velero namespace from `/var/lib/kubelet/plugins` to
+`/var/data/kubelet/plugins`.
+
+```yaml
+hostPath:
+  path: /var/lib/kubelet/plugins
+```
+
+to
+
+```yaml
+hostPath:
+  path: /var/data/kubelet/plugins
+```
+
+and
+
+```yaml
+- name: host-plugins
+  mountPath: /var/lib/kubelet/plugins
+```
+
+to
+
+```yaml
+- name: host-plugins
+  mountPath: /var/data/kubelet/plugins
 ```
 
 **VMware Tanzu Kubernetes Grid Integrated Edition (formerly VMware Enterprise PKS)**  
@@ -449,7 +481,7 @@ For Velero built-in data mover, Velero uses [BestEffort as the QoS][13] for node
 If you want to constraint the CPU/memory usage, you need to [customize the resource limits][11]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][12] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.   
 
 During the restore, the repository may also cache data/metadata so as to reduce the network footprint and speed up the restore. The repository uses its own policy to store and clean up the cache.  
-For Kopia repository, the cache is stored in the node-agent pod's root file system and the cleanup is triggered for the data/metadata that are older than 10 minutes (not configurable at present). So you should prepare enough disk space, otherwise, the node-agent pod may be evicted due to running out of the ephemeral storage.  
+For Kopia repository, the cache is stored in the node-agent pod's root file system. Velero allows you to configure a limit of the cache size so that the data mover pod won't be evicted due to running out of the ephemeral storage. For more details, check [Backup Repository Configuration][17].  
 
 ### Node Selection
 
@@ -459,8 +491,11 @@ For Velero built-in data mover, it uses Kubernetes' scheduler to mount a snapsho
 For the backup, you can intervene this scheduling process through [Data Movement Backup Node Selection][15], so that you can decide which node(s) should/should not run the data movement backup for various purposes.  
 For the restore, this is not supported because sometimes the data movement restore must run in the same node where the restored workload pod is scheduled.  
 
+### BackupPVC Configuration
 
-
+The `BackupPVC` serves as an intermediate Persistent Volume Claim (PVC) utilized during data movement backup operations, providing efficient access to data.
+In complex storage environments, optimizing `BackupPVC` configurations can significantly enhance the performance of backup operations. [This document][16] outlines
+advanced configuration options for `BackupPVC`, allowing users to fine-tune access modes and storage class settings based on their storage provider's capabilities.
 
 [1]: https://github.com/vmware-tanzu/velero/pull/5968
 [2]: csi.md
@@ -477,3 +512,5 @@ For the restore, this is not supported because sometimes the data movement resto
 [13]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
 [14]: node-agent-concurrency.md
 [15]: data-movement-backup-node-selection.md
+[16]: data-movement-backup-pvc-configuration.md
+[17]: backup-repository-configuration.md

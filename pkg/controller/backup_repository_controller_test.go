@@ -21,7 +21,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -29,11 +31,13 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	repomokes "github.com/vmware-tanzu/velero/pkg/repository/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+
+	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 const testMaintenanceFrequency = 10 * time.Minute
 
-func mockBackupRepoReconciler(t *testing.T, rr *velerov1api.BackupRepository, mockOn string, arg interface{}, ret interface{}) *BackupRepoReconciler {
+func mockBackupRepoReconciler(t *testing.T, mockOn string, arg interface{}, ret interface{}) *BackupRepoReconciler {
 	mgr := &repomokes.Manager{}
 	if mockOn != "" {
 		mgr.On(mockOn, arg).Return(ret)
@@ -43,6 +47,7 @@ func mockBackupRepoReconciler(t *testing.T, rr *velerov1api.BackupRepository, mo
 		velerotest.NewLogger(),
 		velerotest.NewFakeControllerRuntimeClient(t),
 		testMaintenanceFrequency,
+		"fake-repo-config",
 		mgr,
 	)
 }
@@ -61,15 +66,15 @@ func mockBackupRepositoryCR() *velerov1api.BackupRepository {
 
 func TestPatchBackupRepository(t *testing.T) {
 	rr := mockBackupRepositoryCR()
-	reconciler := mockBackupRepoReconciler(t, rr, "", nil, nil)
+	reconciler := mockBackupRepoReconciler(t, "", nil, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	err = reconciler.patchBackupRepository(context.Background(), rr, repoReady())
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
+	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 	err = reconciler.patchBackupRepository(context.Background(), rr, repoNotReady("not ready"))
 	assert.NoError(t, err)
-	assert.NotEqual(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
+	assert.NotEqual(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 }
 
 func TestCheckNotReadyRepo(t *testing.T) {
@@ -77,7 +82,7 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	rr.Spec.BackupStorageLocation = "default"
 	rr.Spec.ResticIdentifier = "fake-identifier"
 	rr.Spec.VolumeNamespace = "volume-ns-1"
-	reconciler := mockBackupRepoReconciler(t, rr, "PrepareRepo", rr, nil)
+	reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	locations := &velerov1api.BackupStorageLocation{
@@ -94,13 +99,13 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = reconciler.checkNotReadyRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
+	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 	assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
 }
 
 func TestRunMaintenanceIfDue(t *testing.T) {
 	rr := mockBackupRepositoryCR()
-	reconciler := mockBackupRepoReconciler(t, rr, "PruneRepo", rr, nil)
+	reconciler := mockBackupRepoReconciler(t, "PruneRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	lastTm := rr.Status.LastMaintenanceTime
@@ -118,7 +123,7 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 func TestInitializeRepo(t *testing.T) {
 	rr := mockBackupRepositoryCR()
 	rr.Spec.BackupStorageLocation = "default"
-	reconciler := mockBackupRepoReconciler(t, rr, "PrepareRepo", rr, nil)
+	reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	locations := &velerov1api.BackupStorageLocation{
@@ -135,7 +140,7 @@ func TestInitializeRepo(t *testing.T) {
 	assert.NoError(t, err)
 	err = reconciler.initializeRepo(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.Phase, velerov1api.BackupRepositoryPhaseReady)
+	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 }
 
 func TestBackupRepoReconcile(t *testing.T) {
@@ -189,7 +194,7 @@ func TestBackupRepoReconcile(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			reconciler := mockBackupRepoReconciler(t, test.repo, "", test.repo, nil)
+			reconciler := mockBackupRepoReconciler(t, "", test.repo, nil)
 			err := reconciler.Client.Create(context.TODO(), test.repo)
 			assert.NoError(t, err)
 			_, err = reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: test.repo.Name}})
@@ -243,6 +248,7 @@ func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
 				velerotest.NewLogger(),
 				velerotest.NewFakeControllerRuntimeClient(t),
 				test.userDefinedFreq,
+				"",
 				&mgr,
 			)
 
@@ -370,10 +376,112 @@ func TestNeedInvalidBackupRepo(t *testing.T) {
 				velerov1api.DefaultNamespace,
 				velerotest.NewLogger(),
 				velerotest.NewFakeControllerRuntimeClient(t),
-				time.Duration(0), nil)
+				time.Duration(0), "", nil)
 
 			need := reconciler.needInvalidBackupRepo(test.oldBSL, test.newBSL)
 			assert.Equal(t, test.expect, need)
+		})
+	}
+}
+
+func TestGetBackupRepositoryConfig(t *testing.T) {
+	configWithNoData := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "config-1",
+			Namespace: velerov1api.DefaultNamespace,
+		},
+	}
+
+	configWithWrongData := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "config-1",
+			Namespace: velerov1api.DefaultNamespace,
+		},
+		Data: map[string]string{
+			"fake-repo-type": "",
+		},
+	}
+
+	configWithData := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "config-1",
+			Namespace: velerov1api.DefaultNamespace,
+		},
+		Data: map[string]string{
+			"fake-repo-type":   "{\"cacheLimitMB\": 1000, \"enableCompression\": true}",
+			"fake-repo-type-1": "{\"cacheLimitMB\": 1, \"enableCompression\": false}",
+		},
+	}
+
+	tests := []struct {
+		name           string
+		congiName      string
+		repoName       string
+		repoType       string
+		kubeClientObj  []runtime.Object
+		expectedErr    string
+		expectedResult map[string]string
+	}{
+		{
+			name: "empty configName",
+		},
+		{
+			name:        "get error",
+			congiName:   "config-1",
+			expectedErr: "error getting configMap config-1: configmaps \"config-1\" not found",
+		},
+		{
+			name:      "no config for repo",
+			congiName: "config-1",
+			repoName:  "fake-repo",
+			repoType:  "fake-repo-type",
+			kubeClientObj: []runtime.Object{
+				configWithNoData,
+			},
+		},
+		{
+			name:      "unmarshall error",
+			congiName: "config-1",
+			repoName:  "fake-repo",
+			repoType:  "fake-repo-type",
+			kubeClientObj: []runtime.Object{
+				configWithWrongData,
+			},
+			expectedErr: "error unmarshalling config data from config-1 for repo fake-repo, repo type fake-repo-type: unexpected end of JSON input",
+		},
+		{
+			name:      "succeed",
+			congiName: "config-1",
+			repoName:  "fake-repo",
+			repoType:  "fake-repo-type",
+			kubeClientObj: []runtime.Object{
+				configWithData,
+			},
+			expectedResult: map[string]string{
+				"cacheLimitMB":      "1000",
+				"enableCompression": "true",
+			},
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	corev1.AddToScheme(scheme)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClientBuilder := clientFake.NewClientBuilder()
+			fakeClientBuilder = fakeClientBuilder.WithScheme(scheme)
+
+			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
+
+			result, err := getBackupRepositoryConfig(context.Background(), fakeClient, test.congiName, velerov1api.DefaultNamespace, test.repoName, test.repoType, velerotest.NewLogger())
+
+			if test.expectedErr != "" {
+				assert.EqualError(t, err, test.expectedErr)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, test.expectedResult, result)
+			}
 		})
 	}
 }

@@ -96,7 +96,7 @@ Optionally, set the `$VERSION` environment variable to change the image tag or `
 ```bash
 make container
 ```
-_Note: To build build container images for both `velero` and `velero-restore-helper`, run: `make all-containers`_
+_Note: To build container images for both `velero` and `velero-restore-helper`, run: `make all-containers`_
 
 ### Publishing container images to a registry
 

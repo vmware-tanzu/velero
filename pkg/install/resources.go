@@ -358,7 +358,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 	}
 
 	if o.RestoreOnly {
-		deployOpts = append(deployOpts, WithRestoreOnly())
+		deployOpts = append(deployOpts, WithRestoreOnly(true))
 	}
 
 	if len(o.Plugins) > 0 {
@@ -366,15 +366,15 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 	}
 
 	if o.DefaultVolumesToFsBackup {
-		deployOpts = append(deployOpts, WithDefaultVolumesToFsBackup())
+		deployOpts = append(deployOpts, WithDefaultVolumesToFsBackup(true))
 	}
 
 	if o.DefaultSnapshotMoveData {
-		deployOpts = append(deployOpts, WithDefaultSnapshotMoveData())
+		deployOpts = append(deployOpts, WithDefaultSnapshotMoveData(true))
 	}
 
 	if o.DisableInformerCache {
-		deployOpts = append(deployOpts, WithDisableInformerCache())
+		deployOpts = append(deployOpts, WithDisableInformerCache(true))
 	}
 
 	deploy := Deployment(o.Namespace, deployOpts...)
@@ -396,7 +396,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 			dsOpts = append(dsOpts, WithFeatures(o.Features))
 		}
 		if o.PrivilegedNodeAgent {
-			dsOpts = append(dsOpts, WithPrivilegedNodeAgent())
+			dsOpts = append(dsOpts, WithPrivilegedNodeAgent(true))
 		}
 		ds := DaemonSet(o.Namespace, dsOpts...)
 		if err := appendUnstructured(resources, ds); err != nil {

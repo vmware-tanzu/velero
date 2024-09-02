@@ -140,6 +140,7 @@ type serverConfig struct {
 	disableInformerCache                                                    bool
 	scheduleSkipImmediately                                                 bool
 	maintenanceCfg                                                          repository.MaintenanceConfig
+	backukpRepoConfig                                                       string
 }
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -253,6 +254,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().StringVar(&config.maintenanceCfg.CPULimit, "maintenance-job-cpu-limit", config.maintenanceCfg.CPULimit, "CPU limit for maintenance job. Default is no limit.")
 	command.Flags().StringVar(&config.maintenanceCfg.MemLimit, "maintenance-job-mem-limit", config.maintenanceCfg.MemLimit, "Memory limit for maintenance job. Default is no limit.")
 
+	command.Flags().StringVar(&config.backukpRepoConfig, "backup-repository-config", config.backukpRepoConfig, "The name of configMap containing backup repository configurations.")
+
 	// maintenance job log setting inherited from velero server
 	config.maintenanceCfg.FormatFlag = config.formatFlag
 	config.maintenanceCfg.LogLevelFlag = logLevelFlag
@@ -288,8 +291,10 @@ type server struct {
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
-	if err := uploader.ValidateUploaderType(config.uploaderType); err != nil {
+	if msg, err := uploader.ValidateUploaderType(config.uploaderType); err != nil {
 		return nil, err
+	} else if msg != "" {
+		logger.Warn(msg)
 	}
 
 	if config.clientQPS < 0.0 {
@@ -876,7 +881,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	if _, ok := enabledRuntimeControllers[controller.BackupRepo]; ok {
-		if err := controller.NewBackupRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.repoMaintenanceFrequency, s.repoManager).SetupWithManager(s.mgr); err != nil {
+		if err := controller.NewBackupRepoReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.config.repoMaintenanceFrequency, s.config.backukpRepoConfig, s.repoManager).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.BackupRepo)
 		}
 	}
@@ -1022,6 +1027,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.metrics,
 			s.crClient,
 			multiHookTracker,
+			s.config.resourceTimeout,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", controller.RestoreFinalizer)
 		}
@@ -1147,9 +1153,15 @@ func markDataUploadsCancel(ctx context.Context, client ctrlclient.Client, backup
 			du.Status.Phase == velerov2alpha1api.DataUploadPhaseNew ||
 			du.Status.Phase == "" {
 			err := controller.UpdateDataUploadWithRetry(ctx, client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, log.WithField("dataupload", du.Name),
-				func(dataUpload *velerov2alpha1api.DataUpload) {
+				func(dataUpload *velerov2alpha1api.DataUpload) bool {
+					if dataUpload.Spec.Cancel {
+						return false
+					}
+
 					dataUpload.Spec.Cancel = true
-					dataUpload.Status.Message = fmt.Sprintf("found a dataupload with status %q during the velero server starting, mark it as cancel", du.Status.Phase)
+					dataUpload.Status.Message = fmt.Sprintf("Dataupload is in status %q during the velero server starting, mark it as cancel", du.Status.Phase)
+
+					return true
 				})
 
 			if err != nil {
@@ -1182,9 +1194,15 @@ func markDataDownloadsCancel(ctx context.Context, client ctrlclient.Client, rest
 			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseNew ||
 			dd.Status.Phase == "" {
 			err := controller.UpdateDataDownloadWithRetry(ctx, client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, log.WithField("datadownload", dd.Name),
-				func(dataDownload *velerov2alpha1api.DataDownload) {
+				func(dataDownload *velerov2alpha1api.DataDownload) bool {
+					if dataDownload.Spec.Cancel {
+						return false
+					}
+
 					dataDownload.Spec.Cancel = true
-					dataDownload.Status.Message = fmt.Sprintf("found a datadownload with status %q during the velero server starting, mark it as cancel", dd.Status.Phase)
+					dataDownload.Status.Message = fmt.Sprintf("Datadownload is in status %q during the velero server starting, mark it as cancel", dd.Status.Phase)
+
+					return true
 				})
 
 			if err != nil {

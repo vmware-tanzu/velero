@@ -275,6 +275,12 @@ You can also configure the existing resource policy in a [Restore](api-types/res
 * Update of a resource only applies to the Kubernetes resource data such as its spec. It may not work as expected for certain resource types such as PVCs and Pods. In case of PVCs for example, data in the PV is not restored or overwritten in any way.
 * `update` existing resource policy works in a best-effort way, which means when restore's `--existing-resource-policy` is set to `update`, Velero will try to update the resource if the resource already exists, if the update fails, Velero will fall back to the default non-destructive way in the restore, and just logs a warning without failing the restore.
 
+## Restore "status" field of objects
+
+By default, Velero will remove the `status` field of an object before it's restored. This is because the value `status` field is typically set by the controller during reconciliation.  However, some custom resources are designed to store environment specific information in the `status` field, and it is important to preserve such information during restore.
+
+You can use `--status-exclude-resources` and `--status-exclude-resources` flags to select the resources whose `status` field will be restored by Velero.  If there are resources selected via these flags, velero will trigger another API call to update the restored object to restore `status` field after it's created.
+
 ## Write Sparse files
 If using fs-restore or CSI snapshot data movements, it's supported to write sparse files during restore by the below command:
 ```bash

@@ -223,7 +223,13 @@ Kubernetes namespace resources to exclude from the backup, formatted as resource
   ```
 
 ## Resource policies
-Velero provides resource policies to filter resources to do backup or restore. currently, it only supports skip backup volume by resource policies.
+Velero provides resource policies to filter resources to do backup or restore.
+
+### Supported VolumePolicy actions
+There are three actions supported via the VolumePolicy feature:
+* skip: don't back up the action matching volume's data.
+* snapshot: back up the action matching volume's data by the snapshot way.
+* fs-backup: back up the action matching volumes' data by the fs-backup way.
 
 ### Creating resource policies
 
@@ -243,15 +249,14 @@ Below is the two-step of using resource policies to skip backup of volume:
    This flag could also be combined with the other include and exclude filters above
 
 ### YAML template
-
-Velero only support volume resource policies currently, other kinds of resource policies could be extended in the future. The policies YAML config file would look like this:
+The policies YAML config file would look like this:
 - Yaml template:
     ```yaml
     # currently only supports v1 version
     version: v1
     volumePolicies:
     # each policy consists of a list of conditions and an action
-    # we could have lots of policies, but if the resource matched the first policy, the latters will be ignored
+    # we could have lots of policies, but if the resource matched the first policy, the latter will be ignored
     # each key in the object is one condition, and one policy will apply to resources that meet ALL conditions
     # NOTE: capacity or storageClass is suited for [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes), and pod [Volume](https://kubernetes.io/docs/concepts/storage/volumes) not support it.
     - conditions:
@@ -278,7 +283,7 @@ Velero only support volume resource policies currently, other kinds of resource 
         nfs:
           server: 192.168.200.90
       action:
-        type: skip
+        type: fs-backup
     - conditions:
         # nfs could be empty which matches any nfs volume source
         nfs: {}
@@ -288,7 +293,7 @@ Velero only support volume resource policies currently, other kinds of resource 
         # csi could be empty which matches any csi volume source
         csi: {}
       action:
-        type: skip
+        type: snapshot
     - conditions:
         volumeTypes:
           - emptyDir
@@ -366,12 +371,6 @@ Velero supported conditions and format listed below:
 * The VolumePolicy has the second priority. It supersedes all the other filters.
 * The filesystem volume backup opt-in/opt-out way has the third priority.
 * The `backup.Spec.SnapshotVolumes` has the fourth priority.
-
-### Supported VolumePolicy actions 
-By now, there are three supporting action types:
-* skip: don't back up the action matching volume's data.
-* snapshot: back up the action matching volume's data by the snapshot way.
-* fs-backup: back up the action matching volumes' data by the fs-backup way.
 
 #### Support for `fs-backup` and `snapshot` actions via volume policy feature
 - Starting from velero 1.14, the resource policy/volume policy feature has been extended to support more actions like `fs-backup` and `snapshot`.

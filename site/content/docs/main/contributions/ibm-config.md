@@ -65,8 +65,9 @@ velero install \
     --provider aws \
     --bucket <YOUR_BUCKET> \
     --secret-file ./credentials-velero \
+    --plugins velero/velero-plugin-for-aws:v1.10.0\
     --use-volume-snapshots=false \
-    --backup-location-config region=<YOUR_REGION>,s3ForcePathStyle="true",s3Url=<YOUR_URL_ACCESS_POINT>
+    --backup-location-config region=<YOUR_REGION>,s3ForcePathStyle="true",s3Url=<YOUR_URL_ACCESS_POINT>,checksumAlgorithm=""
 ```
 
 Velero does not have a volume snapshot plugin for IBM Cloud, so creating volume snapshots is disabled.

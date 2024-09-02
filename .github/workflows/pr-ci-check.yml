@@ -7,20 +7,12 @@ jobs:
     strategy:
       fail-fast: false
     steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
-        id: go
-      - name: Check out the code
-        uses: actions/checkout@v4
-      - name: Fetch cached go modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          go-version-file: 'go.mod'
       - name: Make ci
         run: make ci
       - name: Upload test coverage

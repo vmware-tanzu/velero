@@ -41,6 +41,11 @@ type BackupRepositorySpec struct {
 
 	// MaintenanceFrequency is how often maintenance should be run.
 	MaintenanceFrequency metav1.Duration `json:"maintenanceFrequency"`
+
+	// RepositoryConfig is for repository-specific configuration fields.
+	// +optional
+	// +nullable
+	RepositoryConfig map[string]string `json:"repositoryConfig,omitempty"`
 }
 
 // BackupRepositoryPhase represents the lifecycle phase of a BackupRepository.

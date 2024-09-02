@@ -52,8 +52,8 @@ func TestParseCapacity(t *testing.T) {
 		t.Run(test.input, func(t *testing.T) {
 			actual, actualErr := parseCapacity(test.input)
 			if test.expected != emptyCapacity {
-				assert.Equal(t, test.expected.lower.Cmp(actual.lower), 0)
-				assert.Equal(t, test.expected.upper.Cmp(actual.upper), 0)
+				assert.Equal(t, 0, test.expected.lower.Cmp(actual.lower))
+				assert.Equal(t, 0, test.expected.upper.Cmp(actual.upper))
 			}
 			assert.Equal(t, test.expectedErr, actualErr)
 		})

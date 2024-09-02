@@ -18,6 +18,7 @@ package exposer
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
@@ -66,6 +67,12 @@ type CSISnapshotExposeParam struct {
 
 	// Affinity specifies the node affinity of the backup pod
 	Affinity *nodeagent.LoadAffinity
+
+	// BackupPVCConfig is the config for backupPVC (intermediate PVC) of snapshot data movement
+	BackupPVCConfig map[string]nodeagent.BackupPVC
+
+	// Resources defines the resource requirements of the hosting pod
+	Resources corev1.ResourceRequirements
 }
 
 // CSISnapshotExposeWaitParam define the input param for WaitExposed of CSI snapshots
@@ -162,7 +169,20 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		curLog.WithField("vs name", volumeSnapshot.Name).Warnf("The snapshot doesn't contain a valid restore size, use source volume's size %v", volumeSize)
 	}
 
-	backupPVC, err := e.createBackupPVC(ctx, ownerObject, backupVS.Name, csiExposeParam.StorageClass, csiExposeParam.AccessMode, volumeSize)
+	// check if there is a mapping for source pvc storage class in backupPVC config
+	// if the mapping exists then use the values(storage class, readOnly accessMode)
+	// for backupPVC (intermediate PVC in snapshot data movement) object creation
+	backupPVCStorageClass := csiExposeParam.StorageClass
+	backupPVCReadOnly := false
+	if value, exists := csiExposeParam.BackupPVCConfig[csiExposeParam.StorageClass]; exists {
+		if value.StorageClass != "" {
+			backupPVCStorageClass = value.StorageClass
+		}
+
+		backupPVCReadOnly = value.ReadOnly
+	}
+
+	backupPVC, err := e.createBackupPVC(ctx, ownerObject, backupVS.Name, backupPVCStorageClass, csiExposeParam.AccessMode, volumeSize, backupPVCReadOnly)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pvc")
 	}
@@ -174,7 +194,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		}
 	}()
 
-	backupPod, err := e.createBackupPod(ctx, ownerObject, backupPVC, csiExposeParam.HostingPodLabels, csiExposeParam.Affinity)
+	backupPod, err := e.createBackupPod(ctx, ownerObject, backupPVC, csiExposeParam.OperationTimeout, csiExposeParam.HostingPodLabels, csiExposeParam.Affinity, csiExposeParam.Resources)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
 	}
@@ -195,6 +215,8 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.
 
 	backupPodName := ownerObject.Name
 	backupPVCName := ownerObject.Name
+
+	containerName := string(ownerObject.UID)
 	volumeName := string(ownerObject.UID)
 
 	curLog := e.log.WithFields(logrus.Fields{
@@ -237,7 +259,11 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.
 
 	curLog.WithField("pod", pod.Name).Infof("Backup volume is found in pod at index %v", i)
 
-	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, VolumeName: volumeName}}, nil
+	return &ExposeResult{ByPod: ExposeByPod{
+		HostingPod:       pod,
+		HostingContainer: containerName,
+		VolumeName:       volumeName,
+	}}, nil
 }
 
 func (e *csiSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1.ObjectReference) error {
@@ -340,12 +366,18 @@ func (e *csiSnapshotExposer) createBackupVSC(ctx context.Context, ownerObject co
 	return e.csiSnapshotClient.VolumeSnapshotContents().Create(ctx, vsc, metav1.CreateOptions{})
 }
 
-func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject corev1.ObjectReference, backupVS, storageClass, accessMode string, resource resource.Quantity) (*corev1.PersistentVolumeClaim, error) {
+func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject corev1.ObjectReference, backupVS, storageClass, accessMode string, resource resource.Quantity, readOnly bool) (*corev1.PersistentVolumeClaim, error) {
 	backupPVCName := ownerObject.Name
 
 	volumeMode, err := getVolumeModeByAccessMode(accessMode)
 	if err != nil {
 		return nil, err
+	}
+
+	pvcAccessMode := corev1.ReadWriteOnce
+
+	if readOnly {
+		pvcAccessMode = corev1.ReadOnlyMany
 	}
 
 	dataSource := &corev1.TypedLocalObjectReference{
@@ -370,7 +402,7 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
+				pvcAccessMode,
 			},
 			StorageClassName: &storageClass,
 			VolumeMode:       &volumeMode,
@@ -393,12 +425,12 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 	return created, err
 }
 
-func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject corev1.ObjectReference, backupPVC *corev1.PersistentVolumeClaim,
-	label map[string]string, affinity *nodeagent.LoadAffinity) (*corev1.Pod, error) {
+func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject corev1.ObjectReference, backupPVC *corev1.PersistentVolumeClaim, operationTimeout time.Duration,
+	label map[string]string, affinity *nodeagent.LoadAffinity, resources corev1.ResourceRequirements) (*corev1.Pod, error) {
 	podName := ownerObject.Name
 
-	volumeName := string(ownerObject.UID)
 	containerName := string(ownerObject.UID)
+	volumeName := string(ownerObject.UID)
 
 	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace)
 	if err != nil {
@@ -406,13 +438,41 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 	}
 
 	var gracePeriod int64 = 0
-	volumeMounts, volumeDevices := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode)
+	volumeMounts, volumeDevices, volumePath := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode, true)
+	volumeMounts = append(volumeMounts, podInfo.volumeMounts...)
+
+	volumes := []corev1.Volume{{
+		Name: volumeName,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: backupPVC.Name,
+				ReadOnly:  true,
+			},
+		},
+	}}
+	volumes = append(volumes, podInfo.volumes...)
 
 	if label == nil {
 		label = make(map[string]string)
 	}
-
 	label[podGroupLabel] = podGroupSnapshot
+
+	volumeMode := corev1.PersistentVolumeFilesystem
+	if backupPVC.Spec.VolumeMode != nil {
+		volumeMode = *backupPVC.Spec.VolumeMode
+	}
+
+	args := []string{
+		fmt.Sprintf("--volume-path=%s", volumePath),
+		fmt.Sprintf("--volume-mode=%s", volumeMode),
+		fmt.Sprintf("--data-upload=%s", ownerObject.Name),
+		fmt.Sprintf("--resource-timeout=%s", operationTimeout.String()),
+	}
+
+	args = append(args, podInfo.logFormatArgs...)
+	args = append(args, podInfo.logLevelArgs...)
+
+	userID := int64(0)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -448,21 +508,25 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 					Name:            containerName,
 					Image:           podInfo.image,
 					ImagePullPolicy: corev1.PullNever,
-					Command:         []string{"/velero-helper", "pause"},
-					VolumeMounts:    volumeMounts,
-					VolumeDevices:   volumeDevices,
+					Command: []string{
+						"/velero",
+						"data-mover",
+						"backup",
+					},
+					Args:          args,
+					VolumeMounts:  volumeMounts,
+					VolumeDevices: volumeDevices,
+					Env:           podInfo.env,
+					Resources:     resources,
 				},
 			},
 			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
-			Volumes: []corev1.Volume{{
-				Name: volumeName,
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: backupPVC.Name,
-					},
-				},
-			}},
+			Volumes:                       volumes,
+			RestartPolicy:                 corev1.RestartPolicyNever,
+			SecurityContext: &corev1.PodSecurityContext{
+				RunAsUser: &userID,
+			},
 		},
 	}
 

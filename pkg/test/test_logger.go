@@ -50,3 +50,15 @@ func NewSingleLogger(buffer *string) logrus.FieldLogger {
 	logger.Level = logrus.TraceLevel
 	return logrus.NewEntry(logger)
 }
+
+func NewSingleLoggerWithHooks(buffer *string, hooks []logrus.Hook) logrus.FieldLogger {
+	logger := logrus.New()
+	logger.Out = &singleLogRecorder{buffer: buffer}
+	logger.Level = logrus.TraceLevel
+
+	for _, hook := range hooks {
+		logger.Hooks.Add(hook)
+	}
+
+	return logrus.NewEntry(logger)
+}

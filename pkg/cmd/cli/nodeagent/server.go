@@ -60,7 +60,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+
+	cacheutil "k8s.io/client-go/tools/cache"
 )
 
 var (
@@ -84,6 +87,7 @@ type nodeAgentServerConfig struct {
 	metricsAddress          string
 	resourceTimeout         time.Duration
 	dataMoverPrepareTimeout time.Duration
+	nodeAgentConfig         string
 }
 
 func NewServerCommand(f client.Factory) *cobra.Command {
@@ -104,7 +108,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 			logLevel := logLevelFlag.Parse()
 			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))
 
-			logger := logging.DefaultLogger(logLevel, formatFlag.Parse())
+			logger := logging.DefaultMergeLogger(logLevel, formatFlag.Parse())
 			logger.Infof("Starting Velero node-agent server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
 
 			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
@@ -120,6 +124,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
 	command.Flags().DurationVar(&config.dataMoverPrepareTimeout, "data-mover-prepare-timeout", config.dataMoverPrepareTimeout, "How long to wait for preparing a DataUpload/DataDownload. Default is 30 minutes.")
 	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "The address to expose prometheus metrics")
+	command.Flags().StringVar(&config.nodeAgentConfig, "node-agent-config", config.nodeAgentConfig, "The name of configMap containing node-agent configurations.")
 
 	return command
 }
@@ -187,6 +192,9 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
 			},
 			&velerov2alpha1api.DataDownload{}: {
+				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
+			},
+			&v1.Event{}: {
 				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
 			},
 		},
@@ -288,24 +296,78 @@ func (s *nodeAgentServer) run() {
 	var loadAffinity *nodeagent.LoadAffinity
 	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
 		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
+		s.logger.Infof("Using customized loadAffinity %v", loadAffinity)
 	}
-	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, loadAffinity, repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
-	s.attemptDataUploadResume(dataUploadReconciler)
+
+	var backupPVCConfig map[string]nodeagent.BackupPVC
+	if s.dataPathConfigs != nil && s.dataPathConfigs.BackupPVCConfig != nil {
+		backupPVCConfig = s.dataPathConfigs.BackupPVCConfig
+		s.logger.Infof("Using customized backupPVC config %v", backupPVCConfig)
+	}
+
+	podResources := v1.ResourceRequirements{}
+	if s.dataPathConfigs != nil && s.dataPathConfigs.PodResources != nil {
+		if res, err := kube.ParseResourceRequirements(s.dataPathConfigs.PodResources.CPURequest, s.dataPathConfigs.PodResources.MemoryRequest, s.dataPathConfigs.PodResources.CPULimit, s.dataPathConfigs.PodResources.MemoryLimit); err != nil {
+			s.logger.WithError(err).Warn("Pod resource requirements are invalid, ignore")
+		} else {
+			podResources = res
+			s.logger.Infof("Using customized pod resource requirements %v", s.dataPathConfigs.PodResources)
+		}
+	}
+
+	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, loadAffinity, backupPVCConfig, podResources, clock.RealClock{}, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.kubeClient, s.dataPathMgr, repoEnsurer, credentialGetter, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
-	s.attemptDataDownloadResume(dataDownloadReconciler)
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}
+
+	go func() {
+		if err := s.waitCacheForResume(); err != nil {
+			s.logger.WithError(err).Error("Failed to wait cache for resume, will not resume DU/DD")
+			return
+		}
+
+		if err := dataUploadReconciler.AttemptDataUploadResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt data upload resume")
+		}
+
+		if err := dataDownloadReconciler.AttemptDataDownloadResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt data download resume")
+		}
+	}()
 
 	s.logger.Info("Controllers starting...")
 
 	if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		s.logger.Fatal("Problem starting manager", err)
 	}
+}
+
+func (s *nodeAgentServer) waitCacheForResume() error {
+	podInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &v1.Pod{})
+	if err != nil {
+		return errors.Wrap(err, "error getting pod informer")
+	}
+
+	duInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov2alpha1api.DataUpload{})
+	if err != nil {
+		return errors.Wrap(err, "error getting du informer")
+	}
+
+	ddInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov2alpha1api.DataDownload{})
+	if err != nil {
+		return errors.Wrap(err, "error getting dd informer")
+	}
+
+	if !cacheutil.WaitForCacheSync(s.ctx.Done(), podInformer.HasSynced, duInformer.HasSynced, ddInformer.HasSynced) {
+		return errors.New("error waiting informer synced")
+	}
+
+	return nil
 }
 
 // validatePodVolumesHostPath validates that the pod volumes path contains a
@@ -370,31 +432,6 @@ func (s *nodeAgentServer) markInProgressCRsFailed() {
 	s.markInProgressPVRsFailed(client)
 }
 
-func (s *nodeAgentServer) attemptDataUploadResume(r *controller.DataUploadReconciler) {
-	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
-	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
-	if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
-		return
-	}
-	if err := r.AttemptDataUploadResume(s.ctx, client, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data upload resume")
-	}
-}
-
-func (s *nodeAgentServer) attemptDataDownloadResume(r *controller.DataDownloadReconciler) {
-	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
-	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
-	if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
-		return
-	}
-
-	if err := r.AttemptDataDownloadResume(s.ctx, client, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data download resume")
-	}
-}
-
 func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 	pvbs := &velerov1api.PodVolumeBackupList{}
 	if err := client.List(s.ctx, pvbs, &ctrlclient.ListOptions{Namespace: s.namespace}); err != nil {
@@ -412,7 +449,7 @@ func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 		}
 
 		if err := controller.UpdatePVBStatusToFailed(s.ctx, client, &pvbs.Items[i],
-			fmt.Errorf("get a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, velerov1api.PodVolumeBackupPhaseFailed),
+			fmt.Errorf("found a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, velerov1api.PodVolumeBackupPhaseFailed),
 			"", time.Now(), s.logger); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumebackup %q", pvb.GetName())
 			continue
@@ -460,14 +497,14 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 var getConfigsFunc = nodeagent.GetConfigs
 
 func (s *nodeAgentServer) getDataPathConfigs() {
-	configs, err := getConfigsFunc(s.ctx, s.namespace, s.kubeClient)
-	if err != nil {
-		s.logger.WithError(err).Warn("Failed to get node agent configs")
+	if s.config.nodeAgentConfig == "" {
+		s.logger.Info("No node-agent configMap is specified")
 		return
 	}
 
-	if configs == nil {
-		s.logger.Infof("Node agent configs are not found")
+	configs, err := getConfigsFunc(s.ctx, s.namespace, s.kubeClient, s.config.nodeAgentConfig)
+	if err != nil {
+		s.logger.WithError(err).Warnf("Failed to get node agent configs from configMap %s, ignore it", s.config.nodeAgentConfig)
 		return
 	}
 
