@@ -31,7 +31,6 @@ import (
 )
 
 func TestSetupNewRepoAlgorithms(t *testing.T) {
-
 	testCases := []struct {
 		name     string
 		envVars  map[string]string
