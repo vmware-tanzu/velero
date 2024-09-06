@@ -17,7 +17,6 @@ limitations under the License.
 package framework
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -25,11 +24,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
+	"github.com/vmware-tanzu/velero/pkg/cmd/server/config"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/framework/backupitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	ibav1 "github.com/vmware-tanzu/velero/pkg/plugin/framework/itemblockaction/v1"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/framework/restoreitemaction/v2"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
 // Server serves registered plugin implementations.
@@ -41,6 +40,9 @@ type Server interface {
 	//
 	// This method must be called prior to calling .Serve().
 	BindFlags(flags *pflag.FlagSet) Server
+
+	// GetConfig return the config parsed from the flags
+	GetConfig() *config.Config
 
 	// RegisterBackupItemAction registers a backup item action. Accepted format
 	// for the plugin name is <DNS subdomain>/<non-empty name>.
@@ -104,8 +106,8 @@ type Server interface {
 
 // server implements Server.
 type server struct {
+	config              *config.Config
 	log                 *logrus.Logger
-	logLevelFlag        *logging.LevelFlag
 	flagSet             *pflag.FlagSet
 	backupItemAction    *BackupItemActionPlugin
 	backupItemActionV2  *biav2.BackupItemActionPlugin
@@ -122,8 +124,8 @@ func NewServer() Server {
 	log := newLogger()
 
 	return &server{
+		config:              config.GetDefaultConfig(),
 		log:                 log,
-		logLevelFlag:        logging.LogLevelFlag(log.Level),
 		backupItemAction:    NewBackupItemActionPlugin(common.ServerLogger(log)),
 		backupItemActionV2:  biav2.NewBackupItemActionPlugin(common.ServerLogger(log)),
 		volumeSnapshotter:   NewVolumeSnapshotterPlugin(common.ServerLogger(log)),
@@ -136,11 +138,14 @@ func NewServer() Server {
 }
 
 func (s *server) BindFlags(flags *pflag.FlagSet) Server {
-	flags.Var(s.logLevelFlag, "log-level", fmt.Sprintf("The level at which to log. Valid values are %s.", strings.Join(s.logLevelFlag.AllowedValues(), ", ")))
 	s.flagSet = flags
+	s.config.BindFlags(flags)
 	s.flagSet.ParseErrorsWhitelist.UnknownFlags = true // Velero.io word list : ignore
-
 	return s
+}
+
+func (s *server) GetConfig() *config.Config {
+	return s.config
 }
 
 func (s *server) RegisterBackupItemAction(name string, initializer common.HandlerInitializer) Server {
@@ -260,7 +265,7 @@ func (s *server) Serve() {
 		}
 	}
 
-	s.log.Level = s.logLevelFlag.Parse()
+	s.log.Level = s.config.LogLevel.Parse()
 	s.log.Debugf("Setting log level to %s", strings.ToUpper(s.log.Level.String()))
 
 	command := os.Args[0]

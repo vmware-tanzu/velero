@@ -40,6 +40,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
@@ -114,7 +115,7 @@ func (r *backupDeletionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.logger.WithFields(logrus.Fields{
-		"controller":          BackupDeletion,
+		"controller":          constant.ControllerBackupDeletion,
 		"deletebackuprequest": req.String(),
 	})
 	log.Debug("Getting deletebackuprequest")
