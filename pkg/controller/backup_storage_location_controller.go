@@ -191,6 +191,7 @@ func (r *backupStorageLocationReconciler) logReconciledPhase(defaultFound bool, 
 
 func (r *backupStorageLocationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	g := kube.NewPeriodicalEnqueueSource(
+		"backupStorageLocation",
 		r.log,
 		mgr.GetClient(),
 		&velerov1api.BackupStorageLocationList{},

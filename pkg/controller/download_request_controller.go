@@ -218,7 +218,7 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 func (r *downloadRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	downloadRequestSource := kube.NewPeriodicalEnqueueSource(r.log, mgr.GetClient(),
+	downloadRequestSource := kube.NewPeriodicalEnqueueSource("downloadRequest", r.log, mgr.GetClient(),
 		&velerov1api.DownloadRequestList{}, defaultDownloadRequestSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
 	downloadRequestPredicates := kube.NewGenericEventPredicate(func(object kbclient.Object) bool {
 		downloadRequest := object.(*velerov1api.DownloadRequest)

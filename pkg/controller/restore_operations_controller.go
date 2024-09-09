@@ -82,7 +82,7 @@ func NewRestoreOperationsReconciler(
 }
 
 func (r *restoreOperationsReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	s := kube.NewPeriodicalEnqueueSource(r.logger, mgr.GetClient(), &velerov1api.RestoreList{}, r.frequency, kube.PeriodicalEnqueueSourceOption{})
+	s := kube.NewPeriodicalEnqueueSource("restoreOperations", r.logger, mgr.GetClient(), &velerov1api.RestoreList{}, r.frequency, kube.PeriodicalEnqueueSourceOption{})
 	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
 		restore := object.(*velerov1api.Restore)
 		return (restore.Status.Phase == velerov1api.RestorePhaseWaitingForPluginOperations ||
