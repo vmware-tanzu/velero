@@ -43,11 +43,11 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
-type hookPhase string
+type HookPhase string
 
 const (
-	PhasePre  hookPhase = "pre"
-	PhasePost hookPhase = "post"
+	PhasePre  HookPhase = "pre"
+	PhasePost HookPhase = "post"
 )
 
 const (
@@ -81,7 +81,7 @@ type ItemHookHandler interface {
 		groupResource schema.GroupResource,
 		obj runtime.Unstructured,
 		resourceHooks []ResourceHook,
-		phase hookPhase,
+		phase HookPhase,
 		hookTracker *HookTracker,
 	) error
 }
@@ -200,7 +200,7 @@ func (h *DefaultItemHookHandler) HandleHooks(
 	groupResource schema.GroupResource,
 	obj runtime.Unstructured,
 	resourceHooks []ResourceHook,
-	phase hookPhase,
+	phase HookPhase,
 	hookTracker *HookTracker,
 ) error {
 	// We only support hooks on pods right now
@@ -312,27 +312,27 @@ func (h *NoOpItemHookHandler) HandleHooks(
 	groupResource schema.GroupResource,
 	obj runtime.Unstructured,
 	resourceHooks []ResourceHook,
-	phase hookPhase,
+	phase HookPhase,
 	hookTracker *HookTracker,
 ) error {
 	return nil
 }
 
-func phasedKey(phase hookPhase, key string) string {
+func phasedKey(phase HookPhase, key string) string {
 	if phase != "" {
 		return fmt.Sprintf("%v.%v", phase, key)
 	}
 	return key
 }
 
-func getHookAnnotation(annotations map[string]string, key string, phase hookPhase) string {
+func getHookAnnotation(annotations map[string]string, key string, phase HookPhase) string {
 	return annotations[phasedKey(phase, key)]
 }
 
 // getPodExecHookFromAnnotations returns an ExecHook based on the annotations, as long as the
 // 'command' annotation is present. If it is absent, this returns nil.
 // If there is an error in parsing a supplied timeout, it is logged.
-func getPodExecHookFromAnnotations(annotations map[string]string, phase hookPhase, log logrus.FieldLogger) *velerov1api.ExecHook {
+func getPodExecHookFromAnnotations(annotations map[string]string, phase HookPhase, log logrus.FieldLogger) *velerov1api.ExecHook {
 	commandValue := getHookAnnotation(annotations, podBackupHookCommandAnnotationKey, phase)
 	if commandValue == "" {
 		return nil
@@ -561,7 +561,7 @@ func GroupRestoreExecHooks(
 		if hookFromAnnotation.Container == "" {
 			hookFromAnnotation.Container = pod.Spec.Containers[0].Name
 		}
-		hookTrack.Add(restoreName, metadata.GetNamespace(), metadata.GetName(), hookFromAnnotation.Container, HookSourceAnnotation, "<from-annotation>", hookPhase(""))
+		hookTrack.Add(restoreName, metadata.GetNamespace(), metadata.GetName(), hookFromAnnotation.Container, HookSourceAnnotation, "<from-annotation>", HookPhase(""))
 		byContainer[hookFromAnnotation.Container] = []PodExecRestoreHook{
 			{
 				HookName:   "<from-annotation>",
@@ -596,7 +596,7 @@ func GroupRestoreExecHooks(
 			if named.Hook.Container == "" {
 				named.Hook.Container = pod.Spec.Containers[0].Name
 			}
-			hookTrack.Add(restoreName, metadata.GetNamespace(), metadata.GetName(), named.Hook.Container, HookSourceSpec, rrh.Name, hookPhase(""))
+			hookTrack.Add(restoreName, metadata.GetNamespace(), metadata.GetName(), named.Hook.Container, HookSourceSpec, rrh.Name, HookPhase(""))
 			byContainer[named.Hook.Container] = append(byContainer[named.Hook.Container], named)
 		}
 	}

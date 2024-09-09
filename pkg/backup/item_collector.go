@@ -178,6 +178,8 @@ type kubernetesResource struct {
 	groupResource         schema.GroupResource
 	preferredGVR          schema.GroupVersionResource
 	namespace, name, path string
+	orderedResource       bool
+	inItemBlock           bool // set to true during backup processing when added to an ItemBlock
 }
 
 // getItemsFromResourceIdentifiers get the kubernetesResources
@@ -294,6 +296,7 @@ func sortResourcesByOrder(
 	// First select items from the order
 	for _, name := range order {
 		if item, ok := itemMap[name]; ok {
+			item.orderedResource = true
 			sortedItems = append(sortedItems, item)
 			log.Debugf("%s added to sorted resource list.", item.name)
 			delete(itemMap, name)

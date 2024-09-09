@@ -109,19 +109,27 @@ This mainly applies to plugins that operate on pods which reference resources wh
 
 ### Changes to processing item list from the Item Collector
 
-#### New structs ItemBlock and ItemBlockItem
+#### New structs BackupItemBlock, ItemBlock, and ItemBlockItem
 ```go
-type ItemBlock struct {
-    log           logrus.FieldLogger
+package backup
+
+type BackupItemBlock struct {
+    itemblock.ItemBlock
     // This is a reference to the  shared itemBackupper for the backup
     itemBackupper *itemBackupper
+}
+
+package itemblock
+
+type ItemBlock struct {
+    Log           logrus.FieldLogger
     Items         []ItemBlockItem
 }
 
 type ItemBlockItem struct {
-    gr           schema.GroupResource
-    item         *unstructured.Unstructured
-    preferredGVR schema.GroupVersionResource
+    Gr           schema.GroupResource
+    Item         *unstructured.Unstructured
+    PreferredGVR schema.GroupVersionResource
 }
 ```
 

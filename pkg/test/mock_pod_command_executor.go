@@ -24,9 +24,22 @@ import (
 
 type MockPodCommandExecutor struct {
 	mock.Mock
+	// hook execution order
+	HookExecutionLog []HookExecutionEntry
+}
+
+type HookExecutionEntry struct {
+	Namespace, Name, HookName string
+	HookCommand               []string
 }
 
 func (e *MockPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *v1.ExecHook) error {
+	e.HookExecutionLog = append(e.HookExecutionLog, HookExecutionEntry{
+		Namespace:   namespace,
+		Name:        name,
+		HookName:    hookName,
+		HookCommand: hook.Command,
+	})
 	args := e.Called(log, item, namespace, name, hookName, hook)
 	return args.Error(0)
 }

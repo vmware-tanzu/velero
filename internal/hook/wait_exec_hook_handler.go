@@ -169,7 +169,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					hookLog.Error(err)
 					errors = append(errors, err)
 
-					errTracker := multiHookTracker.Record(restoreName, newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true, err)
+					errTracker := multiHookTracker.Record(restoreName, newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, HookPhase(""), true, err)
 					if errTracker != nil {
 						hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 					}
@@ -195,7 +195,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					hookFailed = true
 				}
 
-				errTracker := multiHookTracker.Record(restoreName, newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), hookFailed, hookErr)
+				errTracker := multiHookTracker.Record(restoreName, newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, HookPhase(""), hookFailed, hookErr)
 				if errTracker != nil {
 					hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 				}
@@ -247,7 +247,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 				},
 			)
 
-			errTracker := multiHookTracker.Record(restoreName, pod.Namespace, pod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true, err)
+			errTracker := multiHookTracker.Record(restoreName, pod.Namespace, pod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, HookPhase(""), true, err)
 			if errTracker != nil {
 				hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 			}

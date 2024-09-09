@@ -128,7 +128,7 @@ func TestHandleHooksSkips(t *testing.T) {
 func TestHandleHooks(t *testing.T) {
 	tests := []struct {
 		name                  string
-		phase                 hookPhase
+		phase                 HookPhase
 		groupResource         string
 		item                  runtime.Unstructured
 		hooks                 []ResourceHook
@@ -500,7 +500,7 @@ func TestHandleHooks(t *testing.T) {
 }
 
 func TestGetPodExecHookFromAnnotations(t *testing.T) {
-	phases := []hookPhase{"", PhasePre, PhasePost}
+	phases := []HookPhase{"", PhasePre, PhasePost}
 	for _, phase := range phases {
 		tests := []struct {
 			name         string
@@ -1999,7 +1999,7 @@ func TestBackupHookTracker(t *testing.T) {
 	}
 	test1 := []struct {
 		name                  string
-		phase                 hookPhase
+		phase                 HookPhase
 		groupResource         string
 		pods                  []podWithHook
 		hookTracker           *HookTracker
