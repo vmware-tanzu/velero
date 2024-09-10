@@ -387,7 +387,6 @@ advanced configuration options for `BackupPVC`, allowing users to fine-tune acce
 [3]: file-system-backup.md
 [4]: https://kubernetes.io/blog/2020/12/10/kubernetes-1.20-volume-snapshot-moves-to-ga/
 [5]: https://kubernetes.io/docs/concepts/storage/volumes/#mount-propagation
-[6]: https://docs.openshift.com/container-platform/latest/authentication/managing-security-context-constraints.html
 [7]: https://docs.microsoft.com/en-us/azure/aks/azure-files-dynamic-pv
 [8]: api-types/backupstoragelocation.md
 [9]: supported-providers.md
