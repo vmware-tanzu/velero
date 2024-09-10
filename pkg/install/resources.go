@@ -264,6 +264,9 @@ type VeleroOptions struct {
 	ScheduleSkipImmediately         bool
 	PodResources                    kube.PodResources
 	KeepLatestMaintenanceJobs       int
+	BackupRepoConfigMap             string
+	RepoMaintenanceJobConfigMap     string
+	NodeAgentConfigMap              string
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -376,6 +379,14 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		deployOpts = append(deployOpts, WithDisableInformerCache(true))
 	}
 
+	if len(o.BackupRepoConfigMap) > 0 {
+		deployOpts = append(deployOpts, WithBackupRepoConfigMap(o.BackupRepoConfigMap))
+	}
+
+	if len(o.RepoMaintenanceJobConfigMap) > 0 {
+		deployOpts = append(deployOpts, WithRepoMaintenanceJobConfigMap(o.RepoMaintenanceJobConfigMap))
+	}
+
 	deploy := Deployment(o.Namespace, deployOpts...)
 
 	if err := appendUnstructured(resources, deploy); err != nil {
@@ -397,6 +408,10 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		if o.PrivilegedNodeAgent {
 			dsOpts = append(dsOpts, WithPrivilegedNodeAgent(true))
 		}
+		if len(o.NodeAgentConfigMap) > 0 {
+			dsOpts = append(dsOpts, WithNodeAgentConfigMap(o.NodeAgentConfigMap))
+		}
+
 		ds := DaemonSet(o.Namespace, dsOpts...)
 		if err := appendUnstructured(resources, ds); err != nil {
 			fmt.Printf("error appending DaemonSet %s: %s\n", ds.GetName(), err.Error())

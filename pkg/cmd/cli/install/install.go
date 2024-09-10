@@ -86,6 +86,9 @@ type Options struct {
 	ScheduleSkipImmediately         bool
 	PodResources                    kubeutil.PodResources
 	KeepLatestMaintenanceJobs       int
+	BackupRepoConfigMap             string
+	RepoMaintenanceJobConfigMap     string
+	NodeAgentConfigMap              string
 }
 
 // BindFlags adds command line values to the options struct.
@@ -160,6 +163,24 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		"maintenance-job-mem-limit",
 		o.PodResources.MemoryLimit,
 		"Memory limit for maintenance jobs. Default is no limit.",
+	)
+	flags.StringVar(
+		&o.BackupRepoConfigMap,
+		"backup-repository-configmap",
+		o.BackupRepoConfigMap,
+		"The name of configMap containing backup repository configurations.",
+	)
+	flags.StringVar(
+		&o.RepoMaintenanceJobConfigMap,
+		"repo-maintenance-job-configmap",
+		o.RepoMaintenanceJobConfigMap,
+		"The name of ConfigMap containing repository maintenance Job configurations.",
+	)
+	flags.StringVar(
+		&o.NodeAgentConfigMap,
+		"node-agent-configmap",
+		o.NodeAgentConfigMap,
+		"The name of ConfigMap containing node-agent configurations.",
 	)
 }
 
@@ -259,6 +280,9 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		ScheduleSkipImmediately:         o.ScheduleSkipImmediately,
 		PodResources:                    o.PodResources,
 		KeepLatestMaintenanceJobs:       o.KeepLatestMaintenanceJobs,
+		BackupRepoConfigMap:             o.BackupRepoConfigMap,
+		RepoMaintenanceJobConfigMap:     o.RepoMaintenanceJobConfigMap,
+		NodeAgentConfigMap:              o.NodeAgentConfigMap,
 	}, nil
 }
 

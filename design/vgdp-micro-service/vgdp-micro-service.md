@@ -178,7 +178,7 @@ This log redirecting mechanism is thread safe since the hook acquires the write 
 
 ### Resource Control
 The CPU/memory resource of backupPod/restorePod is configurable, which means users are allowed to configure resources per volume backup/restore.  
-By default, the [Best Effort policy][5] is used, and users are allowed to change it through the ```node-agent-config``` configMap. Specifically, we add below structures to the configMap:  
+By default, the [Best Effort policy][5] is used, and users are allowed to change it through the ConfigMap specified by `velero node-agent` CLI's parameter `--node-agent-configmap`. Specifically, we add below structures to the ConfigMap:  
 ``` 
 type Configs struct {
 	// PodResources is the resource config for various types of pods launched by node-agent, i.e., data mover pods.

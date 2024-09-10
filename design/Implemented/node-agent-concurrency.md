@@ -26,11 +26,11 @@ Therefore, in order to gain the optimized performance with the limited resources
 
 ## Solution
 
-We introduce a configMap named ```node-agent-config``` for users to specify the node-agent related configurations. This configMap is not created by Velero, users should create it manually on demand. The configMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one configMap in each namespace which applies to node-agent in that namespace only.  
+We introduce a ConfigMap specified by `velero node-agent` CLI's parameter `--node-agent-configmap` for users to specify the node-agent related configurations. This configMap is not created by Velero, users should create it manually on demand. The configMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one configMap in each namespace which applies to node-agent in that namespace only.  
 Node-agent server checks these configurations at startup time and use it to initiate the related VGDP modules. Therefore, users could edit this configMap any time, but in order to make the changes effective, node-agent server needs to be restarted.  
-The ```node-agent-config``` configMap may be used for other purpose of configuring node-agent in future, at present, there is only one kind of configuration as the data in the configMap, the name is ```loadConcurrency```.  
+The ConfigMap may be used for other purpose of configuring node-agent in future, at present, there is only one kind of configuration as the data in the configMap, the name is ```loadConcurrency```.  
 
-The data structure for ```node-agent-config``` is as below:
+The data structure is as below:
 ```go
 type Configs struct {
 	// LoadConcurrency is the config for load concurrency per node.
@@ -82,7 +82,7 @@ At least one node is expected to have a label with the specified ```RuledConfigs
 If one node falls into more than one rules, e.g., if node1 also has the label ```beta.kubernetes.io/instance-type=Standard_B4ms```, the smallest number (3) will be used.  
 
 ### Sample
-A sample of the ```node-agent-config``` configMap is as below:
+A sample of the ConfigMap is as below:
 ```json
 {
     "loadConcurrency": {
@@ -110,7 +110,7 @@ A sample of the ```node-agent-config``` configMap is as below:
 ```
 To create the configMap, users need to save something like the above sample to a json file and then run below command:
 ```
-kubectl create cm node-agent-config -n velero --from-file=<json file name>
+kubectl create cm <ConfigMap name> -n velero --from-file=<json file name>
 ```
 
 ### Global data path manager

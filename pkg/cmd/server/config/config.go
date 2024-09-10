@@ -280,13 +280,13 @@ func (c *Config) BindFlags(flags *pflag.FlagSet) {
 	)
 	flags.StringVar(
 		&c.BackupRepoConfig,
-		"backup-repository-config",
+		"backup-repository-configmap",
 		c.BackupRepoConfig,
-		"The name of configMap containing backup repository configurations.",
+		"The name of ConfigMap containing backup repository configurations.",
 	)
 	flags.StringVar(
 		&c.RepoMaintenanceJobConfig,
-		"repo-maintenance-job-config",
+		"repo-maintenance-job-configmap",
 		c.RepoMaintenanceJobConfig,
 		"The name of ConfigMap containing repository maintenance Job configurations.",
 	)

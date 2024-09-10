@@ -31,13 +31,13 @@ Therefore, in order to improve the compatibility, it is worthy to configure the 
 
 ## Solution
 
-We will use the ```node-agent-config``` configMap to host the node affinity configurations.
+We will use the ConfigMap specified by `velero node-agent` CLI's parameter `--node-agent-configmap` to host the node affinity configurations.
 This configMap is not created by Velero, users should create it manually on demand. The configMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one configMap in each namespace which applies to node-agent in that namespace only.  
 Node-agent server checks these configurations at startup time and use it to initiate the related VGDP modules. Therefore, users could edit this configMap any time, but in order to make the changes effective, node-agent server needs to be restarted.  
-Inside ```node-agent-config``` configMap we will add one new kind of configuration as the data in the configMap, the name is ```loadAffinity```.  
+Inside the ConfigMap we will add one new kind of configuration as the data in the configMap, the name is ```loadAffinity```.  
 Users may want to set different LoadAffinity configurations according to different conditions (i.e., for different storages represented by StorageClass, CSI driver, etc.), so we define ```loadAffinity``` as an array. This is for extensibility consideration, at present, we don't implement multiple configurations support, so if there are multiple configurations, we always take the first one in the array.  
 
-The data structure for ```node-agent-config``` is as below:
+The data structure is as below:
 ```go
 type Configs struct {
 	// LoadConcurrency is the config for load concurrency per node.
@@ -63,7 +63,7 @@ Anti-affinity configuration means preventing VGDP instances running in the nodes
 - It could be defined by `MatchExpressions` of `metav1.LabelSelector`. The labels are defined in `Key` and `Values` of `MatchExpressions` and the `Operator` should be defined as `LabelSelectorOpNotIn` or `LabelSelectorOpDoesNotExist`.   
 
 ### Sample
-A sample of the ```node-agent-config``` configMap is as below:
+A sample of the ConfigMap is as below:
 ```json
 {
     "loadAffinity": [
@@ -101,7 +101,7 @@ This sample showcases one anti-affinity configuration:
 
 To create the configMap, users need to save something like the above sample to a json file and then run below command:
 ```
-kubectl create cm node-agent-config -n velero --from-file=<json file name>
+kubectl create cm <ConfigMap name> -n velero --from-file=<json file name>
 ``` 
 
 ### Implementation

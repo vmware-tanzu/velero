@@ -235,7 +235,10 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 		repo,
 	)
 	if err != nil {
-		log.Infof("Cannot find the repo-maintenance-job-config ConfigMap: %s. Use default value.", err.Error())
+		log.Infof("Fail to find the ConfigMap %s to build maintenance job with error: %s. Use default value.",
+			m.namespace+"/"+m.repoMaintenanceJobConfig,
+			err.Error(),
+		)
 	}
 
 	log.Info("Start to maintenance repo")

@@ -79,7 +79,7 @@ Therefore, a BackupRepository configMap is introduced as a template of the confi
 When the backup repository CR is created by the BackupRepository controller, the configurations in the configMap are copied to the ```repositoryConfig``` field.   
 For an existing BackupRepository CR, the configMap is never visited, if users want to modify the configuration value, they should directly edit the BackupRepository CR.  
 
-The BackupRepository configMap is created by users in velero installation namespace. The configMap name must be specified in the velero server parameter ```--backup-repository-config```, otherwise, it won't effect.  
+The BackupRepository configMap is created by users in velero installation namespace. The configMap name must be specified in the velero server parameter ```--backup-repository-configmap```, otherwise, it won't effect.  
 If the configMap name is specified but the configMap doesn't exist by the time of a backup repository is created, the configMap name is ignored.  
 For any reason, if the configMap doesn't effect, nothing is specified to the backup repository CR, so the Unified Repo modules use the hard-coded values to configure the backup repository.  
 
