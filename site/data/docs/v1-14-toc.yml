@@ -59,6 +59,8 @@ toc:
         url: /rbac
       - page: Behind proxy
         url: /proxy
+      - page: Repository Maintenance
+        url: /repository-maintenance
   - title: Plugins
     subfolderitems:
       - page: Overview

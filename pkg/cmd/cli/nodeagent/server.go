@@ -294,7 +294,7 @@ func (s *nodeAgentServer) run() {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
 
-	var loadAffinity *nodeagent.LoadAffinity
+	var loadAffinity *kube.LoadAffinity
 	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
 		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
 		s.logger.Infof("Using customized loadAffinity %v", loadAffinity)
@@ -316,7 +316,21 @@ func (s *nodeAgentServer) run() {
 		}
 	}
 
-	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, loadAffinity, backupPVCConfig, podResources, clock.RealClock{}, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	dataUploadReconciler := controller.NewDataUploadReconciler(
+		s.mgr.GetClient(),
+		s.mgr,
+		s.kubeClient,
+		s.csiSnapshotClient.SnapshotV1(),
+		s.dataPathMgr,
+		loadAffinity,
+		backupPVCConfig,
+		podResources,
+		clock.RealClock{},
+		s.nodeName,
+		s.config.dataMoverPrepareTimeout,
+		s.logger,
+		s.metrics,
+	)
 	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}

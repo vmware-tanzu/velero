@@ -18,11 +18,13 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,30 +33,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/pkg/errors"
-
-	"github.com/vmware-tanzu/velero/pkg/repository/provider"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
-	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
-const RepositoryNameLabel = "velero.io/repo-name"
-const DefaultKeepLatestMaitenanceJobs = 3
-const DefaultMaintenanceJobCPURequest = "0"
-const DefaultMaintenanceJobCPULimit = "0"
-const DefaultMaintenanceJobMemRequest = "0"
-const DefaultMaintenanceJobMemLimit = "0"
+const (
+	RepositoryNameLabel              = "velero.io/repo-name"
+	GlobalKeyForRepoMaintenanceJobCM = "global"
+)
 
-// MaintenanceConfig is the configuration for the repo maintenance job
-type MaintenanceConfig struct {
-	KeepLatestMaitenanceJobs int
-	CPURequest               string
-	MemRequest               string
-	CPULimit                 string
-	MemLimit                 string
-	LogLevelFlag             *logging.LevelFlag
-	FormatFlag               *logging.FormatFlag
+type JobConfigs struct {
+	// LoadAffinities is the config for repository maintenance job load affinity.
+	LoadAffinities []*kube.LoadAffinity `json:"loadAffinity,omitempty"`
+
+	// PodResources is the config for the CPU and memory resources setting.
+	PodResources *kube.PodResources `json:"podResources,omitempty"`
 }
 
 func generateJobName(repo string) string {
@@ -66,117 +59,6 @@ func generateJobName(repo string) string {
 	}
 
 	return jobName
-}
-
-func buildMaintenanceJob(m MaintenanceConfig, param provider.RepoParam, cli client.Client, namespace string) (*batchv1.Job, error) {
-	// Get the Velero server deployment
-	deployment := &appsv1.Deployment{}
-	err := cli.Get(context.TODO(), types.NamespacedName{Name: "velero", Namespace: namespace}, deployment)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the environment variables from the Velero server deployment
-	envVars := veleroutil.GetEnvVarsFromVeleroServer(deployment)
-
-	// Get the volume mounts from the Velero server deployment
-	volumeMounts := veleroutil.GetVolumeMountsFromVeleroServer(deployment)
-
-	// Get the volumes from the Velero server deployment
-	volumes := veleroutil.GetVolumesFromVeleroServer(deployment)
-
-	// Get the service account from the Velero server deployment
-	serviceAccount := veleroutil.GetServiceAccountFromVeleroServer(deployment)
-
-	// Get image
-	image := veleroutil.GetVeleroServerImage(deployment)
-
-	// Set resource limits and requests
-	if m.CPURequest == "" {
-		m.CPURequest = DefaultMaintenanceJobCPURequest
-	}
-	if m.MemRequest == "" {
-		m.MemRequest = DefaultMaintenanceJobMemRequest
-	}
-	if m.CPULimit == "" {
-		m.CPULimit = DefaultMaintenanceJobCPULimit
-	}
-	if m.MemLimit == "" {
-		m.MemLimit = DefaultMaintenanceJobMemLimit
-	}
-
-	resources, err := kube.ParseResourceRequirements(m.CPURequest, m.MemRequest, m.CPULimit, m.MemLimit)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse resource requirements for maintenance job")
-	}
-
-	// Set arguments
-	args := []string{"repo-maintenance"}
-	args = append(args, fmt.Sprintf("--repo-name=%s", param.BackupRepo.Spec.VolumeNamespace))
-	args = append(args, fmt.Sprintf("--repo-type=%s", param.BackupRepo.Spec.RepositoryType))
-	args = append(args, fmt.Sprintf("--backup-storage-location=%s", param.BackupLocation.Name))
-	args = append(args, fmt.Sprintf("--log-level=%s", m.LogLevelFlag.String()))
-	args = append(args, fmt.Sprintf("--log-format=%s", m.FormatFlag.String()))
-
-	// build the maintenance job
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      generateJobName(param.BackupRepo.Name),
-			Namespace: param.BackupRepo.Namespace,
-			Labels: map[string]string{
-				RepositoryNameLabel: param.BackupRepo.Name,
-			},
-		},
-		Spec: batchv1.JobSpec{
-			BackoffLimit: new(int32), // Never retry
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "velero-repo-maintenance-pod",
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  "velero-repo-maintenance-container",
-							Image: image,
-							Command: []string{
-								"/velero",
-							},
-							Args:            args,
-							ImagePullPolicy: v1.PullIfNotPresent,
-							Env:             envVars,
-							VolumeMounts:    volumeMounts,
-							Resources:       resources,
-						},
-					},
-					RestartPolicy:      v1.RestartPolicyNever,
-					Volumes:            volumes,
-					ServiceAccountName: serviceAccount,
-				},
-			},
-		},
-	}
-
-	if affinity := veleroutil.GetAffinityFromVeleroServer(deployment); affinity != nil {
-		job.Spec.Template.Spec.Affinity = affinity
-	}
-
-	if tolerations := veleroutil.GetTolerationsFromVeleroServer(deployment); tolerations != nil {
-		job.Spec.Template.Spec.Tolerations = tolerations
-	}
-
-	if nodeSelector := veleroutil.GetNodeSelectorFromVeleroServer(deployment); nodeSelector != nil {
-		job.Spec.Template.Spec.NodeSelector = nodeSelector
-	}
-
-	if labels := veleroutil.GetVeleroServerLables(deployment); len(labels) > 0 {
-		job.Spec.Template.Labels = labels
-	}
-
-	if annotations := veleroutil.GetVeleroServerAnnotations(deployment); len(annotations) > 0 {
-		job.Spec.Template.Annotations = annotations
-	}
-
-	return job, nil
 }
 
 // deleteOldMaintenanceJobs deletes old maintenance jobs and keeps the latest N jobs
@@ -261,4 +143,97 @@ func getLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error)
 	})
 
 	return &jobList.Items[0], nil
+}
+
+// getMaintenanceJobConfig is called to get the Maintenance Job Config for the
+// BackupRepository specified by the repo parameter.
+//
+// Params:
+//
+//	ctx: the Go context used for controller-runtime client.
+//	client: the controller-runtime client.
+//	logger: the logger.
+//	veleroNamespace: the Velero-installed namespace. It's used to retrieve the BackupRepository.
+//	repoMaintenanceJobConfig: the repository maintenance job ConfigMap name.
+//	repo: the BackupRepository needs to run the maintenance Job.
+func getMaintenanceJobConfig(
+	ctx context.Context,
+	client client.Client,
+	logger logrus.FieldLogger,
+	veleroNamespace string,
+	repoMaintenanceJobConfig string,
+	repo *velerov1api.BackupRepository,
+) (*JobConfigs, error) {
+	var cm v1.ConfigMap
+	if err := client.Get(
+		ctx,
+		types.NamespacedName{
+			Namespace: veleroNamespace,
+			Name:      repoMaintenanceJobConfig,
+		},
+		&cm,
+	); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		} else {
+			return nil, errors.Wrapf(
+				err,
+				"fail to get repo maintenance job configs %s", repoMaintenanceJobConfig)
+		}
+	}
+
+	if cm.Data == nil {
+		return nil, errors.Errorf("data is not available in config map %s", repoMaintenanceJobConfig)
+	}
+
+	// Generate the BackupRepository key.
+	// If using the BackupRepository name as the is more intuitive,
+	// but the BackupRepository generation is dynamic. We cannot assume
+	// they are ready when installing Velero.
+	// Instead we use the volume source namespace, BSL name, and the uploader
+	// type to represent the BackupRepository. The combination of those three
+	// keys can identify a unique BackupRepository.
+	repoJobConfigKey := repo.Spec.VolumeNamespace + "-" +
+		repo.Spec.BackupStorageLocation + "-" + repo.Spec.RepositoryType
+
+	var result *JobConfigs
+	if _, ok := cm.Data[repoJobConfigKey]; ok {
+		logger.Debugf("Find the repo maintenance config %s for repo %s", repoJobConfigKey, repo.Name)
+		result = new(JobConfigs)
+		if err := json.Unmarshal([]byte(cm.Data[repoJobConfigKey]), result); err != nil {
+			return nil, errors.Wrapf(
+				err,
+				"fail to unmarshal configs from %s's key %s",
+				repoMaintenanceJobConfig,
+				repoJobConfigKey)
+		}
+	}
+
+	if _, ok := cm.Data[GlobalKeyForRepoMaintenanceJobCM]; ok {
+		logger.Debugf("Find the global repo maintenance config for repo %s", repo.Name)
+
+		if result == nil {
+			result = new(JobConfigs)
+		}
+
+		globalResult := new(JobConfigs)
+
+		if err := json.Unmarshal([]byte(cm.Data[GlobalKeyForRepoMaintenanceJobCM]), globalResult); err != nil {
+			return nil, errors.Wrapf(
+				err,
+				"fail to unmarshal configs from %s's key %s",
+				repoMaintenanceJobConfig,
+				GlobalKeyForRepoMaintenanceJobCM)
+		}
+
+		if result.PodResources == nil && globalResult.PodResources != nil {
+			result.PodResources = globalResult.PodResources
+		}
+
+		if len(result.LoadAffinities) == 0 {
+			result.LoadAffinities = globalResult.LoadAffinities
+		}
+	}
+
+	return result, nil
 }

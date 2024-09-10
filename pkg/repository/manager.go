@@ -23,12 +23,20 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/repository/provider"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 // SnapshotIdentifier uniquely identifies a snapshot
@@ -92,14 +100,20 @@ type Manager interface {
 }
 
 type manager struct {
-	namespace      string
-	providers      map[string]provider.Provider
-	client         client.Client
-	repoLocker     *RepoLocker
-	repoEnsurer    *Ensurer
-	fileSystem     filesystem.Interface
-	maintenanceCfg MaintenanceConfig
-	log            logrus.FieldLogger
+	namespace string
+	providers map[string]provider.Provider
+	// client is the Velero controller manager's client.
+	// It's limited to resources in the Velero namespace.
+	client                    client.Client
+	repoLocker                *RepoLocker
+	repoEnsurer               *Ensurer
+	fileSystem                filesystem.Interface
+	repoMaintenanceJobConfig  string
+	podResources              kube.PodResources
+	keepLatestMaintenanceJobs int
+	log                       logrus.FieldLogger
+	logLevel                  logrus.Level
+	logFormat                 *logging.FormatFlag
 }
 
 // NewManager create a new repository manager.
@@ -110,18 +124,26 @@ func NewManager(
 	repoEnsurer *Ensurer,
 	credentialFileStore credentials.FileStore,
 	credentialSecretStore credentials.SecretStore,
-	maintenanceCfg MaintenanceConfig,
+	repoMaintenanceJobConfig string,
+	podResources kube.PodResources,
+	keepLatestMaintenanceJobs int,
 	log logrus.FieldLogger,
+	logLevel logrus.Level,
+	logFormat *logging.FormatFlag,
 ) Manager {
 	mgr := &manager{
-		namespace:      namespace,
-		client:         client,
-		providers:      map[string]provider.Provider{},
-		repoLocker:     repoLocker,
-		repoEnsurer:    repoEnsurer,
-		fileSystem:     filesystem.NewFileSystem(),
-		maintenanceCfg: maintenanceCfg,
-		log:            log,
+		namespace:                 namespace,
+		client:                    client,
+		providers:                 map[string]provider.Provider{},
+		repoLocker:                repoLocker,
+		repoEnsurer:               repoEnsurer,
+		fileSystem:                filesystem.NewFileSystem(),
+		repoMaintenanceJobConfig:  repoMaintenanceJobConfig,
+		podResources:              podResources,
+		keepLatestMaintenanceJobs: keepLatestMaintenanceJobs,
+		log:                       log,
+		logLevel:                  logLevel,
+		logFormat:                 logFormat,
 	}
 
 	mgr.providers[velerov1api.BackupRepositoryTypeRestic] = provider.NewResticRepositoryProvider(credentialFileStore, mgr.fileSystem, mgr.log)
@@ -204,9 +226,24 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 		return nil
 	}
 
+	jobConfig, err := getMaintenanceJobConfig(
+		context.Background(),
+		m.client,
+		m.log,
+		m.namespace,
+		m.repoMaintenanceJobConfig,
+		repo,
+	)
+	if err != nil {
+		log.Infof("Cannot find the repo-maintenance-job-config ConfigMap: %s. Use default value.", err.Error())
+	}
+
 	log.Info("Start to maintenance repo")
 
-	maintenanceJob, err := buildMaintenanceJob(m.maintenanceCfg, param, m.client, m.namespace)
+	maintenanceJob, err := m.buildMaintenanceJob(
+		jobConfig,
+		param,
+	)
 	if err != nil {
 		return errors.Wrap(err, "error to build maintenance job")
 	}
@@ -219,8 +256,11 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 	log.Debug("Creating maintenance job")
 
 	defer func() {
-		if err := deleteOldMaintenanceJobs(m.client, param.BackupRepo.Name,
-			m.maintenanceCfg.KeepLatestMaitenanceJobs); err != nil {
+		if err := deleteOldMaintenanceJobs(
+			m.client,
+			param.BackupRepo.Name,
+			m.keepLatestMaintenanceJobs,
+		); err != nil {
 			log.WithError(err).Error("Failed to delete maintenance job")
 		}
 	}()
@@ -337,4 +377,116 @@ func (m *manager) assembleRepoParam(repo *velerov1api.BackupRepository) (provide
 		BackupLocation: bsl,
 		BackupRepo:     repo,
 	}, nil
+}
+
+func (m *manager) buildMaintenanceJob(
+	config *JobConfigs,
+	param provider.RepoParam,
+) (*batchv1.Job, error) {
+	// Get the Velero server deployment
+	deployment := &appsv1.Deployment{}
+	err := m.client.Get(context.TODO(), types.NamespacedName{Name: "velero", Namespace: m.namespace}, deployment)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the environment variables from the Velero server deployment
+	envVars := veleroutil.GetEnvVarsFromVeleroServer(deployment)
+
+	// Get the volume mounts from the Velero server deployment
+	volumeMounts := veleroutil.GetVolumeMountsFromVeleroServer(deployment)
+
+	// Get the volumes from the Velero server deployment
+	volumes := veleroutil.GetVolumesFromVeleroServer(deployment)
+
+	// Get the service account from the Velero server deployment
+	serviceAccount := veleroutil.GetServiceAccountFromVeleroServer(deployment)
+
+	// Get image
+	image := veleroutil.GetVeleroServerImage(deployment)
+
+	// Set resource limits and requests
+	cpuRequest := m.podResources.CPURequest
+	memRequest := m.podResources.MemoryRequest
+	cpuLimit := m.podResources.CPULimit
+	memLimit := m.podResources.MemoryLimit
+	if config != nil && config.PodResources != nil {
+		cpuRequest = config.PodResources.CPURequest
+		memRequest = config.PodResources.MemoryRequest
+		cpuLimit = config.PodResources.CPULimit
+		memLimit = config.PodResources.MemoryLimit
+	}
+	resources, err := kube.ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse resource requirements for maintenance job")
+	}
+
+	// Set arguments
+	args := []string{"repo-maintenance"}
+	args = append(args, fmt.Sprintf("--repo-name=%s", param.BackupRepo.Spec.VolumeNamespace))
+	args = append(args, fmt.Sprintf("--repo-type=%s", param.BackupRepo.Spec.RepositoryType))
+	args = append(args, fmt.Sprintf("--backup-storage-location=%s", param.BackupLocation.Name))
+	args = append(args, fmt.Sprintf("--log-level=%s", m.logLevel.String()))
+	args = append(args, fmt.Sprintf("--log-format=%s", m.logFormat.String()))
+
+	// build the maintenance job
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      generateJobName(param.BackupRepo.Name),
+			Namespace: param.BackupRepo.Namespace,
+			Labels: map[string]string{
+				RepositoryNameLabel: param.BackupRepo.Name,
+			},
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: new(int32), // Never retry
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "velero-repo-maintenance-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "velero-repo-maintenance-container",
+							Image: image,
+							Command: []string{
+								"/velero",
+							},
+							Args:            args,
+							ImagePullPolicy: v1.PullIfNotPresent,
+							Env:             envVars,
+							VolumeMounts:    volumeMounts,
+							Resources:       resources,
+						},
+					},
+					RestartPolicy:      v1.RestartPolicyNever,
+					Volumes:            volumes,
+					ServiceAccountName: serviceAccount,
+				},
+			},
+		},
+	}
+
+	if config != nil && len(config.LoadAffinities) > 0 {
+		affinity := kube.ToSystemAffinity(config.LoadAffinities)
+		job.Spec.Template.Spec.Affinity = affinity
+	}
+
+	if tolerations := veleroutil.GetTolerationsFromVeleroServer(deployment); tolerations != nil {
+		job.Spec.Template.Spec.Tolerations = tolerations
+	}
+
+	if nodeSelector := veleroutil.GetNodeSelectorFromVeleroServer(deployment); nodeSelector != nil {
+		job.Spec.Template.Spec.NodeSelector = nodeSelector
+	}
+
+	if labels := veleroutil.GetVeleroServerLables(deployment); len(labels) > 0 {
+		job.Spec.Template.Labels = labels
+	}
+
+	if annotations := veleroutil.GetVeleroServerAnnotations(deployment); len(annotations) > 0 {
+		job.Spec.Template.Annotations = annotations
+	}
+
+	return job, nil
 }

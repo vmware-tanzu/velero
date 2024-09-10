@@ -56,13 +56,15 @@ toc:
       - page: Backup PVC Configuration
         url: /data-movement-backup-pvc-configuration
       - page: Backup Repository Configuration
-        url: /backup-repository-configuration        
+        url: /backup-repository-configuration
       - page: Verifying Self-signed Certificates
         url: /self-signed-certificates
       - page: Changing RBAC permissions
         url: /rbac
       - page: Behind proxy
         url: /proxy
+      - page: Repository Maintenance
+        url: /repository-maintenance
   - title: Plugins
     subfolderitems:
       - page: Overview

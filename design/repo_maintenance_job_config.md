@@ -1,7 +1,7 @@
 # Repository maintenance job configuration design
 
 ## Abstract
-Add this design to make the repository maintenance job can read configuration from a dedicate ConfigMap and make the Job's necessary parts configurable, e.g. `PodSpec.Affinity` and `PodSpec.resources`.
+Add this design to make the repository maintenance job can read configuration from a dedicate ConfigMap and make the Job's necessary parts configurable, e.g. `PodSpec.Affinity` and `PodSpec.Resources`.
 
 ## Background
 Repository maintenance is split from the Velero server to a k8s Job in v1.14 by design [repository maintenance job](Implemented/repository-maintenance.md).
@@ -18,7 +18,6 @@ This design reuses the data structure introduced by design [node-agent affinity 
 ## Goals
 - Unify the repository maintenance Job configuration at one place.
 - Let user can choose repository maintenance Job running on which nodes.
-- Replace the existing `velero server` parameters `--maintenance-job-cpu-request`, `--maintenance-job-mem-request`, `--maintenance-job-cpu-limit` and `--maintenance-job-mem-limit` by the proposal ConfigMap.
 
 ## Non Goals
 - There was an [issue](https://github.com/vmware-tanzu/velero/issues/7911) to require the whole Job's PodSpec should be configurable. That's not in the scope of this design.
@@ -27,8 +26,24 @@ This design reuses the data structure introduced by design [node-agent affinity 
 
 ## Compatibility
 v1.14 uses the `velero server` CLI's parameter to pass the repository maintenance job configuration.
-In v1.15, those parameters are removed, including `--maintenance-job-cpu-request`, `--maintenance-job-mem-request`, `--maintenance-job-cpu-limit` and `--maintenance-job-mem-limit`.
-Instead, the parameters are read from the ConfigMap specified by `velero server` CLI parameter `--repo-maintenance-job-config` introduced by this design.
+In v1.15, those parameters are still kept, including `--maintenance-job-cpu-request`, `--maintenance-job-mem-request`, `--maintenance-job-cpu-limit`, `--maintenance-job-mem-limit`, and `--keep-latest-maintenance-jobs`.
+But the parameters read from the ConfigMap specified by `velero server` CLI parameter `--repo-maintenance-job-config` introduced by this design have a higher priority.
+
+If there `--repo-maintenance-job-config` is not specified, then the `velero server` parameters are used if provided.
+
+If the `velero server` parameters are not specified too, then the default values are used.
+* `--keep-latest-maintenance-jobs` default value is 3.
+* `--maintenance-job-cpu-request` default value is 0.
+* `--maintenance-job-mem-request` default value is 0.
+* `--maintenance-job-cpu-limit` default value is 0.
+* `--maintenance-job-mem-limit` default value is 0.
+
+## Deprecation
+Propose to deprecate the `velero server` parameters `--maintenance-job-cpu-request`, `--maintenance-job-mem-request`, `--maintenance-job-cpu-limit`, `--maintenance-job-mem-limit`, and `--keep-latest-maintenance-jobs` in release-1.15.
+That means those parameters will be deleted in release-1.17.
+After deletion, those resources-related parameters are replaced by the ConfigMap specified by `velero server` CLI's parameter `--repo-maintenance-job-config`.
+`--keep-latest-maintenance-jobs` is deleted from `velero server` CLI. It turns into a non-configurable internal parameter, and its value is 3.
+Please check [issue 7923](https://github.com/vmware-tanzu/velero/issues/7923) for more information why deleting this parameter.
 
 ## Design
 This design introduces a new ConfigMap specified by `velero server` CLI parameter `--repo-maintenance-job-config` as the source of the repository maintenance job configuration. The specified ConfigMap is read from the namespace where Velero is installed.
@@ -49,14 +64,12 @@ velero server \
 ### Structure
 The data structure for ```repo-maintenance-job-config``` is as below:
 ```go
-type MaintenanceConfigMap map[string]Configs
-
 type Configs struct {
     // LoadAffinity is the config for data path load affinity.
     LoadAffinity []*LoadAffinity `json:"loadAffinity,omitempty"`    
 
-    // Resources is the config for the CPU and memory resources setting.
-    Resource     Resources       `json:"resources,omitempty"`
+    // PodResources is the config for the CPU and memory resources setting.
+    PodResources *kube.PodResources `json:"podResources,omitempty"`
 }
 
 type LoadAffinity struct {
@@ -64,31 +77,28 @@ type LoadAffinity struct {
     NodeSelector metav1.LabelSelector `json:"nodeSelector"`
 }
 
-type Resources struct {
-    // The repository maintenance job CPU request setting
-	CPURequest          string `json:"cpuRequest,omitempty"`
-
-    // The repository maintenance job memory request setting
-	MemRequest          string `json:"memRequest,omitempty"`
-
-    // The repository maintenance job CPU limit setting
-	CPULimit            string `json:"cpuLimit,omitempty"`
-
-    // The repository maintenance job memory limit setting
-	MemLimit            string `json:"memLimit,omitempty"`
+type PodResources struct {
+	CPURequest    string `json:"cpuRequest,omitempty"`
+	MemoryRequest string `json:"memoryRequest,omitempty"`
+	CPULimit      string `json:"cpuLimit,omitempty"`
+	MemoryLimit   string `json:"memoryLimit,omitempty"`
 }
 ```
 
 The ConfigMap content is a map.
-If there is a key value as `global` in the map, the key's value is applied to all BackupRepositories maintenance jobs that don't their own specific configuration in the ConfigMap.
+If there is a key value as `global` in the map, the key's value is applied to all BackupRepositories maintenance jobs that cannot find their own specific configuration in the ConfigMap.
 The other keys in the map is the combination of three elements of a BackupRepository:
-* The namespace in which BackupRepository backs up volume data
-* The BackupRepository referenced BackupStorageLocation's name
-* The BackupRepository's type. Possible values are `kopia` and `restic`
+* The namespace in which BackupRepository backs up volume data.
+* The BackupRepository referenced BackupStorageLocation's name.
+* The BackupRepository's type. Possible values are `kopia` and `restic`.
+
+Those three keys can identify a [unique BackupRepository](https://github.com/vmware-tanzu/velero/blob/2fc6300f2239f250b40b0488c35feae59520f2d3/pkg/repository/backup_repo_op.go#L32-L37).
+
 If there is a key match with BackupRepository, the key's value is applied to the BackupRepository's maintenance jobs.
 By this way, it's possible to let user configure before the BackupRepository is created.
 This is especially convenient for administrator configuring during the Velero installation.
-For example, the following BackupRepository's key should be `test-default-kopia`
+For example, the following BackupRepository's key should be `test-default-kopia`.
+
 ``` yaml
 - apiVersion: velero.io/v1
   kind: BackupRepository
@@ -119,11 +129,11 @@ A sample of the ```repo-maintenance-job-config``` ConfigMap is as below:
 cat <<EOF > repo-maintenance-job-config.json
 {
     "global": {
-        resources: {
+        podResources: {
             "cpuRequest": "100m",
             "cpuLimit": "200m",
-            "memRequest": "100Mi",
-            "memLimit": "200Mi"
+            "memoryRequest": "100Mi",
+            "memoryLimit": "200Mi"
         },
         "loadAffinity": [
             {
@@ -177,18 +187,18 @@ config := Configs {
     LoadAffinity: nil,
 
     // Resources is the config for the CPU and memory resources setting.
-    Resources: Resources{
+    PodResources: &kube.PodResources{
         // The repository maintenance job CPU request setting
 	    CPURequest:   "0m",
 
         // The repository maintenance job memory request setting
-	    MemRequest:   "0Mi",
+	    MemoryRequest:   "0Mi",
 
         // The repository maintenance job CPU limit setting
 	    CPULimit:     "0m",
 
         // The repository maintenance job memory limit setting
-	    MemLimit:     "0Mi",
+	    MemoryLimit:     "0Mi",
     },
 }
 ```
@@ -204,17 +214,32 @@ For example, the ConfigMap content has two elements.
 ``` json
 {
     "global": {
-        "resources": {
+        "loadAffinity": [
+            {
+                "nodeSelector": {
+                    "matchExpressions": [
+                        {
+                            "key": "cloud.google.com/machine-family",
+                            "operator": "In",
+                            "values": [
+                                "e2"
+                            ]
+                        }
+                    ]          
+                }
+            },
+        ],
+        "podResources": {
             "cpuRequest": "100m",
             "cpuLimit": "200m",
-            "memRequest": "100Mi",
-            "memLimit": "200Mi"
+            "memoryRequest": "100Mi",
+            "memoryLimit": "200Mi"
         }
     },
     "ns1-default-kopia": {
-        "resources": {
-            "memRequest": "400Mi",
-            "memLimit": "800Mi"
+        "podResources": {
+            "memoryRequest": "400Mi",
+            "memoryLimit": "800Mi"
         }
     }
 }
@@ -223,19 +248,29 @@ The config value used for BackupRepository backing up volume data in namespace `
 ``` go
 config := Configs {
     // LoadAffinity is the config for data path load affinity.
-    LoadAffinity: nil,
-
-    // The repository maintenance job CPU request setting
-	CPURequest:   "100m",
-
-    // The repository maintenance job memory request setting
-	MemRequest:   "400Mi",
-
-    // The repository maintenance job CPU limit setting
-	CPULimit:     "200m",
-
-    // The repository maintenance job memory limit setting
-	MemLimit:     "800Mi",
+    LoadAffinity: []*kube.LoadAffinity{
+        {
+			NodeSelector: metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "cloud.google.com/machine-family",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"e2"},
+					},
+				},
+			},
+		},
+    },
+    PodResources: &kube.PodResources{
+        // The repository maintenance job CPU request setting
+	    CPURequest:   "",
+        // The repository maintenance job memory request setting
+	    MemoryRequest:   "400Mi",
+        // The repository maintenance job CPU limit setting
+	    CPULimit:     "",
+        // The repository maintenance job memory limit setting
+	    MemoryLimit:     "800Mi",
+    }
 }
 ```
 

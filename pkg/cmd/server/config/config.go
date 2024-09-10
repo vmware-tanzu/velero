@@ -11,9 +11,9 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
-	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
@@ -47,6 +47,12 @@ const (
 	// defaultCredentialsDirectory is the path on disk where credential
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
+
+	DefaultKeepLatestMaintenanceJobs = 3
+	DefaultMaintenanceJobCPURequest  = "0"
+	DefaultMaintenanceJobCPULimit    = "0"
+	DefaultMaintenanceJobMemRequest  = "0"
+	DefaultMaintenanceJobMemLimit    = "0"
 )
 
 var (
@@ -164,9 +170,11 @@ type Config struct {
 	DefaultSnapshotMoveData        bool
 	DisableInformerCache           bool
 	ScheduleSkipImmediately        bool
-	MaintenanceCfg                 repository.MaintenanceConfig
-	BackukpRepoConfig              string
 	CredentialsDirectory           string
+	BackupRepoConfig               string
+	RepoMaintenanceJobConfig       string
+	PodResources                   kube.PodResources
+	KeepLatestMaintenanceJobs      int
 }
 
 func GetDefaultConfig() *Config {
@@ -197,13 +205,13 @@ func GetDefaultConfig() *Config {
 		DisableInformerCache:           defaultDisableInformerCache,
 		ScheduleSkipImmediately:        false,
 		CredentialsDirectory:           defaultCredentialsDirectory,
-	}
-
-	config.MaintenanceCfg = repository.MaintenanceConfig{
-		KeepLatestMaitenanceJobs: repository.DefaultKeepLatestMaitenanceJobs,
-		// maintenance job log setting inherited from velero server
-		FormatFlag:   config.LogFormat,
-		LogLevelFlag: config.LogLevel,
+		PodResources: kube.PodResources{
+			CPURequest:    DefaultMaintenanceJobCPULimit,
+			CPULimit:      DefaultMaintenanceJobCPURequest,
+			MemoryRequest: DefaultMaintenanceJobMemRequest,
+			MemoryLimit:   DefaultMaintenanceJobMemLimit,
+		},
+		KeepLatestMaintenanceJobs: DefaultKeepLatestMaintenanceJobs,
 	}
 
 	return config
@@ -238,11 +246,48 @@ func (c *Config) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&c.DefaultSnapshotMoveData, "default-snapshot-move-data", c.DefaultSnapshotMoveData, "Move data by default for all snapshots supporting data movement.")
 	flags.BoolVar(&c.DisableInformerCache, "disable-informer-cache", c.DisableInformerCache, "Disable informer cache for Get calls on restore. With this enabled, it will speed up restore in cases where there are backup resources which already exist in the cluster, but for very large clusters this will increase velero memory usage. Default is false (don't disable).")
 	flags.BoolVar(&c.ScheduleSkipImmediately, "schedule-skip-immediately", c.ScheduleSkipImmediately, "Skip the first scheduled backup immediately after creating a schedule. Default is false (don't skip).")
-	flags.IntVar(&c.MaintenanceCfg.KeepLatestMaitenanceJobs, "keep-latest-maintenance-jobs", c.MaintenanceCfg.KeepLatestMaitenanceJobs, "Number of latest maintenance jobs to keep each repository. Optional.")
-	flags.StringVar(&c.MaintenanceCfg.CPURequest, "maintenance-job-cpu-request", c.MaintenanceCfg.CPURequest, "CPU request for maintenance job. Default is no limit.")
-	flags.StringVar(&c.MaintenanceCfg.MemRequest, "maintenance-job-mem-request", c.MaintenanceCfg.MemRequest, "Memory request for maintenance job. Default is no limit.")
-	flags.StringVar(&c.MaintenanceCfg.CPULimit, "maintenance-job-cpu-limit", c.MaintenanceCfg.CPULimit, "CPU limit for maintenance job. Default is no limit.")
-	flags.StringVar(&c.MaintenanceCfg.MemLimit, "maintenance-job-mem-limit", c.MaintenanceCfg.MemLimit, "Memory limit for maintenance job. Default is no limit.")
-	flags.StringVar(&c.BackukpRepoConfig, "backup-repository-config", c.BackukpRepoConfig, "The name of configMap containing backup repository configurations.")
 	flags.Var(&c.DefaultVolumeSnapshotLocations, "default-volume-snapshot-locations", "List of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...)")
+
+	flags.IntVar(
+		&c.KeepLatestMaintenanceJobs,
+		"keep-latest-maintenance-jobs",
+		c.KeepLatestMaintenanceJobs,
+		"Number of latest maintenance jobs to keep each repository. Optional.",
+	)
+	flags.StringVar(
+		&c.PodResources.CPURequest,
+		"maintenance-job-cpu-request",
+		c.PodResources.CPURequest,
+		"CPU request for maintenance job. Default is no limit.",
+	)
+	flags.StringVar(
+		&c.PodResources.MemoryRequest,
+		"maintenance-job-mem-request",
+		c.PodResources.MemoryRequest,
+		"Memory request for maintenance job. Default is no limit.",
+	)
+	flags.StringVar(
+		&c.PodResources.CPULimit,
+		"maintenance-job-cpu-limit",
+		c.PodResources.CPULimit,
+		"CPU limit for maintenance job. Default is no limit.",
+	)
+	flags.StringVar(
+		&c.PodResources.MemoryLimit,
+		"maintenance-job-mem-limit",
+		c.PodResources.MemoryLimit,
+		"Memory limit for maintenance job. Default is no limit.",
+	)
+	flags.StringVar(
+		&c.BackupRepoConfig,
+		"backup-repository-config",
+		c.BackupRepoConfig,
+		"The name of configMap containing backup repository configurations.",
+	)
+	flags.StringVar(
+		&c.RepoMaintenanceJobConfig,
+		"repo-maintenance-job-config",
+		c.RepoMaintenanceJobConfig,
+		"The name of ConfigMap containing repository maintenance Job configurations.",
+	)
 }

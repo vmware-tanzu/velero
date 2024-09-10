@@ -25,18 +25,17 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	appsv1 "k8s.io/api/apps/v1"
+	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/repository/provider"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 func TestGenerateJobName1(t *testing.T) {
@@ -263,146 +262,178 @@ func TestGetLatestMaintenanceJob(t *testing.T) {
 	// We expect the returned job to be the newer job
 	assert.Equal(t, newerJob.Name, job.Name)
 }
-func TestBuildMaintenanceJob(t *testing.T) {
+
+func TestGetMaintenanceJobConfig(t *testing.T) {
+	ctx := context.Background()
+	logger := logrus.New()
+	veleroNamespace := "velero"
+	repoMaintenanceJobConfig := "repo-maintenance-job-config"
+	repo := &velerov1api.BackupRepository{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: veleroNamespace,
+			Name:      repoMaintenanceJobConfig,
+		},
+		Spec: velerov1api.BackupRepositorySpec{
+			BackupStorageLocation: "default",
+			RepositoryType:        "kopia",
+			VolumeNamespace:       "test",
+		},
+	}
+
 	testCases := []struct {
-		name            string
-		m               MaintenanceConfig
-		deploy          *appsv1.Deployment
-		expectedJobName string
-		expectedError   bool
+		name           string
+		repoJobConfig  *v1.ConfigMap
+		expectedConfig *JobConfigs
+		expectedError  error
 	}{
 		{
-			name: "Valid maintenance job",
-			m: MaintenanceConfig{
-				CPURequest:   "100m",
-				MemRequest:   "128Mi",
-				CPULimit:     "200m",
-				MemLimit:     "256Mi",
-				LogLevelFlag: logging.LogLevelFlag(logrus.InfoLevel),
-				FormatFlag:   logging.NewFormatFlag(),
-			},
-			deploy: &appsv1.Deployment{
+			name:           "Config not exist",
+			expectedConfig: nil,
+			expectedError:  nil,
+		},
+		{
+			name: "Invalid JSON",
+			repoJobConfig: &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "velero",
-					Namespace: "velero",
+					Namespace: veleroNamespace,
+					Name:      repoMaintenanceJobConfig,
 				},
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+				Data: map[string]string{
+					"test-default-kopia": "{\"cpuRequest:\"100m\"}",
+				},
+			},
+			expectedConfig: nil,
+			expectedError:  fmt.Errorf("fail to unmarshal configs from %s", repoMaintenanceJobConfig),
+		},
+		{
+			name: "Find config specific for BackupRepository",
+			repoJobConfig: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: veleroNamespace,
+					Name:      repoMaintenanceJobConfig,
+				},
+				Data: map[string]string{
+					"test-default-kopia": "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}]}",
+				},
+			},
+			expectedConfig: &JobConfigs{
+				PodResources: &kube.PodResources{
+					CPURequest:    "100m",
+					CPULimit:      "200m",
+					MemoryRequest: "100Mi",
+					MemoryLimit:   "200Mi",
+				},
+				LoadAffinities: []*kube.LoadAffinity{
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
 								{
-									Name:  "velero-repo-maintenance-container",
-									Image: "velero-image",
+									Key:      "cloud.google.com/machine-family",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"e2"},
 								},
 							},
 						},
 					},
 				},
 			},
-			expectedJobName: "test-123-maintain-job",
-			expectedError:   false,
+			expectedError: nil,
 		},
 		{
-			name: "Error getting Velero server deployment",
-			m: MaintenanceConfig{
-				CPURequest:   "100m",
-				MemRequest:   "128Mi",
-				CPULimit:     "200m",
-				MemLimit:     "256Mi",
-				LogLevelFlag: logging.LogLevelFlag(logrus.InfoLevel),
-				FormatFlag:   logging.NewFormatFlag(),
+			name: "Find config specific for global",
+			repoJobConfig: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: veleroNamespace,
+					Name:      repoMaintenanceJobConfig,
+				},
+				Data: map[string]string{
+					GlobalKeyForRepoMaintenanceJobCM: "{\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
+				},
 			},
-			expectedJobName: "",
-			expectedError:   true,
+			expectedConfig: &JobConfigs{
+				PodResources: &kube.PodResources{
+					CPURequest:    "50m",
+					CPULimit:      "100m",
+					MemoryRequest: "50Mi",
+					MemoryLimit:   "100Mi",
+				},
+				LoadAffinities: []*kube.LoadAffinity{
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "cloud.google.com/machine-family",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"n2"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: nil,
 		},
-	}
-
-	param := provider.RepoParam{
-		BackupRepo: &velerov1api.BackupRepository{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "velero",
-				Name:      "test-123",
+		{
+			name: "Specific config supersede global config",
+			repoJobConfig: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: veleroNamespace,
+					Name:      repoMaintenanceJobConfig,
+				},
+				Data: map[string]string{
+					GlobalKeyForRepoMaintenanceJobCM: "{\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
+					"test-default-kopia":             "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}]}",
+				},
 			},
-			Spec: velerov1api.BackupRepositorySpec{
-				VolumeNamespace: "test-123",
-				RepositoryType:  "kopia",
+			expectedConfig: &JobConfigs{
+				PodResources: &kube.PodResources{
+					CPURequest:    "100m",
+					CPULimit:      "200m",
+					MemoryRequest: "100Mi",
+					MemoryLimit:   "200Mi",
+				},
+				LoadAffinities: []*kube.LoadAffinity{
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "cloud.google.com/machine-family",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"e2"},
+								},
+							},
+						},
+					},
+				},
 			},
-		},
-		BackupLocation: &velerov1api.BackupStorageLocation{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "velero",
-				Name:      "test-location",
-			},
+			expectedError: nil,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create a fake clientset with resources
-			objs := []runtime.Object{param.BackupLocation, param.BackupRepo}
-
-			if tc.deploy != nil {
-				objs = append(objs, tc.deploy)
-			}
-			scheme := runtime.NewScheme()
-			_ = appsv1.AddToScheme(scheme)
-			_ = velerov1api.AddToScheme(scheme)
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
-
-			// Call the function to test
-			job, err := buildMaintenanceJob(tc.m, param, cli, "velero")
-
-			// Check the error
-			if tc.expectedError {
-				assert.Error(t, err)
-				assert.Nil(t, job)
+			var fakeClient client.Client
+			if tc.repoJobConfig != nil {
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t, tc.repoJobConfig)
 			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, job)
-				assert.Contains(t, job.Name, tc.expectedJobName)
-				assert.Equal(t, param.BackupRepo.Namespace, job.Namespace)
-				assert.Equal(t, param.BackupRepo.Name, job.Labels[RepositoryNameLabel])
-
-				// Check container
-				assert.Len(t, job.Spec.Template.Spec.Containers, 1)
-				container := job.Spec.Template.Spec.Containers[0]
-				assert.Equal(t, "velero-repo-maintenance-container", container.Name)
-				assert.Equal(t, "velero-image", container.Image)
-				assert.Equal(t, v1.PullIfNotPresent, container.ImagePullPolicy)
-
-				// Check resources
-				expectedResources := v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse(tc.m.CPURequest),
-						v1.ResourceMemory: resource.MustParse(tc.m.MemRequest),
-					},
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse(tc.m.CPULimit),
-						v1.ResourceMemory: resource.MustParse(tc.m.MemLimit),
-					},
-				}
-				assert.Equal(t, expectedResources, container.Resources)
-
-				// Check args
-				expectedArgs := []string{
-					"repo-maintenance",
-					fmt.Sprintf("--repo-name=%s", param.BackupRepo.Spec.VolumeNamespace),
-					fmt.Sprintf("--repo-type=%s", param.BackupRepo.Spec.RepositoryType),
-					fmt.Sprintf("--backup-storage-location=%s", param.BackupLocation.Name),
-					fmt.Sprintf("--log-level=%s", tc.m.LogLevelFlag.String()),
-					fmt.Sprintf("--log-format=%s", tc.m.FormatFlag.String()),
-				}
-				assert.Equal(t, expectedArgs, container.Args)
-
-				// Check affinity
-				assert.Nil(t, job.Spec.Template.Spec.Affinity)
-
-				// Check tolerations
-				assert.Nil(t, job.Spec.Template.Spec.Tolerations)
-
-				// Check node selector
-				assert.Nil(t, job.Spec.Template.Spec.NodeSelector)
+				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
 			}
+
+			jobConfig, err := getMaintenanceJobConfig(
+				ctx,
+				fakeClient,
+				logger,
+				veleroNamespace,
+				repoMaintenanceJobConfig,
+				repo,
+			)
+
+			if tc.expectedError != nil {
+				require.Contains(t, err.Error(), tc.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tc.expectedConfig, jobConfig)
 		})
 	}
 }
