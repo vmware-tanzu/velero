@@ -29,7 +29,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	veleroimage "github.com/vmware-tanzu/velero/internal/velero"
+	veleroimage "github.com/vmware-tanzu/velero/internal/velero/images"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/label"

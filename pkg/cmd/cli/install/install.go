@@ -30,7 +30,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/vmware-tanzu/velero/internal/velero"
+	images "github.com/vmware-tanzu/velero/internal/velero/images"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
@@ -167,7 +167,7 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 func NewInstallOptions() *Options {
 	return &Options{
 		Namespace:                 velerov1api.DefaultNamespace,
-		Image:                     velero.DefaultVeleroImage(),
+		Image:                     images.DefaultVeleroImage(),
 		BackupStorageConfig:       flag.NewMap(),
 		VolumeSnapshotConfig:      flag.NewMap(),
 		PodAnnotations:            flag.NewMap(),

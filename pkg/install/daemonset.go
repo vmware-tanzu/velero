@@ -24,12 +24,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/vmware-tanzu/velero/internal/velero"
+	images "github.com/vmware-tanzu/velero/internal/velero/images"
 )
 
 func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 	c := &podTemplateConfig{
-		image: velero.DefaultVeleroImage(),
+		image: images.DefaultVeleroImage(),
 	}
 
 	for _, opt := range opts {

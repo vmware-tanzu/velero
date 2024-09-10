@@ -192,6 +192,5 @@ func TestPkgImportNoCloudProvider(t *testing.T) {
 			}
 		}
 	}
-	// TODO: expected to fail until #8145 rebase
 	require.Empty(t, cloudProviderDeps)
 }
