@@ -53,8 +53,10 @@ toc:
         url: /csi-snapshot-data-movement
       - page: Node-agent Concurrency
         url: /node-agent-concurrency
-      - page: Backup PVC Configuration
+      - page: Data Movement Backup PVC Configuration
         url: /data-movement-backup-pvc-configuration
+      - page: Data Movement Pod Resource Configuration
+        url: /data-movement-pod-resource-configuration        
       - page: Backup Repository Configuration
         url: /backup-repository-configuration
       - page: Verifying Self-signed Certificates
