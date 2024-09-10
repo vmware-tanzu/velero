@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -1479,9 +1480,12 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 		newGR.Resource = gvr.Resource
 	}
+	if !reflect.DeepEqual(newGR, groupResource) {
+		ctx.log.Infof("Resource to be restored changed from %v to %v", groupResource, newGR)
+	}
 	resourceClient, err := ctx.getResourceClient(newGR, obj, obj.GetNamespace())
 	if err != nil {
-		warnings.Add(namespace, fmt.Errorf("error getting updated resource client for namespace %q, resource %q: %v", namespace, &groupResource, err))
+		warnings.Add(namespace, fmt.Errorf("error getting updated resource client for namespace %q, resource %q: %v", namespace, &newGR, err))
 		return warnings, errs, itemExists
 	}
 
@@ -1496,7 +1500,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// new namespace
 	if !ctx.disableInformerCache {
 		ctx.log.Debugf("Checking for existence %s: %v", obj.GroupVersionKind().Kind, name)
-		fromCluster, err = ctx.getResource(groupResource, obj, namespace, name)
+		fromCluster, err = ctx.getResource(newGR, obj, namespace, name)
 	}
 	if err != nil || fromCluster == nil {
 		// couldn't find the resource, attempt to create
@@ -1519,7 +1523,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		// and if err then itemExists remains false as we were not able to confirm the existence of the object via Get call or creation call.
 		// We return the get error as a warning to notify the user that the object could exist in cluster and we were not able to confirm it.
 		if !ctx.disableInformerCache {
-			fromCluster, err = ctx.getResource(groupResource, obj, namespace, name)
+			fromCluster, err = ctx.getResource(newGR, obj, namespace, name)
 		} else {
 			fromCluster, err = resourceClient.Get(name, metav1.GetOptions{})
 		}
@@ -1550,7 +1554,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		fromClusterWithLabels := fromCluster.DeepCopy() // saving the in-cluster object so that we can create label patch if overall patch fails
 
 		if !equality.Semantic.DeepEqual(fromCluster, obj) {
-			switch groupResource {
+			switch newGR {
 			case kuberesource.ServiceAccounts:
 				desired, err := mergeServiceAccounts(fromCluster, obj)
 				if err != nil {
@@ -1644,6 +1648,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		return warnings, errs, itemExists
 	}
 
+	// detemind whether to restore status according to original GR
 	shouldRestoreStatus := ctx.resourceStatusIncludesExcludes != nil && ctx.resourceStatusIncludesExcludes.ShouldInclude(groupResource.String())
 	if shouldRestoreStatus && statusFieldErr != nil {
 		err := fmt.Errorf("could not get status to be restored %s: %v", kube.NamespaceAndName(obj), statusFieldErr)
@@ -1651,7 +1656,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		errs.Add(namespace, err)
 		return warnings, errs, itemExists
 	}
-	ctx.log.Debugf("status field for %s: exists: %v, should restore: %v", groupResource, statusFieldExists, shouldRestoreStatus)
+	ctx.log.Debugf("status field for %s: exists: %v, should restore: %v", newGR, statusFieldExists, shouldRestoreStatus)
 	// if it should restore status, run a UpdateStatus
 	if statusFieldExists && shouldRestoreStatus {
 		if err := unstructured.SetNestedField(obj.Object, objStatus, "status"); err != nil {
@@ -1690,7 +1695,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 	}
 
-	if groupResource == kuberesource.Pods {
+	if newGR == kuberesource.Pods {
 		pod := new(v1.Pod)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
 			errs.Add(namespace, err)
@@ -1707,7 +1712,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	// Asynchronously executes restore exec hooks if any
 	// Velero will wait for all the asynchronous hook operations to finish in finalizing phase, using hook tracker to track the execution progress.
-	if groupResource == kuberesource.Pods {
+	if newGR == kuberesource.Pods {
 		pod := new(v1.Pod)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(createdObj.UnstructuredContent(), &pod); err != nil {
 			ctx.log.Errorf("error converting pod %s: %v", kube.NamespaceAndName(obj), err)
@@ -1727,7 +1732,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	// Wait for a CRD to be available for instantiating resources
 	// before continuing.
-	if groupResource == kuberesource.CustomResourceDefinitions {
+	if newGR == kuberesource.CustomResourceDefinitions {
 		available, err := ctx.crdAvailable(name, resourceClient)
 		if err != nil {
 			errs.Add(namespace, errors.Wrapf(err, "error verifying the CRD %s is ready to use", name))
