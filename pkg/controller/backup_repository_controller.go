@@ -55,19 +55,19 @@ type BackupRepoReconciler struct {
 	logger               logrus.FieldLogger
 	clock                clocks.WithTickerAndDelayedExecution
 	maintenanceFrequency time.Duration
-	backukpRepoConfig    string
+	backupRepoConfig     string
 	repositoryManager    repository.Manager
 }
 
 func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client,
-	maintenanceFrequency time.Duration, backukpRepoConfig string, repositoryManager repository.Manager) *BackupRepoReconciler {
+	maintenanceFrequency time.Duration, backupRepoConfig string, repositoryManager repository.Manager) *BackupRepoReconciler {
 	c := &BackupRepoReconciler{
 		client,
 		namespace,
 		logger,
 		clocks.RealClock{},
 		maintenanceFrequency,
-		backukpRepoConfig,
+		backupRepoConfig,
 		repositoryManager,
 	}
 
@@ -229,7 +229,7 @@ func (r *BackupRepoReconciler) getIdentiferByBSL(ctx context.Context, req *veler
 }
 
 func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
-	log.WithField("repoConfig", r.backukpRepoConfig).Info("Initializing backup repository")
+	log.WithField("repoConfig", r.backupRepoConfig).Info("Initializing backup repository")
 
 	// confirm the repo's BackupStorageLocation is valid
 	repoIdentifier, err := r.getIdentiferByBSL(ctx, req)
@@ -244,7 +244,7 @@ func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 		})
 	}
 
-	config, err := getBackupRepositoryConfig(ctx, r, r.backukpRepoConfig, r.namespace, req.Name, req.Spec.RepositoryType, log)
+	config, err := getBackupRepositoryConfig(ctx, r, r.backupRepoConfig, r.namespace, req.Name, req.Spec.RepositoryType, log)
 	if err != nil {
 		log.WithError(err).Warn("Failed to get repo config, repo config is ignored")
 	} else if config != nil {

@@ -30,6 +30,18 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
+type LoadAffinity struct {
+	// NodeSelector specifies the label selector to match nodes
+	NodeSelector metav1.LabelSelector `json:"nodeSelector"`
+}
+
+type PodResources struct {
+	CPURequest    string `json:"cpuRequest,omitempty"`
+	MemoryRequest string `json:"memoryRequest,omitempty"`
+	CPULimit      string `json:"cpuLimit,omitempty"`
+	MemoryLimit   string `json:"memoryLimit,omitempty"`
+}
+
 // IsPodRunning does a well-rounded check to make sure the specified pod is running stably.
 // If not, return the error found
 func IsPodRunning(pod *corev1api.Pod) error {
@@ -197,6 +209,50 @@ func CollectPodLogs(ctx context.Context, podGetter corev1client.CoreV1Interface,
 	logIndicator += fmt.Sprintf("***************************end pod logs[%s/%s]***************************\n", pod, container)
 	if _, err := output.Write([]byte(logIndicator)); err != nil {
 		return errors.Wrap(err, "error to write end pod log indicator")
+	}
+
+	return nil
+}
+
+func ToSystemAffinity(loadAffinities []*LoadAffinity) *corev1api.Affinity {
+	if len(loadAffinities) == 0 {
+		return nil
+	}
+	nodeSelectorTermList := make([]corev1api.NodeSelectorTerm, 0)
+
+	for _, loadAffinity := range loadAffinities {
+		requirements := []corev1api.NodeSelectorRequirement{}
+		for k, v := range loadAffinity.NodeSelector.MatchLabels {
+			requirements = append(requirements, corev1api.NodeSelectorRequirement{
+				Key:      k,
+				Values:   []string{v},
+				Operator: corev1api.NodeSelectorOpIn,
+			})
+		}
+
+		for _, exp := range loadAffinity.NodeSelector.MatchExpressions {
+			requirements = append(requirements, corev1api.NodeSelectorRequirement{
+				Key:      exp.Key,
+				Values:   exp.Values,
+				Operator: corev1api.NodeSelectorOperator(exp.Operator),
+			})
+		}
+
+		nodeSelectorTermList = append(
+			nodeSelectorTermList,
+			corev1api.NodeSelectorTerm{
+				MatchExpressions: requirements,
+			},
+		)
+	}
+
+	if len(nodeSelectorTermList) > 0 {
+		result := new(corev1api.Affinity)
+		result.NodeAffinity = new(corev1api.NodeAffinity)
+		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = new(corev1api.NodeSelector)
+		result.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = nodeSelectorTermList
+
+		return result
 	}
 
 	return nil

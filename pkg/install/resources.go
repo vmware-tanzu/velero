@@ -30,8 +30,7 @@ import (
 	v1crds "github.com/vmware-tanzu/velero/config/crd/v1/crds"
 	v2alpha1crds "github.com/vmware-tanzu/velero/config/crd/v2alpha1/crds"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/repository"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
@@ -263,9 +262,8 @@ type VeleroOptions struct {
 	DefaultSnapshotMoveData         bool
 	DisableInformerCache            bool
 	ScheduleSkipImmediately         bool
-	FormatFlag                      *logging.FormatFlag
-	LogLevelFlag                    *logging.LevelFlag
-	MaintenanceCfg                  repository.MaintenanceConfig
+	PodResources                    kube.PodResources
+	KeepLatestMaintenanceJobs       int
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -350,7 +348,8 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		WithPodVolumeOperationTimeout(o.PodVolumeOperationTimeout),
 		WithUploaderType(o.UploaderType),
 		WithScheduleSkipImmediately(o.ScheduleSkipImmediately),
-		WithMaintenanceConfig(o.MaintenanceCfg),
+		WithPodResources(o.PodResources),
+		WithKeepLatestMaintenanceJobs(o.KeepLatestMaintenanceJobs),
 	}
 
 	if len(o.Features) > 0 {

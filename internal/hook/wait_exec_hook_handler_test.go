@@ -1012,17 +1012,17 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 	}
 
 	hookTracker1 := NewMultiHookTracker()
-	hookTracker1.Add("restore1", "default", "my-pod", "container1", HookSourceAnnotation, "<from-annotation>", hookPhase(""))
+	hookTracker1.Add("restore1", "default", "my-pod", "container1", HookSourceAnnotation, "<from-annotation>", HookPhase(""))
 
 	hookTracker2 := NewMultiHookTracker()
-	hookTracker2.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", hookPhase(""))
+	hookTracker2.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""))
 
 	hookTracker3 := NewMultiHookTracker()
-	hookTracker3.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", hookPhase(""))
-	hookTracker3.Add("restore1", "default", "my-pod", "container2", HookSourceSpec, "my-hook-2", hookPhase(""))
+	hookTracker3.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""))
+	hookTracker3.Add("restore1", "default", "my-pod", "container2", HookSourceSpec, "my-hook-2", HookPhase(""))
 
 	hookTracker4 := NewMultiHookTracker()
-	hookTracker4.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", hookPhase(""))
+	hookTracker4.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""))
 
 	tests1 := []struct {
 		name               string

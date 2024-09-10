@@ -310,7 +310,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	}
 
 	var gracePeriod int64 = 0
-	volumeMounts, volumeDevices, volumePath := kube.MakePodPVCAttachment(volumeName, targetPVC.Spec.VolumeMode)
+	volumeMounts, volumeDevices, volumePath := kube.MakePodPVCAttachment(volumeName, targetPVC.Spec.VolumeMode, false)
 	volumeMounts = append(volumeMounts, podInfo.volumeMounts...)
 
 	volumes := []corev1.Volume{{

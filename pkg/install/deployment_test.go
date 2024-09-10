@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/vmware-tanzu/velero/pkg/repository"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 func TestDeployment(t *testing.T) {
@@ -71,17 +71,24 @@ func TestDeployment(t *testing.T) {
 	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
 	assert.Equal(t, "--disable-informer-cache=true", deploy.Spec.Template.Spec.Containers[0].Args[1])
 
-	deploy = Deployment("velero", WithMaintenanceConfig(repository.MaintenanceConfig{
-		KeepLatestMaitenanceJobs: 3,
-		CPURequest:               "100m",
-		MemRequest:               "256Mi",
-		CPULimit:                 "200m",
-		MemLimit:                 "512Mi",
-	}))
-	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 6)
+	deploy = Deployment("velero", WithKeepLatestMaintenanceJobs(3))
+	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
 	assert.Equal(t, "--keep-latest-maintenance-jobs=3", deploy.Spec.Template.Spec.Containers[0].Args[1])
-	assert.Equal(t, "--maintenance-job-cpu-limit=200m", deploy.Spec.Template.Spec.Containers[0].Args[2])
-	assert.Equal(t, "--maintenance-job-cpu-request=100m", deploy.Spec.Template.Spec.Containers[0].Args[3])
-	assert.Equal(t, "--maintenance-job-mem-limit=512Mi", deploy.Spec.Template.Spec.Containers[0].Args[4])
-	assert.Equal(t, "--maintenance-job-mem-request=256Mi", deploy.Spec.Template.Spec.Containers[0].Args[5])
+
+	deploy = Deployment(
+		"velero",
+		WithPodResources(
+			kube.PodResources{
+				CPURequest:    "100m",
+				MemoryRequest: "256Mi",
+				CPULimit:      "200m",
+				MemoryLimit:   "512Mi",
+			},
+		),
+	)
+	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 5)
+	assert.Equal(t, "--maintenance-job-cpu-limit=200m", deploy.Spec.Template.Spec.Containers[0].Args[1])
+	assert.Equal(t, "--maintenance-job-cpu-request=100m", deploy.Spec.Template.Spec.Containers[0].Args[2])
+	assert.Equal(t, "--maintenance-job-mem-limit=512Mi", deploy.Spec.Template.Spec.Containers[0].Args[3])
+	assert.Equal(t, "--maintenance-job-mem-request=256Mi", deploy.Spec.Template.Spec.Containers[0].Args[4])
 }

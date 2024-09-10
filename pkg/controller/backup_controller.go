@@ -42,6 +42,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/label"
@@ -201,7 +202,7 @@ func getLastSuccessBySchedule(backups []velerov1api.Backup) map[string]time.Time
 
 func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := b.logger.WithFields(logrus.Fields{
-		"controller":    Backup,
+		"controller":    constant.ControllerBackup,
 		"backuprequest": req.String(),
 	})
 
@@ -591,16 +592,16 @@ func (b *backupReconciler) validateAndGetSnapshotLocations(backup *velerov1api.B
 // field is checked to see if the backup was a partial failure.
 
 func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
-	b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
+	b.logger.WithField(constant.ControllerBackup, kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
 
 	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
 	// backup log failed for whatever reason.
 	logCounter := logging.NewLogHook()
-	backupLog, err := logging.NewTempFileLogger(b.backupLogLevel, b.formatFlag, logCounter, logrus.Fields{Backup: kubeutil.NamespaceAndName(backup)})
+	backupLog, err := logging.NewTempFileLogger(b.backupLogLevel, b.formatFlag, logCounter, logrus.Fields{constant.ControllerBackup: kubeutil.NamespaceAndName(backup)})
 	if err != nil {
 		return errors.Wrap(err, "error creating dual mode logger for backup")
 	}
-	defer backupLog.Dispose(b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
+	defer backupLog.Dispose(b.logger.WithField(constant.ControllerBackup, kubeutil.NamespaceAndName(backup)))
 
 	backupLog.Info("Setting up backup temp file")
 	backupFile, err := os.CreateTemp("", "")
@@ -615,6 +616,11 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 
 	backupLog.Info("Getting backup item actions")
 	actions, err := pluginManager.GetBackupItemActionsV2()
+	if err != nil {
+		return err
+	}
+	backupLog.Info("Getting ItemBlock actions")
+	ibActions, err := pluginManager.GetItemBlockActions()
 	if err != nil {
 		return err
 	}
@@ -635,9 +641,10 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	}
 
 	backupItemActionsResolver := framework.NewBackupItemActionResolverV2(actions)
+	itemBlockActionResolver := framework.NewItemBlockActionResolver(ibActions)
 
 	var fatalErrs []error
-	if err := b.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver, pluginManager); err != nil {
+	if err := b.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver, itemBlockActionResolver, pluginManager); err != nil {
 		fatalErrs = append(fatalErrs, err)
 	}
 
@@ -678,7 +685,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 		"errors":   backupErrors,
 	}
 
-	backupLog.DoneForPersist(b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)))
+	backupLog.DoneForPersist(b.logger.WithField(constant.ControllerBackup, kubeutil.NamespaceAndName(backup)))
 
 	// Assign finalize phase as close to end as possible so that any errors
 	// logged to backupLog are captured. This is done before uploading the
@@ -725,7 +732,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 		}
 	}
 
-	b.logger.WithField(Backup, kubeutil.NamespaceAndName(backup)).Infof("Initial backup processing complete, moving to %s", backup.Status.Phase)
+	b.logger.WithField(constant.ControllerBackup, kubeutil.NamespaceAndName(backup)).Infof("Initial backup processing complete, moving to %s", backup.Status.Phase)
 
 	// if we return a non-nil error, the calling function will update
 	// the backup's phase to Failed.

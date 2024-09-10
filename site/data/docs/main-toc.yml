@@ -58,13 +58,15 @@ toc:
       - page: Data Movement Pod Resource Configuration
         url: /data-movement-pod-resource-configuration        
       - page: Backup Repository Configuration
-        url: /backup-repository-configuration        
+        url: /backup-repository-configuration
       - page: Verifying Self-signed Certificates
         url: /self-signed-certificates
       - page: Changing RBAC permissions
         url: /rbac
       - page: Behind proxy
         url: /proxy
+      - page: Repository Maintenance
+        url: /repository-maintenance
   - title: Plugins
     subfolderitems:
       - page: Overview

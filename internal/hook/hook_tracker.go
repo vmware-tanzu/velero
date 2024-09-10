@@ -37,7 +37,7 @@ type hookKey struct {
 	// For hooks specified in pod annotation, this field is the pod where hooks are annotated.
 	podName string
 	// HookPhase is only for backup hooks, for restore hooks, this field is empty.
-	hookPhase hookPhase
+	hookPhase HookPhase
 	// HookName is only for hooks specified in the backup/restore spec.
 	// For hooks specified in pod annotation, this field is empty or "<from-annotation>".
 	hookName string
@@ -83,7 +83,7 @@ func NewHookTracker() *HookTracker {
 // Add adds a hook to the hook tracker
 // Add must precede the Record for each individual hook.
 // In other words, a hook must be added to the tracker before its execution result is recorded.
-func (ht *HookTracker) Add(podNamespace, podName, container, source, hookName string, hookPhase hookPhase) {
+func (ht *HookTracker) Add(podNamespace, podName, container, source, hookName string, hookPhase HookPhase) {
 	ht.lock.Lock()
 	defer ht.lock.Unlock()
 
@@ -108,7 +108,7 @@ func (ht *HookTracker) Add(podNamespace, podName, container, source, hookName st
 // Record records the hook's execution status
 // Add must precede the Record for each individual hook.
 // In other words, a hook must be added to the tracker before its execution result is recorded.
-func (ht *HookTracker) Record(podNamespace, podName, container, source, hookName string, hookPhase hookPhase, hookFailed bool, hookErr error) error {
+func (ht *HookTracker) Record(podNamespace, podName, container, source, hookName string, hookPhase HookPhase, hookFailed bool, hookErr error) error {
 	ht.lock.Lock()
 	defer ht.lock.Unlock()
 
@@ -179,7 +179,7 @@ func NewMultiHookTracker() *MultiHookTracker {
 }
 
 // Add adds a backup/restore hook to the tracker
-func (mht *MultiHookTracker) Add(name, podNamespace, podName, container, source, hookName string, hookPhase hookPhase) {
+func (mht *MultiHookTracker) Add(name, podNamespace, podName, container, source, hookName string, hookPhase HookPhase) {
 	mht.lock.Lock()
 	defer mht.lock.Unlock()
 
@@ -190,7 +190,7 @@ func (mht *MultiHookTracker) Add(name, podNamespace, podName, container, source,
 }
 
 // Record records a backup/restore hook execution status
-func (mht *MultiHookTracker) Record(name, podNamespace, podName, container, source, hookName string, hookPhase hookPhase, hookFailed bool, hookErr error) error {
+func (mht *MultiHookTracker) Record(name, podNamespace, podName, container, source, hookName string, hookPhase HookPhase, hookFailed bool, hookErr error) error {
 	mht.lock.RLock()
 	defer mht.lock.RUnlock()
 
