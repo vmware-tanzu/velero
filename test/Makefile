@@ -50,6 +50,10 @@ OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
 # Please reference to this document for Ginkgo label spec format.
 # https://onsi.github.io/ginkgo/#spec-labels
 GINKGO_LABELS ?=
+# When --fail-fast is set, the entire suite will stop when the first failure occurs.
+# Enable --fail-fast by default.
+# https://onsi.github.io/ginkgo/#mental-model-how-ginkgo-handles-failure
+FAIL_FAST ?= true
 VELERO_CLI ?=$$(pwd)/../_output/bin/$(GOOS)/$(GOARCH)/velero
 VELERO_IMAGE ?= velero/velero:main
 PLUGINS ?=
@@ -170,6 +174,7 @@ run-e2e: ginkgo
 		--junit-report e2e/report.xml \
 		--label-filter="$(GINKGO_LABELS)" \
 		--timeout=5h \
+		--fail-fast=$(FAIL_FAST) \
 		./e2e \
 		-- $(COMMON_ARGS) \
 		--upgrade-from-velero-cli=$(UPGRADE_FROM_VELERO_CLI) \
@@ -210,6 +215,7 @@ run-perf: ginkgo
 		--junit-report perf/report.xml \
 		--label-filter="$(GINKGO_LABELS)" \
 		--timeout=5h \
+		--fail-fast=$(FAIL_FAST) \
 		./perf \
 		-- $(COMMON_ARGS) \
 		--nfs-server-path=$(NFS_SERVER_PATH) \
