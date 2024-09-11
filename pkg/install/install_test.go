@@ -180,7 +180,7 @@ func TestPkgImportNoCloudProvider(t *testing.T) {
 	// ignore k8s.io
 	k8sio, err := regexp.Compile("^k8s.io")
 	require.NoError(t, err)
-	cloudProvider, err := regexp.Compile("aws|gcp|azure")
+	cloudProvider, err := regexp.Compile("aws|cloud.google.com|azure")
 	require.NoError(t, err)
 	// depsArr :=[]string{}
 	cloudProviderDeps := []string{}
