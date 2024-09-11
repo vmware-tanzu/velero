@@ -32,41 +32,13 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/repository/provider"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
-
-// SnapshotIdentifier uniquely identifies a snapshot
-// taken by Velero.
-type SnapshotIdentifier struct {
-	// VolumeNamespace is the namespace of the pod/volume that
-	// the snapshot is for.
-	VolumeNamespace string `json:"volumeNamespace"`
-
-	// BackupStorageLocation is the backup's storage location
-	// name.
-	BackupStorageLocation string `json:"backupStorageLocation"`
-
-	// SnapshotID is the short ID of the snapshot.
-	SnapshotID string `json:"snapshotID"`
-
-	// RepositoryType is the type of the repository where the
-	// snapshot is stored
-	RepositoryType string `json:"repositoryType"`
-
-	// Source is the source of the data saved in the repo by the snapshot
-	Source string `json:"source"`
-
-	// UploaderType is the type of uploader which saved the snapshot data
-	UploaderType string `json:"uploaderType"`
-
-	// RepoIdentifier is the identifier of the repository where the
-	// snapshot is stored
-	RepoIdentifier string `json:"repoIdentifier"`
-}
 
 // Manager manages backup repositories.
 type Manager interface {
@@ -105,8 +77,8 @@ type manager struct {
 	// client is the Velero controller manager's client.
 	// It's limited to resources in the Velero namespace.
 	client                    client.Client
-	repoLocker                *RepoLocker
-	repoEnsurer               *Ensurer
+	repoLocker                *repository.RepoLocker
+	repoEnsurer               *repository.Ensurer
 	fileSystem                filesystem.Interface
 	repoMaintenanceJobConfig  string
 	podResources              kube.PodResources
@@ -120,8 +92,8 @@ type manager struct {
 func NewManager(
 	namespace string,
 	client client.Client,
-	repoLocker *RepoLocker,
-	repoEnsurer *Ensurer,
+	repoLocker *repository.RepoLocker,
+	repoEnsurer *repository.Ensurer,
 	credentialFileStore credentials.FileStore,
 	credentialSecretStore credentials.SecretStore,
 	repoMaintenanceJobConfig string,
@@ -216,7 +188,7 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 		"repo UID":  param.BackupRepo.UID,
 	})
 
-	job, err := getLatestMaintenanceJob(m.client, m.namespace)
+	job, err := repository.GetLatestMaintenanceJob(m.client, m.namespace)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -226,7 +198,7 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 		return nil
 	}
 
-	jobConfig, err := getMaintenanceJobConfig(
+	jobConfig, err := repository.GetMaintenanceJobConfig(
 		context.Background(),
 		m.client,
 		m.log,
@@ -259,7 +231,7 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 	log.Debug("Creating maintenance job")
 
 	defer func() {
-		if err := deleteOldMaintenanceJobs(
+		if err := repository.DeleteOldMaintenanceJobs(
 			m.client,
 			param.BackupRepo.Name,
 			m.keepLatestMaintenanceJobs,
@@ -269,12 +241,12 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 	}()
 
 	var jobErr error
-	if err := waitForJobComplete(context.TODO(), m.client, maintenanceJob); err != nil {
+	if err := repository.WaitForJobComplete(context.TODO(), m.client, maintenanceJob); err != nil {
 		log.WithError(err).Error("Error to wait for maintenance job complete")
 		jobErr = err // we won't return here for job may failed by maintenance failure, we want return the actual error
 	}
 
-	result, err := getMaintenanceResultFromJob(m.client, maintenanceJob)
+	result, err := repository.GetMaintenanceResultFromJob(m.client, maintenanceJob)
 	if err != nil {
 		return errors.Wrap(err, "error to get maintenance job result")
 	}
@@ -383,7 +355,7 @@ func (m *manager) assembleRepoParam(repo *velerov1api.BackupRepository) (provide
 }
 
 func (m *manager) buildMaintenanceJob(
-	config *JobConfigs,
+	config *repository.JobConfigs,
 	param provider.RepoParam,
 ) (*batchv1.Job, error) {
 	// Get the Velero server deployment
@@ -435,10 +407,10 @@ func (m *manager) buildMaintenanceJob(
 	// build the maintenance job
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      generateJobName(param.BackupRepo.Name),
+			Name:      repository.GenerateJobName(param.BackupRepo.Name),
 			Namespace: param.BackupRepo.Namespace,
 			Labels: map[string]string{
-				RepositoryNameLabel: param.BackupRepo.Name,
+				repository.RepositoryNameLabel: param.BackupRepo.Name,
 			},
 		},
 		Spec: batchv1.JobSpec{

@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/repository"
+	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
@@ -122,20 +122,20 @@ func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, 
 }
 
 // GetSnapshotIdentifier returns the snapshots represented by SnapshotIdentifier for the given PVBs
-func GetSnapshotIdentifier(podVolumeBackups *velerov1api.PodVolumeBackupList) map[string][]repository.SnapshotIdentifier {
-	res := map[string][]repository.SnapshotIdentifier{}
+func GetSnapshotIdentifier(podVolumeBackups *velerov1api.PodVolumeBackupList) map[string][]repotypes.SnapshotIdentifier {
+	res := map[string][]repotypes.SnapshotIdentifier{}
 	for _, item := range podVolumeBackups.Items {
 		if item.Status.SnapshotID == "" {
 			continue
 		}
 
 		if res[item.Spec.Pod.Namespace] == nil {
-			res[item.Spec.Pod.Namespace] = []repository.SnapshotIdentifier{}
+			res[item.Spec.Pod.Namespace] = []repotypes.SnapshotIdentifier{}
 		}
 
 		snapshots := res[item.Spec.Pod.Namespace]
 
-		snapshots = append(snapshots, repository.SnapshotIdentifier{
+		snapshots = append(snapshots, repotypes.SnapshotIdentifier{
 			VolumeNamespace:       item.Spec.Pod.Namespace,
 			BackupStorageLocation: item.Spec.BackupStorageLocation,
 			SnapshotID:            item.Status.SnapshotID,

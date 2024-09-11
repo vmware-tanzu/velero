@@ -33,6 +33,7 @@ import (
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/repository/provider"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -63,7 +64,7 @@ func TestGetRepositoryProvider(t *testing.T) {
 func TestBuildMaintenanceJob(t *testing.T) {
 	testCases := []struct {
 		name            string
-		m               *JobConfigs
+		m               *repository.JobConfigs
 		deploy          *appsv1.Deployment
 		logLevel        logrus.Level
 		logFormat       *logging.FormatFlag
@@ -72,7 +73,7 @@ func TestBuildMaintenanceJob(t *testing.T) {
 	}{
 		{
 			name: "Valid maintenance job",
-			m: &JobConfigs{
+			m: &repository.JobConfigs{
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					MemoryRequest: "128Mi",
@@ -105,7 +106,7 @@ func TestBuildMaintenanceJob(t *testing.T) {
 		},
 		{
 			name: "Error getting Velero server deployment",
-			m: &JobConfigs{
+			m: &repository.JobConfigs{
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					MemoryRequest: "128Mi",
@@ -179,7 +180,7 @@ func TestBuildMaintenanceJob(t *testing.T) {
 				assert.NotNil(t, job)
 				assert.Contains(t, job.Name, tc.expectedJobName)
 				assert.Equal(t, param.BackupRepo.Namespace, job.Namespace)
-				assert.Equal(t, param.BackupRepo.Name, job.Labels[RepositoryNameLabel])
+				assert.Equal(t, param.BackupRepo.Name, job.Labels[repository.RepositoryNameLabel])
 
 				// Check container
 				assert.Len(t, job.Spec.Template.Spec.Containers, 1)

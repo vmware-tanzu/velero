@@ -28,8 +28,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/repository"
 	repomokes "github.com/vmware-tanzu/velero/pkg/repository/mocks"
+	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 
 	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -210,7 +210,7 @@ func TestBackupRepoReconcile(t *testing.T) {
 func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
 	tests := []struct {
 		name            string
-		mgr             repository.Manager
+		mgr             repotypes.SnapshotIdentifier
 		repo            *velerov1api.BackupRepository
 		freqReturn      time.Duration
 		freqError       error
