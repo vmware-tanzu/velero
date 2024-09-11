@@ -36,16 +36,13 @@ import (
 )
 
 func NewPeriodicalEnqueueSource(
-	controllerName string,
 	logger logrus.FieldLogger,
 	client client.Client,
 	objList client.ObjectList,
 	period time.Duration,
 	option PeriodicalEnqueueSourceOption) *PeriodicalEnqueueSource {
 	return &PeriodicalEnqueueSource{
-		logger: logger.
-			WithField("resource", reflect.TypeOf(objList).String()).
-			WithField("controller", controllerName),
+		logger:  logger.WithField("resource", reflect.TypeOf(objList).String()),
 		Client:  client,
 		objList: objList,
 		period:  period,

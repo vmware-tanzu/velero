@@ -44,6 +44,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/datamover"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
@@ -534,7 +535,7 @@ func (r *DataUploadReconciler) OnDataUploadProgress(ctx context.Context, namespa
 // re-enqueue the previous related request once the related pod is in running status to keep going on the rest logic. and below logic will avoid handling the unwanted
 // pod status and also avoid block others CR handling
 func (r *DataUploadReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	s := kube.NewPeriodicalEnqueueSource("dataUpload", r.logger, r.client, &velerov2alpha1api.DataUploadList{}, preparingMonitorFrequency, kube.PeriodicalEnqueueSourceOption{})
+	s := kube.NewPeriodicalEnqueueSource(r.logger.WithField("controller", constant.ControllerDataUpload), r.client, &velerov2alpha1api.DataUploadList{}, preparingMonitorFrequency, kube.PeriodicalEnqueueSourceOption{})
 	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
 		du := object.(*velerov2alpha1api.DataUpload)
 		return (du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted)

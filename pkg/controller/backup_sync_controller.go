@@ -348,8 +348,7 @@ func (b *backupSyncReconciler) filterBackupOwnerReferences(ctx context.Context, 
 // SetupWithManager is used to setup controller and its watching sources.
 func (b *backupSyncReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	backupSyncSource := kube.NewPeriodicalEnqueueSource(
-		"backupSync",
-		b.logger,
+		b.logger.WithField("controller", constant.ControllerBackupSync),
 		mgr.GetClient(),
 		&velerov1api.BackupStorageLocationList{},
 		backupSyncReconcilePeriod,

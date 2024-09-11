@@ -8,6 +8,8 @@ const (
 	ControllerBackupRepo            = "backup-repo"
 	ControllerBackupStorageLocation = "backup-storage-location"
 	ControllerBackupSync            = "backup-sync"
+	ControllerDataDownload          = "data-download"
+	ControllerDataUpload            = "data-upload"
 	ControllerDownloadRequest       = "download-request"
 	ControllerGarbageCollection     = "gc"
 	ControllerPodVolumeBackup       = "pod-volume-backup"

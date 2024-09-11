@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
@@ -75,7 +76,7 @@ func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client
 }
 
 func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	s := kube.NewPeriodicalEnqueueSource("backupRepo", r.logger, mgr.GetClient(), &velerov1api.BackupRepositoryList{}, repoSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
+	s := kube.NewPeriodicalEnqueueSource(r.logger.WithField("controller", constant.ControllerBackupRepo), mgr.GetClient(), &velerov1api.BackupRepositoryList{}, repoSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.BackupRepository{}, builder.WithPredicates(kube.SpecChangePredicate{})).

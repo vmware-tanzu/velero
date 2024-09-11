@@ -102,7 +102,7 @@ func NewBackupDeletionReconciler(
 
 func (r *backupDeletionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Make sure the expired requests can be deleted eventually
-	s := kube.NewPeriodicalEnqueueSource("backupDeletion", r.logger, mgr.GetClient(), &velerov1api.DeleteBackupRequestList{}, time.Hour, kube.PeriodicalEnqueueSourceOption{})
+	s := kube.NewPeriodicalEnqueueSource(r.logger.WithField("controller", constant.ControllerBackupDeletion), mgr.GetClient(), &velerov1api.DeleteBackupRequestList{}, time.Hour, kube.PeriodicalEnqueueSourceOption{})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.DeleteBackupRequest{}).
 		WatchesRawSource(s, nil).

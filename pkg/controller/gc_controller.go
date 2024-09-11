@@ -33,6 +33,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -75,7 +76,7 @@ func NewGCReconciler(
 // Other Events will be filtered to decrease the number of reconcile call. Especially UpdateEvent must be filtered since we removed
 // the backup status as the sub-resource of backup in v1.9, every change on it will be treated as UpdateEvent and trigger reconcile call.
 func (c *gcReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	s := kube.NewPeriodicalEnqueueSource("gc", c.logger, mgr.GetClient(), &velerov1api.BackupList{}, c.frequency, kube.PeriodicalEnqueueSourceOption{})
+	s := kube.NewPeriodicalEnqueueSource(c.logger.WithField("controller", constant.ControllerGarbageCollection), mgr.GetClient(), &velerov1api.BackupList{}, c.frequency, kube.PeriodicalEnqueueSourceOption{})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Backup{}, builder.WithPredicates(predicate.Funcs{
 			UpdateFunc: func(ue event.UpdateEvent) bool {
