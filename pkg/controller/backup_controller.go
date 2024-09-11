@@ -247,7 +247,10 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		request.Status.StartTimestamp = &metav1.Time{Time: b.clock.Now()}
 	}
 
-	// update status
+	// update status to
+	// BackupPhaseFailedValidation
+	// BackupPhaseInProgress
+	// if patch fail, backup can reconcile again as phase would still be "" or New
 	if err := kubeutil.PatchResource(original, request.Backup, b.kbClient); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "error updating Backup status to %s", request.Status.Phase)
 	}
@@ -304,9 +307,16 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		b.metrics.RegisterBackupValidationFailure(backupScheduleName)
 		b.metrics.RegisterBackupLastStatus(backupScheduleName, metrics.BackupLastStatusFailure)
 	}
-	log.Info("Updating backup's final status")
-	if err := kubeutil.PatchResource(original, request.Backup, b.kbClient); err != nil {
-		log.WithError(err).Error("error updating backup's final status")
+	log.Info("Updating backup's status")
+	// Phases were updated in runBackup()
+	// This patch with retry update Phase from InProgress to
+	// BackupPhaseWaitingForPluginOperations -> backup_operations_controller.go will now reconcile
+	// BackupPhaseWaitingForPluginOperationsPartiallyFailed -> backup_operations_controller.go will now reconcile
+	// BackupPhaseFinalizing -> backup_finalizer_controller.go will now reconcile
+	// BackupPhaseFinalizingPartiallyFailed -> backup_finalizer_controller.go will now reconcile
+	// BackupPhaseFailed
+	if err := kubeutil.PatchResourceWithRetriesOnErrors(b.resourceTimeout, original, request.Backup, b.kbClient); err != nil {
+		log.WithError(err).Errorf("error updating backup's status from %v to %v", original.Status.Phase, request.Backup.Status.Phase)
 	}
 	return ctrl.Result{}, nil
 }

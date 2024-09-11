@@ -1,0 +1,1 @@
+add retries with timeout to existing patch calls that moves a backup/restore from InProgress/Finalizing to a final status phase.

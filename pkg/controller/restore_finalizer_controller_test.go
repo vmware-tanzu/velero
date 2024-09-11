@@ -19,20 +19,19 @@ package controller
 import (
 	"context"
 	"fmt"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	testclocks "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
-
-	"github.com/stretchr/testify/mock"
-
-	corev1api "k8s.io/api/core/v1"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
@@ -44,6 +43,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	pkgUtilKubeMocks "github.com/vmware-tanzu/velero/pkg/util/kube/mocks"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
@@ -554,5 +554,76 @@ func TestWaitRestoreExecHook(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, tc.expectedHooksAttempted, updated.Status.HookStatus.HooksAttempted)
 		assert.Equal(t, tc.expectedHooksFailed, updated.Status.HookStatus.HooksFailed)
+	}
+}
+
+// test finishprocessing with mocks of kube client to simulate connection refused
+func Test_restoreFinalizerReconciler_finishProcessing(t *testing.T) {
+	type args struct {
+		// mockClientActions simulate different client errors
+		mockClientActions func(*pkgUtilKubeMocks.Client)
+		// return bool indicating if the client method was called as expected
+		mockClientAsserts func(*pkgUtilKubeMocks.Client) bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "restore failed to patch status, should retry on connection refused",
+			args: args{
+				mockClientActions: func(client *pkgUtilKubeMocks.Client) {
+					client.On("Patch", mock.Anything, mock.Anything, mock.Anything).Return(syscall.ECONNREFUSED).Once()
+					client.On("Patch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				},
+				mockClientAsserts: func(client *pkgUtilKubeMocks.Client) bool {
+					return client.AssertNumberOfCalls(t, "Patch", 2)
+				},
+			},
+		},
+		{
+			name: "restore failed to patch status, retry on connection refused until max retries",
+			args: args{
+				mockClientActions: func(client *pkgUtilKubeMocks.Client) {
+					client.On("Patch", mock.Anything, mock.Anything, mock.Anything).Return(syscall.ECONNREFUSED)
+				},
+				mockClientAsserts: func(client *pkgUtilKubeMocks.Client) bool {
+					return len(client.Calls) > 2
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "restore patch status ok, should not retry",
+			args: args{
+				mockClientActions: func(client *pkgUtilKubeMocks.Client) {
+					client.On("Patch", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				},
+				mockClientAsserts: func(client *pkgUtilKubeMocks.Client) bool {
+					return client.AssertNumberOfCalls(t, "Patch", 1)
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := pkgUtilKubeMocks.NewClient(t)
+			// mock client actions
+			tt.args.mockClientActions(client)
+			r := &restoreFinalizerReconciler{
+				Client:          client,
+				metrics:         metrics.NewServerMetrics(),
+				clock:           testclocks.NewFakeClock(time.Now()),
+				resourceTimeout: 1 * time.Second,
+			}
+			restore := builder.ForRestore(velerov1api.DefaultNamespace, "restoreName").Result()
+			if err := r.finishProcessing(velerov1api.RestorePhaseInProgress, restore, restore); (err != nil) != tt.wantErr {
+				t.Errorf("restoreFinalizerReconciler.finishProcessing() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.args.mockClientAsserts(client) {
+				t.Errorf("mockClientAsserts() failed")
+			}
+		})
 	}
 }

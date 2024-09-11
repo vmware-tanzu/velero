@@ -109,6 +109,7 @@ type restoreReconciler struct {
 	newPluginManager  func(logger logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
 	globalCrClient    client.Client
+	resourceTimeout   time.Duration
 }
 
 type backupInfo struct {
@@ -130,6 +131,7 @@ func NewRestoreReconciler(
 	defaultItemOperationTimeout time.Duration,
 	disableInformerCache bool,
 	globalCrClient client.Client,
+	resourceTimeout time.Duration,
 ) *restoreReconciler {
 	r := &restoreReconciler{
 		ctx:                         ctx,
@@ -149,7 +151,8 @@ func NewRestoreReconciler(
 		newPluginManager:  newPluginManager,
 		backupStoreGetter: backupStoreGetter,
 
-		globalCrClient: globalCrClient,
+		globalCrClient:  globalCrClient,
+		resourceTimeout: resourceTimeout,
 	}
 
 	// Move the periodical backup and restore metrics computing logic from controllers to here.
@@ -246,6 +249,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// patch to update status and persist to API
+	// This is patching from "" or New, no retry needed
 	err = kubeutil.PatchResource(original, restore, r.kbClient)
 	if err != nil {
 		// return the error so the restore can be re-processed; it's currently
@@ -274,10 +278,15 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		restore.Status.Phase == api.RestorePhaseCompleted {
 		restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 	}
-	log.Debug("Updating restore's final status")
-
-	if err = kubeutil.PatchResource(original, restore, r.kbClient); err != nil {
-		log.WithError(errors.WithStack(err)).Info("Error updating restore's final status")
+	log.Debug("Updating restore's status")
+	// Phases were updated in runValidatedRestore
+	// This patch with retry update Phase from InProgress to
+	// WaitingForPluginOperations
+	// WaitingForPluginOperationsPartiallyFailed
+	// Finalizing
+	// FinalizingPartiallyFailed
+	if err = kubeutil.PatchResourceWithRetriesOnErrors(r.resourceTimeout, original, restore, r.kbClient); err != nil {
+		log.WithError(errors.WithStack(err)).Infof("Error updating restore's status from %v to %v", original.Status.Phase, restore.Status.Phase)
 		// No need to re-enqueue here, because restore's already set to InProgress before.
 		// Controller only handle New restore.
 	}
