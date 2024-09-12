@@ -29,7 +29,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	corev1api "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	storagev1api "k8s.io/api/storage/v1"
 
 	clientTesting "k8s.io/client-go/testing"
@@ -1128,41 +1127,41 @@ var (
 )
 
 func TestGetPVForPVC(t *testing.T) {
-	boundPVC := &v1.PersistentVolumeClaim{
+	boundPVC := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-csi-pvc",
 			Namespace: "default",
 		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Resources: v1.VolumeResourceRequirements{
-				Requests: v1.ResourceList{},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			AccessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
+			Resources: corev1api.VolumeResourceRequirements{
+				Requests: corev1api.ResourceList{},
 			},
 			StorageClassName: &csiStorageClass,
 			VolumeName:       "test-csi-7d28e566-ade7-4ed6-9e15-2e44d2fbcc08",
 		},
-		Status: v1.PersistentVolumeClaimStatus{
-			Phase:       v1.ClaimBound,
-			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Capacity:    v1.ResourceList{},
+		Status: corev1api.PersistentVolumeClaimStatus{
+			Phase:       corev1api.ClaimBound,
+			AccessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
+			Capacity:    corev1api.ResourceList{},
 		},
 	}
-	matchingPV := &v1.PersistentVolume{
+	matchingPV := &corev1api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-csi-7d28e566-ade7-4ed6-9e15-2e44d2fbcc08",
 		},
-		Spec: v1.PersistentVolumeSpec{
-			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Capacity:    v1.ResourceList{},
-			ClaimRef: &v1.ObjectReference{
+		Spec: corev1api.PersistentVolumeSpec{
+			AccessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
+			Capacity:    corev1api.ResourceList{},
+			ClaimRef: &corev1api.ObjectReference{
 				Kind:            "PersistentVolumeClaim",
 				Name:            "test-csi-pvc",
 				Namespace:       "default",
 				ResourceVersion: "1027",
 				UID:             "7d28e566-ade7-4ed6-9e15-2e44d2fbcc08",
 			},
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				CSI: &v1.CSIPersistentVolumeSource{
+			PersistentVolumeSource: corev1api.PersistentVolumeSource{
+				CSI: &corev1api.CSIPersistentVolumeSource{
 					Driver: "hostpath.csi.k8s.io",
 					FSType: "ext4",
 					VolumeAttributes: map[string]string{
@@ -1171,54 +1170,54 @@ func TestGetPVForPVC(t *testing.T) {
 					VolumeHandle: "e61f2b48-527a-11ea-b54f-cab6317018f1",
 				},
 			},
-			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+			PersistentVolumeReclaimPolicy: corev1api.PersistentVolumeReclaimDelete,
 			StorageClassName:              csiStorageClass,
 		},
-		Status: v1.PersistentVolumeStatus{
-			Phase: v1.VolumeBound,
+		Status: corev1api.PersistentVolumeStatus{
+			Phase: corev1api.VolumeBound,
 		},
 	}
 
-	pvcWithNoVolumeName := &v1.PersistentVolumeClaim{
+	pvcWithNoVolumeName := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "no-vol-pvc",
 			Namespace: "default",
 		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Resources: v1.VolumeResourceRequirements{
-				Requests: v1.ResourceList{},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			AccessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
+			Resources: corev1api.VolumeResourceRequirements{
+				Requests: corev1api.ResourceList{},
 			},
 			StorageClassName: &csiStorageClass,
 		},
-		Status: v1.PersistentVolumeClaimStatus{},
+		Status: corev1api.PersistentVolumeClaimStatus{},
 	}
 
-	unboundPVC := &v1.PersistentVolumeClaim{
+	unboundPVC := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "unbound-pvc",
 			Namespace: "default",
 		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Resources: v1.VolumeResourceRequirements{
-				Requests: v1.ResourceList{},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			AccessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
+			Resources: corev1api.VolumeResourceRequirements{
+				Requests: corev1api.ResourceList{},
 			},
 			StorageClassName: &csiStorageClass,
 			VolumeName:       "test-csi-7d28e566-ade7-4ed6-9e15-2e44d2fbcc08",
 		},
-		Status: v1.PersistentVolumeClaimStatus{
-			Phase:       v1.ClaimPending,
-			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Capacity:    v1.ResourceList{},
+		Status: corev1api.PersistentVolumeClaimStatus{
+			Phase:       corev1api.ClaimPending,
+			AccessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
+			Capacity:    corev1api.ResourceList{},
 		},
 	}
 
 	testCases := []struct {
 		name        string
-		inPVC       *v1.PersistentVolumeClaim
+		inPVC       *corev1api.PersistentVolumeClaim
 		expectError bool
-		expectedPV  *v1.PersistentVolume
+		expectedPV  *corev1api.PersistentVolume
 	}{
 		{
 			name:        "should find PV matching the PVC",
@@ -1320,18 +1319,18 @@ func TestGetPVCForPodVolume(t *testing.T) {
 			Name:      "sample-pvc",
 			Namespace: "sample-ns",
 		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Resources: v1.VolumeResourceRequirements{
-				Requests: v1.ResourceList{},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			AccessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
+			Resources: corev1api.VolumeResourceRequirements{
+				Requests: corev1api.ResourceList{},
 			},
 			StorageClassName: &csiStorageClass,
 			VolumeName:       "test-csi-7d28e566-ade7-4ed6-9e15-2e44d2fbcc08",
 		},
-		Status: v1.PersistentVolumeClaimStatus{
-			Phase:       v1.ClaimBound,
-			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Capacity:    v1.ResourceList{},
+		Status: corev1api.PersistentVolumeClaimStatus{
+			Phase:       corev1api.ClaimBound,
+			AccessModes: []corev1api.PersistentVolumeAccessMode{corev1api.ReadWriteOnce},
+			Capacity:    corev1api.ResourceList{},
 		},
 	}
 
@@ -1448,7 +1447,7 @@ func TestMakePodPVCAttachment(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var volMode *v1.PersistentVolumeMode
+			var volMode *corev1api.PersistentVolumeMode
 			if tc.volumeMode != "" {
 				volMode = &tc.volumeMode
 			}
