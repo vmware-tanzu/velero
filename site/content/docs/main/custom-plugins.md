@@ -58,6 +58,7 @@ Velero supports the following kinds of plugins:
 - **Backup Item Action** - executes arbitrary logic for individual items prior to storing them in a backup file
 - **Restore Item Action** - executes arbitrary logic for individual items prior to restoring them into a cluster
 - **Delete Item Action** - executes arbitrary logic based on individual items within a backup prior to deleting the backup
+- **Item Block Action** - executes arbitrary logic for individual items to determine which items should be backed up together
 
 Plugin binaries are discovered by recursively reading a directory in no particular order. Hence no guarantee is provided for the
 order in which item action plugins are invoked. However, if a single binary implements multiple item action plugins,

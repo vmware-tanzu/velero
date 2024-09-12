@@ -13,6 +13,9 @@ processing ("pre" hooks), or after all custom actions have been completed and an
 specified by custom action have been backed up ("post" hooks). Note that hooks are _not_ executed within a shell
 on the containers.
 
+As of Velero 1.15, related items that must be backed up together are grouped into ItemBlocks, and pod hooks run before and after the ItemBlock is backed up.
+In particular, this means that if an ItemBlock contains more than one pod (such as in a scenario where an RWX volume is mounted by multiple pods), pre hooks are run for all pods in the ItemBlock, then the items are backed up, then all post hooks are run.
+
 There are two ways to specify hooks: annotations on the pod itself, and in the Backup spec.
 
 ### Specifying Hooks As Pod Annotations
