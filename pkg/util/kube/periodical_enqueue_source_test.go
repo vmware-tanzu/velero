@@ -42,7 +42,7 @@ func TestStart(t *testing.T) {
 	ctx, cancelFunc := context.WithCancel(context.TODO())
 	client := (&fake.ClientBuilder{}).Build()
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())
-	source := NewPeriodicalEnqueueSource(logrus.WithContext(ctx), client, &velerov1.ScheduleList{}, 1*time.Second, PeriodicalEnqueueSourceOption{})
+	source := NewPeriodicalEnqueueSource(logrus.WithContext(ctx).WithField("controller", "PES_TEST"), client, &velerov1.ScheduleList{}, 1*time.Second, PeriodicalEnqueueSourceOption{})
 
 	require.NoError(t, source.Start(ctx, nil, queue))
 
@@ -75,7 +75,7 @@ func TestPredicate(t *testing.T) {
 	client := (&fake.ClientBuilder{}).Build()
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())
 	source := NewPeriodicalEnqueueSource(
-		logrus.WithContext(ctx),
+		logrus.WithContext(ctx).WithField("controller", "PES_TEST"),
 		client,
 		&velerov1.BackupStorageLocationList{},
 		1*time.Second,
@@ -115,7 +115,7 @@ func TestOrder(t *testing.T) {
 	client := (&fake.ClientBuilder{}).Build()
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())
 	source := NewPeriodicalEnqueueSource(
-		logrus.WithContext(ctx),
+		logrus.WithContext(ctx).WithField("controller", "PES_TEST"),
 		client,
 		&velerov1.BackupStorageLocationList{},
 		1*time.Second,

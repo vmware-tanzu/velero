@@ -1,0 +1,1 @@
+Add controller name to periodical_enqueue_source. The logger parameter now includes an additional field with the value of reflect.TypeOf(objList).String() and another field with the value of controllerName.

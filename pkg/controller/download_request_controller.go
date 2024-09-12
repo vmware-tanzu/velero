@@ -30,6 +30,7 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/itemoperationmap"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
@@ -218,7 +219,7 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 func (r *downloadRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	downloadRequestSource := kube.NewPeriodicalEnqueueSource(r.log, mgr.GetClient(),
+	downloadRequestSource := kube.NewPeriodicalEnqueueSource(r.log.WithField("controller", constant.ControllerDownloadRequest), mgr.GetClient(),
 		&velerov1api.DownloadRequestList{}, defaultDownloadRequestSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
 	downloadRequestPredicates := kube.NewGenericEventPredicate(func(object kbclient.Object) bool {
 		downloadRequest := object.(*velerov1api.DownloadRequest)
