@@ -35,6 +35,7 @@ import (
 	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	"github.com/vmware-tanzu/velero/pkg/podvolume/configs"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	uploaderutil "github.com/vmware-tanzu/velero/pkg/uploader/util"
@@ -419,7 +420,7 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume c
 		// this annotation is used in pkg/restore to identify if a PVC
 		// has a pod volume backup.
 		pvb.Annotations = map[string]string{
-			PVCNameAnnotation: pvc.Name,
+			configs.PVCNameAnnotation: pvc.Name,
 		}
 
 		// this label is used by the pod volume backup controller to tell
