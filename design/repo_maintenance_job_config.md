@@ -27,9 +27,9 @@ This design reuses the data structure introduced by design [node-agent affinity 
 ## Compatibility
 v1.14 uses the `velero server` CLI's parameter to pass the repository maintenance job configuration.
 In v1.15, those parameters are still kept, including `--maintenance-job-cpu-request`, `--maintenance-job-mem-request`, `--maintenance-job-cpu-limit`, `--maintenance-job-mem-limit`, and `--keep-latest-maintenance-jobs`.
-But the parameters read from the ConfigMap specified by `velero server` CLI parameter `--repo-maintenance-job-config` introduced by this design have a higher priority.
+But the parameters read from the ConfigMap specified by `velero server` CLI parameter `--repo-maintenance-job-configmap` introduced by this design have a higher priority.
 
-If there `--repo-maintenance-job-config` is not specified, then the `velero server` parameters are used if provided.
+If there `--repo-maintenance-job-configmap` is not specified, then the `velero server` parameters are used if provided.
 
 If the `velero server` parameters are not specified too, then the default values are used.
 * `--keep-latest-maintenance-jobs` default value is 3.
@@ -41,19 +41,19 @@ If the `velero server` parameters are not specified too, then the default values
 ## Deprecation
 Propose to deprecate the `velero server` parameters `--maintenance-job-cpu-request`, `--maintenance-job-mem-request`, `--maintenance-job-cpu-limit`, `--maintenance-job-mem-limit`, and `--keep-latest-maintenance-jobs` in release-1.15.
 That means those parameters will be deleted in release-1.17.
-After deletion, those resources-related parameters are replaced by the ConfigMap specified by `velero server` CLI's parameter `--repo-maintenance-job-config`.
+After deletion, those resources-related parameters are replaced by the ConfigMap specified by `velero server` CLI's parameter `--repo-maintenance-job-configmap`.
 `--keep-latest-maintenance-jobs` is deleted from `velero server` CLI. It turns into a non-configurable internal parameter, and its value is 3.
 Please check [issue 7923](https://github.com/vmware-tanzu/velero/issues/7923) for more information why deleting this parameter.
 
 ## Design
-This design introduces a new ConfigMap specified by `velero server` CLI parameter `--repo-maintenance-job-config` as the source of the repository maintenance job configuration. The specified ConfigMap is read from the namespace where Velero is installed.
+This design introduces a new ConfigMap specified by `velero server` CLI parameter `--repo-maintenance-job-configmap` as the source of the repository maintenance job configuration. The specified ConfigMap is read from the namespace where Velero is installed.
 If the ConfigMap doesn't exist, the internal default values are used.
 
-Example of using the parameter `--repo-maintenance-job-config`:
+Example of using the parameter `--repo-maintenance-job-configmap`:
 ```
 velero server \
     ...
-    --repo-maintenance-job-config repo-job-config
+    --repo-maintenance-job-configmap repo-job-config
     ...
 ```
 
@@ -62,7 +62,7 @@ velero server \
 * Velero reads this ConfigMap content at starting a new repository maintenance job, so the ConfigMap change will not take affect until the next created job.
 
 ### Structure
-The data structure for ```repo-maintenance-job-config``` is as below:
+The data structure is as below:
 ```go
 type Configs struct {
     // LoadAffinity is the config for data path load affinity.
@@ -124,7 +124,7 @@ For example, the user want to let the nodes is in a specified machine type or th
 This can be done by adding multiple entries in the `LoadAffinity` array.
 
 ### Affinity Example
-A sample of the ```repo-maintenance-job-config``` ConfigMap is as below:
+A sample of the ConfigMap is as below:
 ``` bash
 cat <<EOF > repo-maintenance-job-config.json
 {
@@ -277,17 +277,32 @@ config := Configs {
 
 ### Implementation
 During the Velero repository controller starts to maintain a repository, it will call the repository manager's `PruneRepo` function to build the maintenance Job.
-The ConfigMap specified by `velero server` CLI parameter `--repo-maintenance-job-config` is get to reinitialize the repository `MaintenanceConfig` setting.
+The ConfigMap specified by `velero server` CLI parameter `--repo-maintenance-job-configmap` is get to reinitialize the repository `MaintenanceConfig` setting.
 
 ``` go
-	config, err := GetConfigs(context.Background(), namespace, crClient)
-	if err == nil {
-        if len(config.LoadAffinity) > 0 {
-			mgr.maintenanceCfg.Affinity = toSystemAffinity((*nodeagent.LoadAffinity)(config.LoadAffinity[0]))
-		}
-        ......
-	} else {
-		log.Info("Cannot find the repo-maintenance-job-config ConfigMap: %s", err.Error())
+	jobConfig, err := getMaintenanceJobConfig(
+		context.Background(),
+		m.client,
+		m.log,
+		m.namespace,
+		m.repoMaintenanceJobConfig,
+		repo,
+	)
+	if err != nil {
+        log.Infof("Cannot find the ConfigMap %s with error: %s. Use default value.",
+			m.namespace+"/"+m.repoMaintenanceJobConfig,
+			err.Error(),
+		)
+	}
+
+	log.Info("Start to maintenance repo")
+
+	maintenanceJob, err := m.buildMaintenanceJob(
+		jobConfig,
+		param,
+	)
+	if err != nil {
+		return errors.Wrap(err, "error to build maintenance job")
 	}
 ```
 

@@ -54,6 +54,9 @@ type podTemplateConfig struct {
 	scheduleSkipImmediately         bool
 	podResources                    kube.PodResources
 	keepLatestMaintenanceJobs       int
+	backupRepoConfigMap             string
+	repoMaintenanceJobConfigMap     string
+	nodeAgentConfigMap              string
 }
 
 func WithImage(image string) podTemplateOption {
@@ -174,6 +177,12 @@ func WithPrivilegedNodeAgent(b bool) podTemplateOption {
 	}
 }
 
+func WithNodeAgentConfigMap(nodeAgentConfigMap string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.nodeAgentConfigMap = nodeAgentConfigMap
+	}
+}
+
 func WithScheduleSkipImmediately(b bool) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.scheduleSkipImmediately = b
@@ -189,6 +198,17 @@ func WithPodResources(podResources kube.PodResources) podTemplateOption {
 func WithKeepLatestMaintenanceJobs(keepLatestMaintenanceJobs int) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.keepLatestMaintenanceJobs = keepLatestMaintenanceJobs
+	}
+}
+
+func WithBackupRepoConfigMap(backupRepoConfigMap string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.backupRepoConfigMap = backupRepoConfigMap
+	}
+}
+func WithRepoMaintenanceJobConfigMap(repoMaintenanceJobConfigMap string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.repoMaintenanceJobConfigMap = repoMaintenanceJobConfigMap
 	}
 }
 
@@ -267,6 +287,14 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 
 	if len(c.podResources.MemoryRequest) > 0 {
 		args = append(args, fmt.Sprintf("--maintenance-job-mem-request=%s", c.podResources.MemoryRequest))
+	}
+
+	if len(c.backupRepoConfigMap) > 0 {
+		args = append(args, fmt.Sprintf("--backup-repository-configmap=%s", c.backupRepoConfigMap))
+	}
+
+	if len(c.repoMaintenanceJobConfigMap) > 0 {
+		args = append(args, fmt.Sprintf("--repo-maintenance-job-configmap=%s", c.repoMaintenanceJobConfigMap))
 	}
 
 	deployment := &appsv1.Deployment{

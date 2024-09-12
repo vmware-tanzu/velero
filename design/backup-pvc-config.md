@@ -27,13 +27,13 @@ In some scenarios, users may need to configure some advanced settings of the bac
 
 ## Solution
 
-We will use the ```node-agent-config``` configMap to host the backupPVC configurations.
+We will use the ConfigMap specified by `velero node-agent` CLI's parameter `--node-agent-configmap` to host the backupPVC configurations.
 This configMap is not created by Velero, users should create it manually on demand. The configMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one configMap in each namespace which applies to node-agent in that namespace only.  
 Node-agent server checks these configurations at startup time and use it to initiate the related Exposer modules. Therefore, users could edit this configMap any time, but in order to make the changes effective, node-agent server needs to be restarted.  
-Inside ```node-agent-config``` configMap we will add one new kind of configuration as the data in the configMap, the name is ```backupPVC```.  
+Inside the ConfigMap we will add one new kind of configuration as the data in the configMap, the name is ```backupPVC```.  
 Users may want to set different backupPVC configurations for different volumes, therefore, we define the configurations as a map and allow users to specific configurations by storage class. Specifically, the key of the map element is the storage class name used by the sourcePVC and the value is the set of configurations for the backupPVC created for the sourcePVC.   
 
-The data structure for ```node-agent-config``` is as below:
+The data structure is as below:
 ```go
 type Configs struct {
 	// LoadConcurrency is the config for data path load concurrency per node.
@@ -56,7 +56,7 @@ type BackupPVC struct {
 ```  
 
 ### Sample
-A sample of the ```node-agent-config``` configMap is as below:
+A sample of the ConfigMap is as below:
 ```json
 {
     "backupPVC": {
@@ -76,7 +76,7 @@ A sample of the ```node-agent-config``` configMap is as below:
 
 To create the configMap, users need to save something like the above sample to a json file and then run below command:
 ```
-kubectl create cm node-agent-config -n velero --from-file=<json file name>
+kubectl create cm <ConfigMap name> -n velero --from-file=<json file name>
 ``` 
 
 ### Implementation

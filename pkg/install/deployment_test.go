@@ -91,4 +91,12 @@ func TestDeployment(t *testing.T) {
 	assert.Equal(t, "--maintenance-job-cpu-request=100m", deploy.Spec.Template.Spec.Containers[0].Args[2])
 	assert.Equal(t, "--maintenance-job-mem-limit=512Mi", deploy.Spec.Template.Spec.Containers[0].Args[3])
 	assert.Equal(t, "--maintenance-job-mem-request=256Mi", deploy.Spec.Template.Spec.Containers[0].Args[4])
+
+	deploy = Deployment("velero", WithBackupRepoConfigMap("test-backup-repo-config"))
+	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
+	assert.Equal(t, "--backup-repository-configmap=test-backup-repo-config", deploy.Spec.Template.Spec.Containers[0].Args[1])
+
+	deploy = Deployment("velero", WithRepoMaintenanceJobConfigMap("test-repo-maintenance-config"))
+	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
+	assert.Equal(t, "--repo-maintenance-job-configmap=test-repo-maintenance-config", deploy.Spec.Template.Spec.Containers[0].Args[1])
 }

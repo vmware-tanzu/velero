@@ -8,7 +8,11 @@ Velero uses selectable backup repositories for various backup/restore methods, i
 Velero uses a BackupRepository CR to represent the instance of the backup repository. Now, a new field `repositoryConfig` is added to support various configurations to the underlying backup repository.  
 
 Velero also allows you to specify configurations before the BackupRepository CR is created through a configMap. The configurations in the configMap will be copied to the BackupRepository CR when it is created at the due time.  
-The configMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one configMap in each namespace which applies to Velero instance in that namespace only. The name of the configMap should be specified in the Velero server parameter `--backup-repository-config`.  
+The configMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one configMap in each namespace which applies to Velero instance in that namespace only. The name of the configMap should be specified in the Velero server parameter `--backup-repository-configmap`.  
+
+
+The users can specify the ConfigMap name during velero installation by CLI:
+`velero install --backup-repository-configmap=<ConfigMap-Name>`
 
 Conclusively, you have two ways to add/change/delete configurations of a backup repository:  
 - If the BackupRepository CR for the backup repository is already there, you should modify the `repositoryConfig` field. The new changes will be applied to the backup repository at the due time, it doesn't require Velero server to restart.   

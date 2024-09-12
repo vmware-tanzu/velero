@@ -16,7 +16,7 @@ operation could perform better. Specifically:
   However, it doesn't make any sense to keep replicas when an intermediate volume used by the backup. Therefore, users should be allowed
   to configure another storage class specifically used by the `backupPVC`.
 
-Velero introduces a new section in the node agent configuration configMap (the name of this configMap is passed using `--node-agent-config` velero server argument)
+Velero introduces a new section in the node agent configuration ConfigMap (the name of this ConfigMap is passed using `--node-agent-configmap` velero server argument)
 called `backupPVC`, through which you can specify the following
 configurations:
 
@@ -26,7 +26,10 @@ default the source PVC's storage class will be used.
 - `readOnly`: This is a boolean value. If set to `true` then `ReadOnlyMany` will be the only value set to the backupPVC's access modes. Otherwise 
 `ReadWriteOnce` value will be used.
 
-A sample of `backupPVC` config as part of the configMap would look like:
+The users can specify the ConfigMap name during velero installation by CLI:
+`velero install --node-agent-configmap=<ConfigMap-Name>`
+
+A sample of `backupPVC` config as part of the ConfigMap would look like:
 ```json
 {
     "backupPVC": {
@@ -47,7 +50,7 @@ A sample of `backupPVC` config as part of the configMap would look like:
 **Note:** 
 - Users should make sure that the storage class specified in `backupPVC` config should exist in the cluster and can be used by the
 `backupPVC`, otherwise the corresponding DataUpload CR will stay in `Accepted` phase until timeout (data movement prepare timeout value is 30m by default).
-- If the users are setting `readOnly` value as `true` in the `backupPVC` config then they must also make sure that the storage class that is being used for 
+- If the users are setting `readOnly` value as `true` in the `backupPVC` config then they must also make sure that the storage class that is being used for
 `backupPVC` should support creation of `ReadOnlyMany` PVC from a snapshot, otherwise the corresponding DataUpload CR will stay in `Accepted` phase until
 timeout (data movement prepare timeout value is 30m by default).
 - If any of the above problems occur, then the DataUpload CR is `canceled` after timeout, and the backupPod and backupPVC will be deleted, and the backup

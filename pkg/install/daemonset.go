@@ -50,6 +50,10 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 		daemonSetArgs = append(daemonSetArgs, fmt.Sprintf("--features=%s", strings.Join(c.features, ",")))
 	}
 
+	if len(c.nodeAgentConfigMap) > 0 {
+		daemonSetArgs = append(daemonSetArgs, fmt.Sprintf("--node-agent-configmap=%s", c.nodeAgentConfigMap))
+	}
+
 	userID := int64(0)
 	mountPropagationMode := corev1.MountPropagationHostToContainer
 

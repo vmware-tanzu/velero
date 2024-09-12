@@ -9,11 +9,14 @@ Before v1.14.0, Velero performs periodic maintenance on the repository within Ve
 
 For repository maintenance jobs, there's no limit on resources by default. You could configure the job resource limitation based on target data to be backed up.
 
-From v1.15 and on, Velero introduces a new ConfigMap, specified by `velero server --repo-maintenance-job-config` parameter, to set repository maintenance Job configuration, including Node Affinity and resources. The old `velero server` parameters ( `--maintenance-job-cpu-request`, `--maintenance-job-mem-request`, `--maintenance-job-cpu-limit`, `--maintenance-job-mem-limit`, and `--keep-latest-maintenance-jobs`) introduced in v1.14 are deprecated, and will be deleted in v1.17.
+From v1.15 and on, Velero introduces a new ConfigMap, specified by `velero server --repo-maintenance-job-configmap` parameter, to set repository maintenance Job configuration, including Node Affinity and resources. The old `velero server` parameters ( `--maintenance-job-cpu-request`, `--maintenance-job-mem-request`, `--maintenance-job-cpu-limit`, `--maintenance-job-mem-limit`, and `--keep-latest-maintenance-jobs`) introduced in v1.14 are deprecated, and will be deleted in v1.17.
+
+The users can specify the ConfigMap name during velero installation by CLI:
+`velero install --repo-maintenance-job-configmap=<ConfigMap-Name>`
 
 ## Settings
 ### Resource Limitation and Node Affinity
-Those are specified by the ConfigMap specified by `velero server --repo-maintenance-job-config` parameter.
+Those are specified by the ConfigMap specified by `velero server --repo-maintenance-job-configmap` parameter.
 
 This ConfigMap content is a Map.
 If there is a key value as `global` in the map, the key's value is applied to all BackupRepositories maintenance jobs that cannot find their own specific configuration in the ConfigMap.
@@ -55,7 +58,7 @@ It's possible that the users want to choose nodes that match condition A or cond
 For example, the user want to let the nodes is in a specified machine type or the nodes locate in the us-central1-x zones to run the job.
 This can be done by adding multiple entries in the `LoadAffinity` array.
 
-The sample of the ```repo-maintenance-job-config``` ConfigMap for the above scenario is as below:
+The sample of the ```repo-maintenance-job-configmap``` ConfigMap for the above scenario is as below:
 ``` bash
 cat <<EOF > repo-maintenance-job-config.json
 {
