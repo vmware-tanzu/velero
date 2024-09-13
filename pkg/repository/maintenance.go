@@ -50,7 +50,7 @@ type JobConfigs struct {
 	PodResources *kube.PodResources `json:"podResources,omitempty"`
 }
 
-func generateJobName(repo string) string {
+func GenerateJobName(repo string) string {
 	millisecond := time.Now().UTC().UnixMilli() // millisecond
 
 	jobName := fmt.Sprintf("%s-maintain-job-%d", repo, millisecond)
@@ -61,8 +61,8 @@ func generateJobName(repo string) string {
 	return jobName
 }
 
-// deleteOldMaintenanceJobs deletes old maintenance jobs and keeps the latest N jobs
-func deleteOldMaintenanceJobs(cli client.Client, repo string, keep int) error {
+// DeleteOldMaintenanceJobs deletes old maintenance jobs and keeps the latest N jobs
+func DeleteOldMaintenanceJobs(cli client.Client, repo string, keep int) error {
 	// Get the maintenance job list by label
 	jobList := &batchv1.JobList{}
 	err := cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
@@ -86,7 +86,7 @@ func deleteOldMaintenanceJobs(cli client.Client, repo string, keep int) error {
 	return nil
 }
 
-func waitForJobComplete(ctx context.Context, client client.Client, job *batchv1.Job) error {
+func WaitForJobComplete(ctx context.Context, client client.Client, job *batchv1.Job) error {
 	return wait.PollUntilContextCancel(ctx, 1, true, func(ctx context.Context) (bool, error) {
 		err := client.Get(ctx, types.NamespacedName{Namespace: job.Namespace, Name: job.Name}, job)
 		if err != nil && !apierrors.IsNotFound(err) {
@@ -104,7 +104,7 @@ func waitForJobComplete(ctx context.Context, client client.Client, job *batchv1.
 	})
 }
 
-func getMaintenanceResultFromJob(cli client.Client, job *batchv1.Job) (string, error) {
+func GetMaintenanceResultFromJob(cli client.Client, job *batchv1.Job) (string, error) {
 	// Get the maintenance job related pod by label selector
 	podList := &v1.PodList{}
 	err := cli.List(context.TODO(), podList, client.InNamespace(job.Namespace), client.MatchingLabels(map[string]string{"job-name": job.Name}))
@@ -120,7 +120,7 @@ func getMaintenanceResultFromJob(cli client.Client, job *batchv1.Job) (string, e
 	return podList.Items[0].Status.ContainerStatuses[0].State.Terminated.Message, nil
 }
 
-func getLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error) {
+func GetLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error) {
 	// Get the maintenance job list by label
 	jobList := &batchv1.JobList{}
 	err := cli.List(context.TODO(), jobList, &client.ListOptions{
@@ -145,7 +145,7 @@ func getLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error)
 	return &jobList.Items[0], nil
 }
 
-// getMaintenanceJobConfig is called to get the Maintenance Job Config for the
+// GetMaintenanceJobConfig is called to get the Maintenance Job Config for the
 // BackupRepository specified by the repo parameter.
 //
 // Params:
@@ -156,7 +156,7 @@ func getLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error)
 //	veleroNamespace: the Velero-installed namespace. It's used to retrieve the BackupRepository.
 //	repoMaintenanceJobConfig: the repository maintenance job ConfigMap name.
 //	repo: the BackupRepository needs to run the maintenance Job.
-func getMaintenanceJobConfig(
+func GetMaintenanceJobConfig(
 	ctx context.Context,
 	client client.Client,
 	logger logrus.FieldLogger,

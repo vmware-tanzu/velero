@@ -35,14 +35,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	corev1api "k8s.io/api/core/v1"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/label"
-	"github.com/vmware-tanzu/velero/pkg/repository"
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
+	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	corev1api "k8s.io/api/core/v1"
 )
 
 const (
@@ -57,11 +57,11 @@ type BackupRepoReconciler struct {
 	clock                clocks.WithTickerAndDelayedExecution
 	maintenanceFrequency time.Duration
 	backupRepoConfig     string
-	repositoryManager    repository.Manager
+	repositoryManager    repomanager.Manager
 }
 
 func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client,
-	maintenanceFrequency time.Duration, backupRepoConfig string, repositoryManager repository.Manager) *BackupRepoReconciler {
+	maintenanceFrequency time.Duration, backupRepoConfig string, repositoryManager repomanager.Manager) *BackupRepoReconciler {
 	c := &BackupRepoReconciler{
 		client,
 		namespace,
@@ -294,7 +294,7 @@ func (r *BackupRepoReconciler) getRepositoryMaintenanceFrequency(req *velerov1ap
 
 // ensureRepo calls repo manager's PrepareRepo to ensure the repo is ready for use.
 // An error is returned if the repository can't be connected to or initialized.
-func ensureRepo(repo *velerov1api.BackupRepository, repoManager repository.Manager) error {
+func ensureRepo(repo *velerov1api.BackupRepository, repoManager repomanager.Manager) error {
 	return repoManager.PrepareRepo(repo)
 }
 

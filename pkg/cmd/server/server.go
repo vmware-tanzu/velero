@@ -78,6 +78,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
+	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	"github.com/vmware-tanzu/velero/pkg/restore"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -147,7 +148,7 @@ type server struct {
 	logger                logrus.FieldLogger
 	logLevel              logrus.Level
 	pluginRegistry        process.Registry
-	repoManager           repository.Manager
+	repoManager           repomanager.Manager
 	repoLocker            *repository.RepoLocker
 	repoEnsurer           *repository.Ensurer
 	metrics               *metrics.ServerMetrics
@@ -469,7 +470,7 @@ func (s *server) initRepoManager() error {
 	s.repoLocker = repository.NewRepoLocker()
 	s.repoEnsurer = repository.NewEnsurer(s.mgr.GetClient(), s.logger, s.config.ResourceTimeout)
 
-	s.repoManager = repository.NewManager(
+	s.repoManager = repomanager.NewManager(
 		s.namespace,
 		s.mgr.GetClient(),
 		s.repoLocker,

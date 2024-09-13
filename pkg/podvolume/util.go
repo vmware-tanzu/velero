@@ -23,23 +23,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/repository"
+	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
 const (
-	// PVCNameAnnotation is the key for the annotation added to
-	// pod volume backups when they're for a PVC.
-	PVCNameAnnotation = "velero.io/pvc-name"
-
 	// Deprecated.
 	//
 	// TODO(2.0): remove
 	podAnnotationPrefix = "snapshot.velero.io/"
-
-	// DefaultVolumesToFsBackup specifies whether pod volume backup should be used, by default, to
-	// take backup of all pod volumes.
-	DefaultVolumesToFsBackup = false
 )
 
 // volumeBackupInfo describes the backup info of a volume backed up by PodVolumeBackups
@@ -122,20 +114,20 @@ func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, 
 }
 
 // GetSnapshotIdentifier returns the snapshots represented by SnapshotIdentifier for the given PVBs
-func GetSnapshotIdentifier(podVolumeBackups *velerov1api.PodVolumeBackupList) map[string][]repository.SnapshotIdentifier {
-	res := map[string][]repository.SnapshotIdentifier{}
+func GetSnapshotIdentifier(podVolumeBackups *velerov1api.PodVolumeBackupList) map[string][]repotypes.SnapshotIdentifier {
+	res := map[string][]repotypes.SnapshotIdentifier{}
 	for _, item := range podVolumeBackups.Items {
 		if item.Status.SnapshotID == "" {
 			continue
 		}
 
 		if res[item.Spec.Pod.Namespace] == nil {
-			res[item.Spec.Pod.Namespace] = []repository.SnapshotIdentifier{}
+			res[item.Spec.Pod.Namespace] = []repotypes.SnapshotIdentifier{}
 		}
 
 		snapshots := res[item.Spec.Pod.Namespace]
 
-		snapshots = append(snapshots, repository.SnapshotIdentifier{
+		snapshots = append(snapshots, repotypes.SnapshotIdentifier{
 			VolumeNamespace:       item.Spec.Pod.Namespace,
 			BackupStorageLocation: item.Spec.BackupStorageLocation,
 			SnapshotID:            item.Status.SnapshotID,

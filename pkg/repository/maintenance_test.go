@@ -56,7 +56,7 @@ func TestGenerateJobName1(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.repo, func(t *testing.T) {
 			// Call the function to test
-			jobName := generateJobName(tc.repo)
+			jobName := GenerateJobName(tc.repo)
 
 			// Check if the generated job name starts with the expected prefix
 			if !strings.HasPrefix(jobName, tc.expectedStart) {
@@ -108,7 +108,7 @@ func TestDeleteOldMaintenanceJobs(t *testing.T) {
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	// Call the function
-	err := deleteOldMaintenanceJobs(cli, repo, keep)
+	err := DeleteOldMaintenanceJobs(cli, repo, keep)
 	assert.NoError(t, err)
 
 	// Get the remaining jobs
@@ -167,7 +167,7 @@ func TestWaitForJobComplete(t *testing.T) {
 			// Create a fake Kubernetes client
 			cli := fake.NewClientBuilder().WithObjects(job).Build()
 			// Call the function
-			err := waitForJobComplete(context.Background(), cli, job)
+			err := WaitForJobComplete(context.Background(), cli, job)
 
 			// Check if the error matches the expectation
 			if tc.expectError {
@@ -212,7 +212,7 @@ func TestGetMaintenanceResultFromJob(t *testing.T) {
 	cli := fake.NewClientBuilder().WithObjects(job, pod).Build()
 
 	// Call the function
-	result, err := getMaintenanceResultFromJob(cli, job)
+	result, err := GetMaintenanceResultFromJob(cli, job)
 
 	// Check if the result and error match the expectation
 	assert.NoError(t, err)
@@ -256,7 +256,7 @@ func TestGetLatestMaintenanceJob(t *testing.T) {
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	// Call the function
-	job, err := getLatestMaintenanceJob(cli, "default")
+	job, err := GetLatestMaintenanceJob(cli, "default")
 	assert.NoError(t, err)
 
 	// We expect the returned job to be the newer job
@@ -419,7 +419,7 @@ func TestGetMaintenanceJobConfig(t *testing.T) {
 				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
 			}
 
-			jobConfig, err := getMaintenanceJobConfig(
+			jobConfig, err := GetMaintenanceJobConfig(
 				ctx,
 				fakeClient,
 				logger,

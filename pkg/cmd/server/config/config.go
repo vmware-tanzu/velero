@@ -10,7 +10,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/constant"
-	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	podvolumeconfigs "github.com/vmware-tanzu/velero/pkg/podvolume/configs"
 	"github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -198,7 +198,7 @@ func GetDefaultConfig() *Config {
 		ResourceTerminatingTimeout:     defaultResourceTerminatingTimeout,
 		LogLevel:                       logging.LogLevelFlag(logrus.InfoLevel),
 		LogFormat:                      logging.NewFormatFlag(),
-		DefaultVolumesToFsBackup:       podvolume.DefaultVolumesToFsBackup,
+		DefaultVolumesToFsBackup:       podvolumeconfigs.DefaultVolumesToFsBackup,
 		UploaderType:                   uploader.ResticType,
 		MaxConcurrentK8SConnections:    defaultMaxConcurrentK8SConnections,
 		DefaultSnapshotMoveData:        false,
