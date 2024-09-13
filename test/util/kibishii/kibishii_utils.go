@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -86,7 +87,7 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", kibishiiNamespace)
 	}
 	defer func() {
-		if !veleroCfg.Debug {
+		if !CurrentSpecReport().Failed() || !veleroCfg.FailFast {
 			if err := DeleteNamespace(context.Background(), client, kibishiiNamespace, true); err != nil {
 				fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", kibishiiNamespace))
 			}

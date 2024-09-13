@@ -131,13 +131,16 @@ func (r *ResourceModifiersCase) Verify() error {
 
 func (r *ResourceModifiersCase) Clean() error {
 	// If created some resources which is not in current test namespace, we NEED to override the base Clean function
-	if !r.VeleroCfg.Debug {
+	if CurrentSpecReport().Failed() && r.VeleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
 		if err := DeleteConfigmap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
 			return err
 		}
 
 		return r.GetTestCase().Clean() // only clean up resources in test namespace
 	}
+
 	return nil
 }
 

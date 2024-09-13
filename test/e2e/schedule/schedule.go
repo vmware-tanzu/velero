@@ -203,9 +203,12 @@ func (n *ScheduleBackup) Verify() error {
 }
 
 func (n *ScheduleBackup) Clean() error {
-	if !n.VeleroCfg.Debug {
+	if CurrentSpecReport().Failed() && n.VeleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
 		Expect(VeleroScheduleDelete(n.Ctx, n.VeleroCfg.VeleroCLI, n.VeleroCfg.VeleroNamespace, n.ScheduleName)).To(Succeed())
 		Expect(n.TestCase.Clean()).To(Succeed())
 	}
+
 	return nil
 }

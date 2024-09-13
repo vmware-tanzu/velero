@@ -149,11 +149,14 @@ func (p *PVCSelectedNodeChanging) Verify() error {
 }
 
 func (p *PVCSelectedNodeChanging) Clean() error {
-	if !p.VeleroCfg.Debug {
+	if CurrentSpecReport().Failed() && p.VeleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
 		p.TestCase.Clean()
 		By(fmt.Sprintf("Clean namespace with prefix %s after test", p.mappedNS), func() {
 			CleanupNamespaces(p.Ctx, p.Client, p.mappedNS)
 		})
 	}
+
 	return nil
 }

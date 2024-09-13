@@ -74,7 +74,9 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 	})
 
 	AfterEach(func() {
-		if !veleroCfg.Debug {
+		if CurrentSpecReport().Failed() && veleroCfg.FailFast {
+			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+		} else {
 			By("Clean backups after test", func() {
 				veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
 				DeleteAllBackups(context.Background(), &veleroCfg)

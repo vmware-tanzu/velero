@@ -153,10 +153,13 @@ func (o *OrderedResources) Verify() error {
 }
 
 func (o *OrderedResources) Clean() error {
-	if !o.VeleroCfg.Debug {
+	if CurrentSpecReport().Failed() && o.VeleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
 		Expect(VeleroScheduleDelete(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, o.ScheduleName)).To(Succeed())
 		Expect(o.TestCase.Clean()).To(Succeed())
 	}
+
 	return nil
 }
 

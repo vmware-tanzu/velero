@@ -79,7 +79,9 @@ func APIGroupVersionsTest() {
 	})
 
 	AfterEach(func() {
-		if !veleroCfg.Debug {
+		if CurrentSpecReport().Failed() && veleroCfg.FailFast {
+			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+		} else {
 			for i := 0; i < testCaseNum; i++ {
 				curResource := fmt.Sprintf("rockband%ds", i)
 				curGroup := fmt.Sprintf("%s.%d", group, i)

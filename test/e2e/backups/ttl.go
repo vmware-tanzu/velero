@@ -74,7 +74,10 @@ func TTLTest() {
 
 	AfterEach(func() {
 		veleroCfg.GCFrequency = ""
-		if !veleroCfg.Debug {
+
+		if CurrentSpecReport().Failed() && veleroCfg.FailFast {
+			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+		} else {
 			By("Clean backups after test", func() {
 				DeleteAllBackups(context.Background(), &veleroCfg)
 			})

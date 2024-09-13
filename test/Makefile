@@ -97,7 +97,6 @@ ADDITIONAL_BSL_PREFIX ?=
 ADDITIONAL_BSL_CONFIG ?=
 
 FEATURES ?=
-DEBUG_E2E_TEST ?= false
 DEBUG_VELERO_POD_RESTART ?= false
 VELERO_SERVER_DEBUG_MODE ?= false
 
@@ -148,10 +147,10 @@ COMMON_ARGS := --velerocli=$(VELERO_CLI) \
 	--features=$(FEATURES) \
 	--install-velero=$(INSTALL_VELERO) \
 	--registry-credential-file=$(REGISTRY_CREDENTIAL_FILE) \
-	--debug-e2e-test=$(DEBUG_E2E_TEST) \
 	--velero-server-debug-mode=$(VELERO_SERVER_DEBUG_MODE) \
 	--uploader-type=$(UPLOADER_TYPE) \
-	--debug-velero-pod-restart=$(DEBUG_VELERO_POD_RESTART)
+	--debug-velero-pod-restart=$(DEBUG_VELERO_POD_RESTART) \
+	--fail-fast=$(FAIL_FAST)
 
 # Make sure ginkgo is in $GOBIN
 .PHONY:ginkgo

@@ -69,7 +69,6 @@ func init() {
 	//vmware-tanzu-experiments
 	flag.StringVar(&VeleroCfg.Features, "features", "", "Comma-separated list of features to enable for this Velero process.")
 	flag.StringVar(&VeleroCfg.DefaultClusterContext, "default-cluster-context", "", "Default cluster context for migration test.")
-	flag.BoolVar(&VeleroCfg.Debug, "debug-e2e-test", true, "Switch to control namespace cleaning.")
 	flag.StringVar(&VeleroCfg.UploaderType, "uploader-type", "kopia", "Identify persistent volume backup uploader.")
 	flag.BoolVar(&VeleroCfg.VeleroServerDebugMode, "velero-server-debug-mode", false, "Identify persistent volume backup uploader.")
 	flag.StringVar(&VeleroCfg.NFSServerPath, "nfs-server-path", "", "the path of nfs server")
@@ -77,6 +76,7 @@ func init() {
 	flag.StringVar(&VeleroCfg.BackupForRestore, "backup-for-restore", "", "the name of backup for restore")
 	flag.BoolVar(&VeleroCfg.DeleteClusterResource, "delete-cluster-resource", false, "delete cluster resource after test")
 	flag.BoolVar(&VeleroCfg.DebugVeleroPodRestart, "debug-velero-pod-restart", false, "Switch for debugging velero pod restart.")
+	flag.BoolVar(&VeleroCfg.FailFast, "fail-fast", true, "a switch for failing fast on meeting error.")
 }
 
 func initConfig() error {
@@ -103,6 +103,8 @@ var _ = Describe("Velero test on only backup resources",
 var _ = Describe("Velero test on only restore resources",
 	Label("PerformanceTest", "Restore"), test.TestFunc(&restore.RestoreTest{}))
 
+var testSuitePassed bool
+
 func TestE2e(t *testing.T) {
 	flag.Parse()
 	By("Install test resources before testing TestE2e")
@@ -116,7 +118,7 @@ func TestE2e(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "E2e Suite")
+	testSuitePassed = RunSpecs(t, "E2e Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -128,8 +130,16 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	Expect(report.GenerateYamlReport()).To(Succeed())
-	if InstallVelero && !VeleroCfg.Debug {
-		By("release test resources after testing")
-		Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
+	// If the Velero is installed during test, and the FailFast is not enabled,
+	// uninstall Velero. If not, either Velero is not installed, or kept it for debug.
+	if InstallVelero {
+		if !testSuitePassed && VeleroCfg.FailFast {
+			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+		} else {
+			By("release test resources after testing")
+			ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
+			defer ctxCancel()
+			Expect(VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
+		}
 	}
 })
