@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -56,6 +57,12 @@ const (
 
 var ErrorPodVolumeIsNotPVC = errors.New("pod volume is not a PVC")
 
+// Declare a global set to hold the namespace names which are present in the polling set to avoid  polling for multiple resources
+var (
+	IsNameSpacePresentInPollingSet map[string]string
+	pollingSetLock                 sync.Mutex
+)
+
 // NamespaceAndName returns a string in the format <namespace>/<name>
 func NamespaceAndName(objMeta metav1.Object) string {
 	if objMeta.GetNamespace() == "" {
@@ -79,54 +86,74 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 	// required for keeping track of number of restored items
 	// if namespace is marked for deletion, and we timed out, report an error
 	var terminatingNamespace bool
-	err = wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, true, func(ctx context.Context) (bool, error) {
-		clusterNS, err := client.Get(ctx, namespace.Name, metav1.GetOptions{})
-		// if namespace is marked for deletion, and we timed out, report an error
 
-		if apierrors.IsNotFound(err) {
-			// Namespace isn't in cluster, we're good to create.
-			return true, nil
-		}
-
-		if err != nil {
-			// Return the err and exit the loop.
-			return true, err
-		}
-
-		if clusterNS != nil && (clusterNS.GetDeletionTimestamp() != nil || clusterNS.Status.Phase == corev1api.NamespaceTerminating) {
-			// Marked for deletion, keep waiting
-			terminatingNamespace = true
-			return false, nil
-		}
-
-		// clusterNS found, is not nil, and not marked for deletion, therefore we shouldn't create it.
-		ready = true
-		return true, nil
-	})
-
-	// err will be set if we timed out or encountered issues retrieving the namespace,
-	if err != nil {
-		if terminatingNamespace {
-			return false, nsCreated, errors.Wrapf(err, "timed out waiting for terminating namespace %s to disappear before restoring", namespace.Name)
-		}
-		return false, nsCreated, errors.Wrapf(err, "error getting namespace %s", namespace.Name)
+	if IsNameSpacePresentInPollingSet == nil {
+		IsNameSpacePresentInPollingSet = make(map[string]string)
 	}
 
-	// In the case the namespace already exists and isn't marked for deletion, assume it's ready for use.
-	if ready {
-		return true, nsCreated, nil
-	}
+	// Lock the mutex before accessing the map
+	pollingSetLock.Lock()
+	// Check if the namespace is already present in the polling set. If namespace already in polling set skip the entire function
 
-	clusterNS, err := client.Create(context.TODO(), namespace, metav1.CreateOptions{})
-	if apierrors.IsAlreadyExists(err) {
-		if clusterNS != nil && (clusterNS.GetDeletionTimestamp() != nil || clusterNS.Status.Phase == corev1api.NamespaceTerminating) {
-			// Somehow created after all our polling and marked for deletion, return an error
-			return false, nsCreated, errors.Errorf("namespace %s created and marked for termination after timeout", namespace.Name)
-		}
-	} else if err != nil {
-		return false, nsCreated, errors.Wrapf(err, "error creating namespace %s", namespace.Name)
+	if _, exists := IsNameSpacePresentInPollingSet[namespace.Name]; exists {
+		pollingSetLock.Unlock()
+		return false, nsCreated, errors.Errorf("namespace %s is already present in the polling set to skipping", namespace.Name)
 	} else {
-		nsCreated = true
+
+		// Added the namespace to the polling set
+		IsNameSpacePresentInPollingSet[namespace.Name] = namespace.Name
+		pollingSetLock.Unlock()
+		err = wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, true, func(ctx context.Context) (bool, error) {
+			clusterNS, err := client.Get(ctx, namespace.Name, metav1.GetOptions{})
+			// if namespace is marked for deletion, and we timed out, report an error
+
+			if apierrors.IsNotFound(err) {
+				// Namespace isn't in cluster, we're good to create.
+				return true, nil
+			}
+
+			if err != nil {
+				// Return the err and exit the loop.
+				return true, err
+			}
+
+			if clusterNS != nil && (clusterNS.GetDeletionTimestamp() != nil || clusterNS.Status.Phase == corev1api.NamespaceTerminating) {
+				// Marked for deletion, keep waiting
+				terminatingNamespace = true
+				return false, nil
+			}
+
+			// clusterNS found, is not nil, and not marked for deletion, therefore we shouldn't create it.
+			ready = true
+			return true, nil
+		})
+		pollingSetLock.Lock()
+		delete(IsNameSpacePresentInPollingSet, namespace.Name)
+		pollingSetLock.Unlock()
+		// err will be set if we timed out or encountered issues retrieving the namespace,
+		if err != nil {
+			if terminatingNamespace {
+				return false, nsCreated, errors.Wrapf(err, "timed out waiting for terminating namespace %s to disappear before restoring", namespace.Name)
+			}
+			return false, nsCreated, errors.Wrapf(err, "error getting namespace %s", namespace.Name)
+		}
+
+		// In the case the namespace already exists and isn't marked for deletion, assume it's ready for use.
+		if ready {
+			return true, nsCreated, nil
+		}
+
+		clusterNS, err := client.Create(context.TODO(), namespace, metav1.CreateOptions{})
+		if apierrors.IsAlreadyExists(err) {
+			if clusterNS != nil && (clusterNS.GetDeletionTimestamp() != nil || clusterNS.Status.Phase == corev1api.NamespaceTerminating) {
+				// Somehow created after all our polling and marked for deletion, return an error
+				return false, nsCreated, errors.Errorf("namespace %s created and marked for termination after timeout", namespace.Name)
+			}
+		} else if err != nil {
+			return false, nsCreated, errors.Wrapf(err, "error creating namespace %s", namespace.Name)
+		} else {
+			nsCreated = true
+		}
 	}
 
 	// The namespace created successfully
