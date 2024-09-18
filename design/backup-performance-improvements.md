@@ -102,7 +102,7 @@ message ItemBlockActionGetRelatedItemsResponse {
 }
 ```
 
-A new PluginKind, `ItemBlockActionV1`, will be created, and the backup process will be modified to use this plugin kind.
+A new PluginKind, `ItemBlockAction`, will be created, and the backup process will be modified to use this plugin kind.
 
 For any BIA plugins which return additional items from `Execute()` that need to be backed up at the same time or sequentially in the same worker thread as the current items should add a new IBA plugin to return these same items (minus any which won't exist before BIA `Execute()` is called).
 This mainly applies to plugins that operate on pods which reference resources which must be backed up along with the pod and are potentially affected by pod hooks or for plugins which connect multiple pods whose volumes should be backed up at the same time.
@@ -137,17 +137,21 @@ type ItemBlockItem struct {
 In the `BackupWithResolvers` func, the current Velero implementation iterates over the list of items for backup returned by the Item Collector. For each item, Velero loads the item from the file created by the Item Collector, we call `backupItem`, update the GR map if successful, remove the (temporary) file containing item metadata, and update progress for the backup.
 
 #### Modifications to the loop over ItemCollector results
-The `kubernetesResource` struct used by the item collector will be modified to add an `orderedResource` bool which will be set true for all of the resources moved to the beginning of the list as a result of being ordered resources.
-While the item collector already puts ordered resources first, there is no indication in the list which of these initial items are from the ordered resources list and which are the remaining (unordered) items.
-Velero needs to know which resources are ordered because when we process them later, these initial resources must be processed sequentially, one at a time, before processing the remaining resources in a parallel manner.
+The `kubernetesResource` struct used by the item collector will be modified to add an `orderedResource` bool which will be set true for all of the resources moved to the beginning for each GroupResource as a result of being ordered resources.
+In addition, an `inItemBlock` bool is added to the struct which will be set to true later when processing the list when each item is added to an ItemBlock.
+While the item collector already puts ordered resources first for each GR, there is no indication in the list which of these initial items are from the ordered resources list and which are the remaining (unordered) items.
+Velero needs to know which resources are ordered because when we process them later, the ordered resources for each GroupResource must be processed sequentially in a single ItemBlock.
 
 The current workflow within each iteration of the ItemCollector.items loop will replaced with the following:
 - (note that some of the below should be pulled out into a helper func to facilitate recursive call to it for items returned from `GetRelatedItems`.)
-- Before loop iteration, create a new `itemsInBlock` map of type map[velero.ResourceIdentifier]bool which represents the set of items already included in a block.
-- If `item` is already in `itemsInBlock`, continue. This one has already been processed.
-- Add `item` to `itemsInBlock`.
+- Before loop iteration, create a pointer to a `BackupItemBlock` which will represent the current ItemBlock being processed.
+- If `item` has `inItemBlock==true`, continue. This one has already been processed.
+- If current `itemBlock` is nil, create it.
+- Add `item` to `itemBlock`.
 - Load item from ItemCollector file. Close/remove file after loading (on error return or not, possibly with similar anonymous func to current impl)
+- If other versions of the same item exist (via EnableAPIGroupVersions), add these to the `itemBlock` as well (and load from ItemCollector file)
 - Get matching IBA plugins for item, call `GetRelatedItems` for each. For each item returned, get full item content from ItemCollector (if present in item list, pulling from file, removing file when done) or from cluster (if not present in item list), add item to the current block, add item to `itemsInBlock` map, and then recursively apply current step to each (i.e. call IBA method, add to block, etc.)
+- If current item and next item are both ordered items for the same GR, then continue to next item, adding to current `itemBlock`.
 - Once full ItemBlock list is generated, call `backupItemBlock(block ItemBlock)
 - Add `backupItemBlock` return values to `backedUpGroupResources` map
 
@@ -156,7 +160,7 @@ The current workflow within each iteration of the ItemCollector.items loop will 
 
 Method signature for new func `backupItemBlock` is as follows:
 ```go
-func backupItemBlock(block ItemBlock) []schema.GroupResource
+func (kb *kubernetesBackupper) backupItemBlock(block BackupItemBlock) []schema.GroupResource
 ```
 The return value is a slice of GRs for resources which were backed up. Velero tracks these to determine which CRDs need to be included in the backup. Note that we need to make sure we include in this not only those resources that were backed up directly, but also those backed up indirectly via additional items BIA execute returns.
 
@@ -363,4 +367,4 @@ func (a *PodAction) Name() string {
 ## Implementation
 Phase 1 and Phase 2 could be implemented within the same Velero release cycle, but they need not be.
 Phase 1 is expected to be implemented in Velero 1.15.
-Phase 2 could either be in 1.15 as well, or in a later release, depending on the release timing and resource availability.
+Phase 2 is expected to be implemented in Velero 1.16.
