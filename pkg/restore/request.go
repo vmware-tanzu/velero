@@ -29,6 +29,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
@@ -52,18 +53,19 @@ func resourceKey(obj runtime.Object) string {
 type Request struct {
 	*velerov1api.Restore
 
-	Log                      logrus.FieldLogger
-	Backup                   *velerov1api.Backup
-	PodVolumeBackups         []*velerov1api.PodVolumeBackup
-	VolumeSnapshots          []*volume.Snapshot
-	BackupReader             io.Reader
-	RestoredItems            map[itemKey]restoredItemStatus
-	itemOperationsList       *[]*itemoperation.RestoreOperation
-	ResourceModifiers        *resourcemodifiers.ResourceModifiers
-	DisableInformerCache     bool
-	CSIVolumeSnapshots       []*snapshotv1api.VolumeSnapshot
-	BackupVolumeInfoMap      map[string]volume.BackupVolumeInfo
-	RestoreVolumeInfoTracker *volume.RestoreVolumeInfoTracker
+	Log                            logrus.FieldLogger
+	Backup                         *velerov1api.Backup
+	PodVolumeBackups               []*velerov1api.PodVolumeBackup
+	VolumeSnapshots                []*volume.Snapshot
+	BackupReader                   io.Reader
+	RestoredItems                  map[itemKey]restoredItemStatus
+	itemOperationsList             *[]*itemoperation.RestoreOperation
+	ResourceModifiers              *resourcemodifiers.ResourceModifiers
+	DisableInformerCache           bool
+	CSIVolumeSnapshots             []*snapshotv1api.VolumeSnapshot
+	BackupVolumeInfoMap            map[string]volume.BackupVolumeInfo
+	RestoreVolumeInfoTracker       *volume.RestoreVolumeInfoTracker
+	NamespaceDeletionStatusTracker kube.NamespaceDeletionStatusTracker
 }
 
 type restoredItemStatus struct {
