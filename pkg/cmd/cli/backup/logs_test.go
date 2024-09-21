@@ -136,7 +136,7 @@ func TestNewLogsCommand(t *testing.T) {
 		done := make(chan bool)
 		go func() {
 			err = l.Run(c, f)
-			require.Error(t, err)
+			assert.Error(t, err)
 		}()
 
 		select {

@@ -238,7 +238,6 @@ linters-settings:
   testifylint:
       # TODO: enable them all
       disable:
-        - go-require
         - float-compare
         - require-error
       enable-all: true
