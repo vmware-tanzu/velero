@@ -105,6 +105,8 @@ var (
 		  - CAPI Clusters come before ClusterResourceSets because failing to do so means the CAPI controller-manager will panic.
 		    Both Clusters and ClusterResourceSets need to come before ClusterResourceSetBinding in order to properly restore workload clusters.
 		    See https://github.com/kubernetes-sigs/cluster-api/issues/4105
+		  - apps.kappctrl.k14s.io and packageinstalls.packaging.carvel.dev go after workloads(pod/replicaset/etc.), otherwise the controller may
+		    creates new workloads before restoring them
 	*/
 	defaultRestorePriorities = types.Priorities{
 		HighPriorities: []string{
@@ -135,6 +137,8 @@ var (
 			"clusterbootstraps.run.tanzu.vmware.com",
 			"clusters.cluster.x-k8s.io",
 			"clusterresourcesets.addons.cluster.x-k8s.io",
+			"apps.kappctrl.k14s.io",
+			"packageinstalls.packaging.carvel.dev",
 		},
 	}
 )
