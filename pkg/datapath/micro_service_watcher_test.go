@@ -195,6 +195,9 @@ func TestStartWatch(t *testing.T) {
 				},
 				{
 					event: &v1.Event{Reason: EventReasonCompleted},
+				},
+				{
+					event: &v1.Event{Reason: EventReasonStopped},
 					delay: time.Second,
 				},
 			},
@@ -214,6 +217,9 @@ func TestStartWatch(t *testing.T) {
 				{
 					event: &v1.Event{Reason: EventReasonCompleted},
 				},
+				{
+					event: &v1.Event{Reason: EventReasonStopped},
+				},
 			},
 			expectStartEvent:     true,
 			expectTerminateEvent: true,
@@ -230,6 +236,9 @@ func TestStartWatch(t *testing.T) {
 				},
 				{
 					event: &v1.Event{Reason: EventReasonCompleted},
+				},
+				{
+					event: &v1.Event{Reason: EventReasonStopped},
 				},
 			},
 			redirectLogErr:       errors.New("fake-error"),
@@ -269,7 +278,10 @@ func TestStartWatch(t *testing.T) {
 			insertEventsAfter: []insertEvent{
 				{
 					event: &v1.Event{Reason: EventReasonCompleted},
-					after: time.Second,
+				},
+				{
+					event: &v1.Event{Reason: EventReasonStopped},
+					delay: time.Second,
 				},
 			},
 			expectStartEvent:     true,
@@ -293,6 +305,9 @@ func TestStartWatch(t *testing.T) {
 				},
 				{
 					event: &v1.Event{Reason: EventReasonCompleted},
+				},
+				{
+					event: &v1.Event{Reason: EventReasonStopped},
 					delay: time.Second,
 				},
 			},
@@ -312,6 +327,9 @@ func TestStartWatch(t *testing.T) {
 				},
 				{
 					event: &v1.Event{Reason: EventReasonCancelled},
+				},
+				{
+					event: &v1.Event{Reason: EventReasonStopped},
 				},
 			},
 			terminationMessage:   "fake-termination-message-1",
@@ -338,6 +356,9 @@ func TestStartWatch(t *testing.T) {
 				},
 				{
 					event: &v1.Event{Reason: EventReasonCancelled},
+				},
+				{
+					event: &v1.Event{Reason: EventReasonStopped},
 				},
 			},
 			terminationMessage:   ErrCancelled,

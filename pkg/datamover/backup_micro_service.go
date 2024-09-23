@@ -95,7 +95,7 @@ func NewBackupMicroService(ctx context.Context, client client.Client, kubeClient
 }
 
 func (r *BackupMicroService) Init() error {
-	r.eventRecorder = kube.NewEventRecorder(r.kubeClient, r.client.Scheme(), r.dataUploadName, r.nodeName)
+	r.eventRecorder = kube.NewEventRecorder(r.kubeClient, r.client.Scheme(), r.dataUploadName, r.nodeName, r.logger)
 
 	handler, err := r.duInformer.AddEventHandler(
 		cachetool.ResourceEventHandlerFuncs{
@@ -221,6 +221,8 @@ func (r *BackupMicroService) RunCancelableDataPath(ctx context.Context) (string,
 	if err != nil {
 		log.WithError(err).Error("Async fs backup was not completed")
 	}
+
+	r.eventRecorder.EndingEvent(du, false, datapath.EventReasonStopped, "Data path for %s stopped", du.Name)
 
 	return result, err
 }

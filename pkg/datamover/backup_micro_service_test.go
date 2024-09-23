@@ -62,6 +62,15 @@ func (bt *backupMsTestHelper) Event(_ runtime.Object, _ bool, reason string, mes
 	bt.eventReason = reason
 	bt.eventMsg = fmt.Sprintf(message, a...)
 }
+
+func (bt *backupMsTestHelper) EndingEvent(_ runtime.Object, _ bool, reason string, message string, a ...any) {
+	bt.eventLock.Lock()
+	defer bt.eventLock.Unlock()
+
+	bt.withEvent = true
+	bt.eventReason = reason
+	bt.eventMsg = fmt.Sprintf(message, a...)
+}
 func (bt *backupMsTestHelper) Shutdown() {}
 
 func (bt *backupMsTestHelper) Marshal(v any) ([]byte, error) {
@@ -336,7 +345,7 @@ func TestRunCancelableDataPath(t *testing.T) {
 			ctx:              ctxTimeout,
 			kubeClientObj:    []runtime.Object{duInProgress},
 			dataPathStarted:  true,
-			expectedEventMsg: fmt.Sprintf("Data path for %s started", dataUploadName),
+			expectedEventMsg: fmt.Sprintf("Data path for %s stopped", dataUploadName),
 			expectedErr:      "timed out waiting for fs backup to complete",
 		},
 		{
@@ -347,7 +356,7 @@ func TestRunCancelableDataPath(t *testing.T) {
 			result: &dataPathResult{
 				err: errors.New("fake-data-path-error"),
 			},
-			expectedEventMsg: fmt.Sprintf("Data path for %s started", dataUploadName),
+			expectedEventMsg: fmt.Sprintf("Data path for %s stopped", dataUploadName),
 			expectedErr:      "fake-data-path-error",
 		},
 		{
@@ -358,7 +367,7 @@ func TestRunCancelableDataPath(t *testing.T) {
 			result: &dataPathResult{
 				result: "fake-succeed-result",
 			},
-			expectedEventMsg: fmt.Sprintf("Data path for %s started", dataUploadName),
+			expectedEventMsg: fmt.Sprintf("Data path for %s stopped", dataUploadName),
 		},
 	}
 

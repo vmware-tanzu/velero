@@ -84,7 +84,7 @@ func NewRestoreMicroService(ctx context.Context, client client.Client, kubeClien
 }
 
 func (r *RestoreMicroService) Init() error {
-	r.eventRecorder = kube.NewEventRecorder(r.kubeClient, r.client.Scheme(), r.dataDownloadName, r.nodeName)
+	r.eventRecorder = kube.NewEventRecorder(r.kubeClient, r.client.Scheme(), r.dataDownloadName, r.nodeName, r.logger)
 
 	handler, err := r.ddInformer.AddEventHandler(
 		cachetool.ResourceEventHandlerFuncs{
@@ -198,6 +198,8 @@ func (r *RestoreMicroService) RunCancelableDataPath(ctx context.Context) (string
 	if err != nil {
 		log.WithError(err).Error("Async fs restore was not completed")
 	}
+
+	r.eventRecorder.EndingEvent(dd, false, datapath.EventReasonStopped, "Data path for %s stopped", dd.Name)
 
 	return result, err
 }

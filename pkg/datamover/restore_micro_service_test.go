@@ -289,7 +289,7 @@ func TestRunCancelableRestore(t *testing.T) {
 			ctx:              ctxTimeout,
 			kubeClientObj:    []runtime.Object{ddInProgress},
 			dataPathStarted:  true,
-			expectedEventMsg: fmt.Sprintf("Data path for %s started", dataDownloadName),
+			expectedEventMsg: fmt.Sprintf("Data path for %s stopped", dataDownloadName),
 			expectedErr:      "timed out waiting for fs restore to complete",
 		},
 		{
@@ -300,7 +300,7 @@ func TestRunCancelableRestore(t *testing.T) {
 			result: &dataPathResult{
 				err: errors.New("fake-data-path-error"),
 			},
-			expectedEventMsg: fmt.Sprintf("Data path for %s started", dataDownloadName),
+			expectedEventMsg: fmt.Sprintf("Data path for %s stopped", dataDownloadName),
 			expectedErr:      "fake-data-path-error",
 		},
 		{
@@ -311,7 +311,7 @@ func TestRunCancelableRestore(t *testing.T) {
 			result: &dataPathResult{
 				result: "fake-succeed-result",
 			},
-			expectedEventMsg: fmt.Sprintf("Data path for %s started", dataDownloadName),
+			expectedEventMsg: fmt.Sprintf("Data path for %s stopped", dataDownloadName),
 		},
 	}
 
