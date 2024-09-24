@@ -2,7 +2,7 @@
 
 ## Glossary & Abbreviation
 
-**VGDP**: The collective of modules that is introduced in [Unified Repository design][1]. Velero uses these modules to finish data transmission for various purposes. It includes uploaders and the backup repository.  
+**VGDP**: Velero Generic Data Path. The collective of modules that is introduced in [Unified Repository design][1]. Velero uses these modules to finish data transmission for various purposes. It includes uploaders and the backup repository.  
 **Volume Snapshot Data Movement**: The backup/restore method introduced in [Volume Snapshot Data Movement design][2]. It backs up snapshot data from the volatile and limited production environment into the durable, heterogeneous and scalable backup storage.  
 **VBDM**: Velero Built-in Data Mover as introduced in [Volume Snapshot Data Movement design][2], it is the built-in data mover shipped along with Velero.  
 **Exposer**: Exposer is introduced in [Volume Snapshot Data Movement design][2] and is used to expose the volume snapshots/target volumes for VGDP to access locally.  
