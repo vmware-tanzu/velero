@@ -182,7 +182,9 @@ func (t *TestCase) Start() error {
 
 func (t *TestCase) Clean() error {
 	veleroCfg := t.GetTestCase().VeleroCfg
-	if !veleroCfg.Debug {
+	if CurrentSpecReport().Failed() && veleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
 		By(fmt.Sprintf("Clean namespace with prefix %s after test", t.CaseBaseName), func() {
 			if err := CleanupNamespaces(t.Ctx, t.Client, t.CaseBaseName); err != nil {
 				fmt.Println("Fail to cleanup namespaces: ", err)
@@ -195,6 +197,7 @@ func (t *TestCase) Clean() error {
 			}
 		})
 	}
+
 	return nil
 }
 

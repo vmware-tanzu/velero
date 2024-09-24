@@ -36,6 +36,7 @@ import (
 	"fmt"
 	"strings"
 
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/pkg/errors"
 
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
@@ -176,8 +177,11 @@ func (r *RBACCase) Destroy() error {
 }
 
 func (r *RBACCase) Clean() error {
-	if !r.VeleroCfg.Debug {
+	if CurrentSpecReport().Failed() && r.VeleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
 		return r.Destroy()
 	}
+
 	return nil
 }

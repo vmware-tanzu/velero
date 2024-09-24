@@ -62,7 +62,9 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 	})
 
 	AfterEach(func() {
-		if !veleroCfg.Debug {
+		if CurrentSpecReport().Failed() && veleroCfg.FailFast {
+			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+		} else {
 			By("Clean backups after test", func() {
 				DeleteAllBackups(context.Background(), &veleroCfg)
 			})
@@ -104,13 +106,17 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupLoc
 		if err := CreateNamespace(oneHourTimeout, client, ns); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", ns)
 		}
-		if !veleroCfg.Debug {
+
+		if CurrentSpecReport().Failed() && veleroCfg.FailFast {
+			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+		} else {
 			defer func() {
 				if err := DeleteNamespace(context.Background(), client, ns, true); err != nil {
 					fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", ns))
 				}
 			}()
 		}
+
 		if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, ns,
 			registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData); err != nil {
 			return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", ns)

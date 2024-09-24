@@ -85,7 +85,6 @@ func init() {
 	flag.StringVar(&VeleroCfg.AdditionalBSLConfig, "additional-bsl-config", "", "configuration to use for the additional backup storage location. Format is key1=value1,key2=value2")
 	flag.StringVar(&VeleroCfg.AdditionalBSLCredentials, "additional-bsl-credentials-file", "", "file containing credentials for additional backup storage location provider. Required if testing multiple credentials support.")
 	flag.StringVar(&VeleroCfg.Features, "features", "", "comma-separated list of features to enable for this Velero process.")
-	flag.BoolVar(&VeleroCfg.Debug, "debug-e2e-test", false, "A Switch for enable or disable test data cleaning action.")
 	flag.StringVar(&VeleroCfg.GCFrequency, "garbage-collection-frequency", "", "frequency of garbage collection.")
 	flag.StringVar(&VeleroCfg.DefaultClusterContext, "default-cluster-context", "", "default cluster's kube config context, it's for migration test.")
 	flag.StringVar(&VeleroCfg.StandbyClusterContext, "standby-cluster-context", "", "standby cluster's kube config context, it's for migration test.")
@@ -103,6 +102,7 @@ func init() {
 	flag.StringVar(&VeleroCfg.EKSPolicyARN, "eks-policy-arn", "", "EKS plicy ARN for creating AWS IAM service account.")
 	flag.StringVar(&VeleroCfg.DefaultCLSServiceAccountName, "default-cls-service-account-name", "", "default cluster service account name.")
 	flag.StringVar(&VeleroCfg.StandbyCLSServiceAccountName, "standby-cls-service-account-name", "", "standby cluster service account name.")
+	flag.BoolVar(&VeleroCfg.FailFast, "fail-fast", true, "a switch for failing fast on meeting error.")
 }
 
 // Add label [SkipVanillaZfs]:
@@ -264,6 +264,8 @@ func GetKubeconfigContext() error {
 	return nil
 }
 
+var testSuitePassed bool
+
 func TestE2e(t *testing.T) {
 	// Skip running E2E tests when running only "short" tests because:
 	// 1. E2E tests are long running tests involving installation of Velero and performing backup and restore operations.
@@ -291,7 +293,7 @@ func TestE2e(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "E2e Suite")
+	testSuitePassed = RunSpecs(t, "E2e Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -302,7 +304,9 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	if InstallVelero && !VeleroCfg.Debug {
+	// If the Velero is installed during test, and the FailFast is not enabled,
+	// uninstall Velero. If not, either Velero is not installed, or kept it for debug on failure.
+	if InstallVelero && (testSuitePassed || !VeleroCfg.FailFast) {
 		By("release test resources after testing")
 		ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 		defer ctxCancel()

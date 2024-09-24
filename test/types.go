@@ -84,7 +84,6 @@ type VeleroConfig struct {
 	Plugins                           string
 	AddBSLPlugins                     string
 	KibishiiDirectory                 string
-	Debug                             bool
 	GCFrequency                       string
 	DefaultClusterContext             string
 	StandbyClusterContext             string
@@ -110,6 +109,7 @@ type VeleroConfig struct {
 	StandbyCLSServiceAccountName      string
 	ServiceAccountNameToInstall       string
 	EKSPolicyARN                      string
+	FailFast                          bool
 }
 
 type VeleroCfgInPerf struct {

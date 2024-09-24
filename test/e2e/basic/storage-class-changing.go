@@ -142,7 +142,9 @@ func (s *StorageClasssChanging) Verify() error {
 }
 
 func (s *StorageClasssChanging) Clean() error {
-	if !s.VeleroCfg.Debug {
+	if CurrentSpecReport().Failed() && s.VeleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
 		By(fmt.Sprintf("Start to destroy namespace %s......", s.CaseBaseName), func() {
 			Expect(CleanupNamespacesWithPoll(s.Ctx, s.Client, s.CaseBaseName)).To(Succeed(),
 				fmt.Sprintf("Failed to delete namespace %s", s.CaseBaseName))
@@ -151,5 +153,6 @@ func (s *StorageClasssChanging) Clean() error {
 		DeleteStorageClass(s.Ctx, s.Client, s.desStorageClass)
 		s.TestCase.Clean()
 	}
+
 	return nil
 }
