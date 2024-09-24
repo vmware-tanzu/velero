@@ -177,7 +177,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		{
 			name:         "non-existent backup location fails validation",
 			backup:       defaultBackup().StorageLocation("nonexistent").Result(),
-			expectedErrs: []string{"an existing backup storage location wasn't specified at backup creation time and the default 'nonexistent' wasn't found. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"nonexistent\" not found"},
+			expectedErrs: []string{"an existing backup storage location was not specified at backup creation time and the default nonexistent was not found. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"nonexistent\" not found"},
 		},
 		{
 			name:           "backup for read-only backup location fails validation",
@@ -333,7 +333,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 			backupLocationInAPIServer:        nil,
 			defaultBackupLocationInAPIServer: nil,
 			expectedSuccess:                  false,
-			expectedValidationError:          "an existing backup storage location wasn't specified at backup creation time and the default 'test-backup-location' wasn't found. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"test-backup-location\" not found",
+			expectedValidationError:          "an existing backup storage location was not specified at backup creation time and the default test-backup-location was not found. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"test-backup-location\" not found",
 		},
 		{
 			name:                             "Using default BackupLocation and it can be found in ApiServer",
@@ -351,7 +351,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 			backupLocationInAPIServer:        nil,
 			defaultBackupLocationInAPIServer: nil,
 			expectedSuccess:                  false,
-			expectedValidationError:          fmt.Sprintf("an existing backup storage location wasn't specified at backup creation time and the server default '%s' doesn't exist. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"%s\" not found", defaultBackupLocation, defaultBackupLocation),
+			expectedValidationError:          fmt.Sprintf("an existing backup storage location was not specified at backup creation time and the server default %s does not exist. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"%s\" not found", defaultBackupLocation, defaultBackupLocation),
 		},
 	}
 
