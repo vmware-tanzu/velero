@@ -52,6 +52,7 @@ const (
 	EventReasonCancelled  = "Data-Path-Canceled"
 	EventReasonProgress   = "Data-Path-Progress"
 	EventReasonCancelling = "Data-Path-Canceling"
+	EventReasonStopped    = "Data-Path-Stopped"
 )
 
 type microServiceBRWatcher struct {
@@ -340,15 +341,15 @@ func (ms *microServiceBRWatcher) onEvent(evt *v1.Event) {
 		ms.callbacks.OnProgress(ms.ctx, ms.namespace, ms.taskName, funcGetProgressFromMessage(evt.Message, ms.log))
 	case EventReasonCompleted:
 		ms.log.Infof("Received data path completed message: %v", funcGetResultFromMessage(ms.taskType, evt.Message, ms.log))
-		ms.terminatedFromEvent = true
 	case EventReasonCancelled:
 		ms.log.Infof("Received data path canceled message: %s", evt.Message)
-		ms.terminatedFromEvent = true
 	case EventReasonFailed:
 		ms.log.Infof("Received data path failed message: %s", evt.Message)
-		ms.terminatedFromEvent = true
 	case EventReasonCancelling:
 		ms.log.Infof("Received data path canceling message: %s", evt.Message)
+	case EventReasonStopped:
+		ms.terminatedFromEvent = true
+		ms.log.Infof("Received data path stop message: %s", evt.Message)
 	default:
 		ms.log.Infof("Received event for data path %s, reason: %s, message: %s", ms.taskName, evt.Reason, evt.Message)
 	}
