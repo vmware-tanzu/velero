@@ -50,6 +50,7 @@ type podTemplateConfig struct {
 	uploaderType                    string
 	defaultSnapshotMoveData         bool
 	privilegedNodeAgent             bool
+	privilegedDatamoverPods         bool
 	disableInformerCache            bool
 	scheduleSkipImmediately         bool
 	podResources                    kube.PodResources
@@ -174,6 +175,12 @@ func WithServiceAccountName(sa string) podTemplateOption {
 func WithPrivilegedNodeAgent(b bool) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.privilegedNodeAgent = b
+	}
+}
+
+func WithPrivilegedDatamoverPods(b bool) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.privilegedDatamoverPods = b
 	}
 }
 

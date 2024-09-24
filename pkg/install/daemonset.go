@@ -53,6 +53,9 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 	if len(c.nodeAgentConfigMap) > 0 {
 		daemonSetArgs = append(daemonSetArgs, fmt.Sprintf("--node-agent-configmap=%s", c.nodeAgentConfigMap))
 	}
+	if c.privilegedDatamoverPods {
+		daemonSetArgs = append(daemonSetArgs, "--privileged-datamover-pods=true")
+	}
 
 	userID := int64(0)
 	mountPropagationMode := corev1.MountPropagationHostToContainer

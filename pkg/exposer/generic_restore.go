@@ -37,7 +37,7 @@ import (
 // GenericRestoreExposer is the interfaces for a generic restore exposer
 type GenericRestoreExposer interface {
 	// Expose starts the process to a restore expose, the expose process may take long time
-	Expose(context.Context, corev1.ObjectReference, string, string, map[string]string, corev1.ResourceRequirements, time.Duration) error
+	Expose(context.Context, corev1.ObjectReference, string, string, map[string]string, corev1.ResourceRequirements, time.Duration, bool) error
 
 	// GetExposed polls the status of the expose.
 	// If the expose is accessible by the current caller, it waits the expose ready and returns the expose result.
@@ -69,7 +69,16 @@ type genericRestoreExposer struct {
 	log        logrus.FieldLogger
 }
 
-func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, targetPVCName string, sourceNamespace string, hostingPodLabels map[string]string, resources corev1.ResourceRequirements, timeout time.Duration) error {
+func (e *genericRestoreExposer) Expose(
+	ctx context.Context,
+	ownerObject corev1.ObjectReference,
+	targetPVCName string,
+	sourceNamespace string,
+	hostingPodLabels map[string]string,
+	resources corev1.ResourceRequirements,
+	timeout time.Duration,
+	privileged bool,
+) error {
 	curLog := e.log.WithFields(logrus.Fields{
 		"owner":            ownerObject.Name,
 		"target PVC":       targetPVCName,
@@ -87,7 +96,7 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1.O
 		return errors.Errorf("Target PVC %s/%s has already been bound, abort", sourceNamespace, targetPVCName)
 	}
 
-	restorePod, err := e.createRestorePod(ctx, ownerObject, targetPVC, timeout, hostingPodLabels, selectedNode, resources)
+	restorePod, err := e.createRestorePod(ctx, ownerObject, targetPVC, timeout, hostingPodLabels, selectedNode, resources, privileged)
 	if err != nil {
 		return errors.Wrapf(err, "error to create restore pod")
 	}
@@ -296,8 +305,16 @@ func (e *genericRestoreExposer) RebindVolume(ctx context.Context, ownerObject co
 	return nil
 }
 
-func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObject corev1.ObjectReference, targetPVC *corev1.PersistentVolumeClaim,
-	operationTimeout time.Duration, label map[string]string, selectedNode string, resources corev1.ResourceRequirements) (*corev1.Pod, error) {
+func (e *genericRestoreExposer) createRestorePod(
+	ctx context.Context,
+	ownerObject corev1.ObjectReference,
+	targetPVC *corev1.PersistentVolumeClaim,
+	operationTimeout time.Duration,
+	label map[string]string,
+	selectedNode string,
+	resources corev1.ResourceRequirements,
+	privileged bool,
+) (*corev1.Pod, error) {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
@@ -382,6 +399,12 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 				RunAsUser: &userID,
 			},
 		},
+	}
+
+	if privileged {
+		pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+			Privileged: boolptr.True(),
+		}
 	}
 
 	return e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Create(ctx, pod, metav1.CreateOptions{})

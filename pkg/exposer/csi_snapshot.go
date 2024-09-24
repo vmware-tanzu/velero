@@ -73,6 +73,9 @@ type CSISnapshotExposeParam struct {
 
 	// Resources defines the resource requirements of the hosting pod
 	Resources corev1.ResourceRequirements
+
+	// Privileged determines whether to create a privileged pod
+	Privileged bool
 }
 
 // CSISnapshotExposeWaitParam define the input param for WaitExposed of CSI snapshots
@@ -202,6 +205,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		csiExposeParam.HostingPodLabels,
 		csiExposeParam.Affinity,
 		csiExposeParam.Resources,
+		csiExposeParam.Privileged,
 	)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
@@ -441,6 +445,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	label map[string]string,
 	affinity *kube.LoadAffinity,
 	resources corev1.ResourceRequirements,
+	privileged bool,
 ) (*corev1.Pod, error) {
 	podName := ownerObject.Name
 
@@ -548,6 +553,12 @@ func (e *csiSnapshotExposer) createBackupPod(
 				RunAsUser: &userID,
 			},
 		},
+	}
+
+	if privileged {
+		pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+			Privileged: boolptr.True(),
+		}
 	}
 
 	return e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Create(ctx, pod, metav1.CreateOptions{})

@@ -247,6 +247,7 @@ type VeleroOptions struct {
 	RestoreOnly                     bool
 	UseNodeAgent                    bool
 	PrivilegedNodeAgent             bool
+	PrivilegedDatamoverPods         bool
 	UseVolumeSnapshots              bool
 	BSLConfig                       map[string]string
 	VSLConfig                       map[string]string
@@ -407,6 +408,9 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		}
 		if o.PrivilegedNodeAgent {
 			dsOpts = append(dsOpts, WithPrivilegedNodeAgent(true))
+		}
+		if o.PrivilegedDatamoverPods {
+			dsOpts = append(dsOpts, WithPrivilegedDatamoverPods(true))
 		}
 		if len(o.NodeAgentConfigMap) > 0 {
 			dsOpts = append(dsOpts, WithNodeAgentConfigMap(o.NodeAgentConfigMap))

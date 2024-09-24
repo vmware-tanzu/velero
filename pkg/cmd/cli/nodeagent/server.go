@@ -89,6 +89,7 @@ type nodeAgentServerConfig struct {
 	resourceTimeout         time.Duration
 	dataMoverPrepareTimeout time.Duration
 	nodeAgentConfig         string
+	privilegedDatamoverPods bool
 }
 
 func NewServerCommand(f client.Factory) *cobra.Command {
@@ -126,6 +127,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.dataMoverPrepareTimeout, "data-mover-prepare-timeout", config.dataMoverPrepareTimeout, "How long to wait for preparing a DataUpload/DataDownload. Default is 30 minutes.")
 	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "The address to expose prometheus metrics")
 	command.Flags().StringVar(&config.nodeAgentConfig, "node-agent-configmap", config.nodeAgentConfig, "The name of ConfigMap containing node-agent configurations.")
+	command.Flags().BoolVar(&config.privilegedDatamoverPods, "privileged-datamover-pods", config.privilegedDatamoverPods, "Use privileged mode for the datamover pods. Optional.")
 
 	return command
 }
@@ -330,12 +332,24 @@ func (s *nodeAgentServer) run() {
 		s.config.dataMoverPrepareTimeout,
 		s.logger,
 		s.metrics,
+		s.config.privilegedDatamoverPods,
 	)
 	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(
+		s.mgr.GetClient(),
+		s.mgr,
+		s.kubeClient,
+		s.dataPathMgr,
+		podResources,
+		s.nodeName,
+		s.config.dataMoverPrepareTimeout,
+		s.logger,
+		s.metrics,
+		s.config.privilegedDatamoverPods,
+	)
 	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}
