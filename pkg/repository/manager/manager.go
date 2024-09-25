@@ -418,6 +418,9 @@ func (m *manager) buildMaintenanceJob(
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "velero-repo-maintenance-pod",
+					Labels: map[string]string{
+						repository.RepositoryNameLabel: param.BackupRepo.Name,
+					},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
