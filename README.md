@@ -1,6 +1,8 @@
 ![100]
 
-[![Build Status][1]][2] [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3811/badge)](https://bestpractices.coreinfrastructure.org/projects/3811)
+[![Build Status][1]][2]
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3811/badge)](https://bestpractices.coreinfrastructure.org/projects/3811)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/vmware-tanzu/velero/badge)](https://securityscorecards.dev/viewer/?uri=github.com/vmware-tanzu/velero)
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/vmware-tanzu/velero)
 
 ## Overview
