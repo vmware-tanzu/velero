@@ -86,7 +86,7 @@ func (h *ErrorLocationHook) Fire(entry *logrus.Entry) error {
 type LocationInfo struct {
 	File     string
 	Function string
-	Line     int
+	Line     int32
 }
 
 // GetFrameLocationInfo returns the location of a frame.
@@ -101,7 +101,7 @@ func GetFrameLocationInfo(frame errors.Frame) LocationInfo {
 	tabIndex := strings.LastIndex(functionNameAndFileAndLine, "\t")
 	fileAndLine := strings.Split(functionNameAndFileAndLine[tabIndex+1:], ":")
 
-	line, err := strconv.Atoi(fileAndLine[1])
+	line, err := strconv.ParseInt(fileAndLine[1], 10, 32)
 	if err != nil {
 		line = -1
 	}
@@ -109,7 +109,7 @@ func GetFrameLocationInfo(frame errors.Frame) LocationInfo {
 	return LocationInfo{
 		File:     fileAndLine[0],
 		Function: functionName,
-		Line:     line,
+		Line:     int32(line),
 	}
 }
 
