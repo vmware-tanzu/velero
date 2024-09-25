@@ -461,7 +461,6 @@ func (e *csiSnapshotExposer) createBackupPod(
 		VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 				ClaimName: backupPVC.Name,
-				ReadOnly:  true,
 			},
 		},
 	}}
