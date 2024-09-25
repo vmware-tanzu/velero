@@ -3,6 +3,9 @@ on:
   schedule:
     - cron: '0 2 * * *' # run at 2 AM UTC
 
+permissions:
+  contents: read
+
 jobs:
   nightly-scan:
     name: Trivy nightly scan
@@ -19,10 +22,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@d9cd5b1c23aaf8cb31bb09141028215828364bbb # master
         with:
           image-ref: 'docker.io/velero/${{ matrix.images }}:${{ matrix.versions }}'
           severity: 'CRITICAL,HIGH,MEDIUM'
@@ -31,6 +34,6 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@883d8588e56d1753a8a58c1c86e88976f0c23449 # v3.26.3
         with:
           sarif_file: 'trivy-results.sarif'

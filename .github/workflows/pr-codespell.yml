@@ -1,5 +1,8 @@
 name: Pull Request Codespell Check
 on: [pull_request]
+permissions:
+  contents: read
+
 jobs:
 
   codespell:
@@ -8,10 +11,10 @@ jobs:
     steps:
 
     - name: Check out the code
-      uses: actions/checkout@v4
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
     - name: Codespell
-      uses: codespell-project/actions-codespell@master
+      uses: codespell-project/actions-codespell@406322ec52dd7b488e48c1c4b82e2a8b3a1bf630 # master
       with:
         # ignore the config/.../crd.go file as it's generated binary data that is edited elswhere.
         skip: .git,*.png,*.jpg,*.woff,*.ttf,*.gif,*.ico,./config/crd/v1beta1/crds/crds.go,./config/crd/v1/crds/crds.go,./config/crd/v2alpha1/crds/crds.go,./go.sum,./LICENSE
