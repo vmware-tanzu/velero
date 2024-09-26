@@ -117,7 +117,6 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 			// If the namespace is marked for deletion, and we timed out, adding it in tracker
 			namespaceDeletionStatusTracker.Add(namespace.Name, namespace.Name)
 			return false, nsCreated, errors.Wrapf(err, "timed out waiting for terminating namespace %s to disappear before restoring", namespace.Name)
-
 		} else if namespaceAlreadyInDeletionTracker {
 			// If the namespace is already in the tracker, return an error.
 			return false, nsCreated, err
