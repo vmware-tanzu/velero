@@ -546,6 +546,9 @@ func (e *csiSnapshotExposer) createBackupPod(
 			RestartPolicy:                 corev1.RestartPolicyNever,
 			SecurityContext: &corev1.PodSecurityContext{
 				RunAsUser: &userID,
+				SELinuxOptions: &corev1.SELinuxOptions{
+					Type: "spc_t",
+				},
 			},
 		},
 	}
