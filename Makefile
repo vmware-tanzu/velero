@@ -100,7 +100,7 @@ RESTIC_VERSION ?= 0.15.0
 
 CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le
 BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
-BUILDX_OUTPUT_TYPE ?= docker
+BUILDX_OUTPUT_TYPE ?= image
 
 # set git sha and tree state
 GIT_SHA = $(shell git rev-parse HEAD)
