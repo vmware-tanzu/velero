@@ -54,6 +54,10 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 		daemonSetArgs = append(daemonSetArgs, fmt.Sprintf("--node-agent-configmap=%s", c.nodeAgentConfigMap))
 	}
 
+	if len(c.selinuxDatamover) > 0 {
+		daemonSetArgs = append(daemonSetArgs, fmt.Sprintf("--selinux-datamover=%s", c.selinuxDatamover))
+	}
+
 	userID := int64(0)
 	mountPropagationMode := corev1.MountPropagationHostToContainer
 

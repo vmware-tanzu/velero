@@ -267,6 +267,7 @@ type VeleroOptions struct {
 	BackupRepoConfigMap             string
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
+	SELinuxDatamover                string
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -410,6 +411,9 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		}
 		if len(o.NodeAgentConfigMap) > 0 {
 			dsOpts = append(dsOpts, WithNodeAgentConfigMap(o.NodeAgentConfigMap))
+		}
+		if len(o.SELinuxDatamover) > 0 {
+			dsOpts = append(dsOpts, WithSELinuxDatamover(o.SELinuxDatamover))
 		}
 
 		ds := DaemonSet(o.Namespace, dsOpts...)

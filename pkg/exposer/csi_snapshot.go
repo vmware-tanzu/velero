@@ -73,6 +73,12 @@ type CSISnapshotExposeParam struct {
 
 	// Resources defines the resource requirements of the hosting pod
 	Resources corev1.ResourceRequirements
+
+	// SELinuxDatamover defines how to modify pod definition for SELinux
+	// none: no changes (won't work in SELinux environments). Default value if field is empty.
+	// no-relabeling: Sets securityContext.SELinuxOptions.Type=spc_t. Preferred configuration for SELinux with some performance improvements for volumes with many files, but won't work with restricted pods.
+	// no-readonly: Removes volumes.volumeSource.PVC.ReadOnly=true. For SELinux environments where spc_t is not allowed, but may break shallow copy.
+	SELinuxDatamover string
 }
 
 // CSISnapshotExposeWaitParam define the input param for WaitExposed of CSI snapshots
@@ -202,6 +208,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		csiExposeParam.HostingPodLabels,
 		csiExposeParam.Affinity,
 		csiExposeParam.Resources,
+		csiExposeParam.SELinuxDatamover,
 	)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
@@ -441,6 +448,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	label map[string]string,
 	affinity *kube.LoadAffinity,
 	resources corev1.ResourceRequirements,
+	selinuxDatamover string,
 ) (*corev1.Pod, error) {
 	podName := ownerObject.Name
 
@@ -461,10 +469,14 @@ func (e *csiSnapshotExposer) createBackupPod(
 		VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 				ClaimName: backupPVC.Name,
-				ReadOnly:  true,
 			},
 		},
 	}}
+
+	if selinuxDatamover != SELinuxNoReadOnly {
+		volumes[0].VolumeSource.PersistentVolumeClaim.ReadOnly = true
+	}
+
 	volumes = append(volumes, podInfo.volumes...)
 
 	if label == nil {
@@ -548,6 +560,12 @@ func (e *csiSnapshotExposer) createBackupPod(
 				RunAsUser: &userID,
 			},
 		},
+	}
+
+	if selinuxDatamover == SELinuxNoRelabeling {
+		pod.Spec.SecurityContext.SELinuxOptions = &corev1.SELinuxOptions{
+			Type: "spc_t",
+		}
 	}
 
 	return e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Create(ctx, pod, metav1.CreateOptions{})
