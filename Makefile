@@ -94,13 +94,15 @@ define BUILDX_ERROR
 buildx not enabled, refusing to run this recipe
 see: https://velero.io/docs/main/build-from-source/#making-images-and-updating-velero for more info
 endef
-
+# comma cannot be escaped and can only be used in Make function arguments by putting into variable
+comma=,
 # The version of restic binary to be downloaded
 RESTIC_VERSION ?= 0.15.0
 
 CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le
 BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
-BUILDX_OUTPUT_TYPE ?= image
+BUILDX_PUSH ?= false
+BUILDX_OUTPUT_TYPE ?= image$(subst false,,$(subst true,$(comma)push=true,$(BUILDX_PUSH)))
 
 # set git sha and tree state
 GIT_SHA = $(shell git rev-parse HEAD)
