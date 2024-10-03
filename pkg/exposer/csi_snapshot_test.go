@@ -110,6 +110,7 @@ func TestExpose(t *testing.T) {
 	}
 
 	snapshotHandle := "fake-handle"
+	sourceVolumeMode := corev1.PersistentVolumeFilesystem
 	vscObj := &snapshotv1api.VolumeSnapshotContent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: vscName,
@@ -122,6 +123,7 @@ func TestExpose(t *testing.T) {
 			DeletionPolicy:          snapshotv1api.VolumeSnapshotContentDelete,
 			Driver:                  "fake-driver",
 			VolumeSnapshotClassName: &snapshotClass,
+			SourceVolumeMode:        &sourceVolumeMode,
 		},
 		Status: &snapshotv1api.VolumeSnapshotContentStatus{
 			RestoreSize:    &restoreSize,
@@ -433,6 +435,7 @@ func TestExpose(t *testing.T) {
 				assert.Equal(t, expectedVSC.Spec.DeletionPolicy, vscObj.Spec.DeletionPolicy)
 				assert.Equal(t, expectedVSC.Spec.Driver, vscObj.Spec.Driver)
 				assert.Equal(t, *expectedVSC.Spec.VolumeSnapshotClassName, *vscObj.Spec.VolumeSnapshotClassName)
+				assert.Equal(t, *expectedVSC.Spec.SourceVolumeMode, *vscObj.Spec.SourceVolumeMode)
 
 				if test.expectedVolumeSize != nil {
 					assert.Equal(t, *test.expectedVolumeSize, backupPVC.Spec.Resources.Requests[corev1.ResourceStorage])
