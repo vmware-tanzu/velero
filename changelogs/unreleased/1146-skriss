@@ -1,1 +1,0 @@
-remove pkg/util/collections/map_utils.go, replace with structured API types and apimachinery's unstructured helpers

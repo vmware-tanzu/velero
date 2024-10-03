@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,13 +26,25 @@ import (
 func TestDaemonSet(t *testing.T) {
 	ds := DaemonSet("velero")
 
-	assert.Equal(t, "restic", ds.Spec.Template.Spec.Containers[0].Name)
+	assert.Equal(t, "node-agent", ds.Spec.Template.Spec.Containers[0].Name)
 	assert.Equal(t, "velero", ds.ObjectMeta.Namespace)
 
-	ds = DaemonSet("velero", WithoutCredentialsVolume())
-	assert.Equal(t, 1, len(ds.Spec.Template.Spec.Volumes))
-
-	ds = DaemonSet("velero", WithImage("gcr.io/heptio-images/velero:v0.11"))
-	assert.Equal(t, "gcr.io/heptio-images/velero:v0.11", ds.Spec.Template.Spec.Containers[0].Image)
+	ds = DaemonSet("velero", WithImage("velero/velero:v0.11"))
+	assert.Equal(t, "velero/velero:v0.11", ds.Spec.Template.Spec.Containers[0].Image)
 	assert.Equal(t, corev1.PullIfNotPresent, ds.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+
+	ds = DaemonSet("velero", WithSecret(true))
+	assert.Len(t, ds.Spec.Template.Spec.Containers[0].Env, 7)
+	assert.Len(t, ds.Spec.Template.Spec.Volumes, 4)
+
+	ds = DaemonSet("velero", WithFeatures([]string{"foo,bar,baz"}))
+	assert.Len(t, ds.Spec.Template.Spec.Containers[0].Args, 3)
+	assert.Equal(t, "--features=foo,bar,baz", ds.Spec.Template.Spec.Containers[0].Args[2])
+
+	ds = DaemonSet("velero", WithNodeAgentConfigMap("node-agent-config-map"))
+	assert.Len(t, ds.Spec.Template.Spec.Containers[0].Args, 3)
+	assert.Equal(t, "--node-agent-configmap=node-agent-config-map", ds.Spec.Template.Spec.Containers[0].Args[2])
+
+	ds = DaemonSet("velero", WithServiceAccountName("test-sa"))
+	assert.Equal(t, "test-sa", ds.Spec.Template.Spec.ServiceAccountName)
 }

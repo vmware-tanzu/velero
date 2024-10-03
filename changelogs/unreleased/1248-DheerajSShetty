@@ -1,6 +1,0 @@
-Improve `describe` output
-   * Move Phase to right under Metadata(name/namespace/label/annotations)
-   * Move Validation errors: section right after Phase: section and only
-     show it if the item has a phase of FailedValidation
-   * For restores move Warnings and Errors under Validation errors. Leave
-     their display as is.

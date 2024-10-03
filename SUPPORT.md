@@ -1,5 +1,7 @@
 # Velero Support
 
-Thanks for trying out Velero! We welcome all feedback, please consider joining our mailing list: 
+Thanks for trying out Velero! We welcome all feedback, find all the ways to connect with us on our Community page:
 
-- [Mailing List](https://groups.google.com/forum/#!forum/velero)
+- [Velero Community](https://velero.io/community/)
+
+You can find details on the Velero maintainers' support process [here](https://velero.io/docs/main/support-process/).

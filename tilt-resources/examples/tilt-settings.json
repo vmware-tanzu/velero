@@ -1,0 +1,22 @@
+{
+    "default_registry": "",
+    "enable_providers": [
+        "aws",
+        "gcp",
+        "azure",
+        "csi"
+    ],
+    "providers": { 
+        "aws": "../velero-plugin-for-aws",
+        "gcp": "../velero-plugin-for-gcp",
+        "azure": "../velero-plugin-for-microsoft-azure"
+    },
+    "allowed_contexts": [
+        "development"
+    ],
+    "use_node_agent": false,
+    "create_backup_locations": true,
+    "setup-minio": true,
+    "enable_debug": false,
+    "debug_continue_on_start": true
+}

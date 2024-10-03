@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+{{ partial "head-docs.html" . }}
+
+{{ $fileName := "" }}
+{{ with .File }}{{ $fileName = .LogicalName }}{{ end }}
+{{ if eq $fileName "_index.md" }}
+  <title>{{ .Site.Title }} Docs - Overview</title>
+{{ else }}
+  <title>{{ .Site.Title }} Docs - {{ .Title }}</title>
+{{ end }}
+
+<body id="docs">
+<div class="container-fluid site-outer-container">
+  <div class="site-container">
+    {{ .Render "site-header" }}
+    <div class="post-single-hero post-single-hero-short bg-color-{{ $.Site.Params.hero.backgroundColor }}">
+      <div class="section">
+        <div class="section-content">
+          <h1>Documentation</h1>
+        </div>
+      </div>
+    </div>
+    <div class="section section-card pt-4 pb-0">
+      <div class="container container-max">
+        <div class="row">
+          <div class="col-md-3 toc">
+            {{ .Render "versions" }}
+            <br/>
+            <div id="docsearch">
+              <!-- <form class="d-flex align-items-center">
+                <span class="algolia-autocomplete" style="position: relative; display: inline-block; direction: ltr;">
+                  <input type="search" class="form-control docsearch" id="search-input" placeholder="Search..."
+                          aria-label="Search for..." autocomplete="off" spellcheck="false" role="combobox"
+                          aria-autocomplete="list" aria-expanded="false" aria-owns="algolia-autocomplete-listbox-0"
+                          dir="auto" style="position: relative; vertical-align: top;">
+                </span>
+            </form> -->
+          </div>
+            {{ .Render "nav" }}
+          </div>
+          <div class="col-md-8">
+            {{ .Render "version-warning" }}
+            <div class="documentation-container">
+              {{ with .Title }}<h1>{{ . }}</h1>{{ end }}
+              {{ if eq $.Params.toc "true" }}
+                  <aside>
+                  {{ .TableOfContents }}
+                  </aside>
+              {{ end }}
+
+              {{ .Content }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {{ .Render "footer" }}
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@docsearch/js@3"></script>
+<script type="text/javascript"> docsearch({
+    appId: '9ASKQJ1HR3',
+    apiKey: '170ba79bfa16cebfdf10726ae4771d7e',
+    indexName: 'velero_new',
+    container: '#docsearch',
+    searchParameters: {
+      facetFilters: ["version:{{ .CurrentSection.Params.version }}"]},
+  });
+</script>
+</body>
+
+</html>

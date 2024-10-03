@@ -1,1 +1,0 @@
-Need to defer closing the the ReadCloser in ObjectStoreGRPCServer.GetObject

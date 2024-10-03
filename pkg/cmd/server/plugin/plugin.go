@@ -19,15 +19,23 @@ package plugin
 import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
-	"github.com/heptio/velero/pkg/backup"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cloudprovider/aws"
-	"github.com/heptio/velero/pkg/cloudprovider/azure"
-	"github.com/heptio/velero/pkg/cloudprovider/gcp"
-	velerodiscovery "github.com/heptio/velero/pkg/discovery"
-	veleroplugin "github.com/heptio/velero/pkg/plugin"
-	"github.com/heptio/velero/pkg/restore"
+	"github.com/vmware-tanzu/velero/pkg/datamover"
+
+	dia "github.com/vmware-tanzu/velero/internal/delete/actions/csi"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	bia "github.com/vmware-tanzu/velero/pkg/backup/actions"
+	csibia "github.com/vmware-tanzu/velero/pkg/backup/actions/csi"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/features"
+	iba "github.com/vmware-tanzu/velero/pkg/itemblock/actions"
+	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
+	ria "github.com/vmware-tanzu/velero/pkg/restore/actions"
+	csiria "github.com/vmware-tanzu/velero/pkg/restore/actions/csi"
+	"github.com/vmware-tanzu/velero/pkg/util/actionhelpers"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -37,63 +45,178 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Hidden: true,
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
-			pluginServer.
-				RegisterObjectStore("aws", newAwsObjectStore).
-				RegisterObjectStore("azure", newAzureObjectStore).
-				RegisterObjectStore("gcp", newGcpObjectStore).
-				RegisterBlockStore("aws", newAwsBlockStore).
-				RegisterBlockStore("azure", newAzureBlockStore).
-				RegisterBlockStore("gcp", newGcpBlockStore).
-				RegisterBackupItemAction("pv", newPVBackupItemAction).
-				RegisterBackupItemAction("pod", newPodBackupItemAction).
-				RegisterBackupItemAction("serviceaccount", newServiceAccountBackupItemAction(f)).
-				RegisterRestoreItemAction("job", newJobRestoreItemAction).
-				RegisterRestoreItemAction("pod", newPodRestoreItemAction).
-				RegisterRestoreItemAction("restic", newResticRestoreItemAction).
-				RegisterRestoreItemAction("service", newServiceRestoreItemAction).
-				RegisterRestoreItemAction("serviceaccount", newServiceAccountRestoreItemAction).
-				Serve()
+			config := pluginServer.GetConfig()
+			f.SetClientQPS(config.ClientQPS)
+			f.SetClientBurst(config.ClientBurst)
+			pluginServer = pluginServer.
+				RegisterBackupItemAction(
+					"velero.io/pv",
+					newPVBackupItemAction,
+				).
+				RegisterBackupItemAction(
+					"velero.io/pod",
+					newPodBackupItemAction,
+				).
+				RegisterBackupItemAction(
+					"velero.io/service-account",
+					newServiceAccountBackupItemAction(f),
+				).
+				RegisterRestoreItemAction(
+					"velero.io/job",
+					newJobRestoreItemAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/pod",
+					newPodRestoreItemAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/pod-volume-restore",
+					newPodVolumeRestoreItemAction(f),
+				).
+				RegisterRestoreItemAction(
+					"velero.io/init-restore-hook",
+					newInitRestoreHookPodAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/service",
+					newServiceRestoreItemAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/service-account",
+					newServiceAccountRestoreItemAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/add-pvc-from-pod",
+					newAddPVCFromPodRestoreItemAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/add-pv-from-pvc",
+					newAddPVFromPVCRestoreItemAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/change-storage-class",
+					newChangeStorageClassRestoreItemAction(f),
+				).
+				RegisterRestoreItemAction(
+					"velero.io/change-image-name",
+					newChangeImageNameRestoreItemAction(f),
+				).
+				RegisterRestoreItemAction(
+					"velero.io/role-bindings",
+					newRoleBindingItemAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/cluster-role-bindings",
+					newClusterRoleBindingItemAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/crd-preserve-fields",
+					newCRDV1PreserveUnknownFieldsItemAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/change-pvc-node-selector",
+					newChangePVCNodeSelectorItemAction(f),
+				).
+				RegisterRestoreItemAction(
+					"velero.io/apiservice",
+					newAPIServiceRestoreItemAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/admission-webhook-configuration",
+					newAdmissionWebhookConfigurationAction,
+				).
+				RegisterRestoreItemAction(
+					"velero.io/secret",
+					newSecretRestoreItemAction(f),
+				).
+				RegisterRestoreItemAction(
+					"velero.io/dataupload",
+					newDataUploadRetrieveAction(f),
+				).
+				RegisterDeleteItemAction(
+					"velero.io/dataupload-delete",
+					newDateUploadDeleteItemAction(f),
+				).
+				RegisterDeleteItemAction(
+					"velero.io/csi-volumesnapshot-delete",
+					newVolumeSnapshotDeleteItemAction(f),
+				).
+				RegisterDeleteItemAction(
+					"velero.io/csi-volumesnapshotcontent-delete",
+					newVolumeSnapshotContentDeleteItemAction(f),
+				).
+				RegisterBackupItemActionV2(
+					"velero.io/csi-pvc-backupper",
+					newPvcBackupItemAction(f),
+				).
+				RegisterBackupItemActionV2(
+					"velero.io/csi-volumesnapshot-backupper",
+					newVolumeSnapshotBackupItemAction(f),
+				).
+				RegisterBackupItemActionV2(
+					"velero.io/csi-volumesnapshotcontent-backupper",
+					newVolumeSnapshotContentBackupItemAction,
+				).
+				RegisterBackupItemActionV2(
+					"velero.io/csi-volumesnapshotclass-backupper",
+					newVolumeSnapshotClassBackupItemAction,
+				).
+				RegisterRestoreItemActionV2(
+					"velero.io/csi-pvc-restorer",
+					newPvcRestoreItemAction(f),
+				).
+				RegisterRestoreItemActionV2(
+					"velero.io/csi-volumesnapshot-restorer",
+					newVolumeSnapshotRestoreItemAction(f),
+				).
+				RegisterRestoreItemActionV2(
+					"velero.io/csi-volumesnapshotcontent-restorer",
+					newVolumeSnapshotContentRestoreItemAction,
+				).
+				RegisterRestoreItemActionV2(
+					"velero.io/csi-volumesnapshotclass-restorer",
+					newVolumeSnapshotClassRestoreItemAction,
+				).
+				RegisterItemBlockAction(
+					"velero.io/pvc",
+					newPVCItemBlockAction(f),
+				).
+				RegisterItemBlockAction(
+					"velero.io/pod",
+					newPodItemBlockAction,
+				).
+				RegisterItemBlockAction(
+					"velero.io/service-account",
+					newServiceAccountItemBlockAction(f),
+				)
+
+			if !features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag) {
+				// Do not register crd-remap-version BIA if the API Group feature
+				// flag is enabled, so that the v1 CRD can be backed up.
+				pluginServer = pluginServer.RegisterBackupItemAction(
+					"velero.io/crd-remap-version",
+					newRemapCRDVersionAction(f),
+				)
+			}
+			pluginServer.Serve()
+		},
+		FParseErrWhitelist: cobra.FParseErrWhitelist{ // Velero.io word list : ignore
+			UnknownFlags: true,
 		},
 	}
-
 	pluginServer.BindFlags(c.Flags())
-
 	return c
 }
 
-func newAwsObjectStore(logger logrus.FieldLogger) (interface{}, error) {
-	return aws.NewObjectStore(logger), nil
-}
-
-func newAzureObjectStore(logger logrus.FieldLogger) (interface{}, error) {
-	return azure.NewObjectStore(logger), nil
-}
-
-func newGcpObjectStore(logger logrus.FieldLogger) (interface{}, error) {
-	return gcp.NewObjectStore(logger), nil
-}
-
-func newAwsBlockStore(logger logrus.FieldLogger) (interface{}, error) {
-	return aws.NewBlockStore(logger), nil
-}
-
-func newAzureBlockStore(logger logrus.FieldLogger) (interface{}, error) {
-	return azure.NewBlockStore(logger), nil
-}
-
-func newGcpBlockStore(logger logrus.FieldLogger) (interface{}, error) {
-	return gcp.NewBlockStore(logger), nil
-}
-
 func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return backup.NewPVCAction(logger), nil
+	return bia.NewPVCAction(logger), nil
 }
 
 func newPodBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return backup.NewPodAction(logger), nil
+	return bia.NewPodAction(logger), nil
 }
 
-func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+func newServiceAccountBackupItemAction(f client.Factory) plugincommon.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
 		// TODO(ncdc): consider a k8s style WantsKubernetesClientSet initialization approach
 		clientset, err := f.KubeClient()
@@ -106,9 +229,9 @@ func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerIni
 			return nil, err
 		}
 
-		action, err := backup.NewServiceAccountAction(
+		action, err := bia.NewServiceAccountAction(
 			logger,
-			backup.NewClusterRoleBindingListerMap(clientset),
+			actionhelpers.NewClusterRoleBindingListerMap(clientset),
 			discoveryHelper)
 		if err != nil {
 			return nil, err
@@ -118,22 +241,248 @@ func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerIni
 	}
 }
 
+func newRemapCRDVersionAction(f client.Factory) plugincommon.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		config, err := f.ClientConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		client, err := apiextensions.NewForConfig(config)
+		if err != nil {
+			return nil, err
+		}
+
+		clientset, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+		discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), logger)
+		if err != nil {
+			return nil, err
+		}
+
+		return bia.NewRemapCRDVersionAction(logger, client.ApiextensionsV1beta1().CustomResourceDefinitions(), discoveryHelper), nil
+	}
+}
+
 func newJobRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewJobAction(logger), nil
+	return ria.NewJobAction(logger), nil
 }
 
 func newPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewPodAction(logger), nil
+	return ria.NewPodAction(logger), nil
 }
 
-func newResticRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewResticRestoreAction(logger), nil
+func newInitRestoreHookPodAction(logger logrus.FieldLogger) (interface{}, error) {
+	return ria.NewInitRestoreHookPodAction(logger), nil
+}
+
+func newPodVolumeRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		crClient, err := f.KubebuilderClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return ria.NewPodVolumeRestoreAction(logger, client.CoreV1().ConfigMaps(f.Namespace()), crClient), nil
+	}
 }
 
 func newServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewServiceAction(logger), nil
+	return ria.NewServiceAction(logger), nil
 }
 
 func newServiceAccountRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewServiceAccountAction(logger), nil
+	return ria.NewServiceAccountAction(logger), nil
+}
+
+func newAddPVCFromPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return ria.NewAddPVCFromPodAction(logger), nil
+}
+
+func newAddPVFromPVCRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return ria.NewAddPVFromPVCAction(logger), nil
+}
+
+func newCRDV1PreserveUnknownFieldsItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return ria.NewCRDV1PreserveUnknownFieldsAction(logger), nil
+}
+
+func newChangeStorageClassRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return ria.NewChangeStorageClassAction(
+			logger,
+			client.CoreV1().ConfigMaps(f.Namespace()),
+			client.StorageV1().StorageClasses(),
+		), nil
+	}
+}
+
+func newChangeImageNameRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return ria.NewChangeImageNameAction(
+			logger,
+			client.CoreV1().ConfigMaps(f.Namespace()),
+		), nil
+	}
+}
+func newRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return ria.NewRoleBindingAction(logger), nil
+}
+
+func newClusterRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return ria.NewClusterRoleBindingAction(logger), nil
+}
+
+func newChangePVCNodeSelectorItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return ria.NewChangePVCNodeSelectorAction(
+			logger,
+			client.CoreV1().ConfigMaps(f.Namespace()),
+			client.CoreV1().Nodes(),
+		), nil
+	}
+}
+
+func newAPIServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return ria.NewAPIServiceAction(logger), nil
+}
+
+func newAdmissionWebhookConfigurationAction(logger logrus.FieldLogger) (interface{}, error) {
+	return ria.NewAdmissionWebhookConfigurationAction(logger), nil
+}
+
+func newSecretRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubebuilderClient()
+		if err != nil {
+			return nil, err
+		}
+		return ria.NewSecretAction(logger, client), nil
+	}
+}
+
+func newDataUploadRetrieveAction(f client.Factory) plugincommon.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubebuilderClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return ria.NewDataUploadRetrieveAction(logger, client), nil
+	}
+}
+
+func newDateUploadDeleteItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubebuilderClient()
+		if err != nil {
+			return nil, err
+		}
+		return datamover.NewDataUploadDeleteAction(logger, client), nil
+	}
+}
+
+// CSI plugin init functions.
+
+// BackupItemAction plugins
+
+func newPvcBackupItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return csibia.NewPvcBackupItemAction(f)
+}
+
+func newVolumeSnapshotBackupItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return csibia.NewVolumeSnapshotBackupItemAction(f)
+}
+
+func newVolumeSnapshotContentBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return csibia.NewVolumeSnapshotContentBackupItemAction(logger)
+}
+
+func newVolumeSnapshotClassBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return csibia.NewVolumeSnapshotClassBackupItemAction(logger)
+}
+
+// DeleteItemAction plugins
+
+func newVolumeSnapshotDeleteItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return dia.NewVolumeSnapshotDeleteItemAction(f)
+}
+
+func newVolumeSnapshotContentDeleteItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return dia.NewVolumeSnapshotContentDeleteItemAction(f)
+}
+
+// RestoreItemAction plugins
+
+func newPvcRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return csiria.NewPvcRestoreItemAction(f)
+}
+
+func newVolumeSnapshotRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return csiria.NewVolumeSnapshotRestoreItemAction(f)
+}
+
+func newVolumeSnapshotContentRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return csiria.NewVolumeSnapshotContentRestoreItemAction(logger)
+}
+
+func newVolumeSnapshotClassRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return csiria.NewVolumeSnapshotClassRestoreItemAction(logger)
+}
+
+// ItemBlockAction plugins
+
+func newPVCItemBlockAction(f client.Factory) plugincommon.HandlerInitializer {
+	return iba.NewPVCAction(f)
+}
+
+func newPodItemBlockAction(logger logrus.FieldLogger) (interface{}, error) {
+	return iba.NewPodAction(logger), nil
+}
+
+func newServiceAccountItemBlockAction(f client.Factory) plugincommon.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		// TODO(ncdc): consider a k8s style WantsKubernetesClientSet initialization approach
+		clientset, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), logger)
+		if err != nil {
+			return nil, err
+		}
+
+		action, err := iba.NewServiceAccountAction(
+			logger,
+			actionhelpers.NewClusterRoleBindingListerMap(clientset),
+			discoveryHelper)
+		if err != nil {
+			return nil, err
+		}
+
+		return action, nil
+	}
 }

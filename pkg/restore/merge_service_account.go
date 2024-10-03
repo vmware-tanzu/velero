@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,12 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package restore
 
 import (
 	"encoding/json"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -32,7 +33,6 @@ func mergeServiceAccounts(fromCluster, fromBackup *unstructured.Unstructured) (*
 	desired := new(corev1api.ServiceAccount)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(fromCluster.UnstructuredContent(), desired); err != nil {
 		return nil, errors.Wrap(err, "unable to convert from-cluster service account from unstructured to serviceaccount")
-
 	}
 
 	backupSA := new(corev1api.ServiceAccount)

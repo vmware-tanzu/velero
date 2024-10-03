@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package podexec
 
 import (
 	"bytes"
+	"context"
 	"net/url"
 	"time"
 
@@ -29,7 +30,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 const defaultTimeout = 30 * time.Second
@@ -83,44 +84,52 @@ func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, it
 		return errors.New("hook is required")
 	}
 
+	localHook := *hook
+
 	pod := new(corev1api.Pod)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item, pod); err != nil {
 		return errors.WithStack(err)
 	}
 
-	if hook.Container == "" {
-		if err := setDefaultHookContainer(pod, hook); err != nil {
+	if localHook.Container == "" {
+		if err := setDefaultHookContainer(pod, &localHook); err != nil {
 			return err
 		}
-	} else if err := ensureContainerExists(pod, hook.Container); err != nil {
+	} else if err := ensureContainerExists(pod, localHook.Container); err != nil {
 		return err
 	}
 
-	if len(hook.Command) == 0 {
+	if len(localHook.Command) == 0 {
 		return errors.New("command is required")
 	}
 
-	switch hook.OnError {
+	switch localHook.OnError {
 	case api.HookErrorModeFail, api.HookErrorModeContinue:
 		// use the specified value
 	default:
 		// default to fail
-		hook.OnError = api.HookErrorModeFail
+		localHook.OnError = api.HookErrorModeFail
 	}
 
-	if hook.Timeout.Duration == 0 {
-		hook.Timeout.Duration = defaultTimeout
+	if localHook.Timeout.Duration == 0 {
+		localHook.Timeout.Duration = defaultTimeout
 	}
 
 	hookLog := log.WithFields(
 		logrus.Fields{
 			"hookName":      hookName,
-			"hookContainer": hook.Container,
-			"hookCommand":   hook.Command,
-			"hookOnError":   hook.OnError,
-			"hookTimeout":   hook.Timeout,
+			"hookContainer": localHook.Container,
+			"hookCommand":   localHook.Command,
+			"hookOnError":   localHook.OnError,
+			"hookTimeout":   localHook.Timeout,
 		},
 	)
+
+	if pod.Status.Phase == corev1api.PodSucceeded || pod.Status.Phase == corev1api.PodFailed {
+		hookLog.Infof("Pod entered phase %s before some post-backup exec hooks ran", pod.Status.Phase)
+		return nil
+	}
+
 	hookLog.Info("running exec hook")
 
 	req := e.restClient.Post().
@@ -130,8 +139,8 @@ func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, it
 		SubResource("exec")
 
 	req.VersionedParams(&corev1api.PodExecOptions{
-		Container: hook.Container,
-		Command:   hook.Command,
+		Container: localHook.Container,
+		Command:   localHook.Command,
 		Stdout:    true,
 		Stderr:    true,
 	}, kscheme.ParameterCodec)
@@ -151,13 +160,13 @@ func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, it
 	errCh := make(chan error)
 
 	go func() {
-		err = executor.Stream(streamOptions)
+		err = executor.StreamWithContext(context.Background(), streamOptions)
 		errCh <- err
 	}()
 
 	var timeoutCh <-chan time.Time
-	if hook.Timeout.Duration > 0 {
-		timer := time.NewTimer(hook.Timeout.Duration)
+	if localHook.Timeout.Duration > 0 {
+		timer := time.NewTimer(localHook.Timeout.Duration)
 		defer timer.Stop()
 		timeoutCh = timer.C
 	}
@@ -165,7 +174,7 @@ func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, it
 	select {
 	case err = <-errCh:
 	case <-timeoutCh:
-		return errors.Errorf("timed out after %v", hook.Timeout.Duration)
+		return errors.Errorf("timed out after %v", localHook.Timeout.Duration)
 	}
 
 	hookLog.Infof("stdout: %s", stdout.String())

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ type Command struct {
 	Command        string
 	RepoIdentifier string
 	PasswordFile   string
+	CACertFile     string
 	Dir            string
 	Args           []string
 	ExtraFlags     []string
@@ -50,6 +51,9 @@ func (c *Command) StringSlice() []string {
 	res = append(res, c.Command, repoFlag(c.RepoIdentifier))
 	if c.PasswordFile != "" {
 		res = append(res, passwordFlag(c.PasswordFile))
+	}
+	if c.CACertFile != "" {
+		res = append(res, cacertFlag(c.CACertFile))
 	}
 
 	// If VELERO_SCRATCH_DIR is defined, put the restic cache within it. If not,
@@ -73,7 +77,7 @@ func (c *Command) String() string {
 // Cmd returns an exec.Cmd for the command.
 func (c *Command) Cmd() *exec.Cmd {
 	parts := c.StringSlice()
-	cmd := exec.Command(parts[0], parts[1:]...)
+	cmd := exec.Command(parts[0], parts[1:]...) //nolint:gosec // Internal call. No need to check the parameter.
 	cmd.Dir = c.Dir
 
 	if len(c.Env) > 0 {
@@ -93,4 +97,8 @@ func passwordFlag(file string) string {
 
 func cacheDirFlag(dir string) string {
 	return fmt.Sprintf("--cache-dir=%s", dir)
+}
+
+func cacertFlag(path string) string {
+	return fmt.Sprintf("--cacert=%s", path)
 }

@@ -1,0 +1,15 @@
+{{ $versions := site.Params.versions }}
+{{ $latest   := site.Params.latest }}
+/docs                             /docs/{{ $latest }}     301!
+/docs/latest                      /docs/{{ $latest }}
+/docs/latest/*                    /docs/{{ $latest }}/:splat
+/docs/troubleshooting             /docs/{{ $latest }}/troubleshooting
+/docs/supported-providers         /docs/{{ $latest }}/supported-providers
+/docs/zenhub                      /docs/{{ $latest }}/support-process
+/docs/install-overview            /docs/{{ $latest }}/basic-install
+/docs/start-contributing          /docs/{{ $latest }}/start-contributing
+/docs/customize-installation      /docs/{{ $latest }}/customize-installation
+/docs/faq                         /docs/{{ $latest }}/faq
+/docs/csi                         /docs/{{ $latest }}/csi
+/docs/file-system-backup          /docs/{{ $latest }}/file-system-backup
+/docs/csi-snapshot-data-movement  /docs/{{ $latest }}/csi-snapshot-data-movement

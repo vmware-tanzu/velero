@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2021 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,11 +18,13 @@ package output
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
 	"text/tabwriter"
 
+	"github.com/fatih/color"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -57,7 +59,7 @@ func (d *Describer) Println(args ...interface{}) {
 
 // DescribeMetadata describes standard object metadata in a consistent manner.
 func (d *Describer) DescribeMetadata(metadata metav1.ObjectMeta) {
-	d.Printf("Name:\t%s\n", metadata.Name)
+	d.Printf("Name:\t%s\n", color.New(color.Bold).SprintFunc()(metadata.Name))
 	d.Printf("Namespace:\t%s\n", metadata.Namespace)
 	d.DescribeMap("Labels", metadata.Labels)
 	d.DescribeMap("Annotations", metadata.Annotations)
@@ -117,4 +119,56 @@ func BoolPointerString(b *bool, falseString, trueString, nilString string) strin
 		return trueString
 	}
 	return falseString
+}
+
+type StructuredDescriber struct {
+	output map[string]interface{}
+	format string
+}
+
+// NewStructuredDescriber creates a StructuredDescriber.
+func NewStructuredDescriber(format string) *StructuredDescriber {
+	return &StructuredDescriber{
+		output: make(map[string]interface{}),
+		format: format,
+	}
+}
+
+// DescribeInSF returns the structured output based on the func
+// that applies StructuredDescriber to collect outputs.
+// This function takes arg 'format' for future format extension.
+func DescribeInSF(fn func(d *StructuredDescriber), format string) string {
+	d := NewStructuredDescriber(format)
+	fn(d)
+	return d.JSONEncode()
+}
+
+// Describe adds all types of argument to d.output.
+func (d *StructuredDescriber) Describe(name string, arg interface{}) {
+	d.output[name] = arg
+}
+
+// DescribeMetadata describes standard object metadata.
+func (d *StructuredDescriber) DescribeMetadata(metadata metav1.ObjectMeta) {
+	metadataInfo := make(map[string]interface{})
+	metadataInfo["name"] = metadata.Name
+	metadataInfo["namespace"] = metadata.Namespace
+	metadataInfo["labels"] = metadata.Labels
+	metadataInfo["annotations"] = metadata.Annotations
+	d.Describe("metadata", metadataInfo)
+}
+
+// JSONEncode encodes d.output to json
+func (d *StructuredDescriber) JSONEncode() string {
+	byteBuffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(byteBuffer)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "    ")
+
+	err := encoder.Encode(d.output)
+	if err != nil {
+		fmt.Printf("fail to encode %s", err.Error())
+		return ""
+	}
+	return byteBuffer.String()
 }

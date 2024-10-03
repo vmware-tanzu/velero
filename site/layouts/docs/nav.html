@@ -1,0 +1,28 @@
+<nav class="navigation">
+  <!-- If new pages are added to the site and the TOC needs to be updated, it
+  can be overridden, using toc-mapping.yml -->
+  {{ $version := .CurrentSection.Params.version }}
+  {{ if $version }}
+    {{ $gh := .Page.Params.gh }}
+    {{ $tocTemplateName := index (index $.Site.Data.docs "toc-mapping") $version }}
+    {{ if not $tocTemplateName }}
+      {{ $tocTemplateName = "default" }}
+    {{ end }}
+    {{ $toc := (index $.Site.Data.docs $tocTemplateName).toc }}
+
+    {{ range $toc }}
+      <h3>{{ .title }}</h3>
+      <ul>
+        {{ range .subfolderitems }}
+          <li>
+            {{ if .github }}
+              <a href="{{ $gh }}{{ .url }}" target="_blank">{{ .page }}</a>
+            {{ else }}
+              <a href="/docs/{{ $version }}{{ .url }}">{{ .page }}</a>
+            {{ end }}
+          </li>
+        {{ end }}
+      </ul>
+    {{ end }}
+  {{ end }}
+</nav>

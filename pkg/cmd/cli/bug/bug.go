@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,15 +30,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/velero/pkg/buildinfo"
-	"github.com/heptio/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/features"
 )
 
 const (
 	// kubectlTimeout is how long we wait in seconds for `kubectl version`
 	// before killing the process
 	kubectlTimeout = 5 * time.Second
-	issueURL       = "https://github.com/heptio/velero/issues/new"
+	issueURL       = "https://github.com/vmware-tanzu/velero/issues/new"
 	// IssueTemplate is used to generate .github/ISSUE_TEMPLATE/bug_report.md
 	// as well as the initial text that's place in a new Github issue as
 	// the result of running `velero bug`.
@@ -49,29 +50,35 @@ about: Tell us about a problem you are experiencing
 ---
 
 **What steps did you take and what happened:**
-[A clear and concise description of what the bug is, and what commands you ran.)
+<!--A clear and concise description of what the bug is, and what commands you ran.-->
 
 
 **What did you expect to happen:**
 
+**The following information will help us better understand what's going on**:
 
-**The output of the following commands will help us better understand what's going on**:
-(Pasting long output into a [GitHub gist](https://gist.github.com) or other pastebin is fine.)
+_If you are using velero v1.7.0+:_  
+Please use ` + "`velero debug  --backup <backupname> --restore <restorename>` " +
+		`to generate the support bundle, and attach to this issue, more options please refer to ` +
+		"`velero debug --help` " + `
 
-* ` + "`kubectl logs deployment/velero -n velero`" + `
-* ` + "`velero backup describe <backupname>` or `kubectl get backup/<backupname> -n velero -o yaml`" + `
-* ` + "`velero backup logs <backupname>`" + `
-* ` + "`velero restore describe <restorename>` or `kubectl get restore/<restorename> -n velero -o yaml`" + `
-* ` + "`velero restore logs <restorename>`" + `
+_If you are using earlier versions:_  
+Please provide the output of the following commands (Pasting long output into a [GitHub gist](https://gist.github.com) or other pastebin is fine.)
+- ` + "`kubectl logs deployment/velero -n velero`" + `
+- ` + "`velero backup describe <backupname>` or `kubectl get backup/<backupname> -n velero -o yaml`" + `
+- ` + "`velero backup logs <backupname>`" + `
+- ` + "`velero restore describe <restorename>` or `kubectl get restore/<restorename> -n velero -o yaml`" + `
+- ` + "`velero restore logs <restorename>`" + `
 
 
 **Anything else you would like to add:**
-[Miscellaneous information that will assist in solving the issue.]
+<!--Miscellaneous information that will assist in solving the issue.-->
 
 
 **Environment:**
 
 - Velero version (use ` + "`velero version`" + `):{{.VeleroVersion}} {{.GitCommit}}
+- Velero features (use ` + "`velero client config get features`" + `): {{.Features}}
 - Kubernetes version (use ` + "`kubectl version`" + `): 
 {{- if .KubectlVersion}}
 ` + "```" + `
@@ -81,8 +88,17 @@ about: Tell us about a problem you are experiencing
 - Kubernetes installer & version:
 - Cloud provider or hardware configuration:
 - OS (e.g. from ` + "`/etc/os-release`" + `):
-{{if .RuntimeOS}}	- RuntimeOS: {{.RuntimeOS}}{{end -}}
-{{if .RuntimeArch}}	- RuntimeArch: {{.RuntimeArch}}{{end -}}
+{{- if .RuntimeOS}} - RuntimeOS: {{.RuntimeOS}}{{end}}
+{{- if .RuntimeArch}} - RuntimeArch: {{.RuntimeArch}}{{end}}
+
+
+**Vote on this issue!**
+
+This is an invitation to the Velero community to vote on issues, you can see the project's [top voted issues listed here](https://github.com/vmware-tanzu/velero/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc).  
+Use the "reaction smiley face" up to the right of this comment to vote.
+
+- :+1: for "I would like to see this bug fixed as soon as possible"
+- :-1: for "There are more important bugs to focus on right now"
 `
 )
 
@@ -112,6 +128,7 @@ type VeleroBugInfo struct {
 	RuntimeOS      string
 	RuntimeArch    string
 	KubectlVersion string
+	Features       string
 }
 
 // cmdExistsOnPath checks to see if an executable is available on the current PATH
@@ -145,7 +162,9 @@ func getKubectlVersion() (string, error) {
 	case <-time.After(kubectlTimeout):
 		// we don't care about the possible error returned from Kill() here,
 		// just return an empty string
-		kubectlCmd.Process.Kill()
+		if err := kubectlCmd.Process.Kill(); err != nil {
+			return "", fmt.Errorf("error killing kubectl process: %w", err)
+		}
 		return "", errors.New("timeout waiting for kubectl version")
 
 	case err := <-done:
@@ -154,7 +173,7 @@ func getKubectlVersion() (string, error) {
 		}
 	}
 	versionOut := outbuf.String()
-	kubectlVersion := strings.TrimSpace(string(versionOut))
+	kubectlVersion := strings.TrimSpace(versionOut)
 	return kubectlVersion, nil
 }
 
@@ -164,7 +183,9 @@ func newBugInfo(kubectlVersion string) *VeleroBugInfo {
 		GitCommit:      buildinfo.FormattedGitSHA(),
 		RuntimeOS:      runtime.GOOS,
 		RuntimeArch:    runtime.GOARCH,
-		KubectlVersion: kubectlVersion}
+		KubectlVersion: kubectlVersion,
+		Features:       features.Serialize(),
+	}
 }
 
 // renderToString renders IssueTemplate to a string using the

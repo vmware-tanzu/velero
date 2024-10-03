@@ -1,0 +1,33 @@
+# This file is used by Auto Label PRs action.
+# Works with https://github.com/actions/labeler/
+# Below this line, the keys are labels to be applied, and the values are the file globs to match against.
+# Anything in the `design` directory gets the `Design` label.
+Area/Design:
+  - changed-files:
+      - any-glob-to-any-file: design/*
+# Anything that has plugin infra will be labeled.
+# Individual plugins don't necessarily live here, though
+Area/Plugins:
+  - changed-files:
+      - any-glob-to-any-file: pkg/plugins/**/*
+Dependencies:
+  - changed-files:
+      - any-glob-to-any-file: go.mod
+Documentation:
+  - changed-files:
+      - any-glob-to-any-file: site/content/docs/**/*
+# Anything in the site directory gets the website label *EXCEPT* docs
+Website:
+  - all:
+      - changed-files:
+          - any-glob-to-any-file: site/**/*
+          - all-globs-to-all-files: '!site/content/docs/**/*'
+has-changelog:
+  - changed-files:
+      - any-glob-to-any-file: changelogs/**
+has-e2e-2tests:
+  - changed-files:
+      - any-glob-to-any-file: test/e2e/**/*
+has-unit-tests:
+  - changed-files:
+      - any-glob-to-any-file: pkg/**/*_test.go

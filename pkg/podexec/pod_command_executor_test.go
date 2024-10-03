@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package podexec
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -30,12 +31,13 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	velerotest "github.com/heptio/velero/pkg/util/test"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestNewPodCommandExecutor(t *testing.T) {
@@ -101,12 +103,35 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 				Container: "foo",
 			},
 		},
+		{
+			name:         "hook's container is not overwritten by pod",
+			item:         velerotest.UnstructuredOrDie(`{"kind":"Pod","spec":{"containers":[{"name":"foo"}]}}`).Object,
+			podNamespace: "ns",
+			podName:      "pod",
+			hookName:     "hook",
+			hook: &v1.ExecHook{
+				Container: "",
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			pod := new(corev1api.Pod)
+			hookPodContainerNotSame := false
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(test.item, pod); err != nil {
+				assert.Error(t, err)
+			}
+			if (len(pod.Spec.Containers) > 0) && (pod.Spec.Containers[0].Name != test.hook.Container) {
+				hookPodContainerNotSame = true
+			}
+
 			e := &defaultPodCommandExecutor{}
 			err := e.ExecutePodCommand(velerotest.NewLogger(), test.item, test.podNamespace, test.podName, test.hookName, test.hook)
+
+			if hookPodContainerNotSame && test.hook.Container == pod.Spec.Containers[0].Name {
+				assert.Error(t, fmt.Errorf("hook exec container is overwritten"))
+			}
 			assert.Error(t, err)
 		})
 	}
@@ -187,12 +212,11 @@ func TestExecutePodCommand(t *testing.T) {
 			defer streamExecutorFactory.AssertExpectations(t)
 			podCommandExecutor.streamExecutorFactory = streamExecutorFactory
 
-			baseUrl, _ := url.Parse("https://some.server")
-			contentConfig := rest.ContentConfig{
-				GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"},
+			baseURL, _ := url.Parse("https://some.server")
+			contentConfig := rest.ClientContentConfig{
+				GroupVersion: schema.GroupVersion{Group: "", Version: "v1"},
 			}
-			postRequest := rest.NewRequest(nil, "POST", baseUrl, "/api/v1", contentConfig, rest.Serializers{}, nil, nil, 0)
-			poster.On("Post").Return(postRequest)
+			poster.On("Post").Return(rest.NewRequestWithClient(baseURL, "/api/v1", contentConfig, nil))
 
 			streamExecutor := &mockStreamExecutor{}
 			defer streamExecutor.AssertExpectations(t)
@@ -208,7 +232,7 @@ func TestExecutePodCommand(t *testing.T) {
 				Stdout: &stdout,
 				Stderr: &stderr,
 			}
-			streamExecutor.On("Stream", expectedStreamOptions).Return(test.hookError)
+			streamExecutor.On("StreamWithContext", mock.Anything, expectedStreamOptions).Return(test.hookError)
 
 			err = podCommandExecutor.ExecutePodCommand(velerotest.NewLogger(), pod, "namespace", "name", "hookName", &hook)
 			if test.expectedError != "" {
@@ -239,6 +263,37 @@ func TestEnsureContainerExists(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestPodCompeted(t *testing.T) {
+	pod := &corev1api.Pod{
+		Spec: corev1api.PodSpec{
+			Containers: []corev1api.Container{
+				{
+					Name: "foo",
+				},
+			},
+		},
+		Status: corev1api.PodStatus{
+			Phase: corev1api.PodSucceeded,
+		},
+	}
+
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
+	require.NoError(t, err)
+
+	clientConfig := &rest.Config{}
+	poster := &mockPoster{}
+	defer poster.AssertExpectations(t)
+	podCommandExecutor := NewPodCommandExecutor(clientConfig, poster).(*defaultPodCommandExecutor)
+
+	hook := v1.ExecHook{
+		Container: "foo",
+		Command:   []string{"some", "command"},
+	}
+
+	err = podCommandExecutor.ExecutePodCommand(velerotest.NewLogger(), obj, "namespace", "name", "hookName", &hook)
+	require.NoError(t, err)
+}
+
 type mockStreamExecutorFactory struct {
 	mock.Mock
 }
@@ -253,8 +308,8 @@ type mockStreamExecutor struct {
 	remotecommand.Executor
 }
 
-func (e *mockStreamExecutor) Stream(options remotecommand.StreamOptions) error {
-	args := e.Called(options)
+func (e *mockStreamExecutor) StreamWithContext(ctx context.Context, options remotecommand.StreamOptions) error {
+	args := e.Called(ctx, options)
 	return args.Error(0)
 }
 

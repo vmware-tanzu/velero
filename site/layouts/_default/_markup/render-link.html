@@ -1,0 +1,10 @@
+{{ $link := .Destination }}
+{{ if not (strings.HasPrefix $link "http") }}
+    {{ $url := urls.Parse .Destination }}
+    {{- if $url.Path -}}
+        {{ $fragment := "" }}
+        {{- with $url.Fragment }}{{ $fragment = printf "#%s" . }}{{ end -}}
+        {{- with .Page.GetPage $url.Path }}{{ $link = printf "%s%s" .RelPermalink $fragment }}{{ end }}
+    {{ end }}
+{{ end }}
+<a href="{{ $link | safeURL }}">{{ .Text | safeHTML }}</a>

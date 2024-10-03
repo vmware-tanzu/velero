@@ -1,0 +1,32 @@
+def capture_backup_logs(cmd, namespace):
+    if args.backup:
+        log("Collecting log and information for backup: {}".format(args.backup))
+        backupDescCmd = "{} --namespace={} backup describe {} --details".format(cmd, namespace, args.backup)
+        capture_local(cmd=backupDescCmd, file_name="backup_describe_{}.txt".format(args.backup))
+        backupLogsCmd = "{} --namespace={} backup logs {}".format(cmd, namespace, args.backup)
+        capture_local(cmd=backupLogsCmd, file_name="backup_{}.log".format(args.backup))
+def capture_restore_logs(cmd, namespace):
+    if args.restore:
+        log("Collecting log and information for restore: {}".format(args.restore))
+        restoreDescCmd = "{} --namespace={} restore describe {} --details".format(cmd, namespace, args.restore)
+        capture_local(cmd=restoreDescCmd, file_name="restore_describe_{}.txt".format(args.restore))
+        restoreLogsCmd = "{} --namespace={} restore logs {}".format(cmd, namespace, args.restore)
+        capture_local(cmd=restoreLogsCmd, file_name="restore_{}.log".format(args.restore))
+
+ns = args.namespace if args.namespace else "velero"
+output = args.output if args.output else "bundle.tar.gz"
+cmd = args.cmd if args.cmd else "velero"
+# Working dir for writing during script execution
+crshd = crashd_config(workdir="./velero-bundle")
+set_defaults(kube_config(path=args.kubeconfig, cluster_context=args.kubecontext))
+log("Collecting velero resources in namespace: {}". format(ns))
+kube_capture(what="objects", namespaces=[ns], groups=['velero.io'])
+capture_local(cmd="{} version -n {}".format(cmd, ns), file_name="version.txt")
+log("Collecting velero deployment logs in namespace: {}". format(ns))
+kube_capture(what="logs", namespaces=[ns])
+capture_backup_logs(cmd, ns)
+capture_restore_logs(cmd, ns)
+archive(output_file=output, source_paths=[crshd.workdir])
+log("Generated debug information bundle: {}".format(output))
+
+     

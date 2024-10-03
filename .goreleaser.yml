@@ -1,4 +1,4 @@
-# Copyright 2018 the Heptio Ark contributors.
+# Copyright 2018 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,11 +13,8 @@
 # limitations under the License.
 
 dist: _output
-before:
-  hooks:
-    - ./hack/set-example-tags.sh
 builds:
-  - main: ./cmd/velero/main.go
+  - main: ./cmd/velero/velero.go
     env:
       - CGO_ENABLED=0
     goos:
@@ -28,27 +25,39 @@ builds:
       - amd64
       - arm
       - arm64
+      - ppc64le
     ignore:
-      # don't build arm/arm64 for darwin or windows
+      # don't build arm for darwin and arm/arm64 for windows
       - goos: darwin
         goarch: arm
       - goos: darwin
-        goarch: arm64
+        goarch: ppc64le
       - goos: windows
         goarch: arm
       - goos: windows
         goarch: arm64
+      - goos: windows
+        goarch: ppc64le
     ldflags:
-      - -X "github.com/heptio/velero/pkg/buildinfo.Version={{ .Tag }}" -X "github.com/heptio/velero/pkg/buildinfo.GitSHA={{ .FullCommit }}" -X "github.com/heptio/velero/pkg/buildinfo.GitTreeState={{ .Env.GIT_TREE_STATE }}"
-archive:
-  name_template: "{{ .ProjectName }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}"
-  files:
-    - LICENSE
-    - config/**/*
+      - -X "github.com/vmware-tanzu/velero/pkg/buildinfo.Version={{ .Tag }}" -X "github.com/vmware-tanzu/velero/pkg/buildinfo.GitSHA={{ .FullCommit }}" -X "github.com/vmware-tanzu/velero/pkg/buildinfo.GitTreeState={{ .Env.GIT_TREE_STATE }}" -X "github.com/vmware-tanzu/velero/pkg/buildinfo.ImageRegistry={{ .Env.REGISTRY }}"
+archives:
+  - name_template: "{{ .ProjectName }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}"
+    wrap_in_directory: true
+    files:
+      - LICENSE
+      - examples/**/*
 checksum:
   name_template: 'CHECKSUM'
 release:
   github:
-    owner: heptio
+    owner: vmware-tanzu
     name: velero
   draft: true
+  prerelease: auto
+
+git:
+  # What should be used to sort tags when gathering the current and previous
+  # tags if there are more than one tag in the same commit.
+  #
+  # Default: `-version:refname`
+  tag_sort: -version:creatordate

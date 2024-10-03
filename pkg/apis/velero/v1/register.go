@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,21 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
-
-var (
-	// SchemeBuilder collects the scheme builder functions for the Velero API
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-
-	// AddToScheme applies the SchemeBuilder functions to a specified scheme
-	AddToScheme = SchemeBuilder.AddToScheme
-)
-
-// GroupName is the group name for the Velero API
-const GroupName = "velero.io"
-
-// SchemeGroupVersion is the GroupVersion for the Velero API
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
 
 // Resource gets a Velero GroupResource for a specified resource
 func Resource(resource string) schema.GroupResource {
@@ -66,11 +53,23 @@ func CustomResources() map[string]typeInfo {
 		"DeleteBackupRequest":    newTypeInfo("deletebackuprequests", &DeleteBackupRequest{}, &DeleteBackupRequestList{}),
 		"PodVolumeBackup":        newTypeInfo("podvolumebackups", &PodVolumeBackup{}, &PodVolumeBackupList{}),
 		"PodVolumeRestore":       newTypeInfo("podvolumerestores", &PodVolumeRestore{}, &PodVolumeRestoreList{}),
-		"ResticRepository":       newTypeInfo("resticrepositories", &ResticRepository{}, &ResticRepositoryList{}),
+		"BackupRepository":       newTypeInfo("backuprepositories", &BackupRepository{}, &BackupRepositoryList{}),
 		"BackupStorageLocation":  newTypeInfo("backupstoragelocations", &BackupStorageLocation{}, &BackupStorageLocationList{}),
 		"VolumeSnapshotLocation": newTypeInfo("volumesnapshotlocations", &VolumeSnapshotLocation{}, &VolumeSnapshotLocationList{}),
 		"ServerStatusRequest":    newTypeInfo("serverstatusrequests", &ServerStatusRequest{}, &ServerStatusRequestList{}),
 	}
+}
+
+// CustomResourceKinds returns a list of all custom resources kinds within the Velero
+func CustomResourceKinds() sets.Set[string] {
+	kinds := sets.New[string]()
+
+	resources := CustomResources()
+	for kind := range resources {
+		kinds.Insert(kind)
+	}
+
+	return kinds
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {

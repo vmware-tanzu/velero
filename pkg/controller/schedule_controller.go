@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,154 +17,103 @@ limitations under the License.
 package controller
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
-	"github.com/robfig/cron"
+	cron "github.com/robfig/cron/v3"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/client-go/tools/cache"
+	clocks "k8s.io/utils/clock"
+	ctrl "sigs.k8s.io/controller-runtime"
+	bld "sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
-	"github.com/heptio/velero/pkg/metrics"
-	kubeutil "github.com/heptio/velero/pkg/util/kube"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/constant"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
 	scheduleSyncPeriod = time.Minute
 )
 
-type scheduleController struct {
-	*genericController
-
+type scheduleReconciler struct {
+	client.Client
 	namespace       string
-	schedulesClient velerov1client.SchedulesGetter
-	backupsClient   velerov1client.BackupsGetter
-	schedulesLister listers.ScheduleLister
-	clock           clock.Clock
+	logger          logrus.FieldLogger
+	clock           clocks.WithTickerAndDelayedExecution
 	metrics         *metrics.ServerMetrics
+	skipImmediately bool
 }
 
-func NewScheduleController(
+func NewScheduleReconciler(
 	namespace string,
-	schedulesClient velerov1client.SchedulesGetter,
-	backupsClient velerov1client.BackupsGetter,
-	schedulesInformer informers.ScheduleInformer,
 	logger logrus.FieldLogger,
+	client client.Client,
 	metrics *metrics.ServerMetrics,
-) *scheduleController {
-	c := &scheduleController{
-		genericController: newGenericController("schedule", logger),
-		namespace:         namespace,
-		schedulesClient:   schedulesClient,
-		backupsClient:     backupsClient,
-		schedulesLister:   schedulesInformer.Lister(),
-		clock:             clock.RealClock{},
-		metrics:           metrics,
-	}
-
-	c.syncHandler = c.processSchedule
-	c.cacheSyncWaiters = append(c.cacheSyncWaiters, schedulesInformer.Informer().HasSynced)
-	c.resyncFunc = c.enqueueAllEnabledSchedules
-	c.resyncPeriod = scheduleSyncPeriod
-
-	schedulesInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				schedule := obj.(*api.Schedule)
-
-				switch schedule.Status.Phase {
-				case "", api.SchedulePhaseNew, api.SchedulePhaseEnabled:
-					// add to work queue
-				default:
-					c.logger.WithFields(logrus.Fields{
-						"schedule": kubeutil.NamespaceAndName(schedule),
-						"phase":    schedule.Status.Phase,
-					}).Debug("Schedule is not new, skipping")
-					return
-				}
-
-				key, err := cache.MetaNamespaceKeyFunc(schedule)
-				if err != nil {
-					c.logger.WithError(errors.WithStack(err)).WithField("schedule", schedule).Error("Error creating queue key, item not added to queue")
-					return
-				}
-				c.queue.Add(key)
-				scheduleName := schedule.GetName()
-				c.logger.Info("Creating schedule ", scheduleName)
-				//Init Prometheus metrics to 0 to have them flowing up
-				metrics.InitSchedule(scheduleName)
-			},
-		},
-	)
-
-	return c
-}
-
-func (c *scheduleController) enqueueAllEnabledSchedules() {
-	schedules, err := c.schedulesLister.Schedules(c.namespace).List(labels.NewSelector())
-	if err != nil {
-		c.logger.WithError(errors.WithStack(err)).Error("Error listing Schedules")
-		return
-	}
-
-	for _, schedule := range schedules {
-		if schedule.Status.Phase != api.SchedulePhaseEnabled {
-			continue
-		}
-
-		key, err := cache.MetaNamespaceKeyFunc(schedule)
-		if err != nil {
-			c.logger.WithError(errors.WithStack(err)).WithField("schedule", schedule).Error("Error creating queue key, item not added to queue")
-			continue
-		}
-		c.queue.Add(key)
+	skipImmediately bool,
+) *scheduleReconciler {
+	return &scheduleReconciler{
+		Client:          client,
+		namespace:       namespace,
+		logger:          logger,
+		clock:           clocks.RealClock{},
+		metrics:         metrics,
+		skipImmediately: skipImmediately,
 	}
 }
 
-func (c *scheduleController) processSchedule(key string) error {
-	log := c.logger.WithField("key", key)
+func (c *scheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	s := kube.NewPeriodicalEnqueueSource(c.logger.WithField("controller", constant.ControllerSchedule), mgr.GetClient(), &velerov1.ScheduleList{}, scheduleSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
+	return ctrl.NewControllerManagedBy(mgr).
+		// global predicate, works for both For and Watch
+		WithEventFilter(kube.NewAllEventPredicate(func(obj client.Object) bool {
+			schedule := obj.(*velerov1.Schedule)
+			if pause := schedule.Spec.Paused; pause {
+				c.logger.Infof("schedule %s is paused, skip", schedule.Name)
+				return false
+			}
+			return true
+		})).
+		For(&velerov1.Schedule{}, bld.WithPredicates(kube.SpecChangePredicate{})).
+		WatchesRawSource(s, nil).
+		Complete(c)
+}
 
-	log.Debug("Running processSchedule")
-	ns, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		return errors.Wrap(err, "error splitting queue key")
-	}
+// +kubebuilder:rbac:groups=velero.io,resources=schedules,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=velero.io,resources=schedules/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=velero.io,resources=backups,verbs=create
 
-	log.Debug("Getting Schedule")
-	schedule, err := c.schedulesLister.Schedules(ns).Get(name)
-	if err != nil {
-		// schedule no longer exists
+func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := c.logger.WithField("schedule", req.String())
+
+	log.Debug("Getting schedule")
+	schedule := &velerov1.Schedule{}
+	if err := c.Get(ctx, req.NamespacedName, schedule); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.WithError(err).Debug("Schedule not found")
-			return nil
+			log.WithError(err).Error("schedule not found")
+			c.metrics.RemoveSchedule(req.Name)
+			return ctrl.Result{}, nil
 		}
-		return errors.Wrap(err, "error getting Schedule")
+		return ctrl.Result{}, errors.Wrapf(err, "error getting schedule %s", req.String())
 	}
+	c.metrics.InitSchedule(schedule.Name)
 
-	switch schedule.Status.Phase {
-	case "", api.SchedulePhaseNew, api.SchedulePhaseEnabled:
-		// valid phase for processing
-	default:
-		return nil
+	original := schedule.DeepCopy()
+
+	if schedule.Spec.SkipImmediately == nil {
+		schedule.Spec.SkipImmediately = &c.skipImmediately
 	}
-
-	log.Debug("Cloning schedule")
-	// store ref to original for creating patch
-	original := schedule
-	// don't modify items in the cache
-	schedule = schedule.DeepCopy()
+	if schedule.Spec.SkipImmediately != nil && *schedule.Spec.SkipImmediately {
+		*schedule.Spec.SkipImmediately = false
+		schedule.Status.LastSkipped = &metav1.Time{Time: c.clock.Now()}
+	}
 
 	// validation - even if the item is Enabled, we can't trust it
 	// so re-validate
@@ -172,34 +121,53 @@ func (c *scheduleController) processSchedule(key string) error {
 
 	cronSchedule, errs := parseCronSchedule(schedule, c.logger)
 	if len(errs) > 0 {
-		schedule.Status.Phase = api.SchedulePhaseFailedValidation
+		schedule.Status.Phase = velerov1.SchedulePhaseFailedValidation
 		schedule.Status.ValidationErrors = errs
 	} else {
-		schedule.Status.Phase = api.SchedulePhaseEnabled
+		schedule.Status.Phase = velerov1.SchedulePhaseEnabled
 	}
 
-	// update status if it's changed
+	scheduleNeedsPatch := false
+	errStringArr := make([]string, 0)
 	if currentPhase != schedule.Status.Phase {
-		updatedSchedule, err := patchSchedule(original, schedule, c.schedulesClient)
-		if err != nil {
-			return errors.Wrapf(err, "error updating Schedule phase to %s", schedule.Status.Phase)
+		scheduleNeedsPatch = true
+		errStringArr = append(errStringArr, fmt.Sprintf("phase to %s", schedule.Status.Phase))
+	}
+	// update spec.SkipImmediately if it's changed
+	if original.Spec.SkipImmediately != schedule.Spec.SkipImmediately {
+		scheduleNeedsPatch = true
+		errStringArr = append(errStringArr, fmt.Sprintf("spec.skipImmediately to %v", schedule.Spec.SkipImmediately))
+	}
+	// update status if it's changed
+	if original.Status.LastSkipped != schedule.Status.LastSkipped {
+		scheduleNeedsPatch = true
+		errStringArr = append(errStringArr, fmt.Sprintf("last skipped to %v", schedule.Status.LastSkipped))
+	}
+	if scheduleNeedsPatch {
+		if err := c.Patch(ctx, schedule, client.MergeFrom(original)); err != nil {
+			return ctrl.Result{}, errors.Wrapf(err, "error updating %v for schedule %s", errStringArr, req.String())
 		}
-		schedule = updatedSchedule
 	}
 
-	if schedule.Status.Phase != api.SchedulePhaseEnabled {
-		return nil
+	if schedule.Status.Phase != velerov1.SchedulePhaseEnabled {
+		log.Debugf("the schedule's phase is %s, isn't %s, skip", schedule.Status.Phase, velerov1.SchedulePhaseEnabled)
+		return ctrl.Result{}, nil
 	}
 
-	// check for the schedule being due to run, and submit a Backup if so
-	if err := c.submitBackupIfDue(schedule, cronSchedule); err != nil {
-		return err
+	// Check for the schedule being due to run.
+	// If there are backup created by this schedule still in New or InProgress state,
+	// skip current backup creation to avoid running overlap backups.
+	// As the schedule must be validated before checking whether it's due, we cannot put the checking log in Predicate
+	if c.ifDue(schedule, cronSchedule) && !c.checkIfBackupInNewOrProgress(schedule) {
+		if err := c.submitBackup(ctx, schedule); err != nil {
+			return ctrl.Result{}, errors.Wrapf(err, "error submit backup for schedule %s", req.String())
+		}
 	}
 
-	return nil
+	return ctrl.Result{}, nil
 }
 
-func parseCronSchedule(itm *api.Schedule, logger logrus.FieldLogger) (cron.Schedule, []string) {
+func parseCronSchedule(itm *velerov1.Schedule, logger logrus.FieldLogger) (cron.Schedule, []string) {
 	var validationErrors []string
 	var schedule cron.Schedule
 
@@ -209,7 +177,7 @@ func parseCronSchedule(itm *api.Schedule, logger logrus.FieldLogger) (cron.Sched
 		return nil, validationErrors
 	}
 
-	log := logger.WithField("schedule", kubeutil.NamespaceAndName(itm))
+	log := logger.WithField("schedule", kube.NamespaceAndName(itm))
 
 	// adding a recover() around cron.Parse because it panics on empty string and is possible
 	// that it panics under other scenarios as well.
@@ -239,96 +207,87 @@ func parseCronSchedule(itm *api.Schedule, logger logrus.FieldLogger) (cron.Sched
 	return schedule, nil
 }
 
-func (c *scheduleController) submitBackupIfDue(item *api.Schedule, cronSchedule cron.Schedule) error {
-	var (
-		now                = c.clock.Now()
-		isDue, nextRunTime = getNextRunTime(item, cronSchedule, now)
-		log                = c.logger.WithField("schedule", kubeutil.NamespaceAndName(item))
-	)
+// checkIfBackupInNewOrProgress check whether there are backups created by this schedule still in New or InProgress state
+func (c *scheduleReconciler) checkIfBackupInNewOrProgress(schedule *velerov1.Schedule) bool {
+	log := c.logger.WithField("schedule", kube.NamespaceAndName(schedule))
+	backupList := &velerov1.BackupList{}
+	options := &client.ListOptions{
+		Namespace: schedule.Namespace,
+		LabelSelector: labels.Set(map[string]string{
+			velerov1.ScheduleNameLabel: schedule.Name,
+		}).AsSelector(),
+	}
+
+	err := c.List(context.Background(), backupList, options)
+	if err != nil {
+		log.Errorf("fail to list backup for schedule %s/%s: %s", schedule.Namespace, schedule.Name, err.Error())
+		return true
+	}
+
+	for _, backup := range backupList.Items {
+		if backup.Status.Phase == velerov1.BackupPhaseNew || backup.Status.Phase == velerov1.BackupPhaseInProgress {
+			log.Debugf("%s/%s still has backups that are in InProgress or New...", schedule.Namespace, schedule.Name)
+			return true
+		}
+	}
+	return false
+}
+
+// ifDue check whether schedule is due to create a new backup.
+func (c *scheduleReconciler) ifDue(schedule *velerov1.Schedule, cronSchedule cron.Schedule) bool {
+	isDue, nextRunTime := getNextRunTime(schedule, cronSchedule, c.clock.Now())
+	log := c.logger.WithField("schedule", kube.NamespaceAndName(schedule))
 
 	if !isDue {
 		log.WithField("nextRunTime", nextRunTime).Debug("Schedule is not due, skipping")
-		return nil
+		return false
 	}
 
+	return true
+}
+
+// submitBackup create a backup from schedule.
+func (c *scheduleReconciler) submitBackup(ctx context.Context, schedule *velerov1.Schedule) error {
+	c.logger.WithField("schedule", schedule.Namespace+"/"+schedule.Name).Info("Schedule is due, going to submit backup.")
+
+	now := c.clock.Now()
 	// Don't attempt to "catch up" if there are any missed or failed runs - simply
 	// trigger a Backup if it's time.
-	//
-	// It might also make sense in the future to explicitly check for currently-running
-	// backups so that we don't overlap runs (for disk snapshots in particular, this can
-	// lead to performance issues).
-	log.WithField("nextRunTime", nextRunTime).Info("Schedule is due, submitting Backup")
-	backup := getBackup(item, now)
-	if _, err := c.backupsClient.Backups(backup.Namespace).Create(backup); err != nil {
+	backup := getBackup(schedule, now)
+	if err := c.Create(ctx, backup); err != nil {
 		return errors.Wrap(err, "error creating Backup")
 	}
 
-	original := item
-	schedule := item.DeepCopy()
+	original := schedule.DeepCopy()
+	schedule.Status.LastBackup = &metav1.Time{Time: now}
 
-	schedule.Status.LastBackup = metav1.NewTime(now)
-
-	if _, err := patchSchedule(original, schedule, c.schedulesClient); err != nil {
+	if err := c.Patch(ctx, schedule, client.MergeFrom(original)); err != nil {
 		return errors.Wrapf(err, "error updating Schedule's LastBackup time to %v", schedule.Status.LastBackup)
 	}
 
 	return nil
 }
 
-func getNextRunTime(schedule *api.Schedule, cronSchedule cron.Schedule, asOf time.Time) (bool, time.Time) {
-	// get the latest run time (if the schedule hasn't run yet, this will be the zero value which will trigger
-	// an immediate backup)
-	lastBackupTime := schedule.Status.LastBackup.Time
+func getNextRunTime(schedule *velerov1.Schedule, cronSchedule cron.Schedule, asOf time.Time) (bool, time.Time) {
+	var lastBackupTime time.Time
+	if schedule.Status.LastBackup != nil {
+		lastBackupTime = schedule.Status.LastBackup.Time
+	} else {
+		lastBackupTime = schedule.CreationTimestamp.Time
+	}
+	if schedule.Status.LastSkipped != nil && schedule.Status.LastSkipped.After(lastBackupTime) {
+		lastBackupTime = schedule.Status.LastSkipped.Time
+	}
 
 	nextRunTime := cronSchedule.Next(lastBackupTime)
 
 	return asOf.After(nextRunTime), nextRunTime
 }
 
-func getBackup(item *api.Schedule, timestamp time.Time) *api.Backup {
-	backup := &api.Backup{
-		Spec: item.Spec.Template,
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: item.Namespace,
-			Name:      fmt.Sprintf("%s-%s", item.Name, timestamp.Format("20060102150405")),
-		},
-	}
-
-	addLabelsToBackup(item, backup)
-
-	return backup
-}
-
-func addLabelsToBackup(item *api.Schedule, backup *api.Backup) {
-	labels := item.Labels
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-	labels[velerov1api.ScheduleNameLabel] = item.Name
-
-	backup.Labels = labels
-}
-
-func patchSchedule(original, updated *api.Schedule, client velerov1client.SchedulesGetter) (*api.Schedule, error) {
-	origBytes, err := json.Marshal(original)
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshalling original schedule")
-	}
-
-	updatedBytes, err := json.Marshal(updated)
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshalling updated schedule")
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(origBytes, updatedBytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating json merge patch for schedule")
-	}
-
-	res, err := client.Schedules(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "error patching schedule")
-	}
-
-	return res, nil
+func getBackup(item *velerov1.Schedule, timestamp time.Time) *velerov1.Backup {
+	name := item.TimestampedName(timestamp)
+	return builder.
+		ForBackup(item.Namespace, name).
+		FromSchedule(item).
+		Result()
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ func BackupCommand(repoIdentifier, passwordFile, path string, tags map[string]st
 		PasswordFile:   passwordFile,
 		Dir:            path,
 		Args:           []string{"."},
-		ExtraFlags:     append(backupTagFlags(tags), "--host=velero"),
+		ExtraFlags:     append(backupTagFlags(tags), "--host=velero", "--json"),
 	}
 }
 
@@ -64,7 +64,8 @@ func GetSnapshotCommand(repoIdentifier, passwordFile string, tags map[string]str
 		Command:        "snapshots",
 		RepoIdentifier: repoIdentifier,
 		PasswordFile:   passwordFile,
-		ExtraFlags:     []string{"--json", "--last", getSnapshotTagFlag(tags)},
+		// "--last" is replaced by "--latest=1" in restic v0.12.1
+		ExtraFlags: []string{"--json", "--latest=1", getSnapshotTagFlag(tags)},
 	}
 }
 
@@ -84,16 +85,9 @@ func InitCommand(repoIdentifier string) *Command {
 	}
 }
 
-func StatsCommand(repoIdentifier string) *Command {
+func SnapshotsCommand(repoIdentifier string) *Command {
 	return &Command{
-		Command:        "stats",
-		RepoIdentifier: repoIdentifier,
-	}
-}
-
-func CheckCommand(repoIdentifier string) *Command {
-	return &Command{
-		Command:        "check",
+		Command:        "snapshots",
 		RepoIdentifier: repoIdentifier,
 	}
 }
@@ -110,5 +104,22 @@ func ForgetCommand(repoIdentifier, snapshotID string) *Command {
 		Command:        "forget",
 		RepoIdentifier: repoIdentifier,
 		Args:           []string{snapshotID},
+	}
+}
+
+func UnlockCommand(repoIdentifier string) *Command {
+	return &Command{
+		Command:        "unlock",
+		RepoIdentifier: repoIdentifier,
+	}
+}
+
+func StatsCommand(repoIdentifier, passwordFile, snapshotID string) *Command {
+	return &Command{
+		Command:        "stats",
+		RepoIdentifier: repoIdentifier,
+		PasswordFile:   passwordFile,
+		Args:           []string{snapshotID},
+		ExtraFlags:     []string{"--json"},
 	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ func TestHas(t *testing.T) {
 func TestExcept(t *testing.T) {
 	items := []string{}
 	except := Except(items, "asdf")
-	assert.Len(t, except, 0)
+	assert.Empty(t, except)
 
 	items = []string{"a", "b", "c"}
 	assert.Equal(t, []string{"b", "c"}, Except(items, "a"))

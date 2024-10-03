@@ -1,1 +1,0 @@
-Move all the interfaces and associated types necessary to implement all of the Velero plugins to under the new package `velero`.

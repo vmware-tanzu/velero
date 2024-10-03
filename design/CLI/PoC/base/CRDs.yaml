@@ -1,0 +1,1188 @@
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: (unknown)
+  labels:
+    component: velero
+  name: backups.velero.io
+spec:
+  group: velero.io
+  names:
+    kind: Backup
+    listKind: BackupList
+    plural: backups
+    singular: backup
+  scope: ""
+  validation:
+    openAPIV3Schema:
+      description: Backup is a Velero resource that represents the capture of Kubernetes
+        cluster state at a point in time (API objects and associated volume state).
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: BackupSpec defines the specification for a Velero backup.
+          properties:
+            excludedNamespaces:
+              description: ExcludedNamespaces contains a list of namespaces that
+                are not included in the backup.
+              items:
+                type: string
+              nullable: true
+              type: array
+            excludedResources:
+              description: ExcludedResources is a slice of resource names that are
+                not included in the backup.
+              items:
+                type: string
+              nullable: true
+              type: array
+            hooks:
+              description: Hooks represent custom behaviors that should be executed
+                at different phases of the backup.
+              properties:
+                resources:
+                  description: Resources are hooks that should be executed when
+                    backing up individual instances of a resource.
+                  items:
+                    description: BackupResourceHookSpec defines one or more BackupResourceHooks
+                      that should be executed based on the rules defined for namespaces,
+                      resources, and label selector.
+                    properties:
+                      excludedNamespaces:
+                        description: ExcludedNamespaces specifies the namespaces
+                          to which this hook spec does not apply.
+                        items:
+                          type: string
+                        nullable: true
+                        type: array
+                      excludedResources:
+                        description: ExcludedResources specifies the resources to
+                          which this hook spec does not apply.
+                        items:
+                          type: string
+                        nullable: true
+                        type: array
+                      includedNamespaces:
+                        description: IncludedNamespaces specifies the namespaces
+                          to which this hook spec applies. If empty, it applies
+                          to all namespaces.
+                        items:
+                          type: string
+                        nullable: true
+                        type: array
+                      includedResources:
+                        description: IncludedResources specifies the resources to
+                          which this hook spec applies. If empty, it applies to
+                          all resources.
+                        items:
+                          type: string
+                        nullable: true
+                        type: array
+                      labelSelector:
+                        description: LabelSelector, if specified, filters the resources
+                          to which this hook spec applies.
+                        nullable: true
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: A label selector requirement is a selector
+                                that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship
+                                    to a set of values. Valid operators are In,
+                                    NotIn, Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values.
+                                    If the operator is In or NotIn, the values array
+                                    must be non-empty. If the operator is Exists
+                                    or DoesNotExist, the values array must be empty.
+                                    This array is replaced during a strategic merge
+                                    patch.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: matchLabels is a map of {key,value} pairs.
+                              A single {key,value} in the matchLabels map is equivalent
+                              to an element of matchExpressions, whose key field
+                              is "key", the operator is "In", and the values array
+                              contains only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                      name:
+                        description: Name is the name of this hook.
+                        type: string
+                      post:
+                        description: PostHooks is a list of BackupResourceHooks
+                          to execute after storing the item in the backup. These
+                          are executed after all "additional items" from item actions
+                          are processed.
+                        items:
+                          description: BackupResourceHook defines a hook for a resource.
+                          properties:
+                            exec:
+                              description: Exec defines an exec hook.
+                              properties:
+                                command:
+                                  description: Command is the command and arguments
+                                    to execute.
+                                  items:
+                                    type: string
+                                  minItems: 1
+                                  type: array
+                                container:
+                                  description: Container is the container in the
+                                    pod where the command should be executed. If
+                                    not specified, the pod's first container is
+                                    used.
+                                  type: string
+                                onError:
+                                  description: OnError specifies how Velero should
+                                    behave if it encounters an error executing this
+                                    hook.
+                                  items:
+                                    enum:
+                                      - Continue
+                                      - Fail
+                                  type: string
+                                timeout:
+                                  description: Timeout defines the maximum amount
+                                    of time Velero should wait for the hook to complete
+                                    before considering the execution a failure.
+                                  type: string
+                              required:
+                              - command
+                              type: object
+                          required:
+                          - exec
+                          type: object
+                        type: array
+                      pre:
+                        description: PreHooks is a list of BackupResourceHooks to
+                          execute prior to storing the item in the backup. These
+                          are executed before any "additional items" from item actions
+                          are processed.
+                        items:
+                          description: BackupResourceHook defines a hook for a resource.
+                          properties:
+                            exec:
+                              description: Exec defines an exec hook.
+                              properties:
+                                command:
+                                  description: Command is the command and arguments
+                                    to execute.
+                                  items:
+                                    type: string
+                                  minItems: 1
+                                  type: array
+                                container:
+                                  description: Container is the container in the
+                                    pod where the command should be executed. If
+                                    not specified, the pod's first container is
+                                    used.
+                                  type: string
+                                onError:
+                                  description: OnError specifies how Velero should
+                                    behave if it encounters an error executing this
+                                    hook.
+                                  items:
+                                    enum:
+                                      - Continue
+                                      - Fail
+                                  type: string
+                                timeout:
+                                  description: Timeout defines the maximum amount
+                                    of time Velero should wait for the hook to complete
+                                    before considering the execution a failure.
+                                  type: string
+                              required:
+                              - command
+                              type: object
+                          required:
+                          - exec
+                          type: object
+                        type: array
+                    required:
+                    - name
+                    type: object
+                  nullable: true
+                  type: array
+              type: object
+            includeClusterResources:
+              description: IncludeClusterResources specifies whether cluster-scoped
+                resources should be included for consideration in the backup.
+              nullable: true
+              type: boolean
+            includedNamespaces:
+              description: IncludedNamespaces is a slice of namespace names to include
+                objects from. If empty, all namespaces are included.
+              items:
+                type: string
+              nullable: true
+              type: array
+            includedResources:
+              description: IncludedResources is a slice of resource names to include
+                in the backup. If empty, all resources are included.
+              items:
+                type: string
+              nullable: true
+              type: array
+            labelSelector:
+              description: LabelSelector is a metav1.LabelSelector to filter with
+                when adding individual objects to the backup. If empty or nil, all
+                objects are included. Optional.
+              nullable: true
+              properties:
+                matchExpressions:
+                  description: matchExpressions is a list of label selector requirements.
+                    The requirements are ANDed.
+                  items:
+                    description: A label selector requirement is a selector that
+                      contains values, a key, and an operator that relates the key
+                      and values.
+                    properties:
+                      key:
+                        description: key is the label key that the selector applies
+                          to.
+                        type: string
+                      operator:
+                        description: operator represents a key's relationship to
+                          a set of values. Valid operators are In, NotIn, Exists
+                          and DoesNotExist.
+                        type: string
+                      values:
+                        description: values is an array of string values. If the
+                          operator is In or NotIn, the values array must be non-empty.
+                          If the operator is Exists or DoesNotExist, the values
+                          array must be empty. This array is replaced during a strategic
+                          merge patch.
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - key
+                    - operator
+                    type: object
+                  type: array
+                matchLabels:
+                  additionalProperties:
+                    type: string
+                  description: matchLabels is a map of {key,value} pairs. A single
+                    {key,value} in the matchLabels map is equivalent to an element
+                    of matchExpressions, whose key field is "key", the operator
+                    is "In", and the values array contains only "value". The requirements
+                    are ANDed.
+                  type: object
+              type: object
+            snapshotVolumes:
+              description: SnapshotVolumes specifies whether to take cloud snapshots
+                of any PV's referenced in the set of objects included in the Backup.
+              nullable: true
+              type: boolean
+            storageLocation:
+              description: StorageLocation is a string containing the name of a
+                BackupStorageLocation where the backup should be stored.
+              type: string
+            ttl:
+              description: TTL is a time.Duration-parseable string describing how
+                long the Backup should be retained for.
+              type: string
+            volumeSnapshotLocations:
+              description: VolumeSnapshotLocations is a list containing names of
+                VolumeSnapshotLocations associated with this backup.
+              items:
+                type: string
+              type: array
+          type: object
+        status:
+          description: BackupStatus captures the current status of a Velero backup.
+          properties:
+            completionTimestamp:
+              description: CompletionTimestamp records the time a backup was completed. Completion time is recorded even on failed backups. Completion time is recorded before uploading the backup object. The server's time is used for CompletionTimestamps
+              format: date-time
+              nullable: true
+              type: string
+            errors:
+              description: Errors is a count of all error messages that were generated during execution of the backup.  The actual errors are in the backup's log file in object storage.
+              type: integer
+            expiration:
+              description: Expiration is when this Backup is eligible for garbage-collection.
+              format: date-time
+              nullable: true
+              type: string
+            phase:
+              description: Phase is the current state of the Backup.
+              items:
+                enum:
+                  - New
+                  - FailedValidation
+                  - InProgress
+                  - Completed
+                  - PartiallyFailed
+                  - Failed
+                  - Deleting
+              type: string
+            startTimestamp:
+              description: StartTimestamp records the time a backup was started.
+                Separate from CreationTimestamp, since that value changes on restores.
+                The server's time is used for StartTimestamps
+              format: date-time
+              nullable: true
+              type: string
+            validationErrors:
+              description: ValidationErrors is a slice of all validation errors
+                (if applicable).
+              items:
+                type: string
+              nullable: true
+              type: array
+            version:
+              description: Version is the backup format version.
+              type: integer
+            volumeSnapshotsAttempted:
+              description: VolumeSnapshotsAttempted is the total number of attempted
+                volume snapshots for this backup.
+              type: integer
+            volumeSnapshotsCompleted:
+              description: VolumeSnapshotsCompleted is the total number of successfully
+                completed volume snapshots for this backup.
+              type: integer
+            warnings:
+              description: Warnings is a count of all warning messages that were
+                generated during execution of the backup. The actual warnings are
+                in the backup's log file in object storage.
+              type: integer
+          type: object
+      type: object
+  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: (unknown)
+  labels:
+    component: velero
+  name: deletebackuprequests.velero.io
+spec:
+  group: velero.io
+  names:
+    kind: DeleteBackupRequest
+    listKind: DeleteBackupRequestList
+    plural: deletebackuprequests
+    singular: deletebackuprequest
+  scope: ""
+  validation:
+    openAPIV3Schema:
+      description: DeleteBackupRequest is a request to delete one or more backups.
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+          of an object. Servers should convert recognized schemas to the latest
+          internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+          object represents. Servers may infer this from the endpoint the client
+          submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: DeleteBackupRequestSpec is the specification for which backups
+            to delete.
+          properties:
+            backupName:
+              type: string
+          required:
+            - backupName
+          type: object
+        status:
+          description: DeleteBackupRequestStatus is the current status of a DeleteBackupRequest.
+          properties:
+            errors:
+              description: Errors contains any errors that were encountered during
+                the deletion process.
+              items:
+                type: string
+              nullable: true
+              type: array
+            phase:
+              description: Phase is the current state of the DeleteBackupRequest.
+              items:
+                enum:
+                  - New
+                  - InProgress
+                  - Processed
+              type: string
+          type: object
+      type: object
+  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: (unknown)
+  labels:
+    component: velero
+  name: downloadrequests.velero.io
+spec:
+  group: velero.io
+  names:
+    kind: DownloadRequest
+    listKind: DownloadRequestList
+    plural: downloadrequests
+    singular: downloadrequest
+  scope: ""
+  validation:
+    openAPIV3Schema:
+      description: DownloadRequest is a request to download an artifact from backup
+        object storage, such as a backup log file.
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+          of an object. Servers should convert recognized schemas to the latest
+          internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+          object represents. Servers may infer this from the endpoint the client
+          submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: DownloadRequestSpec is the specification for a download request.
+          properties:
+            target:
+              description: Target is what to download (e.g. logs for a backup).
+              properties:
+                kind:
+                  description: Kind is the type of file to download.
+                  items:
+                    enum:
+                      - BackupLog
+                      - BackupContents
+                      - BackupVolumeSnapshot
+                      - BackupResourceList
+                      - RestoreLog
+                      - RestoreResults
+                      - CSIBackupVolumeSnapshots
+                      - CSIBackupVolumeSnapshotContents
+                  type: string
+                name:
+                  description: Name is the name of the Kubernetes resource with
+                    which the file is associated.
+                  type: string
+              required:
+                - kind
+                - name
+              type: object
+          required:
+            - target
+          type: object
+        status:
+          description: DownloadRequestStatus is the current status of a DownloadRequest.
+          properties:
+            downloadURL:
+              description: DownloadURL contains the pre-signed URL for the target
+                file.
+              type: string
+            expiration:
+              description: Expiration is when this DownloadRequest expires and can
+                be deleted by the system.
+              format: date-time
+              nullable: true
+              type: string
+            phase:
+              description: Phase is the current state of the DownloadRequest.
+              items:
+                enum:
+                  - New
+                  - Processed
+              type: string
+          type: object
+      type: object
+  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: (unknown)
+  labels:
+    component: velero
+  name: restores.velero.io
+spec:
+  group: velero.io
+  names:
+    kind: Restore
+    listKind: RestoreList
+    plural: restores
+    singular: restore
+  scope: ""
+  validation:
+    openAPIV3Schema:
+      description: Restore is a Velero resource that represents the application
+        of resources from a Velero backup to a target Kubernetes cluster.
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+          of an object. Servers should convert recognized schemas to the latest
+          internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+          object represents. Servers may infer this from the endpoint the client
+          submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: RestoreSpec defines the specification for a Velero restore.
+          properties:
+            backupName:
+              description: BackupName is the unique name of the Velero backup to
+                restore from.
+              type: string
+            excludedNamespaces:
+              description: ExcludedNamespaces contains a list of namespaces that
+                are not included in the restore.
+              items:
+                type: string
+              nullable: true
+              type: array
+            excludedResources:
+              description: ExcludedResources is a slice of resource names that are
+                not included in the restore.
+              items:
+                type: string
+              nullable: true
+              type: array
+            includeClusterResources:
+              description: IncludeClusterResources specifies whether cluster-scoped
+                resources should be included for consideration in the restore. If
+                null, defaults to true.
+              nullable: true
+              type: boolean
+            includedNamespaces:
+              description: IncludedNamespaces is a slice of namespace names to include
+                objects from. If empty, all namespaces are included.
+              items:
+                type: string
+              nullable: true
+              type: array
+            includedResources:
+              description: IncludedResources is a slice of resource names to include
+                in the restore. If empty, all resources in the backup are included.
+              items:
+                type: string
+              nullable: true
+              type: array
+            labelSelector:
+              description: LabelSelector is a metav1.LabelSelector to filter with
+                when restoring individual objects from the backup. If empty or nil,
+                all objects are included. Optional.
+              nullable: true
+              properties:
+                matchExpressions:
+                  description: matchExpressions is a list of label selector requirements.
+                    The requirements are ANDed.
+                  items:
+                    description: A label selector requirement is a selector that
+                      contains values, a key, and an operator that relates the key
+                      and values.
+                    properties:
+                      key:
+                        description: key is the label key that the selector applies
+                          to.
+                        type: string
+                      operator:
+                        description: operator represents a key's relationship to
+                          a set of values. Valid operators are In, NotIn, Exists
+                          and DoesNotExist.
+                        type: string
+                      values:
+                        description: values is an array of string values. If the
+                          operator is In or NotIn, the values array must be non-empty.
+                          If the operator is Exists or DoesNotExist, the values
+                          array must be empty. This array is replaced during a strategic
+                          merge patch.
+                        items:
+                          type: string
+                        type: array
+                    required:
+                      - key
+                      - operator
+                    type: object
+                  type: array
+                matchLabels:
+                  additionalProperties:
+                    type: string
+                  description: matchLabels is a map of {key,value} pairs. A single
+                    {key,value} in the matchLabels map is equivalent to an element
+                    of matchExpressions, whose key field is "key", the operator
+                    is "In", and the values array contains only "value". The requirements
+                    are ANDed.
+                  type: object
+              type: object
+            namespaceMapping:
+              additionalProperties:
+                type: string
+              description: NamespaceMapping is a map of source namespace names to
+                target namespace names to restore into. Any source namespaces not
+                included in the map will be restored into namespaces of the same
+                name.
+              type: object
+            restorePVs:
+              description: RestorePVs specifies whether to restore all included
+                PVs from snapshot (via the cloudprovider).
+              nullable: true
+              type: boolean
+            preserveNodePorts:
+              description: PreserveNodePorts specifies whether to restore old nodePorts from backup.
+              nullable: true
+              type: boolean
+            scheduleName:
+              description: ScheduleName is the unique name of the Velero schedule
+                to restore from. If specified, and BackupName is empty, Velero will
+                restore from the most recent successful backup created from this
+                schedule.
+              type: string
+          required:
+            - backupName
+          type: object
+        status:
+          description: RestoreStatus captures the current status of a Velero restore
+          properties:
+            errors:
+              description: Errors is a count of all error messages that were generated
+                during execution of the restore. The actual errors are stored in
+                object storage.
+              type: integer
+            failureReason:
+              description: FailureReason is an error that caused the entire restore
+                to fail.
+              type: string
+            phase:
+              description: Phase is the current state of the Restore
+              items:
+                enum:
+                  - New
+                  - FailedValidation
+                  - InProgress
+                  - Completed
+                  - PartiallyFailed
+                  - Failed
+              type: string
+            validationErrors:
+              description: ValidationErrors is a slice of all validation errors
+                (if applicable)
+              items:
+                type: string
+              nullable: true
+              type: array
+            warnings:
+              description: Warnings is a count of all warning messages that were
+                generated during execution of the restore. The actual warnings are
+                stored in object storage.
+              type: integer
+          type: object
+      type: object
+  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: (unknown)
+  labels:
+    component: velero
+  name: schedules.velero.io
+spec:
+  group: velero.io
+  names:
+    kind: Schedule
+    listKind: ScheduleList
+    plural: schedules
+    singular: schedule
+  scope: ""
+  validation:
+    openAPIV3Schema:
+      description: Schedule is a Velero resource that represents a pre-scheduled
+        or periodic Backup that should be run.
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+          of an object. Servers should convert recognized schemas to the latest
+          internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+          object represents. Servers may infer this from the endpoint the client
+          submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ScheduleSpec defines the specification for a Velero schedule
+          properties:
+            schedule:
+              description: Schedule is a Cron expression defining when to run the
+                Backup.
+              type: string
+            template:
+              description: Template is the definition of the Backup to be run on
+                the provided schedule
+              properties:
+                excludedNamespaces:
+                  description: ExcludedNamespaces contains a list of namespaces
+                    that are not included in the backup.
+                  items:
+                    type: string
+                  nullable: true
+                  type: array
+                excludedResources:
+                  description: ExcludedResources is a slice of resource names that
+                    are not included in the backup.
+                  items:
+                    type: string
+                  nullable: true
+                  type: array
+                hooks:
+                  description: Hooks represent custom behaviors that should be executed
+                    at different phases of the backup.
+                  properties:
+                    resources:
+                      description: Resources are hooks that should be executed when
+                        backing up individual instances of a resource.
+                      items:
+                        description: BackupResourceHookSpec defines one or more
+                          BackupResourceHooks that should be executed based on the
+                          rules defined for namespaces, resources, and label selector.
+                        properties:
+                          excludedNamespaces:
+                            description: ExcludedNamespaces specifies the namespaces
+                              to which this hook spec does not apply.
+                            items:
+                              type: string
+                            nullable: true
+                            type: array
+                          excludedResources:
+                            description: ExcludedResources specifies the resources
+                              to which this hook spec does not apply.
+                            items:
+                              type: string
+                            nullable: true
+                            type: array
+                          includedNamespaces:
+                            description: IncludedNamespaces specifies the namespaces
+                              to which this hook spec applies. If empty, it applies
+                              to all namespaces.
+                            items:
+                              type: string
+                            nullable: true
+                            type: array
+                          includedResources:
+                            description: IncludedResources specifies the resources
+                              to which this hook spec applies. If empty, it applies
+                              to all resources.
+                            items:
+                              type: string
+                            nullable: true
+                            type: array
+                          labelSelector:
+                            description: LabelSelector, if specified, filters the
+                              resources to which this hook spec applies.
+                            nullable: true
+                            properties:
+                              matchExpressions:
+                                description: matchExpressions is a list of label
+                                  selector requirements. The requirements are ANDed.
+                                items:
+                                  description: A label selector requirement is a
+                                    selector that contains values, a key, and an
+                                    operator that relates the key and values.
+                                  properties:
+                                    key:
+                                      description: key is the label key that the
+                                        selector applies to.
+                                      type: string
+                                    operator:
+                                      description: operator represents a key's relationship
+                                        to a set of values. Valid operators are
+                                        In, NotIn, Exists and DoesNotExist.
+                                      type: string
+                                    values:
+                                      description: values is an array of string
+                                        values. If the operator is In or NotIn,
+                                        the values array must be non-empty. If the
+                                        operator is Exists or DoesNotExist, the
+                                        values array must be empty. This array is
+                                        replaced during a strategic merge patch.
+                                      items:
+                                        type: string
+                                      type: array
+                                  required:
+                                    - key
+                                    - operator
+                                  type: object
+                                type: array
+                              matchLabels:
+                                additionalProperties:
+                                  type: string
+                                description: matchLabels is a map of {key,value}
+                                  pairs. A single {key,value} in the matchLabels
+                                  map is equivalent to an element of matchExpressions,
+                                  whose key field is "key", the operator is "In",
+                                  and the values array contains only "value". The
+                                  requirements are ANDed.
+                                type: object
+                            type: object
+                          name:
+                            description: Name is the name of this hook.
+                            type: string
+                          post:
+                            description: PostHooks is a list of BackupResourceHooks
+                              to execute after storing the item in the backup. These
+                              are executed after all "additional items" from item
+                              actions are processed.
+                            items:
+                              description: BackupResourceHook defines a hook for
+                                a resource.
+                              properties:
+                                exec:
+                                  description: Exec defines an exec hook.
+                                  properties:
+                                    command:
+                                      description: Command is the command and arguments
+                                        to execute.
+                                      items:
+                                        type: string
+                                      minItems: 1
+                                      type: array
+                                    container:
+                                      description: Container is the container in
+                                        the pod where the command should be executed.
+                                        If not specified, the pod's first container
+                                        is used.
+                                      type: string
+                                    onError:
+                                      description: OnError specifies how Velero
+                                        should behave if it encounters an error
+                                        executing this hook.
+                                      items:
+                                        enum:
+                                          - Continue
+                                          - Fail
+                                      type: string
+                                    timeout:
+                                      description: Timeout defines the maximum amount
+                                        of time Velero should wait for the hook
+                                        to complete before considering the execution
+                                        a failure.
+                                      type: string
+                                  required:
+                                    - command
+                                  type: object
+                              required:
+                                - exec
+                              type: object
+                            type: array
+                          pre:
+                            description: PreHooks is a list of BackupResourceHooks
+                              to execute prior to storing the item in the backup.
+                              These are executed before any "additional items" from
+                              item actions are processed.
+                            items:
+                              description: BackupResourceHook defines a hook for
+                                a resource.
+                              properties:
+                                exec:
+                                  description: Exec defines an exec hook.
+                                  properties:
+                                    command:
+                                      description: Command is the command and arguments
+                                        to execute.
+                                      items:
+                                        type: string
+                                      minItems: 1
+                                      type: array
+                                    container:
+                                      description: Container is the container in
+                                        the pod where the command should be executed.
+                                        If not specified, the pod's first container
+                                        is used.
+                                      type: string
+                                    onError:
+                                      description: OnError specifies how Velero
+                                        should behave if it encounters an error
+                                        executing this hook.
+                                      items:
+                                        enum:
+                                          - Continue
+                                          - Fail
+                                      type: string
+                                    timeout:
+                                      description: Timeout defines the maximum amount
+                                        of time Velero should wait for the hook
+                                        to complete before considering the execution
+                                        a failure.
+                                      type: string
+                                  required:
+                                    - command
+                                  type: object
+                              required:
+                                - exec
+                              type: object
+                            type: array
+                        required:
+                          - name
+                        type: object
+                      nullable: true
+                      type: array
+                  type: object
+                includeClusterResources:
+                  description: IncludeClusterResources specifies whether cluster-scoped
+                    resources should be included for consideration in the backup.
+                  nullable: true
+                  type: boolean
+                includedNamespaces:
+                  description: IncludedNamespaces is a slice of namespace names
+                    to include objects from. If empty, all namespaces are included.
+                  items:
+                    type: string
+                  nullable: true
+                  type: array
+                includedResources:
+                  description: IncludedResources is a slice of resource names to
+                    include in the backup. If empty, all resources are included.
+                  items:
+                    type: string
+                  nullable: true
+                  type: array
+                labelSelector:
+                  description: LabelSelector is a metav1.LabelSelector to filter
+                    with when adding individual objects to the backup. If empty
+                    or nil, all objects are included. Optional.
+                  nullable: true
+                  properties:
+                    matchExpressions:
+                      description: matchExpressions is a list of label selector
+                        requirements. The requirements are ANDed.
+                      items:
+                        description: A label selector requirement is a selector
+                          that contains values, a key, and an operator that relates
+                          the key and values.
+                        properties:
+                          key:
+                            description: key is the label key that the selector
+                              applies to.
+                            type: string
+                          operator:
+                            description: operator represents a key's relationship
+                              to a set of values. Valid operators are In, NotIn,
+                              Exists and DoesNotExist.
+                            type: string
+                          values:
+                            description: values is an array of string values. If
+                              the operator is In or NotIn, the values array must
+                              be non-empty. If the operator is Exists or DoesNotExist,
+                              the values array must be empty. This array is replaced
+                              during a strategic merge patch.
+                            items:
+                              type: string
+                            type: array
+                        required:
+                          - key
+                          - operator
+                        type: object
+                      type: array
+                    matchLabels:
+                      additionalProperties:
+                        type: string
+                      description: matchLabels is a map of {key,value} pairs. A
+                        single {key,value} in the matchLabels map is equivalent
+                        to an element of matchExpressions, whose key field is "key",
+                        the operator is "In", and the values array contains only
+                        "value". The requirements are ANDed.
+                      type: object
+                  type: object
+                snapshotVolumes:
+                  description: SnapshotVolumes specifies whether to take cloud snapshots
+                    of any PV's referenced in the set of objects included in the
+                    Backup.
+                  nullable: true
+                  type: boolean
+                storageLocation:
+                  description: StorageLocation is a string containing the name of
+                    a BackupStorageLocation where the backup should be stored.
+                  type: string
+                ttl:
+                  description: TTL is a time.Duration-parseable string describing
+                    how long the Backup should be retained for.
+                  type: string
+                volumeSnapshotLocations:
+                  description: VolumeSnapshotLocations is a list containing names
+                    of VolumeSnapshotLocations associated with this backup.
+                  items:
+                    type: string
+                  type: array
+              type: object
+          required:
+            - schedule
+            - template
+          type: object
+        status:
+          description: ScheduleStatus captures the current state of a Velero schedule
+          properties:
+            lastBackup:
+              description: LastBackup is the last time a Backup was run for this Schedule schedule 
+              format: date-time 
+              nullable: true 
+              type: string 
+            phase: 
+              description: Phase is the current phase of the Schedule 
+              items: 
+                enum: 
+                  - New 
+                  - Enabled 
+                  - FailedValidation 
+              type: string 
+            validationErrors: 
+              description: ValidationErrors is a slice of all validation errors (if applicable)
+              items:
+                type: string
+              type: array
+          type: object
+      type: object
+  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true          
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: (unknown)
+  labels:
+    component: velero
+  name: serverstatusrequests.velero.io
+spec:
+  group: velero.io
+  names:
+    kind: ServerStatusRequest
+    listKind: ServerStatusRequestList
+    plural: serverstatusrequests
+    singular: serverstatusrequest
+  scope: ""
+  validation:
+    openAPIV3Schema:
+      description: ServerStatusRequest is a request to access current status information
+        about the Velero server.
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+          of an object. Servers should convert recognized schemas to the latest
+          internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+          object represents. Servers may infer this from the endpoint the client
+          submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ServerStatusRequestSpec is the specification for a ServerStatusRequest.
+          type: object
+        status:
+          description: ServerStatusRequestStatus is the current status of a ServerStatusRequest.
+          properties:
+            phase:
+              description: Phase is the current lifecycle phase of the ServerStatusRequest.
+              items:
+                enum:
+                  - New
+                  - Processed
+              type: string
+            plugins:
+              description: Plugins list information about the plugins running on
+                the Velero server
+              items:
+                description: PluginInfo contains attributes of a Velero plugin
+                properties:
+                  kind:
+                    type: string
+                  name:
+                    type: string
+                required:
+                  - kind
+                  - name
+                type: object
+              nullable: true
+              type: array
+            processedTimestamp:
+              description: ProcessedTimestamp is when the ServerStatusRequest was
+                processed by the ServerStatusRequestController.
+              format: date-time 
+              nullable: true 
+              type: string 
+            serverVersion: 
+              description: ServerVersion is the Velero server version. 
+              type: string
+          type: object
+      type: object
+  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true  

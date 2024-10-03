@@ -69,8 +69,8 @@ carefully to ensure a successful upgrade!**
 - The `Config` CRD has been replaced by `BackupStorageLocation` and `VolumeSnapshotLocation` CRDs. 
 - The interface for external plugins (object/block stores, backup/restore item actions) has changed. If you have authored any custom plugins, they'll 
 need to be updated for v0.10.
-    - The [`ObjectStore.ListCommonPrefixes`](https://github.com/heptio/ark/blob/master/pkg/cloudprovider/object_store.go#L50) signature has changed to add a `prefix` parameter.
-    - Registering plugins has changed. Create a new plugin server with the `NewServer` function, and register plugins with the appropriate functions. See the [`Server`](https://github.com/heptio/ark/blob/master/pkg/plugin/server.go#L37) interface for details.
+    - The [`ObjectStore.ListCommonPrefixes`](https://github.com/vmware-tanzu/velero/blob/main/pkg/cloudprovider/object_store.go#L50) signature has changed to add a `prefix` parameter.
+    - Registering plugins has changed. Create a new plugin server with the `NewServer` function, and register plugins with the appropriate functions. See the [`Server`](https://github.com/vmware-tanzu/velero/blob/main/pkg/plugin/server.go#L37) interface for details.
 - The organization of Ark data in object storage has changed. Existing data will need to be moved around to conform to the new layout.
 
 ### All Changes
@@ -89,7 +89,7 @@ need to be updated for v0.10.
 -   [ec013e6f](https://github.com/heptio/ark/commit/ec013e6f)	Document upgrading plugins in the deployment
 -   [d6162e94](https://github.com/heptio/ark/commit/d6162e94)	fix goreleaser bugs
 -   [a15df276](https://github.com/heptio/ark/commit/a15df276)	Add correct link and change role
--   [46bed015](https://github.com/heptio/ark/commit/46bed015)	add 0.10 breaking changes warning to readme in master
+-   [46bed015](https://github.com/heptio/ark/commit/46bed015)	add 0.10 breaking changes warning to readme in main
 -   [e3a7d6a2](https://github.com/heptio/ark/commit/e3a7d6a2)	add content for issue 994
 -   [400911e9](https://github.com/heptio/ark/commit/400911e9)	address docs issue #978
 -   [b818cc27](https://github.com/heptio/ark/commit/b818cc27)	don't require a default provider VSL if there's only 1
@@ -247,7 +247,7 @@ need to be updated for v0.10.
 - 	[5b89f7b6](https://github.com/heptio/ark/commit/5b89f7b6)	Skip backup sync if it already exists in k8s
 - 	[c6050845](https://github.com/heptio/ark/commit/c6050845)	restore controller: switch to 'c' for receiver name
 - 	[706ae07d](https://github.com/heptio/ark/commit/706ae07d)	enable a schedule to be provided as the source for a restore
-- 	[aea68414](https://github.com/heptio/ark/commit/aea68414)	fix up Slack link in troubleshooting on master branch
+- 	[aea68414](https://github.com/heptio/ark/commit/aea68414)	fix up Slack link in troubleshooting on main branch
 - 	[bb8e2e91](https://github.com/heptio/ark/commit/bb8e2e91)	Document how to run the Ark server locally
 - 	[dc84e591](https://github.com/heptio/ark/commit/dc84e591)	Remove outdated namespace deletion content
 - 	[23abbc9a](https://github.com/heptio/ark/commit/23abbc9a)	fix paths

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,8 +27,14 @@ import (
 func CheckError(err error) {
 	if err != nil {
 		if err != context.Canceled {
-			fmt.Fprintf(os.Stderr, fmt.Sprintf("An error occurred: %v\n", err))
+			fmt.Fprintf(os.Stderr, "An error occurred: %v\n", err)
 		}
 		os.Exit(1)
 	}
+}
+
+// Exit prints msg (with optional args), plus a newline, to stderr and exits with code 1.
+func Exit(msg string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, msg+"\n", args...)
+	os.Exit(1)
 }

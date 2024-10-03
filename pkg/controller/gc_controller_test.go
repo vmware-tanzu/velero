@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,263 +18,130 @@ package controller
 
 import (
 	"context"
-	"fmt"
-	"sort"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/watch"
-	core "k8s.io/client-go/testing"
+	"k8s.io/apimachinery/pkg/types"
+	testclocks "k8s.io/utils/clock/testing"
+	ctrl "sigs.k8s.io/controller-runtime"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
-	"github.com/heptio/velero/pkg/util/kube"
-	velerotest "github.com/heptio/velero/pkg/util/test"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-func TestGCControllerEnqueueAllBackups(t *testing.T) {
-	var (
-		client          = fake.NewSimpleClientset()
-		sharedInformers = informers.NewSharedInformerFactory(client, 0)
-
-		controller = NewGCController(
-			velerotest.NewLogger(),
-			sharedInformers.Velero().V1().Backups(),
-			sharedInformers.Velero().V1().DeleteBackupRequests(),
-			client.VeleroV1(),
-		).(*gcController)
-	)
-
-	// Have to clear this out so the controller doesn't wait
-	controller.cacheSyncWaiters = nil
-
-	keys := make(chan string)
-
-	controller.syncHandler = func(key string) error {
-		keys <- key
-		return nil
-	}
-
-	var expected []string
-
-	for i := 0; i < 3; i++ {
-		backup := velerotest.NewTestBackup().WithName(fmt.Sprintf("backup-%d", i)).Backup
-		sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(backup)
-		expected = append(expected, kube.NamespaceAndName(backup))
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	go controller.Run(ctx, 1)
-
-	var received []string
-
-Loop:
-	for {
-		select {
-		case <-ctx.Done():
-			t.Fatal("test timed out")
-		case key := <-keys:
-			received = append(received, key)
-			if len(received) == len(expected) {
-				break Loop
-			}
-		}
-	}
-
-	sort.Strings(expected)
-	sort.Strings(received)
-	assert.Equal(t, expected, received)
-}
-
-func TestGCControllerHasUpdateFunc(t *testing.T) {
-	backup := velerotest.NewTestBackup().WithName("backup").Backup
-	expected := kube.NamespaceAndName(backup)
-
-	client := fake.NewSimpleClientset(backup)
-
-	fakeWatch := watch.NewFake()
-	defer fakeWatch.Stop()
-	client.PrependWatchReactor("backups", core.DefaultWatchReactor(fakeWatch, nil))
-
-	sharedInformers := informers.NewSharedInformerFactory(client, 0)
-
-	controller := NewGCController(
+func mockGCReconciler(fakeClient kbclient.Client, fakeClock *testclocks.FakeClock, freq time.Duration) *gcReconciler {
+	gcr := NewGCReconciler(
 		velerotest.NewLogger(),
-		sharedInformers.Velero().V1().Backups(),
-		sharedInformers.Velero().V1().DeleteBackupRequests(),
-		client.VeleroV1(),
-	).(*gcController)
-
-	keys := make(chan string)
-
-	controller.syncHandler = func(key string) error {
-		keys <- key
-		return nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	go sharedInformers.Start(ctx.Done())
-	go controller.Run(ctx, 1)
-
-	// wait for the AddFunc
-	select {
-	case <-ctx.Done():
-		t.Fatal("test timed out waiting for AddFunc")
-	case key := <-keys:
-		assert.Equal(t, expected, key)
-	}
-
-	backup.Status.Version = 1234
-	fakeWatch.Add(backup)
-
-	// wait for the UpdateFunc
-	select {
-	case <-ctx.Done():
-		t.Fatal("test timed out waiting for UpdateFunc")
-	case key := <-keys:
-		assert.Equal(t, expected, key)
-	}
+		fakeClient,
+		freq,
+	)
+	gcr.clock = fakeClock
+	return gcr
 }
 
-func TestGCControllerProcessQueueItem(t *testing.T) {
-	fakeClock := clock.NewFakeClock(time.Now())
+func TestGCReconcile(t *testing.T) {
+	fakeClock := testclocks.NewFakeClock(time.Now())
+	defaultBackupLocation := builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "default").Result()
 
 	tests := []struct {
-		name                           string
-		backup                         *api.Backup
-		deleteBackupRequests           []*api.DeleteBackupRequest
-		expectDeletion                 bool
-		createDeleteBackupRequestError bool
-		expectError                    bool
+		name                 string
+		backup               *velerov1api.Backup
+		deleteBackupRequests []*velerov1api.DeleteBackupRequest
+		backupLocation       *velerov1api.BackupStorageLocation
+		expectError          bool
 	}{
 		{
 			name: "can't find backup - no error",
 		},
 		{
-			name: "unexpired backup is not deleted",
-			backup: velerotest.NewTestBackup().WithName("backup-1").
-				WithExpiration(fakeClock.Now().Add(1 * time.Minute)).
-				Backup,
-			expectDeletion: false,
+			name:           "unexpired backup is not deleted",
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(time.Minute)).StorageLocation("default").Result(),
+			backupLocation: defaultBackupLocation,
 		},
 		{
-			name: "expired backup with no pending deletion requests is deleted",
-			backup: velerotest.NewTestBackup().WithName("backup-1").
-				WithExpiration(fakeClock.Now().Add(-1 * time.Second)).
-				Backup,
-			expectDeletion: true,
+			name:           "expired backup in read-only storage location is not deleted",
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-only").Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result(),
 		},
 		{
-			name: "expired backup with a pending deletion request is not deleted",
-			backup: velerotest.NewTestBackup().WithName("backup-1").
-				WithExpiration(fakeClock.Now().Add(-1 * time.Second)).
-				Backup,
-			deleteBackupRequests: []*api.DeleteBackupRequest{
+			name:           "expired backup in read-write storage location is deleted",
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-write").Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").AccessMode(velerov1api.BackupStorageLocationAccessModeReadWrite).Result(),
+		},
+		{
+			name:           "expired backup with no pending deletion requests is deleted",
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Result(),
+			backupLocation: defaultBackupLocation,
+		},
+		{
+			name:           "expired backup with a pending deletion request is not deleted",
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Result(),
+			backupLocation: defaultBackupLocation,
+			deleteBackupRequests: []*velerov1api.DeleteBackupRequest{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: api.DefaultNamespace,
+						Namespace: velerov1api.DefaultNamespace,
 						Name:      "foo",
 						Labels: map[string]string{
-							api.BackupNameLabel: "backup-1",
-							api.BackupUIDLabel:  "",
+							velerov1api.BackupNameLabel: "backup-1",
+							velerov1api.BackupUIDLabel:  "",
 						},
 					},
-					Status: api.DeleteBackupRequestStatus{
-						Phase: api.DeleteBackupRequestPhaseInProgress,
+					Status: velerov1api.DeleteBackupRequestStatus{
+						Phase: velerov1api.DeleteBackupRequestPhaseInProgress,
 					},
 				},
 			},
-			expectDeletion: false,
 		},
 		{
-			name: "expired backup with only processed deletion requests is deleted",
-			backup: velerotest.NewTestBackup().WithName("backup-1").
-				WithExpiration(fakeClock.Now().Add(-1 * time.Second)).
-				Backup,
-			deleteBackupRequests: []*api.DeleteBackupRequest{
+			name:           "expired backup with only processed deletion requests is deleted",
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Result(),
+			backupLocation: defaultBackupLocation,
+			deleteBackupRequests: []*velerov1api.DeleteBackupRequest{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: api.DefaultNamespace,
+						Namespace: velerov1api.DefaultNamespace,
 						Name:      "foo",
 						Labels: map[string]string{
-							api.BackupNameLabel: "backup-1",
-							api.BackupUIDLabel:  "",
+							velerov1api.BackupNameLabel: "backup-1",
+							velerov1api.BackupUIDLabel:  "",
 						},
 					},
-					Status: api.DeleteBackupRequestStatus{
-						Phase: api.DeleteBackupRequestPhaseProcessed,
+					Status: velerov1api.DeleteBackupRequestStatus{
+						Phase: velerov1api.DeleteBackupRequestPhaseProcessed,
 					},
 				},
 			},
-			expectDeletion: true,
-		},
-		{
-			name: "create DeleteBackupRequest error returns an error",
-			backup: velerotest.NewTestBackup().WithName("backup-1").
-				WithExpiration(fakeClock.Now().Add(-1 * time.Second)).
-				Backup,
-			expectDeletion:                 true,
-			createDeleteBackupRequestError: true,
-			expectError:                    true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var (
-				client          = fake.NewSimpleClientset()
-				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-			)
+			if test.backup == nil {
+				return
+			}
 
-			controller := NewGCController(
-				velerotest.NewLogger(),
-				sharedInformers.Velero().V1().Backups(),
-				sharedInformers.Velero().V1().DeleteBackupRequests(),
-				client.VeleroV1(),
-			).(*gcController)
-			controller.clock = fakeClock
+			initObjs := []runtime.Object{}
+			initObjs = append(initObjs, test.backup)
 
-			var key string
-			if test.backup != nil {
-				key = kube.NamespaceAndName(test.backup)
-				sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup)
+			if test.backupLocation != nil {
+				initObjs = append(initObjs, test.backupLocation)
 			}
 
 			for _, dbr := range test.deleteBackupRequests {
-				sharedInformers.Velero().V1().DeleteBackupRequests().Informer().GetStore().Add(dbr)
+				initObjs = append(initObjs, dbr)
 			}
 
-			if test.createDeleteBackupRequestError {
-				client.PrependReactor("create", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.New("foo")
-				})
-			}
-
-			err := controller.processQueueItem(key)
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, initObjs...)
+			reconciler := mockGCReconciler(fakeClient, fakeClock, defaultGCFrequency)
+			_, err := reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			gotErr := err != nil
 			assert.Equal(t, test.expectError, gotErr)
-
-			if test.expectDeletion {
-				require.Len(t, client.Actions(), 1)
-
-				createAction, ok := client.Actions()[0].(core.CreateAction)
-				require.True(t, ok)
-
-				assert.Equal(t, "deletebackuprequests", createAction.GetResource().Resource)
-			} else {
-				assert.Len(t, client.Actions(), 0)
-			}
 		})
 	}
 }

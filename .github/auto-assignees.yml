@@ -1,0 +1,43 @@
+---
+# This assigns a PR to its author
+addAssignees: author
+
+reviewers:
+  # The default reviewers
+  defaults:
+    - maintainers
+
+  groups:
+    maintainers:
+      - sseago
+      - reasonerjt
+      - ywk253100
+      - blackpiglet
+      - shubham-pampattiwar
+      - Lyndon-Li
+      - anshulahuja98
+
+    tech-writer:
+      - sseago
+      - reasonerjt
+      - ywk253100
+      - Lyndon-Li
+
+files:
+  'site/**':
+    - tech-writer
+  '**/*.md':
+    - tech-writer
+  # Technical design requests are ".md" files but should
+  # be reviewed by maintainers
+  '/design/**':
+    - maintainers
+
+options:
+  ignore_draft: true
+  ignored_keywords:
+    - WIP
+    - wip
+    - DO NOT MERGE
+  enable_group_assignment: true
+  number_of_reviewers: 2

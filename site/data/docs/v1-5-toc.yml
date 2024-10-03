@@ -1,0 +1,95 @@
+toc:
+  - title: Introduction
+    subfolderitems:
+      - page: About Velero
+        url: /index.html
+      - page: How Velero works
+        url: /how-velero-works
+      - page: About locations
+        url: /locations
+  - title: Install
+    subfolderitems:
+      - page: Basic Install
+        url: /basic-install
+      - page: Customize Installation
+        url: /customize-installation
+      - page: Upgrade to 1.5
+        url: /upgrade-to-1.5
+      - page: Supported providers
+        url: /supported-providers
+      - page: Evaluation install
+        url: /contributions/minio
+      - page: Restic integration
+        url: /restic
+      - page: Examples
+        url: /examples
+      - page: Uninstalling
+        url: /uninstalling
+  - title: Use
+    subfolderitems:
+      - page: Disaster recovery
+        url: /disaster-case
+      - page: Cluster migration
+        url: /migration-case
+      - page: Resource filtering
+        url: /resource-filtering
+      - page: Backup reference
+        url: /backup-reference
+      - page: Backup hooks
+        url: /backup-hooks
+      - page: Restore reference
+        url: /restore-reference
+      - page: Restore hooks
+        url: /restore-hooks
+      - page: Run in any namespace
+        url: /namespace
+      - page: CSI Support (beta)
+        url: /csi
+      - page: Verifying Self-signed Certificates
+        url: /self-signed-certificates
+      - page: Changing RBAC permissions
+        url: /rbac
+  - title: Plugins
+    subfolderitems:
+      - page: Overview
+        url: /overview-plugins
+      - page: Custom plugins
+        url: /custom-plugins
+  - title: Troubleshoot
+    subfolderitems:
+      - page: Troubleshooting
+        url: /troubleshooting
+      - page: Troubleshoot an install or setup
+        url: /debugging-install
+      - page: Troubleshoot a restore
+        url: /debugging-restores
+      - page: Troubleshoot Restic
+        url: /restic#troubleshooting
+  - title: Contribute
+    subfolderitems:
+      - page: Start Contributing
+        url: /start-contributing
+      - page: Development
+        url: /development
+      - page: Rapid development with Tilt
+        url: /tilt
+      - page: Build from source
+        url: /build-from-source
+      - page: Run locally
+        url: /run-locally
+      - page: Code standards
+        url: /code-standards
+      - page: Website guidelines
+        url: /website-guidelines
+      - page: Documentation style guide
+        url: /style-guide
+  - title: More information
+    subfolderitems:
+      - page: Backup file format
+        url: /output-file-format
+      - page: API types
+        url: /api-types
+      - page: Support process
+        url: /support-process
+      - page: For maintainers
+        url: /maintainers

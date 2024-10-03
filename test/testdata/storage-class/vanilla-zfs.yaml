@@ -1,0 +1,12 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: e2e-storage-class
+parameters:
+  recordsize: "128k"
+  compression: "off"
+  dedup: "off"
+  fstype: "zfs"
+  poolname: "zfspv-pool"
+provisioner: zfs.csi.openebs.io
+volumeBindingMode: WaitForFirstConsumer

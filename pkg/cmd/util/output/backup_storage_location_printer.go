@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,34 +17,44 @@ limitations under the License.
 package output
 
 import (
-	"fmt"
-	"io"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
-	"k8s.io/kubernetes/pkg/printers"
-
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
 )
 
 var (
-	backupStorageLocationColumns = []string{"NAME", "PROVIDER", "BUCKET/PREFIX"}
+	backupStorageLocationColumns = []metav1.TableColumnDefinition{
+		// name needs Type and Format defined for the decorator to identify it:
+		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+		{Name: "Name", Type: "string", Format: "name"},
+		{Name: "Provider"},
+		{Name: "Bucket/Prefix"},
+		{Name: "Phase"},
+		{Name: "Last Validated"},
+		{Name: "Access Mode"},
+		{Name: "Default"},
+	}
 )
 
-func printBackupStorageLocationList(list *v1.BackupStorageLocationList, w io.Writer, options printers.PrintOptions) error {
+func printBackupStorageLocationList(list *velerov1api.BackupStorageLocationList) []metav1.TableRow {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+
 	for i := range list.Items {
-		if err := printBackupStorageLocation(&list.Items[i], w, options); err != nil {
-			return err
-		}
+		rows = append(rows, printBackupStorageLocation(&list.Items[i])...)
 	}
-	return nil
+	return rows
 }
 
-func printBackupStorageLocation(location *v1.BackupStorageLocation, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, location.Name, options.WithKind)
+func printBackupStorageLocation(location *velerov1api.BackupStorageLocation) []metav1.TableRow {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: location},
+	}
 
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", location.Namespace); err != nil {
-			return err
-		}
+	isDefault := ""
+	if location.Spec.Default {
+		isDefault = cmd.TRUE
 	}
 
 	bucketAndPrefix := location.Spec.ObjectStorage.Bucket
@@ -52,20 +62,31 @@ func printBackupStorageLocation(location *v1.BackupStorageLocation, w io.Writer,
 		bucketAndPrefix += "/" + location.Spec.ObjectStorage.Prefix
 	}
 
-	if _, err := fmt.Fprintf(
-		w,
-		"%s\t%s\t%s",
-		name,
+	accessMode := location.Spec.AccessMode
+	if accessMode == "" {
+		accessMode = velerov1api.BackupStorageLocationAccessModeReadWrite
+	}
+
+	status := location.Status.Phase
+	if status == "" {
+		status = "Unknown"
+	}
+
+	lastValidated := location.Status.LastValidationTime
+	LastValidatedStr := "Unknown"
+	if lastValidated != nil {
+		LastValidatedStr = lastValidated.String()
+	}
+
+	row.Cells = append(row.Cells,
+		location.Name,
 		location.Spec.Provider,
 		bucketAndPrefix,
-	); err != nil {
-		return err
-	}
+		status,
+		LastValidatedStr,
+		accessMode,
+		isDefault,
+	)
 
-	if _, err := fmt.Fprint(w, printers.AppendLabels(location.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, location.Labels))
-	return err
+	return []metav1.TableRow{row}
 }

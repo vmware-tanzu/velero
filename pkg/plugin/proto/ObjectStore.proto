@@ -1,5 +1,6 @@
 syntax = "proto3";
 package generated;
+option go_package = "github.com/vmware-tanzu/velero/pkg/plugin/generated";
 
 import "Shared.proto";
 
@@ -8,6 +9,16 @@ message PutObjectRequest {
     string bucket = 2;
     string key = 3;
     bytes body = 4;
+}
+
+message ObjectExistsRequest {
+    string plugin = 1;
+    string bucket = 2;
+    string key = 3;
+}
+
+message ObjectExistsResponse {
+    bool exists = 1;
 }
 
 message GetObjectRequest {
@@ -59,9 +70,15 @@ message CreateSignedURLResponse {
     string url = 1;
 }
 
+message ObjectStoreInitRequest {
+    string plugin = 1;
+    map<string, string> config = 2;
+}
+
 service ObjectStore {
-    rpc Init(InitRequest) returns (Empty);
+    rpc Init(ObjectStoreInitRequest) returns (Empty);
     rpc PutObject(stream PutObjectRequest) returns (Empty);
+    rpc ObjectExists(ObjectExistsRequest) returns (ObjectExistsResponse);
     rpc GetObject(GetObjectRequest) returns (stream Bytes);
     rpc ListCommonPrefixes(ListCommonPrefixesRequest) returns (ListCommonPrefixesResponse);
     rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);

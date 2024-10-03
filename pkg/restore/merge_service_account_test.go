@@ -1,11 +1,11 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,7 +25,7 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	velerotest "github.com/heptio/velero/pkg/util/test"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 var mergedServiceAccountsBenchmarkResult *unstructured.Unstructured
@@ -361,7 +361,6 @@ func TestMergeMaps(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			result := mergeMaps(tc.destination, tc.source)
 
 			assert.Equal(t, tc.expected, result)

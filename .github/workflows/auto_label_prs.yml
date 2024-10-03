@@ -1,0 +1,19 @@
+name: "Auto Label PRs"
+# pull_request_target means that this will run on pull requests, but in the context of the base repo.
+# This should mean PRs from forks are supported. 
+# Because it includes the `synchronize` parameter, any push of a new commit to the HEAD ref of a pull request
+# will trigger this process.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+jobs:
+  # Automatically labels PRs based on file globs in the change.
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          configuration-path: .github/labeler.yml

@@ -1,0 +1,29 @@
+name: Verify goreleaser change
+
+on:
+  pull_request:
+    branches:
+      - 'main'
+      - 'release-**'
+    paths:
+      - '.goreleaser.yml'
+      - 'hack/release-tools/goreleaser.sh'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      name: Checkout
+
+    - name: Verify .goreleaser.yml and try a dryrun release.
+      if: github.repository == 'vmware-tanzu/velero'
+      run: |
+        CHANGELOG=$(ls changelogs | sort -V -r | head -n 1)
+        GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+        REGISTRY=velero \
+        RELEASE_NOTES_FILE=changelogs/$CHANGELOG \
+        PUBLISH=false \
+        make release
+

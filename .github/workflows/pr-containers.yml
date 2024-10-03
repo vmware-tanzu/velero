@@ -1,0 +1,37 @@
+name: build Velero containers on Dockerfile change
+
+on:
+  pull_request:
+    branches:
+      - 'main'
+      - 'release-**'
+    paths:
+      - 'Dockerfile'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      name: Checkout
+
+    - name: Set up QEMU
+      id: qemu
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: all
+
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        version: latest
+
+    # Although this action also calls docker-push.sh, it is not triggered
+    # by push, so BRANCH and TAG are empty by default. docker-push.sh will
+    # only build Velero image without pushing.
+    - name: Make Velero container without pushing to registry.
+      if: github.repository == 'vmware-tanzu/velero'
+      run: |
+        ./hack/docker-push.sh

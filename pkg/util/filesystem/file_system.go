@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ package filesystem
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
+	"path/filepath"
 )
 
 // Interface defines methods for interacting with an
@@ -28,12 +28,14 @@ type Interface interface {
 	TempDir(dir, prefix string) (string, error)
 	MkdirAll(path string, perm os.FileMode) error
 	Create(name string) (io.WriteCloser, error)
+	OpenFile(name string, flag int, perm os.FileMode) (io.WriteCloser, error)
 	RemoveAll(path string) error
 	ReadDir(dirname string) ([]os.FileInfo, error)
 	ReadFile(filename string) ([]byte, error)
 	DirExists(path string) (bool, error)
 	TempFile(dir, prefix string) (NameWriteCloser, error)
 	Stat(path string) (os.FileInfo, error)
+	Glob(path string) ([]string, error)
 }
 
 type NameWriteCloser interface {
@@ -48,8 +50,12 @@ func NewFileSystem() Interface {
 
 type osFileSystem struct{}
 
+func (fs *osFileSystem) Glob(path string) ([]string, error) {
+	return filepath.Glob(path)
+}
+
 func (fs *osFileSystem) TempDir(dir, prefix string) (string, error) {
-	return ioutil.TempDir(dir, prefix)
+	return os.MkdirTemp(dir, prefix)
 }
 
 func (fs *osFileSystem) MkdirAll(path string, perm os.FileMode) error {
@@ -60,16 +66,31 @@ func (fs *osFileSystem) Create(name string) (io.WriteCloser, error) {
 	return os.Create(name)
 }
 
+func (fs *osFileSystem) OpenFile(name string, flag int, perm os.FileMode) (io.WriteCloser, error) {
+	return os.OpenFile(name, flag, perm)
+}
+
 func (fs *osFileSystem) RemoveAll(path string) error {
 	return os.RemoveAll(path)
 }
 
 func (fs *osFileSystem) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
+	var fileInfos []os.FileInfo
+	dirInfos, ise := os.ReadDir(dirname)
+	if ise != nil {
+		return fileInfos, ise
+	}
+	for _, dirInfo := range dirInfos {
+		fileInfo, ise := dirInfo.Info()
+		if ise == nil {
+			fileInfos = append(fileInfos, fileInfo)
+		}
+	}
+	return fileInfos, nil
 }
 
 func (fs *osFileSystem) ReadFile(filename string) ([]byte, error) {
-	return ioutil.ReadFile(filename)
+	return os.ReadFile(filename)
 }
 
 func (fs *osFileSystem) DirExists(path string) (bool, error) {
@@ -84,7 +105,7 @@ func (fs *osFileSystem) DirExists(path string) (bool, error) {
 }
 
 func (fs *osFileSystem) TempFile(dir, prefix string) (NameWriteCloser, error) {
-	return ioutil.TempFile(dir, prefix)
+	return os.CreateTemp(dir, prefix)
 }
 
 func (fs *osFileSystem) Stat(path string) (os.FileInfo, error) {

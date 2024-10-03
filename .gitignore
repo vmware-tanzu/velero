@@ -7,7 +7,6 @@
 _obj
 _test
 _output
-config
 
 # Architecture specific extensions/prefixes
 *.[568vq]
@@ -25,8 +24,6 @@ _testmain.go
 *.test
 *.prof
 
-debug
-
 /velero
 .idea/
 
@@ -38,6 +35,22 @@ debug
 .vscode
 *.diff
 
-_site/
+# Hugo compiled data
+site/public
+site/resources
+site/.hugo_build.lock
 
 .vs
+
+# these are files for local Tilt development:
+_tiltbuild
+tilt-resources/tilt-settings.json
+tilt-resources/velero_v1_backupstoragelocation.yaml
+tilt-resources/deployment.yaml
+tilt-resources/node-agent.yaml
+tilt-resources/cloud
+
+# test generated files
+test/e2e/report.xml
+coverage.out
+__debug_bin*

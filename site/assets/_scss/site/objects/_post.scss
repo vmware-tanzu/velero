@@ -1,0 +1,146 @@
+.post-thumbnail {
+  width: 100%;  
+  margin: 0 auto 1.875rem auto;
+  height: 137px;
+  position: relative;
+  img {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.post-single-hero {
+  background-color: map-get($field-backgrounds, 'med-blue'); // default
+  padding-bottom: 105px;
+  h1,
+  h2,
+  h3 {
+    color: $white;
+    font-weight: $font-weight-light;
+    text-align: center;
+  }
+  &.post-single-hero-short {
+    padding-bottom: 0;
+  }
+}
+
+.post-single-body {
+  margin-top: -105px;
+}
+
+.post-single-meta {
+  display: flex;
+  align-items: center;
+  color: $post-meta-foreground;
+  margin-bottom: 3rem;
+
+  @include media-breakpoint-down(sm) {
+    // flex-direction: column;
+    display: block;
+  }
+}
+
+.post-single-meta-author {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  margin-right: 1rem;
+
+  @include media-breakpoint-down(sm) {
+    justify-content: center;
+    margin-right: 0;
+    margin-bottom: 1rem;
+  }
+}
+
+.post-single-meta-author-avatar {
+  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  margin-right: 1rem;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: auto;
+  }
+}
+
+.post-single-meta-author-name {
+  flex: 1;
+  font-weight: $font-weight-semibold;
+
+  @include media-breakpoint-down(sm) {
+    flex: none;
+  }
+}
+
+.post-single-meta-date {
+  text-align: right;
+
+  @include media-breakpoint-down(sm) {
+    text-align: center;
+  }
+}
+
+.post-single-image {
+  margin: 0 auto 3rem auto;
+  max-width: 700px;
+
+  img {
+    height: auto;
+    width: 100%;
+  }
+
+  @include media-breakpoint-down(sm) {
+    margin-left: -30px;
+    margin-right: -30px;
+  }
+}
+
+.post-single-content {
+  max-width: 700px;
+  margin: 0 auto 3rem auto;
+
+  h2,
+  h3,
+  p {
+    margin-bottom: 1.875rem;
+  }
+
+  h2 {
+    font-size: $font-size-base;
+    font-weight: $font-weight-semibold;
+  }
+
+  h3 {
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+
+  img {
+    max-width: 100%;
+  }
+}
+
+table {
+  border-collapse: collapse;
+}
+
+table, th, td {
+  border: 1px solid black;
+}
+
+th, td {
+  padding: 10px;
+}

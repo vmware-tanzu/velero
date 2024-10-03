@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,16 +35,117 @@ const (
 	// PodUIDLabel is the label key used to identify a pod by uid.
 	PodUIDLabel = "velero.io/pod-uid"
 
+	// PVCUIDLabel is the label key used to identify a PVC by uid.
+	PVCUIDLabel = "velero.io/pvc-uid"
+
 	// PodVolumeOperationTimeoutAnnotation is the annotation key used to apply
 	// a backup/restore-specific timeout value for pod volume operations (i.e.
-	// restic backups/restores).
+	// pod volume backups/restores).
 	PodVolumeOperationTimeoutAnnotation = "velero.io/pod-volume-timeout"
 
 	// StorageLocationLabel is the label key used to identify the storage
 	// location of a backup.
 	StorageLocationLabel = "velero.io/storage-location"
 
-	// ResticVolumeNamespaceLabel is the label key used to identify which
-	// namespace a restic repository stores pod volume backups for.
-	ResticVolumeNamespaceLabel = "velero.io/volume-namespace"
+	// VolumeNamespaceLabel is the label key used to identify which
+	// namespace a repository stores backups for.
+	VolumeNamespaceLabel = "velero.io/volume-namespace"
+
+	// RepositoryTypeLabel is the label key used to identify the type of a repository
+	RepositoryTypeLabel = "velero.io/repository-type"
+
+	// DataUploadLabel is the label key used to identify the dataupload for snapshot backup pod
+	DataUploadLabel = "velero.io/data-upload"
+
+	// DataUploadSnapshotInfoLabel is used to identify the configmap that contains the snapshot info of a data upload
+	// normally the value of the label should the "true" or "false"
+	DataUploadSnapshotInfoLabel = "velero.io/data-upload-snapshot-info"
+
+	// DataDownloadLabel is the label key used to identify the datadownload for snapshot restore pod
+	DataDownloadLabel = "velero.io/data-download"
+
+	// SourceClusterK8sVersionAnnotation is the label key used to identify the k8s
+	// git version of the backup , i.e. v1.16.4
+	SourceClusterK8sGitVersionAnnotation = "velero.io/source-cluster-k8s-gitversion"
+
+	// SourceClusterK8sMajorVersionAnnotation is the label key used to identify the k8s
+	// major version of the backup , i.e. 1
+	SourceClusterK8sMajorVersionAnnotation = "velero.io/source-cluster-k8s-major-version"
+
+	// SourceClusterK8sMajorVersionAnnotation is the label key used to identify the k8s
+	// minor version of the backup , i.e. 16
+	SourceClusterK8sMinorVersionAnnotation = "velero.io/source-cluster-k8s-minor-version"
+
+	// ResourceTimeoutAnnotation is the annotation key used to carry the global resource
+	// timeout value for backup to plugins.
+	ResourceTimeoutAnnotation = "velero.io/resource-timeout"
+
+	// AsyncOperationIDLabel is the label key used to identify the async operation ID
+	AsyncOperationIDLabel = "velero.io/async-operation-id"
+
+	// PVCNameLabel is the label key used to identify the PVC's namespace and name.
+	// The format is <namespace>/<name>.
+	PVCNamespaceNameLabel = "velero.io/pvc-namespace-name"
+
+	// ResourceUsageLabel is the label key to explain the Velero resource usage.
+	ResourceUsageLabel = "velero.io/resource-usage"
+
+	// VolumesToBackupAnnotation is the annotation on a pod whose mounted volumes
+	// need to be backed up using pod volume backup.
+	VolumesToBackupAnnotation = "backup.velero.io/backup-volumes"
+
+	// VolumesToExcludeAnnotation is the annotation on a pod whose mounted volumes
+	// should be excluded from pod volume backup.
+	VolumesToExcludeAnnotation = "backup.velero.io/backup-volumes-excludes"
+
+	// ExcludeFromBackupLabel is the label to exclude k8s resource from backup,
+	// even if the resource contains a matching selector label.
+	ExcludeFromBackupLabel = "velero.io/exclude-from-backup"
+)
+
+type AsyncOperationIDPrefix string
+
+const (
+	AsyncOperationIDPrefixDataDownload AsyncOperationIDPrefix = "dd-"
+	AsyncOperationIDPrefixDataUpload   AsyncOperationIDPrefix = "du-"
+)
+
+type VeleroResourceUsage string
+
+const (
+	VeleroResourceUsageDataUploadResult VeleroResourceUsage = "DataUpload"
+)
+
+// CSI related plugin actions' constant variable
+const (
+	VolumeSnapshotLabel                             = "velero.io/volume-snapshot-name"
+	VolumeSnapshotHandleAnnotation                  = "velero.io/csi-volumesnapshot-handle"
+	VolumeSnapshotRestoreSize                       = "velero.io/csi-volumesnapshot-restore-size"
+	DriverNameAnnotation                            = "velero.io/csi-driver-name"
+	VSCDeletionPolicyAnnotation                     = "velero.io/csi-vsc-deletion-policy"
+	VolumeSnapshotClassSelectorLabel                = "velero.io/csi-volumesnapshot-class"
+	VolumeSnapshotClassDriverBackupAnnotationPrefix = "velero.io/csi-volumesnapshot-class"
+	VolumeSnapshotClassDriverPVCAnnotation          = "velero.io/csi-volumesnapshot-class"
+
+	// There is no release w/ these constants exported. Using the strings for now.
+	// CSI Annotation volumesnapshotclass
+	// https://github.com/kubernetes-csi/external-snapshotter/blob/master/pkg/utils/util.go#L59-L60
+	PrefixedListSecretNameAnnotation      = "csi.storage.k8s.io/snapshotter-list-secret-name"      // #nosec G101
+	PrefixedListSecretNamespaceAnnotation = "csi.storage.k8s.io/snapshotter-list-secret-namespace" // #nosec G101
+
+	// CSI Annotation volumesnapshotcontents
+	PrefixedSecretNameAnnotation      = "csi.storage.k8s.io/snapshotter-secret-name"      // #nosec G101
+	PrefixedSecretNamespaceAnnotation = "csi.storage.k8s.io/snapshotter-secret-namespace" // #nosec G101
+
+	// Velero checks this annotation to determine whether to skip resource excluding check.
+	MustIncludeAdditionalItemAnnotation = "backup.velero.io/must-include-additional-items"
+	// SkippedNoCSIPVAnnotation - Velero checks this annotation on processed PVC to
+	// find out if the snapshot was skipped b/c the PV is not provisioned via CSI
+	SkippedNoCSIPVAnnotation = "backup.velero.io/skipped-no-csi-pv"
+
+	// DynamicPVRestoreLabel is the label key for dynamic PV restore
+	DynamicPVRestoreLabel = "velero.io/dynamic-pv-restore"
+
+	// DataUploadNameAnnotation is the label key for the DataUpload name
+	DataUploadNameAnnotation = "velero.io/data-upload-name"
 )

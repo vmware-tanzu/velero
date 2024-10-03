@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,22 +25,33 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/cli-runtime/pkg/printers"
 
-	"github.com/heptio/velero/pkg/cmd/util/flag"
-	"github.com/heptio/velero/pkg/util/encode"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
+	"github.com/vmware-tanzu/velero/pkg/util/encode"
 )
 
-const downloadRequestTimeout = 30 * time.Second
+const (
+	downloadRequestTimeout = 30 * time.Second
+	emptyDisplay           = "<none>"
+	defaultDataMover       = "velero"
+)
 
 // BindFlags defines a set of output-specific flags within the provided
 // FlagSet.
 func BindFlags(flags *pflag.FlagSet) {
-	flags.StringP("output", "o", "table", "Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'.")
+	flags.StringP("output", "o", "table", "Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. 'table' is not valid for the install command.")
 	labelColumns := flag.NewStringArray()
-	flags.Var(&labelColumns, "label-columns", "a comma-separated list of labels to be displayed as columns")
-	flags.Bool("show-labels", false, "show labels in the last column")
+	flags.VarP(&labelColumns, "label-columns", "L", "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...")
+	flags.Bool("show-labels", false, "Show labels in the last column")
+}
+
+// BindFlagsSimple defines the output format flag only.
+func BindFlagsSimple(flags *pflag.FlagSet) {
+	flags.StringP("output", "o", "table", "Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. 'table' is not valid for the install command.")
 }
 
 // ClearOutputFlagDefault sets the current and default value
@@ -51,7 +62,9 @@ func ClearOutputFlagDefault(cmd *cobra.Command) {
 		return
 	}
 	f.DefValue = ""
-	f.Value.Set("")
+	if err := f.Value.Set(""); err != nil {
+		fmt.Printf("error clear the default value of output flag: %s\n", err.Error())
+	}
 }
 
 // GetOutputFlagValue returns the value of the "output" flag
@@ -84,7 +97,11 @@ func ValidateFlags(cmd *cobra.Command) error {
 func validateOutputFlag(cmd *cobra.Command) error {
 	output := GetOutputFlagValue(cmd)
 	switch output {
-	case "", "table", "json", "yaml":
+	case "", "json", "yaml":
+	case "table":
+		if cmd.Name() == "install" {
+			return errors.New("'table' format is not supported with 'install' command")
+		}
 	default:
 		return errors.Errorf("invalid output format %q - valid values are 'table', 'json', and 'yaml'", output)
 	}
@@ -132,25 +149,86 @@ func printEncoded(obj runtime.Object, format string) (bool, error) {
 }
 
 func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
-	printer, err := NewPrinter(cmd)
+	// 1. generate table
+	var table *metav1.Table
+
+	switch objType := obj.(type) {
+	case *velerov1api.Backup:
+		table = &metav1.Table{
+			ColumnDefinitions: backupColumns,
+			Rows:              printBackup(objType),
+		}
+	case *velerov1api.BackupList:
+		table = &metav1.Table{
+			ColumnDefinitions: backupColumns,
+			Rows:              printBackupList(objType),
+		}
+	case *velerov1api.Restore:
+		table = &metav1.Table{
+			ColumnDefinitions: restoreColumns,
+			Rows:              printRestore(objType),
+		}
+	case *velerov1api.RestoreList:
+		table = &metav1.Table{
+			ColumnDefinitions: restoreColumns,
+			Rows:              printRestoreList(objType),
+		}
+	case *velerov1api.Schedule:
+		table = &metav1.Table{
+			ColumnDefinitions: scheduleColumns,
+			Rows:              printSchedule(objType),
+		}
+	case *velerov1api.ScheduleList:
+		table = &metav1.Table{
+			ColumnDefinitions: scheduleColumns,
+			Rows:              printScheduleList(objType),
+		}
+	case *velerov1api.BackupRepository:
+		table = &metav1.Table{
+			ColumnDefinitions: backupRepoColumns,
+			Rows:              printBackupRepo(objType),
+		}
+	case *velerov1api.BackupRepositoryList:
+		table = &metav1.Table{
+			ColumnDefinitions: backupRepoColumns,
+			Rows:              printBackupRepoList(objType),
+		}
+	case *velerov1api.BackupStorageLocation:
+		table = &metav1.Table{
+			ColumnDefinitions: backupStorageLocationColumns,
+			Rows:              printBackupStorageLocation(objType),
+		}
+	case *velerov1api.BackupStorageLocationList:
+		table = &metav1.Table{
+			ColumnDefinitions: backupStorageLocationColumns,
+			Rows:              printBackupStorageLocationList(objType),
+		}
+	case *velerov1api.VolumeSnapshotLocation:
+		table = &metav1.Table{
+			ColumnDefinitions: volumeSnapshotLocationColumns,
+			Rows:              printVolumeSnapshotLocation(objType),
+		}
+	case *velerov1api.VolumeSnapshotLocationList:
+		table = &metav1.Table{
+			ColumnDefinitions: volumeSnapshotLocationColumns,
+			Rows:              printVolumeSnapshotLocationList(objType),
+		}
+	case *velerov1api.ServerStatusRequest:
+		table = &metav1.Table{
+			ColumnDefinitions: pluginColumns,
+			Rows:              printPluginList(objType),
+		}
+	default:
+		return false, errors.Errorf("type %T is not supported", obj)
+	}
+
+	// 2. print table
+	tablePrinter, err := NewPrinter(cmd)
 	if err != nil {
 		return false, err
 	}
 
-	printer.Handler(backupColumns, nil, printBackup)
-	printer.Handler(backupColumns, nil, printBackupList)
-	printer.Handler(restoreColumns, nil, printRestore)
-	printer.Handler(restoreColumns, nil, printRestoreList)
-	printer.Handler(scheduleColumns, nil, printSchedule)
-	printer.Handler(scheduleColumns, nil, printScheduleList)
-	printer.Handler(resticRepoColumns, nil, printResticRepo)
-	printer.Handler(resticRepoColumns, nil, printResticRepoList)
-	printer.Handler(backupStorageLocationColumns, nil, printBackupStorageLocation)
-	printer.Handler(backupStorageLocationColumns, nil, printBackupStorageLocationList)
-	printer.Handler(volumeSnapshotLocationColumns, nil, printVolumeSnapshotLocation)
-	printer.Handler(volumeSnapshotLocationColumns, nil, printVolumeSnapshotLocationList)
-
-	err = printer.PrintObj(obj, os.Stdout)
+	err = tablePrinter.PrintObj(table, os.Stdout)
 	if err != nil {
 		return false, err
 	}
@@ -160,17 +238,13 @@ func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 
 // NewPrinter returns a printer for doing human-readable table printing of
 // Velero objects.
-func NewPrinter(cmd *cobra.Command) (*printers.HumanReadablePrinter, error) {
+func NewPrinter(cmd *cobra.Command) (printers.ResourcePrinter, error) {
 	options := printers.PrintOptions{
-		NoHeaders:    flag.GetOptionalBoolFlag(cmd, "no-headers"),
 		ShowLabels:   GetShowLabelsValue(cmd),
 		ColumnLabels: GetLabelColumnsValues(cmd),
 	}
 
-	printer := printers.NewHumanReadablePrinter(
-		nil, // decoder, only needed if we want/need to convert unstructured/unknown to typed objects
-		options,
-	)
+	printer := printers.NewTablePrinter(options)
 
 	return printer, nil
 }

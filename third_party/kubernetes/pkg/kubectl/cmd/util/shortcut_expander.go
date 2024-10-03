@@ -1,6 +1,8 @@
 /*
 Copyright 2016 The Kubernetes Authors.
 
+Modifications Copyright 2019 the Velero contributors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -17,13 +19,12 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
 )
 
 // ResourceShortcuts represents a structure that holds the information how to
@@ -33,21 +34,23 @@ type ResourceShortcuts struct {
 	LongForm  schema.GroupResource
 }
 
-// shortcutExpander is a RESTMapper that can be used for Kubernetes resources.   It expands the resource first, then invokes the wrapped
+// shortcutExpander is a RESTMapper that can be used for Kubernetes resources. It expands the
+// resource first, then invokes the wrapped RESTMapper.
+//
+// This shortcutExpander differs from the upstream one in that it takes a []*metav1.APIResourceList
+// in its constructor, rather than a discovery interface. This allows the discovery information to
+// be cached externally so it doesn't have to be re-queried every time the shortcutExpander is invoked.
 type shortcutExpander struct {
 	RESTMapper meta.RESTMapper
 
-	discoveryClient discovery.DiscoveryInterface
-	logger          logrus.FieldLogger
+	resources []*metav1.APIResourceList
+	logger    logrus.FieldLogger
 }
 
 var _ meta.RESTMapper = &shortcutExpander{}
 
-func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface, logger logrus.FieldLogger) (shortcutExpander, error) {
-	if client == nil {
-		return shortcutExpander{}, errors.New("Please provide discovery client to shortcut expander")
-	}
-	return shortcutExpander{RESTMapper: delegate, discoveryClient: client}, nil
+func NewShortcutExpander(delegate meta.RESTMapper, resources []*metav1.APIResourceList, logger logrus.FieldLogger) (shortcutExpander, error) {
+	return shortcutExpander{RESTMapper: delegate, resources: resources, logger: logger}, nil
 }
 
 func (e shortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
@@ -83,56 +86,22 @@ func (e shortcutExpander) RESTMappings(gk schema.GroupKind, versions ...string) 
 // Next we will append the hardcoded list of resources - to be backward compatible with old servers.
 // NOTE that the list is ordered by group priority.
 func (e shortcutExpander) getShortcutMappings() ([]ResourceShortcuts, error) {
-	// TODO delete this once discovery is working for svc and netpol
-	haveSvc := false
-	haveNetpol := false
-
 	res := []ResourceShortcuts{}
-	// get server resources
-	apiResList, err := e.discoveryClient.ServerResources()
-	if err == nil {
-		for _, apiResources := range apiResList {
-			for _, apiRes := range apiResources.APIResources {
-				for _, shortName := range apiRes.ShortNames {
-					gv, err := schema.ParseGroupVersion(apiResources.GroupVersion)
-					if err != nil {
-						e.logger.WithError(err).WithField("groupVersion", apiResources.GroupVersion).Error("Unable to parse groupversion")
-						continue
-					}
-					rs := ResourceShortcuts{
-						ShortForm: schema.GroupResource{Group: gv.Group, Resource: shortName},
-						LongForm:  schema.GroupResource{Group: gv.Group, Resource: apiRes.Name},
-					}
-					res = append(res, rs)
-					if shortName == "svc" {
-						haveSvc = true
-					}
-					if shortName == "netpol" {
-						haveNetpol = true
-					}
+	for _, apiResources := range e.resources {
+		for _, apiRes := range apiResources.APIResources {
+			for _, shortName := range apiRes.ShortNames {
+				gv, err := schema.ParseGroupVersion(apiResources.GroupVersion)
+				if err != nil {
+					e.logger.WithError(err).WithField("groupVersion", apiResources.GroupVersion).Error("Unable to parse groupversion")
+					continue
 				}
+				rs := ResourceShortcuts{
+					ShortForm: schema.GroupResource{Group: gv.Group, Resource: shortName},
+					LongForm:  schema.GroupResource{Group: gv.Group, Resource: apiRes.Name},
+				}
+				res = append(res, rs)
 			}
 		}
-	}
-
-	// 'svc' is not exposed due to the way the services rest storage handler is installed.
-	// 'netpol' is not currently in discovery.
-	// add these 2 shortcuts until they're actually in discovery.
-	if !haveSvc {
-		res = append(res,
-			ResourceShortcuts{
-				ShortForm: schema.GroupResource{Group: "", Resource: "svc"},
-				LongForm:  schema.GroupResource{Group: "", Resource: "services"},
-			},
-		)
-	}
-	if !haveNetpol {
-		res = append(res,
-			ResourceShortcuts{
-				ShortForm: schema.GroupResource{Group: "extensions", Resource: "netpol"},
-				LongForm:  schema.GroupResource{Group: "extensions", Resource: "networkpolicies"},
-			},
-		)
 	}
 
 	return res, nil

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,9 @@ package output
 import (
 	"fmt"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/fatih/color"
+
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 func DescribeSchedule(schedule *v1.Schedule) string {
@@ -28,19 +30,40 @@ func DescribeSchedule(schedule *v1.Schedule) string {
 
 		d.Println()
 		phase := schedule.Status.Phase
+
 		if phase == "" {
 			phase = v1.SchedulePhaseNew
 		}
-		d.Printf("Phase:\t%s\n", phase)
+		phaseString := string(phase)
+		switch phase {
+		case v1.SchedulePhaseEnabled:
+			phaseString = color.GreenString(phaseString)
+		case v1.SchedulePhaseFailedValidation:
+			phaseString = color.RedString(phaseString)
+		}
+		d.Printf("Phase:\t%s\n", phaseString)
+
+		if schedule.Spec.Template.ResourcePolicy != nil {
+			d.Println()
+			DescribeResourcePolicies(d, schedule.Spec.Template.ResourcePolicy)
+		}
+
+		if schedule.Spec.Template.UploaderConfig != nil && schedule.Spec.Template.UploaderConfig.ParallelFilesUpload > 0 {
+			d.Println()
+			DescribeUploaderConfigForBackup(d, schedule.Spec.Template)
+		}
 
 		status := schedule.Status
 		if len(status.ValidationErrors) > 0 {
 			d.Println()
 			d.Printf("Validation errors:")
 			for _, ve := range status.ValidationErrors {
-				d.Printf("\t%s\n", ve)
+				d.Printf("\t%s\n", color.RedString(ve))
 			}
 		}
+
+		d.Println()
+		d.Printf("Paused:\t%t\n", schedule.Spec.Paused)
 
 		d.Println()
 		DescribeScheduleSpec(d, schedule.Spec)
@@ -62,7 +85,7 @@ func DescribeScheduleSpec(d *Describer, spec v1.ScheduleSpec) {
 
 func DescribeScheduleStatus(d *Describer, status v1.ScheduleStatus) {
 	lastBackup := "<never>"
-	if !status.LastBackup.Time.IsZero() {
+	if status.LastBackup != nil && !status.LastBackup.Time.IsZero() {
 		lastBackup = fmt.Sprintf("%v", status.LastBackup.Time)
 	}
 	d.Printf("Last Backup:\t%s\n", lastBackup)

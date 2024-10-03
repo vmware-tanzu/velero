@@ -1,0 +1,19 @@
+name: Pull Request Changelog Check
+# by setting `on: [pull_request]`, that means action will be trigger when PR is opened, synchronize, reopened.
+# Add labeled and unlabeled events too.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+jobs:
+
+  build:
+    name: Run Changelog Check
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out the code
+      uses: actions/checkout@v4
+
+    - name: Changelog check
+      if: ${{ !(contains(github.event.pull_request.labels.*.name, 'kind/changelog-not-required') || contains(github.event.pull_request.labels.*.name, 'Design') || contains(github.event.pull_request.labels.*.name, 'Website') || contains(github.event.pull_request.labels.*.name, 'Documentation'))}}
+      run: ./hack/changelog-check.sh

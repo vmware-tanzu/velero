@@ -1,0 +1,65 @@
+/*
+Copyright the Velero contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package basic
+
+import (
+	"fmt"
+
+	. "github.com/onsi/gomega"
+
+	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/util/providers"
+	. "github.com/vmware-tanzu/velero/test/util/velero"
+)
+
+var SkippedVolumeInfoTest func() = TestFunc(&SkippedVolumeInfo{
+	BackupVolumeInfo{
+		SnapshotVolumes: false,
+		TestCase: TestCase{
+			CaseBaseName: "skipped-volumes-volumeinfo",
+			TestMsg: &TestMSG{
+				Desc: "Test backup's VolumeInfo metadata content for volume-skipped case.",
+				Text: "The VolumeInfo should be generated, and the Skipped parameter should be true.",
+			},
+		},
+	},
+})
+
+type SkippedVolumeInfo struct {
+	BackupVolumeInfo
+}
+
+func (s *SkippedVolumeInfo) Verify() error {
+	volumeInfo, err := GetVolumeInfo(
+		s.VeleroCfg.ObjectStoreProvider,
+		s.VeleroCfg.CloudCredentialsFile,
+		s.VeleroCfg.BSLBucket,
+		s.VeleroCfg.BSLPrefix,
+		s.VeleroCfg.BSLConfig,
+		s.BackupName,
+		BackupObjectsPrefix+"/"+s.BackupName,
+	)
+
+	Expect(err).ShouldNot(HaveOccurred(), "Fail to get VolumeInfo metadata in the Backup Repository.")
+
+	fmt.Printf("The VolumeInfo metadata content: %+v\n", *volumeInfo[0])
+	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
+	Expect(volumeInfo[0].Skipped).To(BeIdenticalTo(true))
+
+	// Clean SC and VSC
+	return s.cleanResource()
+}

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,1173 +17,3369 @@ limitations under the License.
 package restore
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"sort"
 	"testing"
 	"time"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes/scheme"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/dynamic"
+	kubetesting "k8s.io/client-go/testing"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
-	"github.com/heptio/velero/pkg/kuberesource"
-	"github.com/heptio/velero/pkg/plugin/velero"
-	"github.com/heptio/velero/pkg/util/collections"
-	"github.com/heptio/velero/pkg/util/logging"
-	velerotest "github.com/heptio/velero/pkg/util/test"
-	"github.com/heptio/velero/pkg/volume"
+	"github.com/vmware-tanzu/velero/internal/volume"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/archive"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/features"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	uploadermocks "github.com/vmware-tanzu/velero/pkg/podvolume/mocks"
+	"github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/types"
+	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
+	. "github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
-func TestPrioritizeResources(t *testing.T) {
-	tests := []struct {
-		name         string
-		apiResources map[string][]string
-		priorities   []string
-		includes     []string
-		excludes     []string
-		expected     []string
-	}{
-		{
-			name: "priorities & ordering are correctly applied",
-			apiResources: map[string][]string{
-				"v1": {"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
-			},
-			priorities: []string{"namespaces", "configmaps", "pods"},
-			includes:   []string{"*"},
-			expected:   []string{"namespaces", "configmaps", "pods", "aaa", "bbb", "ddd", "ooo", "sss"},
-		},
-		{
-			name: "includes are correctly applied",
-			apiResources: map[string][]string{
-				"v1": {"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
-			},
-			priorities: []string{"namespaces", "configmaps", "pods"},
-			includes:   []string{"namespaces", "aaa", "sss"},
-			expected:   []string{"namespaces", "aaa", "sss"},
-		},
-		{
-			name: "excludes are correctly applied",
-			apiResources: map[string][]string{
-				"v1": {"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
-			},
-			priorities: []string{"namespaces", "configmaps", "pods"},
-			includes:   []string{"*"},
-			excludes:   []string{"ooo", "pods"},
-			expected:   []string{"namespaces", "configmaps", "aaa", "bbb", "ddd", "sss"},
-		},
-	}
-
-	logger := velerotest.NewLogger()
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			var helperResourceList []*metav1.APIResourceList
-
-			for gv, resources := range test.apiResources {
-				resourceList := &metav1.APIResourceList{GroupVersion: gv}
-				for _, resource := range resources {
-					resourceList.APIResources = append(resourceList.APIResources, metav1.APIResource{Name: resource})
-				}
-				helperResourceList = append(helperResourceList, resourceList)
-			}
-
-			helper := velerotest.NewFakeDiscoveryHelper(true, nil)
-			helper.ResourceList = helperResourceList
-
-			includesExcludes := collections.NewIncludesExcludes().Includes(test.includes...).Excludes(test.excludes...)
-
-			result, err := prioritizeResources(helper, test.priorities, includesExcludes, logger)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			require.Equal(t, len(test.expected), len(result))
-
-			for i := range result {
-				if e, a := test.expected[i], result[i].Resource; e != a {
-					t.Errorf("index %d, expected %s, got %s", i, e, a)
-				}
-			}
-		})
-	}
-}
-
-func TestRestoreNamespaceFiltering(t *testing.T) {
-	tests := []struct {
-		name                 string
-		fileSystem           *velerotest.FakeFileSystem
-		baseDir              string
-		restore              *api.Restore
-		expectedReadDirs     []string
-		prioritizedResources []schema.GroupResource
-	}{
-		{
-			name:             "namespacesToRestore having * restores all namespaces",
-			fileSystem:       velerotest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
-			baseDir:          "bak",
-			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "nodes"},
-				{Resource: "secrets"},
-			},
-		},
-		{
-			name:             "namespacesToRestore properly filters",
-			fileSystem:       velerotest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
-			baseDir:          "bak",
-			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"b", "c"}}},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "nodes"},
-				{Resource: "secrets"},
-			},
-		},
-		{
-			name:             "namespacesToRestore properly filters with exclusion filter",
-			fileSystem:       velerotest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
-			baseDir:          "bak",
-			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, ExcludedNamespaces: []string{"a"}}},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "nodes"},
-				{Resource: "secrets"},
-			},
-		},
-		{
-			name:       "namespacesToRestore properly filters with inclusion & exclusion filters",
-			fileSystem: velerotest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
-			baseDir:    "bak",
-			restore: &api.Restore{
-				Spec: api.RestoreSpec{
-					IncludedNamespaces: []string{"a", "b", "c"},
-					ExcludedNamespaces: []string{"b"},
-				},
-			},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/c"},
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "nodes"},
-				{Resource: "secrets"},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			log := velerotest.NewLogger()
-
-			nsClient := &velerotest.FakeNamespaceClient{}
-
-			ctx := &context{
-				restore:              test.restore,
-				namespaceClient:      nsClient,
-				fileSystem:           test.fileSystem,
-				log:                  log,
-				prioritizedResources: test.prioritizedResources,
-			}
-
-			nsClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(&v1.Namespace{}, nil)
-
-			warnings, errors := ctx.restoreFromDir(test.baseDir)
-
-			assert.Empty(t, warnings.Velero)
-			assert.Empty(t, warnings.Cluster)
-			assert.Empty(t, warnings.Namespaces)
-			assert.Empty(t, errors.Velero)
-			assert.Empty(t, errors.Cluster)
-			assert.Empty(t, errors.Namespaces)
-			assert.Equal(t, test.expectedReadDirs, test.fileSystem.ReadDirCalls)
-		})
-	}
-}
-
-func TestRestorePriority(t *testing.T) {
-	tests := []struct {
-		name                 string
-		fileSystem           *velerotest.FakeFileSystem
-		restore              *api.Restore
-		baseDir              string
-		prioritizedResources []schema.GroupResource
-		expectedErrors       api.RestoreResult
-		expectedReadDirs     []string
-	}{
-		{
-			name:       "cluster test",
-			fileSystem: velerotest.NewFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
-			baseDir:    "bak",
-			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "a"},
-				{Resource: "b"},
-				{Resource: "c"},
-			},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/a/cluster", "bak/resources/c/cluster"},
-		},
-		{
-			name:       "resource priorities are applied",
-			fileSystem: velerotest.NewFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
-			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
-			baseDir:    "bak",
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "c"},
-				{Resource: "b"},
-				{Resource: "a"},
-			},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/c/cluster", "bak/resources/a/cluster"},
-		},
-		{
-			name:       "basic namespace",
-			fileSystem: velerotest.NewFakeFileSystem().WithDirectory("bak/resources/a/namespaces/ns-1").WithDirectory("bak/resources/c/namespaces/ns-1"),
-			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
-			baseDir:    "bak",
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "a"},
-				{Resource: "b"},
-				{Resource: "c"},
-			},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/a/namespaces", "bak/resources/a/namespaces/ns-1", "bak/resources/c/namespaces", "bak/resources/c/namespaces/ns-1"},
-		},
-		{
-			name: "error in a single resource doesn't terminate restore immediately, but is returned",
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile("bak/resources/a/namespaces/ns-1/invalid-json.json", []byte("invalid json")).
-				WithDirectory("bak/resources/c/namespaces/ns-1"),
-			restore: &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
-			baseDir: "bak",
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "a"},
-				{Resource: "b"},
-				{Resource: "c"},
-			},
-			expectedErrors: api.RestoreResult{
-				Namespaces: map[string][]string{
-					"ns-1": {"error decoding \"bak/resources/a/namespaces/ns-1/invalid-json.json\": invalid character 'i' looking for beginning of value"},
-				},
-			},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/a/namespaces", "bak/resources/a/namespaces/ns-1", "bak/resources/c/namespaces", "bak/resources/c/namespaces/ns-1"},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			log := velerotest.NewLogger()
-
-			nsClient := &velerotest.FakeNamespaceClient{}
-
-			ctx := &context{
-				restore:              test.restore,
-				namespaceClient:      nsClient,
-				fileSystem:           test.fileSystem,
-				prioritizedResources: test.prioritizedResources,
-				log:                  log,
-			}
-
-			nsClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(&v1.Namespace{}, nil)
-
-			warnings, errors := ctx.restoreFromDir(test.baseDir)
-
-			assert.Empty(t, warnings.Velero)
-			assert.Empty(t, warnings.Cluster)
-			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, test.expectedErrors, errors)
-
-			assert.Equal(t, test.expectedReadDirs, test.fileSystem.ReadDirCalls)
-		})
-	}
-}
-
-func TestNamespaceRemapping(t *testing.T) {
-	var (
-		baseDir              = "bak"
-		restore              = &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, NamespaceMapping: map[string]string{"ns-1": "ns-2"}}}
-		prioritizedResources = []schema.GroupResource{{Resource: "namespaces"}, {Resource: "configmaps"}}
-		labelSelector        = labels.NewSelector()
-		fileSystem           = velerotest.NewFakeFileSystem().
-					WithFile("bak/resources/configmaps/namespaces/ns-1/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()).
-					WithFile("bak/resources/namespaces/cluster/ns-1.json", newTestNamespace("ns-1").ToJSON())
-		expectedNS   = "ns-2"
-		expectedObjs = toUnstructured(newTestConfigMap().WithNamespace("ns-2").ConfigMap)
-	)
-
-	resourceClient := &velerotest.FakeDynamicClient{}
-	for i := range expectedObjs {
-		addRestoreLabels(&expectedObjs[i], "", "")
-		resourceClient.On("Create", &expectedObjs[i]).Return(&expectedObjs[i], nil)
-	}
-
-	dynamicFactory := &velerotest.FakeDynamicFactory{}
-	resource := metav1.APIResource{Name: "configmaps", Namespaced: true}
-	gv := schema.GroupVersion{Group: "", Version: "v1"}
-	dynamicFactory.On("ClientForGroupVersionResource", gv, resource, expectedNS).Return(resourceClient, nil)
-
-	nsClient := &velerotest.FakeNamespaceClient{}
-
-	ctx := &context{
-		dynamicFactory:       dynamicFactory,
-		fileSystem:           fileSystem,
-		selector:             labelSelector,
-		namespaceClient:      nsClient,
-		prioritizedResources: prioritizedResources,
-		restore:              restore,
-		backup:               &api.Backup{},
-		log:                  velerotest.NewLogger(),
-	}
-
-	nsClient.On("Get", "ns-2", metav1.GetOptions{}).Return(&v1.Namespace{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, "ns-2"))
-	ns := newTestNamespace("ns-2").Namespace
-	nsClient.On("Create", ns).Return(ns, nil)
-
-	warnings, errors := ctx.restoreFromDir(baseDir)
-
-	assert.Empty(t, warnings.Velero)
-	assert.Empty(t, warnings.Cluster)
-	assert.Empty(t, warnings.Namespaces)
-	assert.Empty(t, errors.Velero)
-	assert.Empty(t, errors.Cluster)
-	assert.Empty(t, errors.Namespaces)
-
-	// ensure the remapped NS (only) was created via the namespaceClient
-	nsClient.AssertExpectations(t)
-
-	// ensure that we did not try to create namespaces via dynamic client
-	dynamicFactory.AssertNotCalled(t, "ClientForGroupVersionResource", gv, metav1.APIResource{Name: "namespaces", Namespaced: true}, "")
-
-	dynamicFactory.AssertExpectations(t)
-	resourceClient.AssertExpectations(t)
-}
-
-func TestRestoreResourceForNamespace(t *testing.T) {
-	var (
-		trueVal  = true
-		falseVal = false
-		truePtr  = &trueVal
-		falsePtr = &falseVal
-	)
-
-	tests := []struct {
-		name                    string
-		namespace               string
-		resourcePath            string
-		labelSelector           labels.Selector
-		includeClusterResources *bool
-		fileSystem              *velerotest.FakeFileSystem
-		actions                 []resolvedAction
-		expectedErrors          api.RestoreResult
-		expectedObjs            []unstructured.Unstructured
-	}{
-		{
-			name:          "basic normal case",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile("configmaps/cm-1.json", newNamedTestConfigMap("cm-1").ToJSON()).
-				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
-			expectedObjs: toUnstructured(
-				newNamedTestConfigMap("cm-1").ConfigMap,
-				newNamedTestConfigMap("cm-2").ConfigMap,
-			),
-		},
-		{
-			name:         "no such directory causes error",
-			namespace:    "ns-1",
-			resourcePath: "configmaps",
-			fileSystem:   velerotest.NewFakeFileSystem(),
-			expectedErrors: api.RestoreResult{
-				Namespaces: map[string][]string{
-					"ns-1": {"error reading \"configmaps\" resource directory: open configmaps: file does not exist"},
-				},
-			},
-		},
-		{
-			name:         "empty directory is no-op",
-			namespace:    "ns-1",
-			resourcePath: "configmaps",
-			fileSystem:   velerotest.NewFakeFileSystem().WithDirectory("configmaps"),
-		},
-		{
-			name:          "unmarshall failure does not cause immediate return",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile("configmaps/cm-1-invalid.json", []byte("this is not valid json")).
-				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
-			expectedErrors: api.RestoreResult{
-				Namespaces: map[string][]string{
-					"ns-1": {"error decoding \"configmaps/cm-1-invalid.json\": invalid character 'h' in literal true (expecting 'r')"},
-				},
-			},
-			expectedObjs: toUnstructured(newNamedTestConfigMap("cm-2").ConfigMap),
-		},
-		{
-			name:          "matching label selector correctly includes",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.SelectorFromSet(labels.Set(map[string]string{"foo": "bar"})),
-			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
-			expectedObjs:  toUnstructured(newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ConfigMap),
-		},
-		{
-			name:          "non-matching label selector correctly excludes",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.SelectorFromSet(labels.Set(map[string]string{"foo": "not-bar"})),
-			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
-		},
-		{
-			name:          "namespace is remapped",
-			namespace:     "ns-2",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()),
-			expectedObjs:  toUnstructured(newTestConfigMap().WithNamespace("ns-2").ConfigMap),
-		},
-		{
-			name:          "custom restorer is correctly used",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			actions: []resolvedAction{
-				{
-					RestoreItemAction:         newFakeAction("configmaps"),
-					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("configmaps"),
-					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-					selector:                  labels.Everything(),
-				},
-			},
-			expectedObjs: toUnstructured(newTestConfigMap().WithLabels(map[string]string{"fake-restorer": "foo"}).ConfigMap),
-		},
-		{
-			name:          "custom restorer for different group/resource is not used",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			actions: []resolvedAction{
-				{
-					RestoreItemAction:         newFakeAction("foo-resource"),
-					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("foo-resource"),
-					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-					selector:                  labels.Everything(),
-				},
-			},
-			expectedObjs: toUnstructured(newTestConfigMap().ConfigMap),
-		},
-		{
-			name:                    "cluster-scoped resources are skipped when IncludeClusterResources=false",
-			namespace:               "",
-			resourcePath:            "persistentvolumes",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: falsePtr,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
-		},
-		{
-			name:                    "namespaced resources are not skipped when IncludeClusterResources=false",
-			namespace:               "ns-1",
-			resourcePath:            "configmaps",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: falsePtr,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			expectedObjs:            toUnstructured(newTestConfigMap().ConfigMap),
-		},
-		{
-			name:                    "cluster-scoped resources are not skipped when IncludeClusterResources=true",
-			namespace:               "",
-			resourcePath:            "persistentvolumes",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: truePtr,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
-			expectedObjs:            toUnstructured(newTestPV().PersistentVolume),
-		},
-		{
-			name:                    "namespaced resources are not skipped when IncludeClusterResources=true",
-			namespace:               "ns-1",
-			resourcePath:            "configmaps",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: truePtr,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			expectedObjs:            toUnstructured(newTestConfigMap().ConfigMap),
-		},
-		{
-			name:                    "cluster-scoped resources are not skipped when IncludeClusterResources=nil",
-			namespace:               "",
-			resourcePath:            "persistentvolumes",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: nil,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
-			expectedObjs:            toUnstructured(newTestPV().PersistentVolume),
-		},
-		{
-			name:                    "namespaced resources are not skipped when IncludeClusterResources=nil",
-			namespace:               "ns-1",
-			resourcePath:            "configmaps",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: nil,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			expectedObjs:            toUnstructured(newTestConfigMap().ConfigMap),
-		},
-		{
-			name:                    "serviceaccounts are restored",
-			namespace:               "ns-1",
-			resourcePath:            "serviceaccounts",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: nil,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("serviceaccounts/sa-1.json", newTestServiceAccount().ToJSON()),
-			expectedObjs:            toUnstructured(newTestServiceAccount().ServiceAccount),
-		},
-		{
-			name:                    "non-mirror pods are restored",
-			namespace:               "ns-1",
-			resourcePath:            "pods",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: nil,
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile(
-					"pods/pod.json",
-					NewTestUnstructured().
-						WithAPIVersion("v1").
-						WithKind("Pod").
-						WithNamespace("ns-1").
-						WithName("pod1").
-						ToJSON(),
-				),
-			expectedObjs: []unstructured.Unstructured{
-				*(NewTestUnstructured().
-					WithAPIVersion("v1").
-					WithKind("Pod").
-					WithNamespace("ns-1").
-					WithName("pod1").
-					Unstructured),
-			},
-		},
-		{
-			name:                    "mirror pods are not restored",
-			namespace:               "ns-1",
-			resourcePath:            "pods",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: nil,
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile(
-					"pods/pod.json",
-					NewTestUnstructured().
-						WithAPIVersion("v1").
-						WithKind("Pod").
-						WithNamespace("ns-1").
-						WithName("pod1").
-						WithAnnotations(v1.MirrorPodAnnotationKey).
-						ToJSON(),
-				),
-		},
-	}
-
-	var (
-		client                 = fake.NewSimpleClientset()
-		sharedInformers        = informers.NewSharedInformerFactory(client, 0)
-		snapshotLocationLister = sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister()
-	)
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			resourceClient := &velerotest.FakeDynamicClient{}
-			for i := range test.expectedObjs {
-				addRestoreLabels(&test.expectedObjs[i], "my-restore", "my-backup")
-				resourceClient.On("Create", &test.expectedObjs[i]).Return(&test.expectedObjs[i], nil)
-			}
-
-			dynamicFactory := &velerotest.FakeDynamicFactory{}
-			gv := schema.GroupVersion{Group: "", Version: "v1"}
-
-			configMapResource := metav1.APIResource{Name: "configmaps", Namespaced: true}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, configMapResource, test.namespace).Return(resourceClient, nil)
-
-			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, test.namespace).Return(resourceClient, nil)
-			resourceClient.On("Watch", metav1.ListOptions{}).Return(&fakeWatch{}, nil)
-			if test.resourcePath == "persistentvolumes" {
-				resourceClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(&unstructured.Unstructured{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "persistentvolumes"}, ""))
-			}
-
-			// Assume the persistentvolume doesn't already exist in the cluster.
-			saResource := metav1.APIResource{Name: "serviceaccounts", Namespaced: true}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, saResource, test.namespace).Return(resourceClient, nil)
-
-			podResource := metav1.APIResource{Name: "pods", Namespaced: true}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, podResource, test.namespace).Return(resourceClient, nil)
-
-			ctx := &context{
-				dynamicFactory: dynamicFactory,
-				actions:        test.actions,
-				fileSystem:     test.fileSystem,
-				selector:       test.labelSelector,
-				restore: &api.Restore{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: api.DefaultNamespace,
-						Name:      "my-restore",
-					},
-					Spec: api.RestoreSpec{
-						IncludeClusterResources: test.includeClusterResources,
-						BackupName:              "my-backup",
-					},
-				},
-				backup: &api.Backup{},
-				log:    velerotest.NewLogger(),
-				pvRestorer: &pvRestorer{
-					logger: logging.DefaultLogger(logrus.DebugLevel),
-					blockStoreGetter: &fakeBlockStoreGetter{
-						volumeMap: map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
-						volumeID:  "volume-1",
-					},
-					snapshotLocationLister: snapshotLocationLister,
-					backup:                 &api.Backup{},
-				},
-			}
-
-			warnings, errors := ctx.restoreResource(test.resourcePath, test.namespace, test.resourcePath)
-
-			assert.Empty(t, warnings.Velero)
-			assert.Empty(t, warnings.Cluster)
-			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, test.expectedErrors, errors)
-		})
-	}
-}
-
-func TestRestoringExistingServiceAccount(t *testing.T) {
-	fromCluster := newTestServiceAccount()
-	fromClusterUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(fromCluster.ServiceAccount)
-	require.NoError(t, err)
-
-	different := newTestServiceAccount().WithImagePullSecret("image-secret").WithSecret("secret")
-	differentUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(different.ServiceAccount)
-	require.NoError(t, err)
-
+func TestRestorePVWithVolumeInfo(t *testing.T) {
 	tests := []struct {
 		name          string
-		expectedPatch []byte
-		fromBackup    *unstructured.Unstructured
+		restore       *velerov1api.Restore
+		backup        *velerov1api.Backup
+		apiResources  []*test.APIResource
+		tarball       io.Reader
+		want          map[*test.APIResource][]string
+		volumeInfoMap map[string]volume.BackupVolumeInfo
 	}{
 		{
-			name:       "fromCluster and fromBackup are exactly the same",
-			fromBackup: &unstructured.Unstructured{Object: fromClusterUnstructured},
+			name:    "Restore PV with native snapshot",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
+				"pv-1": {
+					BackupMethod: volume.NativeSnapshot,
+					PVName:       "pv-1",
+					NativeSnapshotInfo: &volume.NativeSnapshotInfo{
+						SnapshotHandle: "testSnapshotHandle",
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {"/pv-1"},
+			},
 		},
 		{
-			name:          "fromCluster and fromBackup are different",
-			fromBackup:    &unstructured.Unstructured{Object: differentUnstructured},
-			expectedPatch: []byte(`{"imagePullSecrets":[{"name":"image-secret"}],"secrets":[{"name":"secret"}]}`),
+			name:    "Restore PV with PVB",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
+				"pv-1": {
+					BackupMethod: volume.PodVolumeBackup,
+					PVName:       "pv-1",
+					PVBInfo: &volume.PodVolumeInfo{
+						SnapshotHandle: "testSnapshotHandle",
+						Size:           100,
+						NodeName:       "testNode",
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {},
+			},
+		},
+		{
+			name:    "Restore PV with CSI VolumeSnapshot",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
+				"pv-1": {
+					BackupMethod:      volume.CSISnapshot,
+					SnapshotDataMoved: false,
+					PVName:            "pv-1",
+					CSISnapshotInfo: &volume.CSISnapshotInfo{
+						Driver: "pd.csi.storage.gke.io",
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {},
+			},
+		},
+		{
+			name:    "Restore PV with DataUpload",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
+				"pv-1": {
+					BackupMethod:      volume.CSISnapshot,
+					SnapshotDataMoved: true,
+					PVName:            "pv-1",
+					CSISnapshotInfo: &volume.CSISnapshotInfo{
+						Driver: "pd.csi.storage.gke.io",
+					},
+					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
+						DataMover: "velero",
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {},
+			},
+		},
+		{
+			name:    "Restore PV with ClaimPolicy as Delete",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
+				"pv-1": {
+					PVName:  "pv-1",
+					Skipped: true,
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {},
+			},
+		},
+		{
+			name:    "Restore PV with ClaimPolicy as Retain",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
+				"pv-1": {
+					PVName:  "pv-1",
+					Skipped: true,
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {"/pv-1"},
+			},
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			resourceClient := &velerotest.FakeDynamicClient{}
-			defer resourceClient.AssertExpectations(t)
-			name := fromCluster.GetName()
+	features.Enable("EnableCSI")
 
-			// restoreResource will add the restore label to object provided to create, so we need to make a copy to provide to our expected call
-			m := make(map[string]interface{})
-			for k, v := range test.fromBackup.Object {
-				m[k] = v
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.DiscoveryClient.WithAPIResource(r)
 			}
-			fromBackupWithLabel := &unstructured.Unstructured{Object: m}
-			addRestoreLabels(fromBackupWithLabel, "my-restore", "my-backup")
-			// resetMetadataAndStatus will strip the creationTimestamp before calling Create
-			fromBackupWithLabel.SetCreationTimestamp(metav1.Time{Time: time.Time{}})
+			require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
-			resourceClient.On("Create", fromBackupWithLabel).Return(new(unstructured.Unstructured), k8serrors.NewAlreadyExists(kuberesource.ServiceAccounts, name))
-			resourceClient.On("Get", name, metav1.GetOptions{}).Return(&unstructured.Unstructured{Object: fromClusterUnstructured}, nil)
-
-			if len(test.expectedPatch) > 0 {
-				resourceClient.On("Patch", name, test.expectedPatch).Return(test.fromBackup, nil)
+			data := &Request{
+				Log:                 h.log,
+				Restore:             tc.restore,
+				Backup:              tc.backup,
+				PodVolumeBackups:    nil,
+				VolumeSnapshots:     nil,
+				BackupReader:        tc.tarball,
+				BackupVolumeInfoMap: tc.volumeInfoMap,
 			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				nil, // restoreItemActions
+				nil, // volume snapshotter getter
+			)
 
-			dynamicFactory := &velerotest.FakeDynamicFactory{}
-			gv := schema.GroupVersion{Group: "", Version: "v1"}
-
-			resource := metav1.APIResource{Name: "serviceaccounts", Namespaced: true}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, resource, "ns-1").Return(resourceClient, nil)
-			fromBackupJSON, err := json.Marshal(test.fromBackup)
-			require.NoError(t, err)
-			ctx := &context{
-				dynamicFactory: dynamicFactory,
-				actions:        []resolvedAction{},
-				fileSystem: velerotest.NewFakeFileSystem().
-					WithFile("foo/resources/serviceaccounts/namespaces/ns-1/sa-1.json", fromBackupJSON),
-				selector: labels.NewSelector(),
-				restore: &api.Restore{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: api.DefaultNamespace,
-						Name:      "my-restore",
-					},
-					Spec: api.RestoreSpec{
-						IncludeClusterResources: nil,
-						BackupName:              "my-backup",
-					},
-				},
-				backup: &api.Backup{},
-				log:    velerotest.NewLogger(),
-			}
-			warnings, errors := ctx.restoreResource("serviceaccounts", "ns-1", "foo/resources/serviceaccounts/namespaces/ns-1/")
-
-			assert.Empty(t, warnings.Velero)
-			assert.Empty(t, warnings.Cluster)
-			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, api.RestoreResult{}, errors)
+			assertEmptyResults(t, warnings, errs)
+			assertAPIContents(t, h, tc.want)
 		})
 	}
 }
 
-func TestRestoringPVsWithoutSnapshots(t *testing.T) {
-	pv := `apiVersion: v1
-kind: PersistentVolume
-metadata:
-  annotations:
-    EXPORT_block: "\nEXPORT\n{\n\tExport_Id = 1;\n\tPath = /export/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce;\n\tPseudo
-      = /export/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce;\n\tAccess_Type = RW;\n\tSquash
-      = no_root_squash;\n\tSecType = sys;\n\tFilesystem_id = 1.1;\n\tFSAL {\n\t\tName
-      = VFS;\n\t}\n}\n"
-    Export_Id: "1"
-    Project_Id: "0"
-    Project_block: ""
-    Provisioner_Id: 5fdf4025-78a5-11e8-9ece-0242ac110004
-    kubernetes.io/createdby: nfs-dynamic-provisioner
-    pv.kubernetes.io/provisioned-by: example.com/nfs
-    volume.beta.kubernetes.io/mount-options: vers=4.1
-  creationTimestamp: 2018-06-25T18:27:35Z
-  finalizers:
-  - kubernetes.io/pv-protection
-  name: pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
-  resourceVersion: "2576"
-  selfLink: /api/v1/persistentvolumes/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
-  uid: 6ecd24e4-78a5-11e8-a0d8-e2ad1e9734ce
-spec:
-  accessModes:
-  - ReadWriteMany
-  capacity:
-    storage: 1Mi
-  claimRef:
-    apiVersion: v1
-    kind: PersistentVolumeClaim
-    name: nfs
-    namespace: default
-    resourceVersion: "2565"
-    uid: 6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
-  nfs:
-    path: /export/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
-    server: 10.103.235.254
-  storageClassName: example-nfs
-status:
-  phase: Bound`
-
-	pvc := `apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  annotations:
-    control-plane.alpha.kubernetes.io/leader: '{"holderIdentity":"5fdf5572-78a5-11e8-9ece-0242ac110004","leaseDurationSeconds":15,"acquireTime":"2018-06-25T18:27:35Z","renewTime":"2018-06-25T18:27:37Z","leaderTransitions":0}'
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"v1","kind":"PersistentVolumeClaim","metadata":{"annotations":{},"name":"nfs","namespace":"default"},"spec":{"accessModes":["ReadWriteMany"],"resources":{"requests":{"storage":"1Mi"}},"storageClassName":"example-nfs"}}
-    pv.kubernetes.io/bind-completed: "yes"
-    pv.kubernetes.io/bound-by-controller: "yes"
-    volume.beta.kubernetes.io/storage-provisioner: example.com/nfs
-  creationTimestamp: 2018-06-25T18:27:28Z
-  finalizers:
-  - kubernetes.io/pvc-protection
-  name: nfs
-  namespace: default
-  resourceVersion: "2578"
-  selfLink: /api/v1/namespaces/default/persistentvolumeclaims/nfs
-  uid: 6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
-spec:
-  accessModes:
-  - ReadWriteMany
-  resources:
-    requests:
-      storage: 1Mi
-  storageClassName: example-nfs
-  volumeName: pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
-status:
-  accessModes:
-  - ReadWriteMany
-  capacity:
-    storage: 1Mi
-  phase: Bound`
-
+// TestRestoreResourceFiltering runs restores with different combinations
+// of resource filters (included/excluded resources, included/excluded
+// namespaces, label selectors, "include cluster resources" flag), and
+// verifies that the set of items created in the API are correct.
+// Validation is done by looking at the namespaces/names of the items in
+// the API; contents are not checked.
+func TestRestoreResourceFiltering(t *testing.T) {
 	tests := []struct {
-		name                          string
-		haveSnapshot                  bool
-		legacyBackup                  bool
-		reclaimPolicy                 string
-		expectPVCVolumeName           bool
-		expectedPVCAnnotationsMissing sets.String
-		expectPVCreation              bool
-		expectPVFound                 bool
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		want         map[*test.APIResource][]string
 	}{
 		{
-			name:                "legacy backup, have snapshot, reclaim policy delete, no existing PV found",
-			haveSnapshot:        true,
-			legacyBackup:        true,
-			reclaimPolicy:       "Delete",
-			expectPVCVolumeName: true,
-			expectPVCreation:    true,
+			name:    "no filters restores everything",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+				test.PVs():  {"/pv-1", "/pv-2"},
+			},
 		},
 		{
-			name:                "non-legacy backup, have snapshot, reclaim policy delete, no existing PV found",
-			haveSnapshot:        true,
-			legacyBackup:        false,
-			reclaimPolicy:       "Delete",
-			expectPVCVolumeName: true,
-			expectPVCreation:    true,
+			name:    "included resources filter only restores resources of those types",
+			restore: defaultRestore().IncludedResources("pods").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+			},
 		},
 		{
-			name:                "non-legacy backup, have snapshot, reclaim policy delete, existing PV found",
-			haveSnapshot:        true,
-			legacyBackup:        false,
-			reclaimPolicy:       "Delete",
-			expectPVCVolumeName: true,
-			expectPVCreation:    false,
-			expectPVFound:       true,
+			name:    "excluded resources filter only restores resources not of those types",
+			restore: defaultRestore().ExcludedResources("pvs").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+			},
 		},
 		{
-			name:                "legacy backup, have snapshot, reclaim policy retain, no existing PV found",
-			haveSnapshot:        true,
-			legacyBackup:        true,
-			reclaimPolicy:       "Retain",
-			expectPVCVolumeName: true,
-			expectPVCreation:    true,
+			name:    "included namespaces filter only restores resources in those namespaces",
+			restore: defaultRestore().IncludedNamespaces("ns-1").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-1/deploy-1"},
+			},
 		},
 		{
-			name:                "legacy backup, have snapshot, reclaim policy retain, existing PV found",
-			haveSnapshot:        true,
-			legacyBackup:        true,
-			reclaimPolicy:       "Retain",
-			expectPVCVolumeName: true,
-			expectPVCreation:    false,
-			expectPVFound:       true,
+			name:    "excluded namespaces filter only restores resources not in those namespaces",
+			restore: defaultRestore().ExcludedNamespaces("ns-2").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-1/deploy-1"},
+			},
 		},
 		{
-			name:                "non-legacy backup, have snapshot, reclaim policy retain, no existing PV found",
-			haveSnapshot:        true,
-			legacyBackup:        false,
-			reclaimPolicy:       "Retain",
-			expectPVCVolumeName: true,
-			expectPVCreation:    true,
+			name:    "IncludeClusterResources=false only restores namespaced resources",
+			restore: defaultRestore().IncludeClusterResources(false).Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
+			},
 		},
 		{
-			name:                "non-legacy backup, have snapshot, reclaim policy retain, existing PV found",
-			haveSnapshot:        true,
-			legacyBackup:        false,
-			reclaimPolicy:       "Retain",
-			expectPVCVolumeName: true,
-			expectPVCreation:    false,
-			expectPVFound:       true,
+			name:    "label selector only restores matching resources",
+			restore: defaultRestore().LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").ObjectMeta(builder.WithLabels("a", "b")).Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
+					builder.ForPersistentVolume("pv-2").ObjectMeta(builder.WithLabels("a", "c")).Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-2/deploy-2"},
+				test.PVs():         {"/pv-1"},
+			},
 		},
 		{
-			name:                "non-legacy backup, have snapshot, reclaim policy retain, existing PV found",
-			haveSnapshot:        true,
-			legacyBackup:        false,
-			reclaimPolicy:       "Retain",
-			expectPVCVolumeName: true,
-			expectPVCreation:    false,
-			expectPVFound:       true,
+			name: "OrLabelSelectors only restores matching resources",
+			restore: defaultRestore().OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}},
+				{MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).Result(),
+			backup: defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("a1", "b1")).Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").ObjectMeta(builder.WithLabels("a3", "b3")).Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabels("a5", "b5")).Result(),
+					builder.ForPersistentVolume("pv-2").ObjectMeta(builder.WithLabels("a4", "b4")).Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-2/deploy-2"},
+				test.PVs():         {"/pv-2"},
+			},
 		},
 		{
-			name:                          "no snapshot, reclaim policy delete, no existing PV",
-			haveSnapshot:                  false,
-			reclaimPolicy:                 "Delete",
-			expectPVCVolumeName:           false,
-			expectedPVCAnnotationsMissing: sets.NewString("pv.kubernetes.io/bind-completed", "pv.kubernetes.io/bound-by-controller"),
+			name:    "should include cluster-scoped resources if restoring subset of namespaces and IncludeClusterResources=true",
+			restore: defaultRestore().IncludedNamespaces("ns-1").IncludeClusterResources(true).Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-1/deploy-1"},
+				test.PVs():         {"/pv-1", "/pv-2"},
+			},
 		},
 		{
-			name:                "no snapshot, reclaim policy retain, no existing PV found",
-			haveSnapshot:        false,
-			reclaimPolicy:       "Retain",
-			expectPVCVolumeName: true,
-			expectPVCreation:    true,
+			name:    "should not include cluster-scoped resources if restoring subset of namespaces and IncludeClusterResources=false",
+			restore: defaultRestore().IncludedNamespaces("ns-1").IncludeClusterResources(false).Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-1/deploy-1"},
+				test.PVs():         {},
+			},
 		},
 		{
-			name:                "no snapshot, reclaim policy retain, existing PV found",
-			haveSnapshot:        false,
-			reclaimPolicy:       "Retain",
-			expectPVCVolumeName: true,
-			expectPVCreation:    false,
-			expectPVFound:       true,
+			name:    "should not include cluster-scoped resources if restoring subset of namespaces and IncludeClusterResources=nil",
+			restore: defaultRestore().IncludedNamespaces("ns-1").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-1/deploy-1"},
+				test.PVs():         {},
+			},
+		},
+		{
+			name:    "should include cluster-scoped resources if restoring all namespaces and IncludeClusterResources=true",
+			restore: defaultRestore().IncludeClusterResources(true).Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
+				test.PVs():         {"/pv-1", "/pv-2"},
+			},
+		},
+		{
+			name:    "should not include cluster-scoped resources if restoring all namespaces and IncludeClusterResources=false",
+			restore: defaultRestore().IncludeClusterResources(false).Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
+			},
+		},
+		{
+			name:    "when a wildcard and a specific resource are included, the wildcard takes precedence",
+			restore: defaultRestore().IncludedResources("*", "pods").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
+				test.PVs():         {"/pv-1", "/pv-2"},
+			},
+		},
+		{
+			name:    "wildcard excludes are ignored",
+			restore: defaultRestore().ExcludedResources("*").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
+				test.PVs():         {"/pv-1", "/pv-2"},
+			},
+		},
+		{
+			name:    "unresolvable included resources are ignored",
+			restore: defaultRestore().IncludedResources("pods", "unresolvable").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+			},
+		},
+		{
+			name:    "unresolvable excluded resources are ignored",
+			restore: defaultRestore().ExcludedResources("deployments", "unresolvable").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+				test.PVs():  {"/pv-1", "/pv-2"},
+			},
+		},
+		{
+			name:         "mirror pods are not restored",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithAnnotations(corev1api.MirrorPodAnnotationKey, "foo")).Result()).Done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			want:         map[*test.APIResource][]string{test.Pods(): {}},
+		},
+		{
+			name:         "service accounts are restored",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			tarball:      test.NewTarWriter(t).AddItems("serviceaccounts", builder.ForServiceAccount("ns-1", "sa-1").Result()).Done(),
+			apiResources: []*test.APIResource{test.ServiceAccounts()},
+			want:         map[*test.APIResource][]string{test.ServiceAccounts(): {"ns-1/sa-1"}},
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			dynamicFactory := &velerotest.FakeDynamicFactory{}
-			gv := schema.GroupVersion{Group: "", Version: "v1"}
 
-			pvClient := &velerotest.FakeDynamicClient{}
-			defer pvClient.AssertExpectations(t)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
 
-			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, "").Return(pvClient, nil)
+			for _, r := range tc.apiResources {
+				h.DiscoveryClient.WithAPIResource(r)
+			}
+			require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
-			pvcClient := &velerotest.FakeDynamicClient{}
-			defer pvcClient.AssertExpectations(t)
+			data := &Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				nil, // restoreItemActions
+				nil, // volume snapshotter getter
+			)
 
-			pvcResource := metav1.APIResource{Name: "persistentvolumeclaims", Namespaced: true}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, pvcResource, "default").Return(pvcClient, nil)
+			assertEmptyResults(t, warnings, errs)
+			assertAPIContents(t, h, tc.want)
+		})
+	}
+}
 
-			obj, _, err := scheme.Codecs.UniversalDecoder(v1.SchemeGroupVersion).Decode([]byte(pv), nil, nil)
-			require.NoError(t, err)
-			pvObj, ok := obj.(*v1.PersistentVolume)
-			require.True(t, ok)
-			pvObj.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimPolicy(test.reclaimPolicy)
-			pvBytes, err := json.Marshal(pvObj)
-			require.NoError(t, err)
+// TestRestoreNamespaceMapping runs restores with namespace mappings specified,
+// and verifies that the set of items created in the API are in the correct
+// namespaces. Validation is done by looking at the namespaces/names of the items
+// in the API; contents are not checked.
+func TestRestoreNamespaceMapping(t *testing.T) {
+	tests := []struct {
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		want         map[*test.APIResource][]string
+	}{
+		{
+			name:    "namespace mappings are applied",
+			restore: defaultRestore().NamespaceMappings("ns-1", "mapped-ns-1", "ns-2", "mapped-ns-2").Result(),
+			backup:  defaultBackup().Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+					builder.ForPod("ns-3", "pod-3").Result(),
+				).
+				Done(),
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2", "ns-3/pod-3"},
+			},
+		},
+		{
+			name:    "namespace mappings are applied when IncludedNamespaces are specified",
+			restore: defaultRestore().IncludedNamespaces("ns-1", "ns-2").NamespaceMappings("ns-1", "mapped-ns-1", "ns-2", "mapped-ns-2").Result(),
+			backup:  defaultBackup().Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+					builder.ForPod("ns-3", "pod-3").Result(),
+				).
+				Done(),
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2"},
+			},
+		},
+	}
 
-			obj, _, err = scheme.Codecs.UniversalDecoder(v1.SchemeGroupVersion).Decode([]byte(pvc), nil, nil)
-			require.NoError(t, err)
-			pvcObj, ok := obj.(*v1.PersistentVolumeClaim)
-			require.True(t, ok)
-			pvcBytes, err := json.Marshal(pvcObj)
-			require.NoError(t, err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
 
-			unstructuredPVCMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pvcObj)
-			require.NoError(t, err)
-			unstructuredPVC := &unstructured.Unstructured{Object: unstructuredPVCMap}
+			for _, r := range tc.apiResources {
+				h.DiscoveryClient.WithAPIResource(r)
+			}
+			require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
-			nsClient := &velerotest.FakeNamespaceClient{}
-			ns := newTestNamespace(pvcObj.Namespace).Namespace
-			nsClient.On("Get", pvcObj.Namespace, mock.Anything).Return(ns, nil)
+			data := &Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				nil, // restoreItemActions
+				nil, // volume snapshotter getter
+			)
 
-			backup := &api.Backup{}
-			if test.haveSnapshot && test.legacyBackup {
-				backup.Status.VolumeBackups = map[string]*api.VolumeBackupInfo{
-					"pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce": {
-						SnapshotID: "snap",
+			assertEmptyResults(t, warnings, errs)
+			assertAPIContents(t, h, tc.want)
+		})
+	}
+}
+
+// TestRestoreResourcePriorities runs restores with resource priorities specified,
+// and verifies that the set of items created in the API are created in the expected
+// order. Validation is done by adding a Reactor to the fake dynamic client that records
+// resource identifiers as they're created, and comparing that to the expected order.
+func TestRestoreResourcePriorities(t *testing.T) {
+	tests := []struct {
+		name               string
+		restore            *velerov1api.Restore
+		backup             *velerov1api.Backup
+		apiResources       []*test.APIResource
+		tarball            io.Reader
+		resourcePriorities types.Priorities
+	}{
+		{
+			name:    "resources are restored according to the specified resource priorities",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				AddItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				AddItems("serviceaccounts",
+					builder.ForServiceAccount("ns-1", "sa-1").Result(),
+					builder.ForServiceAccount("ns-2", "sa-2").Result(),
+				).
+				AddItems("persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(),
+					builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.PVs(),
+				test.Deployments(),
+				test.ServiceAccounts(),
+			},
+			resourcePriorities: types.Priorities{
+				HighPriorities: []string{"persistentvolumes", "persistentvolumeclaims", "serviceaccounts"},
+				LowPriorities:  []string{"deployments.apps"},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		h := newHarness(t)
+		h.restorer.resourcePriorities = tc.resourcePriorities
+
+		recorder := &createRecorder{t: t}
+		h.DynamicClient.PrependReactor("create", "*", recorder.reactor())
+
+		for _, r := range tc.apiResources {
+			h.DiscoveryClient.WithAPIResource(r)
+		}
+		require.NoError(t, h.restorer.discoveryHelper.Refresh())
+
+		data := &Request{
+			Log:              h.log,
+			Restore:          tc.restore,
+			Backup:           tc.backup,
+			PodVolumeBackups: nil,
+			VolumeSnapshots:  nil,
+			BackupReader:     tc.tarball,
+		}
+		warnings, errs := h.restorer.Restore(
+			data,
+			nil, // restoreItemActions
+			nil, // volume snapshotter getter
+		)
+
+		assertEmptyResults(t, warnings, errs)
+		assertResourceCreationOrder(t, []string{"persistentvolumes", "persistentvolumeclaims", "serviceaccounts", "pods", "deployments.apps"}, recorder.resources)
+	}
+}
+
+// TestInvalidTarballContents runs restores for tarballs that are invalid in some way, and
+// verifies that the set of items created in the API and the errors returned are correct.
+// Validation is done by looking at the namespaces/names of the items in the API and the
+// Result objects returned from the restorer.
+func TestInvalidTarballContents(t *testing.T) {
+	tests := []struct {
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		want         map[*test.APIResource][]string
+		wantErrs     Result
+		wantWarnings Result
+	}{
+		{
+			name:    "empty tarball returns a warning",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				Done(),
+			wantWarnings: Result{
+				Velero: []string{archive.ErrNotExist.Error()},
+			},
+		},
+		{
+			name:    "invalid JSON is reported as an error and restore continues",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				Add("resources/pods/namespaces/ns-1/pod-1.json", []byte("invalid JSON")).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-2").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-2"},
+			},
+			wantErrs: Result{
+				Namespaces: map[string][]string{
+					"ns-1": {"error decoding"},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.DiscoveryClient.WithAPIResource(r)
+			}
+			require.NoError(t, h.restorer.discoveryHelper.Refresh())
+
+			data := &Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				nil, // restoreItemActions
+				nil, // volume snapshotter getter
+			)
+			assertWantErrsOrWarnings(t, tc.wantWarnings, warnings)
+			assertWantErrsOrWarnings(t, tc.wantErrs, errs)
+			assertAPIContents(t, h, tc.want)
+		})
+	}
+}
+
+func assertWantErrsOrWarnings(t *testing.T, wantRes Result, res Result) {
+	t.Helper()
+	if wantRes.Velero != nil {
+		assert.Equal(t, len(wantRes.Velero), len(res.Velero))
+		for i := range res.Velero {
+			assert.Contains(t, res.Velero[i], wantRes.Velero[i])
+		}
+	}
+	if wantRes.Namespaces != nil {
+		assert.Equal(t, len(wantRes.Namespaces), len(res.Namespaces))
+		for ns := range res.Namespaces {
+			assert.Equal(t, len(wantRes.Namespaces[ns]), len(res.Namespaces[ns]))
+			for i := range res.Namespaces[ns] {
+				assert.Contains(t, res.Namespaces[ns][i], wantRes.Namespaces[ns][i])
+			}
+		}
+	}
+	if wantRes.Cluster != nil {
+		assert.Equal(t, wantRes.Cluster, res.Cluster)
+	}
+}
+
+// TestRestoreItems runs restores of specific items and validates that they are created
+// with the expected metadata/spec/status in the API.
+func TestRestoreItems(t *testing.T) {
+	tests := []struct {
+		name                 string
+		restore              *velerov1api.Restore
+		backup               *velerov1api.Backup
+		apiResources         []*test.APIResource
+		tarball              io.Reader
+		want                 []*test.APIResource
+		expectedRestoreItems map[itemKey]restoredItemStatus
+		disableInformer      bool
+	}{
+		{
+			name:    "metadata uid/resourceVersion/etc. gets removed",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").
+						ObjectMeta(
+							builder.WithLabels("key-1", "val-1"),
+							builder.WithAnnotations("key-1", "val-1"),
+							builder.WithFinalizers("finalizer-1"),
+							builder.WithUID("uid"),
+						).
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").
+						ObjectMeta(
+							builder.WithLabels("key-1", "val-1", "velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+							builder.WithAnnotations("key-1", "val-1"),
+							builder.WithFinalizers("finalizer-1"),
+						).
+						Result(),
+				),
+			},
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}: {action: "created", itemExists: true},
+				{resource: "v1/Pod", namespace: "ns-1", name: "pod-1"}:  {action: "created", itemExists: true},
+			},
+		},
+		{
+			name:    "status gets removed",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					&corev1api.Pod{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "Pod",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "ns-1",
+							Name:      "pod-1",
+						},
+						Status: corev1api.PodStatus{
+							Message: "a non-empty status",
+						},
 					},
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Result(),
+				),
+			},
+		},
+		{
+			name:    "object gets labeled with full backup and restore names when they're both shorter than 63 characters",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Result()),
+			},
+		},
+		{
+			name: "object gets labeled with full backup and restore names when they're both equal to 63 characters",
+			restore: builder.ForRestore(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-exactly-63-characters").
+				Backup("the-really-long-kube-service-name-that-is-exactly-63-characters").
+				Result(),
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-exactly-63-characters").Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").
+						ObjectMeta(
+							builder.WithLabels(
+								"velero.io/backup-name", "the-really-long-kube-service-name-that-is-exactly-63-characters",
+								"velero.io/restore-name", "the-really-long-kube-service-name-that-is-exactly-63-characters",
+							),
+						).Result(),
+				),
+			},
+		},
+		{
+			name: "object gets labeled with shortened backup and restore names when they're both longer than 63 characters",
+			restore: builder.ForRestore(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-much-greater-than-63-characters").
+				Backup("the-really-long-kube-service-name-that-is-much-greater-than-63-characters").
+				Result(),
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-much-greater-than-63-characters").Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "pod-1").
+					ObjectMeta(
+						builder.WithLabels(
+							"velero.io/backup-name", "the-really-long-kube-service-name-that-is-much-greater-th8a11b3",
+							"velero.io/restore-name", "the-really-long-kube-service-name-that-is-much-greater-th8a11b3",
+						),
+					).
+					Result(),
+				),
+			},
+		},
+		{
+			name:    "no error when service account already exists in cluster and is identical to the backed up one",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("serviceaccounts", builder.ForServiceAccount("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
+			},
+			want: []*test.APIResource{
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
+			},
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:          {action: "created", itemExists: true},
+				{resource: "v1/ServiceAccount", namespace: "ns-1", name: "sa-1"}: {action: "skipped", itemExists: true},
+			},
+		},
+		{
+			name:    "update secret data and labels when secret exists in cluster and is not identical to the backed up one, existing resource policy is update",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("secrets", builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"key-1": []byte("value-1")}).Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Secrets(builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"foo": []byte("bar")}).Result()),
+			},
+			disableInformer: true,
+			want: []*test.APIResource{
+				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
+			},
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:  {action: "created", itemExists: true},
+				{resource: "v1/Secret", namespace: "ns-1", name: "sa-1"}: {action: "updated", itemExists: true},
+			},
+		},
+		{
+			name:    "update secret data and labels when secret exists in cluster and is not identical to the backed up one, existing resource policy is update, using informer cache",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("secrets", builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"key-1": []byte("value-1")}).Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Secrets(builder.ForSecret("ns-1", "sa-1").Data(map[string][]byte{"foo": []byte("bar")}).Result()),
+			},
+			disableInformer: false,
+			want: []*test.APIResource{
+				test.Secrets(builder.ForSecret("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Data(map[string][]byte{"key-1": []byte("value-1")}).Result()),
+			},
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}:  {action: "created", itemExists: true},
+				{resource: "v1/Secret", namespace: "ns-1", name: "sa-1"}: {action: "updated", itemExists: true},
+			},
+		},
+		{
+			name:    "update service account labels when service account exists in cluster and is identical to the backed up one, existing resource policy is update",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("serviceaccounts", builder.ForServiceAccount("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Result()),
+			},
+		},
+		{
+			name:    "update pod labels when pod exists in cluster and is identical to the backed up one, existing resource policy is update",
+			restore: defaultRestore().ExistingResourcePolicy("update").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")).Result()),
+			},
+		},
+		{
+			name:    "do not update pod labels when pod exists in cluster and is identical to the backed up one, existing resource policy is none",
+			restore: defaultRestore().ExistingResourcePolicy("none").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+		},
+		{
+			name:    "do not update pod labels when pod exists in cluster and is identical to the backed up one, existing resource policy is not specified, velero behavior is preserved",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "sa-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "sa-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "foo", "velero.io/restore-name", "bar")).Result()),
+			},
+		},
+		{
+			name:    "service account secrets and image pull secrets are restored when service account already exists in cluster",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("serviceaccounts", &corev1api.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ServiceAccount",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "ns-1",
+						Name:      "sa-1",
+					},
+					Secrets:          []corev1api.ObjectReference{{Name: "secret-1"}},
+					ImagePullSecrets: []corev1api.LocalObjectReference{{Name: "pull-secret-1"}},
+				}).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
+			},
+			want: []*test.APIResource{
+				test.ServiceAccounts(&corev1api.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ServiceAccount",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "ns-1",
+						Name:      "sa-1",
+					},
+					Secrets:          []corev1api.ObjectReference{{Name: "secret-1"}},
+					ImagePullSecrets: []corev1api.LocalObjectReference{{Name: "pull-secret-1"}},
+				}),
+			},
+		},
+		{
+			name:    "metadata managedFields gets restored",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").
+						ObjectMeta(
+							builder.WithManagedFields([]metav1.ManagedFieldsEntry{
+								{
+									Manager:    "kubectl",
+									Operation:  "Apply",
+									APIVersion: "v1",
+									FieldsType: "FieldsV1",
+									FieldsV1: &metav1.FieldsV1{
+										Raw: []byte(`{"f:data": {"f:key":{}}}`),
+									},
+								},
+							}),
+						).
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+							builder.WithManagedFields([]metav1.ManagedFieldsEntry{
+								{
+									Manager:    "kubectl",
+									Operation:  "Apply",
+									APIVersion: "v1",
+									FieldsType: "FieldsV1",
+									FieldsV1: &metav1.FieldsV1{
+										Raw: []byte(`{"f:data": {"f:key":{}}}`),
+									},
+								},
+							}),
+						).
+						Result(),
+				),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.AddItems(t, r)
+			}
+
+			data := &Request{
+				Log:                  h.log,
+				Restore:              tc.restore,
+				Backup:               tc.backup,
+				PodVolumeBackups:     nil,
+				VolumeSnapshots:      nil,
+				BackupReader:         tc.tarball,
+				RestoredItems:        map[itemKey]restoredItemStatus{},
+				DisableInformerCache: tc.disableInformer,
+			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				nil, // restoreItemActions
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+			assertRestoredItems(t, h, tc.want)
+			if len(tc.expectedRestoreItems) > 0 {
+				assert.EqualValues(t, tc.expectedRestoreItems, data.RestoredItems)
+			}
+		})
+	}
+}
+
+// recordResourcesAction is a restore item action that can be configured
+// to run for specific resources/namespaces and simply records the items
+// that it is executed for.
+type recordResourcesAction struct {
+	selector                    velero.ResourceSelector
+	ids                         []string
+	additionalItems             []velero.ResourceIdentifier
+	operationID                 string
+	waitForAdditionalItems      bool
+	additionalItemsReadyTimeout time.Duration
+}
+
+func (a *recordResourcesAction) Name() string {
+	return ""
+}
+
+func (a *recordResourcesAction) AppliesTo() (velero.ResourceSelector, error) {
+	return a.selector, nil
+}
+
+func (a *recordResourcesAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+	metadata, err := meta.Accessor(input.Item)
+	if err != nil {
+		return &velero.RestoreItemActionExecuteOutput{
+			UpdatedItem:                 input.Item,
+			AdditionalItems:             a.additionalItems,
+			OperationID:                 a.operationID,
+			WaitForAdditionalItems:      a.waitForAdditionalItems,
+			AdditionalItemsReadyTimeout: a.additionalItemsReadyTimeout,
+		}, err
+	}
+	a.ids = append(a.ids, kubeutil.NamespaceAndName(metadata))
+
+	return &velero.RestoreItemActionExecuteOutput{
+		UpdatedItem:                 input.Item,
+		AdditionalItems:             a.additionalItems,
+		OperationID:                 a.operationID,
+		WaitForAdditionalItems:      a.waitForAdditionalItems,
+		AdditionalItemsReadyTimeout: a.additionalItemsReadyTimeout,
+	}, nil
+}
+
+func (a *recordResourcesAction) Progress(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
+	return velero.OperationProgress{}, nil
+}
+
+func (a *recordResourcesAction) Cancel(operationID string, restore *velerov1api.Restore) error {
+	return nil
+}
+
+func (a *recordResourcesAction) AreAdditionalItemsReady(additionalItems []velero.ResourceIdentifier, restore *velerov1api.Restore) (bool, error) {
+	return true, nil
+}
+
+func (a *recordResourcesAction) ForResource(resource string) *recordResourcesAction {
+	a.selector.IncludedResources = append(a.selector.IncludedResources, resource)
+	return a
+}
+
+func (a *recordResourcesAction) ForNamespace(namespace string) *recordResourcesAction {
+	a.selector.IncludedNamespaces = append(a.selector.IncludedNamespaces, namespace)
+	return a
+}
+
+func (a *recordResourcesAction) ForLabelSelector(selector string) *recordResourcesAction {
+	a.selector.LabelSelector = selector
+	return a
+}
+
+func (a *recordResourcesAction) WithAdditionalItems(items []velero.ResourceIdentifier) *recordResourcesAction {
+	a.additionalItems = items
+	return a
+}
+
+// TestRestoreActionsRunForCorrectItems runs restores with restore item actions, and
+// verifies that each restore item action is run for the correct set of resources based on its
+// AppliesTo() resource selector. Verification is done by using the recordResourcesAction struct,
+// which records which resources it's executed for.
+func TestRestoreActionsRunForCorrectItems(t *testing.T) {
+	tests := []struct {
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		actions      map[*recordResourcesAction][]string
+	}{
+		{
+			name:    "single action with no selector runs for all items",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction): {"ns-1/pod-1", "ns-2/pod-2", "pv-1", "pv-2"},
+			},
+		},
+		{
+			name:    "single action with a resource selector for namespaced resources runs only for matching resources",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("pods"): {"ns-1/pod-1", "ns-2/pod-2"},
+			},
+		},
+		{
+			name:    "single action with a resource selector for cluster-scoped resources runs only for matching resources",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("persistentvolumes"): {"pv-1", "pv-2"},
+			},
+		},
+		{
+			name:    "single action with a namespace selector runs only for resources in that namespace",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForNamespace("ns-1"): {"ns-1/pod-1", "ns-1/pvc-1"},
+			},
+		},
+		{
+			name:    "single action with a resource and namespace selector runs only for matching resources in that namespace",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForNamespace("ns-1").ForResource("pods"): {"ns-1/pod-1"},
+			},
+		},
+		{
+			name:    "single action with a resource and label selector runs only for resources matching that label",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("restore-resource", "true")).Result(),
+					builder.ForPod("ns-1", "pod-2").ObjectMeta(builder.WithLabels("do-not-restore-resource", "true")).Result(),
+					builder.ForPod("ns-2", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").ObjectMeta(builder.WithLabels("restore-resource")).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("pods").ForLabelSelector("restore-resource"): {"ns-1/pod-1", "ns-2/pod-2"},
+			},
+		},
+		{
+			name:    "multiple actions, each with a different resource selector using short name, run for matching resources",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
+				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result(), builder.ForPersistentVolume("pv-2").Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("po"): {"ns-1/pod-1", "ns-2/pod-2"},
+				new(recordResourcesAction).ForResource("pv"): {"pv-1", "pv-2"},
+			},
+		},
+		{
+			name:    "actions with selectors that don't match anything don't run for any resources",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				AddItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForNamespace("ns-1").ForResource("persistentvolumeclaims"): nil,
+				new(recordResourcesAction).ForNamespace("ns-2").ForResource("pods"):                   nil,
+			},
+		},
+		{
+			name:    "actions run for datauploads resource",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("datauploads.velero.io", builder.ForDataUpload("velero", "du").Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.DataUploads()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForNamespace("velero").ForResource("datauploads.velero.io"): {"velero/du"},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.AddItems(t, r)
+			}
+
+			actions := []riav2.RestoreItemAction{}
+			for action := range tc.actions {
+				actions = append(actions, action)
+			}
+
+			data := &Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				actions,
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+
+			for action, want := range tc.actions {
+				sort.Strings(want)
+				sort.Strings(action.ids)
+				assert.Equal(t, want, action.ids)
+			}
+		})
+	}
+}
+
+// pluggableAction is a restore item action that can be plugged with an Execute
+// function body at runtime.
+type pluggableAction struct {
+	selector     velero.ResourceSelector
+	executeFunc  func(*velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error)
+	progressFunc func(string, *velerov1api.Restore) (velero.OperationProgress, error)
+}
+
+func (a *pluggableAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+	if a.executeFunc == nil {
+		return &velero.RestoreItemActionExecuteOutput{
+			UpdatedItem: input.Item,
+		}, nil
+	}
+
+	return a.executeFunc(input)
+}
+
+func (a *pluggableAction) Name() string {
+	return ""
+}
+
+func (a *pluggableAction) AppliesTo() (velero.ResourceSelector, error) {
+	return a.selector, nil
+}
+
+func (a *pluggableAction) Progress(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
+	return velero.OperationProgress{}, nil
+}
+
+func (a *pluggableAction) Cancel(operationID string, restore *velerov1api.Restore) error {
+	return nil
+}
+
+func (a *pluggableAction) addSelector(selector velero.ResourceSelector) *pluggableAction {
+	a.selector = selector
+	return a
+}
+
+func (a *pluggableAction) AreAdditionalItemsReady(additionalItems []velero.ResourceIdentifier, restore *velerov1api.Restore) (bool, error) {
+	return true, nil
+}
+
+// TestRestoreActionModifications runs restores with restore item actions that modify resources, and
+// verifies that that the modified item is correctly created in the API. Verification is done by looking
+// at the full object in the API.
+func TestRestoreActionModifications(t *testing.T) {
+	// modifyingActionGetter is a helper function that returns a *pluggableAction, whose Execute(...)
+	// method modifies the item being passed in by calling the 'modify' function on it.
+	modifyingActionGetter := func(modify func(*unstructured.Unstructured)) *pluggableAction {
+		return &pluggableAction{
+			executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+				obj, ok := input.Item.(*unstructured.Unstructured)
+				if !ok {
+					return nil, errors.Errorf("unexpected type %T", input.Item)
+				}
+
+				res := obj.DeepCopy()
+				modify(res)
+
+				return &velero.RestoreItemActionExecuteOutput{
+					UpdatedItem: res,
+				}, nil
+			},
+		}
+	}
+
+	tests := []struct {
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		actions      []riav2.RestoreItemAction
+		want         []*test.APIResource
+	}{
+		{
+			name:         "action that adds a label to item gets restored",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).Done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: []riav2.RestoreItemAction{
+				modifyingActionGetter(func(item *unstructured.Unstructured) {
+					item.SetLabels(map[string]string{"updated": "true"})
+				}),
+			},
+			want: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("updated", "true")).Result(),
+				),
+			},
+		},
+		{
+			name:         "action that removes a label to item gets restored",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("should-be-removed", "true")).Result()).Done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: []riav2.RestoreItemAction{
+				modifyingActionGetter(func(item *unstructured.Unstructured) {
+					item.SetLabels(nil)
+				}),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "pod-1").Result()),
+			},
+		},
+		{
+			name:         "action with non-matching label selector doesn't prevent restore",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).Done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: []riav2.RestoreItemAction{
+				modifyingActionGetter(func(item *unstructured.Unstructured) {
+					item.SetLabels(map[string]string{"updated": "true"})
+				}).addSelector(velero.ResourceSelector{
+					IncludedResources: []string{
+						"Pod",
+					},
+					LabelSelector: "nonmatching=label",
+				}),
+			},
+			want: []*test.APIResource{
+				test.Pods(builder.ForPod("ns-1", "pod-1").Result()),
+			},
+		},
+		// TODO action that modifies namespace/name - what's the expected behavior?
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.AddItems(t, r)
+			}
+
+			// every restored item should have the restore and backup name labels, set
+			// them here so we don't have to do it in every test case definition above.
+			for _, resource := range tc.want {
+				for _, item := range resource.Items {
+					labels := item.GetLabels()
+					if labels == nil {
+						labels = make(map[string]string)
+					}
+
+					labels["velero.io/restore-name"] = tc.restore.Name
+					labels["velero.io/backup-name"] = tc.restore.Spec.BackupName
+
+					item.SetLabels(labels)
 				}
 			}
 
-			pvRestorer := new(mockPVRestorer)
-			defer pvRestorer.AssertExpectations(t)
-
-			ctx := &context{
-				dynamicFactory: dynamicFactory,
-				actions:        []resolvedAction{},
-				fileSystem: velerotest.NewFakeFileSystem().
-					WithFile("foo/resources/persistentvolumes/cluster/pv.json", pvBytes).
-					WithFile("foo/resources/persistentvolumeclaims/default/pvc.json", pvcBytes),
-				selector: labels.NewSelector(),
-				prioritizedResources: []schema.GroupResource{
-					kuberesource.PersistentVolumes,
-					kuberesource.PersistentVolumeClaims,
-				},
-				restore: &api.Restore{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: api.DefaultNamespace,
-						Name:      "my-restore",
-					},
-				},
-				backup:          backup,
-				log:             velerotest.NewLogger(),
-				pvsToProvision:  sets.NewString(),
-				pvRestorer:      pvRestorer,
-				namespaceClient: nsClient,
+			data := &Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
 			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				tc.actions,
+				nil, // volume snapshotter getter
+			)
 
-			if test.haveSnapshot && !test.legacyBackup {
-				ctx.volumeSnapshots = append(ctx.volumeSnapshots, &volume.Snapshot{
-					Spec: volume.SnapshotSpec{
-						PersistentVolumeName: "pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce",
-					},
-					Status: volume.SnapshotStatus{
-						ProviderSnapshotID: "snap",
-					},
-				})
-			}
-
-			unstructuredPVMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pvObj)
-			require.NoError(t, err)
-			unstructuredPV := &unstructured.Unstructured{Object: unstructuredPVMap}
-
-			if test.expectPVFound {
-				// Copy the PV so that later modifcations don't affect what's returned by our faked calls.
-				inClusterPV := unstructuredPV.DeepCopy()
-				pvClient.On("Get", inClusterPV.GetName(), metav1.GetOptions{}).Return(inClusterPV, nil)
-				pvClient.On("Create", mock.Anything).Return(inClusterPV, k8serrors.NewAlreadyExists(kuberesource.PersistentVolumes, inClusterPV.GetName()))
-				inClusterPVC := unstructuredPVC.DeepCopy()
-				pvcClient.On("Get", pvcObj.Name, mock.Anything).Return(inClusterPVC, nil)
-			}
-
-			// Only set up the client expectation if the test has the proper prerequisites
-			if test.haveSnapshot || test.reclaimPolicy != "Delete" {
-				pvClient.On("Get", unstructuredPV.GetName(), metav1.GetOptions{}).Return(&unstructured.Unstructured{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "persistentvolumes"}, unstructuredPV.GetName()))
-			}
-
-			pvToRestore := unstructuredPV.DeepCopy()
-			restoredPV := unstructuredPV.DeepCopy()
-
-			if test.expectPVCreation {
-				// just to ensure we have the data flowing correctly
-				restoredPV.Object["foo"] = "bar"
-				pvRestorer.On("executePVAction", pvToRestore).Return(restoredPV, nil)
-			}
-
-			resetMetadataAndStatus(unstructuredPV)
-			addRestoreLabels(unstructuredPV, ctx.restore.Name, ctx.restore.Spec.BackupName)
-			unstructuredPV.Object["foo"] = "bar"
-
-			if test.expectPVCreation {
-				createdPV := unstructuredPV.DeepCopy()
-				pvClient.On("Create", unstructuredPV).Return(createdPV, nil)
-			}
-
-			// Restore PV
-			warnings, errors := ctx.restoreResource("persistentvolumes", "", "foo/resources/persistentvolumes/cluster/")
-
-			assert.Empty(t, warnings.Velero)
-			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, api.RestoreResult{}, errors)
-			assert.Empty(t, warnings.Cluster)
-
-			// Prep PVC restore
-			// Handle expectations
-			if !test.expectPVCVolumeName {
-				pvcObj.Spec.VolumeName = ""
-			}
-			for _, key := range test.expectedPVCAnnotationsMissing.List() {
-				delete(pvcObj.Annotations, key)
-			}
-
-			// Recreate the unstructured PVC since the object was edited.
-			unstructuredPVCMap, err = runtime.DefaultUnstructuredConverter.ToUnstructured(pvcObj)
-			require.NoError(t, err)
-			unstructuredPVC = &unstructured.Unstructured{Object: unstructuredPVCMap}
-
-			resetMetadataAndStatus(unstructuredPVC)
-			addRestoreLabels(unstructuredPVC, ctx.restore.Name, ctx.restore.Spec.BackupName)
-
-			createdPVC := unstructuredPVC.DeepCopy()
-			// just to ensure we have the data flowing correctly
-			createdPVC.Object["foo"] = "bar"
-
-			pvcClient.On("Create", unstructuredPVC).Return(createdPVC, nil)
-
-			// Restore PVC
-			warnings, errors = ctx.restoreResource("persistentvolumeclaims", "default", "foo/resources/persistentvolumeclaims/default/")
-
-			assert.Empty(t, warnings.Velero)
-			assert.Empty(t, warnings.Cluster)
-			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, api.RestoreResult{}, errors)
+			assertEmptyResults(t, warnings, errs)
+			assertRestoredItems(t, h, tc.want)
 		})
 	}
 }
 
-type mockPVRestorer struct {
-	mock.Mock
-}
+// TestRestoreWithAsyncOperations runs restores which return operationIDs and
+// verifies that the itemoperations are tracked as appropriate. Verification is done by
+// looking at the restore request's itemOperationsList field.
+func TestRestoreWithAsyncOperations(t *testing.T) {
+	// completedOperationAction is a *pluggableAction, whose Execute(...)
+	// method returns an operationID which will always be done when calling Progress.
+	completedOperationAction := &pluggableAction{
+		executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+			obj, ok := input.Item.(*unstructured.Unstructured)
+			if !ok {
+				return nil, errors.Errorf("unexpected type %T", input.Item)
+			}
+			return &velero.RestoreItemActionExecuteOutput{
+				UpdatedItem: obj,
+				OperationID: obj.GetName() + "-1",
+			}, nil
+		},
+		progressFunc: func(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
+			return velero.OperationProgress{
+				Completed:   true,
+				Description: "Done!",
+			}, nil
+		},
+	}
 
-func (r *mockPVRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	args := r.Called(obj)
-	return args.Get(0).(*unstructured.Unstructured), args.Error(1)
-}
+	// incompleteOperationAction is a *pluggableAction, whose Execute(...)
+	// method returns an operationID which will never be done when calling Progress.
+	incompleteOperationAction := &pluggableAction{
+		executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+			obj, ok := input.Item.(*unstructured.Unstructured)
+			if !ok {
+				return nil, errors.Errorf("unexpected type %T", input.Item)
+			}
+			return &velero.RestoreItemActionExecuteOutput{
+				UpdatedItem: obj,
+				OperationID: obj.GetName() + "-1",
+			}, nil
+		},
+		progressFunc: func(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
+			return velero.OperationProgress{
+				Completed:   false,
+				Description: "Working...",
+			}, nil
+		},
+	}
 
-type mockWatch struct {
-	mock.Mock
-}
+	// noOperationAction is a *pluggableAction, whose Execute(...)
+	// method does not return an operationID.
+	noOperationAction := &pluggableAction{
+		executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+			obj, ok := input.Item.(*unstructured.Unstructured)
+			if !ok {
+				return nil, errors.Errorf("unexpected type %T", input.Item)
+			}
+			return &velero.RestoreItemActionExecuteOutput{
+				UpdatedItem: obj,
+			}, nil
+		},
+	}
 
-func (w *mockWatch) Stop() {
-	w.Called()
-}
-
-func (w *mockWatch) ResultChan() <-chan watch.Event {
-	args := w.Called()
-	return args.Get(0).(chan watch.Event)
-}
-
-type fakeWatch struct{}
-
-func (w *fakeWatch) Stop() {}
-
-func (w *fakeWatch) ResultChan() <-chan watch.Event {
-	return make(chan watch.Event)
-}
-
-func TestHasControllerOwner(t *testing.T) {
 	tests := []struct {
-		name        string
-		object      map[string]interface{}
-		expectOwner bool
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		actions      []riav2.RestoreItemAction
+		want         []*itemoperation.RestoreOperation
 	}{
 		{
-			name:   "missing metadata",
-			object: map[string]interface{}{},
-		},
-		{
-			name: "missing ownerReferences",
-			object: map[string]interface{}{
-				"metadata": map[string]interface{}{},
+			name:         "action that starts a short-running process records operation",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			apiResources: []*test.APIResource{test.Pods()},
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).Done(),
+			actions: []riav2.RestoreItemAction{
+				completedOperationAction,
 			},
-			expectOwner: false,
-		},
-		{
-			name: "have ownerReferences, no controller fields",
-			object: map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"ownerReferences": []interface{}{
-						map[string]interface{}{"foo": "bar"},
+			want: []*itemoperation.RestoreOperation{
+				{
+					Spec: itemoperation.RestoreOperationSpec{
+						RestoreName: "restore-1",
+						ResourceIdentifier: velero.ResourceIdentifier{
+							GroupResource: kuberesource.Pods,
+							Namespace:     "ns-1",
+							Name:          "pod-1"},
+						OperationID: "pod-1-1",
+					},
+					Status: itemoperation.OperationStatus{
+						Phase: "New",
 					},
 				},
 			},
-			expectOwner: false,
 		},
 		{
-			name: "have ownerReferences, controller=false",
-			object: map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"ownerReferences": []interface{}{
-						map[string]interface{}{"controller": false},
+			name:         "action that starts a long-running process records operation",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			apiResources: []*test.APIResource{test.Pods()},
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-2").Result()).Done(),
+			actions: []riav2.RestoreItemAction{
+				incompleteOperationAction,
+			},
+			want: []*itemoperation.RestoreOperation{
+				{
+					Spec: itemoperation.RestoreOperationSpec{
+						RestoreName: "restore-1",
+						ResourceIdentifier: velero.ResourceIdentifier{
+							GroupResource: kuberesource.Pods,
+							Namespace:     "ns-1",
+							Name:          "pod-2"},
+						OperationID: "pod-2-1",
+					},
+					Status: itemoperation.OperationStatus{
+						Phase: "New",
 					},
 				},
 			},
-			expectOwner: false,
 		},
 		{
-			name: "have ownerReferences, controller=true",
-			object: map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"ownerReferences": []interface{}{
-						map[string]interface{}{"controller": false},
-						map[string]interface{}{"controller": false},
-						map[string]interface{}{"controller": true},
-					},
-				},
+			name:         "action that has no operation doesn't record one",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			apiResources: []*test.APIResource{test.Pods()},
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-3").Result()).Done(),
+			actions: []riav2.RestoreItemAction{
+				noOperationAction,
 			},
-			expectOwner: true,
+			want: []*itemoperation.RestoreOperation{},
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			u := &unstructured.Unstructured{Object: test.object}
-			hasOwner := hasControllerOwner(u.GetOwnerReferences())
-			assert.Equal(t, test.expectOwner, hasOwner)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.AddItems(t, r)
+			}
+
+			data := &Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				tc.actions,
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+			resultOper := *data.GetItemOperationsList()
+			// set want Created times so it won't fail the assert.Equal test
+			for i, wantOper := range tc.want {
+				wantOper.Status.Created = resultOper[i].Status.Created
+			}
+			assert.Equal(t, tc.want, *data.GetItemOperationsList())
 		})
 	}
 }
 
-func TestResetMetadataAndStatus(t *testing.T) {
+// TestRestoreActionAdditionalItems runs restores with restore item actions that return additional items
+// to be restored, and verifies that that the correct set of items is created in the API. Verification is
+// done by looking at the namespaces/names of the items in the API; contents are not checked.
+func TestRestoreActionAdditionalItems(t *testing.T) {
+	tests := []struct {
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		tarball      io.Reader
+		apiResources []*test.APIResource
+		actions      []riav2.RestoreItemAction
+		want         map[*test.APIResource][]string
+	}{
+		{
+			name:         "additional items that are already being restored are not restored twice",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).Done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: []riav2.RestoreItemAction{
+				&pluggableAction{
+					selector: velero.ResourceSelector{IncludedNamespaces: []string{"ns-1"}},
+					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+						return &velero.RestoreItemActionExecuteOutput{
+							UpdatedItem: input.Item,
+							AdditionalItems: []velero.ResourceIdentifier{
+								{GroupResource: kuberesource.Pods, Namespace: "ns-2", Name: "pod-2"},
+							},
+						}, nil
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+			},
+		},
+		{
+			name:         "when using a restore namespace filter, additional items that are in a non-included namespace are not restored",
+			restore:      defaultRestore().IncludedNamespaces("ns-1").Result(),
+			backup:       defaultBackup().Result(),
+			tarball:      test.NewTarWriter(t).AddItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).Done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: []riav2.RestoreItemAction{
+				&pluggableAction{
+					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+						return &velero.RestoreItemActionExecuteOutput{
+							UpdatedItem: input.Item,
+							AdditionalItems: []velero.ResourceIdentifier{
+								{GroupResource: kuberesource.Pods, Namespace: "ns-2", Name: "pod-2"},
+							},
+						}, nil
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1"},
+			},
+		},
+		{
+			name:    "when using a restore namespace filter, additional items that are cluster-scoped are restored when IncludeClusterResources=nil",
+			restore: defaultRestore().IncludedNamespaces("ns-1").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			actions: []riav2.RestoreItemAction{
+				&pluggableAction{
+					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+						return &velero.RestoreItemActionExecuteOutput{
+							UpdatedItem: input.Item,
+							AdditionalItems: []velero.ResourceIdentifier{
+								{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
+							},
+						}, nil
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1"},
+				test.PVs():  {"/pv-1"},
+			},
+		},
+		{
+			name:    "additional items that are cluster-scoped are not restored when IncludeClusterResources=false",
+			restore: defaultRestore().IncludeClusterResources(false).Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			actions: []riav2.RestoreItemAction{
+				&pluggableAction{
+					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+						return &velero.RestoreItemActionExecuteOutput{
+							UpdatedItem: input.Item,
+							AdditionalItems: []velero.ResourceIdentifier{
+								{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
+							},
+						}, nil
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1"},
+				test.PVs():  nil,
+			},
+		},
+		{
+			name:    "when using a restore resource filter, additional items that are non-included resources are not restored",
+			restore: defaultRestore().IncludedResources("pods").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
+				AddItems("persistentvolumes", builder.ForPersistentVolume("pv-1").Result()).
+				Done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			actions: []riav2.RestoreItemAction{
+				&pluggableAction{
+					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+						return &velero.RestoreItemActionExecuteOutput{
+							UpdatedItem: input.Item,
+							AdditionalItems: []velero.ResourceIdentifier{
+								{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
+							},
+						}, nil
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1"},
+				test.PVs():  nil,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.AddItems(t, r)
+			}
+
+			data := &Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				tc.actions,
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+			assertAPIContents(t, h, tc.want)
+		})
+	}
+}
+
+// TestShouldRestore runs the ShouldRestore function for various permutations of
+// existing/nonexisting/being-deleted PVs, PVCs, and namespaces, and verifies the
+// result/error matches expectations.
+func TestShouldRestore(t *testing.T) {
+	tests := []struct {
+		name         string
+		pvName       string
+		apiResources []*test.APIResource
+		namespaces   []*corev1api.Namespace
+		want         bool
+		wantErr      error
+	}{
+		{
+			name:   "when PV is not found, result is true",
+			pvName: "pv-1",
+			want:   true,
+		},
+		{
+			name:   "when PV is found and has Phase=Released, result is false",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(&corev1api.PersistentVolume{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "PersistentVolume",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pv-1",
+					},
+					Status: corev1api.PersistentVolumeStatus{
+						Phase: corev1api.VolumeReleased,
+					},
+				}),
+			},
+			want: false,
+		},
+		{
+			name:   "when PV is found and has associated PVC and namespace that aren't deleting, result is false",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").ClaimRef("ns-1", "pvc-1").Result(),
+				),
+				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
+			},
+			namespaces: []*corev1api.Namespace{builder.ForNamespace("ns-1").Result()},
+			want:       false,
+		},
+		{
+			name:   "when PV is found and has associated PVC that is deleting, result is false + timeout error",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").ClaimRef("ns-1", "pvc-1").Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").ObjectMeta(builder.WithDeletionTimestamp(time.Now())).Result(),
+				),
+			},
+			want:    false,
+			wantErr: errors.New("context deadline exceeded"),
+		},
+		{
+			name:   "when PV is found, has associated PVC that's not deleting, has associated NS that is terminating, result is false + timeout error",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").ClaimRef("ns-1", "pvc-1").Result(),
+				),
+				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
+			},
+			namespaces: []*corev1api.Namespace{
+				builder.ForNamespace("ns-1").Phase(corev1api.NamespaceTerminating).Result(),
+			},
+			want:    false,
+			wantErr: errors.New("context deadline exceeded"),
+		},
+		{
+			name:   "when PV is found, has associated PVC that's not deleting, has associated NS that has deletion timestamp, result is false + timeout error",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").ClaimRef("ns-1", "pvc-1").Result(),
+				),
+				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
+			},
+			namespaces: []*corev1api.Namespace{
+				builder.ForNamespace("ns-1").ObjectMeta(builder.WithDeletionTimestamp(time.Now())).Result(),
+			},
+			want:    false,
+			wantErr: errors.New("context deadline exceeded"),
+		},
+		{
+			name:   "when PV is found, associated PVC is not found, result is false + timeout error",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").ClaimRef("ns-1", "pvc-1").Result(),
+				),
+			},
+			want:    false,
+			wantErr: errors.New("context deadline exceeded"),
+		},
+		{
+			name:   "when PV is found, has associated PVC, associated namespace not found, result is false + timeout error",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").ClaimRef("ns-1", "pvc-1").Result(),
+				),
+				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
+			},
+			want:    false,
+			wantErr: errors.New("context deadline exceeded"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			ctx := &restoreContext{
+				log:                        h.log,
+				dynamicFactory:             client.NewDynamicFactory(h.DynamicClient),
+				namespaceClient:            h.KubeClient.CoreV1().Namespaces(),
+				resourceTerminatingTimeout: time.Millisecond,
+			}
+
+			for _, resource := range tc.apiResources {
+				h.AddItems(t, resource)
+			}
+
+			for _, ns := range tc.namespaces {
+				_, err := ctx.namespaceClient.Create(context.TODO(), ns, metav1.CreateOptions{})
+				require.NoError(t, err)
+			}
+
+			pvClient, err := ctx.dynamicFactory.ClientForGroupVersionResource(
+				schema.GroupVersion{Group: "", Version: "v1"},
+				metav1.APIResource{Name: "persistentvolumes"},
+				"",
+			)
+			require.NoError(t, err)
+
+			res, err := ctx.shouldRestore(tc.pvName, pvClient)
+			assert.Equal(t, tc.want, res)
+			if tc.wantErr != nil {
+				if assert.Error(t, err, "expected a non-nil error") {
+					assert.EqualError(t, err, tc.wantErr.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
+	t.Helper()
+
+	for _, resource := range want {
+		resourceClient := h.DynamicClient.Resource(resource.GVR())
+		for _, item := range resource.Items {
+			var client dynamic.ResourceInterface
+			if item.GetNamespace() != "" {
+				client = resourceClient.Namespace(item.GetNamespace())
+			} else {
+				client = resourceClient
+			}
+
+			res, err := client.Get(context.TODO(), item.GetName(), metav1.GetOptions{})
+			if !assert.NoError(t, err) {
+				continue
+			}
+
+			itemJSON, err := json.Marshal(item)
+			if !assert.NoError(t, err) {
+				continue
+			}
+
+			t.Logf("%v", string(itemJSON))
+
+			u := make(map[string]interface{})
+			if !assert.NoError(t, json.Unmarshal(itemJSON, &u)) {
+				continue
+			}
+			want := &unstructured.Unstructured{Object: u}
+
+			// These fields get non-nil zero values in the unstructured objects if they're
+			// empty in the structured objects. Remove them to make comparison easier.
+			unstructured.RemoveNestedField(want.Object, "metadata", "creationTimestamp")
+			unstructured.RemoveNestedField(want.Object, "status")
+			unstructured.RemoveNestedField(res.Object, "status")
+
+			assert.Equal(t, want, res)
+		}
+	}
+}
+
+// volumeSnapshotterGetter is a simple implementation of the VolumeSnapshotterGetter
+// interface that returns vsv1.VolumeSnapshotters from a map if they exist.
+type volumeSnapshotterGetter map[string]vsv1.VolumeSnapshotter
+
+func (vsg volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (vsv1.VolumeSnapshotter, error) {
+	snapshotter, ok := vsg[name]
+	if !ok {
+		return nil, errors.New("volume snapshotter not found")
+	}
+
+	return snapshotter, nil
+}
+
+// volumeSnapshotter is a test fake for the vsv1.VolumeSnapshotter interface
+type volumeSnapshotter struct {
+	// a map from snapshotID to volumeID
+	snapshotVolumes map[string]string
+
+	// a map from volumeID to new pv name
+	pvName map[string]string
+}
+
+// Init is a no-op.
+func (vs *volumeSnapshotter) Init(config map[string]string) error {
+	return nil
+}
+
+// CreateVolumeFromSnapshot looks up the specified snapshotID in the snapshotVolumes
+// map and returns the corresponding volumeID if it exists, or an error otherwise.
+func (vs *volumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+	volumeID, ok := vs.snapshotVolumes[snapshotID]
+	if !ok {
+		return "", errors.New("snapshot not found")
+	}
+
+	return volumeID, nil
+}
+
+// SetVolumeID sets the persistent volume's spec.awsElasticBlockStore.volumeID field
+// with the provided volumeID.
+func (vs *volumeSnapshotter) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "awsElasticBlockStore", "volumeID")
+
+	newPVName, ok := vs.pvName[volumeID]
+	if !ok {
+		return pv, nil
+	}
+
+	unstructured.SetNestedField(pv.UnstructuredContent(), newPVName, "metadata", "name")
+	return pv, nil
+}
+
+// GetVolumeID panics because it's not expected to be used for restores.
+func (*volumeSnapshotter) GetVolumeID(pv runtime.Unstructured) (string, error) {
+	panic("GetVolumeID should not be used for restores")
+}
+
+// CreateSnapshot panics because it's not expected to be used for restores.
+func (*volumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (snapshotID string, err error) {
+	panic("CreateSnapshot should not be used for restores")
+}
+
+// GetVolumeInfo panics because it's not expected to be used for restores.
+func (*volumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+	panic("GetVolumeInfo should not be used for restores")
+}
+
+// DeleteSnapshot panics because it's not expected to be used for restores.
+func (*volumeSnapshotter) DeleteSnapshot(snapshotID string) error {
+	panic("DeleteSnapshot should not be used for backups")
+}
+
+// TestRestorePersistentVolumes runs restores for persistent volumes and verifies that
+// they are restored as expected, including restoring volumes from snapshots when expected.
+// Verification is done by looking at the contents of the API and the metadata/spec/status of
+// the items in the API.
+func TestRestorePersistentVolumes(t *testing.T) {
+	testPVCName := "testPVC"
+	tests := []struct {
+		name                    string
+		restore                 *velerov1api.Restore
+		backup                  *velerov1api.Backup
+		tarball                 io.Reader
+		apiResources            []*test.APIResource
+		volumeSnapshots         []*volume.Snapshot
+		volumeSnapshotLocations []*velerov1api.VolumeSnapshotLocation
+		volumeSnapshotterGetter volumeSnapshotterGetter
+		csiVolumeSnapshots      []*snapshotv1api.VolumeSnapshot
+		dataUploadResult        *corev1api.ConfigMap
+		want                    []*test.APIResource
+		wantError               bool
+		wantWarning             bool
+		csiFeatureVerifierErr   string
+	}{
+		{
+			name:    "when a PV with a reclaim policy of delete has no snapshot and does not exist in-cluster, it does not get restored, and its PVC gets reset for dynamic provisioning",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).ClaimRef("ns-1", "pvc-1").Result(),
+				).
+				AddItems("persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").
+						VolumeName("pv-1").
+						ObjectMeta(
+							builder.WithAnnotations("pv.kubernetes.io/bind-completed", "true", "pv.kubernetes.io/bound-by-controller", "true", "foo", "bar"),
+						).
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			want: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").
+						ObjectMeta(
+							builder.WithAnnotations("foo", "bar"),
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of retain has no snapshot and does not exist in-cluster, it gets restored, with its claim ref",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).ClaimRef("ns-1", "pvc-1").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						ClaimRef("ns-1", "pvc-1").
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of delete has a snapshot and does not exist in-cluster, the snapshot and PV are restored",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).AWSEBSVolumeID("old-volume").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
+			},
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
+				"provider-1": &volumeSnapshotter{
+					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
+				},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).
+						AWSEBSVolumeID("new-volume").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of retain has a snapshot and does not exist in-cluster, the snapshot and PV are restored",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
+			},
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
+				"provider-1": &volumeSnapshotter{
+					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
+				},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("new-volume").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of delete has a snapshot and exists in-cluster, neither the snapshot nor the PV are restored",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
+			},
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
+				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
+				// mappings as a way to verify that the snapshot is not restored, since if it were
+				// restored, we'd get an error of "snapshot not found".
+				"provider-1": &volumeSnapshotter{},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of retain has a snapshot and exists in-cluster, neither the snapshot nor the PV are restored",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
+			},
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
+				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
+				// mappings as a way to verify that the snapshot is not restored, since if it were
+				// restored, we'd get an error of "snapshot not found".
+				"provider-1": &volumeSnapshotter{},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a snapshot is used by a PVC in a namespace that's being remapped, and the original PV exists in-cluster, the PV is renamed",
+			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems(
+					"persistentvolumes",
+					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
+				).
+				AddItems(
+					"persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
+				),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "source-pv",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
+			},
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
+				"provider-1": &volumeSnapshotter{
+					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
+				},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
+					builder.ForPersistentVolume("renamed-source-pv").
+						ObjectMeta(
+							builder.WithAnnotations("velero.io/original-pv-name", "source-pv"),
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+							// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
+						).ClaimRef("target-ns", "pvc-1").
+						AWSEBSVolumeID("new-volume").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("target-ns", "pvc-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						VolumeName("renamed-source-pv").
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a snapshot is used by a PVC in a namespace that's being remapped, and the original PV does not exist in-cluster, the PV is not renamed",
+			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems(
+					"persistentvolumes",
+					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
+				).
+				AddItems(
+					"persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "source-pv",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
+			},
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
+				"provider-1": &volumeSnapshotter{
+					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
+				},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						ClaimRef("target-ns", "pvc-1").
+						AWSEBSVolumeID("new-volume").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("target-ns", "pvc-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						VolumeName("source-pv").
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV without a snapshot is used by a PVC in a namespace that's being remapped, and the original PV exists in-cluster, the PV is not replaced and there is a restore warning",
+			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems(
+					"persistentvolumes",
+					builder.ForPersistentVolume("source-pv").
+						//ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("source-volume").
+						ClaimRef("source-ns", "pvc-1").
+						Result(),
+				).
+				AddItems(
+					"persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").
+						//ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("source-volume").
+						ClaimRef("source-ns", "pvc-1").
+						Result(),
+				),
+				test.PVCs(),
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").
+						AWSEBSVolumeID("source-volume").
+						ClaimRef("source-ns", "pvc-1").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("target-ns", "pvc-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						VolumeName("source-pv").
+						Result(),
+				),
+			},
+			wantWarning: true,
+		},
+		{
+			name:    "when a PV without a snapshot is used by a PVC in a namespace that's being remapped, and the original PV does not exist in-cluster, the PV is not renamed",
+			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems(
+					"persistentvolumes",
+					builder.ForPersistentVolume("source-pv").
+						AWSEBSVolumeID("source-volume").
+						ClaimRef("source-ns", "pvc-1").
+						Result(),
+				).
+				AddItems(
+					"persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").
+						//ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						// the namespace for this PV's claimRef should be the one that the PVC was remapped into.
+						ClaimRef("target-ns", "pvc-1").
+						AWSEBSVolumeID("source-volume").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("target-ns", "pvc-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						VolumeName("source-pv").
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV is renamed and the original PV does not exist in-cluster, the PV should be renamed",
+			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems(
+					"persistentvolumes",
+					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
+				).
+				AddItems(
+					"persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "source-pv",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
+			},
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
+				"provider-1": &volumeSnapshotter{
+					snapshotVolumes: map[string]string{"snapshot-1": "new-pvname"},
+					pvName:          map[string]string{"new-pvname": "new-pvname"},
+				},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("new-pvname").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+							builder.WithAnnotations("velero.io/original-pv-name", "source-pv"),
+						).
+						ClaimRef("target-ns", "pvc-1").
+						AWSEBSVolumeID("new-pvname").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("target-ns", "pvc-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						VolumeName("new-pvname").
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of retain has a snapshot and exists in-cluster, neither the snapshot nor the PV are restored",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: velerov1api.DefaultNamespace,
+						Name:      "default",
+					},
+					Spec: velerov1api.VolumeSnapshotLocationSpec{
+						Provider: "provider-1",
+					},
+				},
+			},
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
+				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
+				// mappings as a way to verify that the snapshot is not restored, since if it were
+				// restored, we'd get an error of "snapshot not found".
+				"provider-1": &volumeSnapshotter{},
+			},
+
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a snapshot is used by a PVC in a namespace that's being remapped, and the original PV exists in-cluster, the PV is renamed by volumesnapshotter",
+			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems(
+					"persistentvolumes",
+					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
+				).
+				AddItems(
+					"persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
+				),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "source-pv",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
+			},
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
+				"provider-1": &volumeSnapshotter{
+					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
+					pvName:          map[string]string{"new-volume": "volumesnapshotter-renamed-source-pv"},
+				},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
+					builder.ForPersistentVolume("volumesnapshotter-renamed-source-pv").
+						ObjectMeta(
+							builder.WithAnnotations("velero.io/original-pv-name", "source-pv"),
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						ClaimRef("target-ns", "pvc-1").
+						AWSEBSVolumeID("new-volume").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("target-ns", "pvc-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						VolumeName("volumesnapshotter-renamed-source-pv").
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of retain has a CSI VolumeSnapshot and does not exist in-cluster, the PV is not restored",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						ClaimRef("velero", testPVCName).
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			csiVolumeSnapshots: []*snapshotv1api.VolumeSnapshot{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "velero",
+						Name:      "test",
+					},
+					Spec: snapshotv1api.VolumeSnapshotSpec{
+						Source: snapshotv1api.VolumeSnapshotSource{
+							PersistentVolumeClaimName: &testPVCName,
+						},
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
+			},
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
+				"provider-1": &volumeSnapshotter{
+					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
+				},
+			},
+			want: []*test.APIResource{},
+		},
+		{
+			name:    "when a PV with a reclaim policy of retain has a DataUpload result CM and does not exist in-cluster, the PV is not restored",
+			restore: defaultRestore().ObjectMeta(builder.WithUID("fakeUID")).Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						ClaimRef("velero", testPVCName).
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+				test.ConfigMaps(),
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
+			},
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
+				"provider-1": &volumeSnapshotter{
+					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
+				},
+			},
+			dataUploadResult: builder.ForConfigMap("velero", "test").ObjectMeta(builder.WithLabelsMap(map[string]string{
+				velerov1api.RestoreUIDLabel:       "fakeUID",
+				velerov1api.PVCNamespaceNameLabel: "velero.testPVC",
+				velerov1api.ResourceUsageLabel:    string(velerov1api.VeleroResourceUsageDataUploadResult),
+			})).Result(),
+			want: []*test.APIResource{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.restorer.resourcePriorities = types.Priorities{HighPriorities: []string{"persistentvolumes", "persistentvolumeclaims"}}
+			h.restorer.pvRenamer = func(oldName string) (string, error) {
+				renamed := "renamed-" + oldName
+				return renamed, nil
+			}
+
+			// set up the VolumeSnapshotLocation client and add test data to it
+			for _, vsl := range tc.volumeSnapshotLocations {
+				require.NoError(t, h.restorer.kbClient.Create(context.Background(), vsl))
+			}
+
+			if tc.dataUploadResult != nil {
+				require.NoError(t, h.restorer.kbClient.Create(context.TODO(), tc.dataUploadResult))
+			}
+
+			for _, r := range tc.apiResources {
+				h.AddItems(t, r)
+			}
+
+			// Collect the IDs of all of the wanted resources so we can ensure the
+			// exact set exists in the API after restore.
+			wantIDs := make(map[*test.APIResource][]string)
+			for i, resource := range tc.want {
+				wantIDs[tc.want[i]] = []string{}
+
+				for _, item := range resource.Items {
+					wantIDs[tc.want[i]] = append(wantIDs[tc.want[i]], fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName()))
+				}
+			}
+
+			data := &Request{
+				Log:                      h.log,
+				Restore:                  tc.restore,
+				Backup:                   tc.backup,
+				VolumeSnapshots:          tc.volumeSnapshots,
+				BackupReader:             tc.tarball,
+				CSIVolumeSnapshots:       tc.csiVolumeSnapshots,
+				RestoreVolumeInfoTracker: volume.NewRestoreVolInfoTracker(tc.restore, h.log, test.NewFakeControllerRuntimeClient(t)),
+			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				nil, // restoreItemActions
+				tc.volumeSnapshotterGetter,
+			)
+
+			if tc.wantWarning {
+				assertNonEmptyResults(t, "warning", warnings)
+			} else {
+				assertEmptyResults(t, warnings)
+			}
+			if tc.wantError {
+				assertNonEmptyResults(t, "error", errs)
+			} else {
+				assertEmptyResults(t, errs)
+			}
+			assertAPIContents(t, h, wantIDs)
+			assertRestoredItems(t, h, tc.want)
+		})
+	}
+}
+
+type fakePodVolumeRestorerFactory struct {
+	restorer *uploadermocks.Restorer
+}
+
+func (f *fakePodVolumeRestorerFactory) NewRestorer(context.Context, *velerov1api.Restore) (podvolume.Restorer, error) {
+	return f.restorer, nil
+}
+
+// TestRestoreWithPodVolume verifies that a call to RestorePodVolumes was made as and when
+// expected for the given pods by using a mock for the pod volume restorer.
+func TestRestoreWithPodVolume(t *testing.T) {
+	tests := []struct {
+		name                        string
+		restore                     *velerov1api.Restore
+		backup                      *velerov1api.Backup
+		apiResources                []*test.APIResource
+		podVolumeBackups            []*velerov1api.PodVolumeBackup
+		podWithPVBs, podWithoutPVBs []*corev1api.Pod
+		want                        map[*test.APIResource][]string
+	}{
+		{
+			name:         "a pod that exists in given backup and contains associated PVBs should have RestorePodVolumes called",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			apiResources: []*test.APIResource{test.Pods()},
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("pod-1").SnapshotID("foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("pod-2").PodNamespace("ns-1").SnapshotID("foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("pod-4").PodNamespace("ns-2").SnapshotID("foo").Result(),
+			},
+			podWithPVBs: []*corev1api.Pod{
+				builder.ForPod("ns-1", "pod-2").
+					Result(),
+				builder.ForPod("ns-2", "pod-4").
+					Result(),
+			},
+			podWithoutPVBs: []*corev1api.Pod{
+				builder.ForPod("ns-2", "pod-3").
+					Result(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-2", "ns-2/pod-3", "ns-2/pod-4"},
+			},
+		},
+		{
+			name:         "a pod that exists in given backup but does not contain associated PVBs should not have should have RestorePodVolumes called",
+			restore:      defaultRestore().Result(),
+			backup:       defaultBackup().Result(),
+			apiResources: []*test.APIResource{test.Pods()},
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("pod-1").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("pod-2").Result(),
+			},
+			podWithPVBs: []*corev1api.Pod{},
+			podWithoutPVBs: []*corev1api.Pod{
+				builder.ForPod("ns-1", "pod-3").
+					Result(),
+				builder.ForPod("ns-2", "pod-4").
+					Result(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-3", "ns-2/pod-4"},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+			restorer := new(uploadermocks.Restorer)
+			defer restorer.AssertExpectations(t)
+			h.restorer.podVolumeRestorerFactory = &fakePodVolumeRestorerFactory{
+				restorer: restorer,
+			}
+
+			// needed only to indicate resource types that can be restored, in this case, pods
+			for _, resource := range tc.apiResources {
+				h.AddItems(t, resource)
+			}
+
+			tarball := test.NewTarWriter(t)
+
+			// these backed up pods don't have any PVBs associated with them, so a call to RestorePodVolumes is not expected to be made for them
+			for _, pod := range tc.podWithoutPVBs {
+				tarball.AddItems("pods", pod)
+			}
+
+			// these backed up pods have PVBs associated with them, so a call to RestorePodVolumes will be made for each of them
+			for _, pod := range tc.podWithPVBs {
+				tarball.AddItems("pods", pod)
+
+				// the restore process adds these labels before restoring, so we must add them here too otherwise they won't match
+				pod.Labels = map[string]string{"velero.io/backup-name": tc.backup.Name, "velero.io/restore-name": tc.restore.Name}
+				expectedArgs := podvolume.RestoreData{
+					Restore:          tc.restore,
+					Pod:              pod,
+					PodVolumeBackups: tc.podVolumeBackups,
+					SourceNamespace:  pod.Namespace,
+					BackupLocation:   "",
+				}
+				restorer.
+					On("RestorePodVolumes", expectedArgs, mock.Anything).
+					Return(nil)
+			}
+
+			data := &Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: tc.podVolumeBackups,
+				BackupReader:     tarball.Done(),
+			}
+
+			warnings, errs := h.restorer.Restore(
+				data,
+				nil, // restoreItemActions
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+			assertAPIContents(t, h, tc.want)
+		})
+	}
+}
+
+func TestResetMetadata(t *testing.T) {
 	tests := []struct {
 		name        string
 		obj         *unstructured.Unstructured
@@ -1192,30 +3388,62 @@ func TestResetMetadataAndStatus(t *testing.T) {
 	}{
 		{
 			name:        "no metadata causes error",
-			obj:         NewTestUnstructured().Unstructured,
+			obj:         &unstructured.Unstructured{},
 			expectedErr: true,
 		},
 		{
-			name:        "keep name, namespace, labels, annotations only",
-			obj:         NewTestUnstructured().WithMetadata("name", "blah", "namespace", "labels", "annotations", "foo").Unstructured,
+			name:        "keep name, namespace, labels, annotations, managedFields, finalizers",
+			obj:         newTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations", "managedFields", "finalizers").Unstructured,
 			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
+			expectedRes: newTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations", "managedFields", "finalizers").Unstructured,
 		},
 		{
-			name:        "don't keep status",
-			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
+			name:        "remove uid, ownerReferences",
+			obj:         newTestUnstructured().WithMetadata("name", "namespace", "uid", "ownerReferences").Unstructured,
 			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithMetadata().Unstructured,
+			expectedRes: newTestUnstructured().WithMetadata("name", "namespace").Unstructured,
+		},
+		{
+			name:        "keep status",
+			obj:         newTestUnstructured().WithMetadata().WithStatus().Unstructured,
+			expectedErr: false,
+			expectedRes: newTestUnstructured().WithMetadata().WithStatus().Unstructured,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res, err := resetMetadataAndStatus(test.obj)
+			res, err := resetMetadata(test.obj)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expectedRes, res)
 			}
+		})
+	}
+}
+
+func TestResetStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		obj         *unstructured.Unstructured
+		expectedRes *unstructured.Unstructured
+	}{
+		{
+			name:        "no status don't cause error",
+			obj:         &unstructured.Unstructured{},
+			expectedRes: &unstructured.Unstructured{},
+		},
+		{
+			name:        "remove status",
+			obj:         newTestUnstructured().WithMetadata().WithStatus().Unstructured,
+			expectedRes: newTestUnstructured().WithMetadata().Unstructured,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resetStatus(test.obj)
+			assert.Equal(t, test.expectedRes, test.obj)
 		})
 	}
 }
@@ -1277,590 +3505,630 @@ func TestIsCompleted(t *testing.T) {
 			groupResource: schema.GroupResource{Group: "", Resource: "namespaces"},
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			u := velerotest.UnstructuredOrDie(test.content)
-			backup, err := isCompleted(u, test.groupResource)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			u := test.UnstructuredOrDie(tt.content)
+			backup, err := isCompleted(u, tt.groupResource)
 
-			if assert.Equal(t, test.expectedErr, err != nil) {
-				assert.Equal(t, test.expected, backup)
+			if assert.Equal(t, tt.expectedErr, err != nil) {
+				assert.Equal(t, tt.expected, backup)
 			}
 		})
 	}
 }
 
-func TestShouldRestore(t *testing.T) {
-	pv := `apiVersion: v1
-kind: PersistentVolume
-metadata:
-  annotations:
-    EXPORT_block: "\nEXPORT\n{\n\tExport_Id = 1;\n\tPath = /export/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce;\n\tPseudo
-      = /export/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce;\n\tAccess_Type = RW;\n\tSquash
-      = no_root_squash;\n\tSecType = sys;\n\tFilesystem_id = 1.1;\n\tFSAL {\n\t\tName
-      = VFS;\n\t}\n}\n"
-    Export_Id: "1"
-    Project_Id: "0"
-    Project_block: ""
-    Provisioner_Id: 5fdf4025-78a5-11e8-9ece-0242ac110004
-    kubernetes.io/createdby: nfs-dynamic-provisioner
-    pv.kubernetes.io/provisioned-by: example.com/nfs
-    volume.beta.kubernetes.io/mount-options: vers=4.1
-  creationTimestamp: 2018-06-25T18:27:35Z
-  finalizers:
-  - kubernetes.io/pv-protection
-  name: pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
-  resourceVersion: "2576"
-  selfLink: /api/v1/persistentvolumes/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
-  uid: 6ecd24e4-78a5-11e8-a0d8-e2ad1e9734ce
-spec:
-  accessModes:
-  - ReadWriteMany
-  capacity:
-    storage: 1Mi
-  claimRef:
-    apiVersion: v1
-    kind: PersistentVolumeClaim
-    name: nfs
-    namespace: default
-    resourceVersion: "2565"
-    uid: 6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
-  nfs:
-    path: /export/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
-    server: 10.103.235.254
-  storageClassName: example-nfs
-status:
-  phase: Bound`
-
-	pvc := `apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  annotations:
-    control-plane.alpha.kubernetes.io/leader: '{"holderIdentity":"5fdf5572-78a5-11e8-9ece-0242ac110004","leaseDurationSeconds":15,"acquireTime":"2018-06-25T18:27:35Z","renewTime":"2018-06-25T18:27:37Z","leaderTransitions":0}'
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"v1","kind":"PersistentVolumeClaim","metadata":{"annotations":{},"name":"nfs","namespace":"default"},"spec":{"accessModes":["ReadWriteMany"],"resources":{"requests":{"storage":"1Mi"}},"storageClassName":"example-nfs"}}
-    pv.kubernetes.io/bind-completed: "yes"
-    pv.kubernetes.io/bound-by-controller: "yes"
-    volume.beta.kubernetes.io/storage-provisioner: example.com/nfs
-  creationTimestamp: 2018-06-25T18:27:28Z
-  finalizers:
-  - kubernetes.io/pvc-protection
-  name: nfs
-  namespace: default
-  resourceVersion: "2578"
-  selfLink: /api/v1/namespaces/default/persistentvolumeclaims/nfs
-  uid: 6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
-spec:
-  accessModes:
-  - ReadWriteMany
-  resources:
-    requests:
-      storage: 1Mi
-  storageClassName: example-nfs
-  volumeName: pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
-status:
-  accessModes:
-  - ReadWriteMany
-  capacity:
-    storage: 1Mi
-  phase: Bound`
-
+func Test_getOrderedResources(t *testing.T) {
 	tests := []struct {
-		name              string
-		expectNSFound     bool
-		expectPVFound     bool
-		pvPhase           string
-		expectPVCFound    bool
-		expectPVCGet      bool
-		expectPVCDeleting bool
-		expectNSGet       bool
-		expectNSDeleting  bool
-		nsPhase           v1.NamespacePhase
-		expectedResult    bool
+		name               string
+		resourcePriorities types.Priorities
+		backupResources    map[string]*archive.ResourceItems
+		want               []string
 	}{
 		{
-			name:           "pv not found, no associated pvc or namespace",
-			expectedResult: true,
+			name:               "when only priorities are specified, they're returned in order",
+			resourcePriorities: types.Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}},
+			backupResources:    nil,
+			want:               []string{"prio-3", "prio-2", "prio-1"},
 		},
 		{
-			name:           "pv found, phase released",
-			pvPhase:        string(v1.VolumeReleased),
-			expectPVFound:  true,
-			expectedResult: false,
+			name:               "when only backup resources are specified, they're returned in alphabetical order",
+			resourcePriorities: types.Priorities{},
+			backupResources: map[string]*archive.ResourceItems{
+				"backup-resource-3": nil,
+				"backup-resource-2": nil,
+				"backup-resource-1": nil,
+			},
+			want: []string{"backup-resource-1", "backup-resource-2", "backup-resource-3"},
 		},
 		{
-			name:           "pv found, has associated pvc and namespace that's aren't deleting",
-			expectPVFound:  true,
-			expectPVCGet:   true,
-			expectNSGet:    true,
-			expectPVCFound: true,
-			expectedResult: false,
+			name:               "when priorities and backup resources are specified, they're returned in the correct order",
+			resourcePriorities: types.Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}},
+			backupResources: map[string]*archive.ResourceItems{
+				"prio-3":            nil,
+				"backup-resource-3": nil,
+				"backup-resource-2": nil,
+				"backup-resource-1": nil,
+			},
+			want: []string{"prio-3", "prio-2", "prio-1", "backup-resource-1", "backup-resource-2", "backup-resource-3"},
 		},
 		{
-			name:              "pv found, has associated pvc that's deleting, don't look up namespace",
-			expectPVFound:     true,
-			expectPVCGet:      true,
-			expectPVCFound:    true,
-			expectPVCDeleting: true,
-			expectedResult:    false,
-		},
-		{
-			name:           "pv found, has associated pvc that's not deleting, has associated namespace that's terminating",
-			expectPVFound:  true,
-			expectPVCGet:   true,
-			expectPVCFound: true,
-			expectNSGet:    true,
-			expectNSFound:  true,
-			nsPhase:        v1.NamespaceTerminating,
-			expectedResult: false,
-		},
-		{
-			name:             "pv found, has associated pvc that's not deleting, has associated namespace that has deletion timestamp",
-			expectPVFound:    true,
-			expectPVCGet:     true,
-			expectPVCFound:   true,
-			expectNSGet:      true,
-			expectNSFound:    true,
-			expectNSDeleting: true,
-			expectedResult:   false,
-		},
-		{
-			name:           "pv found, associated pvc not found, namespace not queried",
-			expectPVFound:  true,
-			expectPVCGet:   true,
-			expectedResult: false,
-		},
-		{
-			name:           "pv found, associated pvc found, namespace not found",
-			expectPVFound:  true,
-			expectPVCGet:   true,
-			expectPVCFound: true,
-			expectNSGet:    true,
-			expectedResult: false,
+			name:               "when priorities and backup resources are specified, they're returned in the correct order",
+			resourcePriorities: types.Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}, LowPriorities: []string{"prio-0"}},
+			backupResources: map[string]*archive.ResourceItems{
+				"prio-3":            nil,
+				"prio-0":            nil,
+				"backup-resource-3": nil,
+				"backup-resource-2": nil,
+				"backup-resource-1": nil,
+			},
+			want: []string{"prio-3", "prio-2", "prio-1", "backup-resource-1", "backup-resource-2", "backup-resource-3", "prio-0"},
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			dynamicFactory := &velerotest.FakeDynamicFactory{}
-			gv := schema.GroupVersion{Group: "", Version: "v1"}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, getOrderedResources(tc.resourcePriorities, tc.backupResources))
+		})
+	}
+}
 
-			pvClient := &velerotest.FakeDynamicClient{}
-			defer pvClient.AssertExpectations(t)
+// assertResourceCreationOrder ensures that resources were created in the expected
+// order. Any resources *not* in resourcePriorities are required to come *after* all
+// resources in any order.
+func assertResourceCreationOrder(t *testing.T, resourcePriorities []string, createdResources []resourceID) {
+	// lastSeen tracks the index in 'resourcePriorities' of the last resource type
+	// we saw created. Once we've seen a resource in 'resourcePriorities', we should
+	// never see another instance of a prior resource.
+	lastSeen := 0
 
-			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, "").Return(pvClient, nil)
-
-			pvcClient := &velerotest.FakeDynamicClient{}
-			defer pvcClient.AssertExpectations(t)
-
-			pvcResource := metav1.APIResource{Name: "persistentvolumeclaims", Namespaced: true}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, pvcResource, "default").Return(pvcClient, nil)
-
-			obj, _, err := scheme.Codecs.UniversalDecoder(v1.SchemeGroupVersion).Decode([]byte(pv), nil, &unstructured.Unstructured{})
-			pvObj := obj.(*unstructured.Unstructured)
-			require.NoError(t, err)
-
-			obj, _, err = scheme.Codecs.UniversalDecoder(v1.SchemeGroupVersion).Decode([]byte(pvc), nil, &unstructured.Unstructured{})
-			pvcObj := obj.(*unstructured.Unstructured)
-			require.NoError(t, err)
-
-			nsClient := &velerotest.FakeNamespaceClient{}
-			defer nsClient.AssertExpectations(t)
-			ns := newTestNamespace(pvcObj.GetNamespace()).Namespace
-
-			// Set up test expectations
-			if test.pvPhase != "" {
-				require.NoError(t, unstructured.SetNestedField(pvObj.Object, test.pvPhase, "status", "phase"))
+	// Find the index in 'resourcePriorities' of the resource type for
+	// the current item, if it exists. This index ('current') *must*
+	// be greater than or equal to 'lastSeen', which was the last resource
+	// we saw, since otherwise the current resource would be out of order. By
+	// initializing current to len(ordered), we're saying that if the resource
+	// is not explicitly in orderedResources, then it must come *after*
+	// all orderedResources.
+	for _, r := range createdResources {
+		current := len(resourcePriorities)
+		for i, item := range resourcePriorities {
+			if item == r.groupResource {
+				current = i
+				break
 			}
+		}
 
-			if test.expectPVFound {
-				pvClient.On("Get", pvObj.GetName(), metav1.GetOptions{}).Return(pvObj, nil)
-			} else {
-				pvClient.On("Get", pvObj.GetName(), metav1.GetOptions{}).Return(&unstructured.Unstructured{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "persistentvolumes"}, pvObj.GetName()))
-			}
+		// the index of the current resource must be the same as or greater than the index of
+		// the last resource we saw for the restored order to be correct.
+		assert.GreaterOrEqual(t, current, lastSeen, "%s was restored out of order", r.groupResource)
+		lastSeen = current
+	}
+}
 
-			if test.expectPVCDeleting {
-				pvcObj.SetDeletionTimestamp(&metav1.Time{Time: time.Now()})
-			}
+type resourceID struct {
+	groupResource string
+	nsAndName     string
+}
 
-			// the pv needs to be found before moving on to look for pvc/namespace
-			// however, even if the pv is found, we may be testing the PV's phase and not expecting
-			// the pvc/namespace to be looked up
-			if test.expectPVCGet {
-				if test.expectPVCFound {
-					pvcClient.On("Get", pvcObj.GetName(), metav1.GetOptions{}).Return(pvcObj, nil)
-				} else {
-					pvcClient.On("Get", pvcObj.GetName(), metav1.GetOptions{}).Return(&unstructured.Unstructured{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "persistentvolumeclaims"}, pvcObj.GetName()))
-				}
-			}
+// createRecorder provides a Reactor that can be used to capture
+// resources created in a fake client.
+type createRecorder struct {
+	t         *testing.T
+	resources []resourceID
+}
 
-			if test.nsPhase != "" {
-				ns.Status.Phase = test.nsPhase
-			}
+func (cr *createRecorder) reactor() func(kubetesting.Action) (bool, runtime.Object, error) {
+	return func(action kubetesting.Action) (bool, runtime.Object, error) {
+		createAction, ok := action.(kubetesting.CreateAction)
+		if !ok {
+			return false, nil, nil
+		}
 
-			if test.expectNSDeleting {
-				ns.SetDeletionTimestamp(&metav1.Time{Time: time.Now()})
-			}
+		accessor, err := meta.Accessor(createAction.GetObject())
+		assert.NoError(cr.t, err)
 
-			if test.expectNSGet {
-				if test.expectNSFound {
-					nsClient.On("Get", pvcObj.GetNamespace(), mock.Anything).Return(ns, nil)
-				} else {
-					nsClient.On("Get", pvcObj.GetNamespace(), metav1.GetOptions{}).Return(&v1.Namespace{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, pvcObj.GetNamespace()))
-				}
-			}
-
-			ctx := &context{
-				dynamicFactory:             dynamicFactory,
-				log:                        velerotest.NewLogger(),
-				namespaceClient:            nsClient,
-				resourceTerminatingTimeout: 1 * time.Millisecond,
-			}
-
-			result, err := ctx.shouldRestore(pvObj.GetName(), pvClient)
-
-			assert.Equal(t, test.expectedResult, result)
+		cr.resources = append(cr.resources, resourceID{
+			groupResource: action.GetResource().GroupResource().String(),
+			nsAndName:     fmt.Sprintf("%s/%s", action.GetNamespace(), accessor.GetName()),
 		})
 
+		return false, nil, nil
 	}
 }
 
-type testUnstructured struct {
-	*unstructured.Unstructured
+func defaultRestore() *builder.RestoreBuilder {
+	return builder.ForRestore(velerov1api.DefaultNamespace, "restore-1").Backup("backup-1")
 }
 
-func NewTestUnstructured() *testUnstructured {
-	obj := &testUnstructured{
-		Unstructured: &unstructured.Unstructured{
-			Object: make(map[string]interface{}),
-		},
-	}
+// assertAPIContents asserts that the dynamic client on the provided harness contains
+// all of the items specified in 'want' (a map from an APIResource definition to a slice
+// of resource identifiers, formatted as <namespace>/<name>).
+func assertAPIContents(t *testing.T, h *harness, want map[*test.APIResource][]string) {
+	t.Helper()
 
-	return obj
-}
-
-func (obj *testUnstructured) WithAPIVersion(v string) *testUnstructured {
-	obj.Object["apiVersion"] = v
-	return obj
-}
-
-func (obj *testUnstructured) WithKind(k string) *testUnstructured {
-	obj.Object["kind"] = k
-	return obj
-}
-
-func (obj *testUnstructured) WithMetadata(fields ...string) *testUnstructured {
-	return obj.withMap("metadata", fields...)
-}
-
-func (obj *testUnstructured) WithSpec(fields ...string) *testUnstructured {
-	if _, found := obj.Object["spec"]; found {
-		panic("spec already set - you probably didn't mean to do this twice!")
-	}
-	return obj.withMap("spec", fields...)
-}
-
-func (obj *testUnstructured) WithStatus(fields ...string) *testUnstructured {
-	return obj.withMap("status", fields...)
-}
-
-func (obj *testUnstructured) WithMetadataField(field string, value interface{}) *testUnstructured {
-	return obj.withMapEntry("metadata", field, value)
-}
-
-func (obj *testUnstructured) WithSpecField(field string, value interface{}) *testUnstructured {
-	return obj.withMapEntry("spec", field, value)
-}
-
-func (obj *testUnstructured) WithStatusField(field string, value interface{}) *testUnstructured {
-	return obj.withMapEntry("status", field, value)
-}
-
-func (obj *testUnstructured) WithAnnotations(fields ...string) *testUnstructured {
-	vals := map[string]string{}
-	for _, field := range fields {
-		vals[field] = "foo"
-	}
-
-	return obj.WithAnnotationValues(vals)
-}
-
-func (obj *testUnstructured) WithAnnotationValues(fieldVals map[string]string) *testUnstructured {
-	annotations := make(map[string]interface{})
-	for field, val := range fieldVals {
-		annotations[field] = val
-	}
-
-	obj = obj.WithMetadataField("annotations", annotations)
-
-	return obj
-}
-
-func (obj *testUnstructured) WithNamespace(ns string) *testUnstructured {
-	return obj.WithMetadataField("namespace", ns)
-}
-
-func (obj *testUnstructured) WithName(name string) *testUnstructured {
-	return obj.WithMetadataField("name", name)
-}
-
-func (obj *testUnstructured) ToJSON() []byte {
-	bytes, err := json.Marshal(obj.Object)
-	if err != nil {
-		panic(err)
-	}
-	return bytes
-}
-
-func (obj *testUnstructured) withMap(name string, fields ...string) *testUnstructured {
-	m := make(map[string]interface{})
-	obj.Object[name] = m
-
-	for _, field := range fields {
-		m[field] = "foo"
-	}
-
-	return obj
-}
-
-func (obj *testUnstructured) withMapEntry(mapName, field string, value interface{}) *testUnstructured {
-	var m map[string]interface{}
-
-	if res, ok := obj.Unstructured.Object[mapName]; !ok {
-		m = make(map[string]interface{})
-		obj.Unstructured.Object[mapName] = m
-	} else {
-		m = res.(map[string]interface{})
-	}
-
-	m[field] = value
-
-	return obj
-}
-
-func toUnstructured(objs ...runtime.Object) []unstructured.Unstructured {
-	res := make([]unstructured.Unstructured, 0, len(objs))
-
-	for _, obj := range objs {
-		jsonObj, err := json.Marshal(obj)
+	for r, want := range want {
+		res, err := h.DynamicClient.Resource(r.GVR()).List(context.TODO(), metav1.ListOptions{})
+		assert.NoError(t, err)
 		if err != nil {
-			panic(err)
+			continue
 		}
 
-		var unstructuredObj unstructured.Unstructured
-
-		if err := json.Unmarshal(jsonObj, &unstructuredObj); err != nil {
-			panic(err)
+		got := sets.NewString()
+		for _, item := range res.Items {
+			got.Insert(fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName()))
 		}
 
-		metadata := unstructuredObj.Object["metadata"].(map[string]interface{})
-
-		delete(metadata, "creationTimestamp")
-
-		delete(unstructuredObj.Object, "status")
-
-		res = append(res, unstructuredObj)
+		assert.Equal(t, sets.NewString(want...), got)
 	}
-
-	return res
 }
 
-type testServiceAccount struct {
-	*v1.ServiceAccount
+func assertEmptyResults(t *testing.T, res ...Result) {
+	t.Helper()
+
+	for _, r := range res {
+		assert.Empty(t, r.Cluster)
+		assert.Empty(t, r.Namespaces)
+		assert.Empty(t, r.Velero)
+	}
 }
 
-func newTestServiceAccount() *testServiceAccount {
-	return &testServiceAccount{
-		ServiceAccount: &v1.ServiceAccount{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "v1",
-				Kind:       "ServiceAccount",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:         "ns-1",
-				Name:              "test-sa",
-				CreationTimestamp: metav1.Time{Time: time.Now()},
-			},
+func assertNonEmptyResults(t *testing.T, typeMsg string, res ...Result) {
+	t.Helper()
+	total := 0
+	for _, r := range res {
+		total += len(r.Cluster)
+		total += len(r.Namespaces)
+		total += len(r.Velero)
+	}
+	assert.Positive(t, total, "Expected at least one "+typeMsg)
+}
+
+type harness struct {
+	*test.APIServer
+
+	restorer *kubernetesRestorer
+	log      logrus.FieldLogger
+}
+
+func newHarness(t *testing.T) *harness {
+	t.Helper()
+
+	apiServer := test.NewAPIServer(t)
+	log := logrus.StandardLogger()
+	kbClient := test.NewFakeControllerRuntimeClient(t)
+
+	discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, log)
+	require.NoError(t, err)
+
+	return &harness{
+		APIServer: apiServer,
+		restorer: &kubernetesRestorer{
+			discoveryHelper:            discoveryHelper,
+			dynamicFactory:             client.NewDynamicFactory(apiServer.DynamicClient),
+			namespaceClient:            apiServer.KubeClient.CoreV1().Namespaces(),
+			resourceTerminatingTimeout: time.Minute,
+			logger:                     log,
+			fileSystem:                 test.NewFakeFileSystem(),
+
+			// unsupported
+			podVolumeRestorerFactory: nil,
+			podVolumeTimeout:         0,
+			kbClient:                 kbClient,
 		},
+		log: log,
 	}
 }
 
-func (sa *testServiceAccount) WithImagePullSecret(name string) *testServiceAccount {
-	secret := v1.LocalObjectReference{Name: name}
-	sa.ImagePullSecrets = append(sa.ImagePullSecrets, secret)
-	return sa
-}
+func (h *harness) AddItems(t *testing.T, resource *test.APIResource) {
+	t.Helper()
 
-func (sa *testServiceAccount) WithSecret(name string) *testServiceAccount {
-	secret := v1.ObjectReference{Name: name}
-	sa.Secrets = append(sa.Secrets, secret)
-	return sa
-}
+	h.DiscoveryClient.WithAPIResource(resource)
+	require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
-func (sa *testServiceAccount) ToJSON() []byte {
-	bytes, _ := json.Marshal(sa.ServiceAccount)
-	return bytes
-}
+	for _, item := range resource.Items {
+		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
+		require.NoError(t, err)
 
-type testPersistentVolume struct {
-	*v1.PersistentVolume
-}
+		unstructuredObj := &unstructured.Unstructured{Object: obj}
 
-func newTestPV() *testPersistentVolume {
-	return &testPersistentVolume{
-		PersistentVolume: &v1.PersistentVolume{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "v1",
-				Kind:       "PersistentVolume",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-pv",
-			},
-			Status: v1.PersistentVolumeStatus{},
-		},
-	}
-}
+		// These fields have non-nil zero values in the unstructured objects. We remove
+		// them to make comparison easier in our tests.
+		unstructured.RemoveNestedField(unstructuredObj.Object, "metadata", "creationTimestamp")
+		unstructured.RemoveNestedField(unstructuredObj.Object, "status")
 
-func (pv *testPersistentVolume) ToJSON() []byte {
-	bytes, _ := json.Marshal(pv.PersistentVolume)
-	return bytes
-}
-
-type testNamespace struct {
-	*v1.Namespace
-}
-
-func newTestNamespace(name string) *testNamespace {
-	return &testNamespace{
-		Namespace: &v1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
-		},
-	}
-}
-
-func (ns *testNamespace) ToJSON() []byte {
-	bytes, _ := json.Marshal(ns.Namespace)
-	return bytes
-}
-
-type testConfigMap struct {
-	*v1.ConfigMap
-}
-
-func newTestConfigMap() *testConfigMap {
-	return newNamedTestConfigMap("cm-1")
-}
-
-func newNamedTestConfigMap(name string) *testConfigMap {
-	return &testConfigMap{
-		ConfigMap: &v1.ConfigMap{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "v1",
-				Kind:       "ConfigMap",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "ns-1",
-				Name:      name,
-			},
-			Data: map[string]string{
-				"foo": "bar",
-			},
-		},
-	}
-}
-
-func (cm *testConfigMap) WithNamespace(name string) *testConfigMap {
-	cm.Namespace = name
-	return cm
-}
-
-func (cm *testConfigMap) WithLabels(labels map[string]string) *testConfigMap {
-	cm.Labels = labels
-	return cm
-}
-
-func (cm *testConfigMap) WithControllerOwner() *testConfigMap {
-	t := true
-	ownerRef := metav1.OwnerReference{
-		Controller: &t,
-	}
-	cm.ConfigMap.OwnerReferences = append(cm.ConfigMap.OwnerReferences, ownerRef)
-	return cm
-}
-
-func (cm *testConfigMap) ToJSON() []byte {
-	bytes, _ := json.Marshal(cm.ConfigMap)
-	return bytes
-}
-
-type fakeAction struct {
-	resource string
-}
-
-type fakeBlockStoreGetter struct {
-	fakeBlockStore *velerotest.FakeBlockStore
-	volumeMap      map[api.VolumeBackupInfo]string
-	volumeID       string
-}
-
-func (r *fakeBlockStoreGetter) GetBlockStore(provider string) (velero.BlockStore, error) {
-	if r.fakeBlockStore == nil {
-		r.fakeBlockStore = &velerotest.FakeBlockStore{
-			RestorableVolumes: r.volumeMap,
-			VolumeID:          r.volumeID,
+		if resource.Namespaced {
+			_, err = h.DynamicClient.Resource(resource.GVR()).Namespace(item.GetNamespace()).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
+		} else {
+			_, err = h.DynamicClient.Resource(resource.GVR()).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
 		}
+		require.NoError(t, err)
 	}
-	return r.fakeBlockStore, nil
 }
 
-func newFakeAction(resource string) *fakeAction {
-	return &fakeAction{resource}
+func Test_resetVolumeBindingInfo(t *testing.T) {
+	tests := []struct {
+		name     string
+		obj      *unstructured.Unstructured
+		expected *unstructured.Unstructured
+	}{
+		{
+			name: "PVs that are bound have their binding and dynamic provisioning annotations removed",
+			obj: newTestUnstructured().WithMetadataField("kind", "persistentVolume").
+				WithName("pv-1").WithAnnotations(
+				kubeutil.KubeAnnBindCompleted,
+				kubeutil.KubeAnnBoundByController,
+				kubeutil.KubeAnnDynamicallyProvisioned,
+			).WithSpecField("claimRef", map[string]interface{}{
+				"namespace":       "ns-1",
+				"name":            "pvc-1",
+				"uid":             "abc",
+				"resourceVersion": "1"}).Unstructured,
+			expected: newTestUnstructured().WithMetadataField("kind", "persistentVolume").
+				WithName("pv-1").
+				WithAnnotations(kubeutil.KubeAnnDynamicallyProvisioned).
+				WithSpecField("claimRef", map[string]interface{}{
+					"namespace": "ns-1", "name": "pvc-1"}).Unstructured,
+		},
+		{
+			name: "PVCs that are bound have their binding annotations removed, but the volume name stays",
+			obj: newTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
+				WithName("pvc-1").WithAnnotations(
+				kubeutil.KubeAnnBindCompleted,
+				kubeutil.KubeAnnBoundByController,
+			).WithSpecField("volumeName", "pv-1").Unstructured,
+			expected: newTestUnstructured().WithMetadataField("kind", "persistentVolumeClaim").
+				WithName("pvc-1").WithAnnotations().
+				WithSpecField("volumeName", "pv-1").Unstructured,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := resetVolumeBindingInfo(tc.obj)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
 }
 
-func (r *fakeAction) AppliesTo() (velero.ResourceSelector, error) {
-	return velero.ResourceSelector{
-		IncludedResources: []string{r.resource},
-	}, nil
+func TestIsAlreadyExistsError(t *testing.T) {
+	tests := []struct {
+		name        string
+		apiResource *test.APIResource
+		obj         *unstructured.Unstructured
+		err         error
+		expected    bool
+	}{
+		{
+			name:     "The input error is IsAlreadyExists error",
+			err:      apierrors.NewAlreadyExists(schema.GroupResource{}, ""),
+			expected: true,
+		},
+		{
+			name: "The input obj isn't service",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Pod",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "The StatusError contains no causes",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+				},
+			},
+			err: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Reason: metav1.StatusReasonInvalid,
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "The causes contains not only port already allocated error",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+				},
+			},
+			err: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Reason: metav1.StatusReasonInvalid,
+					Details: &metav1.StatusDetails{
+						Causes: []metav1.StatusCause{
+							{Message: "provided port is already allocated"},
+							{Message: "other error"},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Get already allocated error but the service doesn't exist",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+					"metadata": map[string]interface{}{
+						"namespace": "default",
+						"name":      "test",
+					},
+				},
+			},
+			err: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Reason: metav1.StatusReasonInvalid,
+					Details: &metav1.StatusDetails{
+						Causes: []metav1.StatusCause{
+							{Message: "provided port is already allocated"},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Get already allocated error and the service exists",
+			apiResource: test.Services(
+				builder.ForService("default", "test").Result(),
+			),
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": "Service",
+					"metadata": map[string]interface{}{
+						"namespace": "default",
+						"name":      "test",
+					},
+				},
+			},
+			err: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Reason: metav1.StatusReasonInvalid,
+					Details: &metav1.StatusDetails{
+						Causes: []metav1.StatusCause{
+							{Message: "provided port is already allocated"},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+	for _, test := range tests {
+		h := newHarness(t)
+
+		ctx := &restoreContext{
+			log:             h.log,
+			dynamicFactory:  client.NewDynamicFactory(h.DynamicClient),
+			namespaceClient: h.KubeClient.CoreV1().Namespaces(),
+		}
+
+		if test.apiResource != nil {
+			h.AddItems(t, test.apiResource)
+		}
+
+		client, err := ctx.dynamicFactory.ClientForGroupVersionResource(
+			schema.GroupVersion{Group: "", Version: "v1"},
+			metav1.APIResource{Name: "services"},
+			"default",
+		)
+		require.NoError(t, err)
+
+		t.Run(test.name, func(t *testing.T) {
+			result, err := isAlreadyExistsError(ctx, test.obj, test.err, client)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expected, result)
+		})
+	}
 }
 
-func (r *fakeAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
-	labels, found, err := unstructured.NestedMap(input.Item.UnstructuredContent(), "metadata", "labels")
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		labels = make(map[string]interface{})
+func TestHasCSIVolumeSnapshot(t *testing.T) {
+	tests := []struct {
+		name           string
+		vs             *snapshotv1api.VolumeSnapshot
+		obj            *unstructured.Unstructured
+		expectedResult bool
+	}{
+		{
+			name: "Invalid PV, expect false.",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": 1,
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "Cannot find VS, expect false",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "PersistentVolume",
+					"apiVersion": "v1",
+					"metadata": map[string]interface{}{
+						"namespace": "default",
+						"name":      "test",
+					},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "VS's source PVC is nil, expect false",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "PersistentVolume",
+					"apiVersion": "v1",
+					"metadata": map[string]interface{}{
+						"namespace": "default",
+						"name":      "test",
+					},
+					"spec": map[string]interface{}{
+						"claimRef": map[string]interface{}{
+							"namespace": "velero",
+							"name":      "test",
+						},
+					},
+				},
+			},
+			vs:             builder.ForVolumeSnapshot("velero", "test").Result(),
+			expectedResult: false,
+		},
+		{
+			name: "PVs claimref is nil, expect false.",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "PersistentVolume",
+					"apiVersion": "v1",
+					"metadata": map[string]interface{}{
+						"namespace": "velero",
+						"name":      "test",
+					},
+				},
+			},
+			vs:             builder.ForVolumeSnapshot("velero", "test").SourcePVC("test").Result(),
+			expectedResult: false,
+		},
+
+		{
+			name: "Find VS, expect true.",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "PersistentVolume",
+					"apiVersion": "v1",
+					"metadata": map[string]interface{}{
+						"namespace": "velero",
+						"name":      "test",
+					},
+					"spec": map[string]interface{}{
+						"claimRef": map[string]interface{}{
+							"namespace": "velero",
+							"name":      "test",
+						},
+					},
+				},
+			},
+			vs:             builder.ForVolumeSnapshot("velero", "test").SourcePVC("test").Result(),
+			expectedResult: true,
+		},
 	}
 
-	labels["fake-restorer"] = "foo"
+	for _, tc := range tests {
+		h := newHarness(t)
 
-	if err := unstructured.SetNestedField(input.Item.UnstructuredContent(), labels, "metadata", "labels"); err != nil {
-		return nil, err
+		ctx := &restoreContext{
+			log: h.log,
+		}
+
+		if tc.vs != nil {
+			ctx.csiVolumeSnapshots = []*snapshotv1api.VolumeSnapshot{tc.vs}
+		}
+
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expectedResult, hasCSIVolumeSnapshot(ctx, tc.obj))
+		})
 	}
-
-	unstructuredObj, ok := input.Item.(*unstructured.Unstructured)
-	if !ok {
-		return nil, errors.New("Unexpected type")
-	}
-
-	// want the baseline functionality too
-	res, err := resetMetadataAndStatus(unstructuredObj)
-	if err != nil {
-		return nil, err
-	}
-
-	return velero.NewRestoreItemActionExecuteOutput(res), nil
 }
 
-type fakeNamespaceClient struct {
-	createdNamespaces []*v1.Namespace
+func TestHasSnapshotDataUpload(t *testing.T) {
+	tests := []struct {
+		name           string
+		duResult       *corev1api.ConfigMap
+		obj            *unstructured.Unstructured
+		expectedResult bool
+		restore        *velerov1api.Restore
+	}{
+		{
+			name: "Invalid PV, expect false.",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind": 1,
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "PV without ClaimRef, expect false",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "PersistentVolume",
+					"apiVersion": "v1",
+					"metadata": map[string]interface{}{
+						"namespace": "default",
+						"name":      "test",
+					},
+				},
+			},
+			duResult:       builder.ForConfigMap("velero", "test").Result(),
+			restore:        builder.ForRestore("velero", "test").ObjectMeta(builder.WithUID("fakeUID")).Result(),
+			expectedResult: false,
+		},
+		{
+			name: "Cannot find DataUploadResult CM, expect false",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "PersistentVolume",
+					"apiVersion": "v1",
+					"metadata": map[string]interface{}{
+						"namespace": "default",
+						"name":      "test",
+					},
+					"spec": map[string]interface{}{
+						"claimRef": map[string]interface{}{
+							"namespace": "velero",
+							"name":      "testPVC",
+						},
+					},
+				},
+			},
+			duResult:       builder.ForConfigMap("velero", "test").Result(),
+			restore:        builder.ForRestore("velero", "test").ObjectMeta(builder.WithUID("fakeUID")).Result(),
+			expectedResult: false,
+		},
+		{
+			name: "Find DataUploadResult CM, expect true",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "PersistentVolume",
+					"apiVersion": "v1",
+					"metadata": map[string]interface{}{
+						"namespace": "default",
+						"name":      "test",
+					},
+					"spec": map[string]interface{}{
+						"claimRef": map[string]interface{}{
+							"namespace": "velero",
+							"name":      "testPVC",
+						},
+					},
+				},
+			},
+			duResult: builder.ForConfigMap("velero", "test").ObjectMeta(builder.WithLabelsMap(map[string]string{
+				velerov1api.RestoreUIDLabel:       "fakeUID",
+				velerov1api.PVCNamespaceNameLabel: "velero/testPVC",
+				velerov1api.ResourceUsageLabel:    string(velerov1api.VeleroResourceUsageDataUploadResult),
+			})).Result(),
+			restore:        builder.ForRestore("velero", "test").ObjectMeta(builder.WithUID("fakeUID")).Result(),
+			expectedResult: false,
+		},
+	}
 
-	corev1.NamespaceInterface
-}
+	for _, tc := range tests {
+		h := newHarness(t)
 
-func (nsc *fakeNamespaceClient) Create(ns *v1.Namespace) (*v1.Namespace, error) {
-	nsc.createdNamespaces = append(nsc.createdNamespaces, ns)
-	return ns, nil
+		ctx := &restoreContext{
+			log:      h.log,
+			kbClient: h.restorer.kbClient,
+			restore:  tc.restore,
+		}
+
+		if tc.duResult != nil {
+			require.NoError(t, ctx.kbClient.Create(context.TODO(), tc.duResult))
+		}
+
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expectedResult, hasSnapshotDataUpload(ctx, tc.obj))
+		})
+	}
 }

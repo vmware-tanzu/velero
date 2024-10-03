@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,10 +18,11 @@ package exec
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"os/exec"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // RunCommand runs a command and returns its stdout, stderr, and its returned
@@ -38,17 +39,39 @@ func RunCommand(cmd *exec.Cmd) (string, string, error) {
 
 	var stdout, stderr string
 
-	if res, readErr := ioutil.ReadAll(stdoutBuf); readErr != nil {
+	if res, readErr := io.ReadAll(stdoutBuf); readErr != nil {
 		stdout = errors.Wrap(readErr, "error reading command's stdout").Error()
 	} else {
 		stdout = string(res)
 	}
 
-	if res, readErr := ioutil.ReadAll(stderrBuf); readErr != nil {
+	if res, readErr := io.ReadAll(stderrBuf); readErr != nil {
 		stderr = errors.Wrap(readErr, "error reading command's stderr").Error()
 	} else {
 		stderr = string(res)
 	}
 
 	return stdout, stderr, runErr
+}
+
+func RunCommandWithLog(cmd *exec.Cmd, log logrus.FieldLogger) (string, string, error) {
+	stdout, stderr, err := RunCommand(cmd)
+	LogErrorAsExitCode(err, log)
+	return stdout, stderr, err
+}
+
+func LogErrorAsExitCode(err error, log logrus.FieldLogger) {
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			log.Errorf("Restic command fail with ExitCode: %d. Process ID is %d, Exit error is: %s", exitError.ExitCode(), exitError.Pid(), exitError.String())
+			// Golang's os.exec -1 ExitCode means signal kill. Usually this is caused
+			// by CGroup's OOM. Log a warning to notice user.
+			// https://github.com/golang/go/blob/master/src/os/exec_posix.go#L128-L136
+			if exitError.ExitCode() == -1 {
+				log.Warnf("The ExitCode is -1, which means the process is terminated by signal. Usually this is caused by CGroup kill due to out of memory. Please check whether there is such information in the work nodes' dmesg log.")
+			}
+		} else {
+			log.WithError(err).Info("Error cannot be convert to ExitError format.")
+		}
+	}
 }

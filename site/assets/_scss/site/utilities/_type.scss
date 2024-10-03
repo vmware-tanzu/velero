@@ -1,0 +1,44 @@
+// Weights
+
+.font-weight-light {
+  font-weight: $font-weight-light !important;
+}
+
+.font-weight-normal {
+  font-weight: $font-weight-normal !important;
+}
+
+.font-weight-medium {
+  font-weight: $font-weight-medium !important;
+}
+
+.font-weight-semibold {
+  font-weight: $font-weight-semibold !important;
+}
+
+.font-weight-bold {
+  font-weight: $font-weight-bold !important;
+}
+
+// Colors
+
+.font-color-darker {
+  color: $body-color-darker !important;
+}
+
+.font-color-darkest {
+  color: $body-color-darkest !important;
+}
+
+// Misc
+
+p {
+  &.lead-in {
+    color: $body-color-darker;
+    font-size: 1.375rem;
+
+    @include media-breakpoint-down(sm) {
+      font-size: 1.125rem;
+    }
+  }
+}

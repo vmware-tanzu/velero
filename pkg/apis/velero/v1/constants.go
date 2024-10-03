@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,14 +29,6 @@ const (
 	// files that store metadata about the backup, such as the backup version.
 	MetadataDir = "metadata"
 
-	// RestoreLabelKey is the label key that's applied to all resources that
-	// are created during a restore. This is applied for ease of identification
-	// of restored resources. The value will be the restore's name.
-	//
-	// This label is DEPRECATED as of v0.10 and will be removed entirely as of
-	// v1.0 and replaced with RestoreNameLabel ("velero.io/restore-name").
-	RestoreLabelKey = "velero-restore"
-
 	// ClusterScopedDir is the name of the directory containing cluster-scoped
 	// resources within a Velero backup.
 	ClusterScopedDir = "cluster"
@@ -44,4 +36,14 @@ const (
 	// NamespaceScopedDir is the name of the directory containing namespace-scoped
 	// resource within a Velero backup.
 	NamespaceScopedDir = "namespaces"
+
+	// CSIFeatureFlag is the feature flag string that defines whether or not CSI features are being used.
+	CSIFeatureFlag = "EnableCSI"
+
+	// PreferredVersionDir is the suffix name of the directory containing the preferred version of the API group
+	// resource within a Velero backup.
+	PreferredVersionDir = "-preferredversion"
+
+	// APIGroupVersionsFeatureFlag is the feature flag string that defines whether or not to handle multiple API Group Versions
+	APIGroupVersionsFeatureFlag = "EnableAPIGroupVersions"
 )

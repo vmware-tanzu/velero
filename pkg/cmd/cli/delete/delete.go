@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,10 +19,11 @@ package delete
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd/cli/backup"
-	"github.com/heptio/velero/pkg/cmd/cli/restore"
-	"github.com/heptio/velero/pkg/cmd/cli/schedule"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backup"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backuplocation"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/restore"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/schedule"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -35,6 +36,9 @@ func NewCommand(f client.Factory) *cobra.Command {
 	backupCommand := backup.NewDeleteCommand(f, "backup")
 	backupCommand.Aliases = []string{"backups"}
 
+	backuplocationCommand := backuplocation.NewDeleteCommand(f, "backup-location")
+	backuplocationCommand.Aliases = []string{"backup-locations"}
+
 	restoreCommand := restore.NewDeleteCommand(f, "restore")
 	restoreCommand.Aliases = []string{"restores"}
 
@@ -43,6 +47,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 	c.AddCommand(
 		backupCommand,
+		backuplocationCommand,
 		restoreCommand,
 		scheduleCommand,
 	)

@@ -1,0 +1,10 @@
+<!--
+# Original table shortcode
+# https://github.com/kubernetes/website/blob/master/layouts/shortcodes/table.html
+-->
+{{ $hasCaption := isset .Params "caption" }}
+{{ $caption    := .Get "caption" }}
+{{ $captionEl  := printf "<table><caption style=\"display: none;\">%s</caption>" $caption }}
+{{ $table      := .Inner | .Page.RenderString }}
+{{ $html       := cond $hasCaption ($table | replaceRE "<table>" $captionEl) $table | safeHTML }}
+{{ $html }}

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,35 +17,40 @@ limitations under the License.
 package output
 
 import (
-	"fmt"
-	"io"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/apimachinery/pkg/runtime"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 var (
-	restoreColumns = []string{"NAME", "BACKUP", "STATUS", "WARNINGS", "ERRORS", "CREATED", "SELECTOR"}
+	restoreColumns = []metav1.TableColumnDefinition{
+		// name needs Type and Format defined for the decorator to identify it:
+		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+		{Name: "Name", Type: "string", Format: "name"},
+		{Name: "Backup"},
+		{Name: "Status"},
+		{Name: "Started"},
+		{Name: "Completed"},
+		{Name: "Errors"},
+		{Name: "Warnings"},
+		{Name: "Created"},
+		{Name: "Selector"},
+	}
 )
 
-func printRestoreList(list *v1.RestoreList, w io.Writer, options printers.PrintOptions) error {
+func printRestoreList(list *v1.RestoreList) []metav1.TableRow {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+
 	for i := range list.Items {
-		if err := printRestore(&list.Items[i], w, options); err != nil {
-			return err
-		}
+		rows = append(rows, printRestore(&list.Items[i])...)
 	}
-	return nil
+	return rows
 }
 
-func printRestore(restore *v1.Restore, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, restore.Name, options.WithKind)
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", restore.Namespace); err != nil {
-			return err
-		}
+func printRestore(restore *v1.Restore) []metav1.TableRow {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: restore},
 	}
 
 	status := restore.Status.Phase
@@ -53,24 +58,17 @@ func printRestore(restore *v1.Restore, w io.Writer, options printers.PrintOption
 		status = v1.RestorePhaseNew
 	}
 
-	if _, err := fmt.Fprintf(
-		w,
-		"%s\t%s\t%s\t%d\t%d\t%s\t%s",
-		name,
+	row.Cells = append(row.Cells,
+		restore.Name,
 		restore.Spec.BackupName,
 		status,
-		restore.Status.Warnings,
+		restore.Status.StartTimestamp,
+		restore.Status.CompletionTimestamp,
 		restore.Status.Errors,
+		restore.Status.Warnings,
 		restore.CreationTimestamp.Time,
 		metav1.FormatLabelSelector(restore.Spec.LabelSelector),
-	); err != nil {
-		return err
-	}
+	)
 
-	if _, err := fmt.Fprint(w, printers.AppendLabels(restore.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, restore.Labels))
-	return err
+	return []metav1.TableRow{row}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package backuplocation
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/client"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -31,7 +31,9 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 	c.AddCommand(
 		NewCreateCommand(f, "create"),
+		NewDeleteCommand(f, "delete"),
 		NewGetCommand(f, "get"),
+		NewSetCommand(f, "set"),
 	)
 
 	return c

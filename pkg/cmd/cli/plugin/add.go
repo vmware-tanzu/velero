@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,45 +17,52 @@ limitations under the License.
 package plugin
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/cmd/util/flag"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/confirm"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 )
 
 const (
 	pluginsVolumeName = "plugins"
-	veleroDeployment  = "velero"
 	veleroContainer   = "velero"
 )
 
 func NewAddCommand(f client.Factory) *cobra.Command {
 	var (
-		imagePullPolicies   = []string{string(v1.PullAlways), string(v1.PullIfNotPresent), string(v1.PullNever)}
-		imagePullPolicyFlag = flag.NewEnum(string(v1.PullIfNotPresent), imagePullPolicies...)
+		imagePullPolicies   = []string{string(corev1api.PullAlways), string(corev1api.PullIfNotPresent), string(corev1api.PullNever)}
+		imagePullPolicyFlag = flag.NewEnum(string(corev1api.PullIfNotPresent), imagePullPolicies...)
 	)
-
+	o := confirm.NewConfirmOptionsWithDescription("Confirm add?, may cause the Velero server pod restart which will fail all ongoing jobs")
 	c := &cobra.Command{
 		Use:   "add IMAGE",
 		Short: "Add a plugin",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
+			if !o.Confirm && !confirm.GetConfirmation("velero plugin add may cause the Velero server pod restart, so it is a dangerous operation",
+				"once Velero server restarts, all the ongoing jobs will fail.") {
+				// Don't do anything unless we get confirmation
+				return
+			}
 			kubeClient, err := f.KubeClient()
 			if err != nil {
 				cmd.CheckError(err)
 			}
 
-			veleroDeploy, err := kubeClient.AppsV1beta1().Deployments(f.Namespace()).Get(veleroDeployment, metav1.GetOptions{})
+			veleroDeploy, err := veleroDeployment(context.TODO(), kubeClient, f.Namespace())
 			if err != nil {
 				cmd.CheckError(err)
 			}
@@ -73,14 +80,14 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 			}
 
 			if !volumeExists {
-				volume := v1.Volume{
+				volume := corev1api.Volume{
 					Name: pluginsVolumeName,
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{},
+					VolumeSource: corev1api.VolumeSource{
+						EmptyDir: &corev1api.EmptyDirVolumeSource{},
 					},
 				}
 
-				volumeMount := v1.VolumeMount{
+				volumeMount := corev1api.VolumeMount{
 					Name:      pluginsVolumeName,
 					MountPath: "/plugins",
 				}
@@ -104,17 +111,7 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 			}
 
 			// add the plugin as an init container
-			plugin := v1.Container{
-				Name:            getName(args[0]),
-				Image:           args[0],
-				ImagePullPolicy: v1.PullPolicy(imagePullPolicyFlag.String()),
-				VolumeMounts: []v1.VolumeMount{
-					{
-						Name:      pluginsVolumeName,
-						MountPath: "/target",
-					},
-				},
-			}
+			plugin := *builder.ForPluginContainer(args[0], corev1api.PullPolicy(imagePullPolicyFlag.String())).Result()
 
 			veleroDeploy.Spec.Template.Spec.InitContainers = append(veleroDeploy.Spec.Template.Spec.InitContainers, plugin)
 
@@ -125,32 +122,13 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 			patchBytes, err := jsonpatch.CreateMergePatch(original, updated)
 			cmd.CheckError(err)
 
-			_, err = kubeClient.AppsV1beta1().Deployments(veleroDeploy.Namespace).Patch(veleroDeploy.Name, types.MergePatchType, patchBytes)
+			_, err = kubeClient.AppsV1().Deployments(veleroDeploy.Namespace).Patch(context.TODO(), veleroDeploy.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 			cmd.CheckError(err)
 		},
 	}
 
-	c.Flags().Var(imagePullPolicyFlag, "image-pull-policy", fmt.Sprintf("the imagePullPolicy for the plugin container. Valid values are %s.", strings.Join(imagePullPolicies, ", ")))
+	c.Flags().Var(imagePullPolicyFlag, "image-pull-policy", fmt.Sprintf("The imagePullPolicy for the plugin container. Valid values are %s.", strings.Join(imagePullPolicies, ", ")))
+	o.BindFlags(c.Flags())
 
 	return c
-}
-
-// getName returns the 'name' component of a docker
-// image (i.e. everything after the last '/' and before
-// any subsequent ':')
-func getName(image string) string {
-	slashIndex := strings.LastIndex(image, "/")
-	colonIndex := strings.LastIndex(image, ":")
-
-	start := 0
-	if slashIndex > 0 {
-		start = slashIndex + 1
-	}
-
-	end := len(image)
-	if colonIndex > slashIndex {
-		end = colonIndex
-	}
-
-	return image[start:end]
 }

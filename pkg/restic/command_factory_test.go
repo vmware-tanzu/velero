@@ -1,11 +1,11 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,7 +32,7 @@ func TestBackupCommand(t *testing.T) {
 	assert.Equal(t, "path", c.Dir)
 	assert.Equal(t, []string{"."}, c.Args)
 
-	expected := []string{"--tag=foo=bar", "--tag=c=d", "--host=velero"}
+	expected := []string{"--tag=foo=bar", "--tag=c=d", "--host=velero", "--json"}
 	sort.Strings(expected)
 	sort.Strings(c.ExtraFlags)
 	assert.Equal(t, expected, c.ExtraFlags)
@@ -58,7 +58,7 @@ func TestGetSnapshotCommand(t *testing.T) {
 	assert.Equal(t, "password-file", c.PasswordFile)
 
 	// set up expected flag names
-	expectedFlags := []string{"--json", "--last", "--tag"}
+	expectedFlags := []string{"--json", "--latest=1", "--tag"}
 	// for tracking actual flag names
 	actualFlags := []string{}
 	// for tracking actual --tag values as a map
@@ -68,10 +68,11 @@ func TestGetSnapshotCommand(t *testing.T) {
 	for _, flag := range c.ExtraFlags {
 		// split into 2 parts from the first = sign (if any)
 		parts := strings.SplitN(flag, "=", 2)
-		// parts[0] is the flag name
-		actualFlags = append(actualFlags, parts[0])
+
 		// convert --tag data to a map
 		if parts[0] == "--tag" {
+			actualFlags = append(actualFlags, parts[0])
+
 			// split based on ,
 			tags := strings.Split(parts[1], ",")
 			// loop through each key-value tag pair
@@ -81,12 +82,13 @@ func TestGetSnapshotCommand(t *testing.T) {
 				// record actual key & value
 				actualTags[kvs[0]] = kvs[1]
 			}
+		} else {
+			actualFlags = append(actualFlags, flag)
 		}
 	}
 
 	assert.Equal(t, expectedFlags, actualFlags)
 	assert.Equal(t, expectedTags, actualTags)
-
 }
 
 func TestInitCommand(t *testing.T) {
@@ -96,17 +98,10 @@ func TestInitCommand(t *testing.T) {
 	assert.Equal(t, "repo-id", c.RepoIdentifier)
 }
 
-func TestStatsCommand(t *testing.T) {
-	c := StatsCommand("repo-id")
+func TestSnapshotsCommand(t *testing.T) {
+	c := SnapshotsCommand("repo-id")
 
-	assert.Equal(t, "stats", c.Command)
-	assert.Equal(t, "repo-id", c.RepoIdentifier)
-}
-
-func TestCheckCommand(t *testing.T) {
-	c := CheckCommand("repo-id")
-
-	assert.Equal(t, "check", c.Command)
+	assert.Equal(t, "snapshots", c.Command)
 	assert.Equal(t, "repo-id", c.RepoIdentifier)
 }
 
@@ -123,4 +118,14 @@ func TestForgetCommand(t *testing.T) {
 	assert.Equal(t, "forget", c.Command)
 	assert.Equal(t, "repo-id", c.RepoIdentifier)
 	assert.Equal(t, []string{"snapshot-id"}, c.Args)
+}
+
+func TestStatsCommand(t *testing.T) {
+	c := StatsCommand("repo-id", "password-file", "snapshot-id")
+
+	assert.Equal(t, "stats", c.Command)
+	assert.Equal(t, "repo-id", c.RepoIdentifier)
+	assert.Equal(t, "password-file", c.PasswordFile)
+	assert.Equal(t, []string{"snapshot-id"}, c.Args)
+	assert.Equal(t, []string{"--json"}, c.ExtraFlags)
 }

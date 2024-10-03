@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,45 +28,62 @@ type ServerMetrics struct {
 }
 
 const (
-	metricNamespace              = "velero"
-	backupTarballSizeBytesGauge  = "backup_tarball_size_bytes"
-	backupAttemptTotal           = "backup_attempt_total"
-	backupSuccessTotal           = "backup_success_total"
-	backupFailureTotal           = "backup_failure_total"
-	backupDurationSeconds        = "backup_duration_seconds"
-	restoreAttemptTotal          = "restore_attempt_total"
-	restoreValidationFailedTotal = "restore_validation_failed_total"
-	restoreSuccessTotal          = "restore_success_total"
-	restoreFailedTotal           = "restore_failed_total"
-	volumeSnapshotAttemptTotal   = "volume_snapshot_attempt_total"
-	volumeSnapshotSuccessTotal   = "volume_snapshot_success_total"
-	volumeSnapshotFailureTotal   = "volume_snapshot_failure_total"
+	metricNamespace           = "velero"
+	podVolumeMetricsNamespace = "podVolume"
+	//Velero metrics
+	backupTarballSizeBytesGauge   = "backup_tarball_size_bytes"
+	backupTotal                   = "backup_total"
+	backupAttemptTotal            = "backup_attempt_total"
+	backupSuccessTotal            = "backup_success_total"
+	backupPartialFailureTotal     = "backup_partial_failure_total"
+	backupFailureTotal            = "backup_failure_total"
+	backupValidationFailureTotal  = "backup_validation_failure_total"
+	backupDurationSeconds         = "backup_duration_seconds"
+	backupDeletionAttemptTotal    = "backup_deletion_attempt_total"
+	backupDeletionSuccessTotal    = "backup_deletion_success_total"
+	backupDeletionFailureTotal    = "backup_deletion_failure_total"
+	backupLastSuccessfulTimestamp = "backup_last_successful_timestamp"
+	backupItemsTotalGauge         = "backup_items_total"
+	backupItemsErrorsGauge        = "backup_items_errors"
+	backupWarningTotal            = "backup_warning_total"
+	backupLastStatus              = "backup_last_status"
+	restoreTotal                  = "restore_total"
+	restoreAttemptTotal           = "restore_attempt_total"
+	restoreValidationFailedTotal  = "restore_validation_failed_total"
+	restoreSuccessTotal           = "restore_success_total"
+	restorePartialFailureTotal    = "restore_partial_failure_total"
+	restoreFailedTotal            = "restore_failed_total"
+	volumeSnapshotAttemptTotal    = "volume_snapshot_attempt_total"
+	volumeSnapshotSuccessTotal    = "volume_snapshot_success_total"
+	volumeSnapshotFailureTotal    = "volume_snapshot_failure_total"
+	csiSnapshotAttemptTotal       = "csi_snapshot_attempt_total"
+	csiSnapshotSuccessTotal       = "csi_snapshot_success_total"
+	csiSnapshotFailureTotal       = "csi_snapshot_failure_total"
 
-	scheduleLabel   = "schedule"
-	backupNameLabel = "backupName"
+	// pod volume metrics
+	podVolumeBackupEnqueueTotal           = "pod_volume_backup_enqueue_count"
+	podVolumeBackupDequeueTotal           = "pod_volume_backup_dequeue_count"
+	podVolumeOperationLatencySeconds      = "pod_volume_operation_latency_seconds"
+	podVolumeOperationLatencyGaugeSeconds = "pod_volume_operation_latency_seconds_gauge"
 
-	secondsInMinute = 60.0
+	// data mover metrics
+	DataUploadSuccessTotal   = "data_upload_success_total"
+	DataUploadFailureTotal   = "data_upload_failure_total"
+	DataUploadCancelTotal    = "data_upload_cancel_total"
+	DataDownloadSuccessTotal = "data_download_success_total"
+	DataDownloadFailureTotal = "data_download_failure_total"
+	DataDownloadCancelTotal  = "data_download_cancel_total"
 
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	legacyMetricNamespace = "ark"
+	// Labels
+	nodeMetricLabel         = "node"
+	podVolumeOperationLabel = "operation"
+	pvbNameLabel            = "pod_volume_backup"
+	scheduleLabel           = "schedule"
+	backupNameLabel         = "backupName"
 
-	// These variables are used only as the keys into a map; the standard variable names above are what is rendered for Prometheus
-	// The Prometheus metric types themselves will take a namespace (ark or velero) and the metric name to construct the output that is scraped.
-	legacyBackupTarballSizeBytesGauge  = "ark-backup_tarball_size_bytes"
-	legacyBackupAttemptTotal           = "ark-backup_attempt_total"
-	legacyBackupSuccessTotal           = "ark-backup_success_total"
-	legacyBackupFailureTotal           = "ark-backup_failure_total"
-	legacyBackupDurationSeconds        = "ark-backup_duration_seconds"
-	legacyRestoreAttemptTotal          = "ark-restore_attempt_total"
-	legacyRestoreValidationFailedTotal = "ark-restore_validation_failed_total"
-	legacyRestoreSuccessTotal          = "ark-restore_success_total"
-	legacyRestoreFailedTotal           = "ark-restore_failed_total"
-	legacyVolumeSnapshotAttemptTotal   = "ark-volume_snapshot_attempt_total"
-	legacyVolumeSnapshotSuccessTotal   = "ark-volume_snapshot_success_total"
-	legacyVolumeSnapshotFailureTotal   = "ark-volume_snapshot_failure_total"
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
+	// metrics values
+	BackupLastStatusSucc    int64 = 1
+	BackupLastStatusFailure int64 = 0
 )
 
 // NewServerMetrics returns new ServerMetrics
@@ -80,6 +97,21 @@ func NewServerMetrics() *ServerMetrics {
 					Help:      "Size, in bytes, of a backup",
 				},
 				[]string{scheduleLabel},
+			),
+			backupLastSuccessfulTimestamp: prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      backupLastSuccessfulTimestamp,
+					Help:      "Last time a backup ran successfully, Unix timestamp in seconds",
+				},
+				[]string{scheduleLabel},
+			),
+			backupTotal: prometheus.NewGauge(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      backupTotal,
+					Help:      "Current number of existent backups",
+				},
 			),
 			backupAttemptTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
@@ -97,11 +129,51 @@ func NewServerMetrics() *ServerMetrics {
 				},
 				[]string{scheduleLabel},
 			),
+			backupPartialFailureTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupPartialFailureTotal,
+					Help:      "Total number of partially failed backups",
+				},
+				[]string{scheduleLabel},
+			),
 			backupFailureTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
 					Namespace: metricNamespace,
 					Name:      backupFailureTotal,
 					Help:      "Total number of failed backups",
+				},
+				[]string{scheduleLabel},
+			),
+			backupValidationFailureTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupValidationFailureTotal,
+					Help:      "Total number of validation failed backups",
+				},
+				[]string{scheduleLabel},
+			),
+			backupDeletionAttemptTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupDeletionAttemptTotal,
+					Help:      "Total number of attempted backup deletions",
+				},
+				[]string{scheduleLabel},
+			),
+			backupDeletionSuccessTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupDeletionSuccessTotal,
+					Help:      "Total number of successful backup deletions",
+				},
+				[]string{scheduleLabel},
+			),
+			backupDeletionFailureTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupDeletionFailureTotal,
+					Help:      "Total number of failed backup deletions",
 				},
 				[]string{scheduleLabel},
 			),
@@ -124,6 +196,45 @@ func NewServerMetrics() *ServerMetrics {
 				},
 				[]string{scheduleLabel},
 			),
+			backupItemsTotalGauge: prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      backupItemsTotalGauge,
+					Help:      "Total number of items backed up",
+				},
+				[]string{scheduleLabel},
+			),
+			backupItemsErrorsGauge: prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      backupItemsErrorsGauge,
+					Help:      "Total number of errors encountered during backup",
+				},
+				[]string{scheduleLabel},
+			),
+			backupWarningTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupWarningTotal,
+					Help:      "Total number of warned backups",
+				},
+				[]string{scheduleLabel},
+			),
+			backupLastStatus: prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      backupLastStatus,
+					Help:      "Last status of the backup. A value of 1 is success, 0 is failure",
+				},
+				[]string{scheduleLabel},
+			),
+			restoreTotal: prometheus.NewGauge(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      restoreTotal,
+					Help:      "Current number of existent restores",
+				},
+			),
 			restoreAttemptTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
 					Namespace: metricNamespace,
@@ -137,6 +248,14 @@ func NewServerMetrics() *ServerMetrics {
 					Namespace: metricNamespace,
 					Name:      restoreSuccessTotal,
 					Help:      "Total number of successful restores",
+				},
+				[]string{scheduleLabel},
+			),
+			restorePartialFailureTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      restorePartialFailureTotal,
+					Help:      "Total number of partially failed restores",
 				},
 				[]string{scheduleLabel},
 			),
@@ -180,46 +299,66 @@ func NewServerMetrics() *ServerMetrics {
 				},
 				[]string{scheduleLabel},
 			),
-			// -------------------------------------------------------------------
-			// Ark backwards compatibility code
-			// TODO: remove this code to drop the ark-namespaced metrics.
-			legacyBackupTarballSizeBytesGauge: prometheus.NewGaugeVec(
+			csiSnapshotAttemptTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      csiSnapshotAttemptTotal,
+					Help:      "Total number of CSI attempted volume snapshots",
+				},
+				[]string{scheduleLabel, backupNameLabel},
+			),
+			csiSnapshotSuccessTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      csiSnapshotSuccessTotal,
+					Help:      "Total number of CSI successful volume snapshots",
+				},
+				[]string{scheduleLabel, backupNameLabel},
+			),
+			csiSnapshotFailureTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      csiSnapshotFailureTotal,
+					Help:      "Total number of CSI failed volume snapshots",
+				},
+				[]string{scheduleLabel, backupNameLabel},
+			),
+		},
+	}
+}
+
+func NewNodeMetrics() *ServerMetrics {
+	return &ServerMetrics{
+		metrics: map[string]prometheus.Collector{
+			podVolumeBackupEnqueueTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: podVolumeMetricsNamespace,
+					Name:      podVolumeBackupEnqueueTotal,
+					Help:      "Total number of pod_volume_backup objects enqueued",
+				},
+				[]string{nodeMetricLabel},
+			),
+			podVolumeBackupDequeueTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: podVolumeMetricsNamespace,
+					Name:      podVolumeBackupDequeueTotal,
+					Help:      "Total number of pod_volume_backup objects dequeued",
+				},
+				[]string{nodeMetricLabel},
+			),
+			podVolumeOperationLatencyGaugeSeconds: prometheus.NewGaugeVec(
 				prometheus.GaugeOpts{
-					Namespace: legacyMetricNamespace,
-					Name:      backupTarballSizeBytesGauge,
-					Help:      "Size, in bytes, of a backup",
+					Namespace: podVolumeMetricsNamespace,
+					Name:      podVolumeOperationLatencyGaugeSeconds,
+					Help:      "Gauge metric indicating time taken, in seconds, to perform pod volume operations",
 				},
-				[]string{scheduleLabel},
+				[]string{nodeMetricLabel, podVolumeOperationLabel, backupNameLabel, pvbNameLabel},
 			),
-			legacyBackupAttemptTotal: prometheus.NewCounterVec(
-				prometheus.CounterOpts{
-					Namespace: legacyMetricNamespace,
-					Name:      backupAttemptTotal,
-					Help:      "Total number of attempted backups",
-				},
-				[]string{scheduleLabel},
-			),
-			legacyBackupSuccessTotal: prometheus.NewCounterVec(
-				prometheus.CounterOpts{
-					Namespace: legacyMetricNamespace,
-					Name:      backupSuccessTotal,
-					Help:      "Total number of successful backups",
-				},
-				[]string{scheduleLabel},
-			),
-			legacyBackupFailureTotal: prometheus.NewCounterVec(
-				prometheus.CounterOpts{
-					Namespace: legacyMetricNamespace,
-					Name:      backupFailureTotal,
-					Help:      "Total number of failed backups",
-				},
-				[]string{scheduleLabel},
-			),
-			legacyBackupDurationSeconds: prometheus.NewHistogramVec(
+			podVolumeOperationLatencySeconds: prometheus.NewHistogramVec(
 				prometheus.HistogramOpts{
-					Namespace: legacyMetricNamespace,
-					Name:      backupDurationSeconds,
-					Help:      "Time taken to complete backup, in seconds",
+					Namespace: podVolumeMetricsNamespace,
+					Name:      podVolumeOperationLatencySeconds,
+					Help:      "Time taken to complete pod volume operations, in seconds",
 					Buckets: []float64{
 						toSeconds(1 * time.Minute),
 						toSeconds(5 * time.Minute),
@@ -232,66 +371,56 @@ func NewServerMetrics() *ServerMetrics {
 						toSeconds(4 * time.Hour),
 					},
 				},
-				[]string{scheduleLabel},
+				[]string{nodeMetricLabel, podVolumeOperationLabel, backupNameLabel, pvbNameLabel},
 			),
-			legacyRestoreAttemptTotal: prometheus.NewCounterVec(
+			DataUploadSuccessTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
-					Namespace: legacyMetricNamespace,
-					Name:      restoreAttemptTotal,
-					Help:      "Total number of attempted restores",
+					Namespace: podVolumeMetricsNamespace,
+					Name:      DataUploadSuccessTotal,
+					Help:      "Total number of successful uploaded snapshots",
 				},
-				[]string{scheduleLabel},
+				[]string{nodeMetricLabel},
 			),
-			legacyRestoreSuccessTotal: prometheus.NewCounterVec(
+			DataUploadFailureTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
-					Namespace: legacyMetricNamespace,
-					Name:      restoreSuccessTotal,
-					Help:      "Total number of successful restores",
+					Namespace: podVolumeMetricsNamespace,
+					Name:      DataUploadFailureTotal,
+					Help:      "Total number of failed uploaded snapshots",
 				},
-				[]string{scheduleLabel},
+				[]string{nodeMetricLabel},
 			),
-			legacyRestoreFailedTotal: prometheus.NewCounterVec(
+			DataUploadCancelTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
-					Namespace: legacyMetricNamespace,
-					Name:      restoreFailedTotal,
-					Help:      "Total number of failed restores",
+					Namespace: podVolumeMetricsNamespace,
+					Name:      DataUploadCancelTotal,
+					Help:      "Total number of canceled uploaded snapshots",
 				},
-				[]string{scheduleLabel},
+				[]string{nodeMetricLabel},
 			),
-			legacyRestoreValidationFailedTotal: prometheus.NewCounterVec(
+			DataDownloadSuccessTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
-					Namespace: legacyMetricNamespace,
-					Name:      restoreValidationFailedTotal,
-					Help:      "Total number of failed restores failing validations",
+					Namespace: podVolumeMetricsNamespace,
+					Name:      DataDownloadSuccessTotal,
+					Help:      "Total number of successful downloaded snapshots",
 				},
-				[]string{scheduleLabel},
+				[]string{nodeMetricLabel},
 			),
-			legacyVolumeSnapshotAttemptTotal: prometheus.NewCounterVec(
+			DataDownloadFailureTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
-					Namespace: legacyMetricNamespace,
-					Name:      volumeSnapshotAttemptTotal,
-					Help:      "Total number of attempted volume snapshots",
+					Namespace: podVolumeMetricsNamespace,
+					Name:      DataDownloadFailureTotal,
+					Help:      "Total number of failed downloaded snapshots",
 				},
-				[]string{scheduleLabel},
+				[]string{nodeMetricLabel},
 			),
-			legacyVolumeSnapshotSuccessTotal: prometheus.NewCounterVec(
+			DataDownloadCancelTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
-					Namespace: legacyMetricNamespace,
-					Name:      volumeSnapshotSuccessTotal,
-					Help:      "Total number of successful volume snapshots",
+					Namespace: podVolumeMetricsNamespace,
+					Name:      DataDownloadCancelTotal,
+					Help:      "Total number of canceled downloaded snapshots",
 				},
-				[]string{scheduleLabel},
+				[]string{nodeMetricLabel},
 			),
-			legacyVolumeSnapshotFailureTotal: prometheus.NewCounterVec(
-				prometheus.CounterOpts{
-					Namespace: legacyMetricNamespace,
-					Name:      volumeSnapshotFailureTotal,
-					Help:      "Total number of failed volume snapshots",
-				},
-				[]string{scheduleLabel},
-			),
-			// TODO: remove code above this comment
-			// -------------------------------------------------------------------
 		},
 	}
 }
@@ -306,70 +435,254 @@ func (m *ServerMetrics) RegisterAllMetrics() {
 // InitSchedule initializes counter metrics of a schedule.
 func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	if c, ok := m.metrics[backupAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[backupSuccessTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[backupPartialFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[backupFailureTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[backupValidationFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[backupDeletionAttemptTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[backupDeletionSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[backupDeletionFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[backupItemsTotalGauge].(*prometheus.GaugeVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[backupItemsErrorsGauge].(*prometheus.GaugeVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[backupWarningTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[backupLastStatus].(*prometheus.GaugeVec); ok {
+		c.WithLabelValues(scheduleName).Set(float64(1))
 	}
 	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
+	}
+	if c, ok := m.metrics[restorePartialFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[restoreFailedTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[restoreSuccessTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[restoreValidationFailedTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[volumeSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[volumeSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[volumeSnapshotFailureTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
+	if c, ok := m.metrics[csiSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName, "").Add(0)
+	}
+	if c, ok := m.metrics[csiSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName, "").Add(0)
+	}
+	if c, ok := m.metrics[csiSnapshotFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName, "").Add(0)
+	}
+}
 
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if c, ok := m.metrics[legacyBackupAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+// RemoveSchedule removes metrics associated with a specified schedule.
+func (m *ServerMetrics) RemoveSchedule(scheduleName string) {
+	if g, ok := m.metrics[backupTarballSizeBytesGauge].(*prometheus.GaugeVec); ok {
+		g.DeleteLabelValues(scheduleName)
 	}
-	if c, ok := m.metrics[legacyBackupSuccessTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+	if c, ok := m.metrics[backupAttemptTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
 	}
-	if c, ok := m.metrics[legacyBackupFailureTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+	if c, ok := m.metrics[backupSuccessTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
 	}
-	if c, ok := m.metrics[legacyRestoreAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+	if c, ok := m.metrics[backupPartialFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
 	}
-	if c, ok := m.metrics[legacyRestoreFailedTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+	if c, ok := m.metrics[backupFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
 	}
-	if c, ok := m.metrics[legacyRestoreSuccessTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+	if c, ok := m.metrics[backupValidationFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
 	}
-	if c, ok := m.metrics[legacyRestoreValidationFailedTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+	if h, ok := m.metrics[backupDurationSeconds].(*prometheus.HistogramVec); ok {
+		h.DeleteLabelValues(scheduleName)
 	}
-	if c, ok := m.metrics[legacyVolumeSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+	if c, ok := m.metrics[backupDeletionAttemptTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
 	}
-	if c, ok := m.metrics[legacyVolumeSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+	if c, ok := m.metrics[backupDeletionSuccessTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
 	}
-	if c, ok := m.metrics[legacyVolumeSnapshotFailureTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+	if c, ok := m.metrics[backupDeletionFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
 	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
+	if g, ok := m.metrics[backupLastSuccessfulTimestamp].(*prometheus.GaugeVec); ok {
+		g.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupItemsTotalGauge].(*prometheus.GaugeVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupItemsErrorsGauge].(*prometheus.GaugeVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupWarningTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[backupLastStatus].(*prometheus.GaugeVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[restorePartialFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[restoreFailedTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[restoreSuccessTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[restoreValidationFailedTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[volumeSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[volumeSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[volumeSnapshotFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName)
+	}
+	if c, ok := m.metrics[csiSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName, "")
+	}
+	if c, ok := m.metrics[csiSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName, "")
+	}
+	if c, ok := m.metrics[csiSnapshotFailureTotal].(*prometheus.CounterVec); ok {
+		c.DeleteLabelValues(scheduleName, "")
+	}
+}
+
+// InitMetricsForNode initializes counter metrics for a node.
+func (m *ServerMetrics) InitMetricsForNode(node string) {
+	if c, ok := m.metrics[podVolumeBackupEnqueueTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Add(0)
+	}
+	if c, ok := m.metrics[podVolumeBackupDequeueTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Add(0)
+	}
+	if c, ok := m.metrics[DataUploadSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Add(0)
+	}
+	if c, ok := m.metrics[DataUploadFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Add(0)
+	}
+	if c, ok := m.metrics[DataUploadCancelTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Add(0)
+	}
+	if c, ok := m.metrics[DataDownloadSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Add(0)
+	}
+	if c, ok := m.metrics[DataDownloadFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Add(0)
+	}
+	if c, ok := m.metrics[DataDownloadCancelTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Add(0)
+	}
+}
+
+// RegisterPodVolumeBackupEnqueue records enqueuing of a PodVolumeBackup object.
+func (m *ServerMetrics) RegisterPodVolumeBackupEnqueue(node string) {
+	if c, ok := m.metrics[podVolumeBackupEnqueueTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Inc()
+	}
+}
+
+// RegisterPodVolumeBackupDequeue records dequeuing of a PodVolumeBackup object.
+func (m *ServerMetrics) RegisterPodVolumeBackupDequeue(node string) {
+	if c, ok := m.metrics[podVolumeBackupDequeueTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Inc()
+	}
+}
+
+// RegisterDataUploadSuccess records successful uploaded snapshots.
+func (m *ServerMetrics) RegisterDataUploadSuccess(node string) {
+	if c, ok := m.metrics[DataUploadSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Inc()
+	}
+}
+
+// RegisterDataUploadFailure records failed uploaded snapshots.
+func (m *ServerMetrics) RegisterDataUploadFailure(node string) {
+	if c, ok := m.metrics[DataUploadFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Inc()
+	}
+}
+
+// RegisterDataUploadCancel records canceled uploaded snapshots.
+func (m *ServerMetrics) RegisterDataUploadCancel(node string) {
+	if c, ok := m.metrics[DataUploadCancelTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Inc()
+	}
+}
+
+// RegisterDataDownloadSuccess records successful downloaded snapshots.
+func (m *ServerMetrics) RegisterDataDownloadSuccess(node string) {
+	if c, ok := m.metrics[DataDownloadSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Inc()
+	}
+}
+
+// RegisterDataDownloadFailure records failed downloaded snapshots.
+func (m *ServerMetrics) RegisterDataDownloadFailure(node string) {
+	if c, ok := m.metrics[DataDownloadFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Inc()
+	}
+}
+
+// RegisterDataDownloadCancel records canceled downloaded snapshots.
+func (m *ServerMetrics) RegisterDataDownloadCancel(node string) {
+	if c, ok := m.metrics[DataDownloadCancelTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(node).Inc()
+	}
+}
+
+// ObservePodVolumeOpLatency records the number of seconds a pod volume operation took.
+func (m *ServerMetrics) ObservePodVolumeOpLatency(node, pvbName, opName, backupName string, seconds float64) {
+	if h, ok := m.metrics[podVolumeOperationLatencySeconds].(*prometheus.HistogramVec); ok {
+		h.WithLabelValues(node, opName, backupName, pvbName).Observe(seconds)
+	}
+}
+
+// RegisterPodVolumeOpLatencyGauge registers the pod volume operation latency as a gauge metric.
+func (m *ServerMetrics) RegisterPodVolumeOpLatencyGauge(node, pvbName, opName, backupName string, seconds float64) {
+	if g, ok := m.metrics[podVolumeOperationLatencyGaugeSeconds].(*prometheus.GaugeVec); ok {
+		g.WithLabelValues(node, opName, backupName, pvbName).Set(seconds)
+	}
 }
 
 // SetBackupTarballSizeBytesGauge records the size, in bytes, of a backup tarball.
@@ -377,13 +690,20 @@ func (m *ServerMetrics) SetBackupTarballSizeBytesGauge(backupSchedule string, si
 	if g, ok := m.metrics[backupTarballSizeBytesGauge].(*prometheus.GaugeVec); ok {
 		g.WithLabelValues(backupSchedule).Set(float64(size))
 	}
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if g, ok := m.metrics[legacyBackupTarballSizeBytesGauge].(*prometheus.GaugeVec); ok {
-		g.WithLabelValues(backupSchedule).Set(float64(size))
+}
+
+// SetBackupLastSuccessfulTimestamp records the last time a backup ran successfully, Unix timestamp in seconds
+func (m *ServerMetrics) SetBackupLastSuccessfulTimestamp(backupSchedule string, time time.Time) {
+	if g, ok := m.metrics[backupLastSuccessfulTimestamp].(*prometheus.GaugeVec); ok {
+		g.WithLabelValues(backupSchedule).Set(float64(time.Unix()))
 	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
+}
+
+// SetBackupTotal records the current number of existent backups.
+func (m *ServerMetrics) SetBackupTotal(numberOfBackups int64) {
+	if g, ok := m.metrics[backupTotal].(prometheus.Gauge); ok {
+		g.Set(float64(numberOfBackups))
+	}
 }
 
 // RegisterBackupAttempt records an backup attempt.
@@ -391,13 +711,6 @@ func (m *ServerMetrics) RegisterBackupAttempt(backupSchedule string) {
 	if c, ok := m.metrics[backupAttemptTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if c, ok := m.metrics[legacyBackupAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(backupSchedule).Inc()
-	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
 }
 
 // RegisterBackupSuccess records a successful completion of a backup.
@@ -405,13 +718,14 @@ func (m *ServerMetrics) RegisterBackupSuccess(backupSchedule string) {
 	if c, ok := m.metrics[backupSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if c, ok := m.metrics[legacyBackupSuccessTotal].(*prometheus.CounterVec); ok {
+	m.SetBackupLastSuccessfulTimestamp(backupSchedule, time.Now())
+}
+
+// RegisterBackupPartialFailure records a partially failed backup.
+func (m *ServerMetrics) RegisterBackupPartialFailure(backupSchedule string) {
+	if c, ok := m.metrics[backupPartialFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
 }
 
 // RegisterBackupFailed records a failed backup.
@@ -419,13 +733,13 @@ func (m *ServerMetrics) RegisterBackupFailed(backupSchedule string) {
 	if c, ok := m.metrics[backupFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if c, ok := m.metrics[legacyBackupFailureTotal].(*prometheus.CounterVec); ok {
+}
+
+// RegisterBackupValidationFailure records a validation failed backup.
+func (m *ServerMetrics) RegisterBackupValidationFailure(backupSchedule string) {
+	if c, ok := m.metrics[backupValidationFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
 }
 
 // RegisterBackupDuration records the number of seconds a backup took.
@@ -433,13 +747,56 @@ func (m *ServerMetrics) RegisterBackupDuration(backupSchedule string, seconds fl
 	if c, ok := m.metrics[backupDurationSeconds].(*prometheus.HistogramVec); ok {
 		c.WithLabelValues(backupSchedule).Observe(seconds)
 	}
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if c, ok := m.metrics[legacyBackupDurationSeconds].(*prometheus.HistogramVec); ok {
-		c.WithLabelValues(backupSchedule).Observe(seconds)
+}
+
+// RegisterBackupDeletionAttempt records the number of attempted backup deletions
+func (m *ServerMetrics) RegisterBackupDeletionAttempt(backupSchedule string) {
+	if c, ok := m.metrics[backupDeletionAttemptTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
 	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
+}
+
+// RegisterBackupDeletionFailed records the number of failed backup deletions
+func (m *ServerMetrics) RegisterBackupDeletionFailed(backupSchedule string) {
+	if c, ok := m.metrics[backupDeletionFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
+}
+
+// RegisterBackupDeletionSuccess records the number of successful backup deletions
+func (m *ServerMetrics) RegisterBackupDeletionSuccess(backupSchedule string) {
+	if c, ok := m.metrics[backupDeletionSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
+}
+
+// RegisterBackupItemsTotalGauge records the number of items to be backed up.
+func (m *ServerMetrics) RegisterBackupItemsTotalGauge(backupSchedule string, items int) {
+	if c, ok := m.metrics[backupItemsTotalGauge].(*prometheus.GaugeVec); ok {
+		c.WithLabelValues(backupSchedule).Set(float64(items))
+	}
+}
+
+// RegisterBackupItemsErrorsGauge records the number of all error messages that were generated during
+// execution of the backup.
+func (m *ServerMetrics) RegisterBackupItemsErrorsGauge(backupSchedule string, items int) {
+	if c, ok := m.metrics[backupItemsErrorsGauge].(*prometheus.GaugeVec); ok {
+		c.WithLabelValues(backupSchedule).Set(float64(items))
+	}
+}
+
+// RegisterBackupWarning records a warned backup.
+func (m *ServerMetrics) RegisterBackupWarning(backupSchedule string) {
+	if c, ok := m.metrics[backupWarningTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
+}
+
+// RegisterBackupLastStatus records the last status of the backup.
+func (m *ServerMetrics) RegisterBackupLastStatus(backupSchedule string, lastStatus int64) {
+	if g, ok := m.metrics[backupLastStatus].(*prometheus.GaugeVec); ok {
+		g.WithLabelValues(backupSchedule).Set(float64(lastStatus))
+	}
 }
 
 // toSeconds translates a time.Duration value into a float64
@@ -448,18 +805,18 @@ func toSeconds(d time.Duration) float64 {
 	return float64(d / time.Second)
 }
 
+// SetRestoreTotal records the current number of existent restores.
+func (m *ServerMetrics) SetRestoreTotal(numberOfRestores int64) {
+	if g, ok := m.metrics[restoreTotal].(prometheus.Gauge); ok {
+		g.Set(float64(numberOfRestores))
+	}
+}
+
 // RegisterRestoreAttempt records an attempt to restore a backup.
 func (m *ServerMetrics) RegisterRestoreAttempt(backupSchedule string) {
 	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if c, ok := m.metrics[legacyRestoreAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(backupSchedule).Inc()
-	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
 }
 
 // RegisterRestoreSuccess records a successful (maybe partial) completion of a restore.
@@ -467,13 +824,13 @@ func (m *ServerMetrics) RegisterRestoreSuccess(backupSchedule string) {
 	if c, ok := m.metrics[restoreSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if c, ok := m.metrics[legacyRestoreSuccessTotal].(*prometheus.CounterVec); ok {
+}
+
+// RegisterRestorePartialFailure records a restore that partially failed.
+func (m *ServerMetrics) RegisterRestorePartialFailure(backupSchedule string) {
+	if c, ok := m.metrics[restorePartialFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
 }
 
 // RegisterRestoreFailed records a restore that failed.
@@ -481,13 +838,6 @@ func (m *ServerMetrics) RegisterRestoreFailed(backupSchedule string) {
 	if c, ok := m.metrics[restoreFailedTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if c, ok := m.metrics[legacyRestoreFailedTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(backupSchedule).Inc()
-	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
 }
 
 // RegisterRestoreValidationFailed records a restore that failed validation.
@@ -495,13 +845,6 @@ func (m *ServerMetrics) RegisterRestoreValidationFailed(backupSchedule string) {
 	if c, ok := m.metrics[restoreValidationFailedTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if c, ok := m.metrics[legacyRestoreValidationFailedTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(backupSchedule).Inc()
-	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
 }
 
 // RegisterVolumeSnapshotAttempts records an attempt to snapshot a volume.
@@ -509,13 +852,6 @@ func (m *ServerMetrics) RegisterVolumeSnapshotAttempts(backupSchedule string, vo
 	if c, ok := m.metrics[volumeSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Add(float64(volumeSnapshotsAttempted))
 	}
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if c, ok := m.metrics[legacyVolumeSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(backupSchedule).Add(float64(volumeSnapshotsAttempted))
-	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
 }
 
 // RegisterVolumeSnapshotSuccesses records a completed volume snapshot.
@@ -523,13 +859,6 @@ func (m *ServerMetrics) RegisterVolumeSnapshotSuccesses(backupSchedule string, v
 	if c, ok := m.metrics[volumeSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Add(float64(volumeSnapshotsCompleted))
 	}
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if c, ok := m.metrics[legacyVolumeSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(backupSchedule).Add(float64(volumeSnapshotsCompleted))
-	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
 }
 
 // RegisterVolumeSnapshotFailures records a failed volume snapshot.
@@ -537,11 +866,25 @@ func (m *ServerMetrics) RegisterVolumeSnapshotFailures(backupSchedule string, vo
 	if c, ok := m.metrics[volumeSnapshotFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Add(float64(volumeSnapshotsFailed))
 	}
-	// -------------------------------------------------------------------
-	// TODO: remove this code to remove the ark-namespaced metrics
-	if c, ok := m.metrics[legacyVolumeSnapshotFailureTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(backupSchedule).Add(float64(volumeSnapshotsFailed))
+}
+
+// RegisterCSISnapshotAttempts records an attempt to snapshot a volume by CSI plugin.
+func (m *ServerMetrics) RegisterCSISnapshotAttempts(backupSchedule, backupName string, csiSnapshotsAttempted int) {
+	if c, ok := m.metrics[csiSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule, backupName).Add(float64(csiSnapshotsAttempted))
 	}
-	// TODO: remove code above this comment
-	// -------------------------------------------------------------------
+}
+
+// RegisterCSISnapshotSuccesses records a completed volume snapshot by CSI plugin.
+func (m *ServerMetrics) RegisterCSISnapshotSuccesses(backupSchedule, backupName string, csiSnapshotCompleted int) {
+	if c, ok := m.metrics[csiSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule, backupName).Add(float64(csiSnapshotCompleted))
+	}
+}
+
+// RegisterCSISnapshotFailures records a failed volume snapshot by CSI plugin.
+func (m *ServerMetrics) RegisterCSISnapshotFailures(backupSchedule, backupName string, csiSnapshotsFailed int) {
+	if c, ok := m.metrics[csiSnapshotFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule, backupName).Add(float64(csiSnapshotsFailed))
+	}
 }

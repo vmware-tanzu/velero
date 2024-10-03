@@ -1,4 +1,4 @@
-# Copyright 2017 the Heptio Ark contributors.
+# Copyright 2017 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,20 +21,25 @@ metadata:
     app: nginx
 
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-deployment
   namespace: nginx-example
+  labels:
+    app: nginx
 spec:
   replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
   template:
     metadata:
       labels:
         app: nginx
     spec:
       containers:
-      - image: nginx:1.7.9
+      - image: nginx:1.17.6
         name: nginx
         ports:
         - containerPort: 80

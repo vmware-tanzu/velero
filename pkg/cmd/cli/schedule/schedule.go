@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package schedule
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/client"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -34,6 +34,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 		NewGetCommand(f, "get"),
 		NewDescribeCommand(f, "describe"),
 		NewDeleteCommand(f, "delete"),
+		NewPauseCommand(f, "pause"),
+		NewUnpauseCommand(f, "unpause"),
 	)
 
 	return c

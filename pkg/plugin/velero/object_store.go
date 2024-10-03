@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,6 +32,9 @@ type ObjectStore interface {
 	// PutObject creates a new object using the data in body within the specified
 	// object storage bucket with the given key.
 	PutObject(bucket, key string, body io.Reader) error
+
+	// ObjectExists checks if there is an object with the given key in the object storage bucket.
+	ObjectExists(bucket, key string) (bool, error)
 
 	// GetObject retrieves the object with the given key from the specified
 	// bucket in object storage.

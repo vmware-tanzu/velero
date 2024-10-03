@@ -1,0 +1,79 @@
+name: "Verify Velero CRDs across k8s versions"
+on:
+  pull_request:
+    # Do not run when the change only includes these directories.
+    paths-ignore:
+      - "site/**"
+      - "design/**"
+
+jobs:
+  # Build the Velero CLI once for all Kubernetes versions, and cache it so the fan-out workers can get it.
+  build-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+      # Look for a CLI that's made for this PR
+      - name: Fetch built CLI
+        id: cache
+        uses: actions/cache@v4
+        env:
+          cache-name: cache-velero-cli
+        with:
+          path: ./_output/bin/linux/amd64/velero
+          # The cache key a combination of the current PR number, and a SHA256 hash of the Velero binary
+          key: velero-${{ github.event.pull_request.number }}-${{ hashFiles('./_output/bin/linux/amd64/velero') }}
+          # This key controls the prefixes that we'll look at in the cache to restore from
+          restore-keys: |
+            velero-${{ github.event.pull_request.number }}-
+      # If no binaries were built for this PR, build it now.
+      - name: Build Velero CLI
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          make local
+  # Check the common CLI against all Kubernetes versions
+  crd-check:
+    needs: build-cli
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Latest k8s versions. There's no series-based tag, nor is there a latest tag.
+        k8s:
+          - 1.23.17
+          - 1.24.17
+          - 1.25.16
+          - 1.26.13
+          - 1.27.10
+          - 1.28.6
+          - 1.29.1
+    # All steps run in parallel unless otherwise specified.
+    # See https://docs.github.com/en/actions/learn-github-actions/managing-complex-workflows#creating-dependent-jobs
+    steps:
+      - name: Fetch built CLI
+        id: cache
+        uses: actions/cache@v4
+        env:
+          cache-name: cache-velero-cli
+        with:
+          path: ./_output/bin/linux/amd64/velero
+          # The cache key a combination of the current PR number, and a SHA256 hash of the Velero binary
+          key: velero-${{ github.event.pull_request.number }}-${{ hashFiles('./_output/bin/linux/amd64/velero') }}
+          # This key controls the prefixes that we'll look at in the cache to restore from
+          restore-keys: |
+            velero-${{ github.event.pull_request.number }}-
+      - uses: engineerd/setup-kind@v0.5.0
+        with:
+          version: "v0.21.0"
+          image: "kindest/node:v${{ matrix.k8s }}"
+      - name: Install CRDs
+        run: |
+          kubectl cluster-info
+          kubectl get pods -n kube-system
+          kubectl version
+          echo "current-context:" $(kubectl config current-context)
+          echo "environment-kubeconfig:" ${KUBECONFIG}
+          ./_output/bin/linux/amd64/velero install --crds-only --dry-run -oyaml | kubectl apply -f -

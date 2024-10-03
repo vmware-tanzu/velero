@@ -1,0 +1,58 @@
+<div class="section section-card section-card-offset-top promo-cards">
+    <div class="section-content">
+        <div class="row">
+            {{ $limit := int (.Scratch.Get "limit") }}
+            {{ $pages := sort (.Site.GetPage "/plugins/list").Resources "Name" }}
+
+            {{ if gt $limit 0 }}
+                {{ $pages = first $limit $pages }}
+            {{ end }}
+
+            {{ range $index, $page := $pages }}
+            <div class="col-md">
+                <div class="card card-light mb-3 mb-md-0 shadow-sm">
+                    <div class="card-body match-height">
+                    </div>
+                </div>
+                <div class="card card-light mb-3 mb-md-0 shadow-sm">
+                    <div class="card-body match-height">
+                        {{ if .Params.link }}
+                            <h5><a href="{{ .Params.link }}" class="dark">{{ .Title }}</a></h5>
+                        {{ else }}
+                            <h5>{{ .Title }}</h5>
+                        {{ end }}
+                        <p>{{ .Content }}</p>
+                        {{ if .Params.objectStorage }}
+                            <img src="https://img.shields.io/badge/Object Storage-supported-green">
+                        {{ end }}
+                        {{ if .Params.volumesnapshotter }}
+                            <img src="https://img.shields.io/badge/VolumeSnapshotter-supported-green">
+                        {{ end }}
+                        {{ if .Params.localStorage }}
+                            <img src="https://img.shields.io/badge/Local Storage-supported-green">
+                        {{ end }}
+                        {{ if .Params.supportedByVeleroTeam }}
+                            <img src="https://img.shields.io/badge/Supported%20By-Velero%20team-blue">
+                        {{ end }}
+                        {{ if .Params.BackupItemAction }}
+                            <img src="https://img.shields.io/badge/BackupItemAction-supported-green">
+                        {{ end }}
+                        {{ if .Params.RestoreItemAction }}
+                            <img src="https://img.shields.io/badge/RestoreItemAction-supported-green">
+                        {{ end }}
+                        {{ if .Params.beta }}
+                            <img src="https://img.shields.io/badge/Beta-true-yellow">
+                        {{ end }}
+                    </div>
+                </div>
+            </div>
+            {{ $currentIndex := add $index 1 }}
+            {{ $row := mod $currentIndex 3 }}
+            {{ if eq $row 0 }}
+        </div>
+        <div class="row mt-4">
+            {{ end }}
+            {{ end }}
+        </div>
+    </div>
+</div>

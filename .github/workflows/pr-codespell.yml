@@ -1,0 +1,57 @@
+name: Pull Request Codespell Check
+on: [pull_request]
+jobs:
+
+  codespell:
+    name: Run Codespell
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out the code
+      uses: actions/checkout@v4
+
+    - name: Codespell
+      uses: codespell-project/actions-codespell@master
+      with:
+        # ignore the config/.../crd.go file as it's generated binary data that is edited elswhere.
+        skip: .git,*.png,*.jpg,*.woff,*.ttf,*.gif,*.ico,./config/crd/v1beta1/crds/crds.go,./config/crd/v1/crds/crds.go,./config/crd/v2alpha1/crds/crds.go,./go.sum,./LICENSE
+        ignore_words_list: iam,aks,ist,bridget,ue,shouldnot,atleast,notin,sme,optin
+        check_filenames: true
+        check_hidden: true
+
+    - name: Velero.io word list check
+      shell: bash {0}
+      run: |
+        IGNORE_COMMENT="Velero.io word list : ignore"
+        FILES_TO_CHECK=$(find . -type f \
+          ! -path "./.git/*" \
+          ! -path "./site/content/docs/v*" \
+          ! -path "./changelogs/CHANGELOG-*" \
+          ! -path "./.github/workflows/pr-codespell.yml" \
+          ! -path "./site/static/fonts/Metropolis/Open Font License.md" \
+          ! -regex '.*\.\(png\|jpg\|woff\|ttf\|gif\|ico\|svg\)'
+        )
+        function check_word_in_files() {
+            local word=$1
+
+            xargs grep -Iinr "$word" <<< "$FILES_TO_CHECK" | \
+            grep -v "$IGNORE_COMMENT" | \
+            grep -i --color=always "$word" && \
+            EXIT_STATUS=1
+        }
+        function check_word_case_sensitive_in_files() {
+            local word=$1
+
+            xargs grep -Inr "$word" <<< "$FILES_TO_CHECK" | \
+            grep -v "$IGNORE_COMMENT" | \
+            grep --color=always "$word" && \
+            EXIT_STATUS=1
+        }
+        EXIT_STATUS=0
+        check_word_case_sensitive_in_files ' kubernetes '
+        check_word_in_files 'on-premise\b'
+        check_word_in_files 'back-up'
+        check_word_in_files 'plug-in'
+        check_word_in_files 'whitelist'
+        check_word_in_files 'blacklist'
+        exit $EXIT_STATUS

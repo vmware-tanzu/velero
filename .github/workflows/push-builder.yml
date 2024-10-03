@@ -1,0 +1,35 @@
+name: build-image
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+    - 'hack/build-image/Dockerfile'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@v4
+      with:
+        # The default value is "1" which fetches only a single commit. If we merge PR without squash or rebase,
+        # there are at least two commits: the first one is the merge commit and the second one is the real commit
+        # contains the changes.
+        # As we use the Dockerfile's commit ID as the tag of the build-image, fetching only 1 commit causes the merge
+        # commit ID to be the tag.
+        # While when running make commands locally, as the local git repository usually contains all commits, the Dockerfile's
+        # commit ID is the second one. This is mismatch with the images in Dockerhub
+        fetch-depth: 2
+
+    - name: Build
+      run: make build-image
+
+    # Only try to publish the container image from the root repo; forks don't have permission to do so and will always get failures.
+    - name: Publish container image
+      if: github.repository == 'vmware-tanzu/velero'
+      run: |
+        docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+       
+        make push-build-image

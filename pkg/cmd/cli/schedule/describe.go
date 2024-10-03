@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,15 +17,18 @@ limitations under the License.
 package schedule
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/cmd/util/output"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 )
 
 func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
@@ -35,25 +38,30 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 		Use:   use + " [NAME1] [NAME2] [NAME...]",
 		Short: "Describe schedules",
 		Run: func(c *cobra.Command, args []string) {
-			veleroClient, err := f.Client()
+			crClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
-			var schedules *v1.ScheduleList
+			schedules := new(v1.ScheduleList)
 			if len(args) > 0 {
-				schedules = new(v1.ScheduleList)
 				for _, name := range args {
-					schedule, err := veleroClient.VeleroV1().Schedules(f.Namespace()).Get(name, metav1.GetOptions{})
+					schedule := new(v1.Schedule)
+					err := crClient.Get(context.TODO(), ctrlclient.ObjectKey{Namespace: f.Namespace(), Name: name}, schedule)
 					cmd.CheckError(err)
 					schedules.Items = append(schedules.Items, *schedule)
 				}
 			} else {
-				schedules, err = veleroClient.VeleroV1().Schedules(f.Namespace()).List(listOptions)
+				selector := labels.NewSelector()
+				if listOptions.LabelSelector != "" {
+					selector, err = labels.Parse(listOptions.LabelSelector)
+					cmd.CheckError(err)
+				}
+				err = crClient.List(context.TODO(), schedules, &ctrlclient.ListOptions{LabelSelector: selector})
 				cmd.CheckError(err)
 			}
 
 			first := true
-			for _, schedule := range schedules.Items {
-				s := output.DescribeSchedule(&schedule)
+			for i := range schedules.Items {
+				s := output.DescribeSchedule(&schedules.Items[i])
 				if first {
 					first = false
 					fmt.Print(s)
@@ -65,7 +73,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 		},
 	}
 
-	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "only show items matching this label selector")
+	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "Only show items matching this label selector.")
 
 	return c
 }

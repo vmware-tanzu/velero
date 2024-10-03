@@ -1,0 +1,14 @@
+<div class="row">
+    {{ $posts := (.Scratch.Get "posts") }}
+
+    {{ range $index, $post := $posts }}
+    {{ partial "blog-post-card.html" . }}
+
+    {{ $currentIndex := add $index 1 }}
+    {{ $row := mod $currentIndex 3 }}
+    {{ if and (eq $row 0) (ne $currentIndex (len $posts)) }}
+</div>
+<div class="row mt-4">
+    {{ end }}
+    {{ end }}
+</div>

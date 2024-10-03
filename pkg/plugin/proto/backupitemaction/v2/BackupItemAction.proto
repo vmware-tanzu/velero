@@ -1,0 +1,51 @@
+syntax = "proto3";
+package v2;
+option go_package = "github.com/vmware-tanzu/velero/pkg/plugin/generated/backupitemaction/v2";
+
+import "Shared.proto";
+import "google/protobuf/empty.proto";
+
+
+message ExecuteRequest {
+    string plugin = 1;
+    bytes item = 2;
+    bytes backup = 3;
+}
+
+message ExecuteResponse {
+    bytes item = 1;
+    repeated generated.ResourceIdentifier additionalItems = 2;
+    string operationID = 3;
+    repeated generated.ResourceIdentifier postOperationItems = 4;
+}
+
+service BackupItemAction {
+    rpc AppliesTo(BackupItemActionAppliesToRequest) returns (BackupItemActionAppliesToResponse);
+    rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+    rpc Progress(BackupItemActionProgressRequest) returns (BackupItemActionProgressResponse);
+    rpc Cancel(BackupItemActionCancelRequest) returns (google.protobuf.Empty);
+}
+
+message BackupItemActionAppliesToRequest {
+    string plugin = 1;
+}
+
+message BackupItemActionAppliesToResponse {
+    generated.ResourceSelector ResourceSelector = 1;
+}
+
+message BackupItemActionProgressRequest {
+    string plugin = 1;
+    string operationID = 2;
+    bytes backup = 3;
+}
+
+message BackupItemActionProgressResponse {
+    generated.OperationProgress progress = 1;
+}
+
+message BackupItemActionCancelRequest {
+    string plugin = 1;
+    string operationID = 2;
+    bytes backup = 3;
+}

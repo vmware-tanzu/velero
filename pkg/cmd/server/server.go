@@ -1,11 +1,11 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright The Velero Contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,266 +18,289 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/pprof"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
+	logrusr "github.com/bombsimon/logrusr/v3"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1api "k8s.io/api/batch/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/clock"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/backup"
-	"github.com/heptio/velero/pkg/buildinfo"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/cmd/util/flag"
-	"github.com/heptio/velero/pkg/cmd/util/signals"
-	"github.com/heptio/velero/pkg/controller"
-	velerodiscovery "github.com/heptio/velero/pkg/discovery"
-	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
-	"github.com/heptio/velero/pkg/metrics"
-	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
-	"github.com/heptio/velero/pkg/podexec"
-	"github.com/heptio/velero/pkg/restic"
-	"github.com/heptio/velero/pkg/restore"
-	"github.com/heptio/velero/pkg/util/kube"
-	"github.com/heptio/velero/pkg/util/logging"
-	"github.com/heptio/velero/pkg/util/stringslice"
+	"github.com/vmware-tanzu/velero/internal/credentials"
+	"github.com/vmware-tanzu/velero/internal/hook"
+	"github.com/vmware-tanzu/velero/internal/storage"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+	"github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/server/config"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
+	"github.com/vmware-tanzu/velero/pkg/constant"
+	"github.com/vmware-tanzu/velero/pkg/controller"
+	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/features"
+	"github.com/vmware-tanzu/velero/pkg/itemoperationmap"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	"github.com/vmware-tanzu/velero/pkg/persistence"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt/process"
+	"github.com/vmware-tanzu/velero/pkg/podexec"
+	"github.com/vmware-tanzu/velero/pkg/podvolume"
+	"github.com/vmware-tanzu/velero/pkg/repository"
+	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
+	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
+	"github.com/vmware-tanzu/velero/pkg/restore"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
-const (
-	// the port where prometheus metrics are exposed
-	defaultMetricsAddress = ":8085"
-
-	defaultBackupSyncPeriod           = time.Minute
-	defaultPodVolumeOperationTimeout  = 60 * time.Minute
-	defaultResourceTerminatingTimeout = 10 * time.Minute
-
-	// server's client default qps and burst
-	defaultClientQPS   float32 = 20.0
-	defaultClientBurst int     = 30
-
-	defaultProfilerAddress = "localhost:6060"
-)
-
-type serverConfig struct {
-	pluginDir, metricsAddress, defaultBackupLocation                        string
-	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
-	restoreResourcePriorities                                               []string
-	defaultVolumeSnapshotLocations                                          map[string]string
-	restoreOnly                                                             bool
-	clientQPS                                                               float32
-	clientBurst                                                             int
-	profilerAddress                                                         string
-}
-
-func NewCommand() *cobra.Command {
-	var (
-		volumeSnapshotLocations = flag.NewMap().WithKeyValueDelimiter(":")
-		logLevelFlag            = logging.LogLevelFlag(logrus.InfoLevel)
-		config                  = serverConfig{
-			pluginDir:                      "/plugins",
-			metricsAddress:                 defaultMetricsAddress,
-			defaultBackupLocation:          "default",
-			defaultVolumeSnapshotLocations: make(map[string]string),
-			backupSyncPeriod:               defaultBackupSyncPeriod,
-			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
-			restoreResourcePriorities:      defaultRestorePriorities,
-			clientQPS:                      defaultClientQPS,
-			clientBurst:                    defaultClientBurst,
-			profilerAddress:                defaultProfilerAddress,
-			resourceTerminatingTimeout:     defaultResourceTerminatingTimeout,
-		}
-	)
+func NewCommand(f client.Factory) *cobra.Command {
+	config := config.GetDefaultConfig()
 
 	var command = &cobra.Command{
-		Use:   "server",
-		Short: "Run the velero server",
-		Long:  "Run the velero server",
+		Use:    "server",
+		Short:  "Run the velero server",
+		Long:   "Run the velero server",
+		Hidden: true,
 		Run: func(c *cobra.Command, args []string) {
 			// go-plugin uses log.Println to log when it's waiting for all plugin processes to complete so we need to
 			// set its output to stdout.
 			log.SetOutput(os.Stdout)
 
-			logLevel := logLevelFlag.Parse()
+			logLevel := config.LogLevel.Parse()
+			format := config.LogFormat.Parse()
+
 			// Make sure we log to stdout so cloud log dashboards don't show this as an error.
 			logrus.SetOutput(os.Stdout)
-			logrus.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
 
 			// Velero's DefaultLogger logs to stdout, so all is good there.
-			logger := logging.DefaultLogger(logLevel)
+			logger := logging.DefaultLogger(logLevel, format)
+
+			logger.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
+
 			logger.Infof("Starting Velero server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
-
-			// NOTE: the namespace flag is bound to velero's persistent flags when the root velero command
-			// creates the client Factory and binds the Factory's flags. We're not using a Factory here in
-			// the server because the Factory gets its basename set at creation time, and the basename is
-			// used to construct the user-agent for clients. Also, the Factory's Namespace() method uses
-			// the client config file to determine the appropriate namespace to use, and that isn't
-			// applicable to the server (it uses the method directly below instead). We could potentially
-			// add a SetBasename() method to the Factory, and tweak how Namespace() works, if we wanted to
-			// have the server use the Factory.
-			namespaceFlag := c.Flag("namespace")
-			if namespaceFlag == nil {
-				cmd.CheckError(errors.New("unable to look up namespace flag"))
-			}
-			namespace := getServerNamespace(namespaceFlag)
-
-			if volumeSnapshotLocations.Data() != nil {
-				config.defaultVolumeSnapshotLocations = volumeSnapshotLocations.Data()
+			if len(features.All()) > 0 {
+				logger.Infof("%d feature flags enabled %s", len(features.All()), features.All())
+			} else {
+				logger.Info("No feature flags enabled")
 			}
 
-			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), config, logger)
+			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
+
+			s, err := newServer(f, config, logger)
 			cmd.CheckError(err)
 
 			cmd.CheckError(s.run())
 		},
 	}
 
-	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(logLevelFlag.AllowedValues(), ", ")))
-	command.Flags().StringVar(&config.pluginDir, "plugin-dir", config.pluginDir, "directory containing Velero plugins")
-	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "the address to expose prometheus metrics")
-	command.Flags().DurationVar(&config.backupSyncPeriod, "backup-sync-period", config.backupSyncPeriod, "how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster")
-	command.Flags().DurationVar(&config.podVolumeOperationTimeout, "restic-timeout", config.podVolumeOperationTimeout, "how long backups/restores of pod volumes should be allowed to run before timing out")
-	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled")
-	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources")
-	command.Flags().StringVar(&config.defaultBackupLocation, "default-backup-storage-location", config.defaultBackupLocation, "name of the default backup storage location")
-	command.Flags().Var(&volumeSnapshotLocations, "default-volume-snapshot-locations", "list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...)")
-	command.Flags().Float32Var(&config.clientQPS, "client-qps", config.clientQPS, "maximum number of requests per second by the server to the Kubernetes API once the burst limit has been reached")
-	command.Flags().IntVar(&config.clientBurst, "client-burst", config.clientBurst, "maximum number of requests by the server to the Kubernetes API in a short period of time")
-	command.Flags().StringVar(&config.profilerAddress, "profiler-address", config.profilerAddress, "the address to expose the pprof profiler")
-	command.Flags().DurationVar(&config.resourceTerminatingTimeout, "terminating-resource-timeout", config.resourceTerminatingTimeout, "how long to wait on persistent volumes and namespaces to terminate during a restore before timing out")
+	config.BindFlags(command.Flags())
 
 	return command
 }
 
-func getServerNamespace(namespaceFlag *pflag.Flag) string {
-	if namespaceFlag.Changed {
-		return namespaceFlag.Value.String()
-	}
-
-	if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
-		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
-			return ns
-		}
-	}
-
-	return api.DefaultNamespace
-}
-
 type server struct {
-	namespace             string
-	metricsAddress        string
-	kubeClientConfig      *rest.Config
-	kubeClient            kubernetes.Interface
-	veleroClient          clientset.Interface
-	discoveryClient       discovery.DiscoveryInterface
-	discoveryHelper       velerodiscovery.Helper
-	dynamicClient         dynamic.Interface
-	sharedInformerFactory informers.SharedInformerFactory
+	namespace        string
+	metricsAddress   string
+	kubeClientConfig *rest.Config
+	kubeClient       kubernetes.Interface
+	discoveryClient  discovery.DiscoveryInterface
+	discoveryHelper  velerodiscovery.Helper
+	dynamicClient    dynamic.Interface
+	// controller-runtime client. the difference from the controller-manager's client
+	// is that the controller-manager's client is limited to list namespaced-scoped
+	// resources in the namespace where Velero is installed, or the cluster-scoped
+	// resources. The crClient doesn't have the limitation.
+	crClient              ctrlclient.Client
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
 	logger                logrus.FieldLogger
 	logLevel              logrus.Level
-	pluginRegistry        plugin.Registry
-	pluginManager         plugin.Manager
-	resticManager         restic.RepositoryManager
+	pluginRegistry        process.Registry
+	repoManager           repomanager.Manager
+	repoLocker            *repository.RepoLocker
+	repoEnsurer           *repository.Ensurer
 	metrics               *metrics.ServerMetrics
-	config                serverConfig
+	config                *config.Config
+	mgr                   manager.Manager
+	credentialFileStore   credentials.FileStore
+	credentialSecretStore credentials.SecretStore
 }
 
-func newServer(namespace, baseName string, config serverConfig, logger *logrus.Logger) (*server, error) {
-	clientConfig, err := client.Config("", "", baseName)
+func newServer(f client.Factory, config *config.Config, logger *logrus.Logger) (*server, error) {
+	if msg, err := uploader.ValidateUploaderType(config.UploaderType); err != nil {
+		return nil, err
+	} else if msg != "" {
+		logger.Warn(msg)
+	}
+
+	if config.ClientQPS < 0.0 {
+		return nil, errors.New("client-qps must be positive")
+	}
+	f.SetClientQPS(config.ClientQPS)
+
+	if config.ClientBurst <= 0 {
+		return nil, errors.New("client-burst must be positive")
+	}
+	f.SetClientBurst(config.ClientBurst)
+
+	if config.ClientPageSize < 0 {
+		return nil, errors.New("client-page-size must not be negative")
+	}
+
+	kubeClient, err := f.KubeClient()
 	if err != nil {
 		return nil, err
 	}
-	if config.clientQPS < 0.0 {
-		return nil, errors.New("client-qps must be positive")
-	}
-	clientConfig.QPS = config.clientQPS
 
-	if config.clientBurst <= 0 {
-		return nil, errors.New("client-burst must be positive")
-	}
-	clientConfig.Burst = config.clientBurst
-
-	kubeClient, err := kubernetes.NewForConfig(clientConfig)
+	dynamicClient, err := f.DynamicClient()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 
-	veleroClient, err := clientset.NewForConfig(clientConfig)
+	crClient, err := f.KubebuilderClient()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 
-	pluginRegistry := plugin.NewRegistry(config.pluginDir, logger, logger.Level)
+	pluginRegistry := process.NewRegistry(config.PluginDir, logger, logger.Level)
 	if err := pluginRegistry.DiscoverPlugins(); err != nil {
 		return nil, err
 	}
-	pluginManager := plugin.NewManager(logger, logger.Level, pluginRegistry)
-	if err != nil {
-		return nil, err
-	}
 
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
+	// cancelFunc is not deferred here because if it was, then ctx would immediately
+	// be canceled once this function exited, making it useless to any informers using later.
+	// That, in turn, causes the velero server to halt when the first informer tries to use it.
+	// Therefore, we must explicitly call it on the error paths in this function.
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
+	clientConfig, err := f.ClientConfig()
+	if err != nil {
+		cancelFunc()
+		return nil, err
+	}
+
+	scheme := runtime.NewScheme()
+	if err := velerov1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := velerov2alpha1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := corev1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := snapshotv1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := batchv1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+
+	ctrl.SetLogger(logrusr.New(logger))
+
+	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
+		Scheme: scheme,
+		Cache: cache.Options{
+			DefaultNamespaces: map[string]cache.Config{
+				f.Namespace(): {},
+			},
+		},
+	})
+	if err != nil {
+		cancelFunc()
+		return nil, err
+	}
+
+	credentialFileStore, err := credentials.NewNamespacedFileStore(
+		mgr.GetClient(),
+		f.Namespace(),
+		config.CredentialsDirectory,
+		filesystem.NewFileSystem(),
+	)
+	if err != nil {
+		cancelFunc()
+		return nil, err
+	}
+
+	credentialSecretStore, err := credentials.NewNamespacedSecretStore(mgr.GetClient(), f.Namespace())
+	if err != nil {
+		cancelFunc()
+		return nil, err
+	}
+
+	var discoveryClient *discovery.DiscoveryClient
+	if discoveryClient, err = discovery.NewDiscoveryClientForConfig(clientConfig); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+
 	s := &server{
-		namespace:             namespace,
-		metricsAddress:        config.metricsAddress,
+		namespace:             f.Namespace(),
+		metricsAddress:        config.MetricsAddress,
 		kubeClientConfig:      clientConfig,
 		kubeClient:            kubeClient,
-		veleroClient:          veleroClient,
-		discoveryClient:       veleroClient.Discovery(),
+		discoveryClient:       discoveryClient,
 		dynamicClient:         dynamicClient,
-		sharedInformerFactory: informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(namespace)),
+		crClient:              crClient,
 		ctx:                   ctx,
 		cancelFunc:            cancelFunc,
 		logger:                logger,
 		logLevel:              logger.Level,
 		pluginRegistry:        pluginRegistry,
-		pluginManager:         pluginManager,
 		config:                config,
+		mgr:                   mgr,
+		credentialFileStore:   credentialFileStore,
+		credentialSecretStore: credentialSecretStore,
 	}
 
 	return s, nil
 }
 
 func (s *server) run() error {
-	defer s.pluginManager.CleanupClients()
-
 	signals.CancelOnShutdown(s.cancelFunc, s.logger)
 
-	if s.config.profilerAddress != "" {
+	if s.config.ProfilerAddress != "" {
 		go s.runProfiler()
 	}
 
@@ -296,32 +319,74 @@ func (s *server) run() error {
 		return err
 	}
 
-	if err := s.validateBackupStorageLocations(); err != nil {
+	s.checkNodeAgent()
+
+	if err := s.initRepoManager(); err != nil {
 		return err
 	}
 
-	if _, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
-		s.logger.WithError(errors.WithStack(err)).
-			Warnf("A backup storage location named %s has been specified for the server to use by default, but no corresponding backup storage location exists. Backups with a location not matching the default will need to explicitly specify an existing location", s.config.defaultBackupLocation)
-	}
-
-	if err := s.initRestic(); err != nil {
+	if err := s.setupBeforeControllerRun(); err != nil {
 		return err
 	}
 
-	if err := s.runControllers(s.config.defaultVolumeSnapshotLocations); err != nil {
+	if err := s.runControllers(s.config.DefaultVolumeSnapshotLocations.Data()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// namespaceExists returns nil if namespace can be successfully
-// gotten from the kubernetes API, or an error otherwise.
-func (s *server) namespaceExists(namespace string) error {
-	s.logger.WithField("namespace", namespace).Info("Checking existence of namespace")
+// setupBeforeControllerRun do any setup that needs to happen before the controllers are started.
+func (s *server) setupBeforeControllerRun() error {
+	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
+	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
+	if err != nil {
+		return errors.WithStack(err)
+	}
 
-	if _, err := s.kubeClient.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
+	markInProgressCRsFailed(s.ctx, client, s.namespace, s.logger)
+
+	if err := setDefaultBackupLocation(s.ctx, client, s.namespace, s.config.DefaultBackupLocation, s.logger); err != nil {
+		return err
+	}
+	return nil
+}
+
+// setDefaultBackupLocation set the BSL that matches the "velero server --default-backup-storage-location"
+func setDefaultBackupLocation(ctx context.Context, client ctrlclient.Client, namespace, defaultBackupLocation string, logger logrus.FieldLogger) error {
+	if defaultBackupLocation == "" {
+		logger.Debug("No default backup storage location specified. Velero will not automatically select a backup storage location for new backups.")
+		return nil
+	}
+
+	backupLocation := &velerov1api.BackupStorageLocation{}
+	if err := client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: defaultBackupLocation}, backupLocation); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.WithField("backupStorageLocation", defaultBackupLocation).WithError(err).Warn("Failed to set default backup storage location at server start")
+			return nil
+		} else {
+			return errors.WithStack(err)
+		}
+	}
+
+	if !backupLocation.Spec.Default {
+		backupLocation.Spec.Default = true
+		if err := client.Update(ctx, backupLocation); err != nil {
+			return errors.WithStack(err)
+		}
+
+		logger.WithField("backupStorageLocation", defaultBackupLocation).Info("Set backup storage location as default")
+	}
+
+	return nil
+}
+
+// namespaceExists returns nil if namespace can be successfully
+// gotten from the Kubernetes API, or an error otherwise.
+func (s *server) namespaceExists(namespace string) error {
+	s.logger.WithField("namespace", namespace).Info("Checking existence of namespace.")
+
+	if _, err := s.kubeClient.CoreV1().Namespaces().Get(s.ctx, namespace, metav1.GetOptions{}); err != nil {
 		return errors.WithStack(err)
 	}
 
@@ -356,35 +421,30 @@ func (s *server) initDiscoveryHelper() error {
 func (s *server) veleroResourcesExist() error {
 	s.logger.Info("Checking existence of Velero custom resource definitions")
 
-	var veleroGroupVersion *metav1.APIResourceList
-	for _, gv := range s.discoveryHelper.Resources() {
-		if gv.GroupVersion == api.SchemeGroupVersion.String() {
-			veleroGroupVersion = gv
-			break
+	// add more group versions whenever available
+	gvResources := map[string]sets.Set[string]{
+		velerov1api.SchemeGroupVersion.String():       velerov1api.CustomResourceKinds(),
+		velerov2alpha1api.SchemeGroupVersion.String(): velerov2alpha1api.CustomResourceKinds(),
+	}
+
+	for _, lst := range s.discoveryHelper.Resources() {
+		if resources, found := gvResources[lst.GroupVersion]; found {
+			for _, resource := range lst.APIResources {
+				s.logger.WithField("kind", resource.Kind).Info("Found custom resource")
+				resources.Delete(resource.Kind)
+			}
 		}
-	}
-
-	if veleroGroupVersion == nil {
-		return errors.Errorf("Velero API group %s not found. Apply examples/common/00-prereqs.yaml to create it.", api.SchemeGroupVersion)
-	}
-
-	foundResources := sets.NewString()
-	for _, resource := range veleroGroupVersion.APIResources {
-		foundResources.Insert(resource.Kind)
 	}
 
 	var errs []error
-	for kind := range api.CustomResources() {
-		if foundResources.Has(kind) {
-			s.logger.WithField("kind", kind).Debug("Found custom resource")
-			continue
+	for gv, resources := range gvResources {
+		for kind := range resources {
+			errs = append(errs, errors.Errorf("custom resource %s not found in Velero API group %s", kind, gv))
 		}
-
-		errs = append(errs, errors.Errorf("custom resource %s not found in Velero API group %s", kind, api.SchemeGroupVersion))
 	}
 
 	if len(errs) > 0 {
-		errs = append(errs, errors.New("Velero custom resources not found - apply examples/common/00-prereqs.yaml to update the custom resource definitions"))
+		errs = append(errs, errors.New("Velero custom resources not found - apply config/crd/v1/bases/*.yaml,config/crd/v2alpha1/bases*.yaml, to update the custom resource definitions"))
 		return kubeerrs.NewAggregate(errs)
 	}
 
@@ -392,109 +452,38 @@ func (s *server) veleroResourcesExist() error {
 	return nil
 }
 
-// validateBackupStorageLocations checks to ensure all backup storage locations exist
-// and have a compatible layout, and returns an error if not.
-func (s *server) validateBackupStorageLocations() error {
-	s.logger.Info("Checking that all backup storage locations are valid")
-
-	locations, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	var invalid []string
-	for _, location := range locations.Items {
-		backupStore, err := persistence.NewObjectBackupStore(&location, s.pluginManager, s.logger)
-		if err != nil {
-			invalid = append(invalid, errors.Wrapf(err, "error getting backup store for location %q", location.Name).Error())
-			continue
-		}
-
-		if err := backupStore.IsValid(); err != nil {
-			invalid = append(invalid, errors.Wrapf(err,
-				"backup store for location %q is invalid (if upgrading from a pre-v0.10 version of Velero, please refer to https://heptio.github.io/velero/v0.10.0/storage-layout-reorg-v0.10 for instructions)",
-				location.Name,
-			).Error())
-		}
-	}
-
-	if len(invalid) > 0 {
-		return errors.Errorf("some backup storage locations are invalid: %s", strings.Join(invalid, "; "))
-	}
-
-	return nil
-}
-
-// - Namespaces go first because all namespaced resources depend on them.
-// - Storage Classes are needed to create PVs and PVCs correctly.
-// - PVs go before PVCs because PVCs depend on them.
-// - PVCs go before pods or controllers so they can be mounted as volumes.
-// - Secrets and config maps go before pods or controllers so they can be mounted
-// 	 as volumes.
-// - Service accounts go before pods or controllers so pods can use them.
-// - Limit ranges go before pods or controllers so pods can use them.
-// - Pods go before controllers so they can be explicitly restored and potentially
-//	 have restic restores run before controllers adopt the pods.
-// - Custom Resource Definitions come before Custom Resource so that they can be
-//   restored with their corresponding CRD.
-var defaultRestorePriorities = []string{
-	"namespaces",
-	"storageclasses",
-	"persistentvolumes",
-	"persistentvolumeclaims",
-	"secrets",
-	"configmaps",
-	"serviceaccounts",
-	"limitranges",
-	"pods",
-	"replicaset",
-	"customresourcedefinitions",
-}
-
-func (s *server) initRestic() error {
-	// warn if restic daemonset does not exist
-	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
-		s.logger.Warn("Velero restic daemonset not found; restic backups/restores will not work until it's created")
+func (s *server) checkNodeAgent() {
+	// warn if node agent does not exist
+	if err := nodeagent.IsRunning(s.ctx, s.kubeClient, s.namespace); err == nodeagent.ErrDaemonSetNotFound {
+		s.logger.Warn("Velero node agent not found; pod volume backups/restores will not work until it's created")
 	} else if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero restic daemonset")
+		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero node agent")
 	}
+}
 
+func (s *server) initRepoManager() error {
 	// ensure the repo key secret is set up
-	if err := restic.EnsureCommonRepositoryKey(s.kubeClient.CoreV1(), s.namespace); err != nil {
+	if err := repokey.EnsureCommonRepositoryKey(s.kubeClient.CoreV1(), s.namespace); err != nil {
 		return err
 	}
 
-	// use a stand-alone secrets informer so we can filter to only the restic credentials
-	// secret(s) within the velero namespace
-	//
-	// note: using an informer to access the single secret for all velero-managed
-	// restic repositories is overkill for now, but will be useful when we move
-	// to fully-encrypted backups and have unique keys per repository.
-	secretsInformer := corev1informers.NewFilteredSecretInformer(
-		s.kubeClient,
-		s.namespace,
-		0,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-		func(opts *metav1.ListOptions) {
-			opts.FieldSelector = fmt.Sprintf("metadata.name=%s", restic.CredentialsSecretName)
-		},
-	)
-	go secretsInformer.Run(s.ctx.Done())
+	s.repoLocker = repository.NewRepoLocker()
+	s.repoEnsurer = repository.NewEnsurer(s.mgr.GetClient(), s.logger, s.config.ResourceTimeout)
 
-	res, err := restic.NewRepositoryManager(
-		s.ctx,
+	s.repoManager = repomanager.NewManager(
 		s.namespace,
-		s.veleroClient,
-		secretsInformer,
-		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
-		s.veleroClient.VeleroV1(),
-		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+		s.mgr.GetClient(),
+		s.repoLocker,
+		s.repoEnsurer,
+		s.credentialFileStore,
+		s.credentialSecretStore,
+		s.config.RepoMaintenanceJobConfig,
+		s.config.PodResources,
+		s.config.KeepLatestMaintenanceJobs,
 		s.logger,
+		s.logLevel,
+		s.config.LogFormat,
 	)
-	if err != nil {
-		return err
-	}
-	s.resticManager = res
 
 	return nil
 }
@@ -502,14 +491,16 @@ func (s *server) initRestic() error {
 func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string) error {
 	s.logger.Info("Starting controllers")
 
-	ctx := s.ctx
-	var wg sync.WaitGroup
-
 	go func() {
 		metricsMux := http.NewServeMux()
 		metricsMux.Handle("/metrics", promhttp.Handler())
 		s.logger.Infof("Starting metric server at address [%s]", s.metricsAddress)
-		if err := http.ListenAndServe(s.metricsAddress, metricsMux); err != nil {
+		server := &http.Server{
+			Addr:              s.metricsAddress,
+			Handler:           metricsMux,
+			ReadHeaderTimeout: 3 * time.Second,
+		}
+		if err := server.ListenAndServe(); err != nil {
 			s.logger.Fatalf("Failed to start metric server at [%s]: %v", s.metricsAddress, err)
 		}
 	}()
@@ -518,197 +509,376 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	// Initialize manual backup metrics
 	s.metrics.InitSchedule("")
 
-	newPluginManager := func(logger logrus.FieldLogger) plugin.Manager {
-		return plugin.NewManager(logger, s.logLevel, s.pluginRegistry)
+	newPluginManager := func(logger logrus.FieldLogger) clientmgmt.Manager {
+		return clientmgmt.NewManager(logger, s.logLevel, s.pluginRegistry)
 	}
 
-	backupSyncController := controller.NewBackupSyncController(
-		s.veleroClient.VeleroV1(),
-		s.veleroClient.VeleroV1(),
-		s.sharedInformerFactory.Velero().V1().Backups(),
-		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-		s.config.backupSyncPeriod,
-		s.namespace,
-		s.config.defaultBackupLocation,
+	backupStoreGetter := persistence.NewObjectBackupStoreGetter(s.credentialFileStore)
+
+	backupTracker := controller.NewBackupTracker()
+
+	// By far, PodVolumeBackup, PodVolumeRestore, BackupStorageLocation controllers
+	// are not included in --disable-controllers list.
+	// This is because of PVB and PVR are used by node agent DaemonSet,
+	// and BSL controller is mandatory for Velero to work.
+	// Note: all runtime type controllers that can be disabled are grouped separately, below:
+	enabledRuntimeControllers := map[string]struct{}{
+		constant.ControllerBackup:              {},
+		constant.ControllerBackupDeletion:      {},
+		constant.ControllerBackupFinalizer:     {},
+		constant.ControllerBackupOperations:    {},
+		constant.ControllerBackupRepo:          {},
+		constant.ControllerBackupSync:          {},
+		constant.ControllerDownloadRequest:     {},
+		constant.ControllerGarbageCollection:   {},
+		constant.ControllerRestore:             {},
+		constant.ControllerRestoreOperations:   {},
+		constant.ControllerSchedule:            {},
+		constant.ControllerServerStatusRequest: {},
+		constant.ControllerRestoreFinalizer:    {},
+	}
+
+	if s.config.RestoreOnly {
+		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
+		s.config.DisabledControllers = append(s.config.DisabledControllers,
+			constant.ControllerBackup,
+			constant.ControllerBackupDeletion,
+			constant.ControllerBackupFinalizer,
+			constant.ControllerBackupOperations,
+			constant.ControllerGarbageCollection,
+			constant.ControllerSchedule,
+		)
+	}
+
+	// Remove disabled controllers so they are not initialized. If a match is not found we want
+	// to halt the system so the user knows this operation was not possible.
+	if err := removeControllers(s.config.DisabledControllers, enabledRuntimeControllers, s.logger); err != nil {
+		log.Fatal(err, "unable to disable a controller")
+	}
+
+	// Enable BSL controller. No need to check whether it's enabled or not.
+	bslr := controller.NewBackupStorageLocationReconciler(
+		s.ctx,
+		s.mgr.GetClient(),
+		storage.DefaultBackupLocationInfo{
+			StorageLocation:           s.config.DefaultBackupLocation,
+			ServerValidationFrequency: s.config.StoreValidationFrequency,
+		},
 		newPluginManager,
+		backupStoreGetter,
 		s.logger,
 	)
-	wg.Add(1)
-	go func() {
-		backupSyncController.Run(ctx, 1)
-		wg.Done()
-	}()
+	if err := bslr.SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupStorageLocation)
+	}
 
-	if s.config.restoreOnly {
-		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
-	} else {
-		backupTracker := controller.NewBackupTracker()
+	pvbInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov1api.PodVolumeBackup{})
+	if err != nil {
+		s.logger.Fatal(err, "fail to get controller-runtime informer from manager for PVB")
+	}
 
+	if _, ok := enabledRuntimeControllers[constant.ControllerBackup]; ok {
 		backupper, err := backup.NewKubernetesBackupper(
+			s.crClient,
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
-			s.resticManager,
-			s.config.podVolumeOperationTimeout,
+			podvolume.NewBackupperFactory(
+				s.repoLocker,
+				s.repoEnsurer,
+				s.crClient,
+				pvbInformer,
+				s.logger,
+			),
+			s.config.PodVolumeOperationTimeout,
+			s.config.DefaultVolumesToFsBackup,
+			s.config.ClientPageSize,
+			s.config.UploaderType,
+			newPluginManager,
+			backupStoreGetter,
 		)
 		cmd.CheckError(err)
-
-		backupController := controller.NewBackupController(
-			s.sharedInformerFactory.Velero().V1().Backups(),
-			s.veleroClient.VeleroV1(),
+		if err := controller.NewBackupReconciler(
+			s.ctx,
+			s.discoveryHelper,
 			backupper,
 			s.logger,
 			s.logLevel,
 			newPluginManager,
 			backupTracker,
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-			s.config.defaultBackupLocation,
-			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
+			s.mgr.GetClient(),
+			s.config.DefaultBackupLocation,
+			s.config.DefaultVolumesToFsBackup,
+			s.config.DefaultBackupTTL,
+			s.config.DefaultCSISnapshotTimeout,
+			s.config.ResourceTimeout,
+			s.config.DefaultItemOperationTimeout,
 			defaultVolumeSnapshotLocations,
 			s.metrics,
-		)
-		wg.Add(1)
-		go func() {
-			backupController.Run(ctx, 1)
-			wg.Done()
-		}()
-
-		scheduleController := controller.NewScheduleController(
-			s.namespace,
-			s.veleroClient.VeleroV1(),
-			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().Schedules(),
-			s.logger,
-			s.metrics,
-		)
-		wg.Add(1)
-		go func() {
-			scheduleController.Run(ctx, 1)
-			wg.Done()
-		}()
-
-		gcController := controller.NewGCController(
-			s.logger,
-			s.sharedInformerFactory.Velero().V1().Backups(),
-			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
-			s.veleroClient.VeleroV1(),
-		)
-		wg.Add(1)
-		go func() {
-			gcController.Run(ctx, 1)
-			wg.Done()
-		}()
-
-		backupDeletionController := controller.NewBackupDeletionController(
-			s.logger,
-			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
-			s.veleroClient.VeleroV1(), // deleteBackupRequestClient
-			s.veleroClient.VeleroV1(), // backupClient
-			s.sharedInformerFactory.Velero().V1().Restores(),
-			s.veleroClient.VeleroV1(), // restoreClient
-			backupTracker,
-			s.resticManager,
-			s.sharedInformerFactory.Velero().V1().PodVolumeBackups(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
-			newPluginManager,
-		)
-		wg.Add(1)
-		go func() {
-			backupDeletionController.Run(ctx, 1)
-			wg.Done()
-		}()
+			backupStoreGetter,
+			s.config.LogFormat.Parse(),
+			s.credentialFileStore,
+			s.config.MaxConcurrentK8SConnections,
+			s.config.DefaultSnapshotMoveData,
+			s.crClient,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackup)
+		}
 	}
 
-	restorer, err := restore.NewKubernetesRestorer(
-		s.discoveryHelper,
-		client.NewDynamicFactory(s.dynamicClient),
-		s.config.restoreResourcePriorities,
-		s.kubeClient.CoreV1().Namespaces(),
-		s.resticManager,
-		s.config.podVolumeOperationTimeout,
-		s.config.resourceTerminatingTimeout,
-		s.logger,
-	)
-	cmd.CheckError(err)
+	if _, ok := enabledRuntimeControllers[constant.ControllerBackupDeletion]; ok {
+		if err := controller.NewBackupDeletionReconciler(
+			s.logger,
+			s.mgr.GetClient(),
+			backupTracker,
+			s.repoManager,
+			s.metrics,
+			s.discoveryHelper,
+			newPluginManager,
+			backupStoreGetter,
+			s.credentialFileStore,
+			s.repoEnsurer,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupDeletion)
+		}
+	}
 
-	restoreController := controller.NewRestoreController(
-		s.namespace,
-		s.sharedInformerFactory.Velero().V1().Restores(),
-		s.veleroClient.VeleroV1(),
-		s.veleroClient.VeleroV1(),
-		restorer,
-		s.sharedInformerFactory.Velero().V1().Backups(),
-		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-		s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
-		s.logger,
-		s.logLevel,
-		newPluginManager,
-		s.config.defaultBackupLocation,
-		s.metrics,
-	)
+	backupOpsMap := itemoperationmap.NewBackupItemOperationsMap()
+	if _, ok := enabledRuntimeControllers[constant.ControllerBackupOperations]; ok {
+		r := controller.NewBackupOperationsReconciler(
+			s.logger,
+			s.mgr.GetClient(),
+			s.config.ItemOperationSyncFrequency,
+			newPluginManager,
+			backupStoreGetter,
+			s.metrics,
+			backupOpsMap,
+		)
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupOperations)
+		}
+	}
 
-	wg.Add(1)
-	go func() {
-		restoreController.Run(ctx, 1)
-		wg.Done()
-	}()
+	if _, ok := enabledRuntimeControllers[constant.ControllerBackupFinalizer]; ok {
+		backupper, err := backup.NewKubernetesBackupper(
+			s.mgr.GetClient(),
+			s.discoveryHelper,
+			client.NewDynamicFactory(s.dynamicClient),
+			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
+			podvolume.NewBackupperFactory(
+				s.repoLocker,
+				s.repoEnsurer,
+				s.crClient,
+				pvbInformer,
+				s.logger,
+			),
+			s.config.PodVolumeOperationTimeout,
+			s.config.DefaultVolumesToFsBackup,
+			s.config.ClientPageSize,
+			s.config.UploaderType,
+			newPluginManager,
+			backupStoreGetter,
+		)
+		cmd.CheckError(err)
+		r := controller.NewBackupFinalizerReconciler(
+			s.mgr.GetClient(),
+			s.crClient,
+			clock.RealClock{},
+			backupper,
+			newPluginManager,
+			backupTracker,
+			backupStoreGetter,
+			s.logger,
+			s.metrics,
+			s.config.ResourceTimeout,
+		)
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupFinalizer)
+		}
+	}
 
-	downloadRequestController := controller.NewDownloadRequestController(
-		s.veleroClient.VeleroV1(),
-		s.sharedInformerFactory.Velero().V1().DownloadRequests(),
-		s.sharedInformerFactory.Velero().V1().Restores(),
-		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-		s.sharedInformerFactory.Velero().V1().Backups(),
-		newPluginManager,
-		s.logger,
-	)
-	wg.Add(1)
-	go func() {
-		downloadRequestController.Run(ctx, 1)
-		wg.Done()
-	}()
+	if _, ok := enabledRuntimeControllers[constant.ControllerBackupRepo]; ok {
+		if err := controller.NewBackupRepoReconciler(
+			s.namespace,
+			s.logger,
+			s.mgr.GetClient(),
+			s.config.RepoMaintenanceFrequency,
+			s.config.BackupRepoConfig,
+			s.repoManager,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupRepo)
+		}
+	}
 
-	resticRepoController := controller.NewResticRepositoryController(
-		s.logger,
-		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
-		s.veleroClient.VeleroV1(),
-		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-		s.resticManager,
-	)
-	wg.Add(1)
-	go func() {
-		// TODO only having a single worker may be an issue since maintenance
-		// can take a long time.
-		resticRepoController.Run(ctx, 1)
-		wg.Done()
-	}()
+	if _, ok := enabledRuntimeControllers[constant.ControllerBackupSync]; ok {
+		syncPeriod := s.config.BackupSyncPeriod
+		if syncPeriod <= 0 {
+			syncPeriod = time.Minute
+		}
 
-	serverStatusRequestController := controller.NewServerStatusRequestController(
-		s.logger,
-		s.veleroClient.VeleroV1(),
-		s.sharedInformerFactory.Velero().V1().ServerStatusRequests(),
-	)
-	wg.Add(1)
-	go func() {
-		serverStatusRequestController.Run(ctx, 1)
-		wg.Done()
-	}()
+		backupSyncReconciler := controller.NewBackupSyncReconciler(
+			s.mgr.GetClient(),
+			s.namespace,
+			syncPeriod,
+			newPluginManager,
+			backupStoreGetter,
+			s.logger,
+		)
+		if err := backupSyncReconciler.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, " unable to create controller ", "controller ", constant.ControllerBackupSync)
+		}
+	}
 
-	// SHARED INFORMERS HAVE TO BE STARTED AFTER ALL CONTROLLERS
-	go s.sharedInformerFactory.Start(ctx.Done())
+	restoreOpsMap := itemoperationmap.NewRestoreItemOperationsMap()
+	if _, ok := enabledRuntimeControllers[constant.ControllerRestoreOperations]; ok {
+		r := controller.NewRestoreOperationsReconciler(
+			s.logger,
+			s.namespace,
+			s.mgr.GetClient(),
+			s.config.ItemOperationSyncFrequency,
+			newPluginManager,
+			backupStoreGetter,
+			s.metrics,
+			restoreOpsMap,
+		)
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerRestoreOperations)
+		}
+	}
 
-	// TODO(1.0): remove
-	cache.WaitForCacheSync(ctx.Done(), s.sharedInformerFactory.Velero().V1().Backups().Informer().HasSynced)
-	s.removeDeprecatedGCFinalizer()
+	if _, ok := enabledRuntimeControllers[constant.ControllerDownloadRequest]; ok {
+		r := controller.NewDownloadRequestReconciler(
+			s.mgr.GetClient(),
+			clock.RealClock{},
+			newPluginManager,
+			backupStoreGetter,
+			s.logger,
+			backupOpsMap,
+			restoreOpsMap,
+		)
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerDownloadRequest)
+		}
+	}
 
-	s.logger.Info("Server started successfully")
+	if _, ok := enabledRuntimeControllers[constant.ControllerGarbageCollection]; ok {
+		r := controller.NewGCReconciler(s.logger, s.mgr.GetClient(), s.config.GarbageCollectionFrequency)
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerGarbageCollection)
+		}
+	}
 
-	<-ctx.Done()
+	pvrInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov1api.PodVolumeRestore{})
+	if err != nil {
+		s.logger.Fatal(err, "fail to get controller-runtime informer from manager for PVR")
+	}
 
-	s.logger.Info("Waiting for all controllers to shut down gracefully")
-	wg.Wait()
+	multiHookTracker := hook.NewMultiHookTracker()
 
+	if _, ok := enabledRuntimeControllers[constant.ControllerRestore]; ok {
+		restorer, err := restore.NewKubernetesRestorer(
+			s.discoveryHelper,
+			client.NewDynamicFactory(s.dynamicClient),
+			s.config.RestoreResourcePriorities,
+			s.kubeClient.CoreV1().Namespaces(),
+			podvolume.NewRestorerFactory(
+				s.repoLocker,
+				s.repoEnsurer,
+				s.kubeClient,
+				s.crClient,
+				pvrInformer,
+				s.logger,
+			),
+			s.config.PodVolumeOperationTimeout,
+			s.config.ResourceTerminatingTimeout,
+			s.config.ResourceTimeout,
+			s.logger,
+			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
+			s.kubeClient.CoreV1().RESTClient(),
+			s.credentialFileStore,
+			s.mgr.GetClient(),
+			multiHookTracker,
+		)
+
+		cmd.CheckError(err)
+
+		r := controller.NewRestoreReconciler(
+			s.ctx,
+			s.namespace,
+			restorer,
+			s.mgr.GetClient(),
+			s.logger,
+			s.logLevel,
+			newPluginManager,
+			backupStoreGetter,
+			s.metrics,
+			s.config.LogFormat.Parse(),
+			s.config.DefaultItemOperationTimeout,
+			s.config.DisableInformerCache,
+			s.crClient,
+			s.config.ResourceTimeout,
+		)
+
+		if err = r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "fail to create controller", "controller", constant.ControllerRestore)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[constant.ControllerSchedule]; ok {
+		if err := controller.NewScheduleReconciler(s.namespace, s.logger, s.mgr.GetClient(), s.metrics, s.config.ScheduleSkipImmediately).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerSchedule)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[constant.ControllerServerStatusRequest]; ok {
+		if err := controller.NewServerStatusRequestReconciler(
+			s.ctx,
+			s.mgr.GetClient(),
+			s.pluginRegistry,
+			clock.RealClock{},
+			s.logger,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerServerStatusRequest)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[constant.ControllerRestoreFinalizer]; ok {
+		if err := controller.NewRestoreFinalizerReconciler(
+			s.logger,
+			s.namespace,
+			s.mgr.GetClient(),
+			newPluginManager,
+			backupStoreGetter,
+			s.metrics,
+			s.crClient,
+			multiHookTracker,
+			s.config.ResourceTimeout,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerRestoreFinalizer)
+		}
+	}
+
+	s.logger.Info("Server starting...")
+
+	if err := s.mgr.Start(s.ctx); err != nil {
+		s.logger.Fatal("Problem starting manager", err)
+	}
+	return nil
+}
+
+// removeControllers will remove any controller listed to be disabled from the list
+// of controllers to be initialized. It will check the runtime controllers. If a match
+// wasn't found and it returns an error.
+func removeControllers(disabledControllers []string, enabledRuntimeControllers map[string]struct{}, logger logrus.FieldLogger) error {
+	for _, controllerName := range disabledControllers {
+		if _, ok := enabledRuntimeControllers[controllerName]; ok {
+			logger.Infof("Disabling controller: %s", controllerName)
+			delete(enabledRuntimeControllers, controllerName)
+		} else {
+			msg := fmt.Sprintf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(config.DisableableControllers, ","))
+			return errors.New(msg)
+		}
+	}
 	return nil
 }
 
@@ -720,47 +890,151 @@ func (s *server) runProfiler() {
 	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
-	if err := http.ListenAndServe(s.config.profilerAddress, mux); err != nil {
+	server := &http.Server{
+		Addr:              s.config.ProfilerAddress,
+		Handler:           mux,
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+	if err := server.ListenAndServe(); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("error running profiler http server")
 	}
 }
 
-// TODO(1.0): remove
-func (s *server) removeDeprecatedGCFinalizer() {
-	const gcFinalizer = "gc.ark.heptio.com"
+// if there is a restarting during the reconciling of backups/restores/etc, these CRs may be stuck in progress status
+// markInProgressCRsFailed tries to mark the in progress CRs as failed when starting the server to avoid the issue
+func markInProgressCRsFailed(ctx context.Context, client ctrlclient.Client, namespace string, log logrus.FieldLogger) {
+	markInProgressBackupsFailed(ctx, client, namespace, log)
 
-	backups, err := s.sharedInformerFactory.Velero().V1().Backups().Lister().List(labels.Everything())
-	if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("error listing backups from cache - unable to remove old finalizers")
+	markInProgressRestoresFailed(ctx, client, namespace, log)
+}
+
+func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, namespace string, log logrus.FieldLogger) {
+	backups := &velerov1api.BackupList{}
+	if err := client.List(ctx, backups, &ctrlclient.ListOptions{Namespace: namespace}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list backups")
 		return
 	}
 
-	for _, backup := range backups {
-		log := s.logger.WithField("backup", kube.NamespaceAndName(backup))
-
-		if !stringslice.Has(backup.Finalizers, gcFinalizer) {
-			log.Debug("backup doesn't have deprecated finalizer - skipping")
+	for i, backup := range backups.Items {
+		if backup.Status.Phase != velerov1api.BackupPhaseInProgress {
+			log.Debugf("the status of backup %q is %q, skip", backup.GetName(), backup.Status.Phase)
 			continue
 		}
-
-		log.Info("removing deprecated finalizer from backup")
-
-		patch := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"finalizers":      stringslice.Except(backup.Finalizers, gcFinalizer),
-				"resourceVersion": backup.ResourceVersion,
-			},
-		}
-
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			log.WithError(errors.WithStack(err)).Error("error marshaling finalizers patch")
+		updated := backup.DeepCopy()
+		updated.Status.Phase = velerov1api.BackupPhaseFailed
+		updated.Status.FailureReason = fmt.Sprintf("found a backup with status %q during the server starting, mark it as %q", backup.Status.Phase, updated.Status.Phase)
+		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&backups.Items[i])); err != nil {
+			log.WithError(errors.WithStack(err)).Errorf("failed to patch backup %q", backup.GetName())
 			continue
 		}
+		log.WithField("backup", backup.GetName()).Warn(updated.Status.FailureReason)
+		markDataUploadsCancel(ctx, client, backup, log)
+	}
+}
 
-		_, err = s.veleroClient.VeleroV1().Backups(backup.Namespace).Patch(backup.Name, types.MergePatchType, patchBytes)
-		if err != nil {
-			log.WithError(errors.WithStack(err)).Error("error marshaling finalizers patch")
+func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client, namespace string, log logrus.FieldLogger) {
+	restores := &velerov1api.RestoreList{}
+	if err := client.List(ctx, restores, &ctrlclient.ListOptions{Namespace: namespace}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list restores")
+		return
+	}
+	for i, restore := range restores.Items {
+		if restore.Status.Phase != velerov1api.RestorePhaseInProgress {
+			log.Debugf("the status of restore %q is %q, skip", restore.GetName(), restore.Status.Phase)
+			continue
+		}
+		updated := restore.DeepCopy()
+		updated.Status.Phase = velerov1api.RestorePhaseFailed
+		updated.Status.FailureReason = fmt.Sprintf("found a restore with status %q during the server starting, mark it as %q", restore.Status.Phase, updated.Status.Phase)
+		updated.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+		if err := client.Patch(ctx, updated, ctrlclient.MergeFrom(&restores.Items[i])); err != nil {
+			log.WithError(errors.WithStack(err)).Errorf("failed to patch restore %q", restore.GetName())
+			continue
+		}
+		log.WithField("restore", restore.GetName()).Warn(updated.Status.FailureReason)
+		markDataDownloadsCancel(ctx, client, restore, log)
+	}
+}
+
+func markDataUploadsCancel(ctx context.Context, client ctrlclient.Client, backup velerov1api.Backup, log logrus.FieldLogger) {
+	dataUploads := &velerov2alpha1api.DataUploadList{}
+
+	if err := client.List(ctx, dataUploads, &ctrlclient.ListOptions{
+		Namespace: backup.GetNamespace(),
+		LabelSelector: labels.Set(map[string]string{
+			velerov1api.BackupUIDLabel: string(backup.GetUID()),
+		}).AsSelector(),
+	}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list dataUploads")
+		return
+	}
+
+	for i := range dataUploads.Items {
+		du := dataUploads.Items[i]
+		if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted ||
+			du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared ||
+			du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress ||
+			du.Status.Phase == velerov2alpha1api.DataUploadPhaseNew ||
+			du.Status.Phase == "" {
+			err := controller.UpdateDataUploadWithRetry(ctx, client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, log.WithField("dataupload", du.Name),
+				func(dataUpload *velerov2alpha1api.DataUpload) bool {
+					if dataUpload.Spec.Cancel {
+						return false
+					}
+
+					dataUpload.Spec.Cancel = true
+					dataUpload.Status.Message = fmt.Sprintf("Dataupload is in status %q during the velero server starting, mark it as cancel", du.Status.Phase)
+
+					return true
+				})
+
+			if err != nil {
+				log.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", du.GetName())
+				continue
+			}
+			log.WithField("dataupload", du.GetName()).Warn(du.Status.Message)
+		}
+	}
+}
+
+func markDataDownloadsCancel(ctx context.Context, client ctrlclient.Client, restore velerov1api.Restore, log logrus.FieldLogger) {
+	dataDownloads := &velerov2alpha1api.DataDownloadList{}
+
+	if err := client.List(ctx, dataDownloads, &ctrlclient.ListOptions{
+		Namespace: restore.GetNamespace(),
+		LabelSelector: labels.Set(map[string]string{
+			velerov1api.RestoreUIDLabel: string(restore.GetUID()),
+		}).AsSelector(),
+	}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list dataDownloads")
+		return
+	}
+
+	for i := range dataDownloads.Items {
+		dd := dataDownloads.Items[i]
+		if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted ||
+			dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared ||
+			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress ||
+			dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseNew ||
+			dd.Status.Phase == "" {
+			err := controller.UpdateDataDownloadWithRetry(ctx, client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, log.WithField("datadownload", dd.Name),
+				func(dataDownload *velerov2alpha1api.DataDownload) bool {
+					if dataDownload.Spec.Cancel {
+						return false
+					}
+
+					dataDownload.Spec.Cancel = true
+					dataDownload.Status.Message = fmt.Sprintf("Datadownload is in status %q during the velero server starting, mark it as cancel", dd.Status.Phase)
+
+					return true
+				})
+
+			if err != nil {
+				log.WithError(errors.WithStack(err)).Errorf("failed to mark datadownload %q cancel", dd.GetName())
+				continue
+			}
+			log.WithField("datadownload", dd.GetName()).Warn(dd.Status.Message)
 		}
 	}
 }

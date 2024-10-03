@@ -1,0 +1,14 @@
+<!--
+# Original youtube shortcode
+# https://github.com/gohugoio/hugo/blob/master/tpl/tplimpl/embedded/templates/shortcodes/youtube.html
+-->
+
+{{- $pc := .Page.Site.Config.Privacy.YouTube -}}
+{{- if not $pc.Disable -}}
+    {{- $ytHost := cond $pc.PrivacyEnhanced  "www.youtube-nocookie.com" "www.youtube.com" -}}
+    {{- $id := .Get "id" | default (.Get 0) -}}
+    {{- $class := .Get "class" | default (.Get 1) }}
+    <div {{ with $class }}class="{{ . }}"{{ end }}>
+        <iframe src="https://{{ $ytHost }}/embed/{{ $id }}{{ with .Get "autoplay" }}{{ if eq . "true" }}?autoplay=1{{ end }}{{ end }}" {{ if not $class }}width="560" height="315" {{ end }}allowfullscreen title="YouTube Video"></iframe>
+    </div>
+{{ end -}}

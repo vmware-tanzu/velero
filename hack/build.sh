@@ -2,6 +2,8 @@
 
 # Copyright 2016 The Kubernetes Authors.
 #
+# Modifications Copyright 2020 the Velero contributors.
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -18,38 +20,55 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [ -z "${PKG}" ]; then
+if [[ -z "${PKG}" ]]; then
     echo "PKG must be set"
     exit 1
 fi
-if [ -z "${BIN}" ]; then
+if [[ -z "${BIN}" ]]; then
     echo "BIN must be set"
     exit 1
 fi
-if [ -z "${GOOS}" ]; then
+if [[ -z "${GOOS}" ]]; then
     echo "GOOS must be set"
     exit 1
 fi
-if [ -z "${GOARCH}" ]; then
+if [[ -z "${GOBIN}" ]]; then
+    echo "GOBIN must be set"
+    exit 1
+fi
+if [[ -z "${GOARCH}" ]]; then
     echo "GOARCH must be set"
     exit 1
 fi
-if [ -z "${VERSION}" ]; then
+if [[ -z "${VERSION}" ]]; then
     echo "VERSION must be set"
     exit 1
 fi
 
-export CGO_ENABLED=0
-
-GIT_SHA=$(git rev-parse HEAD)
-GIT_DIRTY=$(git status --porcelain 2> /dev/null)
-if [[ -z "${GIT_DIRTY}" ]]; then
-  GIT_TREE_STATE=clean
-else
-  GIT_TREE_STATE=dirty
+if [[ -z "${REGISTRY}" ]]; then
+    echo "REGISTRY must be set"
+    exit 1
 fi
 
+if [[ -z "${GIT_SHA}" ]]; then
+    echo "GIT_SHA must be set"
+    exit 1
+fi
+
+if [[ -z "${GIT_TREE_STATE}" ]]; then
+    echo "GIT_TREE_STATE must be set"
+    exit 1
+fi
+
+GCFLAGS=""
+if [[ ${DEBUG:-} = "1" ]]; then
+    GCFLAGS="all=-N -l"
+fi
+
+export CGO_ENABLED=0
+
 LDFLAGS="-X ${PKG}/pkg/buildinfo.Version=${VERSION}"
+LDFLAGS="${LDFLAGS} -X ${PKG}/pkg/buildinfo.ImageRegistry=${REGISTRY}"
 LDFLAGS="${LDFLAGS} -X ${PKG}/pkg/buildinfo.GitSHA=${GIT_SHA}"
 LDFLAGS="${LDFLAGS} -X ${PKG}/pkg/buildinfo.GitTreeState=${GIT_TREE_STATE}"
 
@@ -63,6 +82,7 @@ fi
 
 go build \
     -o ${OUTPUT} \
+    -gcflags "${GCFLAGS}" \
     -installsuffix "static" \
     -ldflags "${LDFLAGS}" \
     ${PKG}/cmd/${BIN}

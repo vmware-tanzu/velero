@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,17 @@ limitations under the License.
 package restore
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/cmd/util/output"
+	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 )
 
 func NewGetCommand(f client.Factory, use string) *cobra.Command {
@@ -36,20 +40,30 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
 
-			veleroClient, err := f.Client()
+			kbClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
-			var restores *api.RestoreList
+			restores := new(api.RestoreList)
 			if len(args) > 0 {
-				restores = new(api.RestoreList)
 				for _, name := range args {
-					restore, err := veleroClient.VeleroV1().Restores(f.Namespace()).Get(name, metav1.GetOptions{})
+					restore := new(api.Restore)
+					err := kbClient.Get(context.TODO(), controllerclient.ObjectKey{Namespace: f.Namespace(), Name: name}, restore)
 					cmd.CheckError(err)
 					restores.Items = append(restores.Items, *restore)
 				}
 			} else {
-				restores, err = veleroClient.VeleroV1().Restores(f.Namespace()).List(listOptions)
+				parsedSelector, err := labels.Parse(listOptions.LabelSelector)
 				cmd.CheckError(err)
+
+				err = kbClient.List(context.TODO(), restores, &controllerclient.ListOptions{LabelSelector: parsedSelector, Namespace: f.Namespace()})
+				cmd.CheckError(err)
+			}
+
+			// Append "(Deleting)" to phase if deletionTimestamp is marked.
+			for i := range restores.Items {
+				if !restores.Items[i].DeletionTimestamp.IsZero() {
+					restores.Items[i].Status.Phase += " (Deleting)"
+				}
 			}
 
 			if printed, err := output.PrintWithFormat(c, restores); printed || err != nil {
@@ -62,7 +76,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 		},
 	}
 
-	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "only show items matching this label selector")
+	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "Only show items matching this label selector.")
 
 	output.BindFlags(c.Flags())
 

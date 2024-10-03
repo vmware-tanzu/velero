@@ -17,7 +17,10 @@ limitations under the License.
 package restore
 
 import (
+	"context"
 	"testing"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -25,16 +28,20 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
-	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
-	"github.com/heptio/velero/pkg/plugin/velero"
-	velerotest "github.com/heptio/velero/pkg/util/test"
-	"github.com/heptio/velero/pkg/volume"
+	"github.com/vmware-tanzu/velero/internal/volume"
+	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks/volumesnapshotter/v1"
+	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
+func defaultBackup() *builder.BackupBuilder {
+	return builder.ForBackup(api.DefaultNamespace, "backup-1")
+}
+
 func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
+	fakeClient := velerotest.NewFakeControllerRuntimeClient(t)
 	tests := []struct {
 		name            string
 		obj             *unstructured.Unstructured
@@ -47,127 +54,91 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 	}{
 		{
 			name:        "no name should error",
-			obj:         NewTestUnstructured().WithMetadata().Unstructured,
-			restore:     velerotest.NewDefaultTestRestore().Restore,
+			obj:         newTestUnstructured().WithMetadata().Unstructured,
+			restore:     builder.ForRestore(api.DefaultNamespace, "").Result(),
 			expectedErr: true,
-		},
-		{
-			name:        "no spec should error",
-			obj:         NewTestUnstructured().WithName("pv-1").Unstructured,
-			restore:     velerotest.NewDefaultTestRestore().Restore,
-			expectedErr: true,
-		},
-		{
-			name:        "ensure spec.claimRef is deleted",
-			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "someOtherField").Unstructured,
-			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
-			backup:      velerotest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).Backup,
-			expectedRes: NewTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("someOtherField").Unstructured,
 		},
 		{
 			name:        "ensure spec.storageClassName is retained",
-			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("storageClassName", "someOtherField").Unstructured,
-			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
-			backup:      velerotest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).Backup,
-			expectedRes: NewTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("storageClassName", "someOtherField").Unstructured,
+			obj:         newTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("storageClassName", "someOtherField").Unstructured,
+			restore:     builder.ForRestore(api.DefaultNamespace, "").RestorePVs(false).Result(),
+			backup:      defaultBackup().Phase(api.BackupPhaseInProgress).Result(),
+			expectedRes: newTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("storageClassName", "someOtherField").Unstructured,
 		},
 		{
 			name:        "if backup.spec.snapshotVolumes is false, ignore restore.spec.restorePVs and return early",
-			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
-			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      velerotest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithSnapshotVolumes(false).Backup,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("storageClassName", "someOtherField").Unstructured,
+			obj:         newTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
+			restore:     builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
+			backup:      defaultBackup().Phase(api.BackupPhaseInProgress).SnapshotVolumes(false).Result(),
+			expectedRes: newTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
 		},
 		{
 			name:    "restore.spec.restorePVs=false, return early",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
-			backup:  velerotest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).Backup,
+			obj:     newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(false).Result(),
+			backup:  defaultBackup().Phase(api.BackupPhaseInProgress).Result(),
 			volumeSnapshots: []*volume.Snapshot{
 				newSnapshot("pv-1", "loc-1", "gp", "az-1", "snap-1", 1000),
 			},
 			locations: []*api.VolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-1").Result(),
 			},
 			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-		},
-		{
-			name:        "backup.status.volumeBackups non-nil and no entry for PV: return early",
-			obj:         NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      velerotest.NewTestBackup().WithName("backup-1").WithSnapshot("non-matching-pv", "snap").Backup,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-		},
-		{
-			name:    "backup.status.volumeBackups has entry for PV, >1 VSLs configured: return error",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:  velerotest.NewTestBackup().WithName("backup-1").WithSnapshot("pv-1", "snap").Backup,
-			locations: []*api.VolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
-			},
-			expectedErr: true,
+			expectedRes: newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 		{
 			name:    "volumeSnapshots is empty: return early",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:  velerotest.NewTestBackup().WithName("backup-1").Backup,
+			obj:     newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
+			backup:  defaultBackup().Result(),
 			locations: []*api.VolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-1").Result(),
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-2").Result(),
 			},
 			volumeSnapshots: []*volume.Snapshot{},
-			expectedRes:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			expectedRes:     newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 		{
 			name:    "volumeSnapshots doesn't have a snapshot for PV: return early",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:  velerotest.NewTestBackup().WithName("backup-1").Backup,
+			obj:     newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
+			backup:  defaultBackup().Result(),
 			locations: []*api.VolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-1").Result(),
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-2").Result(),
 			},
 			volumeSnapshots: []*volume.Snapshot{
 				newSnapshot("non-matching-pv-1", "loc-1", "type-1", "az-1", "snap-1", 1),
 				newSnapshot("non-matching-pv-2", "loc-2", "type-2", "az-2", "snap-2", 2),
 			},
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			expectedRes: newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			var (
-				client                   = fake.NewSimpleClientset()
-				snapshotLocationInformer = informers.NewSharedInformerFactory(client, 0).Velero().V1().VolumeSnapshotLocations()
-			)
-
 			r := &pvRestorer{
-				logger:                 velerotest.NewLogger(),
-				restorePVs:             tc.restore.Spec.RestorePVs,
-				snapshotLocationLister: snapshotLocationInformer.Lister(),
+				logger:         velerotest.NewLogger(),
+				restorePVs:     tc.restore.Spec.RestorePVs,
+				kbclient:       velerotest.NewFakeControllerRuntimeClient(t),
+				volInfoTracker: volume.NewRestoreVolInfoTracker(tc.restore, logrus.New(), fakeClient),
 			}
 			if tc.backup != nil {
 				r.backup = tc.backup
-				r.snapshotVolumes = tc.backup.Spec.SnapshotVolumes
 			}
 
 			for _, loc := range tc.locations {
-				require.NoError(t, snapshotLocationInformer.Informer().GetStore().Add(loc))
+				require.NoError(t, r.kbclient.Create(context.TODO(), loc))
 			}
 
 			res, err := r.executePVAction(tc.obj)
 			switch tc.expectedErr {
 			case true:
 				assert.Nil(t, res)
-				assert.NotNil(t, err)
+				assert.Error(t, err)
 			case false:
 				assert.Equal(t, tc.expectedRes, res)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -189,30 +160,13 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 		expectedSnapshot   *volume.Snapshot
 	}{
 		{
-			name:    "pre-v0.10 backup with .status.volumeBackups with entry for PV and single VSL executes restore",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup: velerotest.NewTestBackup().WithName("backup-1").
-				WithVolumeBackupInfo("pv-1", "snap-1", "type-1", "az-1", int64Ptr(1)).
-				WithVolumeBackupInfo("pv-2", "snap-2", "type-2", "az-2", int64Ptr(2)).
-				Backup,
+			name:    "backup with a matching volume.Snapshot for PV executes restore",
+			obj:     newTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
+			backup:  defaultBackup().Result(),
 			locations: []*api.VolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").WithProvider("provider-1").VolumeSnapshotLocation,
-			},
-			expectedProvider:   "provider-1",
-			expectedSnapshotID: "snap-1",
-			expectedVolumeType: "type-1",
-			expectedVolumeAZ:   "az-1",
-			expectedVolumeIOPS: int64Ptr(1),
-		},
-		{
-			name:    "v0.10+ backup with a matching volume.Snapshot for PV executes restore",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:  velerotest.NewTestBackup().WithName("backup-1").Backup,
-			locations: []*api.VolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").WithProvider("provider-1").VolumeSnapshotLocation,
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-2").WithProvider("provider-2").VolumeSnapshotLocation,
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-1").Provider("provider-1").Result(),
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-2").Provider("provider-2").Result(),
 			},
 			volumeSnapshots: []*volume.Snapshot{
 				newSnapshot("pv-1", "loc-1", "type-1", "az-1", "snap-1", 1),
@@ -229,45 +183,47 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				blockStore       = new(cloudprovidermocks.BlockStore)
-				blockStoreGetter = providerToBlockStoreMap(map[string]velero.BlockStore{
-					tc.expectedProvider: blockStore,
+				logger                  = velerotest.NewLogger()
+				volumeSnapshotter       = new(providermocks.VolumeSnapshotter)
+				volumeSnapshotterGetter = providerToVolumeSnapshotterMap(map[string]vsv1.VolumeSnapshotter{
+					tc.expectedProvider: volumeSnapshotter,
 				})
-				locationsInformer = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0).Velero().V1().VolumeSnapshotLocations()
+				fakeClient = velerotest.NewFakeControllerRuntimeClientBuilder(t).Build()
 			)
 
 			for _, loc := range tc.locations {
-				require.NoError(t, locationsInformer.Informer().GetStore().Add(loc))
+				require.NoError(t, fakeClient.Create(context.Background(), loc))
 			}
 
 			r := &pvRestorer{
-				logger:                 velerotest.NewLogger(),
-				backup:                 tc.backup,
-				volumeSnapshots:        tc.volumeSnapshots,
-				snapshotLocationLister: locationsInformer.Lister(),
-				blockStoreGetter:       blockStoreGetter,
+				logger:                  logger,
+				backup:                  tc.backup,
+				volumeSnapshots:         tc.volumeSnapshots,
+				kbclient:                fakeClient,
+				volumeSnapshotterGetter: volumeSnapshotterGetter,
+				volInfoTracker:          volume.NewRestoreVolInfoTracker(tc.restore, logger, fakeClient),
 			}
 
-			blockStore.On("Init", mock.Anything).Return(nil)
-			blockStore.On("CreateVolumeFromSnapshot", tc.expectedSnapshotID, tc.expectedVolumeType, tc.expectedVolumeAZ, tc.expectedVolumeIOPS).Return("volume-1", nil)
-			blockStore.On("SetVolumeID", tc.obj, "volume-1").Return(tc.obj, nil)
+			volumeSnapshotter.On("Init", mock.Anything).Return(nil)
+			volumeSnapshotter.On("CreateVolumeFromSnapshot", tc.expectedSnapshotID, tc.expectedVolumeType, tc.expectedVolumeAZ, tc.expectedVolumeIOPS).Return("volume-1", nil)
+			volumeSnapshotter.On("SetVolumeID", tc.obj, "volume-1").Return(tc.obj, nil)
 
 			_, err := r.executePVAction(tc.obj)
 			assert.NoError(t, err)
 
-			blockStore.AssertExpectations(t)
+			volumeSnapshotter.AssertExpectations(t)
 		})
 	}
 }
 
-type providerToBlockStoreMap map[string]velero.BlockStore
+type providerToVolumeSnapshotterMap map[string]vsv1.VolumeSnapshotter
 
-func (g providerToBlockStoreMap) GetBlockStore(provider string) (velero.BlockStore, error) {
-	if bs, ok := g[provider]; !ok {
-		return nil, errors.New("block store not found for provider")
-	} else {
-		return bs, nil
+func (g providerToVolumeSnapshotterMap) GetVolumeSnapshotter(provider string) (vsv1.VolumeSnapshotter, error) {
+	bs, ok := g[provider]
+	if !ok {
+		return nil, errors.New("volume snapshotter not found for provider")
 	}
+	return bs, nil
 }
 
 func newSnapshot(pvName, location, volumeType, volumeAZ, snapshotID string, volumeIOPS int64) *volume.Snapshot {
@@ -288,4 +244,95 @@ func newSnapshot(pvName, location, volumeType, volumeAZ, snapshotID string, volu
 func int64Ptr(val int) *int64 {
 	r := int64(val)
 	return &r
+}
+
+type testUnstructured struct {
+	*unstructured.Unstructured
+}
+
+func newTestUnstructured() *testUnstructured {
+	obj := &testUnstructured{
+		Unstructured: &unstructured.Unstructured{
+			Object: make(map[string]interface{}),
+		},
+	}
+
+	return obj
+}
+
+func (obj *testUnstructured) WithMetadata(fields ...string) *testUnstructured {
+	return obj.withMap("metadata", fields...)
+}
+
+func (obj *testUnstructured) WithSpec(fields ...string) *testUnstructured {
+	if _, found := obj.Object["spec"]; found {
+		panic("spec already set - you probably didn't mean to do this twice!")
+	}
+	return obj.withMap("spec", fields...)
+}
+
+func (obj *testUnstructured) WithStatus(fields ...string) *testUnstructured {
+	return obj.withMap("status", fields...)
+}
+
+func (obj *testUnstructured) WithMetadataField(field string, value interface{}) *testUnstructured {
+	return obj.withMapEntry("metadata", field, value)
+}
+
+func (obj *testUnstructured) WithSpecField(field string, value interface{}) *testUnstructured {
+	return obj.withMapEntry("spec", field, value)
+}
+
+func (obj *testUnstructured) WithStatusField(field string, value interface{}) *testUnstructured {
+	return obj.withMapEntry("status", field, value)
+}
+
+func (obj *testUnstructured) WithAnnotations(fields ...string) *testUnstructured {
+	vals := map[string]string{}
+	for _, field := range fields {
+		vals[field] = "foo"
+	}
+
+	return obj.WithAnnotationValues(vals)
+}
+
+func (obj *testUnstructured) WithAnnotationValues(fieldVals map[string]string) *testUnstructured {
+	annotations := make(map[string]interface{})
+	for field, val := range fieldVals {
+		annotations[field] = val
+	}
+
+	obj = obj.WithMetadataField("annotations", annotations)
+
+	return obj
+}
+
+func (obj *testUnstructured) WithName(name string) *testUnstructured {
+	return obj.WithMetadataField("name", name)
+}
+
+func (obj *testUnstructured) withMap(name string, fields ...string) *testUnstructured {
+	m := make(map[string]interface{})
+	obj.Object[name] = m
+
+	for _, field := range fields {
+		m[field] = "foo"
+	}
+
+	return obj
+}
+
+func (obj *testUnstructured) withMapEntry(mapName, field string, value interface{}) *testUnstructured {
+	var m map[string]interface{}
+
+	if res, ok := obj.Unstructured.Object[mapName]; !ok {
+		m = make(map[string]interface{})
+		obj.Unstructured.Object[mapName] = m
+	} else {
+		m = res.(map[string]interface{})
+	}
+
+	m[field] = value
+
+	return obj
 }

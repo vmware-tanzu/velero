@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package restore
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -24,11 +25,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/cmd/cli"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/confirm"
 )
 
 // NewDeleteCommand creates and returns a new cobra command for deleting restores.
@@ -38,26 +41,24 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s [NAMES]", use),
 		Short: "Delete restores",
-		Example: `	# delete a restore named "restore-1"
-	velero restore delete restore-1
+		Example: `  # Delete a restore named "restore-1".
+  velero restore delete restore-1
 
-	# delete a restore named "restore-1" without prompting for confirmation
-	velero restore delete restore-1 --confirm
+  # Delete a restore named "restore-1" without prompting for confirmation.
+  velero restore delete restore-1 --confirm
 
-	# delete restores named "restore-1" and "restore-2"
-	velero restore delete restore-1 restore-2
+  # Delete restores named "restore-1" and "restore-2".
+  velero restore delete restore-1 restore-2
 
-	# delete all restores labelled with foo=bar"
-	velero restore delete --selector foo=bar
+  # Delete all restores labeled with "foo=bar".
+  velero restore delete --selector foo=bar
 	
-	# delete all restores
-	velero restore delete --all`,
-
+  # Delete all restores.
+  velero restore delete --all`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(f, args))
 			cmd.CheckError(o.Validate(c, f, args))
 			cmd.CheckError(Run(o))
-
 		},
 	}
 	o.BindFlags(c.Flags())
@@ -66,7 +67,7 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 
 // Run performs the deletion of restore(s).
 func Run(o *cli.DeleteOptions) error {
-	if !o.Confirm && !cli.GetConfirmation() {
+	if !o.Confirm && !confirm.GetConfirmation() {
 		return nil
 	}
 	var (
@@ -77,7 +78,8 @@ func Run(o *cli.DeleteOptions) error {
 	switch {
 	case len(o.Names) > 0:
 		for _, name := range o.Names {
-			restore, err := o.Client.VeleroV1().Restores(o.Namespace).Get(name, metav1.GetOptions{})
+			restore := new(velerov1api.Restore)
+			err := o.Client.Get(context.TODO(), controllerclient.ObjectKey{Namespace: o.Namespace, Name: name}, restore)
 			if err != nil {
 				errs = append(errs, errors.WithStack(err))
 				continue
@@ -85,32 +87,44 @@ func Run(o *cli.DeleteOptions) error {
 			restores = append(restores, restore)
 		}
 	default:
-		selector := labels.Everything().String()
+		selector := labels.Everything()
 		if o.Selector.LabelSelector != nil {
-			selector = o.Selector.String()
+			convertedSelector, err := metav1.LabelSelectorAsSelector(o.Selector.LabelSelector)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			selector = convertedSelector
 		}
-		res, err := o.Client.VeleroV1().Restores(o.Namespace).List(metav1.ListOptions{
+		restoreList := new(velerov1api.RestoreList)
+		err := o.Client.List(context.TODO(), restoreList, &controllerclient.ListOptions{
+			Namespace:     o.Namespace,
 			LabelSelector: selector,
 		})
 		if err != nil {
 			errs = append(errs, errors.WithStack(err))
 		}
 
-		for i := range res.Items {
-			restores = append(restores, &res.Items[i])
+		for i := range restoreList.Items {
+			restores = append(restores, &restoreList.Items[i])
 		}
 	}
+
+	if len(errs) > 0 {
+		fmt.Println("errs: ", errs)
+		return kubeerrs.NewAggregate(errs)
+	}
+
 	if len(restores) == 0 {
 		fmt.Println("No restores found")
 		return nil
 	}
 	for _, r := range restores {
-		err := o.Client.VeleroV1().Restores(r.Namespace).Delete(r.Name, nil)
+		err := o.Client.Delete(context.TODO(), r, &controllerclient.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, errors.WithStack(err))
 			continue
 		}
-		fmt.Printf("Restore %q deleted\n", r.Name)
+		fmt.Printf("Request to delete restore %q submitted successfully.\nThe restore will be fully deleted after all associated data (restore files in object storage) are removed.\n", r.Name)
 	}
 	return kubeerrs.NewAggregate(errs)
 }

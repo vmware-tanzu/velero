@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -24,12 +25,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/backup"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/cmd/cli"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/confirm"
+	"github.com/vmware-tanzu/velero/pkg/label"
 )
 
 // NewDeleteCommand creates a new command that deletes a backup.
@@ -39,21 +43,20 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s [NAMES]", use),
 		Short: "Delete backups",
-		Example: `  # delete a backup named "backup-1"
+		Example: `  # Delete a backup named "backup-1".
   velero backup delete backup-1
 
-  # delete a backup named "backup-1" without prompting for confirmation
+  # Delete a backup named "backup-1" without prompting for confirmation.
   velero backup delete backup-1 --confirm
 
-  # delete backups named "backup-1" and "backup-2"
+  # Delete backups named "backup-1" and "backup-2".
   velero backup delete backup-1 backup-2
 
-  # delete all backups triggered by schedule "schedule-1"
+  # Delete all backups triggered by schedule "schedule-1".
   velero backup delete --selector velero.io/schedule-name=schedule-1
  
-  # delete all backups
-  velero backup delete --all
-  `,
+  # Delete all backups.
+  velero backup delete --all`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(f, args))
 			cmd.CheckError(o.Validate(c, f, args))
@@ -68,7 +71,7 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 
 // Run performs the delete backup operation.
 func Run(o *cli.DeleteOptions) error {
-	if !o.Confirm && !cli.GetConfirmation() {
+	if !o.Confirm && !confirm.GetConfirmation() {
 		// Don't do anything unless we get confirmation
 		return nil
 	}
@@ -82,7 +85,8 @@ func Run(o *cli.DeleteOptions) error {
 	switch {
 	case len(o.Names) > 0:
 		for _, name := range o.Names {
-			backup, err := o.Client.VeleroV1().Backups(o.Namespace).Get(name, metav1.GetOptions{})
+			backup := new(velerov1api.Backup)
+			err := o.Client.Get(context.TODO(), controllerclient.ObjectKey{Namespace: o.Namespace, Name: name}, backup)
 			if err != nil {
 				errs = append(errs, errors.WithStack(err))
 				continue
@@ -91,17 +95,22 @@ func Run(o *cli.DeleteOptions) error {
 			backups = append(backups, backup)
 		}
 	default:
-		selector := labels.Everything().String()
+		selector := labels.Everything()
 		if o.Selector.LabelSelector != nil {
-			selector = o.Selector.String()
+			convertedSelector, err := metav1.LabelSelectorAsSelector(o.Selector.LabelSelector)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			selector = convertedSelector
 		}
 
-		res, err := o.Client.VeleroV1().Backups(o.Namespace).List(metav1.ListOptions{LabelSelector: selector})
+		backupList := new(velerov1api.BackupList)
+		err := o.Client.List(context.TODO(), backupList, &controllerclient.ListOptions{LabelSelector: selector, Namespace: o.Namespace})
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		for i := range res.Items {
-			backups = append(backups, &res.Items[i])
+		for i := range backupList.Items {
+			backups = append(backups, &backupList.Items[i])
 		}
 	}
 
@@ -112,9 +121,11 @@ func Run(o *cli.DeleteOptions) error {
 
 	// create a backup deletion request for each
 	for _, b := range backups {
-		deleteRequest := backup.NewDeleteBackupRequest(b.Name, string(b.UID))
+		deleteRequest := builder.ForDeleteBackupRequest(o.Namespace, "").BackupName(b.Name).
+			ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, label.GetValidName(b.Name),
+				velerov1api.BackupUIDLabel, string(b.UID)), builder.WithGenerateName(b.Name+"-")).Result()
 
-		if _, err := o.Client.VeleroV1().DeleteBackupRequests(o.Namespace).Create(deleteRequest); err != nil {
+		if err := client.CreateRetryGenerateName(o.Client, context.TODO(), deleteRequest); err != nil {
 			errs = append(errs, err)
 			continue
 		}

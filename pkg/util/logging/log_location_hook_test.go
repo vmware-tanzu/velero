@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,6 @@ import (
 )
 
 func TestRemoveVeleroPackagePrefix(t *testing.T) {
-	assert.Equal(t, "pkg/foo.go", removeVeleroPackagePrefix("github.com/heptio/velero/pkg/foo.go"))
-	assert.Equal(t, "github.com/heptio/velero-plugin-example/foo.go", removeVeleroPackagePrefix("github.com/heptio/velero-plugin-example/foo.go"))
+	assert.Equal(t, "pkg/foo.go", removeVeleroPackagePrefix("github.com/vmware-tanzu/velero/pkg/foo.go"))
+	assert.Equal(t, "github.com/vmware-tanzu/velero-plugin-example/foo.go", removeVeleroPackagePrefix("github.com/vmware-tanzu/velero-plugin-example/foo.go"))
 }

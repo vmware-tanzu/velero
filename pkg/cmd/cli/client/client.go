@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package client
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/velero/pkg/cmd/cli/client/config"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/client/config"
 )
 
 func NewCommand() *cobra.Command {

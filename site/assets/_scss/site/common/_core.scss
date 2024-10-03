@@ -1,0 +1,13 @@
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+
+a {
+  &.dark {
+    color: $body-color !important;
+  }
+  &.light {
+    color: $white !important;
+  }
+}

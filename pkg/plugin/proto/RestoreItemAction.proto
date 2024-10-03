@@ -1,21 +1,31 @@
 syntax = "proto3";
 package generated;
+option go_package = "github.com/vmware-tanzu/velero/pkg/plugin/generated";
 
 import "Shared.proto";
 
-message RestoreExecuteRequest {
+message RestoreItemActionExecuteRequest {
     string plugin = 1;
     bytes item = 2;
     bytes restore = 3;
     bytes itemFromBackup = 4;
 }
 
-message RestoreExecuteResponse {
+message RestoreItemActionExecuteResponse {
     bytes item = 1;
-    string warning = 2;
+    repeated ResourceIdentifier additionalItems = 2;
+    bool skipRestore = 3;
 }
 
 service RestoreItemAction {
-    rpc AppliesTo(AppliesToRequest) returns (AppliesToResponse);
-    rpc Execute(RestoreExecuteRequest) returns (RestoreExecuteResponse);
+    rpc AppliesTo(RestoreItemActionAppliesToRequest) returns (RestoreItemActionAppliesToResponse);
+    rpc Execute(RestoreItemActionExecuteRequest) returns (RestoreItemActionExecuteResponse);
+}
+
+message RestoreItemActionAppliesToRequest {
+    string plugin = 1;
+}
+
+message RestoreItemActionAppliesToResponse {
+    ResourceSelector ResourceSelector = 1;
 }

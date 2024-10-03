@@ -1,5 +1,6 @@
 syntax = "proto3";
 package generated;
+option go_package = "github.com/vmware-tanzu/velero/pkg/plugin/generated";
 
 import "Shared.proto";
 
@@ -14,14 +15,15 @@ message ExecuteResponse {
     repeated ResourceIdentifier additionalItems = 2;
 }
 
-message ResourceIdentifier {
-    string group = 1;
-    string resource = 2;
-    string namespace = 3;
-    string name = 4;
+service BackupItemAction {
+    rpc AppliesTo(BackupItemActionAppliesToRequest) returns (BackupItemActionAppliesToResponse);
+    rpc Execute(ExecuteRequest) returns (ExecuteResponse);
 }
 
-service BackupItemAction {
-    rpc AppliesTo(AppliesToRequest) returns (AppliesToResponse);
-    rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+message BackupItemActionAppliesToRequest {
+    string plugin = 1;
+}
+
+message BackupItemActionAppliesToResponse {
+    ResourceSelector ResourceSelector = 1;
 }

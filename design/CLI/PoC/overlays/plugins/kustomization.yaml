@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+  - ../../base
+
+patchesStrategicMerge:
+  - aws-plugin.yaml # this patches the Velero deployment
+  # - azure-plugin.yaml # this patches the Velero deployment
+
+generatorOptions:
+  disableNameSuffixHash: true
+  labels: 
+    component: velero
+
+secretGenerator:
+- name: cloud-credentials
+  files:
+  - "cloud"
+
+
+
+
+

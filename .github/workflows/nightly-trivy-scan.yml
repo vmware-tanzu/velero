@@ -1,0 +1,36 @@
+name: Trivy Nightly Scan
+on:
+  schedule:
+    - cron: '0 2 * * *' # run at 2 AM UTC
+
+jobs:
+  nightly-scan:
+    name: Trivy nightly scan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # maintain the versions of Velero those need security scan
+        versions: [main]
+        # list of images that need scan
+        images: [velero, velero-restore-helper]
+    permissions:
+      security-events: write  # for github/codeql-action/upload-sarif to upload SARIF results
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'docker.io/velero/${{ matrix.images }}:${{ matrix.versions }}'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          format: 'template'
+          template: '@/contrib/sarif.tpl'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package flag
 
 import (
+	"encoding/csv"
 	"fmt"
 	"strings"
 
@@ -27,25 +28,25 @@ import (
 // map data (i.e. a collection of key-value pairs).
 type Map struct {
 	data              map[string]string
-	entryDelimiter    string
-	keyValueDelimiter string
+	entryDelimiter    rune
+	keyValueDelimiter rune
 }
 
-// NewMap returns a Map using the default delimiters ("=" between keys and
-// values, and "," between map entries, e.g. k1=v1,k2=v2)
+// NewMap returns a Map using the default delimiters ('=' between keys and
+// values, and ',' between map entries, e.g. k1=v1,k2=v2)
 func NewMap() Map {
 	m := Map{
 		data: make(map[string]string),
 	}
 
-	return m.WithEntryDelimiter(",").WithKeyValueDelimiter("=")
+	return m.WithEntryDelimiter(',').WithKeyValueDelimiter('=')
 }
 
 // WithEntryDelimiter sets the delimiter to be used between map
 // entries.
 //
-// For example, in "k1=v1&k2=v2", the entry delimiter is "&"
-func (m Map) WithEntryDelimiter(delimiter string) Map {
+// For example, in "k1=v1&k2=v2", the entry delimiter is '&'
+func (m Map) WithEntryDelimiter(delimiter rune) Map {
 	m.entryDelimiter = delimiter
 	return m
 }
@@ -53,8 +54,8 @@ func (m Map) WithEntryDelimiter(delimiter string) Map {
 // WithKeyValueDelimiter sets the delimiter to be used between
 // keys and values.
 //
-// For example, in "k1=v1&k2=v2", the key-value delimiter is "="
-func (m Map) WithKeyValueDelimiter(delimiter string) Map {
+// For example, in "k1=v1&k2=v2", the key-value delimiter is '='
+func (m Map) WithKeyValueDelimiter(delimiter rune) Map {
 	m.keyValueDelimiter = delimiter
 	return m
 }
@@ -63,17 +64,26 @@ func (m Map) WithKeyValueDelimiter(delimiter string) Map {
 func (m *Map) String() string {
 	var a []string
 	for k, v := range m.data {
-		a = append(a, fmt.Sprintf("%s%s%s", k, m.keyValueDelimiter, v))
+		a = append(a, fmt.Sprintf("%s%s%s", k, string(m.keyValueDelimiter), v))
 	}
-	return strings.Join(a, m.entryDelimiter)
+	return strings.Join(a, string(m.entryDelimiter))
 }
 
 // Set parses the provided string according to the delimiters and
 // assigns the result to the Map receiver. It returns an error if
 // the string is not parseable.
 func (m *Map) Set(s string) error {
-	for _, part := range strings.Split(s, m.entryDelimiter) {
-		kvs := strings.SplitN(part, m.keyValueDelimiter, 2)
+	// use csv.Reader to support parsing input string contains entry delimiters.
+	// e.g. `"k1=a=b,c=d",k2=v2` will be parsed into two parts: `k1=a=b,c=d` and `k2=v2`
+	r := csv.NewReader(strings.NewReader(s))
+	r.Comma = m.entryDelimiter
+	parts, err := r.Read()
+	if err != nil {
+		return errors.Wrapf(err, "error parsing %q", s)
+	}
+
+	for _, part := range parts {
+		kvs := strings.SplitN(part, string(m.keyValueDelimiter), 2)
 		if len(kvs) != 2 {
 			return errors.Errorf("error parsing %q", part)
 		}

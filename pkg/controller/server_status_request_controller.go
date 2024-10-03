@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,102 +17,130 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/client-go/tools/cache"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clocks "k8s.io/utils/clock"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	velerov1informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
-	velerov1listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
-	"github.com/heptio/velero/pkg/serverstatusrequest"
-	kubeutil "github.com/heptio/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/internal/velero"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	"github.com/vmware-tanzu/velero/pkg/constant"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
 
-const statusRequestResyncPeriod = 5 * time.Minute
+const (
+	ttl                       = time.Minute
+	statusRequestResyncPeriod = 5 * time.Minute
+)
 
-type statusRequestController struct {
-	*genericController
-
-	client velerov1client.ServerStatusRequestsGetter
-	lister velerov1listers.ServerStatusRequestLister
-	clock  clock.Clock
+type PluginLister interface {
+	// List returns all PluginIdentifiers for kind.
+	List(kind common.PluginKind) []framework.PluginIdentifier
 }
 
-func NewServerStatusRequestController(
-	logger logrus.FieldLogger,
-	client velerov1client.ServerStatusRequestsGetter,
-	informer velerov1informers.ServerStatusRequestInformer,
-) *statusRequestController {
-	c := &statusRequestController{
-		genericController: newGenericController("serverstatusrequest", logger),
-		client:            client,
-		lister:            informer.Lister(),
+// serverStatusRequestReconciler reconciles a ServerStatusRequest object
+type serverStatusRequestReconciler struct {
+	client         client.Client
+	ctx            context.Context
+	pluginRegistry PluginLister
+	clock          clocks.WithTickerAndDelayedExecution
 
-		clock: clock.RealClock{},
-	}
-
-	c.syncHandler = c.processItem
-	c.cacheSyncWaiters = append(c.cacheSyncWaiters, informer.Informer().HasSynced)
-
-	c.resyncFunc = c.enqueueAllItems
-	c.resyncPeriod = statusRequestResyncPeriod
-
-	informer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				req := obj.(*velerov1api.ServerStatusRequest)
-				key := kubeutil.NamespaceAndName(req)
-
-				c.logger.WithFields(logrus.Fields{
-					"serverStatusRequest": key,
-					"phase":               req.Status.Phase,
-				}).Debug("Enqueueing server status request")
-
-				c.queue.Add(key)
-			},
-		},
-	)
-
-	return c
+	log logrus.FieldLogger
 }
 
-func (c *statusRequestController) processItem(key string) error {
-	log := c.logger.WithField("key", key)
-
-	log.Debug("Running processItem")
-	ns, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		return errors.Wrap(err, "error splitting queue key")
+// NewServerStatusRequestReconciler initializes and returns serverStatusRequestReconciler struct.
+func NewServerStatusRequestReconciler(
+	ctx context.Context,
+	client client.Client,
+	pluginRegistry PluginLister,
+	clock clocks.WithTickerAndDelayedExecution,
+	log logrus.FieldLogger) *serverStatusRequestReconciler {
+	return &serverStatusRequestReconciler{
+		client:         client,
+		ctx:            ctx,
+		pluginRegistry: pluginRegistry,
+		clock:          clock,
+		log:            log,
 	}
+}
 
+// +kubebuilder:rbac:groups=velero.io,resources=serverstatusrequests,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=velero.io,resources=serverstatusrequests/status,verbs=get;update;patch
+
+func (r *serverStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := r.log.WithFields(logrus.Fields{
+		"controller":          constant.ControllerServerStatusRequest,
+		"serverStatusRequest": req.NamespacedName,
+	})
+
+	// Fetch the ServerStatusRequest instance.
 	log.Debug("Getting ServerStatusRequest")
-	req, err := c.lister.ServerStatusRequests(ns).Get(name)
-	// server status request no longer exists
-	if apierrors.IsNotFound(err) {
-		log.WithError(err).Debug("ServerStatusRequest not found")
-		return nil
-	}
-	if err != nil {
-		return errors.Wrap(err, "error getting ServerStatusRequest")
+	statusRequest := &velerov1api.ServerStatusRequest{}
+	if err := r.client.Get(r.ctx, req.NamespacedName, statusRequest); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Debug("Unable to find ServerStatusRequest")
+			return ctrl.Result{}, nil
+		}
+
+		log.WithError(err).Error("Error getting ServerStatusRequest")
+		return ctrl.Result{}, err
 	}
 
-	return serverstatusrequest.Process(req.DeepCopy(), c.client, c.clock, log)
+	log = r.log.WithFields(logrus.Fields{
+		"controller":          constant.ControllerServerStatusRequest,
+		"serverStatusRequest": req.NamespacedName,
+		"phase":               statusRequest.Status.Phase,
+	})
+
+	switch statusRequest.Status.Phase {
+	case "", velerov1api.ServerStatusRequestPhaseNew:
+		log.Info("Processing new ServerStatusRequest")
+		original := statusRequest.DeepCopy()
+		statusRequest.Status.ServerVersion = buildinfo.Version
+		statusRequest.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
+		statusRequest.Status.ProcessedTimestamp = &metav1.Time{Time: r.clock.Now()}
+		statusRequest.Status.Plugins = velero.GetInstalledPluginInfo(r.pluginRegistry)
+
+		if err := r.client.Patch(r.ctx, statusRequest, client.MergeFrom(original)); err != nil {
+			log.WithError(err).Error("Error updating ServerStatusRequest status")
+			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, err
+		}
+	case velerov1api.ServerStatusRequestPhaseProcessed:
+		log.Debug("Checking whether ServerStatusRequest has expired")
+		expiration := statusRequest.Status.ProcessedTimestamp.Add(ttl)
+		if expiration.After(r.clock.Now()) {
+			log.Debug("ServerStatusRequest has not expired")
+			return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
+		}
+
+		log.Debug("ServerStatusRequest has expired, deleting it")
+		if err := r.client.Delete(r.ctx, statusRequest); err != nil {
+			log.WithError(err).Error("Unable to delete the request")
+			return ctrl.Result{}, nil
+		}
+	default:
+		return ctrl.Result{}, errors.New("unexpected ServerStatusRequest phase")
+	}
+
+	// Requeue is mostly to handle deleting any expired status requests that were not
+	// deleted as part of the normal client flow for whatever reason.
+	return ctrl.Result{RequeueAfter: statusRequestResyncPeriod}, nil
 }
 
-func (c *statusRequestController) enqueueAllItems() {
-	items, err := c.lister.List(labels.Everything())
-	if err != nil {
-		c.logger.WithError(err).Error("Error listing all server status requests")
-		return
-	}
-
-	for _, req := range items {
-		c.enqueue(req)
-	}
+func (r *serverStatusRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&velerov1api.ServerStatusRequest{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: 10,
+		}).
+		Complete(r)
 }

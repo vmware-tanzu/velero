@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ const (
 	logSourceField          = "logSource"
 	logSourceSetMarkerField = "@logSourceSetBy"
 	logrusPackage           = "github.com/sirupsen/logrus"
-	veleroPackage           = "github.com/heptio/velero/"
+	veleroPackage           = "github.com/vmware-tanzu/velero/"
 	veleroPackageLen        = len(veleroPackage)
 )
 
@@ -60,7 +60,7 @@ func (h *LogLocationHook) Fire(entry *logrus.Entry) error {
 
 	// skip 2 frames:
 	//   runtime.Callers
-	//   github.com/heptio/velero/pkg/util/logging/(*LogLocationHook).Fire
+	//   github.com/vmware-tanzu/velero/pkg/util/logging/(*LogLocationHook).Fire
 	n := runtime.Callers(2, pcs)
 
 	// re-slice pcs based on the number of entries written
@@ -122,7 +122,7 @@ func getLogSourceSetMarker(entry *logrus.Entry) string {
 
 func removeVeleroPackagePrefix(file string) string {
 	if index := strings.Index(file, veleroPackage); index != -1 {
-		// strip off .../github.com/heptio/velero/ so we just have pkg/...
+		// strip off .../github.com/vmware-tanzu/velero/ so we just have pkg/...
 		return file[index+veleroPackageLen:]
 	}
 

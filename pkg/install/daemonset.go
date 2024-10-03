@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,16 +17,19 @@ limitations under the License.
 package install
 
 import (
+	"fmt"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/vmware-tanzu/velero/internal/velero"
 )
 
 func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 	c := &podTemplateConfig{
-		image: "gcr.io/heptio-images/velero:latest",
+		image: velero.DefaultVeleroImage(),
 	}
 
 	for _, opt := range opts {
@@ -37,11 +40,25 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 	imageParts := strings.Split(c.image, ":")
 	if len(imageParts) == 2 && imageParts[1] != "latest" {
 		pullPolicy = corev1.PullIfNotPresent
-
 	}
 
+	daemonSetArgs := []string{
+		"node-agent",
+		"server",
+	}
+	if len(c.features) > 0 {
+		daemonSetArgs = append(daemonSetArgs, fmt.Sprintf("--features=%s", strings.Join(c.features, ",")))
+	}
+
+	if len(c.nodeAgentConfigMap) > 0 {
+		daemonSetArgs = append(daemonSetArgs, fmt.Sprintf("--node-agent-configmap=%s", c.nodeAgentConfigMap))
+	}
+
+	userID := int64(0)
+	mountPropagationMode := corev1.MountPropagationHostToContainer
+
 	daemonSet := &appsv1.DaemonSet{
-		ObjectMeta: objectMeta(namespace, "restic"),
+		ObjectMeta: objectMeta(namespace, "node-agent"),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
 			APIVersion: appsv1.SchemeGroupVersion.String(),
@@ -49,17 +66,21 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"name": "restic",
+					"name": "node-agent",
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"name": "restic",
-					},
+					Labels: podLabels(c.labels, map[string]string{
+						"name": "node-agent",
+					}),
+					Annotations: c.annotations,
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: "velero",
+					ServiceAccountName: c.serviceAccountName,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsUser: &userID,
+					},
 					Volumes: []corev1.Volume{
 						{
 							Name: "host-pods",
@@ -69,16 +90,48 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 								},
 							},
 						},
+						{
+							Name: "host-plugins",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/var/lib/kubelet/plugins",
+								},
+							},
+						},
+						{
+							Name: "scratch",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: new(corev1.EmptyDirVolumeSource),
+							},
+						},
 					},
 					Containers: []corev1.Container{
 						{
-							Name:            "restic",
+							Name:            "node-agent",
 							Image:           c.image,
+							Ports:           containerPorts(),
 							ImagePullPolicy: pullPolicy,
+							Command: []string{
+								"/velero",
+							},
+							Args: daemonSetArgs,
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: &c.privilegedNodeAgent,
+							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name:      "host-pods",
-									MountPath: "/host_pods",
+									Name:             "host-pods",
+									MountPath:        "/host_pods",
+									MountPropagation: &mountPropagationMode,
+								},
+								{
+									Name:             "host-plugins",
+									MountPath:        "/var/lib/kubelet/plugins",
+									MountPropagation: &mountPropagationMode,
+								},
+								{
+									Name:      "scratch",
+									MountPath: "/scratch",
 								},
 							},
 							Env: []corev1.EnvVar{
@@ -99,14 +152,11 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 									},
 								},
 								{
-									Name:  "GOOGLE_APPLICATION_CREDENTIALS",
-									Value: "/credentials/cloud",
-								},
-								{
-									Name:  "AWS_SHARED_CREDENTIALS_FILE",
-									Value: "/credentials/cloud",
+									Name:  "VELERO_SCRATCH_DIR",
+									Value: "/scratch",
 								},
 							},
+							Resources: c.resources,
 						},
 					},
 				},
@@ -114,7 +164,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 		},
 	}
 
-	if !c.withoutCredentialsVolume {
+	if c.withSecret {
 		daemonSet.Spec.Template.Spec.Volumes = append(
 			daemonSet.Spec.Template.Spec.Volumes,
 			corev1.Volume{
@@ -126,6 +176,33 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 				},
 			},
 		)
+
+		daemonSet.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			daemonSet.Spec.Template.Spec.Containers[0].VolumeMounts,
+			corev1.VolumeMount{
+				Name:      "cloud-credentials",
+				MountPath: "/credentials",
+			},
+		)
+
+		daemonSet.Spec.Template.Spec.Containers[0].Env = append(daemonSet.Spec.Template.Spec.Containers[0].Env, []corev1.EnvVar{
+			{
+				Name:  "GOOGLE_APPLICATION_CREDENTIALS",
+				Value: "/credentials/cloud",
+			},
+			{
+				Name:  "AWS_SHARED_CREDENTIALS_FILE",
+				Value: "/credentials/cloud",
+			},
+			{
+				Name:  "AZURE_CREDENTIALS_FILE",
+				Value: "/credentials/cloud",
+			},
+			{
+				Name:  "ALIBABA_CLOUD_CREDENTIALS_FILE",
+				Value: "/credentials/cloud",
+			},
+		}...)
 	}
 
 	daemonSet.Spec.Template.Spec.Containers[0].Env = append(daemonSet.Spec.Template.Spec.Containers[0].Env, c.envVars...)

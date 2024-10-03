@@ -104,7 +104,7 @@
 ### Download
   - https://github.com/heptio/ark/releases/tag/v0.9.3
 ### Bug Fixes
-  * Initalize Prometheus metrics when creating a new schedule (#689, @lemaral)
+  * Initialize Prometheus metrics when creating a new schedule (#689, @lemaral)
 
 
 ## v0.9.2
@@ -137,7 +137,7 @@
 ### Highlights:
   * Ark now has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called [restic](https://github.com/restic/restic).
     This provides users an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume, whether or not it has snapshot support
-    integrated with Ark. For more information, see the [documentation](https://github.com/heptio/ark/blob/master/docs/restic.md).
+    integrated with Ark. For more information, see the [documentation](https://github.com/vmware-tanzu/velero/blob/main/docs/restic.md).
   * Support for Prometheus metrics has been added! View total number of backup attempts (including success or failure), total backup size in bytes, and backup
     durations. More metrics coming in future releases!
 
@@ -154,7 +154,7 @@
   * Skip completed jobs and pods when restoring (#463, @nrb)
   * Set namespace correctly when syncing backups from object storage (#472, @skriss)
   * When building on macOS, bind-mount volumes with delegated config (#478, @skriss)
-  * Add replica sets and daemonsets to cohabitating resources so they're not backed up twice (#482 #485, @skriss)
+  * Add replica sets and daemonsets to cohabiting resources so they're not backed up twice (#482 #485, @skriss)
   * Shut down the Ark server gracefully on SIGINT/SIGTERM (#483, @skriss)
   * Only back up resources that support GET and DELETE in addition to LIST and CREATE (#486, @nrb)
   * Show a better error message when trying to get an incomplete restore's logs (#496, @nrb)

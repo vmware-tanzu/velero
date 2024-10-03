@@ -1,0 +1,29 @@
+# Adds support for prow-like commands
+# Uses .github/labels.yaml to define areas and kinds
+name: "Prow github actions"
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: jpmcb/prow-github-actions@v1.1.3
+        with:
+          # TODO: before allowing the /lgtm command, see if we can block merging if changelog labels are missing.
+          prow-commands: |
+            /approve
+            /area
+            /assign
+            /cc
+            /close
+            /hold
+            /kind
+            /milestone
+            /retitle
+            /remove
+            /reopen
+            /uncc
+            /unassign
+          github-token: "${{ secrets.GITHUB_TOKEN }}"

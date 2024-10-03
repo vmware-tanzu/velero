@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,13 +35,13 @@ type BackupTracker interface {
 
 type backupTracker struct {
 	lock    sync.RWMutex
-	backups sets.String
+	backups sets.Set[string]
 }
 
 // NewBackupTracker returns a new BackupTracker.
 func NewBackupTracker() BackupTracker {
 	return &backupTracker{
-		backups: sets.NewString(),
+		backups: sets.New[string](),
 	}
 }
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,20 +21,21 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/label"
 )
 
 // NewDeleteBackupRequest creates a DeleteBackupRequest for the backup identified by name and uid.
-func NewDeleteBackupRequest(name string, uid string) *v1.DeleteBackupRequest {
-	return &v1.DeleteBackupRequest{
+func NewDeleteBackupRequest(name string, uid string) *velerov1api.DeleteBackupRequest {
+	return &velerov1api.DeleteBackupRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: name + "-",
 			Labels: map[string]string{
-				v1.BackupNameLabel: name,
-				v1.BackupUIDLabel:  uid,
+				velerov1api.BackupNameLabel: label.GetValidName(name),
+				velerov1api.BackupUIDLabel:  uid,
 			},
 		},
-		Spec: v1.DeleteBackupRequestSpec{
+		Spec: velerov1api.DeleteBackupRequestSpec{
 			BackupName: name,
 		},
 	}
@@ -44,6 +45,6 @@ func NewDeleteBackupRequest(name string, uid string) *v1.DeleteBackupRequest {
 // find DeleteBackupRequests for the backup identified by name and uid.
 func NewDeleteBackupRequestListOptions(name, uid string) metav1.ListOptions {
 	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s,%s=%s", v1.BackupNameLabel, name, v1.BackupUIDLabel, uid),
+		LabelSelector: fmt.Sprintf("%s=%s,%s=%s", velerov1api.BackupNameLabel, label.GetValidName(name), velerov1api.BackupUIDLabel, uid),
 	}
 }

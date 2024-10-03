@@ -1,0 +1,131 @@
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: (unknown)
+  labels:
+    component: velero
+  name: backupstoragelocations.velero.io
+spec:
+  group: velero.io
+  names:
+    kind: BackupStorageLocation
+    listKind: BackupStorageLocationList
+    plural: backupstoragelocations
+    singular: backupstoragelocation
+  scope: ""
+  validation:
+    openAPIV3Schema:
+      description: BackupStorageLocation is a location where Velero stores backup
+        objects.
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: BackupStorageLocationSpec defines the specification for a
+            Velero BackupStorageLocation.
+          properties:
+            accessMode:
+              description: AccessMode defines the permissions for the backup storage
+                location.
+              enum:
+              - ReadOnly
+              - ReadWrite
+              type: string
+            backupSyncPeriod:
+              description: BackupSyncPeriod defines how frequently to sync backup
+                API objects from object storage. A value of 0 disables sync.
+              nullable: true
+              type: string
+            config:
+              additionalProperties:
+                type: string
+              description: Config is for provider-specific configuration fields.
+              type: object
+            objectStorage:
+              description: ObjectStorageLocation specifies the settings necessary
+                to connect to a provider's object storage.
+              properties:
+                bucket:
+                  description: Bucket is the bucket to use for object storage.
+                  type: string
+                prefix:
+                  description: Prefix is the path inside a bucket to use for Velero
+                    storage. Optional.
+                  type: string
+              required:
+              - bucket
+              type: object
+            provider:
+              description: Provider is the provider of the backup storage.
+              type: string
+          required:
+          - objectStorage
+          - provider
+          type: object
+        status:
+          description: BackupStorageLocationStatus describes the current status
+            of a Velero BackupStorageLocation.
+          properties:
+            accessMode:
+              description: "AccessMode is an unused field. \n Deprecated: there
+                is now an AccessMode field on the Spec and this field will be removed
+                entirely as of v2.0."
+              enum:
+              - ReadOnly
+              - ReadWrite
+              type: string
+            lastSyncedRevision:
+              description: "LastSyncedRevision is the value of the `metadata/revision`
+                file in the backup storage location the last time the BSL's contents
+                were synced into the cluster. \n Deprecated: this field is no longer
+                updated or used for detecting changes to the location's contents
+                and will be removed entirely in v2.0."
+              type: string
+            lastSyncedTime:
+              description: LastSyncedTime is the last time the contents of the location
+                were synced into the cluster.
+              format: date-time
+              nullable: true
+              type: string
+            phase:
+              description: Phase is the current state of the BackupStorageLocation.
+              enum:
+              - Available
+              - Unavailable
+              type: string
+          type: object
+      type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+---
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  creationTimestamp: null
+  labels:
+    component: velero
+  name: default
+  namespace: velero
+spec:
+  config:
+    region: minio
+    s3ForcePathStyle: "true"
+    s3Url: http://minio.velero.svc:9000
+  objectStorage:
+    bucket: velero
+  provider: aws

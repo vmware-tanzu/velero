@@ -1,0 +1,61 @@
+syntax = "proto3";
+package v2;
+option go_package = "github.com/vmware-tanzu/velero/pkg/plugin/generated/restoreitemaction/v2";
+
+import "Shared.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
+
+message RestoreItemActionExecuteRequest {
+    string plugin = 1;
+    bytes item = 2;
+    bytes restore = 3;
+    bytes itemFromBackup = 4;
+}
+
+message RestoreItemActionExecuteResponse {
+    bytes item = 1;
+    repeated generated.ResourceIdentifier additionalItems = 2;
+    bool skipRestore = 3;
+    string operationID = 4;
+    bool waitForAdditionalItems = 5;
+    google.protobuf.Duration additionalItemsReadyTimeout = 6;
+}
+
+service RestoreItemAction {
+    rpc AppliesTo(RestoreItemActionAppliesToRequest) returns (RestoreItemActionAppliesToResponse);
+    rpc Execute(RestoreItemActionExecuteRequest) returns (RestoreItemActionExecuteResponse);
+    rpc Progress(RestoreItemActionProgressRequest) returns (RestoreItemActionProgressResponse);
+    rpc Cancel(RestoreItemActionCancelRequest) returns (google.protobuf.Empty);
+    rpc AreAdditionalItemsReady(RestoreItemActionItemsReadyRequest) returns (RestoreItemActionItemsReadyResponse);
+}
+
+message RestoreItemActionAppliesToRequest {
+    string plugin = 1;
+}
+
+message RestoreItemActionAppliesToResponse {
+    generated.ResourceSelector ResourceSelector = 1;
+}
+
+message RestoreItemActionProgressRequest {
+    string plugin = 1;
+    string operationID = 2;
+    bytes restore = 3;
+}
+message RestoreItemActionProgressResponse {
+    generated.OperationProgress progress = 1;
+}
+message RestoreItemActionCancelRequest {
+    string plugin = 1;
+    string operationID = 2;
+    bytes restore = 3;
+}
+message RestoreItemActionItemsReadyRequest {
+    string plugin = 1;
+    bytes restore = 2;
+    repeated generated.ResourceIdentifier additionalItems = 3;
+}
+message RestoreItemActionItemsReadyResponse {
+    bool ready = 1;
+}

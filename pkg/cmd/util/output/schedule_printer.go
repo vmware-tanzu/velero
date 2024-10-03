@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,35 +17,41 @@ limitations under the License.
 package output
 
 import (
-	"fmt"
-	"io"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/apimachinery/pkg/runtime"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 var (
-	scheduleColumns = []string{"NAME", "STATUS", "CREATED", "SCHEDULE", "BACKUP TTL", "LAST BACKUP", "SELECTOR"}
+	scheduleColumns = []metav1.TableColumnDefinition{
+		// name needs Type and Format defined for the decorator to identify it:
+		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+		{Name: "Name", Type: "string", Format: "name"},
+		{Name: "Status"},
+		{Name: "Created"},
+		{Name: "Schedule"},
+		{Name: "Backup TTL"},
+		{Name: "Last Backup"},
+		{Name: "Selector"},
+		{Name: "Paused"},
+	}
 )
 
-func printScheduleList(list *v1.ScheduleList, w io.Writer, options printers.PrintOptions) error {
+func printScheduleList(list *v1.ScheduleList) []metav1.TableRow {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+
 	for i := range list.Items {
-		if err := printSchedule(&list.Items[i], w, options); err != nil {
-			return err
-		}
+		rows = append(rows, printSchedule(&list.Items[i])...)
 	}
-	return nil
+	return rows
 }
 
-func printSchedule(schedule *v1.Schedule, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, schedule.Name, options.WithKind)
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", schedule.Namespace); err != nil {
-			return err
-		}
+func printSchedule(schedule *v1.Schedule) []metav1.TableRow {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: schedule},
 	}
 
 	status := schedule.Status.Phase
@@ -53,26 +59,21 @@ func printSchedule(schedule *v1.Schedule, w io.Writer, options printers.PrintOpt
 		status = v1.SchedulePhaseNew
 	}
 
-	_, err := fmt.Fprintf(
-		w,
-		"%s\t%s\t%s\t%s\t%s\t%s\t%s",
-		name,
+	var lastBackupTime time.Time
+	if schedule.Status.LastBackup != nil {
+		lastBackupTime = schedule.Status.LastBackup.Time
+	}
+
+	row.Cells = append(row.Cells,
+		schedule.Name,
 		status,
 		schedule.CreationTimestamp.Time,
 		schedule.Spec.Schedule,
 		schedule.Spec.Template.TTL.Duration,
-		humanReadableTimeFromNow(schedule.Status.LastBackup.Time),
+		humanReadableTimeFromNow(lastBackupTime),
 		metav1.FormatLabelSelector(schedule.Spec.Template.LabelSelector),
+		schedule.Spec.Paused,
 	)
 
-	if err != nil {
-		return err
-	}
-
-	if _, err := fmt.Fprint(w, printers.AppendLabels(schedule.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-
-	_, err = fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, schedule.Labels))
-	return err
+	return []metav1.TableRow{row}
 }

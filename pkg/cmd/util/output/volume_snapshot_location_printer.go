@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,49 +17,39 @@ limitations under the License.
 package output
 
 import (
-	"fmt"
-	"io"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
-	"k8s.io/kubernetes/pkg/printers"
-
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 var (
-	volumeSnapshotLocationColumns = []string{"NAME", "PROVIDER"}
+	volumeSnapshotLocationColumns = []metav1.TableColumnDefinition{
+		// name needs Type and Format defined for the decorator to identify it:
+		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+		{Name: "Name", Type: "string", Format: "name"},
+		{Name: "Provider"},
+	}
 )
 
-func printVolumeSnapshotLocationList(list *v1.VolumeSnapshotLocationList, w io.Writer, options printers.PrintOptions) error {
+func printVolumeSnapshotLocationList(list *v1.VolumeSnapshotLocationList) []metav1.TableRow {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+
 	for i := range list.Items {
-		if err := printVolumeSnapshotLocation(&list.Items[i], w, options); err != nil {
-			return err
-		}
+		rows = append(rows, printVolumeSnapshotLocation(&list.Items[i])...)
 	}
-	return nil
+	return rows
 }
 
-func printVolumeSnapshotLocation(location *v1.VolumeSnapshotLocation, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, location.Name, options.WithKind)
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", location.Namespace); err != nil {
-			return err
-		}
+func printVolumeSnapshotLocation(location *v1.VolumeSnapshotLocation) []metav1.TableRow {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: location},
 	}
 
-	if _, err := fmt.Fprintf(
-		w,
-		"%s\t%s",
-		name,
+	row.Cells = append(row.Cells,
+		location.Name,
 		location.Spec.Provider,
-	); err != nil {
-		return err
-	}
+	)
 
-	if _, err := fmt.Fprint(w, printers.AppendLabels(location.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, location.Labels))
-	return err
+	return []metav1.TableRow{row}
 }

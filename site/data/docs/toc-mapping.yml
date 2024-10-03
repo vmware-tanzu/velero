@@ -1,0 +1,29 @@
+# This file can be used to explicitly map a release to a specific table-of-contents
+# (TOC). You'll want to use this after any revamps to information architecture, to ensure
+# that the navigation for older versions still work.
+
+main: main-toc
+v1.14: v1-14-toc
+v1.13: v1-13-toc
+v1.12: v1-12-toc
+v1.11: v1-11-toc
+v1.10: v1-10-toc
+v1.9: v1-9-toc
+v1.8: v1-8-toc
+v1.7: v1-7-toc
+v1.6: v1-6-toc
+v1.5: v1-5-toc
+v1.4: v1-4-toc
+v1.3.2: v1-3-2-toc
+v1.3.1: v1-3-1-toc
+v1.3.0: v1-3-0-toc
+v1.2.0: v1-2-0-toc
+v1.1.0: v1-1-0-toc
+v1.0.0: v1-0-0-toc
+v0.11.0: v011-toc
+v0.10.0: v010-toc
+v0.9.0: v9-toc
+v0.8.1: v8-1-toc
+v0.8.0: v8-toc
+v0.7.1: v7-1-toc
+v0.7.0: v7-toc

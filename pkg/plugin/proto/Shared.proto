@@ -1,21 +1,43 @@
 syntax = "proto3";
 package generated;
+option go_package = "github.com/vmware-tanzu/velero/pkg/plugin/generated";
+
+import "google/protobuf/timestamp.proto";
 
 message Empty {}
 
-message InitRequest {
-    string plugin = 1;
-    map<string, string> config = 2;
+message Stack {
+    repeated StackFrame frames = 1;
 }
 
-message AppliesToRequest {
-    string plugin = 1;
+message StackFrame {
+    string file = 1;
+    int32 line = 2;
+    string function = 3;
 }
 
-message AppliesToResponse {
+message ResourceIdentifier {
+    string group = 1;
+    string resource = 2;
+    string namespace = 3;
+    string name = 4;
+}
+
+message ResourceSelector {
     repeated string includedNamespaces = 1;
     repeated string excludedNamespaces = 2;
     repeated string includedResources = 3;
     repeated string excludedResources = 4;
     string selector = 5;
+}
+
+message OperationProgress {
+    bool completed = 1;
+    string err = 2;
+    int64 nCompleted = 3;
+    int64 nTotal = 4;
+    string operationUnits = 5;
+    string description = 6;
+    google.protobuf.Timestamp started = 7;
+    google.protobuf.Timestamp updated = 8;
 }

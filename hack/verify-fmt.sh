@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2017 the Heptio Ark contributors.
+# Copyright 2017 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,4 +15,4 @@
 # limitations under the License.
 
 HACK_DIR=$(dirname "${BASH_SOURCE[0]}")
-"${HACK_DIR}"/update-fmt.sh --verify
+"${HACK_DIR}"/update-1fmt.sh --verify

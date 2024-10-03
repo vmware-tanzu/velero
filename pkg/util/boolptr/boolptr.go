@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,12 +18,12 @@ package boolptr
 
 // IsSetToTrue returns true if and only if the bool pointer is non-nil and set to true.
 func IsSetToTrue(b *bool) bool {
-	return b != nil && *b == true
+	return b != nil && *b
 }
 
 // IsSetToFalse returns true if and only if the bool pointer is non-nil and set to false.
 func IsSetToFalse(b *bool) bool {
-	return b != nil && *b == false
+	return b != nil && !*b
 }
 
 // True returns a *bool whose underlying value is true.

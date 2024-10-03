@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,16 @@ limitations under the License.
 package client
 
 import (
+	"context"
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 )
 
 // DynamicFactory contains methods for retrieving dynamic clients for GroupVersionResources and
@@ -32,6 +35,8 @@ type DynamicFactory interface {
 	// ClientForGroupVersionResource returns a Dynamic client for the given group/version
 	// and resource for the given namespace.
 	ClientForGroupVersionResource(gv schema.GroupVersion, resource metav1.APIResource, namespace string) (Dynamic, error)
+	// DynamicSharedInformerFactory returns a DynamicSharedInformerFactory.
+	DynamicSharedInformerFactory() dynamicinformer.DynamicSharedInformerFactory
 }
 
 // dynamicFactory implements DynamicFactory.
@@ -50,6 +55,10 @@ func (f *dynamicFactory) ClientForGroupVersionResource(gv schema.GroupVersion, r
 	}, nil
 }
 
+func (f *dynamicFactory) DynamicSharedInformerFactory() dynamicinformer.DynamicSharedInformerFactory {
+	return dynamicinformer.NewDynamicSharedInformerFactory(f.dynamicClient, time.Minute)
+}
+
 // Creator creates an object.
 type Creator interface {
 	// Create creates an object.
@@ -59,7 +68,7 @@ type Creator interface {
 // Lister lists objects.
 type Lister interface {
 	// List lists all the objects of a given resource.
-	List(metav1.ListOptions) (runtime.Object, error)
+	List(metav1.ListOptions) (*unstructured.UnstructuredList, error)
 }
 
 // Watcher watches objects.
@@ -81,6 +90,18 @@ type Patcher interface {
 	Patch(name string, data []byte) (*unstructured.Unstructured, error)
 }
 
+// Deletor deletes an object.
+type Deletor interface {
+	//Patch patches the named object using the provided patch bytes, which are expected to be in JSON merge patch format. The patched object is returned.
+
+	Delete(name string, opts metav1.DeleteOptions) error
+}
+
+// StatusUpdater updates status field of a object
+type StatusUpdater interface {
+	UpdateStatus(obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error)
+}
+
 // Dynamic contains client methods that Velero needs for backing up and restoring resources.
 type Dynamic interface {
 	Creator
@@ -88,6 +109,8 @@ type Dynamic interface {
 	Watcher
 	Getter
 	Patcher
+	Deletor
+	StatusUpdater
 }
 
 // dynamicResourceClient implements Dynamic.
@@ -98,21 +121,29 @@ type dynamicResourceClient struct {
 var _ Dynamic = &dynamicResourceClient{}
 
 func (d *dynamicResourceClient) Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	return d.resourceClient.Create(obj, metav1.CreateOptions{})
+	return d.resourceClient.Create(context.TODO(), obj, metav1.CreateOptions{})
 }
 
-func (d *dynamicResourceClient) List(options metav1.ListOptions) (runtime.Object, error) {
-	return d.resourceClient.List(options)
+func (d *dynamicResourceClient) List(options metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+	return d.resourceClient.List(context.TODO(), options)
 }
 
 func (d *dynamicResourceClient) Watch(options metav1.ListOptions) (watch.Interface, error) {
-	return d.resourceClient.Watch(options)
+	return d.resourceClient.Watch(context.TODO(), options)
 }
 
 func (d *dynamicResourceClient) Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
-	return d.resourceClient.Get(name, opts)
+	return d.resourceClient.Get(context.TODO(), name, opts)
 }
 
 func (d *dynamicResourceClient) Patch(name string, data []byte) (*unstructured.Unstructured, error) {
-	return d.resourceClient.Patch(name, types.MergePatchType, data, metav1.UpdateOptions{})
+	return d.resourceClient.Patch(context.TODO(), name, types.MergePatchType, data, metav1.PatchOptions{})
+}
+
+func (d *dynamicResourceClient) Delete(name string, opts metav1.DeleteOptions) error {
+	return d.resourceClient.Delete(context.TODO(), name, opts)
+}
+
+func (d *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error) {
+	return d.resourceClient.UpdateStatus(context.TODO(), obj, opts)
 }

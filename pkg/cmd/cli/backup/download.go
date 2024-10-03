@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,22 +26,30 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 )
 
 func NewDownloadCommand(f client.Factory) *cobra.Command {
+	config, err := client.LoadConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: Error reading config file: %v\n", err)
+	}
 	o := NewDownloadOptions()
+	o.caCertFile = config.CACertFile()
+
 	c := &cobra.Command{
 		Use:   "download NAME",
-		Short: "Download a backup",
+		Short: "Download all Kubernetes manifests for a backup",
+		Long:  "Download all Kubernetes manifests for a backup. Contents of persistent volume snapshots are not included.",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args))
-			cmd.CheckError(o.Validate(c, args))
+			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
 	}
@@ -51,11 +60,13 @@ func NewDownloadCommand(f client.Factory) *cobra.Command {
 }
 
 type DownloadOptions struct {
-	Name         string
-	Output       string
-	Force        bool
-	Timeout      time.Duration
-	writeOptions int
+	Name                  string
+	Output                string
+	Force                 bool
+	Timeout               time.Duration
+	InsecureSkipTLSVerify bool
+	writeOptions          int
+	caCertFile            string
 }
 
 func NewDownloadOptions() *DownloadOptions {
@@ -65,12 +76,22 @@ func NewDownloadOptions() *DownloadOptions {
 }
 
 func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.StringVarP(&o.Output, "output", "o", o.Output, "path to output file. Defaults to <NAME>-data.tar.gz in the current directory")
-	flags.BoolVar(&o.Force, "force", o.Force, "forces the download and will overwrite file if it exists already")
-	flags.DurationVar(&o.Timeout, "timeout", o.Timeout, "maximum time to wait to process download request")
+	flags.StringVarP(&o.Output, "output", "o", o.Output, "Path to output file. Defaults to <NAME>-data.tar.gz in the current directory.")
+	flags.BoolVar(&o.Force, "force", o.Force, "Forces the download and will overwrite file if it exists already.")
+	flags.DurationVar(&o.Timeout, "timeout", o.Timeout, "Maximum time to wait to process download request.")
+	flags.BoolVar(&o.InsecureSkipTLSVerify, "insecure-skip-tls-verify", o.InsecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
+	flags.StringVar(&o.caCertFile, "cacert", o.caCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
 }
 
-func (o *DownloadOptions) Validate(c *cobra.Command, args []string) error {
+func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+	kbClient, err := f.KubebuilderClient()
+	cmd.CheckError(err)
+
+	backup := new(velerov1api.Backup)
+	if err := kbClient.Get(context.TODO(), controllerclient.ObjectKey{Namespace: f.Namespace(), Name: o.Name}, backup); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -94,7 +115,7 @@ func (o *DownloadOptions) Complete(args []string) error {
 }
 
 func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
-	veleroClient, err := f.Client()
+	kbClient, err := f.KubebuilderClient()
 	cmd.CheckError(err)
 
 	backupDest, err := os.OpenFile(o.Output, o.writeOptions, 0600)
@@ -103,7 +124,7 @@ func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 	defer backupDest.Close()
 
-	err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), o.Name, v1.DownloadTargetKindBackupContents, backupDest, o.Timeout)
+	err = downloadrequest.Stream(context.Background(), kbClient, f.Namespace(), o.Name, velerov1api.DownloadTargetKindBackupContents, backupDest, o.Timeout, o.InsecureSkipTLSVerify, o.caCertFile)
 	if err != nil {
 		os.Remove(o.Output)
 		cmd.CheckError(err)

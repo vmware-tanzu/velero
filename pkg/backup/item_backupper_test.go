@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,853 +17,255 @@ limitations under the License.
 package backup
 
 import (
-	"archive/tar"
-	"encoding/json"
-	"fmt"
-	"reflect"
 	"testing"
-	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
+
+	"github.com/stretchr/testify/assert"
 	corev1api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/sets"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/plugin/velero"
-	resticmocks "github.com/heptio/velero/pkg/restic/mocks"
-	"github.com/heptio/velero/pkg/util/collections"
-	velerotest "github.com/heptio/velero/pkg/util/test"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 )
 
-func TestBackupItemSkips(t *testing.T) {
+func Test_resourceKey(t *testing.T) {
 	tests := []struct {
-		testName      string
-		namespace     string
+		resource metav1.Object
+		want     string
+	}{
+		{resource: builder.ForPod("default", "test").Result(), want: "v1/Pod"},
+		{resource: builder.ForDeployment("default", "test").Result(), want: "apps/v1/Deployment"},
+		{resource: builder.ForPersistentVolume("test").Result(), want: "v1/PersistentVolume"},
+		{resource: builder.ForRole("default", "test").Result(), want: "rbac.authorization.k8s.io/v1/Role"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			content, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(tt.resource)
+			unstructured := &unstructured.Unstructured{Object: content}
+			assert.Equal(t, tt.want, resourceKey(unstructured))
+		})
+	}
+}
+
+func Test_zoneFromPVNodeAffinity(t *testing.T) {
+	keys := []string{
+		awsEbsCsiZoneKey,
+		azureCsiZoneKey,
+		gkeCsiZoneKey,
+		zoneLabel,
+		zoneLabelDeprecated,
+	}
+	tests := []struct {
+		name      string
+		pv        *corev1api.PersistentVolume
+		wantKey   string
+		wantValue string
+	}{
+		{
+			name: "AWS CSI Volume",
+			pv: builder.ForPersistentVolume("awscsi").NodeAffinityRequired(
+				builder.ForNodeSelector(
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.ebs.csi.aws.com/zone",
+						"In", "us-east-2c").Result(),
+				).Result(),
+			).Result(),
+			wantKey:   "topology.ebs.csi.aws.com/zone",
+			wantValue: "us-east-2c",
+		},
+		{
+			name: "Azure CSI Volume",
+			pv: builder.ForPersistentVolume("azurecsi").NodeAffinityRequired(
+				builder.ForNodeSelector(
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.disk.csi.azure.com/zone",
+						"In", "us-central").Result(),
+				).Result(),
+			).Result(),
+			wantKey:   "topology.disk.csi.azure.com/zone",
+			wantValue: "us-central",
+		},
+		{
+			name: "GCP CSI Volume",
+			pv: builder.ForPersistentVolume("gcpcsi").NodeAffinityRequired(
+				builder.ForNodeSelector(
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.gke.io/zone",
+						"In", "us-west1-a").Result(),
+				).Result(),
+			).Result(),
+			wantKey:   "topology.gke.io/zone",
+			wantValue: "us-west1-a",
+		},
+		{
+			name: "AWS CSI Volume with multiple zone value, returns the first",
+			pv: builder.ForPersistentVolume("awscsi").NodeAffinityRequired(
+				builder.ForNodeSelector(
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.ebs.csi.aws.com/zone",
+						"In", "us-east-2c", "us-west").Result(),
+				).Result(),
+			).Result(),
+			wantKey:   "topology.ebs.csi.aws.com/zone",
+			wantValue: "us-east-2c",
+		},
+		{
+			name: "Volume with no matching key",
+			pv: builder.ForPersistentVolume("no-matching-pv").NodeAffinityRequired(
+				builder.ForNodeSelector(
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("some-key",
+						"In", "us-west").Result(),
+				).Result(),
+			).Result(),
+			wantKey:   "",
+			wantValue: "",
+		},
+		{
+			name: "Volume with multiple valid keys, returns the first match", // it should never happen
+			pv: builder.ForPersistentVolume("multi-matching-pv").NodeAffinityRequired(
+				builder.ForNodeSelector(
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.disk.csi.azure.com/zone",
+						"In", "us-central").Result(),
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.ebs.csi.aws.com/zone",
+						"In", "us-east-2c", "us-west").Result(),
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.ebs.csi.aws.com/zone",
+						"In", "unknown").Result(),
+				).Result(),
+			).Result(),
+			wantKey:   "topology.disk.csi.azure.com/zone",
+			wantValue: "us-central",
+		},
+		{
+			/* an valid example of node affinity in a GKE's regional PV
+			nodeAffinity:
+			  required:
+			    nodeSelectorTerms:
+			    - matchExpressions:
+			      - key: topology.gke.io/zone
+			        operator: In
+			        values:
+			        - us-central1-a
+			    - matchExpressions:
+			      - key: topology.gke.io/zone
+			        operator: In
+			        values:
+			        - us-central1-c
+			*/
+			name: "Volume with multiple valid keys, and provider is gke, returns all valid entries's first zone value",
+			pv: builder.ForPersistentVolume("multi-matching-pv").NodeAffinityRequired(
+				builder.ForNodeSelector(
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.gke.io/zone",
+						"In", "us-central1-c").Result(),
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.gke.io/zone",
+						"In", "us-east-2c", "us-east-2b").Result(),
+					*builder.NewNodeSelectorTermBuilder().WithMatchExpression("topology.gke.io/zone",
+						"In", "europe-north1-a").Result(),
+				).Result(),
+			).Result(),
+			wantKey:   "topology.gke.io/zone",
+			wantValue: "us-central1-c__us-east-2c__europe-north1-a",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			k, v := zoneFromPVNodeAffinity(tt.pv, keys...)
+			assert.Equal(t, tt.wantKey, k)
+			assert.Equal(t, tt.wantValue, v)
+		})
+	}
+}
+
+func TestGetPVName(t *testing.T) {
+	testcases := []struct {
 		name          string
-		namespaces    *collections.IncludesExcludes
+		obj           metav1.Object
 		groupResource schema.GroupResource
-		resources     *collections.IncludesExcludes
-		terminating   bool
-		backedUpItems map[itemKey]struct{}
+		pvName        string
+		hasErr        bool
 	}{
 		{
-			testName:   "namespace not in includes list",
-			namespace:  "ns",
-			name:       "foo",
-			namespaces: collections.NewIncludesExcludes().Includes("a"),
+			name:          "pv should return pv name",
+			obj:           builder.ForPersistentVolume("test-pv").Result(),
+			groupResource: kuberesource.PersistentVolumes,
+			pvName:        "test-pv",
+			hasErr:        false,
 		},
 		{
-			testName:   "namespace in excludes list",
-			namespace:  "ns",
-			name:       "foo",
-			namespaces: collections.NewIncludesExcludes().Excludes("ns"),
+			name:          "pvc without volumeName should return error",
+			obj:           builder.ForPersistentVolumeClaim("ns", "pvc-1").Result(),
+			groupResource: kuberesource.PersistentVolumeClaims,
+			pvName:        "",
+			hasErr:        true,
 		},
 		{
-			testName:      "resource not in includes list",
-			namespace:     "ns",
-			name:          "foo",
-			groupResource: schema.GroupResource{Group: "foo", Resource: "bar"},
-			namespaces:    collections.NewIncludesExcludes(),
-			resources:     collections.NewIncludesExcludes().Includes("a.b"),
+			name:          "pvc with volumeName should return pv name",
+			obj:           builder.ForPersistentVolumeClaim("ns", "pvc-1").VolumeName("test-pv-2").Result(),
+			groupResource: kuberesource.PersistentVolumeClaims,
+			pvName:        "test-pv-2",
+			hasErr:        false,
 		},
 		{
-			testName:      "resource in excludes list",
-			namespace:     "ns",
-			name:          "foo",
-			groupResource: schema.GroupResource{Group: "foo", Resource: "bar"},
-			namespaces:    collections.NewIncludesExcludes(),
-			resources:     collections.NewIncludesExcludes().Excludes("bar.foo"),
-		},
-		{
-			testName:      "resource already backed up",
-			namespace:     "ns",
-			name:          "foo",
-			groupResource: schema.GroupResource{Group: "foo", Resource: "bar"},
-			namespaces:    collections.NewIncludesExcludes(),
-			resources:     collections.NewIncludesExcludes(),
-			backedUpItems: map[itemKey]struct{}{
-				{resource: "bar.foo", namespace: "ns", name: "foo"}: {},
-			},
-		},
-		{
-			testName:      "terminating resource",
-			namespace:     "ns",
-			name:          "foo",
-			groupResource: schema.GroupResource{Group: "foo", Resource: "bar"},
-			namespaces:    collections.NewIncludesExcludes(),
-			resources:     collections.NewIncludesExcludes(),
-			terminating:   true,
+			name:          "unsupported group resource should return empty pv name",
+			obj:           builder.ForPod("ns", "pod1").Result(),
+			groupResource: kuberesource.Pods,
+			pvName:        "",
+			hasErr:        false,
 		},
 	}
-
-	for _, test := range tests {
-		t.Run(test.testName, func(t *testing.T) {
-			req := &Request{
-				NamespaceIncludesExcludes: test.namespaces,
-				ResourceIncludesExcludes:  test.resources,
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			o := &unstructured.Unstructured{Object: nil}
+			if tc.obj != nil {
+				data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.obj)
+				o = &unstructured.Unstructured{Object: data}
+				require.NoError(t, err)
 			}
-
-			ib := &defaultItemBackupper{
-				backupRequest: req,
-				backedUpItems: test.backedUpItems,
-			}
-
-			pod := &corev1api.Pod{
-				TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
-				ObjectMeta: metav1.ObjectMeta{Namespace: test.namespace, Name: test.name},
-			}
-
-			if test.terminating {
-				pod.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-			}
-			unstructuredObj, unmarshalErr := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
-			require.NoError(t, unmarshalErr)
-			u := &unstructured.Unstructured{Object: unstructuredObj}
-			err := ib.backupItem(velerotest.NewLogger(), u, test.groupResource)
-			assert.NoError(t, err)
+			name, err2 := getPVName(o, tc.groupResource)
+			assert.Equal(t, tc.pvName, name)
+			assert.Equal(t, tc.hasErr, err2 != nil)
 		})
 	}
 }
 
-func TestBackupItemSkipsClusterScopedResourceWhenIncludeClusterResourcesFalse(t *testing.T) {
-	f := false
-	ib := &defaultItemBackupper{
-		backupRequest: &Request{
-			Backup: &v1.Backup{
-				Spec: v1.BackupSpec{
-					IncludeClusterResources: &f,
-				},
-			},
-			NamespaceIncludesExcludes: collections.NewIncludesExcludes(),
-			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
-		},
-	}
-
-	u := velerotest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Foo","metadata":{"name":"bar"}}`)
-	err := ib.backupItem(velerotest.NewLogger(), u, schema.GroupResource{Group: "foo", Resource: "bar"})
-	assert.NoError(t, err)
+func TestRandom(t *testing.T) {
+	pv := new(corev1api.PersistentVolume)
+	pvc := new(corev1api.PersistentVolumeClaim)
+	obj := builder.ForPod("ns1", "pod1").ServiceAccount("sa").Result()
+	o, _ := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	err1 := runtime.DefaultUnstructuredConverter.FromUnstructured(o, pv)
+	err2 := runtime.DefaultUnstructuredConverter.FromUnstructured(o, pvc)
+	t.Logf("err1: %v, err2: %v", err1, err2)
 }
 
-func TestBackupItemNoSkips(t *testing.T) {
+func TestAddVolumeInfo(t *testing.T) {
 	tests := []struct {
-		name                                  string
-		item                                  string
-		namespaceIncludesExcludes             *collections.IncludesExcludes
-		expectError                           bool
-		expectExcluded                        bool
-		expectedTarHeaderName                 string
-		tarWriteError                         bool
-		tarHeaderWriteError                   bool
-		customAction                          bool
-		expectedActionID                      string
-		customActionAdditionalItemIdentifiers []velero.ResourceIdentifier
-		customActionAdditionalItems           []runtime.Unstructured
-		groupResource                         string
-		snapshottableVolumes                  map[string]v1.VolumeBackupInfo
-		snapshotError                         error
-		additionalItemError                   error
-		trackedPVCs                           sets.String
-		expectedTrackedPVCs                   sets.String
+		name string
+		pv   *corev1api.PersistentVolume
 	}{
 		{
-			name:                      "explicit namespace include",
-			item:                      `{"metadata":{"namespace":"foo","name":"bar"}}`,
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("foo"),
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/resource.group/namespaces/foo/bar.json",
+			name: "PV has ClaimRef",
+			pv:   builder.ForPersistentVolume("testPV").ClaimRef("testNS", "testPVC").Result(),
 		},
 		{
-			name:                      "* namespace include",
-			item:                      `{"metadata":{"namespace":"foo","name":"bar"}}`,
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/resource.group/namespaces/foo/bar.json",
-		},
-		{
-			name:                  "cluster-scoped",
-			item:                  `{"metadata":{"name":"bar"}}`,
-			expectError:           false,
-			expectExcluded:        false,
-			expectedTarHeaderName: "resources/resource.group/cluster/bar.json",
-		},
-		{
-			name:                "tar header write error",
-			item:                `{"metadata":{"name":"bar"},"spec":{"color":"green"},"status":{"foo":"bar"}}`,
-			expectError:         true,
-			tarHeaderWriteError: true,
-		},
-		{
-			name:          "tar write error",
-			item:          `{"metadata":{"name":"bar"},"spec":{"color":"green"},"status":{"foo":"bar"}}`,
-			expectError:   true,
-			tarWriteError: true,
-		},
-		{
-			name:                      "action invoked - cluster-scoped",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"metadata":{"name":"bar"}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/resource.group/cluster/bar.json",
-			customAction:              true,
-			expectedActionID:          "bar",
-		},
-		{
-			name:                      "action invoked - namespaced",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"metadata":{"namespace": "myns", "name":"bar"}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/resource.group/namespaces/myns/bar.json",
-			customAction:              true,
-			expectedActionID:          "myns/bar",
-		},
-		{
-			name:                      "action invoked - additional items",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"metadata":{"namespace": "myns", "name":"bar"}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/resource.group/namespaces/myns/bar.json",
-			customAction:              true,
-			expectedActionID:          "myns/bar",
-			customActionAdditionalItemIdentifiers: []velero.ResourceIdentifier{
-				{
-					GroupResource: schema.GroupResource{Group: "g1", Resource: "r1"},
-					Namespace:     "ns1",
-					Name:          "n1",
-				},
-				{
-					GroupResource: schema.GroupResource{Group: "g2", Resource: "r2"},
-					Namespace:     "ns2",
-					Name:          "n2",
-				},
-			},
-			customActionAdditionalItems: []runtime.Unstructured{
-				velerotest.UnstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
-				velerotest.UnstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
-			},
-		},
-		{
-			name:                      "action invoked - additional items - error",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"metadata":{"namespace": "myns", "name":"bar"}}`,
-			expectError:               true,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/resource.group/namespaces/myns/bar.json",
-			customAction:              true,
-			expectedActionID:          "myns/bar",
-			customActionAdditionalItemIdentifiers: []velero.ResourceIdentifier{
-				{
-					GroupResource: schema.GroupResource{Group: "g1", Resource: "r1"},
-					Namespace:     "ns1",
-					Name:          "n1",
-				},
-				{
-					GroupResource: schema.GroupResource{Group: "g2", Resource: "r2"},
-					Namespace:     "ns2",
-					Name:          "n2",
-				},
-			},
-			customActionAdditionalItems: []runtime.Unstructured{
-				velerotest.UnstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
-				velerotest.UnstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
-			},
-			additionalItemError: errors.New("foo"),
-		},
-		{
-			name:                      "takePVSnapshot is not invoked for PVs when blockStore == nil",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
-			groupResource:             "persistentvolumes",
-		},
-		{
-			name:                      "takePVSnapshot is invoked for PVs when blockStore != nil",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
-			groupResource:             "persistentvolumes",
-			snapshottableVolumes: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
-			},
-		},
-		{
-			name:                      "takePVSnapshot is not invoked for PVs when their claim is tracked in the restic PVC tracker",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"claimRef": {"namespace": "pvc-ns", "name": "pvc"}, "awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
-			groupResource:             "persistentvolumes",
-			// empty snapshottableVolumes causes a blockStore to be created, but no
-			// snapshots are expected to be taken.
-			snapshottableVolumes: map[string]v1.VolumeBackupInfo{},
-			trackedPVCs:          sets.NewString(key("pvc-ns", "pvc"), key("another-pvc-ns", "another-pvc")),
-		},
-		{
-			name:                      "takePVSnapshot is invoked for PVs when their claim is not tracked in the restic PVC tracker",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"claimRef": {"namespace": "pvc-ns", "name": "pvc"}, "awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
-			groupResource:             "persistentvolumes",
-			snapshottableVolumes: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
-			},
-			trackedPVCs: sets.NewString(key("another-pvc-ns", "another-pvc")),
-		},
-		{
-			name:                      "backup fails when takePVSnapshot fails",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:               true,
-			groupResource:             "persistentvolumes",
-			snapshottableVolumes: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
-			},
-			snapshotError: fmt.Errorf("failure"),
-		},
-		{
-			name:                      "pod's restic PVC volume backups (only) are tracked",
-			item:                      `{"apiVersion": "v1", "kind": "Pod", "spec": {"volumes": [{"name": "volume-1", "persistentVolumeClaim": {"claimName": "bar"}},{"name": "volume-2", "persistentVolumeClaim": {"claimName": "baz"}},{"name": "volume-1", "emptyDir": {}}]}, "metadata":{"namespace":"foo","name":"bar", "annotations": {"backup.velero.io/backup-volumes": "volume-1,volume-2"}}}`,
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			groupResource:             "pods",
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/pods/namespaces/foo/bar.json",
-			expectedTrackedPVCs:       sets.NewString(key("foo", "bar"), key("foo", "baz")),
+			name: "PV has no ClaimRef",
+			pv:   builder.ForPersistentVolume("testPV").Result(),
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			var (
-				action        *fakeAction
-				backup        = new(Request)
-				groupResource = schema.ParseGroupResource("resource.group")
-				backedUpItems = make(map[itemKey]struct{})
-				w             = &fakeTarWriter{}
-			)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ib := itemBackupper{}
+			ib.backupRequest = new(Request)
+			ib.backupRequest.VolumesInformation.Init()
 
-			backup.Backup = new(v1.Backup)
-			backup.NamespaceIncludesExcludes = collections.NewIncludesExcludes()
-			backup.ResourceIncludesExcludes = collections.NewIncludesExcludes()
-			backup.SnapshotLocations = []*v1.VolumeSnapshotLocation{
-				new(v1.VolumeSnapshotLocation),
-			}
+			pvObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pv)
+			require.NoError(t, err)
+			logger := logrus.StandardLogger()
 
-			if test.groupResource != "" {
-				groupResource = schema.ParseGroupResource(test.groupResource)
-			}
-
-			item, err := velerotest.GetAsMap(test.item)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			namespaces := test.namespaceIncludesExcludes
-			if namespaces == nil {
-				namespaces = collections.NewIncludesExcludes()
-			}
-
-			if test.tarHeaderWriteError {
-				w.writeHeaderError = errors.New("error")
-			}
-			if test.tarWriteError {
-				w.writeError = errors.New("error")
-			}
-
-			if test.customAction {
-				action = &fakeAction{
-					additionalItems: test.customActionAdditionalItemIdentifiers,
-				}
-				backup.ResolvedActions = []resolvedAction{
-					{
-						BackupItemAction:          action,
-						namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-						resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes(groupResource.String()),
-						selector:                  labels.Everything(),
-					},
-				}
-			}
-
-			podCommandExecutor := &velerotest.MockPodCommandExecutor{}
-			defer podCommandExecutor.AssertExpectations(t)
-
-			dynamicFactory := &velerotest.FakeDynamicFactory{}
-			defer dynamicFactory.AssertExpectations(t)
-
-			discoveryHelper := velerotest.NewFakeDiscoveryHelper(true, nil)
-
-			blockStoreGetter := &blockStoreGetter{}
-
-			b := (&defaultItemBackupperFactory{}).newItemBackupper(
-				backup,
-				backedUpItems,
-				podCommandExecutor,
-				w,
-				dynamicFactory,
-				discoveryHelper,
-				nil, // restic backupper
-				newPVCSnapshotTracker(),
-				blockStoreGetter,
-			).(*defaultItemBackupper)
-
-			var blockStore *velerotest.FakeBlockStore
-			if test.snapshottableVolumes != nil {
-				blockStore = &velerotest.FakeBlockStore{
-					SnapshottableVolumes: test.snapshottableVolumes,
-					VolumeID:             "vol-abc123",
-					Error:                test.snapshotError,
-				}
-
-				blockStoreGetter.blockStore = blockStore
-			}
-
-			if test.trackedPVCs != nil {
-				b.resticSnapshotTracker.pvcs = test.trackedPVCs
-			}
-
-			// make sure the podCommandExecutor was set correctly in the real hook handler
-			assert.Equal(t, podCommandExecutor, b.itemHookHandler.(*defaultItemHookHandler).podCommandExecutor)
-
-			itemHookHandler := &mockItemHookHandler{}
-			defer itemHookHandler.AssertExpectations(t)
-			b.itemHookHandler = itemHookHandler
-
-			additionalItemBackupper := &mockItemBackupper{}
-			defer additionalItemBackupper.AssertExpectations(t)
-			b.additionalItemBackupper = additionalItemBackupper
-
-			obj := &unstructured.Unstructured{Object: item}
-			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, backup.ResourceHooks, hookPhasePre).Return(nil)
-			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, backup.ResourceHooks, hookPhasePost).Return(nil)
-
-			for i, item := range test.customActionAdditionalItemIdentifiers {
-				if test.additionalItemError != nil && i > 0 {
-					break
-				}
-				itemClient := &velerotest.FakeDynamicClient{}
-				defer itemClient.AssertExpectations(t)
-
-				dynamicFactory.On("ClientForGroupVersionResource", item.GroupResource.WithVersion("").GroupVersion(), metav1.APIResource{Name: item.Resource}, item.Namespace).Return(itemClient, nil)
-
-				itemClient.On("Get", item.Name, metav1.GetOptions{}).Return(test.customActionAdditionalItems[i], nil)
-
-				additionalItemBackupper.On("backupItem", mock.AnythingOfType("*logrus.Entry"), test.customActionAdditionalItems[i], item.GroupResource).Return(test.additionalItemError)
-			}
-
-			err = b.backupItem(velerotest.NewLogger(), obj, groupResource)
-			gotError := err != nil
-			if e, a := test.expectError, gotError; e != a {
-				t.Fatalf("error: expected %t, got %t: %v", e, a, err)
-			}
-			if test.expectError {
-				return
-			}
-
-			if test.expectExcluded {
-				if len(w.headers) > 0 {
-					t.Errorf("unexpected header write")
-				}
-				if len(w.data) > 0 {
-					t.Errorf("unexpected data write")
-				}
-				return
-			}
-
-			// Convert to JSON for comparing number of bytes to the tar header
-			itemJSON, err := json.Marshal(&item)
-			if err != nil {
-				t.Fatal(err)
-			}
-			require.Equal(t, 1, len(w.headers), "headers")
-			assert.Equal(t, test.expectedTarHeaderName, w.headers[0].Name, "header.name")
-			assert.Equal(t, int64(len(itemJSON)), w.headers[0].Size, "header.size")
-			assert.Equal(t, byte(tar.TypeReg), w.headers[0].Typeflag, "header.typeflag")
-			assert.Equal(t, int64(0755), w.headers[0].Mode, "header.mode")
-			assert.False(t, w.headers[0].ModTime.IsZero(), "header.modTime set")
-			assert.Equal(t, 1, len(w.data), "# of data")
-
-			actual, err := velerotest.GetAsMap(string(w.data[0]))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if e, a := item, actual; !reflect.DeepEqual(e, a) {
-				t.Errorf("data: expected %s, got %s", e, a)
-			}
-
-			if test.customAction {
-				if len(action.ids) != 1 {
-					t.Errorf("unexpected custom action ids: %v", action.ids)
-				} else if e, a := test.expectedActionID, action.ids[0]; e != a {
-					t.Errorf("action.ids[0]: expected %s, got %s", e, a)
-				}
-
-				require.Equal(t, 1, len(action.backups), "unexpected custom action backups: %#v", action.backups)
-				assert.Equal(t, backup.Backup, &(action.backups[0]), "backup")
-			}
-
-			if test.snapshottableVolumes != nil {
-				require.Equal(t, len(test.snapshottableVolumes), len(blockStore.SnapshotsTaken))
-			}
-
-			if len(test.snapshottableVolumes) > 0 {
-				require.Len(t, backup.VolumeSnapshots, 1)
-				snapshot := backup.VolumeSnapshots[0]
-
-				assert.Equal(t, test.snapshottableVolumes["vol-abc123"].SnapshotID, snapshot.Status.ProviderSnapshotID)
-				assert.Equal(t, test.snapshottableVolumes["vol-abc123"].Type, snapshot.Spec.VolumeType)
-				assert.Equal(t, test.snapshottableVolumes["vol-abc123"].Iops, snapshot.Spec.VolumeIOPS)
-				assert.Equal(t, test.snapshottableVolumes["vol-abc123"].AvailabilityZone, snapshot.Spec.VolumeAZ)
-			}
-
-			if test.expectedTrackedPVCs != nil {
-				require.Equal(t, len(test.expectedTrackedPVCs), len(b.resticSnapshotTracker.pvcs))
-
-				for key := range test.expectedTrackedPVCs {
-					assert.True(t, b.resticSnapshotTracker.pvcs.Has(key))
-				}
-			}
+			err = ib.addVolumeInfo(&unstructured.Unstructured{Object: pvObj}, logger)
+			require.NoError(t, err)
 		})
 	}
-}
-
-type blockStoreGetter struct {
-	blockStore velero.BlockStore
-}
-
-func (b *blockStoreGetter) GetBlockStore(name string) (velero.BlockStore, error) {
-	if b.blockStore != nil {
-		return b.blockStore, nil
-	}
-	return nil, errors.New("plugin not found")
-}
-
-type addAnnotationAction struct{}
-
-func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
-	// since item actions run out-of-proc, do a deep-copy here to simulate passing data
-	// across a process boundary.
-	copy := item.(*unstructured.Unstructured).DeepCopy()
-
-	metadata, err := meta.Accessor(copy)
-	if err != nil {
-		return copy, nil, nil
-	}
-
-	annotations := metadata.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	annotations["foo"] = "bar"
-	metadata.SetAnnotations(annotations)
-
-	return copy, nil, nil
-}
-
-func (a *addAnnotationAction) AppliesTo() (velero.ResourceSelector, error) {
-	panic("not implemented")
-}
-
-func TestItemActionModificationsToItemPersist(t *testing.T) {
-	var (
-		w   = &fakeTarWriter{}
-		obj = &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"namespace": "myns",
-					"name":      "bar",
-				},
-			},
-		}
-		req = &Request{
-			NamespaceIncludesExcludes: collections.NewIncludesExcludes(),
-			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
-			ResolvedActions: []resolvedAction{
-				{
-					BackupItemAction:          &addAnnotationAction{},
-					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-					resourceIncludesExcludes:  collections.NewIncludesExcludes(),
-					selector:                  labels.Everything(),
-				},
-			},
-		}
-
-		b = (&defaultItemBackupperFactory{}).newItemBackupper(
-			req,
-			make(map[itemKey]struct{}),
-			nil,
-			w,
-			&velerotest.FakeDynamicFactory{},
-			velerotest.NewFakeDiscoveryHelper(true, nil),
-			nil,
-			newPVCSnapshotTracker(),
-			nil,
-		).(*defaultItemBackupper)
-	)
-
-	// our expected backed-up object is the passed-in object plus the annotation
-	// that the backup item action adds.
-	expected := obj.DeepCopy()
-	expected.SetAnnotations(map[string]string{"foo": "bar"})
-
-	// method under test
-	require.NoError(t, b.backupItem(velerotest.NewLogger(), obj, schema.ParseGroupResource("resource.group")))
-
-	// get the actual backed-up item
-	require.Len(t, w.data, 1)
-	actual, err := velerotest.GetAsMap(string(w.data[0]))
-	require.NoError(t, err)
-
-	assert.EqualValues(t, expected.Object, actual)
-}
-
-func TestResticAnnotationsPersist(t *testing.T) {
-	var (
-		w   = &fakeTarWriter{}
-		obj = &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"namespace": "myns",
-					"name":      "bar",
-					"annotations": map[string]interface{}{
-						"backup.velero.io/backup-volumes": "volume-1,volume-2",
-					},
-				},
-			},
-		}
-		req = &Request{
-			NamespaceIncludesExcludes: collections.NewIncludesExcludes(),
-			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
-			ResolvedActions: []resolvedAction{
-				{
-					BackupItemAction:          &addAnnotationAction{},
-					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-					resourceIncludesExcludes:  collections.NewIncludesExcludes(),
-					selector:                  labels.Everything(),
-				},
-			},
-		}
-		resticBackupper = &resticmocks.Backupper{}
-		b               = (&defaultItemBackupperFactory{}).newItemBackupper(
-			req,
-			make(map[itemKey]struct{}),
-			nil,
-			w,
-			&velerotest.FakeDynamicFactory{},
-			velerotest.NewFakeDiscoveryHelper(true, nil),
-			resticBackupper,
-			newPVCSnapshotTracker(),
-			nil,
-		).(*defaultItemBackupper)
-	)
-
-	resticBackupper.
-		On("BackupPodVolumes", mock.Anything, mock.Anything, mock.Anything).
-		Return(map[string]string{"volume-1": "snapshot-1", "volume-2": "snapshot-2"}, nil)
-
-	// our expected backed-up object is the passed-in object, plus the annotation
-	// that the backup item action adds, plus the annotations that the restic
-	// backupper adds
-	expected := obj.DeepCopy()
-	annotations := expected.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	annotations["foo"] = "bar"
-	annotations["snapshot.velero.io/volume-1"] = "snapshot-1"
-	annotations["snapshot.velero.io/volume-2"] = "snapshot-2"
-	expected.SetAnnotations(annotations)
-
-	// method under test
-	require.NoError(t, b.backupItem(velerotest.NewLogger(), obj, schema.ParseGroupResource("pods")))
-
-	// get the actual backed-up item
-	require.Len(t, w.data, 1)
-	actual, err := velerotest.GetAsMap(string(w.data[0]))
-	require.NoError(t, err)
-
-	assert.EqualValues(t, expected.Object, actual)
-}
-
-func TestTakePVSnapshot(t *testing.T) {
-	iops := int64(1000)
-
-	tests := []struct {
-		name                   string
-		snapshotEnabled        bool
-		pv                     string
-		ttl                    time.Duration
-		expectError            bool
-		expectedVolumeID       string
-		expectedSnapshotsTaken int
-		volumeInfo             map[string]v1.VolumeBackupInfo
-	}{
-		{
-			name:            "snapshot disabled",
-			pv:              `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}}`,
-			snapshotEnabled: false,
-		},
-		{
-			name:            "unsupported PV source type",
-			snapshotEnabled: true,
-			pv:              `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"unsupportedPVSource": {}}}`,
-			expectError:     false,
-		},
-		{
-			name:                   "without iops",
-			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:            false,
-			expectedSnapshotsTaken: 1,
-			expectedVolumeID:       "vol-abc123",
-			ttl:                    5 * time.Minute,
-			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": {Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
-			},
-		},
-		{
-			name:                   "with iops",
-			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:            false,
-			expectedSnapshotsTaken: 1,
-			expectedVolumeID:       "vol-abc123",
-			ttl:                    5 * time.Minute,
-			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": {Type: "io1", Iops: &iops, SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
-			},
-		},
-		{
-			name:             "create snapshot error",
-			snapshotEnabled:  true,
-			pv:               `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
-			expectedVolumeID: "pd-abc123",
-			expectError:      true,
-		},
-		{
-			name:                   "PV with label metadata but no failureDomainZone",
-			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/region": "us-east-1"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:            false,
-			expectedSnapshotsTaken: 1,
-			expectedVolumeID:       "vol-abc123",
-			ttl:                    5 * time.Minute,
-			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": {Type: "gp", SnapshotID: "snap-1"},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			backup := &v1.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: v1.DefaultNamespace,
-					Name:      "mybackup",
-				},
-				Spec: v1.BackupSpec{
-					SnapshotVolumes: &test.snapshotEnabled,
-					TTL:             metav1.Duration{Duration: test.ttl},
-				},
-			}
-
-			blockStore := &velerotest.FakeBlockStore{
-				SnapshottableVolumes: test.volumeInfo,
-				VolumeID:             test.expectedVolumeID,
-			}
-
-			ib := &defaultItemBackupper{
-				backupRequest: &Request{
-					Backup:            backup,
-					SnapshotLocations: []*v1.VolumeSnapshotLocation{new(v1.VolumeSnapshotLocation)},
-				},
-				blockStoreGetter: &blockStoreGetter{blockStore: blockStore},
-			}
-
-			pv, err := velerotest.GetAsMap(test.pv)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// method under test
-			err = ib.takePVSnapshot(&unstructured.Unstructured{Object: pv}, velerotest.NewLogger())
-
-			gotErr := err != nil
-
-			if e, a := test.expectError, gotErr; e != a {
-				t.Errorf("error: expected %v, got %v", e, a)
-			}
-			if test.expectError {
-				return
-			}
-
-			if !test.snapshotEnabled {
-				// don't need to check anything else if snapshots are disabled
-				return
-			}
-
-			// we should have exactly one snapshot taken
-			require.Equal(t, test.expectedSnapshotsTaken, blockStore.SnapshotsTaken.Len())
-
-			if test.expectedSnapshotsTaken > 0 {
-				require.Len(t, ib.backupRequest.VolumeSnapshots, 1)
-				snapshot := ib.backupRequest.VolumeSnapshots[0]
-
-				snapshotID, _ := blockStore.SnapshotsTaken.PopAny()
-				assert.Equal(t, snapshotID, snapshot.Status.ProviderSnapshotID)
-				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].Type, snapshot.Spec.VolumeType)
-				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].Iops, snapshot.Spec.VolumeIOPS)
-				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].AvailabilityZone, snapshot.Spec.VolumeAZ)
-			}
-		})
-	}
-}
-
-type fakeTarWriter struct {
-	closeCalled      bool
-	headers          []*tar.Header
-	data             [][]byte
-	writeHeaderError error
-	writeError       error
-}
-
-func (w *fakeTarWriter) Close() error { return nil }
-
-func (w *fakeTarWriter) Write(data []byte) (int, error) {
-	w.data = append(w.data, data)
-	return 0, w.writeError
-}
-
-func (w *fakeTarWriter) WriteHeader(header *tar.Header) error {
-	w.headers = append(w.headers, header)
-	return w.writeHeaderError
-}
-
-type mockItemBackupper struct {
-	mock.Mock
-}
-
-func (ib *mockItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error {
-	args := ib.Called(logger, obj, groupResource)
-	return args.Error(0)
 }

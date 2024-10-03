@@ -1,0 +1,111 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: backuprepositories.velero.io
+spec:
+  group: velero.io
+  names:
+    kind: BackupRepository
+    listKind: BackupRepositoryList
+    plural: backuprepositories
+    singular: backuprepository
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - jsonPath: .spec.repositoryType
+      name: Repository Type
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BackupRepositorySpec is the specification for a BackupRepository.
+            properties:
+              backupStorageLocation:
+                description: |-
+                  BackupStorageLocation is the name of the BackupStorageLocation
+                  that should contain this repository.
+                type: string
+              maintenanceFrequency:
+                description: MaintenanceFrequency is how often maintenance should
+                  be run.
+                type: string
+              repositoryConfig:
+                additionalProperties:
+                  type: string
+                description: RepositoryConfig is for repository-specific configuration
+                  fields.
+                nullable: true
+                type: object
+              repositoryType:
+                description: RepositoryType indicates the type of the backend repository
+                enum:
+                - kopia
+                - restic
+                - ""
+                type: string
+              resticIdentifier:
+                description: |-
+                  ResticIdentifier is the full restic-compatible string for identifying
+                  this repository.
+                type: string
+              volumeNamespace:
+                description: |-
+                  VolumeNamespace is the namespace this backup repository contains
+                  pod volume backups for.
+                type: string
+            required:
+            - backupStorageLocation
+            - maintenanceFrequency
+            - resticIdentifier
+            - volumeNamespace
+            type: object
+          status:
+            description: BackupRepositoryStatus is the current status of a BackupRepository.
+            properties:
+              lastMaintenanceTime:
+                description: LastMaintenanceTime is the last time maintenance was
+                  run.
+                format: date-time
+                nullable: true
+                type: string
+              message:
+                description: Message is a message about the current status of the
+                  BackupRepository.
+                type: string
+              phase:
+                description: Phase is the current state of the BackupRepository.
+                enum:
+                - New
+                - Ready
+                - NotReady
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources: {}
