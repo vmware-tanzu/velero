@@ -117,7 +117,20 @@ func GetMaintenanceResultFromJob(cli client.Client, job *batchv1.Job) (string, e
 	}
 
 	// we only have one maintenance pod for the job
-	return podList.Items[0].Status.ContainerStatuses[0].State.Terminated.Message, nil
+	pod := podList.Items[0]
+
+	statuses := pod.Status.ContainerStatuses
+	if len(statuses) == 0 {
+		return "", fmt.Errorf("no container statuses found for job %s", job.Name)
+	}
+
+	// we only have one maintenance container
+	terminated := statuses[0].State.Terminated
+	if terminated == nil {
+		return "", fmt.Errorf("container for job %s is not terminated", job.Name)
+	}
+
+	return terminated.Message, nil
 }
 
 func GetLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error) {
