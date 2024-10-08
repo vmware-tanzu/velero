@@ -35,8 +35,8 @@ Linting is enforced by the project CI through `.github/workflows/pr-linter-check
 Linters settings is verified by `hack/verify-lint-config.sh` and is enforced by the project CI through `.github/workflows/pr-ci-check.yml` job.
 
 To update `golangci-lint` used by the project, update:
-- `with.version` of golangci/golangci-lint-action in [`.github/workflows/pr-linter-check.yml:18`](https://github.com/vmware-tanzu/velero/blob/main/.github/workflows/pr-linter-check.yml#L19)
-- `golangci-lint` version installed in build-image in [`hack/build-image/Dockerfile:97`](https://github.com/vmware-tanzu/velero/blob/main/hack/build-image/Dockerfile#L96)
+- `with.version` of golangci/golangci-lint-action in [`.github/workflows/pr-linter-check.yml:18`](https://github.com/vmware-tanzu/velero/blob/main/.github/workflows/pr-linter-check.yml#L18)
+- `golangci-lint` version installed in build-image in [`hack/build-image/Dockerfile:97`](https://github.com/vmware-tanzu/velero/blob/main/hack/build-image/Dockerfile#L97)
 - documentation reference comment in [`.golangci.yaml:1`](https://github.com/vmware-tanzu/velero/blob/main/.golangci.yaml#L1)
 
 ## Test
