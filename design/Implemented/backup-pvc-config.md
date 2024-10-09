@@ -90,5 +90,5 @@ Once `backupPVC.readOnly` is set to true, users must make sure that the storage 
 Once above problems happen, the DataUpload CR is cancelled after prepare timeout and the backupPVC and backupPod will be deleted, so there is no way to tell the cause is one of the above problems or others.  
 To help the troubleshooting, we can add some diagnostic mechanism to discover the status of the backupPod before deleting it as a result of the prepare timeout.  
 
-[1]: Implemented/unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
+[1]: unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
 [2]: volume-snapshot-data-movement/volume-snapshot-data-movement.md
