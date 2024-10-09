@@ -116,8 +116,7 @@ func (nt *nsTracker) init(
 	for _, namespace := range unstructuredNSs {
 		if nt.singleLabelSelector != nil &&
 			nt.singleLabelSelector.Matches(labels.Set(namespace.GetLabels())) {
-			nt.logger.Debugf(`Track namespace %s, 
-				because its labels match backup LabelSelector.`,
+			nt.logger.Debugf("Track namespace %s, because its labels match backup LabelSelector.",
 				namespace.GetName(),
 			)
 
@@ -128,8 +127,7 @@ func (nt *nsTracker) init(
 		if len(nt.orLabelSelector) > 0 {
 			for _, selector := range nt.orLabelSelector {
 				if selector.Matches(labels.Set(namespace.GetLabels())) {
-					nt.logger.Debugf(`Track namespace %s",
-						"because its labels match the backup OrLabelSelector.`,
+					nt.logger.Debugf("Track namespace %s, because its labels match the backup OrLabelSelector.",
 						namespace.GetName(),
 					)
 					nt.track(namespace.GetName())
@@ -148,8 +146,7 @@ func (nt *nsTracker) init(
 		}
 
 		if nt.namespaceFilter.ShouldInclude(namespace.GetName()) {
-			nt.logger.Debugf(`Track namespace %s,
-				because its name match the backup namespace filter.`,
+			nt.logger.Debugf("Track namespace %s, because its name match the backup namespace filter.",
 				namespace.GetName(),
 			)
 			nt.track(namespace.GetName())
