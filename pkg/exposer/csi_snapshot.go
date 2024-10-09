@@ -202,6 +202,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		csiExposeParam.HostingPodLabels,
 		csiExposeParam.Affinity,
 		csiExposeParam.Resources,
+		backupPVCReadOnly,
 	)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
@@ -442,6 +443,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	label map[string]string,
 	affinity *kube.LoadAffinity,
 	resources corev1.ResourceRequirements,
+	backupPVCReadOnly bool,
 ) (*corev1.Pod, error) {
 	podName := ownerObject.Name
 
@@ -454,7 +456,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	}
 
 	var gracePeriod int64 = 0
-	volumeMounts, volumeDevices, volumePath := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode, true)
+	volumeMounts, volumeDevices, volumePath := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode, backupPVCReadOnly)
 	volumeMounts = append(volumeMounts, podInfo.volumeMounts...)
 
 	volumes := []corev1.Volume{{
@@ -462,10 +464,14 @@ func (e *csiSnapshotExposer) createBackupPod(
 		VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 				ClaimName: backupPVC.Name,
-				ReadOnly:  true,
 			},
 		},
 	}}
+
+	if backupPVCReadOnly {
+		volumes[0].VolumeSource.PersistentVolumeClaim.ReadOnly = true
+	}
+
 	volumes = append(volumes, podInfo.volumes...)
 
 	if label == nil {
