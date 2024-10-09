@@ -424,8 +424,7 @@ func GetVolumeSnapshotClassForStorageClass(
 		return &vsClass, nil
 	}
 	return nil, fmt.Errorf(
-		`failed to get VolumeSnapshotClass for provisioner %s, 
-		ensure that the desired VolumeSnapshot class has the %s label`,
+		"failed to get VolumeSnapshotClass for provisioner %s, ensure that the desired VolumeSnapshot class has the %s label",
 		provisioner, velerov1api.VolumeSnapshotClassSelectorLabel)
 }
 
