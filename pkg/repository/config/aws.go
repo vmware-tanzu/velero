@@ -34,6 +34,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// getS3CredentialsFunc is used to make testing more convenient
+var getS3CredentialsFunc = GetS3Credentials
+
 const (
 	// AWS specific environment variable
 	awsProfileEnvVar         = "AWS_PROFILE"
@@ -63,7 +66,7 @@ func GetS3ResticEnvVars(config map[string]string) (map[string]string, error) {
 	// GetS3ResticEnvVars reads the AWS config, from files and envs
 	// if needed assumes the role and returns the session credentials
 	// setting these variables emulates what would happen for example when using kube2iam
-	if creds, err := GetS3Credentials(config); err == nil && creds != nil {
+	if creds, err := getS3CredentialsFunc(config); err == nil && creds != nil {
 		result[awsKeyIDEnvVar] = creds.AccessKeyID
 		result[awsSecretKeyEnvVar] = creds.SecretAccessKey
 		result[awsSessTokenEnvVar] = creds.SessionToken
