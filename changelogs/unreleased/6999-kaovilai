@@ -1,0 +1,1 @@
+restore: Add new resource filters can separate cluster and namespace scope resources.
