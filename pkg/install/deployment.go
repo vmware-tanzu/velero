@@ -57,6 +57,7 @@ type podTemplateConfig struct {
 	backupRepoConfigMap             string
 	repoMaintenanceJobConfigMap     string
 	nodeAgentConfigMap              string
+	selinuxDatamover                string
 }
 
 func WithImage(image string) podTemplateOption {
@@ -180,6 +181,12 @@ func WithPrivilegedNodeAgent(b bool) podTemplateOption {
 func WithNodeAgentConfigMap(nodeAgentConfigMap string) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.nodeAgentConfigMap = nodeAgentConfigMap
+	}
+}
+
+func WithSELinuxDatamover(selinuxDatamover string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.selinuxDatamover = selinuxDatamover
 	}
 }
 

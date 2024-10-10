@@ -76,6 +76,7 @@ type DataUploadReconciler struct {
 	podResources        corev1.ResourceRequirements
 	preparingTimeout    time.Duration
 	metrics             *metrics.ServerMetrics
+	selinuxDatamover    string
 }
 
 func NewDataUploadReconciler(
@@ -92,6 +93,7 @@ func NewDataUploadReconciler(
 	preparingTimeout time.Duration,
 	log logrus.FieldLogger,
 	metrics *metrics.ServerMetrics,
+	selinuxDatamover string,
 ) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:            client,
@@ -114,6 +116,7 @@ func NewDataUploadReconciler(
 		podResources:     podResources,
 		preparingTimeout: preparingTimeout,
 		metrics:          metrics,
+		selinuxDatamover: selinuxDatamover,
 	}
 }
 
@@ -816,6 +819,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			Affinity:         r.loadAffinity,
 			BackupPVCConfig:  r.backupPVCConfig,
 			Resources:        r.podResources,
+			SELinuxDatamover: r.selinuxDatamover,
 		}, nil
 	}
 	return nil, nil

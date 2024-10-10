@@ -36,6 +36,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
+	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/install"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -89,6 +90,7 @@ type Options struct {
 	BackupRepoConfigMap             string
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
+	SELinuxDatamover                string
 }
 
 // BindFlags adds command line values to the options struct.
@@ -181,6 +183,12 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		"node-agent-configmap",
 		o.NodeAgentConfigMap,
 		"The name of ConfigMap containing node-agent configurations.",
+	)
+	flags.StringVar(
+		&o.SELinuxDatamover,
+		"selinux-datamover",
+		o.SELinuxDatamover,
+		"Data Mover backup pod options for handling selinux. Supported values are 'none', 'no-relabeling', and 'no-readonly'. Default is 'none'.",
 	)
 }
 
@@ -283,6 +291,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		BackupRepoConfigMap:             o.BackupRepoConfigMap,
 		RepoMaintenanceJobConfigMap:     o.RepoMaintenanceJobConfigMap,
 		NodeAgentConfigMap:              o.NodeAgentConfigMap,
+		SELinuxDatamover:                o.SELinuxDatamover,
 	}, nil
 }
 
@@ -419,6 +428,10 @@ func (o *Options) Validate(c *cobra.Command, args []string, f client.Factory) er
 		return err
 	} else if msg != "" {
 		fmt.Printf("⚠️  %s\n", msg)
+	}
+
+	if err := exposer.ValidateSELinuxDatamover(o.SELinuxDatamover); err != nil {
+		return err
 	}
 
 	// If we're only installing CRDs, we can skip the rest of the validation.

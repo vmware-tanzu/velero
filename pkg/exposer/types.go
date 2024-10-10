@@ -17,6 +17,9 @@ limitations under the License.
 package exposer
 
 import (
+	"fmt"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -25,6 +28,9 @@ const (
 	AccessModeBlock      = "by-block-device"
 	podGroupLabel        = "velero.io/exposer-pod-group"
 	podGroupSnapshot     = "snapshot-exposer"
+	SELinuxNone          = "none"
+	SELinuxNoRelabeling  = "no-relabeling"
+	SELinuxNoReadOnly    = "no-readonly"
 )
 
 // ExposeResult defines the result of expose.
@@ -38,4 +44,15 @@ type ExposeByPod struct {
 	HostingPod       *corev1.Pod
 	HostingContainer string
 	VolumeName       string
+}
+
+// ValidateSelinuxDatamover validates if the input param is a valid SELinux approach for data mover.
+// It will return an error if it's invalid.
+func ValidateSELinuxDatamover(t string) error {
+	t = strings.TrimSpace(t)
+	if t != "" && t != SELinuxNone && t != SELinuxNoRelabeling && t != SELinuxNoReadOnly {
+		return fmt.Errorf("invalid SELinux datamover option '%s', valid options are: '%s', '%s', '%s'", t, SELinuxNone, SELinuxNoRelabeling, SELinuxNoReadOnly)
+	}
+
+	return nil
 }

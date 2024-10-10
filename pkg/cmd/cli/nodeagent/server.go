@@ -57,6 +57,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
+	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
@@ -89,6 +90,7 @@ type nodeAgentServerConfig struct {
 	resourceTimeout         time.Duration
 	dataMoverPrepareTimeout time.Duration
 	nodeAgentConfig         string
+	selinuxDatamover        string
 }
 
 func NewServerCommand(f client.Factory) *cobra.Command {
@@ -126,6 +128,12 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.dataMoverPrepareTimeout, "data-mover-prepare-timeout", config.dataMoverPrepareTimeout, "How long to wait for preparing a DataUpload/DataDownload. Default is 30 minutes.")
 	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "The address to expose prometheus metrics")
 	command.Flags().StringVar(&config.nodeAgentConfig, "node-agent-configmap", config.nodeAgentConfig, "The name of ConfigMap containing node-agent configurations.")
+	command.Flags().StringVar(
+		&config.selinuxDatamover,
+		"selinux-datamover",
+		config.selinuxDatamover,
+		"Data Mover backup pod options for handling selinux. Supported values are 'none', 'no-relabeling', and 'no-readonly'. Default is 'none'.",
+	)
 
 	return command
 }
@@ -239,6 +247,10 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 	s.getDataPathConfigs()
 	s.dataPathMgr = datapath.NewManager(s.getDataPathConcurrentNum(defaultDataPathConcurrentNum))
 
+	if err = exposer.ValidateSELinuxDatamover(config.selinuxDatamover); err != nil {
+		return nil, err
+	}
+
 	return s, nil
 }
 
@@ -330,6 +342,7 @@ func (s *nodeAgentServer) run() {
 		s.config.dataMoverPrepareTimeout,
 		s.logger,
 		s.metrics,
+		s.config.selinuxDatamover,
 	)
 	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
