@@ -46,6 +46,11 @@ spec:
       jsonPath: .status.node
       name: Node
       type: string
+    - description: Elapsed time of actual transfer, eventually 'completion time' -
+        'start time'.
+      jsonPath: .status.elapsedTransferTime
+      name: Elapsed Time
+      type: string
     name: v2alpha1
     schema:
       openAPIV3Schema:
@@ -159,6 +164,11 @@ spec:
                   as a result of the DataUpload.
                 nullable: true
                 type: object
+              elapsedTransferTime:
+                description: |-
+                  ElapsedTransferTime is the total amount of time it took to complete
+                  this DataUpload (completion time - start time).
+                type: string
               message:
                 description: Message is a message about the DataUpload's status.
                 type: string
