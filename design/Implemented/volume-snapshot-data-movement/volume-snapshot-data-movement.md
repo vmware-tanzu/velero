@@ -977,6 +977,6 @@ Restore command is kept as is.
 
 
 
-[1]: ../Implemented/unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
-[2]: ../Implemented/general-progress-monitoring.md
+[1]: ../unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
+[2]: ../general-progress-monitoring.md
 [3]: ../node-agent-concurrency.md

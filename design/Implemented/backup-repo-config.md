@@ -120,4 +120,4 @@ kubectl apply -f <yaml file name>
 
 
 
-[1]: Implemented/unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
+[1]: unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md

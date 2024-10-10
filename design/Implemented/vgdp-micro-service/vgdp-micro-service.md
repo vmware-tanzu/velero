@@ -215,9 +215,9 @@ CLI is not changed.
 
 
 
-[1]: ../Implemented/unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
+[1]: ../unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
 [2]: ../volume-snapshot-data-movement/volume-snapshot-data-movement.md
 [3]: https://kubernetes.io/blog/2022/09/02/cosi-kubernetes-object-storage-management/
-[4]: ../Implemented/node-agent-concurrency.md
+[4]: ../node-agent-concurrency.md
 [5]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
 
