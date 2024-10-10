@@ -82,7 +82,7 @@ func (c *scheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return true
 		})).
 		For(&velerov1.Schedule{}, bld.WithPredicates(kube.SpecChangePredicate{})).
-		WatchesRawSource(s, nil).
+		WatchesRawSource(s).
 		Complete(c)
 }
 
