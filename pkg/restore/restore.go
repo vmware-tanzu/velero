@@ -48,6 +48,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
@@ -1676,24 +1677,44 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	// restore the managedFields
-	withoutManagedFields := createdObj.DeepCopy()
-	createdObj.SetManagedFields(obj.GetManagedFields())
-	patchBytes, err := generatePatch(withoutManagedFields, createdObj)
-	if err != nil {
-		ctx.log.Errorf("error generating patch for managed fields %s: %v", kube.NamespaceAndName(obj), err)
+	firstPatchTry := true
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var withoutManagedFields *unstructured.Unstructured
+		var patchBytes []byte
+		var patchErr error
+
+		if !firstPatchTry {
+			createdObj, patchErr = resourceClient.Get(name, metav1.GetOptions{})
+			if patchErr != nil {
+				ctx.log.Errorf("error fetching latest object for %s: %v", kube.NamespaceAndName(obj), patchErr)
+				return patchErr
+			}
+		}
+
+		firstPatchTry = false
+		withoutManagedFields = createdObj.DeepCopy()
+		createdObj.SetManagedFields(obj.GetManagedFields())
+		patchBytes, patchErr = generatePatch(withoutManagedFields, createdObj)
+		if patchErr != nil {
+			ctx.log.Errorf("error generating patch for managed fields %s: %v", kube.NamespaceAndName(obj), patchErr)
+			return patchErr
+		}
+		if patchBytes != nil {
+			_, patchErr = resourceClient.Patch(name, patchBytes)
+			if patchErr != nil {
+				ctx.log.Errorf("error patching managed fields %s: %v", kube.NamespaceAndName(obj), patchErr)
+				return patchErr
+			}
+			ctx.log.Infof("managed fields for %s patched successfully", kube.NamespaceAndName(obj))
+		}
+
+		return nil
+	})
+
+	if err != nil && !apierrors.IsNotFound(err) {
 		errs.Add(namespace, err)
 		return warnings, errs, itemExists
-	}
-	if patchBytes != nil {
-		if _, err = resourceClient.Patch(name, patchBytes); err != nil {
-			ctx.log.Errorf("error patch for managed fields %s: %v", kube.NamespaceAndName(obj), err)
-			if !apierrors.IsNotFound(err) {
-				errs.Add(namespace, err)
-				return warnings, errs, itemExists
-			}
-		} else {
-			ctx.log.Infof("the managed fields for %s is patched", kube.NamespaceAndName(obj))
-		}
 	}
 
 	if newGR == kuberesource.Pods {
