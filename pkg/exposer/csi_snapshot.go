@@ -174,12 +174,20 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 	// for backupPVC (intermediate PVC in snapshot data movement) object creation
 	backupPVCStorageClass := csiExposeParam.StorageClass
 	backupPVCReadOnly := false
+	spcNoRelabeling := false
 	if value, exists := csiExposeParam.BackupPVCConfig[csiExposeParam.StorageClass]; exists {
 		if value.StorageClass != "" {
 			backupPVCStorageClass = value.StorageClass
 		}
 
 		backupPVCReadOnly = value.ReadOnly
+		if value.SPCNoRelabeling {
+			if backupPVCReadOnly {
+				spcNoRelabeling = true
+			} else {
+				curLog.WithField("vs name", volumeSnapshot.Name).Warn("Ignoring spcNoRelabling for read-write volume")
+			}
+		}
 	}
 
 	backupPVC, err := e.createBackupPVC(ctx, ownerObject, backupVS.Name, backupPVCStorageClass, csiExposeParam.AccessMode, volumeSize, backupPVCReadOnly)
@@ -203,6 +211,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		csiExposeParam.Affinity,
 		csiExposeParam.Resources,
 		backupPVCReadOnly,
+		spcNoRelabeling,
 	)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
@@ -444,6 +453,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	affinity *kube.LoadAffinity,
 	resources corev1.ResourceRequirements,
 	backupPVCReadOnly bool,
+	spcNoRelabeling bool,
 ) (*corev1.Pod, error) {
 	podName := ownerObject.Name
 
@@ -555,6 +565,12 @@ func (e *csiSnapshotExposer) createBackupPod(
 				RunAsUser: &userID,
 			},
 		},
+	}
+
+	if spcNoRelabeling {
+		pod.Spec.SecurityContext.SELinuxOptions = &corev1.SELinuxOptions{
+			Type: "spc_t",
+		}
 	}
 
 	return e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Create(ctx, pod, metav1.CreateOptions{})
