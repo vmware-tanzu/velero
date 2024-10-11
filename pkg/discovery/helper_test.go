@@ -224,14 +224,15 @@ func TestHelper_ResourceFor(t *testing.T) {
 			},
 		},
 	}
-
 	h := &helper{
-		discoveryClient: fakeDiscoveryClient,
-		lock:            sync.RWMutex{},
-		mapper:          nil,
-		resources:       fakeDiscoveryClient.Resources,
-		resourcesMap:    make(map[schema.GroupVersionResource]metav1.APIResource),
-		serverVersion:   &version.Info{Major: "1", Minor: "22", GitVersion: "v1.22.1"},
+		discoveryClient: &velerotest.DiscoveryClient{
+			FakeDiscovery: fakeDiscoveryClient,
+		},
+		lock:          sync.RWMutex{},
+		mapper:        nil,
+		resources:     fakeDiscoveryClient.Resources,
+		resourcesMap:  make(map[schema.GroupVersionResource]metav1.APIResource),
+		serverVersion: &version.Info{Major: "1", Minor: "22", GitVersion: "v1.22.1"},
 	}
 
 	for _, resourceList := range h.resources {
@@ -352,11 +353,13 @@ func TestHelper_KindFor(t *testing.T) {
 	}
 
 	h := &helper{
-		discoveryClient: fakeDiscoveryClient,
-		lock:            sync.RWMutex{},
-		resources:       fakeDiscoveryClient.Resources,
-		resourcesMap:    make(map[schema.GroupVersionResource]metav1.APIResource),
-		serverVersion:   &version.Info{Major: "1", Minor: "22", GitVersion: "v1.22.1"},
+		discoveryClient: &velerotest.DiscoveryClient{
+			FakeDiscovery: fakeDiscoveryClient,
+		},
+		lock:          sync.RWMutex{},
+		resources:     fakeDiscoveryClient.Resources,
+		resourcesMap:  make(map[schema.GroupVersionResource]metav1.APIResource),
+		serverVersion: &version.Info{Major: "1", Minor: "22", GitVersion: "v1.22.1"},
 	}
 
 	h.kindMap = map[schema.GroupVersionKind]metav1.APIResource{pvGVK: pvAPIRes}
@@ -517,9 +520,11 @@ func TestHelper_Refresh(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			h := &helper{
-				lock:            sync.RWMutex{},
-				discoveryClient: fakeDiscoveryClient,
-				logger:          logrus.New(),
+				lock: sync.RWMutex{},
+				discoveryClient: &velerotest.DiscoveryClient{
+					FakeDiscovery: fakeDiscoveryClient,
+				},
+				logger: logrus.New(),
 			}
 			// Set feature flags
 			if testCase.features != "" {
@@ -637,7 +642,9 @@ func TestHelper(t *testing.T) {
 	fakeDiscoveryClient := &fake.FakeDiscovery{
 		Fake: &clientgotesting.Fake{},
 	}
-	h, err := NewHelper(fakeDiscoveryClient, logrus.New())
+	h, err := NewHelper(&velerotest.DiscoveryClient{
+		FakeDiscovery: fakeDiscoveryClient,
+	}, logrus.New())
 	assert.NoError(t, err)
 	// All below calls put together for the implementation are empty or just very simple, and just want to cover testing
 	// If wanting to write unit tests for some functions could remove it and with writing new function alone
