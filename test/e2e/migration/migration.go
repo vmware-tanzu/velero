@@ -81,12 +81,6 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 		}
 	})
 	AfterEach(func() {
-		By(fmt.Sprintf("Switch to default kubeconfig context %s", veleroCfg.DefaultClusterContext), func() {
-			Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
-			veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
-			veleroCfg.ClusterToInstallVelero = veleroCfg.DefaultClusterName
-		})
-
 		if CurrentSpecReport().Failed() && veleroCfg.FailFast {
 			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
 		} else {
@@ -113,6 +107,12 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					DeleteNamespace(context.Background(), *veleroCfg.StandbyClient, migrationNamespace, true)
 				})
 			}
+
+			By(fmt.Sprintf("Switch to default kubeconfig context %s", veleroCfg.DefaultClusterContext), func() {
+				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
+				veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
+				veleroCfg.ClusterToInstallVelero = veleroCfg.DefaultClusterName
+			})
 		}
 	})
 	When("kibishii is the sample workload", func() {

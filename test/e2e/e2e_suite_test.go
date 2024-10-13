@@ -233,7 +233,7 @@ var _ = Describe("Velero test on parallel files upload",
 var _ = Describe("Velero test on parallel files download",
 	Label("UploaderConfig", "ParallelFilesDownload"), ParallelFilesDownloadTest)
 
-func GetKubeconfigContext() error {
+func GetKubeConfigContext() error {
 	var err error
 	var tcDefault, tcStandby TestClient
 	tcDefault, err = NewTestClient(VeleroCfg.DefaultClusterContext)
@@ -287,7 +287,7 @@ func TestE2e(t *testing.T) {
 	}
 
 	var err error
-	if err = GetKubeconfigContext(); err != nil {
+	if err = GetKubeConfigContext(); err != nil {
 		fmt.Println(err)
 		t.FailNow()
 	}
