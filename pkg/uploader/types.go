@@ -57,7 +57,7 @@ type SnapshotInfo struct {
 	Size int64  `json:"Size"`
 }
 
-// Progress which defined two variables to record progress
+// Progress which defined three variables to record progress
 type Progress struct {
 	TotalBytes   int64 `json:"totalBytes,omitempty"`
 	BytesDone    int64 `json:"doneBytes,omitempty"`

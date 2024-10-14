@@ -486,6 +486,9 @@ func (r *DataDownloadReconciler) OnDataDownloadProgress(ctx context.Context, nam
 
 	original := dd.DeepCopy()
 	dd.Status.Progress = shared.DataMoveOperationProgress{TotalBytes: progress.TotalBytes, BytesDone: progress.BytesDone}
+	dd.Status.ElapsedTransferTime = metav1.Duration{
+		time.Since(dd.Status.StartTimestamp.Time),
+	}
 
 	if err := r.client.Patch(ctx, &dd, client.MergeFrom(original)); err != nil {
 		log.WithError(err).Error("Failed to update restore snapshot progress")

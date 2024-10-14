@@ -45,6 +45,15 @@ spec:
       jsonPath: .status.node
       name: Node
       type: string
+    - description: Elapsed time of the actual transfer, eventually completion time
+        - start time
+      jsonPath: .status.elapsedTransferTime
+      name: Elapsed Time
+      type: string
+    - description: Actual bytes/second moved onto the cluster
+      jsonPath: .status.throughput
+      name: Throughput bytes/sec
+      type: integer
     name: v2alpha1
     schema:
       openAPIV3Schema:
@@ -144,6 +153,9 @@ spec:
                 format: date-time
                 nullable: true
                 type: string
+              elapsedTransferTime:
+                description: ElapsedTransferTime
+                type: string
               message:
                 description: Message is a message about the DataDownload's status.
                 type: string
@@ -185,6 +197,10 @@ spec:
                 format: date-time
                 nullable: true
                 type: string
+              throughput:
+                description: Throughput
+                format: int64
+                type: integer
             type: object
         type: object
     served: true

@@ -236,7 +236,7 @@ func (fs *fileSystemBR) StartRestore(snapshotID string, target AccessPoint, uplo
 // UpdateProgress which implement ProgressUpdater interface to update progress status
 func (fs *fileSystemBR) UpdateProgress(p *uploader.Progress) {
 	if fs.callbacks.OnProgress != nil {
-		fs.callbacks.OnProgress(context.Background(), fs.namespace, fs.jobName, &uploader.Progress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone})
+		fs.callbacks.OnProgress(context.Background(), fs.namespace, fs.jobName, &uploader.Progress{TotalBytes: p.TotalBytes, BytesDone: p.BytesDone, SkippedBytes: p.SkippedBytes})
 	}
 }
 

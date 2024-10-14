@@ -442,6 +442,11 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 		log.Info("Data upload completed")
 		r.metrics.RegisterDataUploadSuccess(r.nodeName)
 	}
+
+	du.Status.ElapsedTransferTime = metav1.Duration{
+		du.Status.CompletionTimestamp.Sub(du.Status.StartTimestamp.Time),
+	}
+
 }
 
 func (r *DataUploadReconciler) OnDataUploadFailed(ctx context.Context, namespace, duName string, err error) {
