@@ -98,7 +98,7 @@ func (p *Progress) EstimatedDataSize(fileCount int, totalBytes int64) {
 // UpdateProgress which calls Updater UpdateProgress interface, update progress by third-party implementation
 func (p *Progress) UpdateProgress() {
 	if p.outputThrottle.ShouldOutput() {
-		p.Updater.UpdateProgress(&uploader.Progress{TotalBytes: p.estimatedTotalBytes, BytesDone: p.processedBytes})
+		p.Updater.UpdateProgress(&uploader.Progress{TotalBytes: p.estimatedTotalBytes, BytesDone: p.processedBytes, SkippedBytes: p.cachedBytes})
 	}
 }
 

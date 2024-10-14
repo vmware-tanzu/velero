@@ -26,4 +26,7 @@ type DataMoveOperationProgress struct {
 
 	// +optional
 	BytesDone int64 `json:"bytesDone,omitempty"`
+
+	// +optional
+	SkippedBytes int64 `json:"skippedBytes,omitempty"`
 }

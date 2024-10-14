@@ -51,6 +51,12 @@ spec:
       jsonPath: .status.elapsedTransferTime
       name: Elapsed Time
       type: string
+    - description: Actual bytes/second moved off cluster, ignoring skipped/cached
+        bytes due to incremental hashing
+      format: int64
+      jsonPath: .status.throughput
+      name: Throughput bytes/sec
+      type: integer
     name: v2alpha1
     schema:
       openAPIV3Schema:
@@ -193,11 +199,15 @@ spec:
                 type: string
               progress:
                 description: |-
-                  Progress holds the total number of bytes of the volume and the current
-                  number of backed up bytes. This can be used to display progress information
+                  Progress holds the total number of bytes of the volume, the current
+                  number of backed up bytes, and the number of bytes skipped due to
+                  any incremental caching. This can be used to display progress information
                   about the backup operation.
                 properties:
                   bytesDone:
+                    format: int64
+                    type: integer
+                  skippedBytes:
                     format: int64
                     type: integer
                   totalBytes:
@@ -217,6 +227,12 @@ spec:
                 format: date-time
                 nullable: true
                 type: string
+              throughput:
+                description: |-
+                  Throughput is the rate of actual bytes transferred off-cluster during
+                  this DataUpload. It is equivalent to: (doneBytes - skippedBytes) / elapsedTime
+                format: int64
+                type: integer
             type: object
         type: object
     served: true
