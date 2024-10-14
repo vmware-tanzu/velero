@@ -529,7 +529,7 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 		var err error
 		if s3URL == "" {
 			if region == "" {
-				region, err = getS3BucketRegion(bucket)
+				region, err = getS3BucketRegion(bucket, config)
 				if err != nil {
 					return map[string]string{}, errors.Wrap(err, "error get s3 bucket region")
 				}
