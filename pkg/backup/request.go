@@ -17,7 +17,6 @@ limitations under the License.
 package backup
 
 import (
-	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -41,7 +40,6 @@ type Request struct {
 	SnapshotLocations         []*velerov1api.VolumeSnapshotLocation
 	NamespaceIncludesExcludes *collections.IncludesExcludes
 	ResourceIncludesExcludes  collections.IncludesExcludesInterface
-	ResourceHooks             []hook.ResourceHook
 	ResolvedActions           []framework.BackupItemResolvedActionV2
 	ResolvedItemBlockActions  []framework.ItemBlockResolvedAction
 	VolumeSnapshots           []*volume.Snapshot

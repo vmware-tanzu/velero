@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	kbClient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	"github.com/vmware-tanzu/velero/internal/volumehelper"
@@ -72,9 +71,7 @@ type itemBackupper struct {
 	podVolumeSnapshotTracker *podvolume.Tracker
 	volumeSnapshotterGetter  VolumeSnapshotterGetter
 
-	itemHookHandler                    hook.ItemHookHandler
 	snapshotLocationVolumeSnapshotters map[string]vsv1.VolumeSnapshotter
-	hookTracker                        *hook.HookTracker
 	volumeHelperImpl                   volumehelper.VolumeHelper
 }
 

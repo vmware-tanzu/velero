@@ -121,6 +121,7 @@ type kubernetesBackupper struct {
 	uploaderType              string
 	pluginManager             func(logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter         persistence.ObjectBackupStoreGetter
+	hookParser                hook.Parser
 }
 
 func (i *itemKey) String() string {
@@ -163,6 +164,7 @@ func NewKubernetesBackupper(
 		uploaderType:              uploaderType,
 		pluginManager:             pluginManager,
 		backupStoreGetter:         backupStoreGetter,
+		hookParser:                hook.NewParser(discoveryHelper),
 	}, nil
 }
 
@@ -170,43 +172,6 @@ func NewKubernetesBackupper(
 // include and exclude from the backup.
 func getNamespaceIncludesExcludes(backup *velerov1api.Backup) *collections.IncludesExcludes {
 	return collections.NewIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...)
-}
-
-func getResourceHooks(hookSpecs []velerov1api.BackupResourceHookSpec, discoveryHelper discovery.Helper) ([]hook.ResourceHook, error) {
-	resourceHooks := make([]hook.ResourceHook, 0, len(hookSpecs))
-
-	for _, s := range hookSpecs {
-		h, err := getResourceHook(s, discoveryHelper)
-		if err != nil {
-			return []hook.ResourceHook{}, err
-		}
-
-		resourceHooks = append(resourceHooks, h)
-	}
-
-	return resourceHooks, nil
-}
-
-func getResourceHook(hookSpec velerov1api.BackupResourceHookSpec, discoveryHelper discovery.Helper) (hook.ResourceHook, error) {
-	h := hook.ResourceHook{
-		Name: hookSpec.Name,
-		Selector: hook.ResourceHookSelector{
-			Namespaces: collections.NewIncludesExcludes().Includes(hookSpec.IncludedNamespaces...).Excludes(hookSpec.ExcludedNamespaces...),
-			Resources:  collections.GetResourceIncludesExcludes(discoveryHelper, hookSpec.IncludedResources, hookSpec.ExcludedResources),
-		},
-		Pre:  hookSpec.PreHooks,
-		Post: hookSpec.PostHooks,
-	}
-
-	if hookSpec.LabelSelector != nil {
-		labelSelector, err := metav1.LabelSelectorAsSelector(hookSpec.LabelSelector)
-		if err != nil {
-			return hook.ResourceHook{}, errors.WithStack(err)
-		}
-		h.Selector.LabelSelector = labelSelector
-	}
-
-	return h, nil
 }
 
 type VolumeSnapshotterGetter interface {
@@ -279,11 +244,6 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	log.Infof("Backing up all volumes using pod volume backup: %t", boolptr.IsSetToTrue(backupRequest.Backup.Spec.DefaultVolumesToFsBackup))
 
 	var err error
-	backupRequest.ResourceHooks, err = getResourceHooks(backupRequest.Spec.Hooks.Resources, kb.discoveryHelper)
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Debugf("Error from getResourceHooks")
-		return err
-	}
 
 	backupRequest.ResolvedActions, err = backupItemActionResolver.ResolveActions(kb.discoveryHelper, log)
 	if err != nil {
@@ -365,10 +325,6 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		podVolumeBackupper:       podVolumeBackupper,
 		podVolumeSnapshotTracker: podvolume.NewTracker(),
 		volumeSnapshotterGetter:  volumeSnapshotterGetter,
-		itemHookHandler: &hook.DefaultItemHookHandler{
-			PodCommandExecutor: kb.podCommandExecutor,
-		},
-		hookTracker: hook.NewHookTracker(),
 		volumeHelperImpl: volumehelper.NewVolumeHelperImpl(
 			resourcePolicy,
 			backupRequest.Spec.SnapshotVolumes,
@@ -442,6 +398,8 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		itemsMap[key] = append(itemsMap[key], items[i])
 	}
 
+	hookHandler := hook.NewHandler(podVolumeBackupper, kb.podCommandExecutor)
+
 	var itemBlock *BackupItemBlock
 
 	for i := range items {
@@ -488,7 +446,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		addNextToBlock := i < len(items)-1 && items[i].orderedResource && items[i+1].orderedResource && items[i].groupResource == items[i+1].groupResource
 		if itemBlock != nil && len(itemBlock.Items) > 0 && !addNextToBlock {
 			log.Infof("Backing Up Item Block including %s %s/%s (%v items in block)", items[i].groupResource.String(), items[i].namespace, items[i].name, len(itemBlock.Items))
-			backedUpGRs := kb.backupItemBlock(*itemBlock)
+			backedUpGRs := kb.backupItemBlock(hookHandler, *itemBlock)
 			for _, backedUpGR := range backedUpGRs {
 				backedUpGroupResources[backedUpGR] = true
 			}
@@ -528,9 +486,6 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		}
 	}
 
-	processedPVBs := itemBackupper.podVolumeBackupper.WaitAllPodVolumesProcessed(log)
-	backupRequest.PodVolumeBackups = append(backupRequest.PodVolumeBackups, processedPVBs...)
-
 	// do a final update on progress since we may have just added some CRDs and may not have updated
 	// for the last few processed items.
 	updated = backupRequest.Backup.DeepCopy()
@@ -541,12 +496,21 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	updated.Status.Progress.TotalItems = backedUpItems
 	updated.Status.Progress.ItemsBackedUp = backedUpItems
 
+	results := hookHandler.WaitAllResourceHooksCompleted(ctx, log)
+	for _, result := range results.Results {
+		if result.Status == hook.StatusFailed {
+			log.WithError(result.Error).WithField("name", result.Hook.Resource.GetName()).Errorf("Error running %s hooks for pod", result.Hook.Type)
+		}
+	}
 	// update the hooks execution status
 	if updated.Status.HookStatus == nil {
 		updated.Status.HookStatus = &velerov1api.HookStatus{}
 	}
-	updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed = itemBackupper.hookTracker.Stat()
+	updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed = results.Total, results.Failed
 	log.Debugf("hookAttempted: %d, hookFailed: %d", updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed)
+
+	processedPVBs, _ := itemBackupper.podVolumeBackupper.WaitAllPodVolumesProcessed(log)
+	backupRequest.PodVolumeBackups = append(backupRequest.PodVolumeBackups, processedPVBs...)
 
 	if err := kube.PatchResource(backupRequest.Backup, updated, kb.kbClient); err != nil {
 		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress and hook status")
@@ -649,7 +613,7 @@ func (kb *kubernetesBackupper) executeItemBlockActions(
 	}
 }
 
-func (kb *kubernetesBackupper) backupItemBlock(itemBlock BackupItemBlock) []schema.GroupResource {
+func (kb *kubernetesBackupper) backupItemBlock(hookHandler hook.Handler, itemBlock BackupItemBlock) []schema.GroupResource {
 	// find pods in ItemBlock
 	// filter pods based on whether they still need to be backed up
 	// this list will be used to run pre/post hooks
@@ -672,9 +636,35 @@ func (kb *kubernetesBackupper) backupItemBlock(itemBlock BackupItemBlock) []sche
 			}
 		}
 	}
-	postHookPods, failedPods, errs := kb.handleItemBlockHooks(itemBlock, preHookPods, hook.PhasePre)
-	for i, pod := range failedPods {
-		itemBlock.Log.WithError(errs[i]).WithField("name", pod.Item.GetName()).Error("Error running pre hooks for pod")
+
+	var successPods []itemblock.ItemBlockItem
+	var failedPods []itemblock.ItemBlockItem
+
+	for _, pod := range preHookPods {
+		hooks, err := kb.hookParser.ListApplicableResourcePreBackupHooks(itemBlock.Log, pod.Item, pod.Gr, itemBlock.itemBackupper.backupRequest.Spec.Hooks.Resources)
+		if err != nil {
+			itemBlock.Log.WithError(err).Error("failed to list applicable resource pre backup hooks")
+			failedPods = append(failedPods, pod)
+			continue
+		}
+		if len(hooks) == 0 {
+			successPods = append(successPods, pod)
+			continue
+		}
+		results := hookHandler.HandleResourceHooks(context.Background(), itemBlock.Log, pod.Item, hooks)
+		failed := false
+		for _, result := range results {
+			if result.Status == hook.StatusFailed {
+				failed = true
+			}
+		}
+		if failed {
+			failedPods = append(failedPods, pod)
+		} else {
+			successPods = append(successPods, pod)
+		}
+	}
+	for _, pod := range failedPods {
 		// if pre hook fails, flag pod as backed-up and move on
 		_, key, err := kb.itemMetadataAndKey(pod)
 		if err != nil {
@@ -693,9 +683,16 @@ func (kb *kubernetesBackupper) backupItemBlock(itemBlock BackupItemBlock) []sche
 	}
 
 	itemBlock.Log.Debug("Executing post hooks")
-	_, failedPods, errs = kb.handleItemBlockHooks(itemBlock, postHookPods, hook.PhasePost)
-	for i, pod := range failedPods {
-		itemBlock.Log.WithError(errs[i]).WithField("name", pod.Item.GetName()).Error("Error running post  hooks for pod")
+	for _, pod := range successPods {
+		hooks, err := kb.hookParser.ListApplicableResourcePostBackupHooks(itemBlock.Log, pod.Item, pod.Gr, itemBlock.itemBackupper.backupRequest.Spec.Hooks.Resources)
+		if err != nil {
+			itemBlock.Log.WithError(err).Error("failed to list applicable resource post backup hooks")
+			continue
+		}
+		if len(hooks) == 0 {
+			continue
+		}
+		hookHandler.AsyncHandleResourceHooks(context.Background(), itemBlock.Log, pod.Item, hooks)
 	}
 
 	return grList
@@ -712,22 +709,6 @@ func (kb *kubernetesBackupper) itemMetadataAndKey(item itemblock.ItemBlockItem) 
 		name:      metadata.GetName(),
 	}
 	return metadata, key, nil
-}
-
-func (kb *kubernetesBackupper) handleItemBlockHooks(itemBlock BackupItemBlock, hookPods []itemblock.ItemBlockItem, phase hook.HookPhase) ([]itemblock.ItemBlockItem, []itemblock.ItemBlockItem, []error) {
-	var successPods []itemblock.ItemBlockItem
-	var failedPods []itemblock.ItemBlockItem
-	var errs []error
-	for _, pod := range hookPods {
-		err := itemBlock.itemBackupper.itemHookHandler.HandleHooks(itemBlock.Log, pod.Gr, pod.Item, itemBlock.itemBackupper.backupRequest.ResourceHooks, phase, itemBlock.itemBackupper.hookTracker)
-		if err == nil {
-			successPods = append(successPods, pod)
-		} else {
-			failedPods = append(failedPods, pod)
-			errs = append(errs, err)
-		}
-	}
-	return successPods, failedPods, errs
 }
 
 func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper, unstructured *unstructured.Unstructured, preferredGVR schema.GroupVersionResource, itemBlock *BackupItemBlock) bool {
@@ -895,9 +876,7 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 		dynamicFactory:           kb.dynamicFactory,
 		kbClient:                 kb.kbClient,
 		discoveryHelper:          kb.discoveryHelper,
-		itemHookHandler:          &hook.NoOpItemHookHandler{},
 		podVolumeSnapshotTracker: podvolume.NewTracker(),
-		hookTracker:              hook.NewHookTracker(),
 	}
 	updateFiles := make(map[string]FileForArchive)
 	backedUpGroupResources := map[schema.GroupResource]bool{}
