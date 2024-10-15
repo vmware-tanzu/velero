@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
@@ -3964,8 +3965,8 @@ func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *
 	return res, pvcSummary, nil
 }
 
-func (b *fakePodVolumeBackupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velerov1.PodVolumeBackup {
-	return b.pvbs
+func (b *fakePodVolumeBackupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, error) {
+	return b.pvbs, nil
 }
 
 // TestBackupWithPodVolume runs backups of pods that are annotated for PodVolume backup,
@@ -4233,6 +4234,8 @@ func newHarness(t *testing.T) *harness {
 			podCommandExecutor:        nil,
 			podVolumeBackupperFactory: new(fakePodVolumeBackupperFactory),
 			podVolumeTimeout:          0,
+
+			hookParser: hook.NewParser(discoveryHelper),
 		},
 		log: log,
 	}

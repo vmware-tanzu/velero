@@ -599,16 +599,18 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 		cancelFunc()
 	}()
 	cases := []struct {
-		name              string
-		ctx               context.Context
-		statusToBeUpdated *velerov1api.PodVolumeBackupStatus
-		expectedErr       string
-		expectedPVBPhase  velerov1api.PodVolumeBackupPhase
+		name                 string
+		ctx                  context.Context
+		statusToBeUpdated    *velerov1api.PodVolumeBackupStatus
+		expectedError        bool
+		expectedErrorMessage string
+		expectedPVBPhase     velerov1api.PodVolumeBackupPhase
 	}{
 		{
-			name:        "context canceled",
-			ctx:         timeoutCtx,
-			expectedErr: "timed out waiting for all PodVolumeBackups to complete",
+			name:                 "context canceled",
+			expectedError:        true,
+			ctx:                  timeoutCtx,
+			expectedErrorMessage: "timed out waiting for all PodVolumeBackups to complete",
 		},
 		{
 			name: "failed pvbs",
@@ -617,8 +619,8 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 				Phase:   velerov1api.PodVolumeBackupPhaseFailed,
 				Message: "failed",
 			},
-			expectedPVBPhase: velerov1api.PodVolumeBackupPhaseFailed,
-			expectedErr:      "pod volume backup failed: failed",
+			expectedPVBPhase:     velerov1api.PodVolumeBackupPhaseFailed,
+			expectedErrorMessage: "pod volume backup failed: failed",
 		},
 		{
 			name: "completed pvbs",
@@ -666,10 +668,13 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		pvbs := backuper.WaitAllPodVolumesProcessed(logger)
+		pvbs, err := backuper.WaitAllPodVolumesProcessed(logger)
+		if c.expectedError {
+			require.Error(t, err)
+		}
 
-		if c.expectedErr != "" {
-			assert.Equal(t, c.expectedErr, logHook.entry.Message)
+		if c.expectedErrorMessage != "" {
+			assert.Equal(t, c.expectedErrorMessage, logHook.entry.Message)
 		}
 
 		if c.expectedPVBPhase != "" {
