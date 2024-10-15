@@ -68,6 +68,10 @@ type BackupPVC struct {
 
 	// ReadOnly sets the backupPVC's access mode as read only
 	ReadOnly bool `json:"readOnly,omitempty"`
+
+	// SPCNoRelabeling sets Spec.SecurityContext.SELinux.Type to "spc_t" for the pod mounting the backupPVC
+	// ignored if ReadOnly is false
+	SPCNoRelabeling bool `json:"spcNoRelabeling,omitempty"`
 }
 
 type Configs struct {

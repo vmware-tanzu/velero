@@ -15,6 +15,10 @@ operation could perform better. Specifically:
 - Some storage providers create one or more replicas when creating a volume, the number of replicas is defined in the storage class.
   However, it doesn't make any sense to keep replicas when an intermediate volume used by the backup. Therefore, users should be allowed
   to configure another storage class specifically used by the `backupPVC`.
+- In SELinux-enabled clusters, such as OpenShift, when using the above-mentioned readOnly access mode setting, SELinux relabeling of the
+  volume is not possible. Therefore for these clusters, when setting `readOnly` for a storage class, users must also disable relabeling.
+  Note that this option is not consistent with the Restricted pod security policy, so if Velero pods must run with a restricted policy,
+  disabling relabeling (and therefore readOnly volume mounting) is not possible.
 
 Velero introduces a new section in the node agent configuration ConfigMap (the name of this ConfigMap is passed using `--node-agent-configmap` velero server argument)
 called `backupPVC`, through which you can specify the following
@@ -25,6 +29,10 @@ default the source PVC's storage class will be used.
 
 - `readOnly`: This is a boolean value. If set to `true` then `ReadOnlyMany` will be the only value set to the backupPVC's access modes. Otherwise 
 `ReadWriteOnce` value will be used.
+
+- `spcNoRelabeling`: This is a boolean value. If set to `true`, then `pod.Spec.SecurityContext.SELinuxOptions.Type` will be set to `spc_t`. From
+  the SELinux point of view, this will be considered a "Super Privileged Container" which means that selinux enforcement will be disabled and
+  volume relabeling will not occur. This field is ignored if `readOnly` is `false`.
 
 The users can specify the ConfigMap name during velero installation by CLI:
 `velero install --node-agent-configmap=<ConfigMap-Name>`
@@ -43,6 +51,10 @@ A sample of `backupPVC` config as part of the ConfigMap would look like:
         "storage-class-3": {
             "readOnly": true
         }        
+        "storage-class-4": {
+            "readOnly": true,
+            "spcNoRelabeling": true
+        }
     }
 }
 ```
@@ -53,5 +65,7 @@ A sample of `backupPVC` config as part of the ConfigMap would look like:
 - If the users are setting `readOnly` value as `true` in the `backupPVC` config then they must also make sure that the storage class that is being used for
 `backupPVC` should support creation of `ReadOnlyMany` PVC from a snapshot, otherwise the corresponding DataUpload CR will stay in `Accepted` phase until
 timeout (data movement prepare timeout value is 30m by default).
+- In an SELinux-enabled cluster, any time users set `readOnly=true` they must also set `spcNoRelabeling=true`. There is no need to set `spcNoRelabeling=true`
+if the volume is not readOnly.
 - If any of the above problems occur, then the DataUpload CR is `canceled` after timeout, and the backupPod and backupPVC will be deleted, and the backup
 will be marked as `PartiallyFailed`.
