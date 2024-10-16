@@ -80,7 +80,7 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.BackupRepository{}, builder.WithPredicates(kube.SpecChangePredicate{})).
-		WatchesRawSource(s, nil).
+		WatchesRawSource(s).
 		Watches(&velerov1api.BackupStorageLocation{}, kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
 			builder.WithPredicates(
 				// When BSL updates, check if the backup repositories need to be invalidated
