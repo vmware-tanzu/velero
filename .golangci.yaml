@@ -139,6 +139,7 @@ issues:
   exclude-dirs:
     - third_party/*
     - pkg/plugin/generated/*
+    - .go/*
   exclude-dirs-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
