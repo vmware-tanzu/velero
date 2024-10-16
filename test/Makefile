@@ -53,7 +53,7 @@ GINKGO_LABELS ?=
 # When --fail-fast is set, the entire suite will stop when the first failure occurs.
 # Enable --fail-fast by default.
 # https://onsi.github.io/ginkgo/#mental-model-how-ginkgo-handles-failure
-FAIL_FAST ?= true
+FAIL_FAST ?= false
 VELERO_CLI ?=$$(pwd)/../_output/bin/$(GOOS)/$(GOARCH)/velero
 VELERO_IMAGE ?= velero/velero:main
 PLUGINS ?=
