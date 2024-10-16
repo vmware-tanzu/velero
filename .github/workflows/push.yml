@@ -23,11 +23,6 @@ jobs:
 
     - uses: actions/checkout@v4
 
-    # Fix issue of setup-gcloud
-    - run: |
-        sudo apt-get install python2.7
-        export CLOUDSDK_PYTHON="/usr/bin/python2"
-
     - id: 'auth'
       uses: google-github-actions/auth@v2
       with:
