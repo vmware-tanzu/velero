@@ -45,7 +45,7 @@ func (s *ItemBlockActionGRPCServer) getImpl(name string) (ibav1.ItemBlockAction,
 
 	itemAction, ok := impl.(ibav1.ItemBlockAction)
 	if !ok {
-		return nil, errors.Errorf("%T is not a backup item action", impl)
+		return nil, errors.Errorf("%T is not an ItemBlock action", impl)
 	}
 
 	return itemAction, nil
