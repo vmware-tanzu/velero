@@ -1,8 +1,5 @@
 name: Main CI
 
-env:
-  CLOUDSDK_PYTHON: python3
-
 on:
   push:
     branches:
