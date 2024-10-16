@@ -332,7 +332,6 @@ func (e *csiSnapshotExposer) createBackupVSC(ctx context.Context, ownerObject co
 			DeletionPolicy:          snapshotv1api.VolumeSnapshotContentDelete,
 			Driver:                  snapshotVSC.Spec.Driver,
 			VolumeSnapshotClassName: snapshotVSC.Spec.VolumeSnapshotClassName,
-			SourceVolumeMode:        snapshotVSC.Spec.SourceVolumeMode,
 		},
 	}
 
