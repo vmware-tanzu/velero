@@ -77,7 +77,7 @@ endif
 # check buildx is enabled only if docker is in path
 # macOS/Windows docker cli without Docker Desktop license: https://github.com/abiosoft/colima
 # To add buildx to docker cli: https://github.com/abiosoft/colima/discussions/273#discussioncomment-2684502
-ifeq ($(shell which docker 2>/dev/null 1>&2 && docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
+ifeq ($(shell which docker 2>/dev/null 1>&2 && (docker buildx ls >/dev/null && echo buildx_enabled) || echo buildx_disabled), buildx_enabled)
 	BUILDX_ENABLED ?= true
 # if emulated docker cli from podman, assume enabled
 # emulated docker cli from podman: https://podman-desktop.io/docs/migrating-from-docker/emulating-docker-cli-with-podman
