@@ -121,13 +121,24 @@ func GetS3Credentials(config map[string]string) (*aws.Credentials, error) {
 
 // GetAWSBucketRegion returns the AWS region that a bucket is in, or an error
 // if the region cannot be determined.
-func GetAWSBucketRegion(bucket string) (string, error) {
-	cfg, err := awsconfig.LoadDefaultConfig(context.Background())
+// It will use us-east-1 as hinting server and requires config param to use as credentials
+func GetAWSBucketRegion(bucket string, config map[string]string) (string, error) {
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithCredentialsProvider(
+		aws.CredentialsProviderFunc(
+			func(context.Context) (aws.Credentials, error) {
+				s3creds, err := GetS3Credentials(config)
+				if s3creds == nil {
+					return aws.Credentials{}, err
+				}
+				return *s3creds, err
+			},
+		),
+	))
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 	client := s3.NewFromConfig(cfg)
-	region, err := s3manager.GetBucketRegion(context.Background(), client, bucket)
+	region, err := s3manager.GetBucketRegion(context.Background(), client, bucket, func(o *s3.Options) { o.Region = "us-east-1" })
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
