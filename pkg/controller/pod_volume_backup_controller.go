@@ -279,7 +279,7 @@ func (r *PodVolumeBackupReconciler) OnDataPathProgress(ctx context.Context, name
 	}
 
 	original := pvb.DeepCopy()
-	pvb.Status.Progress = veleroapishared.DataMoveOperationProgress{TotalBytes: progress.TotalBytes, BytesDone: progress.BytesDone}
+	pvb.Status.Progress = veleroapishared.DataMoveOperationProgress{TotalBytes: progress.TotalBytes, BytesDone: progress.BytesDone, SkippedBytes: progress.SkippedBytes}
 
 	if err := r.Client.Patch(ctx, &pvb, client.MergeFrom(original)); err != nil {
 		log.WithError(err).Error("Failed to update progress")

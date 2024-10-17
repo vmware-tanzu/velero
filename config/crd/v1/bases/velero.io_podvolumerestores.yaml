@@ -191,6 +191,9 @@ spec:
                   bytesDone:
                     format: int64
                     type: integer
+                  skippedBytes:
+                    format: int64
+                    type: integer
                   totalBytes:
                     format: int64
                     type: integer

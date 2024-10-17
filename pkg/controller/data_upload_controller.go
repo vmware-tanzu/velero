@@ -442,6 +442,11 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 		log.Info("Data upload completed")
 		r.metrics.RegisterDataUploadSuccess(r.nodeName)
 	}
+
+	du.Status.ElapsedTransferTime = metav1.Duration{
+		du.Status.CompletionTimestamp.Sub(du.Status.StartTimestamp.Time),
+	}
+
 }
 
 func (r *DataUploadReconciler) OnDataUploadFailed(ctx context.Context, namespace, duName string, err error) {
@@ -539,7 +544,11 @@ func (r *DataUploadReconciler) OnDataUploadProgress(ctx context.Context, namespa
 	}
 
 	original := du.DeepCopy()
-	du.Status.Progress = shared.DataMoveOperationProgress{TotalBytes: progress.TotalBytes, BytesDone: progress.BytesDone}
+	du.Status.Progress = shared.DataMoveOperationProgress{TotalBytes: progress.TotalBytes, BytesDone: progress.BytesDone, SkippedBytes: progress.SkippedBytes}
+	du.Status.ElapsedTransferTime = metav1.Duration{
+		time.Since(du.Status.StartTimestamp.Time),
+	}
+	du.Status.Throughput = (progress.BytesDone - progress.SkippedBytes) / int64(du.Status.ElapsedTransferTime.Seconds())
 
 	if err := r.client.Patch(ctx, &du, client.MergeFrom(original)); err != nil {
 		log.WithError(err).Error("Failed to update progress")
