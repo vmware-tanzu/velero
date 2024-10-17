@@ -79,6 +79,9 @@ endif
 # To add buildx to docker cli: https://github.com/abiosoft/colima/discussions/273#discussioncomment-2684502
 ifeq ($(shell which docker 2>/dev/null 1>&2 && docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
 	BUILDX_ENABLED ?= true
+# inactive buildx could still build
+else ifeq ($(shell which docker 2>/dev/null 1>&2 && docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), inactive)
+	BUILDX_ENABLED ?= true
 # if emulated docker cli from podman, assume enabled
 # emulated docker cli from podman: https://podman-desktop.io/docs/migrating-from-docker/emulating-docker-cli-with-podman
 # podman known issues:
