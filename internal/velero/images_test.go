@@ -86,6 +86,7 @@ func TestImageRegistry(t *testing.T) {
 }
 
 func testDefaultImage(t *testing.T, defaultImageFn func() string, imageName string) {
+	t.Helper()
 	testCases := []struct {
 		name              string
 		buildInfoVersion  string

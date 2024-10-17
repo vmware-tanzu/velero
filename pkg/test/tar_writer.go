@@ -40,6 +40,7 @@ type TarWriter struct {
 }
 
 func NewTarWriter(t *testing.T) *TarWriter {
+	t.Helper()
 	tw := new(TarWriter)
 	tw.t = t
 	tw.buf = new(bytes.Buffer)

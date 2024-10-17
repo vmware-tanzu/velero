@@ -314,6 +314,7 @@ linters:
     - staticcheck
     - stylecheck
     - testifylint
+    - thelper
     - typecheck
     - unconvert
     - unparam

@@ -3576,6 +3576,7 @@ func Test_getOrderedResources(t *testing.T) {
 // order. Any resources *not* in resourcePriorities are required to come *after* all
 // resources in any order.
 func assertResourceCreationOrder(t *testing.T, resourcePriorities []string, createdResources []resourceID) {
+	t.Helper()
 	// lastSeen tracks the index in 'resourcePriorities' of the last resource type
 	// we saw created. Once we've seen a resource in 'resourcePriorities', we should
 	// never see another instance of a prior resource.
