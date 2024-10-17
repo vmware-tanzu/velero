@@ -1,0 +1,1 @@
+Remove multiple single quotes from Velero backup.status.validationErrors field
