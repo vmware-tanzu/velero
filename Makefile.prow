@@ -19,6 +19,17 @@ GOPATH := $(shell go env GOPATH)
 GOBIN := $(GOPATH)/bin
 GOSRC := $(GOPATH)/src
 
+# Prow settings for e2e tests
+OADP_E2E_DIR := /tmp/oadp-operator
+OADP_E2E_BRANCH := master
+VELERO_IMAGE ?= quay.io/konveyor/velero:latest
+CLUSTER_ARCH ?= $(shell oc get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}')
+CLUSTER_OS ?= $(shell oc get node -o jsonpath='{.items[0].status.nodeInfo.operatingSystem}')
+DOCKER_BUILD_ARGS = --platform=$(CLUSTER_OS)/$(CLUSTER_ARCH)
+GINKGO_ARGS ?= ""  # by default (empty) run all tests, otherwise specify a test to run
+LOCAL_BUILT_IMAGE=ttl.sh/velero-$(CLUSTER_ARCH)-$(shell git rev-parse --short HEAD):1h
+
+
 
 # upstream ci target: verify-modules verify all test
 # we need to modify verify, test, all to avoid usage of docker CLI
@@ -88,3 +99,50 @@ $(GOBIN)/golangci-lint:
 $(GOBIN)/setup-envtest:
 	@echo "Installing envtest tools"
 	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
+.PHONY: clone-oadp-operator
+clone-oadp-operator: clean-oadp-operator
+	@echo "Cloning oadp-operator"
+	git clone --depth 1 --single-branch --branch $(OADP_E2E_BRANCH) https://github.com/openshift/oadp-operator.git $(OADP_E2E_DIR)
+
+.PHONY: clean-oadp-operator
+clean-oadp-operator:
+	@echo "Cleaning oadp-operator"
+	rm -rf $(OADP_E2E_DIR)
+
+# build the Dockerfile.ubi
+.PHONY: build
+build:
+	@echo "Building Dockerfile.ubi with tag: $(LOCAL_BUILT_IMAGE)"
+	docker build -t $(LOCAL_BUILT_IMAGE) -f Dockerfile.ubi . $(DOCKER_BUILD_ARGS)
+
+# push the image to ttl.sh
+.PHONY: push
+push:
+	@echo "Pushing image: $(LOCAL_BUILT_IMAGE)"
+	docker push $(LOCAL_BUILT_IMAGE)
+
+# deploy oadp-operator, potentially used by prow jobs
+.PHONY: deploy-olm
+deploy-olm: clone-oadp-operator
+	@echo "Deploying oadp-operator"
+	pushd $(OADP_E2E_DIR) && make deploy-olm && popd
+
+# test-e2e is to be used by prow.
+.PHONY: test-e2e
+test-e2e: clone-oadp-operator
+	@echo "Running oadp-operator e2e tests"
+	pushd $(OADP_E2E_DIR) && VELERO_IMAGE=$(VELERO_IMAGE) make test-e2e && popd
+
+# build and test locally
+.PHONY: local-build-test-e2e
+local-build-test-e2e: build push clone-oadp-operator
+	@echo "Building Velero and Running oadp-operator e2e tests locally"
+	pushd $(OADP_E2E_DIR) && VELERO_IMAGE=$(LOCAL_BUILT_IMAGE) OPENSHIFT_CI=false make test-e2e && popd
+
+# to run just one test, export GINKGO_ARGS="--ginkgo.focus='MySQL application CSI'"
+# do NOT build, test locally
+.PHONY: local-test-e2e
+local-test-e2e: clone-oadp-operator
+	@echo "Running oadp-operator e2e tests locally"
+	pushd $(OADP_E2E_DIR) && VELERO_IMAGE=$(LOCAL_BUILT_IMAGE) OPENSHIFT_CI=false GINKGO_ARGS=$(GINKGO_ARGS) make test-e2e && popd
