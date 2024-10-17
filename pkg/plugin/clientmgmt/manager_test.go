@@ -282,6 +282,7 @@ func getPluginTest(
 	expectedResultFunc func(name string, sharedPluginProcess process.RestartableProcess) interface{},
 	reinitializable bool,
 ) {
+	t.Helper()
 	logger := test.NewLogger()
 	logLevel := logrus.InfoLevel
 

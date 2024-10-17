@@ -77,6 +77,7 @@ func defaultTestDbr() *velerov1api.DeleteBackupRequest {
 }
 
 func setupBackupDeletionControllerTest(t *testing.T, req *velerov1api.DeleteBackupRequest, objects ...runtime.Object) *backupDeletionControllerTestData {
+	t.Helper()
 	var (
 		fakeClient        = velerotest.NewFakeControllerRuntimeClient(t, append(objects, req)...)
 		volumeSnapshotter = &velerotest.FakeVolumeSnapshotter{SnapshotsTaken: sets.NewString()}

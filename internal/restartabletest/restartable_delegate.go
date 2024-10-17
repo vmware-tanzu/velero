@@ -75,6 +75,7 @@ func RunRestartableDelegateTests(
 	newMock func() Mockable,
 	tests ...RestartableDelegateTest,
 ) {
+	t.Helper()
 	for _, tc := range tests {
 		t.Run(tc.Function, func(t *testing.T) {
 			p := new(MockRestartableProcess)

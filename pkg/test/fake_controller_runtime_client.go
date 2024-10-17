@@ -33,6 +33,7 @@ import (
 )
 
 func NewFakeControllerRuntimeClientBuilder(t *testing.T) *k8sfake.ClientBuilder {
+	t.Helper()
 	scheme := runtime.NewScheme()
 
 	require.NoError(t, velerov1api.AddToScheme(scheme))
@@ -46,6 +47,7 @@ func NewFakeControllerRuntimeClientBuilder(t *testing.T) *k8sfake.ClientBuilder 
 }
 
 func NewFakeControllerRuntimeClient(t *testing.T, initObjs ...runtime.Object) client.Client {
+	t.Helper()
 	scheme := runtime.NewScheme()
 
 	require.NoError(t, velerov1api.AddToScheme(scheme))
@@ -62,5 +64,6 @@ func NewFakeControllerRuntimeWatchClient(
 	t *testing.T,
 	initObjs ...runtime.Object,
 ) client.WithWatch {
+	t.Helper()
 	return NewFakeControllerRuntimeClientBuilder(t).WithRuntimeObjects(initObjs...).Build()
 }

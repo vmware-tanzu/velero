@@ -38,6 +38,7 @@ import (
 const testMaintenanceFrequency = 10 * time.Minute
 
 func mockBackupRepoReconciler(t *testing.T, mockOn string, arg interface{}, ret interface{}) *BackupRepoReconciler {
+	t.Helper()
 	mgr := &repomokes.Manager{}
 	if mockOn != "" {
 		mgr.On(mockOn, arg).Return(ret)
