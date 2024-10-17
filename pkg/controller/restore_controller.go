@@ -559,17 +559,18 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 	}
 
 	restoreReq := &pkgrestore.Request{
-		Log:                      restoreLog,
-		Restore:                  restore,
-		Backup:                   info.backup,
-		PodVolumeBackups:         podVolumeBackups,
-		VolumeSnapshots:          volumeSnapshots,
-		BackupReader:             backupFile,
-		ResourceModifiers:        resourceModifiers,
-		DisableInformerCache:     r.disableInformerCache,
-		CSIVolumeSnapshots:       csiVolumeSnapshots,
-		BackupVolumeInfoMap:      backupVolumeInfoMap,
-		RestoreVolumeInfoTracker: volume.NewRestoreVolInfoTracker(restore, restoreLog, r.globalCrClient),
+		Log:                            restoreLog,
+		Restore:                        restore,
+		Backup:                         info.backup,
+		PodVolumeBackups:               podVolumeBackups,
+		VolumeSnapshots:                volumeSnapshots,
+		BackupReader:                   backupFile,
+		ResourceModifiers:              resourceModifiers,
+		DisableInformerCache:           r.disableInformerCache,
+		CSIVolumeSnapshots:             csiVolumeSnapshots,
+		BackupVolumeInfoMap:            backupVolumeInfoMap,
+		RestoreVolumeInfoTracker:       volume.NewRestoreVolInfoTracker(restore, restoreLog, r.globalCrClient),
+		NamespaceDeletionStatusTracker: kubeutil.NewNamespaceDeletionStatusTracker(),
 	}
 	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, pluginManager)
 
