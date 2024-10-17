@@ -22,7 +22,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
-	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	"github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 const StorageClassName = "e2e-storage-class"
@@ -39,6 +39,13 @@ const Gcp = "gcp"
 const Vsphere = "vsphere"
 
 const UploaderTypeRestic = "restic"
+
+const (
+	KubeSystemNamespace           = "kube-system"
+	VSphereCSIControllerNamespace = "vmware-system-csi"
+	VeleroVSphereSecretName       = "velero-vsphere-config-secret"
+	VeleroVSphereConfigMapName    = "velero-vsphere-plugin-config"
+)
 
 var PublicCloudProviders = []string{AWS, Azure, Gcp, Vsphere}
 var LocalCloudProviders = []string{Kind, VanillaZFS}
@@ -87,9 +94,9 @@ type VeleroConfig struct {
 	GCFrequency                       string
 	DefaultClusterContext             string
 	StandbyClusterContext             string
-	ClientToInstallVelero             *TestClient
-	DefaultClient                     *TestClient
-	StandbyClient                     *TestClient
+	ClientToInstallVelero             *k8s.TestClient
+	DefaultClient                     *k8s.TestClient
+	StandbyClient                     *k8s.TestClient
 	ClusterToInstallVelero            string
 	DefaultClusterName                string
 	StandbyClusterName                string
