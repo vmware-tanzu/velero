@@ -197,7 +197,7 @@ run-e2e: ginkgo
 		--standby-cluster-name=$(STANDBY_CLUSTER_NAME) \
 		--eks-policy-arn=$(EKS_POLICY_ARN) \
 		--default-cls-service-account-name=$(DEFAULT_CLS_SERVICE_ACCOUNT_NAME) \
-		--standby-cls-service-account-name=$(STANDBY_CLS_SERVICE_ACCOUNT_NAME)
+		--standby-cls-service-account-name=$(STANDBY_CLS_SERVICE_ACCOUNT_NAME) \
 		--kibishii-directory=$(KIBISHII_DIRECTORY) \
 		--disable-informer-cache=$(DISABLE_INFORMER_CACHE)
 
