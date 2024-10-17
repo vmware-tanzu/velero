@@ -396,3 +396,18 @@ new-changelog:
 	@mkdir -p ./changelogs/unreleased/ && \
 	echo $(CHANGELOG_BODY) > ./changelogs/unreleased/$(GH_PR_NUMBER)-$(GH_LOGIN) && \
 	echo "\"$(CHANGELOG_BODY)\" added to ./changelogs/unreleased/$(GH_PR_NUMBER)-$(GH_LOGIN)"
+
+# Build image for current-context cluster
+# defaults to ttl.sh registry where image will live for 24 hours
+.PHONY: container-current-context
+container-current-context: CLUSTER_ARCH ?= $(shell kubectl get nodes -o jsonpath='{range .items[0]}{.status.nodeInfo.operatingSystem}{"/"}{.status.nodeInfo.architecture}{end}')
+container-current-context: CLUSTER_IMAGE_REGISTRY ?= ttl.sh/$(shell git rev-parse --short HEAD)/$(CLUSTER_ARCH)
+container-current-context: CLUSTER_IMAGE_VERSION ?= 24h
+container-current-context:
+	@export TAG1=$(CLUSTER_IMAGE_REGISTRY)/velero:$(CLUSTER_IMAGE_VERSION) && echo "Building $$TAG1 for $(CLUSTER_ARCH)" && \
+	make container ARCH=$(CLUSTER_ARCH) IMAGE_TAGS=$$TAG1 && docker push $$TAG1 && \
+	export TAG2=$(CLUSTER_IMAGE_REGISTRY)/velero-restore-helper:$(CLUSTER_IMAGE_VERSION) && echo "Building $$TAG2 for $(CLUSTER_ARCH)" && \
+	make container ARCH=$(CLUSTER_ARCH) IMAGE_TAGS=$$TAG2 BIN=velero-restore-helper && docker push $$TAG2 && \
+	echo "Images should be available at:" && \
+	echo "$$TAG1" && \
+	echo "$$TAG2"
