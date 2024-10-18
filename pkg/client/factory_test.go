@@ -129,7 +129,7 @@ func TestFactory(t *testing.T) {
 					LabelSelector: "none",
 				},
 			)
-			assert.Contains(t, e.Error(), fmt.Sprintf("Get \"%s/apis/%s/%s/namespaces/%s", test.expectedHost, resource.Group, resource.Version, namespace))
+			assert.ErrorContains(t, e, fmt.Sprintf("Get \"%s/apis/%s/%s/namespaces/%s", test.expectedHost, resource.Group, resource.Version, namespace))
 			assert.Nil(t, list)
 			assert.NotNil(t, dynamicClient)
 

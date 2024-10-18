@@ -103,7 +103,7 @@ func TestDeleteFunctions(t *testing.T) {
 		bkList.Items = append(bkList.Items, bk)
 		errList := deleteBackups(kbclient, bkList)
 		assert.Len(t, errList, 1)
-		assert.Contains(t, errList[0].Error(), fmt.Sprintf("delete backup \"%s\" associated with deleted BSL: backups.velero.io \"%s\" not found", bk.Name, bk.Name))
+		assert.ErrorContains(t, errList[0], fmt.Sprintf("delete backup \"%s\" associated with deleted BSL: backups.velero.io \"%s\" not found", bk.Name, bk.Name))
 	})
 	t.Run("deleteBackupRepos", func(t *testing.T) {
 		bkrepo := velerov1api.BackupRepository{}
@@ -111,6 +111,6 @@ func TestDeleteFunctions(t *testing.T) {
 		bkrepoList.Items = append(bkrepoList.Items, bkrepo)
 		errList := deleteBackupRepos(kbclient, bkrepoList)
 		assert.Len(t, errList, 1)
-		assert.Contains(t, errList[0].Error(), fmt.Sprintf("delete backup repository \"%s\" associated with deleted BSL: backuprepositories.velero.io \"%s\" not found", bkrepo.Name, bkrepo.Name))
+		assert.ErrorContains(t, errList[0], fmt.Sprintf("delete backup repository \"%s\" associated with deleted BSL: backuprepositories.velero.io \"%s\" not found", bkrepo.Name, bkrepo.Name))
 	})
 }

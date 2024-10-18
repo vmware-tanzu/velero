@@ -23,7 +23,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"strings"
 	"testing"
 	"time"
 
@@ -617,7 +616,7 @@ func TestRedirectDataMoverLogs(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 
-				assert.True(t, strings.Contains(buffer, test.logMessage))
+				assert.Contains(t, buffer, test.logMessage)
 			}
 		})
 	}

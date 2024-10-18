@@ -429,7 +429,7 @@ func TestGetMaintenanceJobConfig(t *testing.T) {
 			)
 
 			if tc.expectedError != nil {
-				require.Contains(t, err.Error(), tc.expectedError.Error())
+				require.ErrorContains(t, err, tc.expectedError.Error())
 			} else {
 				require.NoError(t, err)
 			}

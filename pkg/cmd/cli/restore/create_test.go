@@ -113,7 +113,7 @@ func TestCreateCommand(t *testing.T) {
 
 		//Validate
 		e = o.Validate(cmd, args, f)
-		require.Contains(t, e.Error(), "either a backup or schedule must be specified, but not both")
+		require.ErrorContains(t, e, "either a backup or schedule must be specified, but not both")
 
 		//cmd
 		e = o.Run(cmd, f)

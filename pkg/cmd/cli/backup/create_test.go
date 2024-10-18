@@ -225,8 +225,8 @@ func TestCreateCommand(t *testing.T) {
 
 		//Validate
 		e = o.Validate(cmd, args, f)
-		require.Contains(t, e.Error(), "include-resources, exclude-resources and include-cluster-resources are old filter parameters")
-		require.Contains(t, e.Error(), "include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\nThey cannot be used together")
+		require.ErrorContains(t, e, "include-resources, exclude-resources and include-cluster-resources are old filter parameters")
+		require.ErrorContains(t, e, "include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\nThey cannot be used together")
 
 		//cmd
 		e = o.Run(cmd, f)
@@ -292,7 +292,7 @@ func TestCreateCommand(t *testing.T) {
 
 		// Validate
 		e = o.Validate(cmd, args, f)
-		assert.Contains(t, e.Error(), fmt.Sprintf("backupstoragelocations.velero.io \"%s\" not found", bsl))
+		assert.ErrorContains(t, e, fmt.Sprintf("backupstoragelocations.velero.io \"%s\" not found", bsl))
 	})
 
 	t.Run("create a backup create command with specific volume-snapshot-locations setting", func(t *testing.T) {
