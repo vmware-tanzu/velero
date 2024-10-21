@@ -151,7 +151,7 @@ func TestCreateCommand_Run(t *testing.T) {
 	assert.NoError(t, e)
 
 	e = o.Run(c, f)
-	assert.Contains(t, e.Error(), fmt.Sprintf("%s: no such file or directory", caCertFile))
+	assert.ErrorContains(t, e, fmt.Sprintf("%s: no such file or directory", caCertFile))
 
 	// verify all options are set as expected
 	assert.Equal(t, name, o.Name)
