@@ -1,13 +1,13 @@
 ---
-title: "Upgrading to Velero 1.14"
+title: "Upgrading to Velero 1.15"
 layout: docs
 ---
 
 ## Prerequisites
 
-- Velero [v1.13.x][5] installed.
+- Velero [v1.14.x][7] installed.
 
-If you're not yet running at least Velero v1.8, see the following:
+If you're not yet running at least Velero v1.14, see the following:
 
 - [Upgrading to v1.8][1]
 - [Upgrading to v1.9][2]
@@ -15,15 +15,14 @@ If you're not yet running at least Velero v1.8, see the following:
 - [Upgrading to v1.11][4]
 - [Upgrading to v1.12][5]
 - [Upgrading to v1.13][6]
+- [Upgrading to v1.14][7]
 
 Before upgrading, check the [Velero compatibility matrix](https://github.com/vmware-tanzu/velero#velero-compatibility-matrix) to make sure your version of Kubernetes is supported by the new version of Velero.
 
 ## Instructions
 
-**Caution:** Starting in Velero v1.10, kopia has replaced restic as the default uploader. It is now possible to upgrade from a version >= v1.10 directly. However, the procedure for upgrading to v1.13 from a Velero release lower than v1.10 is different.
-
-### Upgrade from v1.13
-1. Install the Velero v1.13 command-line interface (CLI) by following the [instructions here][0].
+### Upgrade from v1.14
+1. Install the Velero v1.15 command-line interface (CLI) by following the [instructions here][0].
 
     Verify that you've properly installed it by running:
 
@@ -35,7 +34,7 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 
     ```bash
     Client:
-        Version: v1.14.0
+        Version: v1.15.0
         Git commit: <git SHA>
     ```
 
@@ -45,29 +44,21 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
     velero install --crds-only --dry-run -o yaml | kubectl apply -f -
     ```
 
-3. Delete the CSI plugin. Because the Velero CSI plugin is already merged into the Velero, need to remove the existing CSI plugin InitContainer. Otherwise, the Velero server plugin would fail to start due to same plugin registered twice.
-Please find more information of CSI plugin merging in this page [csi].
-If the `plugin remove` command fails due to `not found`, that is caused by the Velero CSI plugin not installed before upgrade. It's safe to ignore the error.
-   
-   ``` bash
-   velero plugin remove velero-velero-plugin-for-csi
-   ```
-
-4. Update the container image used by the Velero deployment, plugin and (optionally) the node agent daemon set:
+3. Update the container image used by the Velero deployment, plugin and (optionally) the node agent daemon set:
     ```bash
    # set the container and image of the init container for plugin accordingly,
    # if you are using other plugin
     kubectl set image deployment/velero \
-        velero=velero/velero:v1.14.0 \
-        velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.10.0 \
+        velero=velero/velero:v1.15.0 \
+        velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.11.0 \
         --namespace velero
 
     # optional, if using the node agent daemonset
     kubectl set image daemonset/node-agent \
-        node-agent=velero/velero:v1.14.0 \
+        node-agent=velero/velero:v1.15.0 \
         --namespace velero
     ```
-5. Confirm that the deployment is up and running with the correct version by running:
+4. Confirm that the deployment is up and running with the correct version by running:
 
     ```bash
     velero version
@@ -77,11 +68,11 @@ If the `plugin remove` command fails due to `not found`, that is caused by the V
 
     ```bash
     Client:
-        Version: v1.14.0
+        Version: v1.15.0
         Git commit: <git SHA>
 
     Server:
-        Version: v1.14.0
+        Version: v1.15.0
     ```
 
 [0]: basic-install.md#install-the-cli
@@ -91,3 +82,4 @@ If the `plugin remove` command fails due to `not found`, that is caused by the V
 [4]: https://velero.io/docs/v1.11/upgrade-to-1.11
 [5]: https://velero.io/docs/v1.12/upgrade-to-1.12
 [6]: https://velero.io/docs/v1.13/upgrade-to-1.13
+[7]: https://velero.io/docs/v1.14/upgrade-to-1.14
