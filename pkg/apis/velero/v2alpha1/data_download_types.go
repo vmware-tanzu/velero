@@ -115,6 +115,14 @@ type DataDownloadStatus struct {
 	// Node is name of the node where the DataDownload is processed.
 	// +optional
 	Node string `json:"node,omitempty"`
+
+	// ElapsedTransferTime
+	// +optional
+	ElapsedTransferTime metav1.Duration `json:"elapsedTransferTime,omitempty"`
+
+	// Throughput
+	// +optional
+	Throughput int64 `json:"throughput,omitempty"`
 }
 
 // TODO(2.0) After converting all resources to use the runtime-controller client, the genclient and k8s:deepcopy markers will no longer be needed and should be removed.
@@ -130,6 +138,8 @@ type DataDownloadStatus struct {
 // +kubebuilder:printcolumn:name="Storage Location",type="string",JSONPath=".spec.backupStorageLocation",description="Name of the Backup Storage Location where the backup data is stored"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Time duration since this DataDownload was created"
 // +kubebuilder:printcolumn:name="Node",type="string",JSONPath=".status.node",description="Name of the node where the DataDownload is processed"
+// +kubebuilder:printcolumn:name="Elapsed Time",type="string",JSONPath=".status.elapsedTransferTime",description="Elapsed time of the actual transfer, eventually completion time - start time"
+// +kubebuilder:printcolumn:name="Throughput bytes/sec",type="integer",JSONPath=".status.throughput",description="Actual bytes/second moved onto the cluster"
 
 // DataDownload acts as the protocol between data mover plugins and data mover controller for the datamover restore operation
 type DataDownload struct {
