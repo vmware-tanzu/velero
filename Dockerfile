@@ -49,6 +49,7 @@ RUN mkdir -p /output/usr/bin && \
 # Restic binary build section
 FROM --platform=$BUILDPLATFORM golang:1.22-bookworm AS restic-builder
 
+ARG GOPROXY
 ARG BIN
 ARG TARGETOS
 ARG TARGETARCH
