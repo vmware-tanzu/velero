@@ -1,1 +1,0 @@
-Fix issue #7972, sync the backupPVC deletion in expose clean up

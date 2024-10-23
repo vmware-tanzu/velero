@@ -1,1 +1,0 @@
-Fix issue #7620, add backup repository configuration implementation and support cacheLimit configuration for Kopia repo

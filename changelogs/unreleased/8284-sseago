@@ -1,1 +1,0 @@
-only set spec.volumes readonly if PVC is readonly for datamover
