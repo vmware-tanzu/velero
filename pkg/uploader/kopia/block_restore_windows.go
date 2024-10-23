@@ -33,7 +33,7 @@ type BlockOutput struct {
 	targetFileName string
 }
 
-func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remoteFile fs.File) error {
+func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remoteFile fs.File, progressCb restore.FileWriteProgress) error {
 	return fmt.Errorf("block mode is not supported for Windows")
 }
 
