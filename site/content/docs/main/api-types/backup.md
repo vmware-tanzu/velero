@@ -93,7 +93,9 @@ spec:
   # all namespace-scoped resources are included. Optional.
   # Cannot work with include-resources, exclude-resources and include-cluster-resources.
   includedNamespaceScopedResources: {}
-  # Individual objects must match this label selector to be included in the backup. Optional.
+  # Individual objects must match this label selector to be included in the backup.
+  # If matched object is Namespace, the namespace will act as IncludedNamespaces, and all resources in the namespace are included in the backup.
+  # Optional.
   labelSelector:
     matchLabels:
       app: velero
