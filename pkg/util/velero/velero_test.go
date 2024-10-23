@@ -312,6 +312,105 @@ func TestGetEnvVarsFromVeleroServer(t *testing.T) {
 	}
 }
 
+func TestGetEnvFromSourcesFromVeleroServer(t *testing.T) {
+	tests := []struct {
+		name     string
+		deploy   *appsv1.Deployment
+		expected []v1.EnvFromSource
+	}{
+		{
+			name: "no env vars",
+			deploy: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									EnvFrom: []v1.EnvFromSource{},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []v1.EnvFromSource{},
+		},
+		{
+			name: "configmap",
+			deploy: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									EnvFrom: []v1.EnvFromSource{
+										{
+											ConfigMapRef: &v1.ConfigMapEnvSource{
+												LocalObjectReference: v1.LocalObjectReference{
+													Name: "foo",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []v1.EnvFromSource{
+				{
+					ConfigMapRef: &v1.ConfigMapEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "foo",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "secret",
+			deploy: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									EnvFrom: []v1.EnvFromSource{
+										{
+											SecretRef: &v1.SecretEnvSource{
+												LocalObjectReference: v1.LocalObjectReference{
+													Name: "foo",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []v1.EnvFromSource{
+				{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "foo",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := GetEnvFromSourcesFromVeleroServer(test.deploy)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
 func TestGetVolumeMountsFromVeleroServer(t *testing.T) {
 	tests := []struct {
 		name   string
