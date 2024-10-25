@@ -65,6 +65,7 @@ func TestCreateCommand(t *testing.T) {
 		restoreVolumes := "true"
 		preserveNodePorts := "true"
 		labels := "c=foo"
+		annotations := "ann=foo"
 		includeNamespaces := "app1,app2"
 		excludeNamespaces := "pod1,pod2,pod3"
 		existingResourcePolicy := "none"
@@ -88,6 +89,7 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--restore-volumes", restoreVolumes})
 		flags.Parse([]string{"--preserve-nodeports", preserveNodePorts})
 		flags.Parse([]string{"--labels", labels})
+		flags.Parse([]string{"--annotations", annotations})
 		flags.Parse([]string{"--existing-resource-policy", existingResourcePolicy})
 		flags.Parse([]string{"--include-namespaces", includeNamespaces})
 		flags.Parse([]string{"--exclude-namespaces", excludeNamespaces})
@@ -124,6 +126,7 @@ func TestCreateCommand(t *testing.T) {
 		require.Equal(t, restoreVolumes, o.RestoreVolumes.String())
 		require.Equal(t, preserveNodePorts, o.PreserveNodePorts.String())
 		require.Equal(t, labels, o.Labels.String())
+		require.Equal(t, annotations, o.Annotations.String())
 		require.Equal(t, includeNamespaces, o.IncludeNamespaces.String())
 		require.Equal(t, excludeNamespaces, o.ExcludeNamespaces.String())
 		require.Equal(t, existingResourcePolicy, o.ExistingResourcePolicy)

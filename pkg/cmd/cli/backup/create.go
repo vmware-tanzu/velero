@@ -94,6 +94,7 @@ type CreateOptions struct {
 	IncludeNamespaceScopedResources flag.StringArray
 	ExcludeNamespaceScopedResources flag.StringArray
 	Labels                          flag.Map
+	Annotations                     flag.Map
 	Selector                        flag.LabelSelector
 	OrSelector                      flag.OrLabelSelector
 	IncludeClusterResources         flag.OptionalBool
@@ -113,6 +114,7 @@ func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
 		IncludeNamespaces:       flag.NewStringArray("*"),
 		Labels:                  flag.NewMap(),
+		Annotations:             flag.NewMap(),
 		SnapshotVolumes:         flag.NewOptionalBool(nil),
 		IncludeClusterResources: flag.NewOptionalBool(nil),
 	}
@@ -129,6 +131,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.IncludeNamespaceScopedResources, "include-namespace-scoped-resources", "Namespaced resources to include in the backup, formatted as resource.group, such as deployments.apps(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
 	flags.Var(&o.ExcludeNamespaceScopedResources, "exclude-namespace-scoped-resources", "Namespaced resources to exclude from the backup, formatted as resource.group, such as deployments.apps(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
 	flags.Var(&o.Labels, "labels", "Labels to apply to the backup.")
+	flags.Var(&o.Annotations, "annotations", "Annotations to apply to the backup.")
 	flags.StringVar(&o.StorageLocation, "storage-location", "", "Location in which to store the backup.")
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "List of locations (at most one per provider) where volume snapshots should be stored.")
 	flags.VarP(&o.Selector, "selector", "l", "Only back up resources matching this label selector.")
@@ -403,7 +406,7 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 		}
 	}
 
-	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data())).Result()
+	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data()), builder.WithAnnotationsMap(o.Annotations.Data())).Result()
 	return backup, nil
 }
 

@@ -43,6 +43,7 @@ import (
 func TestCreateOptions_BuildBackup(t *testing.T) {
 	o := NewCreateOptions()
 	o.Labels.Set("velero.io/test=true")
+	o.Annotations.Set("velero.io/annTest=true")
 	o.OrderedResources = "pods=p1,p2;persistentvolumeclaims=pvc1,pvc2"
 	orders, err := ParseOrderedResources(o.OrderedResources)
 	o.CSISnapshotTimeout = 20 * time.Minute
@@ -75,6 +76,9 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 	assert.Equal(t, map[string]string{
 		"velero.io/test": "true",
 	}, backup.GetLabels())
+	assert.Equal(t, map[string]string{
+		"velero.io/annTest": "true",
+	}, backup.GetAnnotations())
 	assert.Equal(t, map[string]string{
 		"pods":                   "p1,p2",
 		"persistentvolumeclaims": "pvc1,pvc2",
@@ -113,8 +117,9 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 		}, backup.GetAnnotations())
 	})
 
-	t.Run("command line labels take precedence over schedule labels", func(t *testing.T) {
+	t.Run("command line labels and annotations take precedence over scheduled ones", func(t *testing.T) {
 		o.Labels.Set("velero.io/test=yes,custom-label=true")
+		o.Annotations.Set("velero.io/test=yes,custom-annotation=true")
 		backup, err := o.BuildBackup(cmdtest.VeleroNameSpace)
 		assert.NoError(t, err)
 
@@ -124,6 +129,10 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 			velerov1api.ScheduleNameLabel: "test",
 			"custom-label":                "true",
 		}, backup.GetLabels())
+		assert.Equal(t, map[string]string{
+			"velero.io/test":    "yes",
+			"custom-annotation": "true",
+		}, backup.GetAnnotations())
 	})
 }
 
@@ -171,6 +180,7 @@ func TestCreateCommand(t *testing.T) {
 		includeNamespaceScopedResources := "Endpoints,Event,PodTemplate"
 		excludeNamespaceScopedResources := "Secret,MultiClusterIngress"
 		labels := "c=foo"
+		annotations := "ann=foo"
 		storageLocation := "bsl-name-1"
 		snapshotLocations := "region=minio"
 		selector := "a=pod"
@@ -199,6 +209,7 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--include-namespace-scoped-resources", includeNamespaceScopedResources})
 		flags.Parse([]string{"--exclude-namespace-scoped-resources", excludeNamespaceScopedResources})
 		flags.Parse([]string{"--labels", labels})
+		flags.Parse([]string{"--annotations", annotations})
 		flags.Parse([]string{"--storage-location", storageLocation})
 		flags.Parse([]string{"--volume-snapshot-locations", snapshotLocations})
 		flags.Parse([]string{"--selector", selector})
@@ -248,6 +259,7 @@ func TestCreateCommand(t *testing.T) {
 		require.Equal(t, includeNamespaceScopedResources, o.IncludeNamespaceScopedResources.String())
 		require.Equal(t, excludeNamespaceScopedResources, o.ExcludeNamespaceScopedResources.String())
 		require.True(t, test.CompareSlice(strings.Split(labels, ","), strings.Split(o.Labels.String(), ",")))
+		require.True(t, test.CompareSlice(strings.Split(annotations, ","), strings.Split(o.Annotations.String(), ",")))
 		require.Equal(t, storageLocation, o.StorageLocation)
 		require.Equal(t, snapshotLocations, strings.Split(o.SnapshotLocations[0], ",")[0])
 		require.Equal(t, selector, o.Selector.String())
