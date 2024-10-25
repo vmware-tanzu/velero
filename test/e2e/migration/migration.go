@@ -164,11 +164,10 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 							semver.Compare(versionWithoutPatch, "v1.14") < 0 {
 							OriginVeleroCfg.Plugins = OriginVeleroCfg.Plugins + "," + migrationNeedPlugins[CSI][0]
 						}
-						if OriginVeleroCfg.SnapshotMoveData {
-							if OriginVeleroCfg.CloudProvider == Azure {
-								OriginVeleroCfg.Plugins = OriginVeleroCfg.Plugins + "," + migrationNeedPlugins[AWS][0]
-							}
+						if OriginVeleroCfg.SnapshotMoveData && OriginVeleroCfg.CloudProvider == Azure {
+							OriginVeleroCfg.Plugins = OriginVeleroCfg.Plugins + "," + migrationNeedPlugins[AWS][0]
 						}
+
 						veleroCLI2Version.VeleroCLI, err = InstallVeleroCLI(veleroCLI2Version.VeleroVersion)
 						Expect(err).To(Succeed())
 					}
