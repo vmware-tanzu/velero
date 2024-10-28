@@ -188,33 +188,54 @@ func TestGetMaintenanceResultFromJob(t *testing.T) {
 		},
 	}
 
-	// Set up test pod
+	// Set up test pod with no status
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pod",
 			Namespace: "default",
 			Labels:    map[string]string{"job-name": job.Name},
 		},
-		Status: v1.PodStatus{
-			ContainerStatuses: []v1.ContainerStatus{
-				{
-					State: v1.ContainerState{
-						Terminated: &v1.ContainerStateTerminated{
-							Message: "test message",
-						},
+	}
+
+	// Create a fake Kubernetes client
+	cli := fake.NewClientBuilder().WithObjects(job, pod).Build()
+
+	// test an error should be returned
+	result, err := GetMaintenanceResultFromJob(cli, job)
+	assert.Error(t, err)
+	assert.Equal(t, "", result)
+
+	// Set a non-terminated container status to the pod
+	pod.Status = v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				State: v1.ContainerState{},
+			},
+		},
+	}
+
+	// Test an error should be returned
+	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
+	result, err = GetMaintenanceResultFromJob(cli, job)
+	assert.Error(t, err)
+	assert.Equal(t, "", result)
+
+	// Set a terminated container status to the pod
+	pod.Status = v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						Message: "test message",
 					},
 				},
 			},
 		},
 	}
 
-	// Create a fake Kubernetes client
-	cli := fake.NewClientBuilder().WithObjects(job, pod).Build()
-
-	// Call the function
-	result, err := GetMaintenanceResultFromJob(cli, job)
-
-	// Check if the result and error match the expectation
+	// This call should return the termination message with no error
+	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
+	result, err = GetMaintenanceResultFromJob(cli, job)
 	assert.NoError(t, err)
 	assert.Equal(t, "test message", result)
 }
