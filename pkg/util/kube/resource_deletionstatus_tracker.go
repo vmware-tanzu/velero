@@ -23,49 +23,49 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// NamespaceDeletionStatusTracker keeps track of in-progress backups.
-type NamespaceDeletionStatusTracker interface {
+// resourceDeletionStatusTracker keeps track of in-progress backups.
+type ResourceDeletionStatusTracker interface {
 	// Add informs the tracker that a polling is in progress to check namespace deletion status.
-	Add(ns, name string)
+	Add(kind, ns, name string)
 	// Delete informs the tracker that a namespace deletion is completed.
-	Delete(ns, name string)
+	Delete(kind, ns, name string)
 	// Contains returns true if the tracker is tracking the namespace deletion progress.
-	Contains(ns, name string) bool
+	Contains(kind, ns, name string) bool
 }
 
-type namespaceDeletionStatusTracker struct {
+type resourceDeletionStatusTracker struct {
 	lock                           sync.RWMutex
 	isNameSpacePresentInPollingSet sets.Set[string]
 }
 
-// NewNamespaceDeletionStatusTracker returns a new NamespaceDeletionStatusTracker.
-func NewNamespaceDeletionStatusTracker() NamespaceDeletionStatusTracker {
-	return &namespaceDeletionStatusTracker{
+// NewResourceDeletionStatusTracker returns a new ResourceDeletionStatusTracker.
+func NewResourceDeletionStatusTracker() ResourceDeletionStatusTracker {
+	return &resourceDeletionStatusTracker{
 		isNameSpacePresentInPollingSet: sets.New[string](),
 	}
 }
 
-func (bt *namespaceDeletionStatusTracker) Add(ns, name string) {
+func (bt *resourceDeletionStatusTracker) Add(kind, ns, name string) {
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
 
-	bt.isNameSpacePresentInPollingSet.Insert(namespaceDeletionStatusTrackerKey(ns, name))
+	bt.isNameSpacePresentInPollingSet.Insert(resourceDeletionStatusTrackerKey(kind, ns, name))
 }
 
-func (bt *namespaceDeletionStatusTracker) Delete(ns, name string) {
+func (bt *resourceDeletionStatusTracker) Delete(kind, ns, name string) {
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
 
-	bt.isNameSpacePresentInPollingSet.Delete(namespaceDeletionStatusTrackerKey(ns, name))
+	bt.isNameSpacePresentInPollingSet.Delete(resourceDeletionStatusTrackerKey(kind, ns, name))
 }
 
-func (bt *namespaceDeletionStatusTracker) Contains(ns, name string) bool {
+func (bt *resourceDeletionStatusTracker) Contains(kind, ns, name string) bool {
 	bt.lock.RLock()
 	defer bt.lock.RUnlock()
 
-	return bt.isNameSpacePresentInPollingSet.Has(namespaceDeletionStatusTrackerKey(ns, name))
+	return bt.isNameSpacePresentInPollingSet.Has(resourceDeletionStatusTrackerKey(kind, ns, name))
 }
 
-func namespaceDeletionStatusTrackerKey(ns, name string) string {
-	return fmt.Sprintf("%s/%s", ns, name)
+func resourceDeletionStatusTrackerKey(kind, ns, name string) string {
+	return fmt.Sprintf("%s/%s/%s", kind, ns, name)
 }

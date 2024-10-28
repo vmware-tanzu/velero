@@ -74,7 +74,7 @@ func NamespaceAndName(objMeta metav1.Object) string {
 //
 //	namespace already exists and is not ready, this function will return (false, false, nil).
 //	If the namespace exists and is marked for deletion, this function will wait up to the timeout for it to fully delete.
-func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client corev1client.NamespaceInterface, timeout time.Duration, namespaceDeletionStatusTracker NamespaceDeletionStatusTracker) (ready bool, nsCreated bool, err error) {
+func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client corev1client.NamespaceInterface, timeout time.Duration, resourceDeletionStatusTracker ResourceDeletionStatusTracker) (ready bool, nsCreated bool, err error) {
 	// nsCreated tells whether the namespace was created by this method
 	// required for keeping track of number of restored items
 	// if namespace is marked for deletion, and we timed out, report an error
@@ -96,7 +96,7 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 			return true, err
 		}
 		if clusterNS != nil && (clusterNS.GetDeletionTimestamp() != nil || clusterNS.Status.Phase == corev1api.NamespaceTerminating) {
-			if namespaceDeletionStatusTracker.Contains(clusterNS.Name, clusterNS.Name) {
+			if resourceDeletionStatusTracker.Contains(clusterNS.Kind, clusterNS.Name, clusterNS.Name) {
 				namespaceAlreadyInDeletionTracker = true
 				return true, errors.Errorf("namespace %s is already present in the polling set, skipping execution", namespace.Name)
 			}
@@ -115,7 +115,7 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 	if err != nil {
 		if terminatingNamespace {
 			// If the namespace is marked for deletion, and we timed out, adding it in tracker
-			namespaceDeletionStatusTracker.Add(namespace.Name, namespace.Name)
+			resourceDeletionStatusTracker.Add(namespace.Kind, namespace.Name, namespace.Name)
 			return false, nsCreated, errors.Wrapf(err, "timed out waiting for terminating namespace %s to disappear before restoring", namespace.Name)
 		} else if namespaceAlreadyInDeletionTracker {
 			// If the namespace is already in the tracker, return an error.

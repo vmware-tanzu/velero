@@ -102,23 +102,23 @@ type Restorer interface {
 
 // kubernetesRestorer implements Restorer for restoring into a Kubernetes cluster.
 type kubernetesRestorer struct {
-	discoveryHelper                discovery.Helper
-	dynamicFactory                 client.DynamicFactory
-	namespaceClient                corev1.NamespaceInterface
-	podVolumeRestorerFactory       podvolume.RestorerFactory
-	podVolumeTimeout               time.Duration
-	resourceTerminatingTimeout     time.Duration
-	resourceTimeout                time.Duration
-	resourcePriorities             types.Priorities
-	fileSystem                     filesystem.Interface
-	pvRenamer                      func(string) (string, error)
-	logger                         logrus.FieldLogger
-	podCommandExecutor             podexec.PodCommandExecutor
-	podGetter                      cache.Getter
-	credentialFileStore            credentials.FileStore
-	kbClient                       crclient.Client
-	multiHookTracker               *hook.MultiHookTracker
-	namespaceDeletionStatusTracker kube.NamespaceDeletionStatusTracker
+	discoveryHelper               discovery.Helper
+	dynamicFactory                client.DynamicFactory
+	namespaceClient               corev1.NamespaceInterface
+	podVolumeRestorerFactory      podvolume.RestorerFactory
+	podVolumeTimeout              time.Duration
+	resourceTerminatingTimeout    time.Duration
+	resourceTimeout               time.Duration
+	resourcePriorities            types.Priorities
+	fileSystem                    filesystem.Interface
+	pvRenamer                     func(string) (string, error)
+	logger                        logrus.FieldLogger
+	podCommandExecutor            podexec.PodCommandExecutor
+	podGetter                     cache.Getter
+	credentialFileStore           credentials.FileStore
+	kbClient                      crclient.Client
+	multiHookTracker              *hook.MultiHookTracker
+	resourceDeletionStatusTracker kube.ResourceDeletionStatusTracker
 }
 
 // NewKubernetesRestorer creates a new kubernetesRestorer.
@@ -324,7 +324,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		backupVolumeInfoMap:            req.BackupVolumeInfoMap,
 		restoreVolumeInfoTracker:       req.RestoreVolumeInfoTracker,
 		hooksWaitExecutor:              hooksWaitExecutor,
-		namespaceDeletionStatusTracker: req.NamespaceDeletionStatusTracker,
+		resourceDeletionStatusTracker:  req.ResourceDeletionStatusTracker,
 	}
 
 	return restoreCtx.execute()
@@ -373,7 +373,7 @@ type restoreContext struct {
 	backupVolumeInfoMap            map[string]volume.BackupVolumeInfo
 	restoreVolumeInfoTracker       *volume.RestoreVolumeInfoTracker
 	hooksWaitExecutor              *hooksWaitExecutor
-	namespaceDeletionStatusTracker kube.NamespaceDeletionStatusTracker
+	resourceDeletionStatusTracker  kube.ResourceDeletionStatusTracker
 }
 
 type resourceClientKey struct {
@@ -721,7 +721,7 @@ func (ctx *restoreContext) processSelectedResource(
 					ns,
 					ctx.namespaceClient,
 					ctx.resourceTerminatingTimeout,
-					ctx.namespaceDeletionStatusTracker,
+					ctx.resourceDeletionStatusTracker,
 				)
 				if err != nil {
 					errs.AddVeleroError(err)
@@ -1123,7 +1123,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		// namespace into which the resource is being restored into exists.
 		// This is the *remapped* namespace that we are ensuring exists.
 		nsToEnsure := getNamespace(ctx.log, archive.GetItemFilePath(ctx.restoreDir, "namespaces", "", obj.GetNamespace()), namespace)
-		_, nsCreated, err := kube.EnsureNamespaceExistsAndIsReady(nsToEnsure, ctx.namespaceClient, ctx.resourceTerminatingTimeout, ctx.namespaceDeletionStatusTracker)
+		_, nsCreated, err := kube.EnsureNamespaceExistsAndIsReady(nsToEnsure, ctx.namespaceClient, ctx.resourceTerminatingTimeout, ctx.resourceDeletionStatusTracker)
 		if err != nil {
 			errs.AddVeleroError(err)
 			return warnings, errs, itemExists

@@ -47,16 +47,16 @@ func TestNamespaceAndName(t *testing.T) {
 
 func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 	tests := []struct {
-		name                           string
-		expectNSFound                  bool
-		nsPhase                        corev1.NamespacePhase
-		nsDeleting                     bool
-		expectCreate                   bool
-		alreadyExists                  bool
-		expectedResult                 bool
-		expectedCreatedResult          bool
-		nsAlreadyInTerminationTracker  bool
-		namespaceDeletionStatusTracker NamespaceDeletionStatusTracker
+		name                          string
+		expectNSFound                 bool
+		nsPhase                       corev1.NamespacePhase
+		nsDeleting                    bool
+		expectCreate                  bool
+		alreadyExists                 bool
+		expectedResult                bool
+		expectedCreatedResult         bool
+		nsAlreadyInTerminationTracker bool
+		ResourceDeletionStatusTracker ResourceDeletionStatusTracker
 	}{
 		{
 			name:                  "namespace found, not deleting",
@@ -107,7 +107,7 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 		},
 	}
 
-	namespaceDeletionStatusTracker := NewNamespaceDeletionStatusTracker()
+	resourceDeletionStatusTracker := NewResourceDeletionStatusTracker()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			namespace := &corev1.Namespace{
@@ -144,10 +144,10 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 			}
 
 			if test.nsAlreadyInTerminationTracker {
-				namespaceDeletionStatusTracker.Add("test", "test")
+				resourceDeletionStatusTracker.Add(namespace.Kind, "test", "test")
 			}
 
-			result, nsCreated, _ := EnsureNamespaceExistsAndIsReady(namespace, nsClient, timeout, namespaceDeletionStatusTracker)
+			result, nsCreated, _ := EnsureNamespaceExistsAndIsReady(namespace, nsClient, timeout, resourceDeletionStatusTracker)
 
 			assert.Equal(t, test.expectedResult, result)
 			assert.Equal(t, test.expectedCreatedResult, nsCreated)

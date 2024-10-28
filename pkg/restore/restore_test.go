@@ -2293,11 +2293,11 @@ func TestShouldRestore(t *testing.T) {
 			h := newHarness(t)
 
 			ctx := &restoreContext{
-				log:                            h.log,
-				dynamicFactory:                 client.NewDynamicFactory(h.DynamicClient),
-				namespaceClient:                h.KubeClient.CoreV1().Namespaces(),
-				resourceTerminatingTimeout:     time.Millisecond,
-				namespaceDeletionStatusTracker: kube.NewNamespaceDeletionStatusTracker(),
+				log:                           h.log,
+				dynamicFactory:                client.NewDynamicFactory(h.DynamicClient),
+				namespaceClient:               h.KubeClient.CoreV1().Namespaces(),
+				resourceTerminatingTimeout:    time.Millisecond,
+				resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 			}
 
 			for _, resource := range tc.apiResources {
@@ -3712,10 +3712,10 @@ func newHarness(t *testing.T) *harness {
 			fileSystem:                 test.NewFakeFileSystem(),
 
 			// unsupported
-			podVolumeRestorerFactory:       nil,
-			podVolumeTimeout:               0,
-			kbClient:                       kbClient,
-			namespaceDeletionStatusTracker: kube.NewNamespaceDeletionStatusTracker(),
+			podVolumeRestorerFactory:      nil,
+			podVolumeTimeout:              0,
+			kbClient:                      kbClient,
+			resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 		},
 		log: log,
 	}
@@ -3902,10 +3902,10 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		h := newHarness(t)
 
 		ctx := &restoreContext{
-			log:                            h.log,
-			dynamicFactory:                 client.NewDynamicFactory(h.DynamicClient),
-			namespaceClient:                h.KubeClient.CoreV1().Namespaces(),
-			namespaceDeletionStatusTracker: kube.NewNamespaceDeletionStatusTracker(),
+			log:                           h.log,
+			dynamicFactory:                client.NewDynamicFactory(h.DynamicClient),
+			namespaceClient:               h.KubeClient.CoreV1().Namespaces(),
+			resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 		}
 
 		if test.apiResource != nil {
@@ -4022,8 +4022,8 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		h := newHarness(t)
 
 		ctx := &restoreContext{
-			log:                            h.log,
-			namespaceDeletionStatusTracker: kube.NewNamespaceDeletionStatusTracker(),
+			log:                           h.log,
+			resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 		}
 
 		if tc.vs != nil {
@@ -4123,10 +4123,10 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		h := newHarness(t)
 
 		ctx := &restoreContext{
-			log:                            h.log,
-			kbClient:                       h.restorer.kbClient,
-			restore:                        tc.restore,
-			namespaceDeletionStatusTracker: kube.NewNamespaceDeletionStatusTracker(),
+			log:                           h.log,
+			kbClient:                      h.restorer.kbClient,
+			restore:                       tc.restore,
+			resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 		}
 
 		if tc.duResult != nil {
