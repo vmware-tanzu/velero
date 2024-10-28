@@ -35,12 +35,13 @@ const Azure = "azure"
 const AzureCSI = "azure-csi"
 const AwsCSI = "aws-csi"
 const AWS = "aws"
-const Gcp = "gcp"
+const GCP = "gcp"
 const Vsphere = "vsphere"
+const CSI = "csi"
 
 const UploaderTypeRestic = "restic"
 
-var PublicCloudProviders = []string{AWS, Azure, Gcp, Vsphere}
+var PublicCloudProviders = []string{AWS, Azure, GCP, Vsphere}
 var LocalCloudProviders = []string{Kind, VanillaZFS}
 var CloudProviders = append(PublicCloudProviders, LocalCloudProviders...)
 

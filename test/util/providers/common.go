@@ -78,7 +78,7 @@ func getProvider(cloudProvider string) (ObjectsInStorage, error) {
 	case AWS, Vsphere:
 		aws := AWSStorage("")
 		s = &aws
-	case Gcp:
+	case GCP:
 		gcs := GCSStorage("")
 		s = &gcs
 	case Azure:

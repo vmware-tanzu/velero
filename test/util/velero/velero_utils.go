@@ -54,77 +54,56 @@ const BackupObjectsPrefix = "backups"
 const RestoreObjectsPrefix = "restores"
 const PluginsObjectsPrefix = "plugins"
 
-var pluginsMatrix = map[string]map[string][]string{
-	"v1.7": {
-		"aws":     {"velero/velero-plugin-for-aws:v1.3.0"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.3.0"},
-		"vsphere": {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.3.0"},
-		"gcp":     {"velero/velero-plugin-for-gcp:v1.3.0"},
-		"csi":     {"velero/velero-plugin-for-csi:v0.2.0"},
-	},
-	"v1.8": {
-		"aws":     {"velero/velero-plugin-for-aws:v1.4.0"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.4.0"},
-		"vsphere": {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.3.1"},
-		"gcp":     {"velero/velero-plugin-for-gcp:v1.4.0"},
-		"csi":     {"velero/velero-plugin-for-csi:v0.2.0"},
-	},
-	"v1.9": {
-		"aws":     {"velero/velero-plugin-for-aws:v1.5.0"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.5.0"},
-		"vsphere": {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.4.0"},
-		"gcp":     {"velero/velero-plugin-for-gcp:v1.5.0"},
-		"csi":     {"velero/velero-plugin-for-csi:v0.3.0"},
-	},
+var PluginsMatrix = map[string]map[string][]string{
 	"v1.10": {
-		"aws":     {"velero/velero-plugin-for-aws:v1.6.0"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.6.0"},
-		"vsphere": {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":     {"velero/velero-plugin-for-gcp:v1.6.0"},
-		"csi":     {"velero/velero-plugin-for-csi:v0.4.0"},
+		"aws":     {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.6.0"},
+		"azure":   {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.6.0"},
+		"vsphere": {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
+		"gcp":     {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.6.0"},
+		"csi":     {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.4.0"},
 	},
 	"v1.11": {
-		"aws":     {"velero/velero-plugin-for-aws:v1.7.0"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.7.0"},
-		"vsphere": {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":     {"velero/velero-plugin-for-gcp:v1.7.0"},
-		"csi":     {"velero/velero-plugin-for-csi:v0.5.0"},
+		"aws":     {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.7.0"},
+		"azure":   {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.7.0"},
+		"vsphere": {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
+		"gcp":     {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.7.0"},
+		"csi":     {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.5.0"},
 	},
 	"v1.12": {
-		"aws":     {"velero/velero-plugin-for-aws:v1.8.0"},
-		"azure":   {"velero/velero-plugin-for-microsoft-azure:v1.8.0"},
-		"vsphere": {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":     {"velero/velero-plugin-for-gcp:v1.8.0"},
-		"csi":     {"velero/velero-plugin-for-csi:v0.6.0"},
+		"aws":     {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.8.0"},
+		"azure":   {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.8.0"},
+		"vsphere": {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
+		"gcp":     {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.8.0"},
+		"csi":     {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.6.0"},
 	},
 	"v1.13": {
-		"aws":       {"velero/velero-plugin-for-aws:v1.9.2"},
-		"azure":     {"velero/velero-plugin-for-microsoft-azure:v1.9.2"},
-		"vsphere":   {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":       {"velero/velero-plugin-for-gcp:v1.9.2"},
-		"csi":       {"velero/velero-plugin-for-csi:v0.7.1"},
-		"datamover": {"velero/velero-plugin-for-aws:v1.9.2"},
+		"aws":       {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.9.2"},
+		"azure":     {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.9.2"},
+		"vsphere":   {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":       {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.9.2"},
+		"csi":       {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.7.1"},
+		"datamover": {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.9.2"},
 	},
 	"v1.14": {
-		"aws":       {"velero/velero-plugin-for-aws:v1.10.1"},
-		"azure":     {"velero/velero-plugin-for-microsoft-azure:v1.10.1"},
-		"vsphere":   {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":       {"velero/velero-plugin-for-gcp:v1.10.1"},
-		"datamover": {"velero/velero-plugin-for-aws:v1.10.1"},
+		"aws":       {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.10.1"},
+		"azure":     {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.10.1"},
+		"vsphere":   {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":       {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.10.1"},
+		"datamover": {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.10.1"},
 	},
 	"v1.15": {
-		"aws":       {"velero/velero-plugin-for-aws:v1.11.0"},
-		"azure":     {"velero/velero-plugin-for-microsoft-azure:v1.11.0"},
-		"vsphere":   {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":       {"velero/velero-plugin-for-gcp:v1.11.0"},
-		"datamover": {"velero/velero-plugin-for-aws:v1.11.0"},
+		"aws":       {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.11.0"},
+		"azure":     {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.11.0"},
+		"vsphere":   {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":       {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.11.0"},
+		"datamover": {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.11.0"},
 	},
 	"main": {
-		"aws":       {"velero/velero-plugin-for-aws:main"},
-		"azure":     {"velero/velero-plugin-for-microsoft-azure:main"},
-		"vsphere":   {"vsphereveleroplugin/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":       {"velero/velero-plugin-for-gcp:main"},
-		"datamover": {"velero/velero-plugin-for-aws:main"},
+		"aws":       {"gcr.io/velero-gcp/velero-plugin-for-aws:main"},
+		"azure":     {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:main"},
+		"vsphere":   {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":       {"gcr.io/velero-gcp/velero-plugin-for-gcp:main"},
+		"datamover": {"gcr.io/velero-gcp/velero-plugin-for-aws:main"},
 	},
 }
 
@@ -132,10 +111,10 @@ func getPluginsByVersion(version, cloudProvider, objectStoreProvider string, nee
 	var cloudMap map[string][]string
 	arr := strings.Split(version, ".")
 	if len(arr) >= 3 {
-		cloudMap = pluginsMatrix[arr[0]+"."+arr[1]]
+		cloudMap = PluginsMatrix[arr[0]+"."+arr[1]]
 	}
 	if len(cloudMap) == 0 {
-		cloudMap = pluginsMatrix["main"]
+		cloudMap = PluginsMatrix["main"]
 		if len(cloudMap) == 0 {
 			return nil, errors.Errorf("fail to get plugins by version: main")
 		}
