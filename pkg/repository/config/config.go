@@ -34,6 +34,7 @@ const (
 	AzureBackend BackendType = "velero.io/azure"
 	GCPBackend   BackendType = "velero.io/gcp"
 	FSBackend    BackendType = "velero.io/fs"
+	PVCBackend   BackendType = "replicated.com/pvc"
 
 	// CredentialsFileKey is the key within a BSL config that is checked to see if
 	// the BSL is using its own credentials, rather than those in the environment
@@ -109,7 +110,7 @@ func GetBackendType(provider string, config map[string]string) BackendType {
 }
 
 func IsBackendTypeValid(backendType BackendType) bool {
-	return (backendType == AWSBackend || backendType == AzureBackend || backendType == GCPBackend || backendType == FSBackend)
+	return (backendType == AWSBackend || backendType == AzureBackend || backendType == GCPBackend || backendType == FSBackend || backendType == PVCBackend)
 }
 
 // GetRepoIdentifier returns the string to be used as the value of the --repo flag in
