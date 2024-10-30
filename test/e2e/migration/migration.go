@@ -25,6 +25,7 @@ import (
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"golang.org/x/mod/semver"
 
 	. "github.com/vmware-tanzu/velero/test"
 	util "github.com/vmware-tanzu/velero/test/util/csi"
@@ -146,22 +147,26 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 						OriginVeleroCfg.RestoreHelperImage = ""
 						OriginVeleroCfg.Plugins = ""
 
-						// It is for v1.13.x migration scenario only, because since v1.14, nightly CI won't
-						// pass velero-plugin-for-csi to E2E test anymore, and velero installation will not
-						// fetch velero-plugin-for-csi automatically, so add it as hardcode below.
-						// TODO: remove this section from future version like v1.15, e.g.
+						versionWithoutPatch := semver.MajorMinor(veleroCLI2Version.VeleroVersion)
+						// Read migration case needs plugins from the PluginsMatrix map.
+						migrationNeedPlugins, ok := PluginsMatrix[versionWithoutPatch]
+						Expect(ok).To(BeTrue())
+
 						if OriginVeleroCfg.CloudProvider == Azure {
-							OriginVeleroCfg.Plugins = "velero/velero-plugin-for-microsoft-azure:v1.9.0"
+							OriginVeleroCfg.Plugins = migrationNeedPlugins[Azure][0]
 						}
 						if OriginVeleroCfg.CloudProvider == AWS {
-							OriginVeleroCfg.Plugins = "velero/velero-plugin-for-aws:v1.9.0"
+							OriginVeleroCfg.Plugins = migrationNeedPlugins[AWS][0]
 						}
-						if strings.Contains(OriginVeleroCfg.Features, FeatureCSI) {
-							OriginVeleroCfg.Plugins = OriginVeleroCfg.Plugins + ",velero/velero-plugin-for-csi:v0.7.0"
+						// Because Velero CSI plugin is deprecated in v1.14,
+						// only need to install it for version lower than v1.14.
+						if strings.Contains(OriginVeleroCfg.Features, FeatureCSI) &&
+							semver.Compare(versionWithoutPatch, "v1.14") < 0 {
+							OriginVeleroCfg.Plugins = OriginVeleroCfg.Plugins + "," + migrationNeedPlugins[CSI][0]
 						}
 						if OriginVeleroCfg.SnapshotMoveData {
 							if OriginVeleroCfg.CloudProvider == Azure {
-								OriginVeleroCfg.Plugins = OriginVeleroCfg.Plugins + ",velero/velero-plugin-for-aws:v1.9.0"
+								OriginVeleroCfg.Plugins = OriginVeleroCfg.Plugins + "," + migrationNeedPlugins[AWS][0]
 							}
 						}
 						veleroCLI2Version.VeleroCLI, err = InstallVeleroCLI(veleroCLI2Version.VeleroVersion)
