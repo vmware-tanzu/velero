@@ -328,6 +328,7 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	request := &pkgbackup.Request{
 		Backup:           backup.DeepCopy(), // don't modify items in the cache
 		SkippedPVTracker: pkgbackup.NewSkipPVTracker(),
+		BackedUpItems:    pkgbackup.NewBackedUpItemsMap(),
 	}
 	request.VolumesInformation.Init()
 

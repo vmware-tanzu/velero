@@ -44,9 +44,9 @@ func TestRequest_BackupResourceList(t *testing.T) {
 			name:     "my-pv",
 		},
 	}
-	backedUpItems := map[itemKey]struct{}{}
+	backedUpItems := NewBackedUpItemsMap()
 	for _, it := range items {
-		backedUpItems[it] = struct{}{}
+		backedUpItems.AddItem(it)
 	}
 
 	req := Request{BackedUpItems: backedUpItems}
@@ -70,9 +70,9 @@ func TestRequest_BackupResourceListEntriesSorted(t *testing.T) {
 			namespace: "ns1",
 		},
 	}
-	backedUpItems := map[itemKey]struct{}{}
+	backedUpItems := NewBackedUpItemsMap()
 	for _, it := range items {
-		backedUpItems[it] = struct{}{}
+		backedUpItems.AddItem(it)
 	}
 
 	req := Request{BackedUpItems: backedUpItems}

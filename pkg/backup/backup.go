@@ -297,8 +297,6 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		return err
 	}
 
-	backupRequest.BackedUpItems = map[itemKey]struct{}{}
-
 	podVolumeTimeout := kb.podVolumeTimeout
 	if val := backupRequest.Annotations[velerov1api.PodVolumeOperationTimeoutAnnotation]; val != "" {
 		parsed, err := time.ParseDuration(val)
@@ -499,12 +497,13 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 
 		// updated total is computed as "how many items we've backed up so far, plus
 		// how many items we know of that are remaining"
-		totalItems := len(backupRequest.BackedUpItems) + (len(items) - (i + 1))
+		backedUpItems := backupRequest.BackedUpItems.Len()
+		totalItems := backedUpItems + (len(items) - (i + 1))
 
 		// send a progress update
 		update <- progressUpdate{
 			totalItems:    totalItems,
-			itemsBackedUp: len(backupRequest.BackedUpItems),
+			itemsBackedUp: backedUpItems,
 		}
 
 		log.WithFields(map[string]interface{}{
@@ -512,7 +511,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 			"resource":  items[i].groupResource.String(),
 			"namespace": items[i].namespace,
 			"name":      items[i].name,
-		}).Infof("Backed up %d items out of an estimated total of %d (estimate will change throughout the backup)", len(backupRequest.BackedUpItems), totalItems)
+		}).Infof("Backed up %d items out of an estimated total of %d (estimate will change throughout the backup)", backedUpItems, totalItems)
 	}
 
 	// no more progress updates will be sent on the 'update' channel
@@ -538,8 +537,9 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	if updated.Status.Progress == nil {
 		updated.Status.Progress = &velerov1api.BackupProgress{}
 	}
-	updated.Status.Progress.TotalItems = len(backupRequest.BackedUpItems)
-	updated.Status.Progress.ItemsBackedUp = len(backupRequest.BackedUpItems)
+	backedUpItems := backupRequest.BackedUpItems.Len()
+	updated.Status.Progress.TotalItems = backedUpItems
+	updated.Status.Progress.ItemsBackedUp = backedUpItems
 
 	// update the hooks execution status
 	if updated.Status.HookStatus == nil {
@@ -558,8 +558,8 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		log.Infof("Summary for skipped PVs: %s", skippedPVSummary)
 	}
 
-	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(backupRequest.BackedUpItems), ItemsBackedUp: len(backupRequest.BackedUpItems)}
-	log.WithField("progress", "").Infof("Backed up a total of %d items", len(backupRequest.BackedUpItems))
+	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: backedUpItems, ItemsBackedUp: backedUpItems}
+	log.WithField("progress", "").Infof("Backed up a total of %d items", backedUpItems)
 
 	return nil
 }
@@ -667,7 +667,7 @@ func (kb *kubernetesBackupper) backupItemBlock(itemBlock BackupItemBlock) []sche
 				continue
 			}
 			// Don't run hooks if pod has already been backed up
-			if _, exists := itemBlock.itemBackupper.backupRequest.BackedUpItems[key]; !exists {
+			if !itemBlock.itemBackupper.backupRequest.BackedUpItems.Has(key) {
 				preHookPods = append(preHookPods, item)
 			}
 		}
@@ -681,7 +681,7 @@ func (kb *kubernetesBackupper) backupItemBlock(itemBlock BackupItemBlock) []sche
 			itemBlock.Log.WithError(errors.WithStack(err)).Error("Error accessing pod metadata")
 			continue
 		}
-		itemBlock.itemBackupper.backupRequest.BackedUpItems[key] = struct{}{}
+		itemBlock.itemBackupper.backupRequest.BackedUpItems.AddItem(key)
 	}
 
 	itemBlock.Log.Debug("Backing up items in BackupItemBlock")
@@ -861,8 +861,6 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 		return err
 	}
 
-	backupRequest.BackedUpItems = map[itemKey]struct{}{}
-
 	// set up a temp dir for the itemCollector to use to temporarily
 	// store items as they're scraped from the API.
 	tempDir, err := os.MkdirTemp("", "")
@@ -947,14 +945,15 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 
 		// updated total is computed as "how many items we've backed up so far, plus
 		// how many items we know of that are remaining"
-		totalItems := len(backupRequest.BackedUpItems) + (len(items) - (i + 1))
+		backedUpItems := backupRequest.BackedUpItems.Len()
+		totalItems := backedUpItems + (len(items) - (i + 1))
 
 		log.WithFields(map[string]interface{}{
 			"progress":  "",
 			"resource":  item.groupResource.String(),
 			"namespace": item.namespace,
 			"name":      item.name,
-		}).Infof("Updated %d items out of an estimated total of %d (estimate will change throughout the backup finalizer)", len(backupRequest.BackedUpItems), totalItems)
+		}).Infof("Updated %d items out of an estimated total of %d (estimate will change throughout the backup finalizer)", backedUpItems, totalItems)
 	}
 
 	volumeInfos, err := backupStore.GetBackupVolumeInfos(backupRequest.Backup.Name)
@@ -979,7 +978,7 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 		return err
 	}
 
-	log.WithField("progress", "").Infof("Updated a total of %d items", len(backupRequest.BackedUpItems))
+	log.WithField("progress", "").Infof("Updated a total of %d items", backupRequest.BackedUpItems.Len())
 
 	return nil
 }
