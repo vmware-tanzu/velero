@@ -553,6 +553,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 					VolumeMounts:  volumeMounts,
 					VolumeDevices: volumeDevices,
 					Env:           podInfo.env,
+					EnvFrom:       podInfo.envFrom,
 					Resources:     resources,
 				},
 			},
