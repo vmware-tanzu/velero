@@ -158,16 +158,21 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 						if OriginVeleroCfg.CloudProvider == AWS {
 							OriginVeleroCfg.Plugins = migrationNeedPlugins[AWS][0]
 						}
+						// If HasVspherePlugin is false, only install the AWS plugin.
+						// If do nothing here, the default behavior is
+						// installing both AWS and vSphere plugins.
+						if OriginVeleroCfg.CloudProvider == Vsphere &&
+							!OriginVeleroCfg.HasVspherePlugin {
+							OriginVeleroCfg.Plugins = migrationNeedPlugins[AWS][0]
+						}
 						// Because Velero CSI plugin is deprecated in v1.14,
 						// only need to install it for version lower than v1.14.
 						if strings.Contains(OriginVeleroCfg.Features, FeatureCSI) &&
 							semver.Compare(versionWithoutPatch, "v1.14") < 0 {
 							OriginVeleroCfg.Plugins = OriginVeleroCfg.Plugins + "," + migrationNeedPlugins[CSI][0]
 						}
-						if OriginVeleroCfg.SnapshotMoveData {
-							if OriginVeleroCfg.CloudProvider == Azure {
-								OriginVeleroCfg.Plugins = OriginVeleroCfg.Plugins + "," + migrationNeedPlugins[AWS][0]
-							}
+						if OriginVeleroCfg.SnapshotMoveData && OriginVeleroCfg.CloudProvider == Azure {
+							OriginVeleroCfg.Plugins = OriginVeleroCfg.Plugins + "," + migrationNeedPlugins[AWS][0]
 						}
 						veleroCLI2Version.VeleroCLI, err = InstallVeleroCLI(veleroCLI2Version.VeleroVersion)
 						Expect(err).To(Succeed())
@@ -253,8 +258,9 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			})
 
 			if useVolumeSnapshots {
-				if veleroCfg.CloudProvider == Vsphere {
-					// TODO - remove after upload progress monitoring is implemented
+				// Only wait for the snapshots.backupdriver.cnsdp.vmware.com
+				// when the vSphere plugin is used.
+				if veleroCfg.HasVspherePlugin {
 					By("Waiting for vSphere uploads to complete", func() {
 						Expect(WaitForVSphereUploadCompletion(context.Background(), time.Hour,
 							migrationNamespace, kibishiiWorkerCount)).To(Succeed())

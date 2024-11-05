@@ -78,6 +78,7 @@ These configuration parameters are expected as values to the following command l
 1. `--standby-cluster-object-store-provider`: Object store provider for standby cluster.
 1. `--debug-velero-pod-restart`: A switch for debugging velero pod restart.
 1. `--fail-fast`: A switch for for failing fast on meeting error.
+1. `--disable-vsphere-plugin`: A switch for not install the Velero vSphere plugin when the provider is set to `vsphere`.
 
 These configurations or parameters are used to generate install options for Velero for each test suite.
 
@@ -129,12 +130,13 @@ Below is a mapping between `make` variables to E2E configuration flags.
 1. `INSTALL_VELERO `: `-install-velero`. Optional.
 1. `DEBUG_VELERO_POD_RESTART`: `-debug-velero-pod-restart`. Optional.
 1. `FAIL_FAST`: `--fail-fast`. Optional.
+1. `DISABLE_VSPHERE_PLUGIN`: `--diable-vsphere-plugin`. Optional.
 
 
 
 ### Examples
 
-Basic examples:
+#### Basic examples:
 
 1. Run Velero tests in a kind cluster with AWS (or MinIO) as the storage provider:
     
@@ -208,7 +210,7 @@ ADDITIONAL_CREDS_FILE=/path/to/azure-creds \
 make test-e2e
 ```
 
-Upgrade examples:
+#### Upgrade examples:
 
 1. Run Velero upgrade tests with pre-upgrade version:
 
@@ -234,7 +236,7 @@ UPGRADE_FROM_VELERO_VERSION=v1.10.2,v1.11.0 \
 make test-e2e
 ```
 
-Migration examples:
+#### Migration examples:
 
 1. Migration between 2 cluster of the same provider tests:
     
@@ -275,7 +277,7 @@ GINKGO_LABELS="Migration" \
 make test-e2e
 ```
 
-## 5. Filtering tests
+#### Filtering tests
 
 In release-1.15, Velero bumps the [Ginkgo](https://onsi.github.io/ginkgo/) version to [v2](https://onsi.github.io/ginkgo/MIGRATING_TO_V2).
 Velero E2E start to use [labels](https://onsi.github.io/ginkgo/#spec-labels) to filter cases instead of [`-focus` and `-skip`](https://onsi.github.io/ginkgo/#focused-specs) parameters.
@@ -285,7 +287,6 @@ Both `make run-e2e` and `make run-perf` CLI support using parameter `GINKGO_LABE
 `GINKGO_LABELS` is interpreted into `ginkgo run` CLI's parameter [`--label-filter`](https://onsi.github.io/ginkgo/#spec-labels).
 
 
-### Examples
 E2E tests can be run with specific cases to be included and/or excluded using the commands below:
 
 1. Run Velero tests with specific cases to be included:
@@ -315,6 +316,44 @@ In this example, cases are labelled as
 * `Upgrade` and `Restic`
 * `Migration` and `Restic` 
 will be skipped.
+
+#### VKS environment test
+1. Run the CSI data mover test. 
+
+`HAS_VSPHERE_PLUGIN` should be set to `false` to not install the Velero vSphere plugin.
+``` bash
+CLOUD_PROVIDER=vsphere \
+DEFAULT_CLUSTER=wl-antreav1301 \
+STANDBY_CLUSTER=wl-antreav1311 \
+DEFAULT_CLUSTER_NAME=192.168.0.4 \
+STANDBY_CLUSTER_NAME=192.168.0.3 \
+FEATURES=EnableCSI \
+PLUGINS=gcr.io/velero-gcp/velero-plugin-for-aws:main \
+HAS_VSPHERE_PLUGIN=false \
+OBJECT_STORE_PROVIDER=aws \
+CREDS_FILE=$HOME/aws-credential \
+BSL_CONFIG=region=us-east-1 \
+BSL_BUCKET=nightly-normal-account4-test \
+BSL_PREFIX=nightly \
+ADDITIONAL_BSL_PLUGINS=gcr.io/velero-gcp/velero-plugin-for-aws:main \
+ADDITIONAL_OBJECT_STORE_PROVIDER=aws \
+ADDITIONAL_BSL_CONFIG=region=us-east-1 \
+ADDITIONAL_BSL_BUCKET=nightly-normal-account4-test \
+ADDITIONAL_BSL_PREFIX=addition-bsl \
+ADDITIONAL_CREDS_FILE=$HOME/aws-credential \
+VELERO_IMAGE=gcr.io/velero-gcp/velero:main \
+RESTORE_HELPER_IMAGE=gcr.io/velero-gcp/velero-restore-helper:main \
+VERSION=main \
+SNAPSHOT_MOVE_DATA=true \
+STANDBY_CLUSTER_CLOUD_PROVIDER=vsphere \
+STANDBY_CLUSTER_OBJECT_STORE_PROVIDER=aws \
+STANDBY_CLUSTER_PLUGINS=gcr.io/velero-gcp/velero-plugin-for-aws:main \
+DISABLE_INFORMER_CACHE=true \
+REGISTRY_CREDENTIAL_FILE=$HOME/.docker/config.json \
+GINKGO_LABELS=Migration \
+KIBISHII_DIRECTORY=$HOME/kibishii/kubernetes/yaml/ \
+make test-e2e
+```
 
 ## 6. Full Tests execution
 

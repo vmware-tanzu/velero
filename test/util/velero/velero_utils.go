@@ -107,7 +107,7 @@ var PluginsMatrix = map[string]map[string][]string{
 	},
 }
 
-func getPluginsByVersion(version, cloudProvider, objectStoreProvider string, needDataMoverPlugin bool) ([]string, error) {
+func getPluginsByVersion(version string, cloudProvider string, needDataMoverPlugin bool) ([]string, error) {
 	var cloudMap map[string][]string
 	arr := strings.Split(version, ".")
 	if len(arr) >= 3 {
@@ -131,18 +131,6 @@ func getPluginsByVersion(version, cloudProvider, objectStoreProvider string, nee
 		plugins, ok = cloudMap[cloudProvider]
 		if !ok {
 			return nil, errors.Errorf("fail to get plugins by version: %s and provider %s", version, cloudProvider)
-		}
-	}
-	// TODO: Is this section need?
-	if objectStoreProvider != cloudProvider {
-		pluginsForObjectStoreProvider, ok := cloudMap[objectStoreProvider]
-		if !ok {
-			return nil, errors.Errorf("fail to get plugins by version: %s and object store provider %s", version, objectStoreProvider)
-		}
-		for _, p := range pluginsForObjectStoreProvider {
-			if !slices.Contains(plugins, p) {
-				plugins = append(plugins, p)
-			}
 		}
 	}
 
@@ -630,7 +618,7 @@ func getProviderPlugins(ctx context.Context, veleroCLI string, cloudProvider str
 		return nil, errors.WithMessage(err, "failed to get velero version")
 	}
 
-	plugins, err := getPluginsByVersion(version, cloudProvider, cloudProvider, false)
+	plugins, err := getPluginsByVersion(version, cloudProvider, false)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", cloudProvider, version)
 	}
@@ -673,7 +661,7 @@ func getPlugins(ctx context.Context, veleroCfg VeleroConfig) ([]string, error) {
 		if veleroCfg.SnapshotMoveData && veleroCfg.DataMoverPlugin == "" && !veleroCfg.IsUpgradeTest {
 			needDataMoverPlugin = true
 		}
-		plugins, err = getPluginsByVersion(version, cloudProvider, objectStoreProvider, needDataMoverPlugin)
+		plugins, err = getPluginsByVersion(version, cloudProvider, needDataMoverPlugin)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", objectStoreProvider, version)
 		}

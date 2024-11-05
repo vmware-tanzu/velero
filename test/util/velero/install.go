@@ -320,7 +320,7 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 
 	if len(options.Features) > 0 {
 		args = append(args, "--features", options.Features)
-		if !strings.EqualFold(cloudProvider, test.Vsphere) && strings.EqualFold(options.Features, test.FeatureCSI) && options.UseVolumeSnapshots {
+		if strings.EqualFold(options.Features, test.FeatureCSI) && options.UseVolumeSnapshots {
 			// https://github.com/openebs/zfs-localpv/blob/develop/docs/snapshot.md
 			fmt.Printf("Start to install %s VolumeSnapshotClass ... \n", cloudProvider)
 			if err := k8s.KubectlApplyByFile(ctx, fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", cloudProvider)); err != nil {
