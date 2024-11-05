@@ -74,7 +74,7 @@ type serverResourcesInterface interface {
 }
 
 type helper struct {
-	discoveryClient discovery.DiscoveryInterface
+	discoveryClient discovery.AggregatedDiscoveryInterface
 	logger          logrus.FieldLogger
 
 	// lock guards mapper, resources and resourcesMap
@@ -89,7 +89,7 @@ type helper struct {
 
 var _ Helper = &helper{}
 
-func NewHelper(discoveryClient discovery.DiscoveryInterface, logger logrus.FieldLogger) (Helper, error) {
+func NewHelper(discoveryClient discovery.AggregatedDiscoveryInterface, logger logrus.FieldLogger) (Helper, error) {
 	h := &helper{
 		discoveryClient: discoveryClient,
 		logger:          logger,

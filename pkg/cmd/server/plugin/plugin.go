@@ -224,7 +224,12 @@ func newServiceAccountBackupItemAction(f client.Factory) plugincommon.HandlerIni
 			return nil, err
 		}
 
-		discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), logger)
+		discoveryClient, err := f.DiscoveryClient()
+		if err != nil {
+			return nil, err
+		}
+
+		discoveryHelper, err := velerodiscovery.NewHelper(discoveryClient, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -253,11 +258,11 @@ func newRemapCRDVersionAction(f client.Factory) plugincommon.HandlerInitializer 
 			return nil, err
 		}
 
-		clientset, err := f.KubeClient()
+		discoveryClient, err := f.DiscoveryClient()
 		if err != nil {
 			return nil, err
 		}
-		discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), logger)
+		discoveryHelper, err := velerodiscovery.NewHelper(discoveryClient, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -470,7 +475,12 @@ func newServiceAccountItemBlockAction(f client.Factory) plugincommon.HandlerInit
 			return nil, err
 		}
 
-		discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), logger)
+		discoveryClient, err := f.DiscoveryClient()
+		if err != nil {
+			return nil, err
+		}
+
+		discoveryHelper, err := velerodiscovery.NewHelper(discoveryClient, logger)
 		if err != nil {
 			return nil, err
 		}

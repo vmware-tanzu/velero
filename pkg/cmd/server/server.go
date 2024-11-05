@@ -135,7 +135,7 @@ type server struct {
 	metricsAddress   string
 	kubeClientConfig *rest.Config
 	kubeClient       kubernetes.Interface
-	discoveryClient  discovery.DiscoveryInterface
+	discoveryClient  discovery.AggregatedDiscoveryInterface
 	discoveryHelper  velerodiscovery.Helper
 	dynamicClient    dynamic.Interface
 	// controller-runtime client. the difference from the controller-manager's client
@@ -269,8 +269,8 @@ func newServer(f client.Factory, config *config.Config, logger *logrus.Logger) (
 		return nil, err
 	}
 
-	var discoveryClient *discovery.DiscoveryClient
-	if discoveryClient, err = discovery.NewDiscoveryClientForConfig(clientConfig); err != nil {
+	var discoveryClient discovery.AggregatedDiscoveryInterface
+	if discoveryClient, err = f.DiscoveryClient(); err != nil {
 		cancelFunc()
 		return nil, err
 	}
