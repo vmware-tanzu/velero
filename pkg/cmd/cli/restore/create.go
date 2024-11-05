@@ -84,6 +84,7 @@ type CreateOptions struct {
 	RestoreVolumes            flag.OptionalBool
 	PreserveNodePorts         flag.OptionalBool
 	Labels                    flag.Map
+	Annotations               flag.Map
 	IncludeNamespaces         flag.StringArray
 	ExcludeNamespaces         flag.StringArray
 	ExistingResourcePolicy    string
@@ -107,6 +108,7 @@ type CreateOptions struct {
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
 		Labels:                  flag.NewMap(),
+		Annotations:             flag.NewMap(),
 		IncludeNamespaces:       flag.NewStringArray("*"),
 		NamespaceMappings:       flag.NewMap().WithEntryDelimiter(',').WithKeyValueDelimiter(':'),
 		RestoreVolumes:          flag.NewOptionalBool(nil),
@@ -123,6 +125,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "Namespaces to exclude from the restore.")
 	flags.Var(&o.NamespaceMappings, "namespace-mappings", "Namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...")
 	flags.Var(&o.Labels, "labels", "Labels to apply to the restore.")
+	flags.Var(&o.Annotations, "annotations", "Annotations to apply to the restore.")
 	flags.Var(&o.IncludeResources, "include-resources", "Resources to include in the restore, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources).")
 	flags.Var(&o.ExcludeResources, "exclude-resources", "Resources to exclude from the restore, formatted as resource.group, such as storageclasses.storage.k8s.io.")
 	flags.StringVar(&o.ExistingResourcePolicy, "existing-resource-policy", "", "Restore Policy to be used during the restore workflow, can be - none or update")
@@ -309,9 +312,10 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 	restore := &api.Restore{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: f.Namespace(),
-			Name:      o.RestoreName,
-			Labels:    o.Labels.Data(),
+			Namespace:   f.Namespace(),
+			Name:        o.RestoreName,
+			Labels:      o.Labels.Data(),
+			Annotations: o.Annotations.Data(),
 		},
 		Spec: api.RestoreSpec{
 			BackupName:              o.BackupName,
