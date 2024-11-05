@@ -118,6 +118,7 @@ type VeleroConfig struct {
 	ServiceAccountNameToInstall       string
 	EKSPolicyARN                      string
 	FailFast                          bool
+	HasVspherePlugin                  bool
 }
 
 type VeleroCfgInPerf struct {

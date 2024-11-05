@@ -190,8 +190,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			})
 
 			if useVolumeSnapshots {
-				if veleroCfg.CloudProvider == Vsphere {
-					// TODO - remove after upload progress monitoring is implemented
+				if veleroCfg.HasVspherePlugin {
 					By("Waiting for vSphere uploads to complete", func() {
 						Expect(WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour,
 							upgradeNamespace, 2)).To(Succeed())

@@ -120,9 +120,8 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 
 	// Checkpoint for a successful backup
 	if useVolumeSnapshots {
-		if providerName == Vsphere {
+		if veleroCfg.HasVspherePlugin {
 			// Wait for uploads started by the Velero Plugin for vSphere to complete
-			// TODO - remove after upload progress monitoring is implemented
 			fmt.Println("Waiting for vSphere uploads to complete")
 			if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace, 2); err != nil {
 				return errors.Wrapf(err, "Error waiting for uploads to complete")

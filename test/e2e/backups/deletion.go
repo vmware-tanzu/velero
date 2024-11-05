@@ -34,7 +34,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
-// Test backup and restore of Kibishi using restic
+// Test backup and restore of Kibishii using restic
 
 func BackupDeletionWithSnapshots() {
 	backup_deletion_test(true)
@@ -143,7 +143,8 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupLoc
 		})
 	})
 	for _, ns := range workloadNamespaceList {
-		if providerName == Vsphere && useVolumeSnapshots {
+		if useVolumeSnapshots &&
+			veleroCfg.HasVspherePlugin {
 			// Wait for uploads started by the Velero Plugin for vSphere to complete
 			// TODO - remove after upload progress monitoring is implemented
 			fmt.Println("Waiting for vSphere uploads to complete")
