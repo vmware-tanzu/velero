@@ -44,26 +44,38 @@ jobs:
         run: |
           IMAGE=velero VERSION=pr-test make container
           docker save velero:pr-test -o ./velero.tar
+  # Create json of k8s versions to test
+  # from guide: https://stackoverflow.com/a/65094398/4590470
+  setup-test-matrix:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set k8s versions
+        id: set-matrix
+        # everything excluding older tags below 1.23. limits needs to be high enough to cover all latest versions
+        # and test labels
+        # grep -E "v[1-9]\.(2[3-9]|[3-9][0-9])" filters for v1.23 to v9.99
+        run: |
+          echo "matrix={\
+            \"k8s\":$(wget -q -O - "https://hub.docker.com/v2/namespaces/kindest/repositories/node/tags?page_size=50" | grep -o '"name": *"[^"]*' | grep -o '[^"]*$' | grep -v -E "alpha|beta" | grep -E "v[1-9]\.(2[3-9]|[3-9][0-9])" | awk -F. '{if(!a[$1"."$2]++)print $1"."$2"."$NF}' | sort -r | sed s/v//g | jq -R -c -s 'split("\n")[:-1]'),\
+            \"labels\":[\
+              \"Basic && (ClusterResource || NodePort || StorageClass)\", \
+              \"ResourceFiltering && !Restic\", \
+              \"ResourceModifier || (Backups && BackupsSync) || PrivilegesMgmt || OrderedResources\", \
+              \"(NamespaceMapping && Single && Restic) || (NamespaceMapping && Multiple && Restic)\"\
+            ]}" >> $GITHUB_OUTPUT
+
   # Run E2E test against all Kubernetes versions on kind
   run-e2e-test:
-    needs: build
+    needs:
+      - build
+      - setup-test-matrix
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        k8s:
-          - 1.23.17
-          - 1.24.17
-          - 1.25.16
-          - 1.26.13
-          - 1.27.10
-          - 1.28.6
-          - 1.29.1
-        labels:
-          # labels are used to filter running E2E cases
-          - Basic && (ClusterResource || NodePort || StorageClass)
-          - ResourceFiltering && !Restic
-          - ResourceModifier || (Backups && BackupsSync) || PrivilegesMgmt || OrderedResources
-          - (NamespaceMapping && Single && Restic) || (NamespaceMapping && Multiple && Restic)
+      matrix: ${{fromJson(needs.setup-test-matrix.outputs.matrix)}}
       fail-fast: false
     steps:
       - name: Check out the code
