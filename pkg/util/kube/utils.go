@@ -119,7 +119,7 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 			return false, nsCreated, errors.Wrapf(err, "timed out waiting for terminating namespace %s to disappear before restoring", namespace.Name)
 		} else if namespaceAlreadyInDeletionTracker {
 			// If the namespace is already in the tracker, return an error.
-			return false, nsCreated, err
+			return false, nsCreated, errors.Wrapf(err, "skipping polling for terminating namespace %s", namespace.Name)
 		}
 		return false, nsCreated, errors.Wrapf(err, "error getting namespace %s", namespace.Name)
 	}

@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// resourceDeletionStatusTracker keeps track of in-progress backups.
+// resourceDeletionStatusTracker keeps track of  items pending deletion.
 type ResourceDeletionStatusTracker interface {
 	// Add informs the tracker that a polling is in progress to check namespace deletion status.
 	Add(kind, ns, name string)
