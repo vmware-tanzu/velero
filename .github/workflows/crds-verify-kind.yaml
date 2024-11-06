@@ -5,7 +5,7 @@ on:
     paths-ignore:
       - "site/**"
       - "design/**"
-
+      - "**/*.md"
 jobs:
   # Build the Velero CLI once for all Kubernetes versions, and cache it so the fan-out workers can get it.
   build-cli:
