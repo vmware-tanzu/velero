@@ -279,7 +279,7 @@ You can also configure the existing resource policy in a [Restore](api-types/res
 
 By default, Velero will remove the `status` field of an object before it's restored. This is because the value `status` field is typically set by the controller during reconciliation.  However, some custom resources are designed to store environment specific information in the `status` field, and it is important to preserve such information during restore.
 
-You can use `--status-exclude-resources` and `--status-exclude-resources` flags to select the resources whose `status` field will be restored by Velero.  If there are resources selected via these flags, velero will trigger another API call to update the restored object to restore `status` field after it's created.
+You can use `--status-include-resources` and `--status-exclude-resources` flags to select the resources whose `status` field will be restored by Velero.  If there are resources selected via these flags, velero will trigger another API call to update the restored object to restore `status` field after it's created.
 
 ## Write Sparse files
 If using fs-restore or CSI snapshot data movements, it's supported to write sparse files during restore by the below command:
