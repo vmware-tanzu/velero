@@ -276,7 +276,7 @@ volumePolicies:
 			vol: &v1.PersistentVolume{
 				Spec: v1.PersistentVolumeSpec{
 					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "aws.ebs.csi.driver"},
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "ebs.csi.aws.com"},
 					}},
 			},
 			skip: true,
@@ -311,7 +311,7 @@ volumePolicies:
 						v1.ResourceStorage: resource.MustParse("1Gi"),
 					},
 					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "aws.ebs.csi.driver"},
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "ebs.csi.aws.com"},
 					}},
 			},
 			skip: true,

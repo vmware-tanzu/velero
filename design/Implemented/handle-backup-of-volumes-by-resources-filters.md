@@ -86,7 +86,7 @@ volumePolicies:
     # capacity condition matches the volumes whose capacity falls into the range
     capacity: "0,100Gi"
     csi:
-      driver: aws.ebs.csi.driver
+      driver: ebs.csi.aws.com
       fsType: ext4
     storageClass:
     - gp2
@@ -174,7 +174,7 @@ data:
   - conditions:
       capacity: "0,100Gi"
       csi:
-        driver: aws.ebs.csi.driver
+        driver: ebs.csi.aws.com
         fsType: ext4
       storageClass:
       - gp2
