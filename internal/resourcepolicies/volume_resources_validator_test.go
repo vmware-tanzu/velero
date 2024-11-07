@@ -166,6 +166,47 @@ func TestValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "error format of csi driver",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]interface{}{
+							"capacity":     "0,10Gi",
+							"storageClass": []string{"gp2", "ebs-sc"},
+							"csi": interface{}(
+								map[string]interface{}{
+									"driver": []string{"aws.efs.csi.driver"},
+								}),
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "error format of csi driver volumeAttributes",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]interface{}{
+							"capacity":     "0,10Gi",
+							"storageClass": []string{"gp2", "ebs-sc"},
+							"csi": interface{}(
+								map[string]interface{}{
+									"driver":           "aws.efs.csi.driver",
+									"volumeAttributes": "test",
+								}),
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "unsupported version",
 			res: &ResourcePolicies{
 				Version: "v2",
@@ -219,6 +260,65 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			wantErr: true,
+		},
+		{
+			name: "supported format volume policies only csi driver",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]interface{}{
+							"csi": interface{}(
+								map[string]interface{}{
+									"driver": "aws.efs.csi.driver",
+								}),
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "supported format volume policies only csi volumeattributes",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]interface{}{
+							"csi": interface{}(
+								map[string]interface{}{
+									"volumeAttributes": map[string]string{
+										"key1": "value1",
+									},
+								}),
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "supported format volume policies with csi driver and volumeattributes",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]interface{}{
+							"csi": interface{}(
+								map[string]interface{}{
+									"driver": "aws.efs.csi.driver",
+									"volumeAttributes": map[string]string{
+										"key1": "value1",
+									},
+								}),
+						},
+					},
+				},
+			},
+			wantErr: false,
 		},
 		{
 			name: "supported format volume policies",

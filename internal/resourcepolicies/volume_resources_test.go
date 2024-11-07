@@ -201,21 +201,45 @@ func TestCSIConditionMatch(t *testing.T) {
 		expectedMatch bool
 	}{
 		{
-			name:          "match csi condition",
+			name:          "match csi driver condition",
 			condition:     &csiCondition{&csiVolumeSource{Driver: "test"}},
 			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}),
 			expectedMatch: true,
 		},
 		{
-			name:          "empty csi condition",
+			name:          "empty csi driver condition",
 			condition:     &csiCondition{nil},
 			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}),
 			expectedMatch: true,
 		},
 		{
-			name:          "empty csi volume",
+			name:          "empty csi driver volume",
 			condition:     &csiCondition{&csiVolumeSource{Driver: "test"}},
 			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{}),
+			expectedMatch: false,
+		},
+		{
+			name:          "match csi volumeAttributes condition",
+			condition:     &csiCondition{&csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}),
+			expectedMatch: true,
+		},
+		{
+			name:          "empty csi volumeAttributes condition",
+			condition:     &csiCondition{&csiVolumeSource{Driver: "test"}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}),
+			expectedMatch: true,
+		},
+		{
+			name:          "empty csi volumeAttributes volume // SMB volumes",
+			condition:     &csiCondition{&csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": ""}}),
+			expectedMatch: false,
+		},
+		{
+			name:          "empty csi volumeAttributes volume // SMB volumes",
+			condition:     &csiCondition{&csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}),
 			expectedMatch: false,
 		},
 	}
@@ -348,8 +372,18 @@ func TestParsePodVolume(t *testing.T) {
 			if tc.expectedCSI != nil {
 				if structuredVolume.csi == nil {
 					t.Errorf("Expected a non-nil CSI volume source")
-				} else if *tc.expectedCSI != *structuredVolume.csi {
+				} else if tc.expectedCSI.Driver != structuredVolume.csi.Driver {
 					t.Errorf("CSI volume source does not match expected value")
+				}
+				// Check volumeAttributes
+				if len(tc.expectedCSI.VolumeAttributes) != len(structuredVolume.csi.VolumeAttributes) {
+					t.Errorf("CSI volume attributes does not match expected value")
+				} else {
+					for k, v := range tc.expectedCSI.VolumeAttributes {
+						if structuredVolume.csi.VolumeAttributes[k] != v {
+							t.Errorf("CSI volume attributes does not match expected value")
+						}
+					}
 				}
 			}
 		})
@@ -415,8 +449,18 @@ func TestParsePV(t *testing.T) {
 			if tc.expectedCSI != nil {
 				if structuredVolume.csi == nil {
 					t.Errorf("Expected a non-nil CSI volume source")
-				} else if *tc.expectedCSI != *structuredVolume.csi {
+				} else if tc.expectedCSI.Driver != structuredVolume.csi.Driver {
 					t.Errorf("CSI volume source does not match expected value")
+				}
+				// Check volumeAttributes
+				if len(tc.expectedCSI.VolumeAttributes) != len(structuredVolume.csi.VolumeAttributes) {
+					t.Errorf("CSI volume attributes does not match expected value")
+				} else {
+					for k, v := range tc.expectedCSI.VolumeAttributes {
+						if structuredVolume.csi.VolumeAttributes[k] != v {
+							t.Errorf("CSI volume attributes does not match expected value")
+						}
+					}
 				}
 			}
 		})
