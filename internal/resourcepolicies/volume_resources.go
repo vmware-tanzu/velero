@@ -60,7 +60,7 @@ func (s *structuredVolume) parsePV(pv *corev1api.PersistentVolume) {
 
 	csi := pv.Spec.CSI
 	if csi != nil {
-		s.csi = &csiVolumeSource{Driver: csi.Driver}
+		s.csi = &csiVolumeSource{Driver: csi.Driver, VolumeAttributes: csi.VolumeAttributes}
 	}
 
 	s.volumeType = getVolumeTypeFromPV(pv)
@@ -74,7 +74,7 @@ func (s *structuredVolume) parsePodVolume(vol *corev1api.Volume) {
 
 	csi := vol.CSI
 	if csi != nil {
-		s.csi = &csiVolumeSource{Driver: csi.Driver}
+		s.csi = &csiVolumeSource{Driver: csi.Driver, VolumeAttributes: csi.VolumeAttributes}
 	}
 
 	s.volumeType = getVolumeTypeFromVolume(vol)
@@ -160,7 +160,25 @@ func (c *csiCondition) match(v *structuredVolume) bool {
 		return false
 	}
 
-	return c.csi.Driver == v.csi.Driver
+	if c.csi.Driver != v.csi.Driver {
+		return false
+	}
+
+	if c.csi.VolumeAttributes == nil || len(c.csi.VolumeAttributes) == 0 {
+		return true
+	}
+
+	if v.csi.VolumeAttributes == nil || len(v.csi.VolumeAttributes) == 0 {
+		return false
+	}
+
+	for key, value := range c.csi.VolumeAttributes { // match csi: {driver: "csi", volumeAttributes: {key: value}}
+		if value != v.csi.VolumeAttributes[key] { // if the value of the key does not match, return false
+			return false
+		}
+	}
+
+	return true
 }
 
 // parseCapacity parse string into capacity format

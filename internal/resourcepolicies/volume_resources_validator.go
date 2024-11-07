@@ -27,6 +27,8 @@ const currentSupportDataVersion = "v1"
 
 type csiVolumeSource struct {
 	Driver string `yaml:"driver,omitempty"`
+	// CSI volume attributes
+	VolumeAttributes map[string]string `yaml:"volumeAttributes,omitempty"`
 }
 
 type nFSVolumeSource struct {
