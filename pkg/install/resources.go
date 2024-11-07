@@ -267,6 +267,7 @@ type VeleroOptions struct {
 	BackupRepoConfigMap             string
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
+	ItemBlockWorkerCount            int
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -353,6 +354,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		WithScheduleSkipImmediately(o.ScheduleSkipImmediately),
 		WithPodResources(o.PodResources),
 		WithKeepLatestMaintenanceJobs(o.KeepLatestMaintenanceJobs),
+		WithItemBlockWorkerCount(o.ItemBlockWorkerCount),
 	}
 
 	if len(o.Features) > 0 {

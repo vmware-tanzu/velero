@@ -89,6 +89,7 @@ type Options struct {
 	BackupRepoConfigMap             string
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
+	ItemBlockWorkerCount            int
 }
 
 // BindFlags adds command line values to the options struct.
@@ -181,6 +182,12 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		"node-agent-configmap",
 		o.NodeAgentConfigMap,
 		"The name of ConfigMap containing node-agent configurations.",
+	)
+	flags.IntVar(
+		&o.ItemBlockWorkerCount,
+		"item-block-worker-count",
+		o.ItemBlockWorkerCount,
+		"Number of worker threads to process ItemBlocks. Default is one. Optional.",
 	)
 }
 
@@ -283,6 +290,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		BackupRepoConfigMap:             o.BackupRepoConfigMap,
 		RepoMaintenanceJobConfigMap:     o.RepoMaintenanceJobConfigMap,
 		NodeAgentConfigMap:              o.NodeAgentConfigMap,
+		ItemBlockWorkerCount:            o.ItemBlockWorkerCount,
 	}, nil
 }
 

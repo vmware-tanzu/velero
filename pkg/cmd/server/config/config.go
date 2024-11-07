@@ -53,6 +53,8 @@ const (
 	DefaultMaintenanceJobCPULimit    = "0"
 	DefaultMaintenanceJobMemRequest  = "0"
 	DefaultMaintenanceJobMemLimit    = "0"
+
+	DefaultItemBlockWorkerCount = 1
 )
 
 var (
@@ -179,6 +181,7 @@ type Config struct {
 	RepoMaintenanceJobConfig       string
 	PodResources                   kube.PodResources
 	KeepLatestMaintenanceJobs      int
+	ItemBlockWorkerCount           int
 }
 
 func GetDefaultConfig() *Config {
@@ -216,6 +219,7 @@ func GetDefaultConfig() *Config {
 			MemoryLimit:   DefaultMaintenanceJobMemLimit,
 		},
 		KeepLatestMaintenanceJobs: DefaultKeepLatestMaintenanceJobs,
+		ItemBlockWorkerCount:      DefaultItemBlockWorkerCount,
 	}
 
 	return config
@@ -293,5 +297,11 @@ func (c *Config) BindFlags(flags *pflag.FlagSet) {
 		"repo-maintenance-job-configmap",
 		c.RepoMaintenanceJobConfig,
 		"The name of ConfigMap containing repository maintenance Job configurations.",
+	)
+	flags.IntVar(
+		&c.ItemBlockWorkerCount,
+		"item-block-worker-count",
+		c.ItemBlockWorkerCount,
+		"Number of worker threads to process ItemBlocks. Default is one. Optional.",
 	)
 }
