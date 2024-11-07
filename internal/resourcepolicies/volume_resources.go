@@ -172,8 +172,8 @@ func (c *csiCondition) match(v *structuredVolume) bool {
 		return false
 	}
 
-	for key, value := range c.csi.VolumeAttributes { // match csi: {driver: "csi", volumeAttributes: {key: value}}
-		if value != v.csi.VolumeAttributes[key] { // if the value of the key does not match, return false
+	for key, value := range c.csi.VolumeAttributes {
+		if value != v.csi.VolumeAttributes[key] {
 			return false
 		}
 	}
