@@ -148,6 +148,16 @@ func TestGetResourceMatchedAction(t *testing.T) {
 				},
 			},
 			{
+				Action: Action{Type: "skip"},
+				Conditions: map[string]interface{}{
+					"csi": interface{}(
+						map[string]interface{}{
+							"driver":           "files.csi.driver",
+							"volumeAttributes": map[string]string{"protocol": "nfs"},
+						}),
+				},
+			},
+			{
 				Action: Action{Type: "snapshot"},
 				Conditions: map[string]interface{}{
 					"capacity":     "10,100Gi",
@@ -183,6 +193,24 @@ func TestGetResourceMatchedAction(t *testing.T) {
 				csi:          &csiVolumeSource{Driver: "aws.efs.csi.driver"},
 			},
 			expectedAction: &Action{Type: "skip"},
+		},
+		{
+			name: "match policy AFS NFS",
+			volume: &structuredVolume{
+				capacity:     *resource.NewQuantity(5<<30, resource.BinarySI),
+				storageClass: "afs-nfs",
+				csi:          &csiVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"protocol": "nfs"}},
+			},
+			expectedAction: &Action{Type: "skip"},
+		},
+		{
+			name: "match policy AFS SMB",
+			volume: &structuredVolume{
+				capacity:     *resource.NewQuantity(5<<30, resource.BinarySI),
+				storageClass: "afs-smb",
+				csi:          &csiVolumeSource{Driver: "files.csi.driver"},
+			},
+			expectedAction: nil,
 		},
 		{
 			name: "both matches return the first policy",
@@ -238,7 +266,7 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 			Namespace: "test-namespace",
 		},
 		Data: map[string]string{
-			"test-data": "version: v1\nvolumePolicies:\n- conditions:\n    capacity: '0,10Gi'\n  action:\n    type: skip",
+			"test-data": "version: v1\nvolumePolicies:\n  - conditions:\n      capacity: '0,10Gi'\n      csi:\n        driver: disks.csi.driver\n    action:\n      type: skip\n  - conditions:\n      csi:\n        driver: files.csi.driver\n        volumeAttributes:\n          protocol: nfs\n    action:\n      type: skip",
 		},
 	}
 
@@ -248,13 +276,27 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 
 	// Check that the returned resourcePolicies object contains the expected data
 	assert.Equal(t, "v1", resPolicies.version)
-	assert.Len(t, resPolicies.volumePolicies, 1)
+	assert.Len(t, resPolicies.volumePolicies, 2)
 	policies := ResourcePolicies{
 		Version: "v1",
 		VolumePolicies: []VolumePolicy{
 			{
 				Conditions: map[string]interface{}{
 					"capacity": "0,10Gi",
+					"csi": map[string]interface{}{
+						"driver": "disks.csi.driver",
+					},
+				},
+				Action: Action{
+					Type: Skip,
+				},
+			},
+			{
+				Conditions: map[string]interface{}{
+					"csi": map[string]interface{}{
+						"driver":           "files.csi.driver",
+						"volumeAttributes": map[string]string{"protocol": "nfs"},
+					},
 				},
 				Action: Action{
 					Type: Skip,
