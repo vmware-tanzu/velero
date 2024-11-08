@@ -95,18 +95,30 @@ func TestLoadResourcePolicies(t *testing.T) {
 		{
 			name: "supported formart volume policies",
 			yamlData: `version: v1
-	volumePolicies:
-	- conditions:
-		capacity: "0,100Gi"
-		csi:
-		  driver: aws.efs.csi.driver
-		nfs: {}
-		storageClass:
-		- gp2
-		- ebs-sc
-	  action:
-		type: skip`,
-			wantErr: true,
+volumePolicies:
+  - conditions:
+      capacity: '0,100Gi'
+      csi:
+        driver: aws.efs.csi.driver
+    action:
+      type: skip
+`,
+			wantErr: false,
+		},
+		{
+			name: "supported formart csi driver with volumeAttributes for volume policies",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      capacity: '0,100Gi'
+      csi:
+        driver: aws.efs.csi.driver
+        volumeAttributes:
+          key1: value1
+    action:
+      type: skip
+`,
+			wantErr: false,
 		},
 	}
 	for _, tc := range testCases {
@@ -298,7 +310,173 @@ volumePolicies:
 			skip: false,
 		},
 		{
-			name: "csi not configured",
+			name: "Skip AFS CSI condition with Disk volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: files.csi.driver
+    action:
+      type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "disks.csi.driver"},
+					}},
+			},
+			skip: false,
+		},
+		{
+			name: "Skip AFS CSI condition with AFS volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: files.csi.driver
+    action:
+      type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver"},
+					}},
+			},
+			skip: true,
+		},
+		{
+			name: "Skip AFS NFS CSI condition with Disk volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip
+`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "disks.csi.driver"},
+					}},
+			},
+			skip: false,
+		},
+		{
+			name: "Skip AFS NFS CSI condition with AFS SMB volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip
+`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
+					}},
+			},
+			skip: false,
+		},
+		{
+			name: "Skip AFS NFS CSI condition with AFS NFS volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip
+`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"protocol": "nfs"}},
+					}},
+			},
+			skip: true,
+		},
+		{
+			name: "Skip Disk and AFS NFS CSI condition with Disk volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: disks.csi.driver
+    action:
+      type: skip
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "disks.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
+					}},
+			},
+			skip: true,
+		},
+		{
+			name: "Skip Disk and AFS NFS CSI condition with AFS SMB volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: disks.csi.driver
+    action:
+      type: skip
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
+					}},
+			},
+			skip: false,
+		},
+		{
+			name: "Skip Disk and AFS NFS CSI condition with AFS NFS volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: disks.csi.driver
+    action:
+      type: skip
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1", "protocol": "nfs"}},
+					}},
+			},
+			skip: true,
+		},
+		{
+			name: "csi not configured and testing capacity condition",
 			yamlData: `version: v1
 volumePolicies:
 - conditions:

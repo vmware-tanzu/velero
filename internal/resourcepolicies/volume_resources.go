@@ -153,7 +153,11 @@ func (c *csiCondition) match(v *structuredVolume) bool {
 	}
 
 	if c.csi.Driver == "" { // match csi: {}
-		return v.csi != nil
+		if v.csi != nil {
+			return true
+		} 
+
+		return false
 	}
 
 	if v.csi == nil {

@@ -70,7 +70,10 @@ func (c *nfsCondition) validate() error {
 }
 
 func (c *csiCondition) validate() error {
-	// validate by yamlv3
+	if c != nil && c.csi != nil && c.csi.Driver == "" && c.csi.VolumeAttributes != nil {
+		return errors.New("csi driver should not be empty")
+	}
+	
 	return nil
 }
 

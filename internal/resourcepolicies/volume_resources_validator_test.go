@@ -297,7 +297,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "supported format volume policies with csi driver and volumeattributes",

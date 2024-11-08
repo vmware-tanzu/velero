@@ -231,13 +231,13 @@ func TestCSIConditionMatch(t *testing.T) {
 			expectedMatch: true,
 		},
 		{
-			name:          "empty csi volumeAttributes volume // SMB volumes",
+			name:          "empty csi volumeAttributes volume",
 			condition:     &csiCondition{&csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}},
 			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": ""}}),
 			expectedMatch: false,
 		},
 		{
-			name:          "empty csi volumeAttributes volume // SMB volumes",
+			name:          "empty csi volumeAttributes volume",
 			condition:     &csiCondition{&csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}},
 			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}),
 			expectedMatch: false,
@@ -326,7 +326,8 @@ func TestParsePodVolume(t *testing.T) {
 	}
 	csiVolume := corev1api.Volume{}
 	csiVolume.CSI = &corev1api.CSIVolumeSource{
-		Driver: "csi.example.com",
+		Driver:           "csi.example.com",
+		VolumeAttributes: map[string]string{"protocol": "nfs"},
 	}
 	emptyVolume := corev1api.Volume{}
 
@@ -345,7 +346,7 @@ func TestParsePodVolume(t *testing.T) {
 		{
 			name:        "CSI volume",
 			inputVolume: &csiVolume,
-			expectedCSI: &csiVolumeSource{Driver: "csi.example.com"},
+			expectedCSI: &csiVolumeSource{Driver: "csi.example.com", VolumeAttributes: map[string]string{"protocol": "nfs"}},
 		},
 		{
 			name:        "Empty volume",
@@ -397,7 +398,7 @@ func TestParsePV(t *testing.T) {
 	nfsVolume.Spec.NFS = &corev1api.NFSVolumeSource{Server: "nfs.example.com", Path: "/exports/data"}
 	csiVolume := corev1api.PersistentVolume{}
 	csiVolume.Spec.Capacity = corev1api.ResourceList{corev1api.ResourceStorage: resource.MustParse("2Gi")}
-	csiVolume.Spec.CSI = &corev1api.CSIPersistentVolumeSource{Driver: "csi.example.com"}
+	csiVolume.Spec.CSI = &corev1api.CSIPersistentVolumeSource{Driver: "csi.example.com", VolumeAttributes: map[string]string{"protocol": "nfs"}}
 	emptyVolume := corev1api.PersistentVolume{}
 
 	// Test cases
@@ -417,7 +418,7 @@ func TestParsePV(t *testing.T) {
 			name:        "CSI volume",
 			inputVolume: &csiVolume,
 			expectedNFS: nil,
-			expectedCSI: &csiVolumeSource{Driver: "csi.example.com"},
+			expectedCSI: &csiVolumeSource{Driver: "csi.example.com", VolumeAttributes: map[string]string{"protocol": "nfs"}},
 		},
 		{
 			name:        "Empty volume",
