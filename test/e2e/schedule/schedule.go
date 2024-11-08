@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 
@@ -41,7 +42,7 @@ func (n *ScheduleBackup) Init() error {
 	}
 	n.ScheduleArgs = []string{
 		"--include-namespaces", strings.Join(*n.NSIncluded, ","),
-		"--schedule=*/" + fmt.Sprintf("%v", n.Period) + " * * * *",
+		"--schedule=*/" + strconv.Itoa(n.Period) + " * * * *",
 	}
 
 	Expect(n.Period).To(BeNumerically("<", 30))
