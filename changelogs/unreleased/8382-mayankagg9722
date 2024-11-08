@@ -1,0 +1,1 @@
+Adding support in velero Resource Policies for filtering PVs based on additional VolumeAttributes properties under CSI PVs
