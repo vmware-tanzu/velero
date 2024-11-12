@@ -1,0 +1,56 @@
+name: Auto Update Go Patch
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs every day at midnight UTC
+  workflow_dispatch: # Allows manual triggering of the workflow
+  pull_request:
+    paths: # only run on pull requests that modify this workflow
+    - '.github/workflows/auto_bump_golang.yml'
+permissions: 
+  pull-requests: write
+  contents: write
+  actions: write # needed if branch 'actions/update-go-mod-patch' is not pre-created and action is pushing .github/workflows/... to the repo
+env:
+  GH_TOKEN: ${{ github.token }}
+jobs:
+  bump-golang-patch-main:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    - name: Update to latest go version allowable from current Dockerfile
+      id: update-go-mod-patch
+      run: |
+        CONTAINER_NAME=$(cat Dockerfile | grep golang: | head -n 1 | cut -d ' ' -f 3)
+        GO_VERSION=$(docker run --rm $CONTAINER_NAME go version | cut -d ' ' -f 3 | cut -d 'o' -f 2)
+        echo "Latest golang version allowed by image: $GO_VERSION"
+        echo "Updating go.mod go version to latest patch version"
+        go get go@$GO_VERSION toolchain@none
+        go mod tidy
+        echo "container=$CONTAINER_NAME" >> $GITHUB_ENV
+        echo "goversion=$GO_VERSION" >> $GITHUB_ENV
+    - name: Create PR with updated go.mod if needed
+      # if not a PR, (ie. schedule or manual trigger by maintainer) then create a PR
+      # For review purposes, PR authors who make changes to this workflow file should push to their main branch to demonstrate the workflow and link to the PR.
+      if: github.event_name != 'pull_request'
+      run: |
+        if ! git diff --exit-code -- go.mod go.sum; then
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Action"
+          git checkout -B actions/update-go-mod-patch
+          git add go.mod go.sum
+          git commit -m "Update Go in go.mod to $goversion"
+          echo "Pushing to $GITHUB_REPOSITORY at actions/update-go-mod-patch"
+          git push --force --set-upstream origin actions/update-go-mod-patch || echo "Please ensure your fork's actions/update-go-mod-patch branch is up to date with upstream/main first."
+          echo "PR to $GITHUB_REPOSITORY main"
+          gh pr create --title "Update Go in go.mod to $goversion" --body "Updated Go in go.mod to match latest patch available from Dockerfile image: $container" --base main --repo $GITHUB_REPOSITORY
+        fi;
+        cat go.mod
