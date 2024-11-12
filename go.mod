@@ -1,5 +1,11 @@
 module github.com/vmware-tanzu/velero
 
+// Do not pin patch version here. Leave patch at X.Y.0
+// Unset GOTOOLCHAIN to assume GOTOOLCHAIN=local where go cli version in path is used.
+// Use env GOTOOLCHAIN=auto to allow go to decide whichever is newer from go.mod or cli in path.
+// or GOTOOLCHAIN=goX.Y.Z to use a specific toolchain version
+// See: https://go.dev/doc/toolchain#select and https://github.com/vmware-tanzu/velero/issues/8397
+// To bump minor version, run `go get go@X.Y.0 toolchain@none` (ie. `go get go@1.23.0 toolchain@none`)
 go 1.22.0
 
 require (

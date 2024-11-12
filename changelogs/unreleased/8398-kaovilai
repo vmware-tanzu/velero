@@ -1,0 +1,1 @@
+Add go buildinfo to velero to identify toolchain used to build velero

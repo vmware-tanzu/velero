@@ -19,11 +19,17 @@ limitations under the License.
 // worrying about introducing circular dependencies.
 package buildinfo
 
-import "fmt"
+import (
+	"fmt"
+	"runtime/debug"
+)
 
 var (
 	// Version is the current version of Velero, set by the go linker's -X flag at build time.
 	Version string
+
+	// goVersion is the version of Go that was used to build Velero
+	goBuildInfo *debug.BuildInfo
 
 	// GitSHA is the actual commit that is being built, set by the go linker's -X flag at build time.
 	GitSHA string
@@ -43,4 +49,15 @@ func FormattedGitSHA() string {
 		return fmt.Sprintf("%s-%s", GitSHA, GitTreeState)
 	}
 	return GitSHA
+}
+
+func GoVersion() string {
+	if goBuildInfo == nil {
+		var ok bool
+		goBuildInfo, ok = debug.ReadBuildInfo()
+		if !ok {
+			return "cannot read Go BuildInfo"
+		}
+	}
+	return goBuildInfo.GoVersion
 }

@@ -69,6 +69,7 @@ func printVersion(w io.Writer, clientOnly bool, kbClient kbclient.Client, server
 	fmt.Fprintln(w, "Client:")
 	fmt.Fprintf(w, "\tVersion: %s\n", buildinfo.Version)
 	fmt.Fprintf(w, "\tGit commit: %s\n", buildinfo.FormattedGitSHA())
+	fmt.Fprintf(w, "\tGo version: %s\n", buildinfo.GoVersion())
 
 	if clientOnly {
 		return

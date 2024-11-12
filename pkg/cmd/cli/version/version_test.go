@@ -49,7 +49,7 @@ func TestPrintVersion(t *testing.T) {
 	buildinfo.GitSHA = "somegitsha"
 	buildinfo.GitTreeState = "dirty"
 
-	clientVersion := fmt.Sprintf("Client:\n\tVersion: %s\n\tGit commit: %s\n", buildinfo.Version, buildinfo.FormattedGitSHA())
+	clientVersion := fmt.Sprintf("Client:\n\tVersion: %s\n\tGit commit: %s\n\tGo version: %s\n", buildinfo.Version, buildinfo.FormattedGitSHA(), buildinfo.GoVersion())
 
 	tests := []struct {
 		name                string

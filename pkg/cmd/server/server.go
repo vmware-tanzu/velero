@@ -109,7 +109,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 			logger.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
 
-			logger.Infof("Starting Velero server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
+			logger.Infof("Starting Velero server %s (%s) go-version: %s", buildinfo.Version, buildinfo.FormattedGitSHA(), buildinfo.GoVersion())
 			if len(features.All()) > 0 {
 				logger.Infof("%d feature flags enabled %s", len(features.All()), features.All())
 			} else {
