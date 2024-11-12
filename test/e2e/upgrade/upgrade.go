@@ -202,9 +202,12 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 					snapshotCheckPoint, err := GetSnapshotCheckPoint(*veleroCfg.ClientToInstallVelero, veleroCfg, 2,
 						upgradeNamespace, backupName, KibishiiPVCNameList)
 					Expect(err).NotTo(HaveOccurred(), "Fail to get snapshot checkpoint")
-					Expect(SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,
-						veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
-						veleroCfg.BSLConfig, backupName, snapshotCheckPoint)).To(Succeed())
+					Expect(CheckSnapshotsInProvider(
+						veleroCfg,
+						backupName,
+						snapshotCheckPoint,
+						false,
+					)).To(Succeed())
 				})
 			}
 

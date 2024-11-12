@@ -131,9 +131,12 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		if err != nil {
 			return errors.Wrap(err, "Fail to get snapshot checkpoint")
 		}
-		err = SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,
-			veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLConfig,
-			backupName, snapshotCheckPoint)
+		err = CheckSnapshotsInProvider(
+			veleroCfg,
+			backupName,
+			snapshotCheckPoint,
+			false,
+		)
 		if err != nil {
 			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
@@ -166,9 +169,12 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 					return errors.Wrap(err, "failed to get snapshot checkPoint")
 				}
 			} else {
-				err = SnapshotsShouldNotExistInCloud(veleroCfg.CloudProvider,
-					veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLConfig,
-					backupName, SnapshotCheckPoint{})
+				err = CheckSnapshotsInProvider(
+					veleroCfg,
+					backupName,
+					SnapshotCheckPoint{},
+					false,
+				)
 				if err != nil {
 					return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 				}

@@ -289,9 +289,12 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 						snapshotCheckPoint, err = GetSnapshotCheckPoint(*veleroCfg.DefaultClient, veleroCfg, kibishiiWorkerCount,
 							migrationNamespace, backupName, GetKibishiiPVCNameList(kibishiiWorkerCount))
 						Expect(err).NotTo(HaveOccurred(), "Fail to get snapshot checkpoint")
-						Expect(SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,
-							veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket,
-							veleroCfg.BSLConfig, backupName, snapshotCheckPoint)).To(Succeed())
+						Expect(CheckSnapshotsInProvider(
+							veleroCfg,
+							backupName,
+							snapshotCheckPoint,
+							false,
+						)).To(Succeed())
 					})
 				}
 			}
