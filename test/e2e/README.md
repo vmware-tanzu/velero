@@ -78,7 +78,7 @@ These configuration parameters are expected as values to the following command l
 1. `--standby-cluster-object-store-provider`: Object store provider for standby cluster.
 1. `--debug-velero-pod-restart`: A switch for debugging velero pod restart.
 1. `--fail-fast`: A switch for for failing fast on meeting error.
-1. `--disable-vsphere-plugin`: A switch for not install the Velero vSphere plugin when the provider is set to `vsphere`.
+1. `--has-vsphere-plugin`: A switch to indicate whether the Velero vSphere plugin is installed for vSphere environment.
 
 These configurations or parameters are used to generate install options for Velero for each test suite.
 
@@ -130,7 +130,7 @@ Below is a mapping between `make` variables to E2E configuration flags.
 1. `INSTALL_VELERO `: `-install-velero`. Optional.
 1. `DEBUG_VELERO_POD_RESTART`: `-debug-velero-pod-restart`. Optional.
 1. `FAIL_FAST`: `--fail-fast`. Optional.
-1. `DISABLE_VSPHERE_PLUGIN`: `--diable-vsphere-plugin`. Optional.
+1. `HAS_VSPHERE_PLUGIN`: `--has-vsphere-plugin`. Optional.
 
 
 
@@ -338,8 +338,8 @@ BSL_PREFIX=nightly \
 ADDITIONAL_BSL_PLUGINS=gcr.io/velero-gcp/velero-plugin-for-aws:main \
 ADDITIONAL_OBJECT_STORE_PROVIDER=aws \
 ADDITIONAL_BSL_CONFIG=region=us-east-1 \
-ADDITIONAL_BSL_BUCKET=nightly-normal-account4-test \
-ADDITIONAL_BSL_PREFIX=addition-bsl \
+ADDITIONAL_BSL_BUCKET=nightly-restrict-account-test \
+ADDITIONAL_BSL_PREFIX=nightly \
 ADDITIONAL_CREDS_FILE=$HOME/aws-credential \
 VELERO_IMAGE=gcr.io/velero-gcp/velero:main \
 RESTORE_HELPER_IMAGE=gcr.io/velero-gcp/velero-restore-helper:main \
