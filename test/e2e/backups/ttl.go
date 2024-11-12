@@ -140,13 +140,11 @@ func TTLTest() {
 			Expect(err).NotTo(HaveOccurred(), "Fail to get snapshot checkpoint")
 
 			Expect(
-				SnapshotsShouldBeCreatedInCloud(
-					veleroCfg.CloudProvider,
-					veleroCfg.CloudCredentialsFile,
-					veleroCfg.BSLBucket,
-					veleroCfg.BSLConfig,
+				CheckSnapshotsInProvider(
+					veleroCfg,
 					test.backupName,
 					snapshotCheckPoint,
+					false,
 				),
 			).NotTo(HaveOccurred(), "Fail to verify the created snapshots")
 		}
@@ -202,9 +200,13 @@ func TTLTest() {
 
 		By("PersistentVolume snapshots should be deleted", func() {
 			if useVolumeSnapshots {
-				Expect(SnapshotsShouldNotExistInCloud(veleroCfg.CloudProvider,
-					veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLConfig,
-					test.backupName, snapshotCheckPoint)).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
+				snapshotCheckPoint.ExpectCount = 0
+				Expect(CheckSnapshotsInProvider(
+					veleroCfg,
+					test.backupName,
+					snapshotCheckPoint,
+					false,
+				)).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 			}
 		})
 

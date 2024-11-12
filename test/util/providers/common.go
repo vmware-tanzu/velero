@@ -28,14 +28,14 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/internal/volume"
-	. "github.com/vmware-tanzu/velero/test"
+	velerotest "github.com/vmware-tanzu/velero/test"
 	velero "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 type ObjectsInStorage interface {
 	IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) (bool, error)
 	DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) error
-	IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupName string, snapshotCheck SnapshotCheckPoint) error
+	IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupName string, snapshotCheck velerotest.SnapshotCheckPoint) error
 	GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, objectKey string) (io.ReadCloser, error)
 }
 
@@ -75,13 +75,13 @@ func ObjectsShouldNotBeInBucket(objectStoreProvider, cloudCredentialsFile, bslBu
 func getProvider(cloudProvider string) (ObjectsInStorage, error) {
 	var s ObjectsInStorage
 	switch cloudProvider {
-	case AWS, Vsphere:
+	case velerotest.AWS, velerotest.Vsphere:
 		aws := AWSStorage("")
 		s = &aws
-	case GCP:
+	case velerotest.GCP:
 		gcs := GCSStorage("")
 		s = &gcs
-	case Azure:
+	case velerotest.Azure:
 		az := AzureStorage("")
 		s = &az
 	default:
@@ -102,7 +102,7 @@ func IsObjectsInBucket(objectStoreProvider, cloudCredentialsFile, bslBucket, bsl
 	bslPrefix = getFullPrefix(bslPrefix, subPrefix)
 	s, err := getProvider(objectStoreProvider)
 	if err != nil {
-		return false, errors.Wrapf(err, fmt.Sprintf("Object store provider %s is not valid", objectStoreProvider))
+		return false, errors.Wrapf(err, "Object store provider %s is not valid", objectStoreProvider)
 	}
 	return s.IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName)
 }
@@ -116,66 +116,77 @@ func DeleteObjectsInBucket(objectStoreProvider, cloudCredentialsFile, bslBucket,
 	}
 	s, err := getProvider(objectStoreProvider)
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Object store provider %s is not valid", objectStoreProvider))
+		return errors.Wrapf(err, "Object store provider %s is not valid", objectStoreProvider)
 	}
 	err = s.DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName)
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Fail to delete %s", bslPrefix))
+		return errors.Wrapf(err, "Fail to delete %s", bslPrefix)
 	}
 	return nil
 }
 
-func SnapshotsShouldNotExistInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheckPoint SnapshotCheckPoint) error {
-	fmt.Printf("|| VERIFICATION || - Snapshots should not exist in cloud, backup %s\n", backupName)
+func CheckSnapshotsInProvider(
+	veleroCfg velerotest.VeleroConfig,
+	backupName string,
+	snapshotCheckPoint velerotest.SnapshotCheckPoint,
+	checkStandbyCluster bool,
+) error {
+	fmt.Printf("|| VERIFICATION || - there should %d snapshots in provider, backup %s\n",
+		snapshotCheckPoint.ExpectCount, backupName)
 
-	if cloudProvider == VanillaZFS {
-		fmt.Printf("Skip snapshot check for cloud provider %s", cloudProvider)
+	if veleroCfg.CloudProvider == velerotest.VanillaZFS {
+		fmt.Printf("Skip snapshot check for cloud provider %s", veleroCfg.CloudProvider)
 		return nil
 	}
-	if cloudCredentialsFile == "" {
-		return errors.New(fmt.Sprintf("|| ERROR || - Please provide credential file of cloud %s \n", cloudProvider))
-	}
-
-	snapshotCheckPoint.ExpectCount = 0
-	err := IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName, snapshotCheckPoint)
-	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("|| UNEXPECTED ||Snapshots %s exist in cloud after backup as expected", backupName))
-	}
-	fmt.Printf("|| EXPECTED || - Snapshots do not exist in cloud, backup %s\n", backupName)
-	return nil
-}
-
-func SnapshotsShouldBeCreatedInCloud(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheckPoint SnapshotCheckPoint) error {
-	fmt.Printf("|| VERIFICATION || - Snapshots should exist in cloud, backup %s\n", backupName)
-
-	if cloudProvider == VanillaZFS {
-		fmt.Printf("Skip snapshot check for cloud provider %s", cloudProvider)
+	if veleroCfg.CloudProvider == velerotest.Vsphere && !veleroCfg.HasVspherePlugin {
+		fmt.Printf("Skip snapshot check for vSphere environment that doesn't have Velero vSphere plugin.")
 		return nil
 	}
-	if cloudCredentialsFile == "" {
-		return errors.New(fmt.Sprintf("|| ERROR || - Please provide credential file of cloud %s \n", cloudProvider))
+	if veleroCfg.CloudCredentialsFile == "" {
+		return errors.New(fmt.Sprintf("|| ERROR || - Please provide credential file of cloud %s \n", veleroCfg.CloudProvider))
 	}
 
-	err := IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName, snapshotCheckPoint)
-	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("|| UNEXPECTED || - Snapshots %s do not exist in cloud after backup as expected", backupName))
+	cloudCredentialsFile := veleroCfg.CloudCredentialsFile
+	bslBucket := veleroCfg.BSLBucket
+	bslConfig := veleroCfg.BSLConfig
+	if checkStandbyCluster {
+		bslBucket = veleroCfg.AdditionalBSLBucket
+
+		// Only vSphere environment's snapshot on standby cluster is related to BSL.
+		if veleroCfg.CloudProvider == velerotest.Vsphere {
+			cloudCredentialsFile = veleroCfg.AdditionalBSLCredentials
+			bslConfig = veleroCfg.AdditionalBSLConfig
+		}
 	}
-	fmt.Printf("|| EXPECTED || - Snapshots of backup %s exist in cloud %s\n", backupName, cloudProvider)
+
+	err := isSnapshotExisted(
+		veleroCfg.CloudProvider,
+		cloudCredentialsFile,
+		bslBucket,
+		bslConfig,
+		backupName,
+		snapshotCheckPoint,
+	)
+	if err != nil {
+		return errors.Wrapf(err, "|| UNEXPECTED || - Snapshots count is not as expected after backup %s", backupName)
+	}
+
+	fmt.Printf("|| EXPECTED || - Snapshots of backup %s exist in provider %s\n", backupName, veleroCfg.CloudProvider)
 	return nil
 }
 
-func IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheck SnapshotCheckPoint) error {
+func isSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig, backupName string, snapshotCheck velerotest.SnapshotCheckPoint) error {
 	s, err := getProvider(cloudProvider)
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Cloud provider %s is not valid", cloudProvider))
+		return errors.Wrapf(err, "Cloud provider %s is not valid", cloudProvider)
 	}
-	if cloudProvider == Vsphere {
+	if cloudProvider == velerotest.Vsphere {
 		var retSnapshotIDs []string
 		ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*2)
 		defer ctxCancel()
 		retSnapshotIDs, err = velero.GetVsphereSnapshotIDs(ctx, time.Hour, snapshotCheck.NamespaceBackedUp, snapshotCheck.PodName)
 		if err != nil {
-			return errors.Wrapf(err, fmt.Sprintf("Fail to get snapshot CRs of backup%s", backupName))
+			return errors.Wrapf(err, "Fail to get snapshot CRs of backup%s", backupName)
 		}
 
 		bslPrefix := "plugins"
@@ -201,7 +212,7 @@ func IsSnapshotExisted(cloudProvider, cloudCredentialsFile, bslBucket, bslConfig
 	} else {
 		err = s.IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupName, snapshotCheck)
 		if err != nil {
-			return errors.Wrapf(err, fmt.Sprintf("Fail to get snapshot of backup %s", backupName))
+			return errors.Wrapf(err, "Fail to get snapshot of backup %s", backupName)
 		}
 	}
 	return nil
@@ -221,7 +232,7 @@ func GetVolumeInfoMetadataContent(
 	fmt.Printf("|| VERIFICATION || - Get backup %s volumeinfo file in storage %s\n", backupName, bslPrefix)
 	s, err := getProvider(objectStoreProvider)
 	if err != nil {
-		return nil, errors.Wrapf(err, fmt.Sprintf("Cloud provider %s is not valid", objectStoreProvider))
+		return nil, errors.Wrapf(err, "Cloud provider %s is not valid", objectStoreProvider)
 	}
 
 	return s.GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, volumeFileName)
