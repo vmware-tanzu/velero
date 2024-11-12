@@ -38,6 +38,8 @@ const AWS = "aws"
 const GCP = "gcp"
 const Vsphere = "vsphere"
 const CSI = "csi"
+const Velero = "velero"
+const VeleroRestoreHelper = "velero-restore-helper"
 
 const UploaderTypeRestic = "restic"
 

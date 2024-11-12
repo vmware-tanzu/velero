@@ -41,7 +41,7 @@ const (
 	bslDeletionTestNs = "bsl-deletion"
 )
 
-// Test backup and restore of Kibishi using restic
+// Test backup and restore of Kibishii using restic
 
 func BslDeletionWithSnapshots() {
 	BslDeletionTest(true)
@@ -141,10 +141,10 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			podName1 := "kibishii-deployment-0"
 			podName2 := "kibishii-deployment-1"
 
-			label_1 := "for=1"
+			label1 := "for=1"
 			// TODO remove when issue https://github.com/vmware-tanzu/velero/issues/4724 is fixed
-			//label_2 := "for!=1"
-			label_2 := "for=2"
+			//label2 := "for!=1"
+			label2 := "for=2"
 			By("Create namespace for sample workload", func() {
 				Expect(CreateNamespace(oneHourTimeout, *veleroCfg.ClientToInstallVelero, bslDeletionTestNs)).To(Succeed())
 			})
@@ -157,8 +157,8 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 
 			// Restic can not backup PV only, so pod need to be labeled also
 			By("Label all 2 worker-pods of Kibishii", func() {
-				Expect(AddLabelToPod(context.Background(), podName1, bslDeletionTestNs, label_1)).To(Succeed())
-				Expect(AddLabelToPod(context.Background(), "kibishii-deployment-1", bslDeletionTestNs, label_2)).To(Succeed())
+				Expect(AddLabelToPod(context.Background(), podName1, bslDeletionTestNs, label1)).To(Succeed())
+				Expect(AddLabelToPod(context.Background(), "kibishii-deployment-1", bslDeletionTestNs, label2)).To(Succeed())
 			})
 
 			By("Get all 2 PVCs of Kibishii and label them separately ", func() {
@@ -172,8 +172,8 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 				fmt.Println(pvc)
 				Expect(pvc).To(HaveLen(1))
 				pvc2 := pvc[0]
-				Expect(AddLabelToPvc(context.Background(), pvc1, bslDeletionTestNs, label_1)).To(Succeed())
-				Expect(AddLabelToPvc(context.Background(), pvc2, bslDeletionTestNs, label_2)).To(Succeed())
+				Expect(AddLabelToPvc(context.Background(), pvc1, bslDeletionTestNs, label1)).To(Succeed())
+				Expect(AddLabelToPvc(context.Background(), pvc2, bslDeletionTestNs, label2)).To(Succeed())
 			})
 
 			var BackupCfg BackupConfig
@@ -182,7 +182,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			BackupCfg.BackupLocation = backupLocation1
 			BackupCfg.UseVolumeSnapshots = useVolumeSnapshots
 			BackupCfg.DefaultVolumesToFsBackup = !useVolumeSnapshots
-			BackupCfg.Selector = label_1
+			BackupCfg.Selector = label1
 			By(fmt.Sprintf("Backup one of PV of sample workload by label-1 - Kibishii by the first BSL %s", backupLocation1), func() {
 				// TODO currently, the upgrade case covers the upgrade path from 1.6 to main and the velero v1.6 doesn't support "debug" command
 				// TODO move to "runDebug" after we bump up to 1.7 in the upgrade case
@@ -195,7 +195,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 
 			BackupCfg.BackupName = backupName2
 			BackupCfg.BackupLocation = backupLocation2
-			BackupCfg.Selector = label_2
+			BackupCfg.Selector = label2
 			By(fmt.Sprintf("Back up the other one PV of sample workload with label-2 into the additional BSL %s", backupLocation2), func() {
 				Expect(VeleroBackupNamespace(oneHourTimeout, veleroCfg.VeleroCLI,
 					veleroCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {
@@ -205,8 +205,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			})
 
 			if useVolumeSnapshots {
-				if veleroCfg.CloudProvider == Vsphere {
-					// TODO - remove after upload progress monitoring is implemented
+				if veleroCfg.HasVspherePlugin {
 					By("Waiting for vSphere uploads to complete", func() {
 						Expect(WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour,
 							bslDeletionTestNs, 2)).To(Succeed())
@@ -324,7 +323,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			// })
 
 			if useVolumeSnapshots {
-				if veleroCfg.CloudProvider == Vsphere {
+				if veleroCfg.HasVspherePlugin {
 					By(fmt.Sprintf("Snapshot in backup %s should still exist, because snapshot CR will be deleted 24 hours later if the status is a success", backupName2), func() {
 						Expect(SnapshotCRsCountShouldBe(context.Background(), bslDeletionTestNs,
 							backupName1, 1)).To(Succeed())
@@ -332,6 +331,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 							backupName2, 1)).To(Succeed())
 					})
 				}
+
 				var snapshotCheckPoint SnapshotCheckPoint
 				snapshotCheckPoint.NamespaceBackedUp = bslDeletionTestNs
 				By(fmt.Sprintf("Snapshot should not be deleted in cloud object store after deleting bsl %s", backupLocation1), func() {

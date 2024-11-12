@@ -124,14 +124,16 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			veleroCfg.GCFrequency = ""
 			By(fmt.Sprintf("Install the expected old version Velero (%s) for upgrade",
 				veleroCLI2Version.VeleroVersion), func() {
-				//Set VeleroImage and RestoreHelperImage to blank
-				//VeleroImage and RestoreHelperImage should be the default value in originalCli
 				tmpCfgForOldVeleroInstall := veleroCfg
 				tmpCfgForOldVeleroInstall.UpgradeFromVeleroVersion = veleroCLI2Version.VeleroVersion
 				tmpCfgForOldVeleroInstall.VeleroCLI = veleroCLI2Version.VeleroCLI
-				tmpCfgForOldVeleroInstall.VeleroImage = ""
-				tmpCfgForOldVeleroInstall.RestoreHelperImage = ""
-				tmpCfgForOldVeleroInstall.Plugins = ""
+
+				tmpCfgForOldVeleroInstall, err = SetImagesToDefaultValues(
+					tmpCfgForOldVeleroInstall,
+					veleroCLI2Version.VeleroVersion,
+				)
+				Expect(err).To(Succeed(), "Fail to set the images for upgrade-from Velero installation.")
+
 				tmpCfgForOldVeleroInstall.UploaderType = ""
 				version, err := GetVeleroVersion(oneHourTimeout, tmpCfgForOldVeleroInstall.VeleroCLI, true)
 				Expect(err).To(Succeed(), "Fail to get Velero version")
@@ -145,9 +147,6 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 					tmpCfgForOldVeleroInstall.UseRestic = !useVolumeSnapshots
 					tmpCfgForOldVeleroInstall.UseNodeAgent = false
 				}
-				//TODO: Remove this setting when upgrade path is from 1.13 to higher
-				//TODO: version, or self version 1.12 and older versions have no this parameter.
-				tmpCfgForOldVeleroInstall.WithoutDisableInformerCacheParam = true
 
 				Expect(VeleroInstall(context.Background(), &tmpCfgForOldVeleroInstall, false)).To(Succeed())
 				Expect(CheckVeleroVersion(context.Background(), tmpCfgForOldVeleroInstall.VeleroCLI,

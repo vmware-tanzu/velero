@@ -25,7 +25,6 @@ import (
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"golang.org/x/mod/semver"
 
 	. "github.com/vmware-tanzu/velero/test"
 	util "github.com/vmware-tanzu/velero/test/util/csi"
@@ -142,38 +141,12 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					if veleroCLI2Version.VeleroVersion == "self" {
 						veleroCLI2Version.VeleroCLI = veleroCfg.VeleroCLI
 					} else {
-						fmt.Printf("Using default images address of Velero CLI %s\n", veleroCLI2Version.VeleroVersion)
-						OriginVeleroCfg.VeleroImage = ""
-						OriginVeleroCfg.RestoreHelperImage = ""
-						OriginVeleroCfg.Plugins = ""
+						OriginVeleroCfg, err = SetImagesToDefaultValues(
+							OriginVeleroCfg,
+							veleroCLI2Version.VeleroVersion,
+						)
+						Expect(err).To(Succeed(), "Fail to set images for the migrate-from Velero installation.")
 
-						versionWithoutPatch := semver.MajorMinor(veleroCLI2Version.VeleroVersion)
-						// Read migration case needs plugins from the PluginsMatrix map.
-						migrationNeedPlugins, ok := PluginsMatrix[versionWithoutPatch]
-						Expect(ok).To(BeTrue())
-
-						if OriginVeleroCfg.CloudProvider == Azure {
-							OriginVeleroCfg.Plugins = migrationNeedPlugins[Azure][0]
-						}
-						if OriginVeleroCfg.CloudProvider == AWS {
-							OriginVeleroCfg.Plugins = migrationNeedPlugins[AWS][0]
-						}
-						// If HasVspherePlugin is false, only install the AWS plugin.
-						// If do nothing here, the default behavior is
-						// installing both AWS and vSphere plugins.
-						if OriginVeleroCfg.CloudProvider == Vsphere &&
-							!OriginVeleroCfg.HasVspherePlugin {
-							OriginVeleroCfg.Plugins = migrationNeedPlugins[AWS][0]
-						}
-						// Because Velero CSI plugin is deprecated in v1.14,
-						// only need to install it for version lower than v1.14.
-						if strings.Contains(OriginVeleroCfg.Features, FeatureCSI) &&
-							semver.Compare(versionWithoutPatch, "v1.14") < 0 {
-							OriginVeleroCfg.Plugins = OriginVeleroCfg.Plugins + "," + migrationNeedPlugins[CSI][0]
-						}
-						if OriginVeleroCfg.SnapshotMoveData && OriginVeleroCfg.CloudProvider == Azure {
-							OriginVeleroCfg.Plugins = OriginVeleroCfg.Plugins + "," + migrationNeedPlugins[AWS][0]
-						}
 						veleroCLI2Version.VeleroCLI, err = InstallVeleroCLI(veleroCLI2Version.VeleroVersion)
 						Expect(err).To(Succeed())
 					}

@@ -65,8 +65,15 @@ func GetKibishiiPVCNameList(workerCount int) []string {
 }
 
 // RunKibishiiTests runs kibishii tests on the provider.
-func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
-	useVolumeSnapshots, defaultVolumesToFsBackup bool) error {
+func RunKibishiiTests(
+	veleroCfg VeleroConfig,
+	backupName string,
+	restoreName string,
+	backupLocation string,
+	kibishiiNamespace string,
+	useVolumeSnapshots bool,
+	defaultVolumesToFsBackup bool,
+) error {
 	pvCount := len(KibishiiPVCNameList)
 	client := *veleroCfg.ClientToInstallVelero
 	oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)

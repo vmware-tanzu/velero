@@ -36,6 +36,7 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
+	"golang.org/x/mod/semver"
 	ver "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,67 +55,126 @@ const BackupObjectsPrefix = "backups"
 const RestoreObjectsPrefix = "restores"
 const PluginsObjectsPrefix = "plugins"
 
-var PluginsMatrix = map[string]map[string][]string{
+var ImagesMatrix = map[string]map[string][]string{
 	"v1.10": {
-		"aws":     {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.6.0"},
-		"azure":   {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.6.0"},
-		"vsphere": {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":     {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.6.0"},
-		"csi":     {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.4.0"},
+		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.6.0"},
+		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.6.0"},
+		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
+		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.6.0"},
+		"csi":                   {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.4.0"},
+		"velero":                {"gcr.io/velero-gcp/velero:v1.10.2"},
+		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.10.2"},
 	},
 	"v1.11": {
-		"aws":     {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.7.0"},
-		"azure":   {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.7.0"},
-		"vsphere": {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":     {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.7.0"},
-		"csi":     {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.5.0"},
+		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.7.0"},
+		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.7.0"},
+		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
+		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.7.0"},
+		"csi":                   {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.5.0"},
+		"velero":                {"gcr.io/velero-gcp/velero:v1.11.1"},
+		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.11.1"},
 	},
 	"v1.12": {
-		"aws":     {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.8.0"},
-		"azure":   {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.8.0"},
-		"vsphere": {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":     {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.8.0"},
-		"csi":     {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.6.0"},
+		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.8.0"},
+		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.8.0"},
+		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
+		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.8.0"},
+		"csi":                   {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.6.0"},
+		"velero":                {"gcr.io/velero-gcp/velero:v1.12.4"},
+		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.12.4"},
 	},
 	"v1.13": {
-		"aws":       {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.9.2"},
-		"azure":     {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.9.2"},
-		"vsphere":   {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":       {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.9.2"},
-		"csi":       {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.7.1"},
-		"datamover": {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.9.2"},
+		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.9.2"},
+		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.9.2"},
+		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.9.2"},
+		"csi":                   {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.7.1"},
+		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.9.2"},
+		"velero":                {"gcr.io/velero-gcp/velero:v1.13.2"},
+		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.13.2"},
 	},
 	"v1.14": {
-		"aws":       {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.10.1"},
-		"azure":     {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.10.1"},
-		"vsphere":   {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":       {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.10.1"},
-		"datamover": {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.10.1"},
+		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.10.1"},
+		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.10.1"},
+		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.10.1"},
+		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.10.1"},
+		"velero":                {"gcr.io/velero-gcp/velero:v1.14.1"},
+		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.14.1"},
 	},
 	"v1.15": {
-		"aws":       {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.11.0"},
-		"azure":     {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.11.0"},
-		"vsphere":   {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":       {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.11.0"},
-		"datamover": {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.11.0"},
+		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.11.0"},
+		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.11.0"},
+		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.11.0"},
+		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.11.0"},
+		"velero":                {"gcr.io/velero-gcp/velero:v1.15.0"},
+		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.15.0"},
 	},
 	"main": {
-		"aws":       {"gcr.io/velero-gcp/velero-plugin-for-aws:main"},
-		"azure":     {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:main"},
-		"vsphere":   {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":       {"gcr.io/velero-gcp/velero-plugin-for-gcp:main"},
-		"datamover": {"gcr.io/velero-gcp/velero-plugin-for-aws:main"},
+		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:main"},
+		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:main"},
+		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:main"},
+		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:main"},
+		"velero":                {"gcr.io/velero-gcp/velero:main"},
+		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:main"},
 	},
+}
+
+func SetImagesToDefaultValues(config VeleroConfig, version string) (VeleroConfig, error) {
+	fmt.Printf("Get the images for version %s\n", version)
+
+	ret := config
+
+	ret.Plugins = ""
+
+	versionWithoutPatch := semver.MajorMinor(version)
+	// Read migration case needs images from the PluginsMatrix map.
+	images, ok := ImagesMatrix[versionWithoutPatch]
+	if !ok {
+		return config, fmt.Errorf("fail to read the images for version %s from the ImagesMatrix",
+			versionWithoutPatch)
+	}
+
+	ret.VeleroImage = images[Velero][0]
+	ret.RestoreHelperImage = images[VeleroRestoreHelper][0]
+
+	if ret.CloudProvider == Azure {
+		ret.Plugins = images[Azure][0]
+	}
+	if ret.CloudProvider == AWS {
+		ret.Plugins = images[AWS][0]
+	}
+	// If HasVspherePlugin is false, only install the AWS plugin.
+	// If do nothing here, the default behavior is
+	// installing both AWS and vSphere plugins.
+	if ret.CloudProvider == Vsphere &&
+		!ret.HasVspherePlugin {
+		ret.Plugins = images[AWS][0]
+	}
+
+	// Because Velero CSI plugin is deprecated in v1.14,
+	// only need to install it for version lower than v1.14.
+	if strings.Contains(ret.Features, FeatureCSI) &&
+		semver.Compare(versionWithoutPatch, "v1.14") < 0 {
+		ret.Plugins = ret.Plugins + "," + images[CSI][0]
+	}
+	if ret.SnapshotMoveData && ret.CloudProvider == Azure {
+		ret.Plugins = ret.Plugins + "," + images[AWS][0]
+	}
+
+	return ret, nil
 }
 
 func getPluginsByVersion(version string, cloudProvider string, needDataMoverPlugin bool) ([]string, error) {
 	var cloudMap map[string][]string
 	arr := strings.Split(version, ".")
 	if len(arr) >= 3 {
-		cloudMap = PluginsMatrix[arr[0]+"."+arr[1]]
+		cloudMap = ImagesMatrix[arr[0]+"."+arr[1]]
 	}
 	if len(cloudMap) == 0 {
-		cloudMap = PluginsMatrix["main"]
+		cloudMap = ImagesMatrix["main"]
 		if len(cloudMap) == 0 {
 			return nil, errors.Errorf("fail to get plugins by version: main")
 		}
