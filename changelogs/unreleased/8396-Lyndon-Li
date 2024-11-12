@@ -1,0 +1,1 @@
+Fix issue #8391, check ErrCancelled from suffix of data mover pod's termination message
