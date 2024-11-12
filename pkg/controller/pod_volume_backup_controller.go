@@ -141,6 +141,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseInProgress
 	pvb.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
 	if err := r.Client.Patch(ctx, &pvb, client.MergeFrom(original)); err != nil {
+		r.closeDataPath(ctx, pvb.Name)
 		return r.errorOut(ctx, &pvb, err, "error updating PodVolumeBackup status", log)
 	}
 
@@ -150,11 +151,13 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		Name:      pvb.Spec.Pod.Name,
 	}
 	if err := r.Client.Get(ctx, podNamespacedName, &pod); err != nil {
+		r.closeDataPath(ctx, pvb.Name)
 		return r.errorOut(ctx, &pvb, err, fmt.Sprintf("getting pod %s/%s", pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name), log)
 	}
 
 	path, err := exposer.GetPodVolumeHostPath(ctx, &pod, pvb.Spec.Volume, r.Client, r.fileSystem, log)
 	if err != nil {
+		r.closeDataPath(ctx, pvb.Name)
 		return r.errorOut(ctx, &pvb, err, "error exposing host path for pod volume", log)
 	}
 
@@ -169,6 +172,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		RepositoryEnsurer: r.repositoryEnsurer,
 		CredentialGetter:  r.credentialGetter,
 	}); err != nil {
+		r.closeDataPath(ctx, pvb.Name)
 		return r.errorOut(ctx, &pvb, err, "error to initialize data path", log)
 	}
 
@@ -193,6 +197,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		ForceFull:      false,
 		Tags:           pvb.Spec.Tags,
 	}); err != nil {
+		r.closeDataPath(ctx, pvb.Name)
 		return r.errorOut(ctx, &pvb, err, "error starting data path backup", log)
 	}
 
@@ -361,7 +366,6 @@ func (r *PodVolumeBackupReconciler) closeDataPath(ctx context.Context, pvbName s
 }
 
 func (r *PodVolumeBackupReconciler) errorOut(ctx context.Context, pvb *velerov1api.PodVolumeBackup, err error, msg string, log logrus.FieldLogger) (ctrl.Result, error) {
-	r.closeDataPath(ctx, pvb.Name)
 	_ = UpdatePVBStatusToFailed(ctx, r.Client, pvb, err, msg, r.clock.Now(), log)
 
 	return ctrl.Result{}, err
