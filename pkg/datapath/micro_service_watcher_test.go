@@ -360,7 +360,7 @@ func TestStartWatch(t *testing.T) {
 					event: &v1.Event{Reason: EventReasonStopped},
 				},
 			},
-			terminationMessage:   ErrCancelled,
+			terminationMessage:   fmt.Sprintf("Failed to init data path service for DataUpload %s: %v", "fake-du-name", errors.New(ErrCancelled)),
 			expectStartEvent:     true,
 			expectTerminateEvent: true,
 			expectCancel:         true,
