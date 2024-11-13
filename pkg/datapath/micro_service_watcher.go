@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -321,7 +322,7 @@ func (ms *microServiceBRWatcher) startWatch() {
 		if lastPod.Status.Phase == v1.PodSucceeded {
 			ms.callbacks.OnCompleted(ms.ctx, ms.namespace, ms.taskName, funcGetResultFromMessage(ms.taskType, terminateMessage, ms.log))
 		} else {
-			if terminateMessage == ErrCancelled {
+			if strings.HasSuffix(terminateMessage, ErrCancelled) {
 				ms.callbacks.OnCancelled(ms.ctx, ms.namespace, ms.taskName)
 			} else {
 				ms.callbacks.OnFailed(ms.ctx, ms.namespace, ms.taskName, errors.New(terminateMessage))

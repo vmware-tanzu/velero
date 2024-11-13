@@ -264,7 +264,7 @@ The policies YAML config file would look like this:
         capacity: "10,100Gi"
         # pv matches specific csi driver
         csi:
-          driver: aws.ebs.csi.driver
+          driver: ebs.csi.aws.com
         # pv matches one of the storage class list
         storageClass:
           - gp2

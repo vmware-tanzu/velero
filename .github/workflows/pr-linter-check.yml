@@ -1,7 +1,12 @@
 name: Pull Request Linter Check
-on: [pull_request]
+on:
+  pull_request:
+    # Do not run when the change only includes these directories.
+    paths-ignore:
+      - "site/**"
+      - "design/**"
+      - "**/*.md"
 jobs:
-
   build:
     name: Run Linter Check
     runs-on: ubuntu-latest
