@@ -153,11 +153,7 @@ func (c *csiCondition) match(v *structuredVolume) bool {
 	}
 
 	if c.csi.Driver == "" { // match csi: {}
-		if v.csi != nil {
-			return true
-		} 
-
-		return false
+		return v.csi != nil
 	}
 
 	if v.csi == nil {
@@ -168,11 +164,11 @@ func (c *csiCondition) match(v *structuredVolume) bool {
 		return false
 	}
 
-	if c.csi.VolumeAttributes == nil || len(c.csi.VolumeAttributes) == 0 {
+	if len(c.csi.VolumeAttributes) == 0 {
 		return true
 	}
 
-	if v.csi.VolumeAttributes == nil || len(v.csi.VolumeAttributes) == 0 {
+	if len(v.csi.VolumeAttributes) == 0 {
 		return false
 	}
 
