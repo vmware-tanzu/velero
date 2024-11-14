@@ -1,8 +1,8 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: e2e-csi-storage-class
-provisioner: ebs.csi.aws.com
+  name: e2e-storage-class
+provisioner: kubernetes.io/aws-ebs
 parameters:
   type: gp2
 reclaimPolicy: Delete

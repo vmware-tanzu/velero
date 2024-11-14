@@ -61,6 +61,5 @@ func (n *NativeSnapshotVolumeInfo) Verify() error {
 	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
 	Expect(volumeInfo[0].NativeSnapshotInfo).NotTo(BeNil())
 
-	// Clean SC and VSC
-	return n.cleanResource()
+	return nil
 }

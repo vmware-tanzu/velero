@@ -139,7 +139,7 @@ var _ = AfterSuite(func() {
 			By("release test resources after testing")
 			ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer ctxCancel()
-			Expect(VeleroUninstall(ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
+			Expect(VeleroUninstall(ctx, VeleroCfg)).To(Succeed())
 		}
 	}
 })

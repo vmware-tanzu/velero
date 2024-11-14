@@ -100,7 +100,7 @@ func APIGroupVersionsTest() {
 			})
 			if InstallVelero {
 				By("Uninstall Velero in api group version case", func() {
-					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).NotTo(HaveOccurred())
+					Expect(VeleroUninstall(ctx, veleroCfg)).NotTo(HaveOccurred())
 				})
 			}
 		}
