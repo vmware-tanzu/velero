@@ -4,10 +4,10 @@ kind: StorageClass
 metadata:
   labels:
     addonmanager.kubernetes.io/mode: EnsureExists
-  name: e2e-csi-storage-class
+  name: e2e-storage-class
 parameters:
   type: pd-standard
-provisioner: pd.csi.storage.gke.io
+provisioner: kubernetes.io/gce-pd
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 

@@ -63,11 +63,6 @@ func (p *PVBackupFiltering) Init() error {
 }
 
 func (p *PVBackupFiltering) CreateResources() error {
-	err := InstallStorageClass(p.Ctx, fmt.Sprintf("../testdata/storage-class/%s.yaml", p.VeleroCfg.CloudProvider))
-	if err != nil {
-		return errors.Wrapf(err, "failed to install storage class for pv backup filtering test")
-	}
-
 	for _, ns := range *p.NSIncluded {
 		By(fmt.Sprintf("Create namespaces %s for workload\n", ns), func() {
 			Expect(CreateNamespace(p.Ctx, p.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))

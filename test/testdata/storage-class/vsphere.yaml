@@ -5,8 +5,7 @@ metadata:
   annotations:
     storageclass.kubernetes.io/is-default-class: "false"
 parameters:
-  #StoragePolicyName: "vSAN Default Storage Policy" # This is used for TKGm environment.
-  svStorageClass: worker-storagepolicy # This is used for TKGs/uTKG environment.
+  svStorageClass: worker-storagepolicy
 provisioner: csi.vsphere.vmware.com
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer

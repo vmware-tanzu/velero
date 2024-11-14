@@ -31,7 +31,6 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
-	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 type BackupVolumeInfo struct {
@@ -108,9 +107,6 @@ func (v *BackupVolumeInfo) CreateResources() error {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 
-		// Install StorageClass
-		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s-csi.yaml", v.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install StorageClass")
-
 		// Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", createNSName)
 		// Make sure PVC count is great than 3 to allow both empty volumes and file populated volumes exist per pod
@@ -120,7 +116,7 @@ func (v *BackupVolumeInfo) CreateResources() error {
 		var vols []*v1.Volume
 		for i := 0; i <= pvcCount-1; i++ {
 			pvcName := fmt.Sprintf("volume-info-pvc-%d", i)
-			pvc, err := CreatePVC(v.Client, createNSName, pvcName, CSIStorageClassName, nil)
+			pvc, err := CreatePVC(v.Client, createNSName, pvcName, StorageClassName, nil)
 			Expect(err).To(Succeed())
 			volumeName := fmt.Sprintf("volume-info-pv-%d", i)
 			vols = append(vols, CreateVolumes(pvc.Name, []string{volumeName})...)
@@ -158,12 +154,4 @@ func (v *BackupVolumeInfo) Destroy() error {
 	}
 
 	return WaitAllSelectedNSDeleted(v.Ctx, v.Client, "ns-test=true")
-}
-
-func (v *BackupVolumeInfo) cleanResource() error {
-	if err := DeleteStorageClass(v.Ctx, v.Client, CSIStorageClassName); err != nil {
-		return errors.Wrap(err, "fail to delete the StorageClass")
-	}
-
-	return nil
 }
