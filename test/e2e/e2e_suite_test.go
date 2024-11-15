@@ -103,6 +103,7 @@ func init() {
 	flag.StringVar(&VeleroCfg.DefaultCLSServiceAccountName, "default-cls-service-account-name", "", "default cluster service account name.")
 	flag.StringVar(&VeleroCfg.StandbyCLSServiceAccountName, "standby-cls-service-account-name", "", "standby cluster service account name.")
 	flag.BoolVar(&VeleroCfg.FailFast, "fail-fast", true, "a switch for failing fast on meeting error.")
+	flag.BoolVar(&VeleroCfg.HasVspherePlugin, "has-vsphere-plugin", false, "a switch for installing vSphere plugin.")
 }
 
 // Add label [SkipVanillaZfs]:
