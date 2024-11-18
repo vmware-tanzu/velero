@@ -67,6 +67,22 @@ func TestGetInheritedPodInfo(t *testing.T) {
 									Value: "value-2",
 								},
 							},
+							EnvFrom: []v1.EnvFromSource{
+								{
+									ConfigMapRef: &v1.ConfigMapEnvSource{
+										LocalObjectReference: v1.LocalObjectReference{
+											Name: "test-configmap",
+										},
+									},
+								},
+								{
+									SecretRef: &v1.SecretEnvSource{
+										LocalObjectReference: v1.LocalObjectReference{
+											Name: "test-secret",
+										},
+									},
+								},
+							},
 							VolumeMounts: []v1.VolumeMount{
 								{
 									Name: "volume-1",
@@ -114,6 +130,22 @@ func TestGetInheritedPodInfo(t *testing.T) {
 								{
 									Name:  "env-2",
 									Value: "value-2",
+								},
+							},
+							EnvFrom: []v1.EnvFromSource{
+								{
+									ConfigMapRef: &v1.ConfigMapEnvSource{
+										LocalObjectReference: v1.LocalObjectReference{
+											Name: "test-configmap",
+										},
+									},
+								},
+								{
+									SecretRef: &v1.SecretEnvSource{
+										LocalObjectReference: v1.LocalObjectReference{
+											Name: "test-secret",
+										},
+									},
 								},
 							},
 							VolumeMounts: []v1.VolumeMount{
@@ -191,6 +223,22 @@ func TestGetInheritedPodInfo(t *testing.T) {
 						Value: "value-2",
 					},
 				},
+				envFrom: []v1.EnvFromSource{
+					{
+						ConfigMapRef: &v1.ConfigMapEnvSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "test-configmap",
+							},
+						},
+					},
+					{
+						SecretRef: &v1.SecretEnvSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "test-secret",
+							},
+						},
+					},
+				},
 				volumeMounts: []v1.VolumeMount{
 					{
 						Name: "volume-1",
@@ -226,6 +274,22 @@ func TestGetInheritedPodInfo(t *testing.T) {
 					{
 						Name:  "env-2",
 						Value: "value-2",
+					},
+				},
+				envFrom: []v1.EnvFromSource{
+					{
+						ConfigMapRef: &v1.ConfigMapEnvSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "test-configmap",
+							},
+						},
+					},
+					{
+						SecretRef: &v1.SecretEnvSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "test-secret",
+							},
+						},
 					},
 				},
 				volumeMounts: []v1.VolumeMount{

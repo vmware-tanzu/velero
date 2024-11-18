@@ -70,6 +70,8 @@ func TestBuildMaintenanceJob(t *testing.T) {
 		logFormat       *logging.FormatFlag
 		expectedJobName string
 		expectedError   bool
+		expectedEnv     []v1.EnvVar
+		expectedEnvFrom []v1.EnvFromSource
 	}{
 		{
 			name: "Valid maintenance job",
@@ -93,6 +95,28 @@ func TestBuildMaintenanceJob(t *testing.T) {
 								{
 									Name:  "velero-repo-maintenance-container",
 									Image: "velero-image",
+									Env: []v1.EnvVar{
+										{
+											Name:  "test-name",
+											Value: "test-value",
+										},
+									},
+									EnvFrom: []v1.EnvFromSource{
+										{
+											ConfigMapRef: &v1.ConfigMapEnvSource{
+												LocalObjectReference: v1.LocalObjectReference{
+													Name: "test-configmap",
+												},
+											},
+										},
+										{
+											SecretRef: &v1.SecretEnvSource{
+												LocalObjectReference: v1.LocalObjectReference{
+													Name: "test-secret",
+												},
+											},
+										},
+									},
 								},
 							},
 						},
@@ -103,6 +127,28 @@ func TestBuildMaintenanceJob(t *testing.T) {
 			logFormat:       logging.NewFormatFlag(),
 			expectedJobName: "test-123-maintain-job",
 			expectedError:   false,
+			expectedEnv: []v1.EnvVar{
+				{
+					Name:  "test-name",
+					Value: "test-value",
+				},
+			},
+			expectedEnvFrom: []v1.EnvFromSource{
+				{
+					ConfigMapRef: &v1.ConfigMapEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "test-configmap",
+						},
+					},
+				},
+				{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "test-secret",
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "Error getting Velero server deployment",
@@ -190,6 +236,10 @@ func TestBuildMaintenanceJob(t *testing.T) {
 				assert.Equal(t, "velero-repo-maintenance-container", container.Name)
 				assert.Equal(t, "velero-image", container.Image)
 				assert.Equal(t, v1.PullIfNotPresent, container.ImagePullPolicy)
+
+				// Check container env
+				assert.Equal(t, tc.expectedEnv, container.Env)
+				assert.Equal(t, tc.expectedEnvFrom, container.EnvFrom)
 
 				// Check resources
 				expectedResources := v1.ResourceRequirements{

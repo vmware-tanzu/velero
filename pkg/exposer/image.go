@@ -31,6 +31,7 @@ type inheritedPodInfo struct {
 	image          string
 	serviceAccount string
 	env            []v1.EnvVar
+	envFrom        []v1.EnvFromSource
 	volumeMounts   []v1.VolumeMount
 	volumes        []v1.Volume
 	logLevelArgs   []string
@@ -53,6 +54,7 @@ func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veler
 	podInfo.serviceAccount = podSpec.ServiceAccountName
 
 	podInfo.env = podSpec.Containers[0].Env
+	podInfo.envFrom = podSpec.Containers[0].EnvFrom
 	podInfo.volumeMounts = podSpec.Containers[0].VolumeMounts
 	podInfo.volumes = podSpec.Volumes
 

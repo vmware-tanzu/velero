@@ -368,6 +368,9 @@ func (m *manager) buildMaintenanceJob(
 	// Get the environment variables from the Velero server deployment
 	envVars := veleroutil.GetEnvVarsFromVeleroServer(deployment)
 
+	// Get the referenced storage from the Velero server deployment
+	envFromSources := veleroutil.GetEnvFromSourcesFromVeleroServer(deployment)
+
 	// Get the volume mounts from the Velero server deployment
 	volumeMounts := veleroutil.GetVolumeMountsFromVeleroServer(deployment)
 
@@ -433,6 +436,7 @@ func (m *manager) buildMaintenanceJob(
 							Args:            args,
 							ImagePullPolicy: v1.PullIfNotPresent,
 							Env:             envVars,
+							EnvFrom:         envFromSources,
 							VolumeMounts:    volumeMounts,
 							Resources:       resources,
 						},

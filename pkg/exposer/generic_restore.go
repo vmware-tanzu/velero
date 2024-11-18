@@ -370,6 +370,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 					VolumeMounts:  volumeMounts,
 					VolumeDevices: volumeDevices,
 					Env:           podInfo.env,
+					EnvFrom:       podInfo.envFrom,
 					Resources:     resources,
 				},
 			},
