@@ -59,7 +59,10 @@ if [[ -z "${GIT_TREE_STATE}" ]]; then
     echo "GIT_TREE_STATE must be set"
     exit 1
 fi
-
+# verifies go cli has boring
+if [[ "${GOEXPERIMENT}" = "boringcrypto" ]]; then \
+    (go tool nm $(which go) | grep sig.BoringCrypto) || (echo "go CLI is not boringcrypto enabled"; exit 1)
+fi
 GCFLAGS=""
 if [[ ${DEBUG:-} = "1" ]]; then
     GCFLAGS="all=-N -l"
@@ -86,3 +89,13 @@ go build \
     -installsuffix "static" \
     -ldflags "${LDFLAGS}" \
     ${PKG}/cmd/${BIN}
+
+# verify fips
+if [[ -z "${GOEXPERIMENT:-}" ]]; then
+    GOEXPERIMENT=""
+fi
+if [[ ${GOEXPERIMENT} = "boringcrypto" ]]; then
+    # workaround for broken pipe is to write to file and grep file
+    tempfile=$(mktemp)
+    (go tool nm ${OUTPUT} > ${tempfile} && grep ${tempfile} -qe sig.BoringCrypto && rm ${tempfile} && echo "FIPS verified for ${OUTPUT}") || (echo "FIPS not found in ${OUTPUT}" && rm ${tempfile} && exit 1)
+fi

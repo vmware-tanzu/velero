@@ -25,6 +25,7 @@ ARG GIT_TREE_STATE
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
+ARG GOEXPERIMENT
 
 ENV CGO_ENABLED=0 \
     GO111MODULE=on \
@@ -32,12 +33,16 @@ ENV CGO_ENABLED=0 \
     GOOS=${TARGETOS} \
     GOARCH=${TARGETARCH} \
     GOARM=${TARGETVARIANT} \
+    GOEXPERIMENT=${GOEXPERIMENT} \
     LDFLAGS="-X ${PKG}/pkg/buildinfo.Version=${VERSION} -X ${PKG}/pkg/buildinfo.GitSHA=${GIT_SHA} -X ${PKG}/pkg/buildinfo.GitTreeState=${GIT_TREE_STATE} -X ${PKG}/pkg/buildinfo.ImageRegistry=${REGISTRY}"
 
 WORKDIR /go/src/github.com/vmware-tanzu/velero
+# verifies go cli has boring
+RUN if [ "${GOEXPERIMENT}" = "boringcrypto" ]; then \
+        go tool nm $(which go) | grep sig.BoringCrypto \
+    fi
 
 COPY . /go/src/github.com/vmware-tanzu/velero
-
 RUN mkdir -p /output/usr/bin && \
     export GOARM=$( echo "${GOARM}" | cut -c2-) && \
     go build -o /output/${BIN} \
@@ -55,13 +60,19 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 ARG RESTIC_VERSION
+ARG GOEXPERIMENT
 
 ENV CGO_ENABLED=0 \
     GO111MODULE=on \
     GOPROXY=${GOPROXY} \
     GOOS=${TARGETOS} \
     GOARCH=${TARGETARCH} \
-    GOARM=${TARGETVARIANT}
+    GOARM=${TARGETVARIANT} \
+    GOEXPERIMENT=${GOEXPERIMENT}
+# verifies go cli has boring
+RUN if [ "${GOEXPERIMENT}" = "boringcrypto" ]; then \
+        go tool nm $(which go) | grep sig.BoringCrypto \
+    fi
 
 COPY . /go/src/github.com/vmware-tanzu/velero
 
@@ -69,6 +80,21 @@ RUN mkdir -p /output/usr/bin && \
     export GOARM=$(echo "${GOARM}" | cut -c2-) && \
     /go/src/github.com/vmware-tanzu/velero/hack/build-restic.sh && \
     go clean -modcache -cache
+
+# validate that FIPS is enabled in the binaries
+FROM --platform=$BUILDPLATFORM golang:1.22-bookworm AS fips-validator
+ARG GOEXPERIMENT
+ARG BIN
+COPY --from=velero-builder /output /
+COPY --from=restic-builder /output /
+RUN if [ "${GOEXPERIMENT}" = "boringcrypto" ]; then \
+        go tool nm ${BIN} > ${BIN}nm && \
+        go tool nm velero-helper > velero-helpernm && \
+        go tool nm restic > resticnm && \
+        grep ${BIN}nm -qe sig.BoringCrypto && \
+        grep velero-helpernm -qe sig.BoringCrypto && \
+        grep resticnm -qe sig.BoringCrypto && \
+    fi
 
 # Velero image packing section
 FROM paketobuildpacks/run-jammy-tiny:latest

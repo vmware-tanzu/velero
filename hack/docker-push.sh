@@ -92,6 +92,11 @@ if [[ -z "$BUILDX_PLATFORMS" ]]; then
     BUILDX_PLATFORMS="linux/amd64,linux/arm64"
 fi
 
+# if SUFFIX is set, append it to the version
+if [[ -n "$SUFFIX" ]]; then
+    VERSION="$VERSION-$SUFFIX"
+fi
+
 # Debugging info
 echo "Highest tag found: $HIGHEST"
 echo "BRANCH: $BRANCH"

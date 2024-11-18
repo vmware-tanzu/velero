@@ -44,6 +44,21 @@ jobs:
         run: |
           IMAGE=velero VERSION=pr-test make container
           docker save velero:pr-test -o ./velero.tar
+  # validate boringcrypto
+  # make local uses build.sh that verifies boringcrypto
+  build-boring:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+      - name: Build Velero CLI
+        if: steps.cli-cache.outputs.cache-hit != 'true'
+        run: |
+          GOEXPERIMENT=boringcrypto make local
   # Create json of k8s versions to test
   # from guide: https://stackoverflow.com/a/65094398/4590470
   setup-test-matrix:

@@ -69,6 +69,7 @@ jobs:
           # Build and push Velero image to docker registry
           docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
           VERSION=$(./hack/docker-push.sh | grep 'VERSION:' | awk -F: '{print $2}' | xargs)
+          GOEXPERIMENT=boringcrypto SUFFIX=boringcrypto ./hack/docker-push.sh && echo published boringcrypto image
 
           # Upload Velero image package to GCS
           source hack/ci/build_util.sh

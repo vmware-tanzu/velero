@@ -121,7 +121,10 @@ GOOS = $(word 1, $(platform_temp))
 GOARCH = $(word 2, $(platform_temp))
 GOPROXY ?= https://proxy.golang.org
 GOBIN=$$(pwd)/.go/bin
-
+ifeq ($(GOEXPERIMENT), boringcrypto)
+	EE=$(shell echo hi)
+# $(shell (go tool nm $(shell which go) | grep "crypto/internal/boring/sig.BoringCrypto") || echo "go installed cannot use boringcrypto")
+endif
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-containers' rule.
 all:
@@ -143,6 +146,7 @@ local: build-dirs
 	GOOS=$(GOOS) \
 	GOARCH=$(GOARCH) \
 	GOBIN=$(GOBIN) \
+	GOEXPERIMENT=${GOEXPERIMENT} \
 	VERSION=$(VERSION) \
 	REGISTRY=$(REGISTRY) \
 	PKG=$(PKG) \
@@ -159,6 +163,7 @@ _output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
 	$(MAKE) shell CMD="-c '\
 		GOOS=$(GOOS) \
 		GOARCH=$(GOARCH) \
+		GOEXPERIMENT=${GOEXPERIMENT} \
 		GOBIN=$(GOBIN) \
 		VERSION=$(VERSION) \
 		REGISTRY=$(REGISTRY) \
@@ -204,6 +209,7 @@ endif
 	$(addprefix -t , $(IMAGE_TAGS)) \
 	$(addprefix -t , $(GCR_IMAGE_TAGS)) \
 	--build-arg=GOPROXY=$(GOPROXY) \
+	--build-arg=GOEXPERIMENT=$(GOEXPERIMENT) \
 	--build-arg=PKG=$(PKG) \
 	--build-arg=BIN=$(BIN) \
 	--build-arg=VERSION=$(VERSION) \
