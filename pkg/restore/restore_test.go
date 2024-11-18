@@ -58,6 +58,7 @@ import (
 	uploadermocks "github.com/vmware-tanzu/velero/pkg/podvolume/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/types"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	. "github.com/vmware-tanzu/velero/pkg/util/results"
 )
@@ -2292,10 +2293,11 @@ func TestShouldRestore(t *testing.T) {
 			h := newHarness(t)
 
 			ctx := &restoreContext{
-				log:                        h.log,
-				dynamicFactory:             client.NewDynamicFactory(h.DynamicClient),
-				namespaceClient:            h.KubeClient.CoreV1().Namespaces(),
-				resourceTerminatingTimeout: time.Millisecond,
+				log:                           h.log,
+				dynamicFactory:                client.NewDynamicFactory(h.DynamicClient),
+				namespaceClient:               h.KubeClient.CoreV1().Namespaces(),
+				resourceTerminatingTimeout:    time.Millisecond,
+				resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 			}
 
 			for _, resource := range tc.apiResources {
@@ -3711,9 +3713,10 @@ func newHarness(t *testing.T) *harness {
 			fileSystem:                 test.NewFakeFileSystem(),
 
 			// unsupported
-			podVolumeRestorerFactory: nil,
-			podVolumeTimeout:         0,
-			kbClient:                 kbClient,
+			podVolumeRestorerFactory:      nil,
+			podVolumeTimeout:              0,
+			kbClient:                      kbClient,
+			resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 		},
 		log: log,
 	}
@@ -3900,9 +3903,10 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		h := newHarness(t)
 
 		ctx := &restoreContext{
-			log:             h.log,
-			dynamicFactory:  client.NewDynamicFactory(h.DynamicClient),
-			namespaceClient: h.KubeClient.CoreV1().Namespaces(),
+			log:                           h.log,
+			dynamicFactory:                client.NewDynamicFactory(h.DynamicClient),
+			namespaceClient:               h.KubeClient.CoreV1().Namespaces(),
+			resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 		}
 
 		if test.apiResource != nil {
@@ -4019,7 +4023,8 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		h := newHarness(t)
 
 		ctx := &restoreContext{
-			log: h.log,
+			log:                           h.log,
+			resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 		}
 
 		if tc.vs != nil {
@@ -4119,9 +4124,10 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		h := newHarness(t)
 
 		ctx := &restoreContext{
-			log:      h.log,
-			kbClient: h.restorer.kbClient,
-			restore:  tc.restore,
+			log:                           h.log,
+			kbClient:                      h.restorer.kbClient,
+			restore:                       tc.restore,
+			resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 		}
 
 		if tc.duResult != nil {

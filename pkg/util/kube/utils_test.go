@@ -47,14 +47,16 @@ func TestNamespaceAndName(t *testing.T) {
 
 func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 	tests := []struct {
-		name                  string
-		expectNSFound         bool
-		nsPhase               corev1.NamespacePhase
-		nsDeleting            bool
-		expectCreate          bool
-		alreadyExists         bool
-		expectedResult        bool
-		expectedCreatedResult bool
+		name                          string
+		expectNSFound                 bool
+		nsPhase                       corev1.NamespacePhase
+		nsDeleting                    bool
+		expectCreate                  bool
+		alreadyExists                 bool
+		expectedResult                bool
+		expectedCreatedResult         bool
+		nsAlreadyInTerminationTracker bool
+		ResourceDeletionStatusTracker ResourceDeletionStatusTracker
 	}{
 		{
 			name:                  "namespace found, not deleting",
@@ -95,8 +97,17 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 			expectedResult:        false,
 			expectedCreatedResult: false,
 		},
+		{
+			name:                          "same namespace found earlier, terminating phase already tracked",
+			expectNSFound:                 true,
+			nsPhase:                       corev1.NamespaceTerminating,
+			expectedResult:                false,
+			expectedCreatedResult:         false,
+			nsAlreadyInTerminationTracker: true,
+		},
 	}
 
+	resourceDeletionStatusTracker := NewResourceDeletionStatusTracker()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			namespace := &corev1.Namespace{
@@ -132,7 +143,11 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 				nsClient.On("Create", namespace).Return(namespace, nil)
 			}
 
-			result, nsCreated, _ := EnsureNamespaceExistsAndIsReady(namespace, nsClient, timeout)
+			if test.nsAlreadyInTerminationTracker {
+				resourceDeletionStatusTracker.Add(namespace.Kind, "test", "test")
+			}
+
+			result, nsCreated, _ := EnsureNamespaceExistsAndIsReady(namespace, nsClient, timeout, resourceDeletionStatusTracker)
 
 			assert.Equal(t, test.expectedResult, result)
 			assert.Equal(t, test.expectedCreatedResult, nsCreated)
