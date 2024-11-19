@@ -198,6 +198,15 @@ container:
 ifneq ($(BUILDX_ENABLED), true)
 	$(error $(BUILDX_ERROR))
 endif
+	@docker buildx rm velero-$(BIN)-builder || true
+	@docker buildx create --use --name=velero-$(BIN)-builder
+	$(MAKE) container-linux
+
+	for osversion in $(ALL_OSVERSIONS.windows); do \
+		OSVERSION=$${osversion} $(MAKE) container-windows; \
+	done
+
+container-linux:
 	@docker buildx build --pull \
 	--output=type=$(BUILDX_OUTPUT_TYPE) \
 	--platform $(BUILDX_PLATFORMS) \
@@ -212,6 +221,23 @@ endif
 	--build-arg=REGISTRY=$(REGISTRY) \
 	--build-arg=RESTIC_VERSION=$(RESTIC_VERSION) \
 	-f $(VELERO_DOCKERFILE) .
+
+container-windows:
+	@docker buildx build --pull \
+	--output=type=$(BUILDX_OUTPUT_TYPE) \
+	--platform $(BUILDX_PLATFORMS) \
+	$(addprefix -t , $(IMAGE_TAGS)) \
+	$(addprefix -t , $(GCR_IMAGE_TAGS)) \
+	--build-arg=GOPROXY=$(GOPROXY) \
+	--build-arg=PKG=$(PKG) \
+	--build-arg=BIN=$(BIN) \
+	--build-arg=VERSION=$(VERSION) \
+	--build-arg=GIT_SHA=$(GIT_SHA) \
+	--build-arg=GIT_TREE_STATE=$(GIT_TREE_STATE) \
+	--build-arg=REGISTRY=$(REGISTRY) \
+	--build-arg=RESTIC_VERSION=$(RESTIC_VERSION) \
+	-f $(VELERO_DOCKERFILE) .
+
 	@echo "container: $(IMAGE):$(VERSION)"
 ifeq ($(BUILDX_OUTPUT_TYPE)_$(REGISTRY), registry_velero)
 	docker pull $(IMAGE):$(VERSION)
