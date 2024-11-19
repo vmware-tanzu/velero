@@ -42,7 +42,7 @@ jobs:
       - name: Build Velero Image
         if: steps.image-cache.outputs.cache-hit != 'true'
         run: |
-          SAVE_IMAGE=false IMAGE=velero VERSION=pr-test make container
+          IMAGE=velero VERSION=pr-test make container
           docker save velero:pr-test -o ./velero.tar
   # Create json of k8s versions to test
   # from guide: https://stackoverflow.com/a/65094398/4590470
