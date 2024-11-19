@@ -57,9 +57,9 @@ func CreateConfigMapFromYAMLData(c clientset.Interface, yamlData, cmName, namesp
 }
 
 // WaitForConfigMapComplete uses c to wait for completions to complete for the Job jobName in namespace ns.
-func WaitForConfigMapComplete(c clientset.Interface, ns, configmapName string) error {
+func WaitForConfigMapComplete(c clientset.Interface, ns, cmName string) error {
 	return wait.Poll(PollInterval, PollTimeout, func() (bool, error) {
-		_, err := c.CoreV1().ConfigMaps(ns).Get(context.TODO(), configmapName, metav1.GetOptions{})
+		_, err := c.CoreV1().ConfigMaps(ns).Get(context.TODO(), cmName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -67,13 +67,13 @@ func WaitForConfigMapComplete(c clientset.Interface, ns, configmapName string) e
 	})
 }
 
-func GetConfigmap(c clientset.Interface, ns, secretName string) (*v1.ConfigMap, error) {
+func GetConfigMap(c clientset.Interface, ns, secretName string) (*v1.ConfigMap, error) {
 	return c.CoreV1().ConfigMaps(ns).Get(context.TODO(), secretName, metav1.GetOptions{})
 }
 
 func DeleteConfigMap(c clientset.Interface, ns, name string) error {
 	if err := c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to delete  configmap in namespace %q", ns))
+		return errors.Wrap(err, fmt.Sprintf("failed to delete  ConfigMap in namespace %q", ns))
 	}
 	return nil
 }

@@ -250,7 +250,7 @@ func cleanVSpherePluginConfig(c clientset.Interface, ns, secretName, configMapNa
 	}
 
 	//clear configmap
-	_, err = k8s.GetConfigmap(c, ns, configMapName)
+	_, err = k8s.GetConfigMap(c, ns, configMapName)
 	if err == nil {
 		if err := k8s.WaitForConfigmapDelete(c, ns, configMapName); err != nil {
 			return errors.WithMessagef(err, "Failed to clear up vsphere plugin configmap in %s namespace", ns)
