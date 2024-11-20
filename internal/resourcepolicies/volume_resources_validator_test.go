@@ -280,7 +280,7 @@ func TestValidate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "supported format volume policies only csi volumeattributes",
+			name: "unsupported format volume policies only csi volumeattributes",
 			res: &ResourcePolicies{
 				Version: "v1",
 				VolumePolicies: []VolumePolicy{

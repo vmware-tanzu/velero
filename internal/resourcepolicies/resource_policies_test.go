@@ -93,7 +93,7 @@ func TestLoadResourcePolicies(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "supported formart volume policies",
+			name: "supported format volume policies",
 			yamlData: `version: v1
 volumePolicies:
   - conditions:
@@ -106,7 +106,7 @@ volumePolicies:
 			wantErr: false,
 		},
 		{
-			name: "supported formart csi driver with volumeAttributes for volume policies",
+			name: "supported format csi driver with volumeAttributes for volume policies",
 			yamlData: `version: v1
 volumePolicies:
   - conditions:
