@@ -13,10 +13,10 @@ As of Today, Velero resource policy already provides us the way to filter volume
   - User wants to back up AFS (Azure file shares) but only want to backup `SMB` type of file share volumes and not `NFS` file share volumes.
 
 ## Goals
+- We are only bringing additional support in the resource policy to only handle volumes during backup.
 - Introducing support for `VolumeAttributes` filter along with `driver` filter in CSI volume conditions to handle volumes.
  
 ## Non-Goals
-- We are only bringing additional support in the resource policy to only handle volumes during backup.
 - Currently, only handles volumes, and does not support other resources.
  
 ## Use-cases/Scenarios
