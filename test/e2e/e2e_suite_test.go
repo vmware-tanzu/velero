@@ -140,6 +140,9 @@ var _ = Describe("Service NodePort reservation during restore is configurable",
 var _ = Describe("Storage class of persistent volumes and persistent volume claims can be changed during restores",
 	Label("Basic", "StorageClass"), StorageClasssChangingTest)
 
+var _ = Describe("Changing BackupPVC Configuration for Data Movement Backup Operation",
+	Label("Basic", "backupPVCConfig"), BackupPVCConfigChangeTest)
+
 var _ = Describe("Node selectors of persistent volume claims can be changed during restores",
 	Label("Basic", "SelectedNode", "SKIP_KIND"), PVCSelectedNodeChangingTest)
 
