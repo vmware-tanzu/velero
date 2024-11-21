@@ -21,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
@@ -81,11 +80,6 @@ func (p *ParallelFilesUpload) Init() error {
 }
 
 func (p *ParallelFilesUpload) CreateResources() error {
-	err := InstallStorageClass(p.Ctx, fmt.Sprintf("../testdata/storage-class/%s.yaml", p.VeleroCfg.CloudProvider))
-	if err != nil {
-		return errors.Wrapf(err, "failed to install storage class for pv backup filtering test")
-	}
-
 	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
 		Expect(CreateNamespace(p.Ctx, p.Client, p.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", p.namespace))

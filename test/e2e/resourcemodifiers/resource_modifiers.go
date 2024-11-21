@@ -134,7 +134,7 @@ func (r *ResourceModifiersCase) Clean() error {
 	if CurrentSpecReport().Failed() && r.VeleroCfg.FailFast {
 		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
 	} else {
-		if err := DeleteConfigmap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
+		if err := DeleteConfigMap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
 			return err
 		}
 

@@ -8,6 +8,6 @@ metadata:
     snapshot.storage.kubernetes.io/is-default-class: "true"
   labels:
     velero.io/csi-volumesnapshot-class: "true"
-  name: volumesnapshotclass-delete
+  name: e2e-volume-snapshot-class
 parameters:
   svVolumeSnapshotClass: volumesnapshotclass-delete

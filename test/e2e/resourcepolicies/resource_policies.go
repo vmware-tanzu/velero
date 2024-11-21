@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package filtering
+package resourcepolicies
 
 import (
 	"fmt"
@@ -29,7 +29,6 @@ import (
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
-	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 const FileName = "test-data.txt"
@@ -101,10 +100,6 @@ func (r *ResourcePoliciesCase) Init() error {
 }
 
 func (r *ResourcePoliciesCase) CreateResources() error {
-	By(("Installing storage class..."), func() {
-		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", r.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
-	})
-
 	By(fmt.Sprintf("Create configmap %s in namespaces %s for workload\n", r.cmName, r.VeleroCfg.VeleroNamespace), func() {
 		Expect(CreateConfigMapFromYAMLData(r.Client.ClientGo, r.yamlConfig, r.cmName, r.VeleroCfg.VeleroNamespace)).To(Succeed(), fmt.Sprintf("Failed to create configmap %s in namespaces %s for workload\n", r.cmName, r.VeleroCfg.VeleroNamespace))
 	})
@@ -181,11 +176,7 @@ func (r *ResourcePoliciesCase) Clean() error {
 	if CurrentSpecReport().Failed() && r.VeleroCfg.FailFast {
 		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
 	} else {
-		if err := r.deleteTestStorageClassList([]string{StorageClassName, StorageClassName2}); err != nil {
-			return err
-		}
-
-		if err := DeleteConfigmap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
+		if err := DeleteConfigMap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
 			return err
 		}
 
@@ -244,15 +235,6 @@ func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) erro
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("failed to create file into pod %s in namespace: %q", pod.Name, namespace))
 			}
-		}
-	}
-	return nil
-}
-
-func (r *ResourcePoliciesCase) deleteTestStorageClassList(scList []string) error {
-	for _, v := range scList {
-		if err := DeleteStorageClass(r.Ctx, r.Client, v); err != nil {
-			return err
 		}
 	}
 	return nil

@@ -71,7 +71,7 @@ func GetConfigmap(c clientset.Interface, ns, secretName string) (*v1.ConfigMap, 
 	return c.CoreV1().ConfigMaps(ns).Get(context.TODO(), secretName, metav1.GetOptions{})
 }
 
-func DeleteConfigmap(c clientset.Interface, ns, name string) error {
+func DeleteConfigMap(c clientset.Interface, ns, name string) error {
 	if err := c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to delete  configmap in namespace %q", ns))
 	}
@@ -79,7 +79,7 @@ func DeleteConfigmap(c clientset.Interface, ns, name string) error {
 }
 
 func WaitForConfigmapDelete(c clientset.Interface, ns, name string) error {
-	if err := DeleteConfigmap(c, ns, name); err != nil {
+	if err := DeleteConfigMap(c, ns, name); err != nil {
 		return err
 	}
 

@@ -78,8 +78,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			By("Uninstall Velero", func() {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
-				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
-					veleroCfg.VeleroNamespace)).To(Succeed())
+				Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 			})
 		}
 	})
@@ -97,8 +96,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				By("Uninstall Velero", func() {
 					ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 					defer ctxCancel()
-					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
-						veleroCfg.VeleroNamespace)).To(Succeed())
+					Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 				})
 			}
 		}

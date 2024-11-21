@@ -616,9 +616,7 @@ func RunDebug(ctx context.Context, veleroCLI, veleroNamespace, backup, restore s
 	if len(backup) > 0 {
 		args = append(args, "--backup", backup)
 	}
-	if len(restore) > 0 {
-		//args = append(args, "--restore", restore)
-	}
+
 	fmt.Printf("Generating the debug tarball at %s\n", output)
 	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
 		fmt.Println(errors.Wrapf(err, "failed to run the debug command"))
@@ -1228,6 +1226,7 @@ func GetBackupsCreationTime(ctx context.Context, veleroCLI, bslName string) ([]s
 func GetAllBackups(ctx context.Context, veleroCLI string) ([]string, error) {
 	return GetBackupsFromBsl(ctx, veleroCLI, "")
 }
+
 func DeleteBslResource(ctx context.Context, veleroCLI string, bslName string) error {
 	args := []string{"backup-location", "delete", bslName, "--confirm"}
 
@@ -1431,6 +1430,7 @@ func VeleroUpgrade(ctx context.Context, veleroCfg VeleroConfig) error {
 	}
 	return waitVeleroReady(ctx, veleroCfg.VeleroNamespace, veleroCfg.UseNodeAgent)
 }
+
 func ApplyCRDs(ctx context.Context, veleroCLI string) ([]string, error) {
 	cmds := []*common.OsCommandLine{}
 
@@ -1629,20 +1629,32 @@ func GetVeleroPodName(ctx context.Context) ([]string, error) {
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
-func InstallTestStorageClasses(path string) error {
+// InstallStorageClasses create the "e2e-storage-class" and "e2e-storage-class-2"
+// StorageClasses for E2E tests.
+//
+// e2e-storage-class is the default StorageClass for E2E.
+// e2e-storage-class-2 is used for the StorageClass mapping test case.
+// Kibishii StorageClass is not covered here.
+func InstallStorageClasses(provider string) error {
 	ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer ctxCancel()
-	err := InstallStorageClass(ctx, path)
-	if err != nil {
+
+	storageClassFilePath := fmt.Sprintf("../testdata/storage-class/%s.yaml", provider)
+
+	if err := InstallStorageClass(ctx, storageClassFilePath); err != nil {
 		return err
 	}
-	content, err := os.ReadFile(path)
+	content, err := os.ReadFile(storageClassFilePath)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get %s when install storage class", path)
+		return errors.Wrapf(err, "failed to get %s when install storage class", storageClassFilePath)
 	}
 
-	// replace sc to new value
-	newContent := strings.ReplaceAll(string(content), fmt.Sprintf("name: %s", StorageClassName), fmt.Sprintf("name: %s", StorageClassName2))
+	// Replace the name to e2e-storage-class-2
+	newContent := strings.ReplaceAll(
+		string(content),
+		fmt.Sprintf("name: %s", StorageClassName),
+		fmt.Sprintf("name: %s", StorageClassName2),
+	)
 
 	tmpFile, err := os.CreateTemp("", "sc-file")
 	if err != nil {
