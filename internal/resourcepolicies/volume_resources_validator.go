@@ -71,7 +71,7 @@ func (c *nfsCondition) validate() error {
 
 func (c *csiCondition) validate() error {
 	if c != nil && c.csi != nil && c.csi.Driver == "" && c.csi.VolumeAttributes != nil {
-		return errors.New("csi driver should not be empty")
+		return errors.New("csi driver should not be empty when filtering by volume attributes")
 	}
 
 	return nil
