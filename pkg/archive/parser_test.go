@@ -32,6 +32,7 @@ func TestParse(t *testing.T) {
 		name       string
 		files      []string
 		dir        string
+		longNames  map[string]string
 		wantErrMsg error
 		want       map[string]*ResourceItems
 	}{
@@ -89,6 +90,59 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "a mix of long api name, long file name cluster-scoped and namespaced items across multiple resources are correctly returned",
+			dir:  "root-dir",
+			longNames: map[string]string{
+				"somesha256":        "item-1",
+				"longapinamesha256": "thelongestapinameyouhaveeverseenever",
+			},
+			files: []string{
+				"root-dir/resources/widgets.foo/cluster/somesha256.json",
+				"root-dir/resources/widgets.foo/cluster/item-2.json",
+				"root-dir/resources/widgets.foo/namespaces/ns-1/item-1.json",
+				"root-dir/resources/widgets.foo/namespaces/ns-1/item-2.json",
+				"root-dir/resources/widgets.foo/namespaces/ns-2/item-1.json",
+				"root-dir/resources/longapinamesha256/namespaces/ns-2/item-2.json",
+
+				"root-dir/resources/dongles.foo/cluster/item-3.json",
+				"root-dir/resources/dongles.foo/cluster/item-4.json",
+
+				"root-dir/resources/dongles.bar/namespaces/ns-3/item-3.json",
+				"root-dir/resources/dongles.bar/namespaces/ns-3/item-4.json",
+				"root-dir/resources/dongles.bar/namespaces/ns-4/item-5.json",
+				"root-dir/resources/dongles.bar/namespaces/ns-4/item-6.json",
+			},
+			want: map[string]*ResourceItems{
+				"widgets.foo": {
+					GroupResource: "widgets.foo",
+					ItemsByNamespace: map[string][]string{
+						"":     {"item-2", "item-1"},
+						"ns-1": {"item-1", "item-2"},
+						"ns-2": {"item-1"},
+					},
+				},
+				"thelongestapinameyouhaveeverseenever": {
+					GroupResource: "thelongestapinameyouhaveeverseenever",
+					ItemsByNamespace: map[string][]string{
+						"ns-2": {"item-2"},
+					},
+				},
+				"dongles.foo": {
+					GroupResource: "dongles.foo",
+					ItemsByNamespace: map[string][]string{
+						"": {"item-3", "item-4"},
+					},
+				},
+				"dongles.bar": {
+					GroupResource: "dongles.bar",
+					ItemsByNamespace: map[string][]string{
+						"ns-3": {"item-3", "item-4"},
+						"ns-4": {"item-5", "item-6"},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -108,7 +162,7 @@ func TestParse(t *testing.T) {
 				}
 			}
 
-			res, err := p.Parse(tc.dir)
+			res, err := p.Parse(tc.dir, tc.longNames)
 			if tc.wantErrMsg != nil {
 				assert.ErrorIs(t, err, tc.wantErrMsg, "Error should be: %v, got: %v", tc.wantErrMsg, err)
 			} else {
@@ -125,6 +179,7 @@ func TestParseGroupVersions(t *testing.T) {
 		files      []string
 		backupDir  string
 		wantErrMsg error
+		longNames  map[string]string
 		want       map[string]metav1.APIGroup
 	}{
 		{
@@ -203,6 +258,48 @@ func TestParseGroupVersions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:      "when resource directories and files have long names, they are correctly mapped and parsed",
+			backupDir: "/var/folders",
+			longNames: map[string]string{
+				"longhash123": "pods",
+				"longhash456": "deployments.apps",
+				"filehash789": "very-long-pod-name-that-exceeds-normal-length-limits-123456789",
+				"filehashABC": "another-long-deployment-name-with-many-characters-123456789",
+			},
+			files: []string{
+				"/var/folders/resources/longhash123/v1-preferredversion/namespaces/default/filehash789.json",
+				"/var/folders/resources/longhash456/v1-preferredversion/namespaces/default/filehashABC.json",
+			},
+			want: map[string]metav1.APIGroup{
+				"pods": {
+					Name: "",
+					Versions: []metav1.GroupVersionForDiscovery{
+						{
+							GroupVersion: "v1",
+							Version:      "v1",
+						},
+					},
+					PreferredVersion: metav1.GroupVersionForDiscovery{
+						GroupVersion: "v1",
+						Version:      "v1",
+					},
+				},
+				"deployments.apps": {
+					Name: "apps",
+					Versions: []metav1.GroupVersionForDiscovery{
+						{
+							GroupVersion: "apps/v1",
+							Version:      "v1",
+						},
+					},
+					PreferredVersion: metav1.GroupVersionForDiscovery{
+						GroupVersion: "apps/v1",
+						Version:      "v1",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -222,7 +319,7 @@ func TestParseGroupVersions(t *testing.T) {
 				}
 			}
 
-			res, err := p.ParseGroupVersions(tc.backupDir)
+			res, err := p.ParseGroupVersions(tc.backupDir, tc.longNames)
 			if tc.wantErrMsg != nil {
 				assert.ErrorIs(t, err, tc.wantErrMsg, "Error should be: %v, got: %v", tc.wantErrMsg, err)
 			} else {

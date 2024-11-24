@@ -59,7 +59,7 @@ func InvokeDeleteActions(ctx *Context) error {
 	}
 
 	// get items out of backup tarball into a temp directory
-	dir, err := archive.NewExtractor(ctx.Log, ctx.Filesystem).UnzipAndExtractBackup(ctx.BackupReader)
+	dir, longNames, err := archive.NewExtractor(ctx.Log, ctx.Filesystem).UnzipAndExtractBackup(ctx.BackupReader)
 	if err != nil {
 		return errors.Wrapf(err, "error extracting backup")
 	}
@@ -71,7 +71,7 @@ func InvokeDeleteActions(ctx *Context) error {
 
 	ctx.Log.Debugf("Downloaded and extracted the backup file to: %s", dir)
 
-	backupResources, err := archive.NewParser(ctx.Log, ctx.Filesystem).Parse(dir)
+	backupResources, err := archive.NewParser(ctx.Log, ctx.Filesystem).Parse(dir, longNames)
 	if existErr := errors.Is(err, archive.ErrNotExist); existErr {
 		ctx.Log.Debug("ignore invoking delete item actions: ", err)
 		return nil
