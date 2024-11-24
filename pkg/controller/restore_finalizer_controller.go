@@ -92,6 +92,7 @@ func NewRestoreFinalizerReconciler(
 func (r *restoreFinalizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Restore{}).
+		Named(constant.ControllerRestoreFinalizer).
 		Complete(r)
 }
 

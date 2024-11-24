@@ -90,6 +90,7 @@ func (c *gcReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			},
 		})).
 		WatchesRawSource(s).
+		Named(constant.ControllerGarbageCollection).
 		Complete(c)
 }
 
