@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func NewPeriodicalEnqueueSource(
@@ -66,7 +67,7 @@ type PeriodicalEnqueueSourceOption struct {
 }
 
 // Start enqueue items periodically
-func (p *PeriodicalEnqueueSource) Start(ctx context.Context, q workqueue.RateLimitingInterface) error {
+func (p *PeriodicalEnqueueSource) Start(ctx context.Context, q workqueue.TypedRateLimitingInterface[reconcile.Request]) error {
 	go wait.Until(func() {
 		p.logger.Debug("enqueueing resources ...")
 		// empty the list otherwise the result of the new list call will be appended
