@@ -46,6 +46,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
@@ -297,6 +298,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *restoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Restore{}).
+		Named(constant.ControllerRestore).
 		Complete(r)
 }
 
