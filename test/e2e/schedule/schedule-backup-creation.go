@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,7 +58,7 @@ func (s *ScheduleBackupCreation) Init() error {
 	s.pvcName = "pvc-1"
 	s.ScheduleArgs = []string{
 		"--include-namespaces", s.namespace,
-		"--schedule=*/" + fmt.Sprintf("%v", s.Period) + " * * * *",
+		"--schedule=*/" + strconv.Itoa(s.Period) + " * * * *",
 	}
 	Expect(s.Period).To(BeNumerically("<", 30))
 	return nil
