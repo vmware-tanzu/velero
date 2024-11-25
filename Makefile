@@ -101,9 +101,19 @@ RESTIC_VERSION ?= 0.15.0
 
 CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le
 BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
+# Whether or not buildx should push the image to the registry, applies to when BUILDX_PLATFORMS has multiple platforms below.
+# false by default because most people do not have credentials to $(REGISTRY) nor should they push from their local development machine.
+# once you have set $(REGISTRY) or $(IMAGE) and have credentials to those registries, you can set BUILDX_PUSH=true
 BUILDX_PUSH ?= false
-BUILDX_OUTPUT_TYPE ?= image$(subst false,,$(subst true,$(comma)push=true,$(BUILDX_PUSH)))
-
+# if BUILDX_PLATFORMS has multiple platforms, we need to use BUILDX_OUTPUT_TYPE=image and optionally BUILDX_OUTPUT_TYPE=image,push=true if BUILDX_PUSH is true
+# The default image store in Docker Engine doesn't support loading multi-platform images. So set BUILDX_PUSH=true to push the image to the registry if you need to use the
+# multi-platform output image. In the future, we may add containerd support for multi-platform images. https://docs.docker.com/engine/storage/containerd/
+# if BUILDX_PLATFORMS has only one platform, we can use BUILDX_OUTPUT_TYPE=docker to import the image to the local docker daemon
+ifeq ($(words $(subst $(comma), ,$(BUILDX_PLATFORMS))),1)
+	BUILDX_OUTPUT_TYPE ?= docker
+else
+	BUILDX_OUTPUT_TYPE ?= image$(subst false,,$(subst true,$(comma)push=true,$(BUILDX_PUSH)))
+endif
 # set git sha and tree state
 GIT_SHA = $(shell git rev-parse HEAD)
 ifneq ($(shell git status --porcelain 2> /dev/null),)
