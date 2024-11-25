@@ -1170,8 +1170,8 @@ func TestRestoreVolumeInfoResult(t *testing.T) {
 				pvcCSISnapshotMap: map[string]snapshotv1api.VolumeSnapshot{
 					"testNS/testPVC": *builder.ForVolumeSnapshot("sourceNS", "testCSISnapshot").
 						ObjectMeta(
-							builder.WithAnnotations(VolumeSnapshotHandleAnnotation, "csi-snap-001",
-								CSIDriverNameAnnotation, "test-csi-driver"),
+							builder.WithAnnotations(velerov1api.VolumeSnapshotHandleAnnotation, "csi-snap-001",
+								velerov1api.DriverNameAnnotation, "test-csi-driver"),
 						).SourceVolumeSnapshotContentName("test-vsc-001").
 						Status().RestoreSize("1Gi").Result(),
 				},
@@ -1269,7 +1269,7 @@ func TestRestoreVolumeInfoResult(t *testing.T) {
 					SnapshotDataMoved: true,
 					SnapshotDataMovementInfo: &SnapshotDataMovementInfo{
 						DataMover:      "velero",
-						UploaderType:   kopia,
+						UploaderType:   velerov1api.BackupRepositoryTypeKopia,
 						SnapshotHandle: "dd-snap-001",
 						OperationID:    "dd-operation-001",
 					},
@@ -1282,7 +1282,7 @@ func TestRestoreVolumeInfoResult(t *testing.T) {
 					SnapshotDataMoved: true,
 					SnapshotDataMovementInfo: &SnapshotDataMovementInfo{
 						DataMover:      "velero",
-						UploaderType:   kopia,
+						UploaderType:   velerov1api.BackupRepositoryTypeKopia,
 						SnapshotHandle: "dd-snap-002",
 						OperationID:    "dd-operation-002",
 					},
