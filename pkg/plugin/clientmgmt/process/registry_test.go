@@ -114,7 +114,9 @@ func TestReadPluginsDir(t *testing.T) {
 		WithFileAndMode("/plugins/nonexecutable2", []byte("plugin2"), 0644).
 		WithFileAndMode("/plugins/executable3", []byte("plugin3"), 0755).
 		WithFileAndMode("/plugins/nested/executable4", []byte("plugin4"), 0755).
-		WithFileAndMode("/plugins/nested/nonexecutable5", []byte("plugin4"), 0644)
+		WithFileAndMode("/plugins/nested/nonexecutable5", []byte("plugin4"), 0644).
+		WithFileAndMode("/plugins/nested/win-exe1.exe", []byte("plugin4"), 0600).
+		WithFileAndMode("/plugins/nested/WIN-EXE2.EXE", []byte("plugin4"), 0600)
 
 	plugins, err := r.readPluginsDir(dir)
 	require.NoError(t, err)
@@ -123,6 +125,8 @@ func TestReadPluginsDir(t *testing.T) {
 		"/plugins/executable1",
 		"/plugins/executable3",
 		"/plugins/nested/executable4",
+		"/plugins/nested/win-exe1.exe",
+		"/plugins/nested/WIN-EXE2.EXE",
 	}
 
 	sort.Strings(plugins)
