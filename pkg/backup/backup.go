@@ -1059,7 +1059,8 @@ func updateVolumeInfos(
 
 		for index := range volumeInfos {
 			if volumeInfos[index].PVCName == dataUpload.Spec.SourcePVC &&
-				volumeInfos[index].PVCNamespace == dataUpload.Spec.SourceNamespace {
+				volumeInfos[index].PVCNamespace == dataUpload.Spec.SourceNamespace &&
+				volumeInfos[index].SnapshotDataMovementInfo != nil {
 				if dataUpload.Status.CompletionTimestamp != nil {
 					volumeInfos[index].CompletionTimestamp = dataUpload.Status.CompletionTimestamp
 				}
