@@ -429,10 +429,15 @@ func DiagnosePV(pv *corev1api.PersistentVolume) string {
 	return diag
 }
 
-func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, nodeClient corev1client.CoreV1Interface,
+func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, blockAccess bool, nodeClient corev1client.CoreV1Interface,
 	storageClient storagev1.StorageV1Interface, log logrus.FieldLogger) (string, error) {
 	var nodeOS string
 	var scFsType string
+
+	if blockAccess {
+		log.Infof("Use linux node for block access for PVC %s/%s", pvc.Namespace, pvc.Name)
+		return NodeOSLinux, nil
+	}
 
 	if value := pvc.Annotations[KubeAnnSelectedNode]; value != "" {
 		os, err := GetNodeOS(context.Background(), value, nodeClient)

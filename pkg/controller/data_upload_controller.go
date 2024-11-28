@@ -803,14 +803,18 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			return nil, errors.Wrapf(err, "failed to get PVC %s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC)
 		}
 
-		nodeOS, err := kube.GetPVCAttachingNodeOS(pvc, r.kubeClient.CoreV1(), r.kubeClient.StorageV1(), r.logger)
+		accessMode := exposer.AccessModeFileSystem
+		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == corev1.PersistentVolumeBlock {
+			accessMode = exposer.AccessModeBlock
+		}
+
+		nodeOS, err := kube.GetPVCAttachingNodeOS(pvc, (accessMode == exposer.AccessModeBlock), r.kubeClient.CoreV1(), r.kubeClient.StorageV1(), r.logger)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get attaching node OS for PVC %s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC)
 		}
 
-		accessMode := exposer.AccessModeFileSystem
-		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == corev1.PersistentVolumeBlock {
-			accessMode = exposer.AccessModeBlock
+		if err := kube.HasNodeWithOS(context.Background(), nodeOS, r.kubeClient.CoreV1()); err != nil {
+			return nil, errors.Wrapf(err, "no appropriate node to run data upload for PVC %s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC)
 		}
 
 		hostingPodLabels := map[string]string{velerov1api.DataUploadLabel: du.Name}

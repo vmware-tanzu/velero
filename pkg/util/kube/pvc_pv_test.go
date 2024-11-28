@@ -1610,6 +1610,7 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 		name           string
 		pvc            *corev1api.PersistentVolumeClaim
 		kubeClientObj  []runtime.Object
+		blockAccess    bool
 		expectedNodeOS string
 		err            string
 	}{
@@ -1662,6 +1663,12 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 			},
 			expectedNodeOS: NodeOSWindows,
 		},
+		{
+			name:           "block access",
+			pvc:            pvcObjWithBoth,
+			blockAccess:    true,
+			expectedNodeOS: NodeOSLinux,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -1669,7 +1676,7 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 
 			var kubeClient kubernetes.Interface = fakeKubeClient
 
-			nodeOS, err := GetPVCAttachingNodeOS(test.pvc, kubeClient.CoreV1(), kubeClient.StorageV1(), velerotest.NewLogger())
+			nodeOS, err := GetPVCAttachingNodeOS(test.pvc, test.blockAccess, kubeClient.CoreV1(), kubeClient.StorageV1(), velerotest.NewLogger())
 
 			if err != nil {
 				assert.EqualError(t, err, test.err)
