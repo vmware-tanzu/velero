@@ -127,6 +127,10 @@ func setupPolicy(ctx context.Context, rep repo.RepositoryWriter, sourceInfo snap
 		curPolicy.UploadPolicy.ParallelUploadAboveSize = newOptionalInt64(2 << 30)
 	}
 
+	if runtime.GOOS == "windows" {
+		curPolicy.FilesPolicy.IgnoreRules = []string{"/System Volume Information/", "/$Recycle.Bin/"}
+	}
+
 	err := setPolicyFunc(ctx, rep, sourceInfo, curPolicy)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to set policy")
