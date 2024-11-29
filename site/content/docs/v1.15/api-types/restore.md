@@ -115,7 +115,7 @@ spec:
   # that should be applied to resources before restoration. Optional
   resourceModifier:
     kind: ConfigMap
-    name: resource-modifier-config
+    name: resource-modifier-configmap
   # Actions to perform during or post restore. The only hooks currently supported are
   # adding an init container to a pod before it can be restored and executing a command in a
   # restored pod's container. Optional.
