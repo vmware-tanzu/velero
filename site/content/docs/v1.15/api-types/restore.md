@@ -114,7 +114,6 @@ spec:
   # ResourceModifier specifies the reference to JSON resource patches
   # that should be applied to resources before restoration. Optional
   resourceModifier:
-    apiVersion: v1
     kind: ConfigMap
     name: resource-modifier-config
   # Actions to perform during or post restore. The only hooks currently supported are
