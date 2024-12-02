@@ -999,11 +999,6 @@ func TestMaxHookWait(t *testing.T) {
 }
 
 func TestRestoreHookTrackerUpdate(t *testing.T) {
-	type change struct {
-		// delta to wait since last change applied or pod added
-		wait    time.Duration
-		updated *v1.Pod
-	}
 	type expectedExecution struct {
 		hook  *velerov1api.ExecHook
 		name  string
