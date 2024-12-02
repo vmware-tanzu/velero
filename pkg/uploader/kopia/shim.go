@@ -237,7 +237,7 @@ func (sr *shimRepository) Flush(ctx context.Context) error {
 	return sr.udmRepo.Flush(ctx)
 }
 
-func (sr *shimRepository) ConcatenateObjects(ctx context.Context, objectIDs []object.ID) (object.ID, error) {
+func (sr *shimRepository) ConcatenateObjects(ctx context.Context, objectIDs []object.ID, opt repo.ConcatenateOptions) (object.ID, error) {
 	if len(objectIDs) == 0 {
 		return object.EmptyID, errors.New("object list is empty")
 	}
