@@ -50,7 +50,6 @@ Below are the input parameters that are configurable to meet different build pur
 - BUILD_OUTPUT_TYPE: the type of output for the build, i.e., `docker`, `tar`, `registry`, while `docker` and `tar` is for local build; `registry` means push build. Default value is `docker`  
 - BUILD_OS: which types of OS should be built for. Multiple values are accepted, e.g., `linux,windows`. Default value is `linux`  
 - BUILD_ARCH: which types of architecture should be built for. Multiple values are accepted, e.g., `amd64,arm64`. Default value is `amd64`  
-- BUILD_TAG_GCR: whether to build and push GCR images. GCR images are not likely required during Dev cycle, so the default value is `false`  
 
 ## Windows Build
 
