@@ -490,7 +490,7 @@ func CleanupVolumeSnapshot(
 		vs,
 	)
 	if err != nil {
-		log.Debugf("Failed to get volumesnapshot %s/%s", volSnap.Namespace, volSnap.Name)
+		log.Infof("Failed to get volumesnapshot %s/%s", volSnap.Namespace, volSnap.Name)
 		return
 	}
 
@@ -502,13 +502,13 @@ func CleanupVolumeSnapshot(
 			crClient,
 		)
 		if err != nil {
-			log.Debugf("Failed to patch DeletionPolicy of volume snapshot %s/%s",
+			log.Infof("Failed to patch DeletionPolicy of volume snapshot %s/%s",
 				vs.Namespace, vs.Name)
 		}
 	}
 	err = crClient.Delete(context.TODO(), vs)
 	if err != nil {
-		log.Debugf("Failed to delete volumesnapshot %s/%s: %v", vs.Namespace, vs.Name, err)
+		log.Infof("Failed to delete volumesnapshot %s/%s: %v", vs.Namespace, vs.Name, err)
 	} else {
 		log.Infof("Deleted volumesnapshot with volumesnapshotContent %s/%s",
 			vs.Namespace, vs.Name)
@@ -701,6 +701,10 @@ func WaitUntilVSCHandleIsReady(
 				crclient.ObjectKeyFromObject(volSnap),
 				vs,
 			); err != nil {
+				// if not found, do not error out yet, we want to retry Get until timeout
+				if apierrors.IsNotFound(err) {
+					return false, nil
+				}
 				return false,
 					errors.Wrapf(err, fmt.Sprintf(
 						"failed to get volumesnapshot %s/%s",
