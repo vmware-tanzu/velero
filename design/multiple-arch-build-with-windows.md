@@ -76,7 +76,7 @@ The built image could be listed by `docker image ls`.
 
 **Local build for linux-amd64 and windows-amd64 to tar**
 ```
-BUILDX_OUTPUT_TYPE=tar BUILD_OS=linux,windows make container
+BUILD_OUTPUT_TYPE=tar BUILD_OS=linux,windows make container
 ```
 Under `_output` directory, below files are generated:  
 ```
@@ -86,7 +86,7 @@ velero-main-windows-ltsc2022-amd64.tar
 
 **Local build for linux-amd64, linux-arm64 and windows-amd64 to tar**
 ```
-BUILDX_OUTPUT_TYPE=tar BUILD_OS=linux,windows BUILD_ARCH=amd64,arm64 make container
+BUILD_OUTPUT_TYPE=tar BUILD_OS=linux,windows BUILD_ARCH=amd64,arm64 make container
 ```
 Under `_output` directory, below files are generated:  
 ```
@@ -98,7 +98,7 @@ velero-main-windows-ltsc2022-amd64.tar
 **Push build for linux-amd64 and windows-amd64**  
 Prerequisite: login to registry, e.g., through `docker login`  
 ```
-BUILDX_OUTPUT_TYPE=registry REGISTRY=<registry> BUILD_OS=linux,windows make container
+BUILD_OUTPUT_TYPE=registry REGISTRY=<registry> BUILD_OS=linux,windows make container
 ```
 Nothing is available locally, in the registry 3 tags are available:
 ```
@@ -110,7 +110,7 @@ velero/velero:main-linux-amd64
 **Push build for linux-amd64, linux-arm64 and windows-amd64**  
 Prerequisite: login to registry, e.g., through `docker login` 
 ```
-BUILDX_OUTPUT_TYPE=registry REGISTRY=<registry> BUILD_OS=linux,windows BUILD_ARCH=amd64,arm64 make container
+BUILD_OUTPUT_TYPE=registry REGISTRY=<registry> BUILD_OS=linux,windows BUILD_ARCH=amd64,arm64 make container
 ```
 Nothing is available locally, in the registry 4 tags are available:
 ```

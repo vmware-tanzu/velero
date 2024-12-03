@@ -1,4 +1,4 @@
-# Copyright 2020 the Velero contributors.
+# Copyright the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,8 +38,6 @@ ENV CGO_ENABLED=0 \
 
 WORKDIR /go/src/github.com/vmware-tanzu/velero
 
-RUN apt-get update && apt-get install -y jq
-
 COPY . /go/src/github.com/vmware-tanzu/velero
 
 RUN mkdir -p /output/usr/bin && \
@@ -52,7 +50,6 @@ RUN mkdir -p /output/usr/bin && \
 
 # Velero image packing section
 FROM mcr.microsoft.com/windows/nanoserver:${OS_VERSION}
-ENTRYPOINT [ "velero.exe" ]
 COPY --from=velero-builder /output /
 
 USER ContainerUser
