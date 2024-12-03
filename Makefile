@@ -471,7 +471,7 @@ go-generate:
 # make new-changelog CHANGELOG_BODY="Changes you have made"
 new-changelog: GH_LOGIN ?= $(shell gh pr view --json author --jq .author.login 2> /dev/null)
 new-changelog: GH_PR_NUMBER ?= $(shell gh pr view --json number --jq .number 2> /dev/null)
-new-changelog: CHANGELOG_BODY ?= "$(shell gh pr view --json title --jq .title)"
+new-changelog: CHANGELOG_BODY ?= '$(shell gh pr view --json title --jq .title)'
 new-changelog:
 	@if [ "$(GH_LOGIN)" = "" ]; then \
 		echo "branch does not have PR or cli not logged in, try 'gh auth login' or 'gh pr create'"; \
@@ -479,4 +479,4 @@ new-changelog:
 	fi
 	@mkdir -p ./changelogs/unreleased/ && \
 	echo $(CHANGELOG_BODY) > ./changelogs/unreleased/$(GH_PR_NUMBER)-$(GH_LOGIN) && \
-	echo "\"$(CHANGELOG_BODY)\" added to ./changelogs/unreleased/$(GH_PR_NUMBER)-$(GH_LOGIN)"
+	echo \"$(CHANGELOG_BODY)\" added to "./changelogs/unreleased/$(GH_PR_NUMBER)-$(GH_LOGIN)"

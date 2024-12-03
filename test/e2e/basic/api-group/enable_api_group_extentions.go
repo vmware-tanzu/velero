@@ -83,13 +83,11 @@ func APIExtensionsVersionsTest() {
 					ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 					defer ctxCancel()
 					Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
-					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
-						veleroCfg.VeleroNamespace)).To(Succeed())
+					Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 					Expect(DeleteCRDByName(context.Background(), crdName)).To(Succeed())
 
 					Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyClusterContext)).To(Succeed())
-					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
-						veleroCfg.VeleroNamespace)).To(Succeed())
+					Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 					Expect(DeleteCRDByName(context.Background(), crdName)).To(Succeed())
 				})
 			}

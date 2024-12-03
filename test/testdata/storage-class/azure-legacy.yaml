@@ -1,8 +1,8 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: e2e-csi-storage-class
-provisioner: disk.csi.azure.com
+  name: e2e-storage-class
+provisioner: kubernetes.io/azure-disk
 parameters:
   cachingmode: ReadOnly
   kind: Managed

@@ -93,20 +93,32 @@ func TestLoadResourcePolicies(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "supported formart volume policies",
+			name: "supported format volume policies",
 			yamlData: `version: v1
-	volumePolicies:
-	- conditions:
-		capacity: "0,100Gi"
-		csi:
-		  driver: aws.efs.csi.driver
-		nfs: {}
-		storageClass:
-		- gp2
-		- ebs-sc
-	  action:
-		type: skip`,
-			wantErr: true,
+volumePolicies:
+  - conditions:
+      capacity: '0,100Gi'
+      csi:
+        driver: aws.efs.csi.driver
+    action:
+      type: skip
+`,
+			wantErr: false,
+		},
+		{
+			name: "supported format csi driver with volumeAttributes for volume policies",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      capacity: '0,100Gi'
+      csi:
+        driver: aws.efs.csi.driver
+        volumeAttributes:
+          key1: value1
+    action:
+      type: skip
+`,
+			wantErr: false,
 		},
 	}
 	for _, tc := range testCases {
@@ -132,6 +144,16 @@ func TestGetResourceMatchedAction(t *testing.T) {
 					"csi": interface{}(
 						map[string]interface{}{
 							"driver": "aws.efs.csi.driver",
+						}),
+				},
+			},
+			{
+				Action: Action{Type: "skip"},
+				Conditions: map[string]interface{}{
+					"csi": interface{}(
+						map[string]interface{}{
+							"driver":           "files.csi.driver",
+							"volumeAttributes": map[string]string{"protocol": "nfs"},
 						}),
 				},
 			},
@@ -171,6 +193,24 @@ func TestGetResourceMatchedAction(t *testing.T) {
 				csi:          &csiVolumeSource{Driver: "aws.efs.csi.driver"},
 			},
 			expectedAction: &Action{Type: "skip"},
+		},
+		{
+			name: "match policy AFS NFS",
+			volume: &structuredVolume{
+				capacity:     *resource.NewQuantity(5<<30, resource.BinarySI),
+				storageClass: "afs-nfs",
+				csi:          &csiVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"protocol": "nfs"}},
+			},
+			expectedAction: &Action{Type: "skip"},
+		},
+		{
+			name: "match policy AFS SMB",
+			volume: &structuredVolume{
+				capacity:     *resource.NewQuantity(5<<30, resource.BinarySI),
+				storageClass: "afs-smb",
+				csi:          &csiVolumeSource{Driver: "files.csi.driver"},
+			},
+			expectedAction: nil,
 		},
 		{
 			name: "both matches return the first policy",
@@ -226,7 +266,7 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 			Namespace: "test-namespace",
 		},
 		Data: map[string]string{
-			"test-data": "version: v1\nvolumePolicies:\n- conditions:\n    capacity: '0,10Gi'\n  action:\n    type: skip",
+			"test-data": "version: v1\nvolumePolicies:\n  - conditions:\n      capacity: '0,10Gi'\n      csi:\n        driver: disks.csi.driver\n    action:\n      type: skip\n  - conditions:\n      csi:\n        driver: files.csi.driver\n        volumeAttributes:\n          protocol: nfs\n    action:\n      type: skip",
 		},
 	}
 
@@ -236,13 +276,27 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 
 	// Check that the returned resourcePolicies object contains the expected data
 	assert.Equal(t, "v1", resPolicies.version)
-	assert.Len(t, resPolicies.volumePolicies, 1)
+	assert.Len(t, resPolicies.volumePolicies, 2)
 	policies := ResourcePolicies{
 		Version: "v1",
 		VolumePolicies: []VolumePolicy{
 			{
 				Conditions: map[string]interface{}{
 					"capacity": "0,10Gi",
+					"csi": map[string]interface{}{
+						"driver": "disks.csi.driver",
+					},
+				},
+				Action: Action{
+					Type: Skip,
+				},
+			},
+			{
+				Conditions: map[string]interface{}{
+					"csi": map[string]interface{}{
+						"driver":           "files.csi.driver",
+						"volumeAttributes": map[string]string{"protocol": "nfs"},
+					},
 				},
 				Action: Action{
 					Type: Skip,
@@ -298,7 +352,173 @@ volumePolicies:
 			skip: false,
 		},
 		{
-			name: "csi not configured",
+			name: "Skip AFS CSI condition with Disk volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: files.csi.driver
+    action:
+      type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "disks.csi.driver"},
+					}},
+			},
+			skip: false,
+		},
+		{
+			name: "Skip AFS CSI condition with AFS volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: files.csi.driver
+    action:
+      type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver"},
+					}},
+			},
+			skip: true,
+		},
+		{
+			name: "Skip AFS NFS CSI condition with Disk volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip
+`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "disks.csi.driver"},
+					}},
+			},
+			skip: false,
+		},
+		{
+			name: "Skip AFS NFS CSI condition with AFS SMB volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip
+`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
+					}},
+			},
+			skip: false,
+		},
+		{
+			name: "Skip AFS NFS CSI condition with AFS NFS volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip
+`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"protocol": "nfs"}},
+					}},
+			},
+			skip: true,
+		},
+		{
+			name: "Skip Disk and AFS NFS CSI condition with Disk volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: disks.csi.driver
+    action:
+      type: skip
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "disks.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
+					}},
+			},
+			skip: true,
+		},
+		{
+			name: "Skip Disk and AFS NFS CSI condition with AFS SMB volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: disks.csi.driver
+    action:
+      type: skip
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
+					}},
+			},
+			skip: false,
+		},
+		{
+			name: "Skip Disk and AFS NFS CSI condition with AFS NFS volumes",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      csi:
+        driver: disks.csi.driver
+    action:
+      type: skip
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip`,
+			vol: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1", "protocol": "nfs"}},
+					}},
+			},
+			skip: true,
+		},
+		{
+			name: "csi not configured and testing capacity condition",
 			yamlData: `version: v1
 volumePolicies:
 - conditions:

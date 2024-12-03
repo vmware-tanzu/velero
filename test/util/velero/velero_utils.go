@@ -37,6 +37,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 	"golang.org/x/mod/semver"
+	"k8s.io/apimachinery/pkg/labels"
 	ver "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -334,7 +335,7 @@ func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace st
 
 func checkSchedulePhase(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string) error {
 	return wait.PollImmediate(time.Second*5, time.Minute*2, func() (bool, error) {
-		checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
+		checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-o", "json")
 		jsonBuf, err := common.CMDExecWithOutput(checkCMD)
 		if err != nil {
 			return false, err
@@ -354,7 +355,7 @@ func checkSchedulePhase(ctx context.Context, veleroCLI, veleroNamespace, schedul
 }
 
 func checkSchedulePause(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string, pause bool) error {
-	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
+	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-o", "json")
 	jsonBuf, err := common.CMDExecWithOutput(checkCMD)
 	if err != nil {
 		return err
@@ -372,7 +373,7 @@ func checkSchedulePause(ctx context.Context, veleroCLI, veleroNamespace, schedul
 	return nil
 }
 func CheckScheduleWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string, order map[string]string) error {
-	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-ojson")
+	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-o", "json")
 	jsonBuf, err := common.CMDExecWithOutput(checkCMD)
 	if err != nil {
 		return err
@@ -393,8 +394,8 @@ func CheckScheduleWithResourceOrder(ctx context.Context, veleroCLI, veleroNamesp
 	}
 }
 
-func CheckBackupWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespace, backupName string, order map[string]string) error {
-	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "get", "backup", backupName, "-ojson")
+func CheckBackupWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespace, backupName string, orderResources map[string]string) error {
+	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "get", "backup", backupName, "-o", "json")
 	jsonBuf, err := common.CMDExecWithOutput(checkCMD)
 	if err != nil {
 		return err
@@ -407,10 +408,10 @@ func CheckBackupWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespac
 	if backup.Status.Phase != velerov1api.BackupPhaseCompleted {
 		return errors.Errorf("Unexpected restore phase got %s, expecting %s", backup.Status.Phase, velerov1api.BackupPhaseCompleted)
 	}
-	if reflect.DeepEqual(backup.Spec.OrderedResources, order) {
+	if reflect.DeepEqual(backup.Spec.OrderedResources, orderResources) {
 		return nil
 	} else {
-		return fmt.Errorf("resource order %v set in backup command is not equal with order %v stored in backup cr", order, backup.Spec.OrderedResources)
+		return fmt.Errorf("resource order %v set in backup command is not equal with order %v stored in backup cr", orderResources, backup.Spec.OrderedResources)
 	}
 }
 
@@ -452,7 +453,7 @@ func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace strin
 			args = append(args, "--snapshot-volumes=false")
 		} // if "--snapshot-volumes" is not provide, snapshot should be taken as default behavior.
 	} else { // DefaultVolumesToFsBackup is false
-		// Althrough DefaultVolumesToFsBackup is false, but probably DefaultVolumesToFsBackup
+		// Although DefaultVolumesToFsBackup is false, but probably DefaultVolumesToFsBackup
 		// was set to true in installation CLI in snapshot volume test, so set DefaultVolumesToFsBackup
 		// to false specifically to make sure volume snapshot was taken
 		if backupCfg.UseVolumeSnapshots {
@@ -462,7 +463,7 @@ func VeleroBackupNamespace(ctx context.Context, veleroCLI, veleroNamespace strin
 				args = append(args, "--default-volumes-to-fs-backup=false")
 			}
 		}
-		// Also Althrough DefaultVolumesToFsBackup is false, but probably DefaultVolumesToFsBackup
+		// Although DefaultVolumesToFsBackup is false, but probably DefaultVolumesToFsBackup
 		// was set to true in installation CLI in FS volume backup test, so do nothing here, no DefaultVolumesToFsBackup
 		// appear in backup CLI
 	}
@@ -616,9 +617,7 @@ func RunDebug(ctx context.Context, veleroCLI, veleroNamespace, backup, restore s
 	if len(backup) > 0 {
 		args = append(args, "--backup", backup)
 	}
-	if len(restore) > 0 {
-		//args = append(args, "--restore", restore)
-	}
+
 	fmt.Printf("Generating the debug tarball at %s\n", output)
 	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
 		fmt.Println(errors.Wrapf(err, "failed to run the debug command"))
@@ -1183,51 +1182,35 @@ func GetLatestSuccessBackupsFromBSL(ctx context.Context, veleroCLI, bslName stri
 	return backups[0], nil
 }
 
-func GetScheduledBackupsCreationTime(ctx context.Context, veleroCLI, bslName, scheduleName string) ([]string, error) {
-	var creationTimes []string
-	backups, err := GetBackupsCreationTime(ctx, veleroCLI, bslName)
-	if err != nil {
-		return nil, err
-	}
-	for _, b := range backups {
-		if strings.Contains(b, scheduleName) {
-			creationTimes = append(creationTimes, b)
-		}
-	}
-	return creationTimes, nil
-}
-func GetBackupsCreationTime(ctx context.Context, veleroCLI, bslName string) ([]string, error) {
-	args1 := []string{"get", "backups"}
-	createdTime := "$1,\",\" $5,$6,$7,$8"
-	if strings.TrimSpace(bslName) != "" {
-		args1 = append(args1, "-l", "velero.io/storage-location="+bslName)
-	}
-	cmds := []*common.OsCommandLine{}
+func GetBackupsForSchedule(
+	ctx context.Context,
+	client kbclient.Client,
+	scheduleName string,
+	namespace string,
+) ([]velerov1api.Backup, error) {
+	backupList := new(velerov1api.BackupList)
 
-	cmd := &common.OsCommandLine{
-		Cmd:  veleroCLI,
-		Args: args1,
+	if err := client.List(
+		ctx,
+		backupList,
+		&kbclient.ListOptions{
+			Namespace: namespace,
+			LabelSelector: labels.SelectorFromSet(map[string]string{
+				velerov1api.ScheduleNameLabel: scheduleName,
+			}),
+		},
+	); err != nil {
+		return nil, fmt.Errorf("failed to list backup in %s namespace for schedule %s: %s",
+			namespace, scheduleName, err.Error())
 	}
-	cmds = append(cmds, cmd)
 
-	cmd = &common.OsCommandLine{
-		Cmd:  "awk",
-		Args: []string{"{print " + createdTime + "}"},
-	}
-	cmds = append(cmds, cmd)
-
-	cmd = &common.OsCommandLine{
-		Cmd:  "tail",
-		Args: []string{"-n", "+2"},
-	}
-	cmds = append(cmds, cmd)
-
-	return common.GetListByCmdPipes(ctx, cmds)
+	return backupList.Items, nil
 }
 
 func GetAllBackups(ctx context.Context, veleroCLI string) ([]string, error) {
 	return GetBackupsFromBsl(ctx, veleroCLI, "")
 }
+
 func DeleteBslResource(ctx context.Context, veleroCLI string, bslName string) error {
 	args := []string{"backup-location", "delete", bslName, "--confirm"}
 
@@ -1431,6 +1414,7 @@ func VeleroUpgrade(ctx context.Context, veleroCfg VeleroConfig) error {
 	}
 	return waitVeleroReady(ctx, veleroCfg.VeleroNamespace, veleroCfg.UseNodeAgent)
 }
+
 func ApplyCRDs(ctx context.Context, veleroCLI string) ([]string, error) {
 	cmds := []*common.OsCommandLine{}
 
@@ -1629,20 +1613,32 @@ func GetVeleroPodName(ctx context.Context) ([]string, error) {
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
-func InstallTestStorageClasses(path string) error {
+// InstallStorageClasses create the "e2e-storage-class" and "e2e-storage-class-2"
+// StorageClasses for E2E tests.
+//
+// e2e-storage-class is the default StorageClass for E2E.
+// e2e-storage-class-2 is used for the StorageClass mapping test case.
+// Kibishii StorageClass is not covered here.
+func InstallStorageClasses(provider string) error {
 	ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer ctxCancel()
-	err := InstallStorageClass(ctx, path)
-	if err != nil {
+
+	storageClassFilePath := fmt.Sprintf("../testdata/storage-class/%s.yaml", provider)
+
+	if err := InstallStorageClass(ctx, storageClassFilePath); err != nil {
 		return err
 	}
-	content, err := os.ReadFile(path)
+	content, err := os.ReadFile(storageClassFilePath)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get %s when install storage class", path)
+		return errors.Wrapf(err, "failed to get %s when install storage class", storageClassFilePath)
 	}
 
-	// replace sc to new value
-	newContent := strings.ReplaceAll(string(content), fmt.Sprintf("name: %s", StorageClassName), fmt.Sprintf("name: %s", StorageClassName2))
+	// Replace the name to e2e-storage-class-2
+	newContent := strings.ReplaceAll(
+		string(content),
+		fmt.Sprintf("name: %s", StorageClassName),
+		fmt.Sprintf("name: %s", StorageClassName2),
+	)
 
 	tmpFile, err := os.CreateTemp("", "sc-file")
 	if err != nil {
