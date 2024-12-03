@@ -136,11 +136,7 @@ func (kp *kopiaProvider) RunBackup(
 	})
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
 	kpUploader := snapshotfs.NewUploader(repoWriter)
-	progress := new(kopia.Progress)
-	progress.InitThrottle(backupProgressCheckInterval)
-	progress.Updater = updater
-	progress.Log = log
-	kpUploader.Progress = progress
+	kpUploader.Progress = kopia.NewProgress(updater, backupProgressCheckInterval, log)
 	kpUploader.FailFast = true
 	quit := make(chan struct{})
 	log.Info("Starting backup")
@@ -222,9 +218,7 @@ func (kp *kopiaProvider) RunRestore(
 	})
 
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
-	progress := new(kopia.Progress)
-	progress.InitThrottle(restoreProgressCheckInterval)
-	progress.Updater = updater
+	progress := kopia.NewProgress(updater, restoreProgressCheckInterval, log)
 	restoreCancel := make(chan struct{})
 	quit := make(chan struct{})
 
