@@ -23,6 +23,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+
+	"github.com/kopia/kopia/snapshot/snapshotfs"
 )
 
 // Throttle throttles controlle the interval of output result
@@ -41,11 +43,6 @@ func (t *Throttle) ShouldOutput() bool {
 	return false
 }
 
-func (p *Progress) InitThrottle(interval time.Duration) {
-	p.outputThrottle.throttle = 0
-	p.outputThrottle.interval = interval
-}
-
 // Progress represents a backup or restore counters.
 type Progress struct {
 	// all int64 must precede all int32 due to alignment requirements on ARM
@@ -59,13 +56,29 @@ type Progress struct {
 	ignoredErrorCount int32 //the total errors has ignored
 	// +checkatomic
 	fatalErrorCount     int32 //the total errors has occurred
-	estimatedFileCount  int32 // +checklocksignore the total count of files to be processed
+	estimatedFileCount  int64 // +checklocksignore the total count of files to be processed
 	estimatedTotalBytes int64 // +checklocksignore	the total size of files to be processed
 	// +checkatomic
-	processedBytes int64                    // which statistic all bytes has been processed currently
-	outputThrottle Throttle                 // which control the frequency of update progress
-	Updater        uploader.ProgressUpdater //which kopia progress will call the UpdateProgress interface, the third party will implement the interface to do the progress update
-	Log            logrus.FieldLogger       // output info into log when backup
+	processedBytes  int64                    // which statistic all bytes has been processed currently
+	outputThrottle  Throttle                 // which control the frequency of update progress
+	updater         uploader.ProgressUpdater //which kopia progress will call the UpdateProgress interface, the third party will implement the interface to do the progress update
+	log             logrus.FieldLogger       // output info into log when backup
+	estimationParam snapshotfs.EstimationParameters
+}
+
+func NewProgress(updater uploader.ProgressUpdater, interval time.Duration, log logrus.FieldLogger) *Progress {
+	return &Progress{
+		outputThrottle: Throttle{
+			throttle: 0,
+			interval: interval,
+		},
+		updater: updater,
+		estimationParam: snapshotfs.EstimationParameters{
+			Type:              snapshotfs.EstimationTypeClassic,
+			AdaptiveThreshold: 300000,
+		},
+		log: log,
+	}
 }
 
 // UploadedBytes the total bytes has uploaded currently
@@ -80,17 +93,17 @@ func (p *Progress) UploadedBytes(numBytes int64) {
 func (p *Progress) Error(path string, err error, isIgnored bool) {
 	if isIgnored {
 		atomic.AddInt32(&p.ignoredErrorCount, 1)
-		p.Log.Warnf("Ignored error when processing %v: %v", path, err)
+		p.log.Warnf("Ignored error when processing %v: %v", path, err)
 	} else {
 		atomic.AddInt32(&p.fatalErrorCount, 1)
-		p.Log.Errorf("Error when processing %v: %v", path, err)
+		p.log.Errorf("Error when processing %v: %v", path, err)
 	}
 }
 
 // EstimatedDataSize statistic the total size of files to be processed and total files to be processed
-func (p *Progress) EstimatedDataSize(fileCount int, totalBytes int64) {
+func (p *Progress) EstimatedDataSize(fileCount int64, totalBytes int64) {
 	atomic.StoreInt64(&p.estimatedTotalBytes, totalBytes)
-	atomic.StoreInt32(&p.estimatedFileCount, int32(fileCount))
+	atomic.StoreInt64(&p.estimatedFileCount, fileCount)
 
 	p.UpdateProgress()
 }
@@ -98,7 +111,7 @@ func (p *Progress) EstimatedDataSize(fileCount int, totalBytes int64) {
 // UpdateProgress which calls Updater UpdateProgress interface, update progress by third-party implementation
 func (p *Progress) UpdateProgress() {
 	if p.outputThrottle.ShouldOutput() {
-		p.Updater.UpdateProgress(&uploader.Progress{TotalBytes: p.estimatedTotalBytes, BytesDone: p.processedBytes})
+		p.updater.UpdateProgress(&uploader.Progress{TotalBytes: p.estimatedTotalBytes, BytesDone: p.processedBytes})
 	}
 }
 
@@ -153,3 +166,11 @@ func (p *Progress) ProgressBytes(processedBytes int64, totalBytes int64) {
 }
 
 func (p *Progress) FinishedFile(fname string, err error) {}
+
+func (p *Progress) EstimationParameters() snapshotfs.EstimationParameters {
+	return p.estimationParam
+}
+
+func (p *Progress) Enabled() bool {
+	return true
+}
