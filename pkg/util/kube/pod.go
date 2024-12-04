@@ -262,7 +262,7 @@ func DiagnosePod(pod *corev1api.Pod) string {
 	diag := fmt.Sprintf("Pod %s/%s, phase %s, node name %s\n", pod.Namespace, pod.Name, pod.Status.Phase, pod.Spec.NodeName)
 
 	for _, condition := range pod.Status.Conditions {
-		diag += fmt.Sprintf("Pod condition %s, reason %s, message %s\n", condition.Type, condition.Reason, condition.Message)
+		diag += fmt.Sprintf("Pod condition %s, status %s, reason %s, message %s\n", condition.Type, condition.Status, condition.Reason, condition.Message)
 	}
 
 	return diag

@@ -959,3 +959,403 @@ func Test_csiSnapshotExposer_createBackupPVC(t *testing.T) {
 		})
 	}
 }
+
+func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
+	backup := &velerov1.Backup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: velerov1.SchemeGroupVersion.String(),
+			Kind:       "Backup",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			UID:       "fake-uid",
+		},
+	}
+
+	backupPodWithoutNodeName := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: backup.APIVersion,
+					Kind:       backup.Kind,
+					Name:       backup.Name,
+					UID:        backup.UID,
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:    corev1.PodInitialized,
+					Status:  corev1.ConditionTrue,
+					Message: "fake-pod-message",
+				},
+			},
+		},
+	}
+
+	backupPodWithNodeName := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: backup.APIVersion,
+					Kind:       backup.Kind,
+					Name:       backup.Name,
+					UID:        backup.UID,
+				},
+			},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "fake-node",
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:    corev1.PodInitialized,
+					Status:  corev1.ConditionTrue,
+					Message: "fake-pod-message",
+				},
+			},
+		},
+	}
+
+	backupPVCWithoutVolumeName := corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: backup.APIVersion,
+					Kind:       backup.Kind,
+					Name:       backup.Name,
+					UID:        backup.UID,
+				},
+			},
+		},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Phase: corev1.ClaimPending,
+		},
+	}
+
+	backupPVCWithVolumeName := corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: backup.APIVersion,
+					Kind:       backup.Kind,
+					Name:       backup.Name,
+					UID:        backup.UID,
+				},
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			VolumeName: "fake-pv",
+		},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Phase: corev1.ClaimPending,
+		},
+	}
+
+	backupPV := corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-pv",
+		},
+		Status: corev1.PersistentVolumeStatus{
+			Phase:   corev1.VolumePending,
+			Message: "fake-pv-message",
+		},
+	}
+
+	readyToUse := false
+	vscMessage := "fake-vsc-message"
+	backupVSC := snapshotv1api.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-vsc",
+		},
+		Status: &snapshotv1api.VolumeSnapshotContentStatus{
+			ReadyToUse: &readyToUse,
+			Error: &snapshotv1api.VolumeSnapshotError{
+				Message: &vscMessage,
+			},
+		},
+	}
+
+	backupVSWithoutStatus := snapshotv1api.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: backup.APIVersion,
+					Kind:       backup.Kind,
+					Name:       backup.Name,
+					UID:        backup.UID,
+				},
+			},
+		},
+	}
+
+	backupVSWithoutVSC := snapshotv1api.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: backup.APIVersion,
+					Kind:       backup.Kind,
+					Name:       backup.Name,
+					UID:        backup.UID,
+				},
+			},
+		},
+		Status: &snapshotv1api.VolumeSnapshotStatus{},
+	}
+
+	vsMessage := "fake-vs-message"
+	backupVSWithVSC := snapshotv1api.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: backup.APIVersion,
+					Kind:       backup.Kind,
+					Name:       backup.Name,
+					UID:        backup.UID,
+				},
+			},
+		},
+		Status: &snapshotv1api.VolumeSnapshotStatus{
+			BoundVolumeSnapshotContentName: &backupVSC.Name,
+			Error: &snapshotv1api.VolumeSnapshotError{
+				Message: &vsMessage,
+			},
+		},
+	}
+
+	nodeAgentPod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "node-agent-pod-1",
+			Labels:    map[string]string{"name": "node-agent"},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "fake-node",
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+		},
+	}
+
+	tests := []struct {
+		name              string
+		ownerBackup       *velerov1.Backup
+		kubeClientObj     []runtime.Object
+		snapshotClientObj []runtime.Object
+		expected          string
+	}{
+		{
+			name:        "no pod, pvc, vs",
+			ownerBackup: backup,
+			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+error getting backup pod fake-backup, err: pods "fake-backup" not found
+error getting backup pvc fake-backup, err: persistentvolumeclaims "fake-backup" not found
+error getting backup vs fake-backup, err: volumesnapshots.snapshot.storage.k8s.io "fake-backup" not found
+***************************end diagnose CSI exposer[velero/fake-backup]***************************
+`,
+		},
+		{
+			name:        "pod without node name, pvc without volume name, vs without status",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				&backupPodWithoutNodeName,
+				&backupPVCWithoutVolumeName,
+			},
+			snapshotClientObj: []runtime.Object{
+				&backupVSWithoutStatus,
+			},
+			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+Pod velero/fake-backup, phase Pending, node name 
+Pod condition Initialized, status True, reason , message fake-pod-message
+PVC velero/fake-backup, phase Pending, binding to 
+VS velero/fake-backup, bind to , readyToUse false, errMessage 
+***************************end diagnose CSI exposer[velero/fake-backup]***************************
+`,
+		},
+		{
+			name:        "pod without node name, pvc without volume name, vs without VSC",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				&backupPodWithoutNodeName,
+				&backupPVCWithoutVolumeName,
+			},
+			snapshotClientObj: []runtime.Object{
+				&backupVSWithoutVSC,
+			},
+			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+Pod velero/fake-backup, phase Pending, node name 
+Pod condition Initialized, status True, reason , message fake-pod-message
+PVC velero/fake-backup, phase Pending, binding to 
+VS velero/fake-backup, bind to , readyToUse false, errMessage 
+***************************end diagnose CSI exposer[velero/fake-backup]***************************
+`,
+		},
+		{
+			name:        "pod with node name, no node agent",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				&backupPodWithNodeName,
+				&backupPVCWithoutVolumeName,
+			},
+			snapshotClientObj: []runtime.Object{
+				&backupVSWithoutVSC,
+			},
+			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+Pod velero/fake-backup, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+node-agent is not running in node fake-node
+PVC velero/fake-backup, phase Pending, binding to 
+VS velero/fake-backup, bind to , readyToUse false, errMessage 
+***************************end diagnose CSI exposer[velero/fake-backup]***************************
+`,
+		},
+		{
+			name:        "pod with node name, node agent is running",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				&backupPodWithNodeName,
+				&backupPVCWithoutVolumeName,
+				&nodeAgentPod,
+			},
+			snapshotClientObj: []runtime.Object{
+				&backupVSWithoutVSC,
+			},
+			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+Pod velero/fake-backup, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+PVC velero/fake-backup, phase Pending, binding to 
+VS velero/fake-backup, bind to , readyToUse false, errMessage 
+***************************end diagnose CSI exposer[velero/fake-backup]***************************
+`,
+		},
+		{
+			name:        "pvc with volume name, no pv",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				&backupPodWithNodeName,
+				&backupPVCWithVolumeName,
+				&nodeAgentPod,
+			},
+			snapshotClientObj: []runtime.Object{
+				&backupVSWithoutVSC,
+			},
+			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+Pod velero/fake-backup, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+PVC velero/fake-backup, phase Pending, binding to fake-pv
+error getting backup pv fake-pv, err: persistentvolumes "fake-pv" not found
+VS velero/fake-backup, bind to , readyToUse false, errMessage 
+***************************end diagnose CSI exposer[velero/fake-backup]***************************
+`,
+		},
+		{
+			name:        "pvc with volume name, pv exists",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				&backupPodWithNodeName,
+				&backupPVCWithVolumeName,
+				&backupPV,
+				&nodeAgentPod,
+			},
+			snapshotClientObj: []runtime.Object{
+				&backupVSWithoutVSC,
+			},
+			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+Pod velero/fake-backup, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+PVC velero/fake-backup, phase Pending, binding to fake-pv
+PV fake-pv, phase Pending, reason , message fake-pv-message
+VS velero/fake-backup, bind to , readyToUse false, errMessage 
+***************************end diagnose CSI exposer[velero/fake-backup]***************************
+`,
+		},
+		{
+			name:        "vs with vsc, vsc doesn't exist",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				&backupPodWithNodeName,
+				&backupPVCWithVolumeName,
+				&backupPV,
+				&nodeAgentPod,
+			},
+			snapshotClientObj: []runtime.Object{
+				&backupVSWithVSC,
+			},
+			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+Pod velero/fake-backup, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+PVC velero/fake-backup, phase Pending, binding to fake-pv
+PV fake-pv, phase Pending, reason , message fake-pv-message
+VS velero/fake-backup, bind to fake-vsc, readyToUse false, errMessage fake-vs-message
+error getting backup vsc fake-vsc, err: volumesnapshotcontents.snapshot.storage.k8s.io "fake-vsc" not found
+***************************end diagnose CSI exposer[velero/fake-backup]***************************
+`,
+		},
+		{
+			name:        "vs with vsc, vsc exists",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				&backupPodWithNodeName,
+				&backupPVCWithVolumeName,
+				&backupPV,
+				&nodeAgentPod,
+			},
+			snapshotClientObj: []runtime.Object{
+				&backupVSWithVSC,
+				&backupVSC,
+			},
+			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+Pod velero/fake-backup, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+PVC velero/fake-backup, phase Pending, binding to fake-pv
+PV fake-pv, phase Pending, reason , message fake-pv-message
+VS velero/fake-backup, bind to fake-vsc, readyToUse false, errMessage fake-vs-message
+VSC fake-vsc, readyToUse false, errMessage fake-vsc-message, handle 
+***************************end diagnose CSI exposer[velero/fake-backup]***************************
+`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(tt.kubeClientObj...)
+			fakeSnapshotClient := snapshotFake.NewSimpleClientset(tt.snapshotClientObj...)
+			e := &csiSnapshotExposer{
+				kubeClient:        fakeKubeClient,
+				csiSnapshotClient: fakeSnapshotClient.SnapshotV1(),
+				log:               velerotest.NewLogger(),
+			}
+			var ownerObject corev1.ObjectReference
+			if tt.ownerBackup != nil {
+				ownerObject = corev1.ObjectReference{
+					Kind:       tt.ownerBackup.Kind,
+					Namespace:  tt.ownerBackup.Namespace,
+					Name:       tt.ownerBackup.Name,
+					UID:        tt.ownerBackup.UID,
+					APIVersion: tt.ownerBackup.APIVersion,
+				}
+			}
+
+			diag := e.DiagnoseExpose(context.Background(), ownerObject)
+			assert.Equal(t, tt.expected, diag)
+		})
+	}
+}
