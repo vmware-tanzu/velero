@@ -208,12 +208,12 @@ func (e *genericRestoreExposer) DiagnoseExpose(ctx context.Context, ownerObject 
 
 	pod, err := e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(ctx, restorePodName, metav1.GetOptions{})
 	if err != nil {
-		diag += fmt.Sprintf("error to get restore pod %s, err: %v\n", restorePodName, err)
+		diag += fmt.Sprintf("error getting restore pod %s, err: %v\n", restorePodName, err)
 	}
 
 	pvc, err := e.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(ctx, restorePVCName, metav1.GetOptions{})
 	if err != nil {
-		diag += fmt.Sprintf("error to get restore pvc %s, err: %v\n", restorePVCName, err)
+		diag += fmt.Sprintf("error getting restore pvc %s, err: %v\n", restorePVCName, err)
 	}
 
 	if pod != nil {
@@ -231,7 +231,7 @@ func (e *genericRestoreExposer) DiagnoseExpose(ctx context.Context, ownerObject 
 
 		if pvc.Spec.VolumeName != "" {
 			if pv, err := e.kubeClient.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{}); err != nil {
-				diag += fmt.Sprintf("error getting backup pv %s, err: %v\n", pvc.Spec.VolumeName, err)
+				diag += fmt.Sprintf("error getting restore pv %s, err: %v\n", pvc.Spec.VolumeName, err)
 			} else {
 				diag += kube.DiagnosePV(pv)
 			}

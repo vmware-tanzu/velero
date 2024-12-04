@@ -355,7 +355,7 @@ func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject cor
 	if vs != nil {
 		diag += csi.DiagnoseVS(vs)
 
-		if vs.Status.BoundVolumeSnapshotContentName != nil && *vs.Status.BoundVolumeSnapshotContentName != "" {
+		if vs.Status != nil && vs.Status.BoundVolumeSnapshotContentName != nil && *vs.Status.BoundVolumeSnapshotContentName != "" {
 			if vsc, err := e.csiSnapshotClient.VolumeSnapshotContents().Get(ctx, *vs.Status.BoundVolumeSnapshotContentName, metav1.GetOptions{}); err != nil {
 				diag += fmt.Sprintf("error getting backup vsc %s, err: %v\n", *vs.Status.BoundVolumeSnapshotContentName, err)
 			} else {
