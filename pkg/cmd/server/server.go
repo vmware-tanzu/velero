@@ -239,17 +239,34 @@ func newServer(f client.Factory, config *config.Config, logger *logrus.Logger) (
 
 	ctrl.SetLogger(logrusr.New(logger))
 
-	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
-		Scheme: scheme,
-		Cache: cache.Options{
-			DefaultNamespaces: map[string]cache.Config{
-				f.Namespace(): {},
+	var mgr manager.Manager
+	retry := 10
+	for {
+		mgr, err = ctrl.NewManager(clientConfig, ctrl.Options{
+			Scheme: scheme,
+			Cache: cache.Options{
+				DefaultNamespaces: map[string]cache.Config{
+					f.Namespace(): {},
+				},
 			},
-		},
-	})
+		})
+		if err == nil {
+			break
+		}
+
+		retry--
+		if retry == 0 {
+			break
+		}
+
+		logger.WithError(err).Warn("Failed to create controller manager, need retry")
+
+		time.Sleep(time.Second)
+	}
+
 	if err != nil {
 		cancelFunc()
-		return nil, err
+		return nil, errors.Wrap(err, "error creating controller manager")
 	}
 
 	credentialFileStore, err := credentials.NewNamespacedFileStore(

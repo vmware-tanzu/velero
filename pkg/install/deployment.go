@@ -220,7 +220,7 @@ func WithItemBlockWorkerCount(itemBlockWorkerCount int) podTemplateOption {
 	}
 }
 
-func WithForWinows() podTemplateOption {
+func WithForWindows() podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.forWindows = true
 	}

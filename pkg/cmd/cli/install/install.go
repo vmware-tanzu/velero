@@ -394,7 +394,12 @@ func (o *Options) Run(c *cobra.Command, f client.Factory) error {
 
 		if o.UseNodeAgent {
 			fmt.Println("Waiting for node-agent daemonset to be ready.")
-			if _, err = install.DaemonSetIsReady(dynamicFactory, o.Namespace); err != nil {
+			if _, err = install.NodeAgentIsReady(dynamicFactory, o.Namespace); err != nil {
+				return errors.Wrap(err, errorMsg)
+			}
+
+			fmt.Println("Waiting for node-agent-windows daemonset to be ready.")
+			if _, err = install.NodeAgentWindowsIsReady(dynamicFactory, o.Namespace); err != nil {
 				return errors.Wrap(err, errorMsg)
 			}
 		}
