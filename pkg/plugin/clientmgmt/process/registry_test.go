@@ -45,6 +45,7 @@ func TestNewRegistry(t *testing.T) {
 
 type fakeFileInfo struct {
 	fs.FileInfo
+	name string
 	mode os.FileMode
 }
 
@@ -52,9 +53,14 @@ func (f *fakeFileInfo) Mode() os.FileMode {
 	return f.mode
 }
 
+func (f *fakeFileInfo) Name() string {
+	return f.name
+}
+
 func TestExecutable(t *testing.T) {
 	tests := []struct {
 		name             string
+		fileName         string
 		mode             uint32
 		expectExecutable bool
 	}{
@@ -90,11 +96,29 @@ func TestExecutable(t *testing.T) {
 			mode:             0777,
 			expectExecutable: true,
 		},
+		{
+			name:             "windows lower case",
+			fileName:         "test.exe",
+			mode:             0,
+			expectExecutable: true,
+		},
+		{
+			name:             "windows upper case",
+			fileName:         "test.EXE",
+			mode:             0,
+			expectExecutable: true,
+		},
+		{
+			name:     "windows wrong ext",
+			fileName: "test.EXE1",
+			mode:     0,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			info := &fakeFileInfo{
+				name: test.fileName,
 				mode: os.FileMode(test.mode),
 			}
 

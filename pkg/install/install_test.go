@@ -127,7 +127,7 @@ func TestDeploymentIsReady(t *testing.T) {
 	assert.True(t, ready)
 }
 
-func TestDaemonSetIsReady(t *testing.T) {
+func TestNodeAgentIsReady(t *testing.T) {
 	daemonset := &appsv1.DaemonSet{
 		Status: appsv1.DaemonSetStatus{
 			NumberAvailable:        1,
@@ -143,7 +143,28 @@ func TestDaemonSetIsReady(t *testing.T) {
 	factory := &test.FakeDynamicFactory{}
 	factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
 
-	ready, err := DaemonSetIsReady(factory, "velero")
+	ready, err := NodeAgentIsReady(factory, "velero")
+	require.NoError(t, err)
+	assert.True(t, ready)
+}
+
+func TestNodeAgentWindowsIsReady(t *testing.T) {
+	daemonset := &appsv1.DaemonSet{
+		Status: appsv1.DaemonSetStatus{
+			NumberAvailable:        0,
+			DesiredNumberScheduled: 0,
+		},
+	}
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(daemonset)
+	require.NoError(t, err)
+
+	dc := &test.FakeDynamicClient{}
+	dc.On("Get", mock.Anything, mock.Anything).Return(&unstructured.Unstructured{Object: obj}, nil)
+
+	factory := &test.FakeDynamicFactory{}
+	factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
+
+	ready, err := NodeAgentWindowsIsReady(factory, "velero")
 	require.NoError(t, err)
 	assert.True(t, ready)
 }
