@@ -971,6 +971,10 @@ func (dt *ddResumeTestHelper) PeekExposed(context.Context, corev1.ObjectReferenc
 	return nil
 }
 
+func (dt *ddResumeTestHelper) DiagnoseExpose(context.Context, corev1.ObjectReference) string {
+	return ""
+}
+
 func (dt *ddResumeTestHelper) RebindVolume(context.Context, corev1.ObjectReference, string, string, time.Duration) error {
 	return nil
 }

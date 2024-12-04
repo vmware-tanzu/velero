@@ -308,6 +308,67 @@ func (e *csiSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1
 	return nil
 }
 
+func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject corev1.ObjectReference) string {
+	backupPodName := ownerObject.Name
+	backupPVCName := ownerObject.Name
+	backupVSName := ownerObject.Name
+
+	diag := fmt.Sprintf("***************************begin diagnose CSI exposer[%s/%s]***************************\n", ownerObject.Namespace, ownerObject.Name)
+
+	pod, err := e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(ctx, backupPodName, metav1.GetOptions{})
+	if err != nil {
+		diag += fmt.Sprintf("error getting backup pod %s, err: %v\n", backupPodName, err)
+	}
+
+	pvc, err := e.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(ctx, backupPVCName, metav1.GetOptions{})
+	if err != nil {
+		diag += fmt.Sprintf("error getting backup pvc %s, err: %v\n", backupPVCName, err)
+	}
+
+	vs, err := e.csiSnapshotClient.VolumeSnapshots(ownerObject.Namespace).Get(ctx, backupVSName, metav1.GetOptions{})
+	if err != nil {
+		diag += fmt.Sprintf("error getting backup vs %s, err: %v\n", backupVSName, err)
+	}
+
+	if pod != nil {
+		diag += kube.DiagnosePod(pod)
+
+		if pod.Spec.NodeName != "" {
+			if err := nodeagent.KbClientIsRunningInNode(ctx, ownerObject.Namespace, pod.Spec.NodeName, e.kubeClient); err != nil {
+				diag += fmt.Sprintf("node-agent is not running in node %s\n", pod.Spec.NodeName)
+			}
+		}
+	}
+
+	if pvc != nil {
+		diag += kube.DiagnosePVC(pvc)
+
+		if pvc.Spec.VolumeName != "" {
+			if pv, err := e.kubeClient.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{}); err != nil {
+				diag += fmt.Sprintf("error getting backup pv %s, err: %v\n", pvc.Spec.VolumeName, err)
+			} else {
+				diag += kube.DiagnosePV(pv)
+			}
+		}
+	}
+
+	if vs != nil {
+		diag += csi.DiagnoseVS(vs)
+
+		if vs.Status.BoundVolumeSnapshotContentName != nil && *vs.Status.BoundVolumeSnapshotContentName != "" {
+			if vsc, err := e.csiSnapshotClient.VolumeSnapshotContents().Get(ctx, *vs.Status.BoundVolumeSnapshotContentName, metav1.GetOptions{}); err != nil {
+				diag += fmt.Sprintf("error getting backup vsc %s, err: %v\n", *vs.Status.BoundVolumeSnapshotContentName, err)
+			} else {
+				diag += csi.DiagnoseVSC(vsc)
+			}
+		}
+	}
+
+	diag += fmt.Sprintf("***************************end diagnose CSI exposer[%s/%s]***************************\n", ownerObject.Namespace, ownerObject.Name)
+
+	return diag
+}
+
 const cleanUpTimeout = time.Minute
 
 func (e *csiSnapshotExposer) CleanUp(ctx context.Context, ownerObject corev1.ObjectReference, vsName string, sourceNamespace string) {

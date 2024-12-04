@@ -755,6 +755,8 @@ func (r *DataUploadReconciler) onPrepareTimeout(ctx context.Context, du *velerov
 			volumeSnapshotName = du.Spec.CSISnapshot.VolumeSnapshot
 		}
 
+		log.Warn(ep.DiagnoseExpose(ctx, getOwnerObject(du)))
+
 		ep.CleanUp(ctx, getOwnerObject(du), volumeSnapshotName, du.Spec.SourceNamespace)
 
 		log.Info("Dataupload has been cleaned up")
