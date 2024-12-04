@@ -689,6 +689,8 @@ func (r *DataDownloadReconciler) onPrepareTimeout(ctx context.Context, dd *veler
 		return
 	}
 
+	log.Warn(r.restoreExposer.DiagnoseExpose(ctx, getDataDownloadOwnerObject(dd)))
+
 	r.restoreExposer.CleanUp(ctx, getDataDownloadOwnerObject(dd))
 
 	log.Info("Dataupload has been cleaned up")

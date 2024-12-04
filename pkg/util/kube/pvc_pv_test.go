@@ -1463,3 +1463,6 @@ func TestMakePodPVCAttachment(t *testing.T) {
 		})
 	}
 }
+
+func TestDiagnosePVC(t *testing.T) {
+}
