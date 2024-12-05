@@ -271,9 +271,6 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 	if len(options.Image) > 0 {
 		args = append(args, "--image", options.Image)
 	}
-	if options.UseRestic {
-		args = append(args, "--use-restic")
-	}
 	if options.UseNodeAgent {
 		args = append(args, "--use-node-agent")
 	}

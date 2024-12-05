@@ -91,8 +91,9 @@ func TestFuncWithMultiIt(tests []VeleroBackupRestoreTest) func() {
 }
 
 func TestIt(test VeleroBackupRestoreTest) error {
-	test.Init()
-	It(test.GetTestMsg().Text, func() {
+	It("Run E2E test case", func() {
+		Expect(test.Init()).To(Succeed())
+
 		Expect(RunTestCase(test)).To(Succeed(), test.GetTestMsg().FailedMSG)
 	})
 	return nil
@@ -213,6 +214,7 @@ func RunTestCase(test VeleroBackupRestoreTest) error {
 	if test == nil {
 		return errors.New("No case should be tested")
 	}
+	fmt.Println("Running case: ", test.GetTestMsg().Text)
 	test.Start()
 	defer test.GetTestCase().CtxCancel()
 

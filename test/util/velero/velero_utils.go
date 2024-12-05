@@ -255,10 +255,7 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	io.DefaultVolumesToFsBackup = veleroCfg.DefaultVolumesToFsBackup
 	io.UseVolumeSnapshots = veleroCfg.UseVolumeSnapshots
 
-	if !veleroCfg.UseRestic {
-		io.UseNodeAgent = veleroCfg.UseNodeAgent
-	}
-	io.UseRestic = veleroCfg.UseRestic
+	io.UseNodeAgent = veleroCfg.UseNodeAgent
 	io.Image = veleroCfg.VeleroImage
 	io.Namespace = veleroCfg.VeleroNamespace
 	io.UploaderType = veleroCfg.UploaderType

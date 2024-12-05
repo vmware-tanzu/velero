@@ -113,8 +113,8 @@ func GetVolumeSnapshotContentNameByPod(client TestClient, podName, namespace, ba
 	if len(pvList) != 1 {
 		return "", errors.New(fmt.Sprintf("Only 1 PV of PVC %s pod %s should be found under namespace %s", pvcList[0], podName, namespace))
 	}
-	pv_value, err := GetPersistentVolume(context.Background(), client, "", pvList[0])
-	fmt.Println(pv_value.Annotations["pv.kubernetes.io/provisioned-by"])
+	pvValue, err := GetPersistentVolume(context.Background(), client, "", pvList[0])
+	fmt.Println(pvValue.Annotations["pv.kubernetes.io/provisioned-by"])
 	if err != nil {
 		return "", err
 	}
@@ -148,14 +148,10 @@ func CheckVolumeSnapshotCR(client TestClient, index map[string]string, expectedC
 	if len(apiVersion) == 0 {
 		return nil, errors.New("Fail to get APIVersion")
 	}
-	// if apiVersion[0] == "v1beta1" {
-	// 	if snapshotContentNameList, err = GetCsiSnapshotHandle(client, apiVersion[0], index); err != nil {
-	// 		return nil, errors.Wrap(err, "Fail to get Azure CSI snapshot content")
-	// 	}
-	// } else
+
 	if apiVersion[0] == "v1" {
 		if snapshotContentNameList, err = GetCsiSnapshotHandle(client, apiVersion[0], index); err != nil {
-			return nil, errors.Wrap(err, "Fail to get Azure CSI snapshot content")
+			return nil, errors.Wrap(err, "Fail to get CSI snapshot content")
 		}
 	} else {
 		return nil, errors.New("API version is invalid")
