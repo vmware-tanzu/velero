@@ -323,6 +323,14 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	}}
 	volumes = append(volumes, podInfo.volumes...)
 
+	if label == nil {
+		label = make(map[string]string)
+	}
+
+	for k, v := range thirdPartyLabels {
+		label[k] = v
+	}
+
 	volumeMode := corev1.PersistentVolumeFilesystem
 	if targetPVC.Spec.VolumeMode != nil {
 		volumeMode = *targetPVC.Spec.VolumeMode
