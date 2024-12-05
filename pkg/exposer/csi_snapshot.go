@@ -313,20 +313,23 @@ func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject cor
 	backupPVCName := ownerObject.Name
 	backupVSName := ownerObject.Name
 
-	diag := fmt.Sprintf("***************************begin diagnose CSI exposer[%s/%s]***************************\n", ownerObject.Namespace, ownerObject.Name)
+	diag := "begin diagnose CSI exposer\n"
 
 	pod, err := e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(ctx, backupPodName, metav1.GetOptions{})
 	if err != nil {
+		pod = nil
 		diag += fmt.Sprintf("error getting backup pod %s, err: %v\n", backupPodName, err)
 	}
 
 	pvc, err := e.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(ctx, backupPVCName, metav1.GetOptions{})
 	if err != nil {
+		pvc = nil
 		diag += fmt.Sprintf("error getting backup pvc %s, err: %v\n", backupPVCName, err)
 	}
 
 	vs, err := e.csiSnapshotClient.VolumeSnapshots(ownerObject.Namespace).Get(ctx, backupVSName, metav1.GetOptions{})
 	if err != nil {
+		vs = nil
 		diag += fmt.Sprintf("error getting backup vs %s, err: %v\n", backupVSName, err)
 	}
 
@@ -364,7 +367,7 @@ func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject cor
 		}
 	}
 
-	diag += fmt.Sprintf("***************************end diagnose CSI exposer[%s/%s]***************************\n", ownerObject.Namespace, ownerObject.Name)
+	diag += "end diagnose CSI exposer"
 
 	return diag
 }
