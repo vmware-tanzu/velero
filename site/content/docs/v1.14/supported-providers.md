@@ -55,7 +55,7 @@ _Some storage providers, like Quobyte, may need a different [signature algorithm
 
 In the case you want to take volume snapshots but didn't find a plugin for your provider, Velero has support for snapshotting using File System Backup. Please see the [File System Backup][30] documentation.
 
-[0]: https://github.com/aws/aws-sdk-go/aws
+[0]: https://github.com/aws/aws-sdk-go-v2
 [1]: contributions/ibm-config.md
 [2]: contributions/oracle-config.md
 [3]: contributions/minio.md

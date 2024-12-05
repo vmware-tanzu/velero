@@ -55,7 +55,7 @@ After you publish your plugin, open a PR that adds your plugin to the appropriat
 [9]: get-started.md
 [10]: https://kubernetes.slack.com/messages/velero
 [11]: https://github.com/heptio/velero/issues
-[12]: https://github.com/aws/aws-sdk-go/aws
+[12]: https://github.com/aws/aws-sdk-go
 [13]: https://portworx.slack.com/messages/px-k8s
 [14]: https://github.com/portworx/ark-plugin/issues
 [15]: api-types/backupstoragelocation.md#aws
