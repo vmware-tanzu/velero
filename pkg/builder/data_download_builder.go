@@ -118,6 +118,12 @@ func (d *DataDownloadBuilder) Labels(labels map[string]string) *DataDownloadBuil
 	return d
 }
 
+// Annotations sets the DataDownload's Annotations.
+func (d *DataDownloadBuilder) Annotations(annotations map[string]string) *DataDownloadBuilder {
+	d.object.Annotations = annotations
+	return d
+}
+
 // StartTimestamp sets the DataDownload's StartTimestamp.
 func (d *DataDownloadBuilder) StartTimestamp(startTime *metav1.Time) *DataDownloadBuilder {
 	d.object.Status.StartTimestamp = startTime
