@@ -488,6 +488,10 @@ func (e *csiSnapshotExposer) createBackupPod(
 	}
 	label[podGroupLabel] = podGroupSnapshot
 
+	for k, v := range thirdPartyLabels {
+		label[k] = v
+	}
+
 	volumeMode := corev1.PersistentVolumeFilesystem
 	if backupPVC.Spec.VolumeMode != nil {
 		volumeMode = *backupPVC.Spec.VolumeMode
