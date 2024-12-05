@@ -5545,6 +5545,36 @@ func TestUpdateVolumeInfos(t *testing.T) {
 				},
 			},
 		},
+		{
+			// This is an error case. No crash happen here is good enough.
+			name:       "VolumeInfo doesn't have SnapshotDataMovementInfo when there is a matching DataUpload",
+			operations: []*itemoperation.BackupOperation{},
+			dataUpload: builder.ForDataUpload("velero", "du-1").
+				CompletionTimestamp(&now).
+				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{VolumeSnapshot: "vs-1"}).
+				SnapshotID("snapshot-id").
+				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000}).
+				Phase(velerov2alpha1.DataUploadPhaseCompleted).
+				SourceNamespace("ns-1").
+				SourcePVC("pvc-1").
+				Result(),
+			volumeInfos: []*volume.BackupVolumeInfo{
+				{
+					PVCName:                  "pvc-1",
+					PVCNamespace:             "ns-1",
+					CompletionTimestamp:      &metav1.Time{},
+					SnapshotDataMovementInfo: nil,
+				},
+			},
+			expectedVolumeInfos: []*volume.BackupVolumeInfo{
+				{
+					PVCName:                  "pvc-1",
+					PVCNamespace:             "ns-1",
+					CompletionTimestamp:      &metav1.Time{},
+					SnapshotDataMovementInfo: nil,
+				},
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -5561,8 +5591,10 @@ func TestUpdateVolumeInfos(t *testing.T) {
 			}
 
 			require.NoError(t, updateVolumeInfos(tc.volumeInfos, unstructures, tc.operations, logger))
-			require.Equal(t, tc.expectedVolumeInfos[0].CompletionTimestamp, tc.volumeInfos[0].CompletionTimestamp)
-			require.Equal(t, tc.expectedVolumeInfos[0].SnapshotDataMovementInfo, tc.volumeInfos[0].SnapshotDataMovementInfo)
+			if len(tc.expectedVolumeInfos) > 0 {
+				require.Equal(t, tc.expectedVolumeInfos[0].CompletionTimestamp, tc.volumeInfos[0].CompletionTimestamp)
+				require.Equal(t, tc.expectedVolumeInfos[0].SnapshotDataMovementInfo, tc.volumeInfos[0].SnapshotDataMovementInfo)
+			}
 		})
 	}
 }
