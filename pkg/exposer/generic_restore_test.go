@@ -646,11 +646,10 @@ func Test_ReastoreDiagnoseExpose(t *testing.T) {
 		{
 			name:         "no pod, pvc",
 			ownerRestore: restore,
-			expected: `***************************begin diagnose restore exposer[velero/fake-restore]***************************
+			expected: `begin diagnose restore exposer
 error getting restore pod fake-restore, err: pods "fake-restore" not found
 error getting restore pvc fake-restore, err: persistentvolumeclaims "fake-restore" not found
-***************************end diagnose restore exposer[velero/fake-restore]***************************
-`,
+end diagnose restore exposer`,
 		},
 		{
 			name:         "pod without node name, pvc without volume name, vs without status",
@@ -659,12 +658,11 @@ error getting restore pvc fake-restore, err: persistentvolumeclaims "fake-restor
 				&restorePodWithoutNodeName,
 				&restorePVCWithoutVolumeName,
 			},
-			expected: `***************************begin diagnose restore exposer[velero/fake-restore]***************************
+			expected: `begin diagnose restore exposer
 Pod velero/fake-restore, phase Pending, node name 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to 
-***************************end diagnose restore exposer[velero/fake-restore]***************************
-`,
+end diagnose restore exposer`,
 		},
 		{
 			name:         "pod without node name, pvc without volume name",
@@ -673,12 +671,11 @@ PVC velero/fake-restore, phase Pending, binding to
 				&restorePodWithoutNodeName,
 				&restorePVCWithoutVolumeName,
 			},
-			expected: `***************************begin diagnose restore exposer[velero/fake-restore]***************************
+			expected: `begin diagnose restore exposer
 Pod velero/fake-restore, phase Pending, node name 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to 
-***************************end diagnose restore exposer[velero/fake-restore]***************************
-`,
+end diagnose restore exposer`,
 		},
 		{
 			name:         "pod with node name, no node agent",
@@ -687,13 +684,12 @@ PVC velero/fake-restore, phase Pending, binding to
 				&restorePodWithNodeName,
 				&restorePVCWithoutVolumeName,
 			},
-			expected: `***************************begin diagnose restore exposer[velero/fake-restore]***************************
+			expected: `begin diagnose restore exposer
 Pod velero/fake-restore, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
-node-agent is not running in node fake-node
+node-agent is not running in node fake-node, err: daemonset pod not found in running state in node fake-node
 PVC velero/fake-restore, phase Pending, binding to 
-***************************end diagnose restore exposer[velero/fake-restore]***************************
-`,
+end diagnose restore exposer`,
 		},
 		{
 			name:         "pod with node name, node agent is running",
@@ -703,12 +699,11 @@ PVC velero/fake-restore, phase Pending, binding to
 				&restorePVCWithoutVolumeName,
 				&nodeAgentPod,
 			},
-			expected: `***************************begin diagnose restore exposer[velero/fake-restore]***************************
+			expected: `begin diagnose restore exposer
 Pod velero/fake-restore, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to 
-***************************end diagnose restore exposer[velero/fake-restore]***************************
-`,
+end diagnose restore exposer`,
 		},
 		{
 			name:         "pvc with volume name, no pv",
@@ -718,13 +713,12 @@ PVC velero/fake-restore, phase Pending, binding to
 				&restorePVCWithVolumeName,
 				&nodeAgentPod,
 			},
-			expected: `***************************begin diagnose restore exposer[velero/fake-restore]***************************
+			expected: `begin diagnose restore exposer
 Pod velero/fake-restore, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to fake-pv
 error getting restore pv fake-pv, err: persistentvolumes "fake-pv" not found
-***************************end diagnose restore exposer[velero/fake-restore]***************************
-`,
+end diagnose restore exposer`,
 		},
 		{
 			name:         "pvc with volume name, pv exists",
@@ -735,13 +729,12 @@ error getting restore pv fake-pv, err: persistentvolumes "fake-pv" not found
 				&restorePV,
 				&nodeAgentPod,
 			},
-			expected: `***************************begin diagnose restore exposer[velero/fake-restore]***************************
+			expected: `begin diagnose restore exposer
 Pod velero/fake-restore, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-restore, phase Pending, binding to fake-pv
 PV fake-pv, phase Pending, reason , message fake-pv-message
-***************************end diagnose restore exposer[velero/fake-restore]***************************
-`,
+end diagnose restore exposer`,
 		},
 	}
 	for _, test := range tests {
