@@ -1166,12 +1166,11 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 		{
 			name:        "no pod, pvc, vs",
 			ownerBackup: backup,
-			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+			expected: `begin diagnose CSI exposer
 error getting backup pod fake-backup, err: pods "fake-backup" not found
 error getting backup pvc fake-backup, err: persistentvolumeclaims "fake-backup" not found
 error getting backup vs fake-backup, err: volumesnapshots.snapshot.storage.k8s.io "fake-backup" not found
-***************************end diagnose CSI exposer[velero/fake-backup]***************************
-`,
+end diagnose CSI exposer`,
 		},
 		{
 			name:        "pod without node name, pvc without volume name, vs without status",
@@ -1183,13 +1182,12 @@ error getting backup vs fake-backup, err: volumesnapshots.snapshot.storage.k8s.i
 			snapshotClientObj: []runtime.Object{
 				&backupVSWithoutStatus,
 			},
-			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+			expected: `begin diagnose CSI exposer
 Pod velero/fake-backup, phase Pending, node name 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to 
 VS velero/fake-backup, bind to , readyToUse false, errMessage 
-***************************end diagnose CSI exposer[velero/fake-backup]***************************
-`,
+end diagnose CSI exposer`,
 		},
 		{
 			name:        "pod without node name, pvc without volume name, vs without VSC",
@@ -1201,13 +1199,12 @@ VS velero/fake-backup, bind to , readyToUse false, errMessage
 			snapshotClientObj: []runtime.Object{
 				&backupVSWithoutVSC,
 			},
-			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+			expected: `begin diagnose CSI exposer
 Pod velero/fake-backup, phase Pending, node name 
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to 
 VS velero/fake-backup, bind to , readyToUse false, errMessage 
-***************************end diagnose CSI exposer[velero/fake-backup]***************************
-`,
+end diagnose CSI exposer`,
 		},
 		{
 			name:        "pod with node name, no node agent",
@@ -1219,14 +1216,13 @@ VS velero/fake-backup, bind to , readyToUse false, errMessage
 			snapshotClientObj: []runtime.Object{
 				&backupVSWithoutVSC,
 			},
-			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+			expected: `begin diagnose CSI exposer
 Pod velero/fake-backup, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
-node-agent is not running in node fake-node
+node-agent is not running in node fake-node, err: daemonset pod not found in running state in node fake-node
 PVC velero/fake-backup, phase Pending, binding to 
 VS velero/fake-backup, bind to , readyToUse false, errMessage 
-***************************end diagnose CSI exposer[velero/fake-backup]***************************
-`,
+end diagnose CSI exposer`,
 		},
 		{
 			name:        "pod with node name, node agent is running",
@@ -1239,13 +1235,12 @@ VS velero/fake-backup, bind to , readyToUse false, errMessage
 			snapshotClientObj: []runtime.Object{
 				&backupVSWithoutVSC,
 			},
-			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+			expected: `begin diagnose CSI exposer
 Pod velero/fake-backup, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to 
 VS velero/fake-backup, bind to , readyToUse false, errMessage 
-***************************end diagnose CSI exposer[velero/fake-backup]***************************
-`,
+end diagnose CSI exposer`,
 		},
 		{
 			name:        "pvc with volume name, no pv",
@@ -1258,14 +1253,13 @@ VS velero/fake-backup, bind to , readyToUse false, errMessage
 			snapshotClientObj: []runtime.Object{
 				&backupVSWithoutVSC,
 			},
-			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+			expected: `begin diagnose CSI exposer
 Pod velero/fake-backup, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to fake-pv
 error getting backup pv fake-pv, err: persistentvolumes "fake-pv" not found
 VS velero/fake-backup, bind to , readyToUse false, errMessage 
-***************************end diagnose CSI exposer[velero/fake-backup]***************************
-`,
+end diagnose CSI exposer`,
 		},
 		{
 			name:        "pvc with volume name, pv exists",
@@ -1279,14 +1273,13 @@ VS velero/fake-backup, bind to , readyToUse false, errMessage
 			snapshotClientObj: []runtime.Object{
 				&backupVSWithoutVSC,
 			},
-			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+			expected: `begin diagnose CSI exposer
 Pod velero/fake-backup, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to fake-pv
 PV fake-pv, phase Pending, reason , message fake-pv-message
 VS velero/fake-backup, bind to , readyToUse false, errMessage 
-***************************end diagnose CSI exposer[velero/fake-backup]***************************
-`,
+end diagnose CSI exposer`,
 		},
 		{
 			name:        "vs with vsc, vsc doesn't exist",
@@ -1300,15 +1293,14 @@ VS velero/fake-backup, bind to , readyToUse false, errMessage
 			snapshotClientObj: []runtime.Object{
 				&backupVSWithVSC,
 			},
-			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+			expected: `begin diagnose CSI exposer
 Pod velero/fake-backup, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to fake-pv
 PV fake-pv, phase Pending, reason , message fake-pv-message
 VS velero/fake-backup, bind to fake-vsc, readyToUse false, errMessage fake-vs-message
 error getting backup vsc fake-vsc, err: volumesnapshotcontents.snapshot.storage.k8s.io "fake-vsc" not found
-***************************end diagnose CSI exposer[velero/fake-backup]***************************
-`,
+end diagnose CSI exposer`,
 		},
 		{
 			name:        "vs with vsc, vsc exists",
@@ -1323,15 +1315,14 @@ error getting backup vsc fake-vsc, err: volumesnapshotcontents.snapshot.storage.
 				&backupVSWithVSC,
 				&backupVSC,
 			},
-			expected: `***************************begin diagnose CSI exposer[velero/fake-backup]***************************
+			expected: `begin diagnose CSI exposer
 Pod velero/fake-backup, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to fake-pv
 PV fake-pv, phase Pending, reason , message fake-pv-message
 VS velero/fake-backup, bind to fake-vsc, readyToUse false, errMessage fake-vs-message
 VSC fake-vsc, readyToUse false, errMessage fake-vsc-message, handle 
-***************************end diagnose CSI exposer[velero/fake-backup]***************************
-`,
+end diagnose CSI exposer`,
 		},
 	}
 	for _, tt := range tests {

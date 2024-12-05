@@ -204,15 +204,17 @@ func (e *genericRestoreExposer) DiagnoseExpose(ctx context.Context, ownerObject 
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
-	diag := fmt.Sprintf("***************************begin diagnose restore exposer[%s/%s]***************************\n", ownerObject.Namespace, ownerObject.Name)
+	diag := "begin diagnose restore exposer\n"
 
 	pod, err := e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(ctx, restorePodName, metav1.GetOptions{})
 	if err != nil {
+		pod = nil
 		diag += fmt.Sprintf("error getting restore pod %s, err: %v\n", restorePodName, err)
 	}
 
 	pvc, err := e.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(ctx, restorePVCName, metav1.GetOptions{})
 	if err != nil {
+		pvc = nil
 		diag += fmt.Sprintf("error getting restore pvc %s, err: %v\n", restorePVCName, err)
 	}
 
@@ -221,7 +223,7 @@ func (e *genericRestoreExposer) DiagnoseExpose(ctx context.Context, ownerObject 
 
 		if pod.Spec.NodeName != "" {
 			if err := nodeagent.KbClientIsRunningInNode(ctx, ownerObject.Namespace, pod.Spec.NodeName, e.kubeClient); err != nil {
-				diag += fmt.Sprintf("node-agent is not running in node %s\n", pod.Spec.NodeName)
+				diag += fmt.Sprintf("node-agent is not running in node %s, err: %v\n", pod.Spec.NodeName, err)
 			}
 		}
 	}
@@ -238,7 +240,7 @@ func (e *genericRestoreExposer) DiagnoseExpose(ctx context.Context, ownerObject 
 		}
 	}
 
-	diag += fmt.Sprintf("***************************end diagnose restore exposer[%s/%s]***************************\n", ownerObject.Namespace, ownerObject.Name)
+	diag += "end diagnose restore exposer"
 
 	return diag
 }
