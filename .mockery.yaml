@@ -1,0 +1,14 @@
+filename: "{{.InterfaceName | snakecase}}.go"
+outpkg: mocks
+packages:
+    github.com/vmware-tanzu/velero/pkg/podvolume:
+        interfaces:
+            Backupper:
+              config:
+                dir: pkg/podvolume/mocks
+    github.com/vmware-tanzu/velero/pkg/podexec:
+        interfaces:
+            PodCommandExecutor:
+              config:
+                dir: pkg/podexec/mocks
+            
