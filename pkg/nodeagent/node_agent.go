@@ -99,8 +99,17 @@ func IsRunning(ctx context.Context, kubeClient kubernetes.Interface, namespace s
 	}
 }
 
-// IsRunningInNode checks if the node agent pod is running properly in a specified node. If not, return the error found
+// KbClientIsRunningInNode checks if the node agent pod is running properly in a specified node through kube client. If not, return the error found
+func KbClientIsRunningInNode(ctx context.Context, namespace string, nodeName string, kubeClient kubernetes.Interface) error {
+	return isRunningInNode(ctx, namespace, nodeName, nil, kubeClient)
+}
+
+// IsRunningInNode checks if the node agent pod is running properly in a specified node through controller client. If not, return the error found
 func IsRunningInNode(ctx context.Context, namespace string, nodeName string, crClient ctrlclient.Client) error {
+	return isRunningInNode(ctx, namespace, nodeName, crClient, nil)
+}
+
+func isRunningInNode(ctx context.Context, namespace string, nodeName string, crClient ctrlclient.Client, kubeClient kubernetes.Interface) error {
 	if nodeName == "" {
 		return errors.New("node name is empty")
 	}
@@ -111,7 +120,12 @@ func IsRunningInNode(ctx context.Context, namespace string, nodeName string, crC
 		return errors.Wrap(err, "fail to parse selector")
 	}
 
-	err = crClient.List(ctx, pods, &ctrlclient.ListOptions{LabelSelector: parsedSelector})
+	if crClient != nil {
+		err = crClient.List(ctx, pods, &ctrlclient.ListOptions{LabelSelector: parsedSelector})
+	} else {
+		pods, err = kubeClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: parsedSelector.String()})
+	}
+
 	if err != nil {
 		return errors.Wrap(err, "failed to list daemonset pods")
 	}

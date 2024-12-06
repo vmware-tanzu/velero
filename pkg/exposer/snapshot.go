@@ -37,6 +37,10 @@ type SnapshotExposer interface {
 	// Otherwise, it returns nil immediately.
 	PeekExposed(context.Context, corev1.ObjectReference) error
 
+	// DiagnoseExpose generate the diagnostic info when the expose is not finished for a long time.
+	// If it finds any problem, it returns an string about the problem.
+	DiagnoseExpose(context.Context, corev1.ObjectReference) string
+
 	// CleanUp cleans up any objects generated during the snapshot expose
 	CleanUp(context.Context, corev1.ObjectReference, string, string)
 }
