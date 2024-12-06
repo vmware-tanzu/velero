@@ -39,7 +39,3 @@ type ExposeByPod struct {
 	HostingContainer string
 	VolumeName       string
 }
-
-var thirdPartyLabels map[string]string = map[string]string{
-	"azure.workload.identity/use": "true",
-}

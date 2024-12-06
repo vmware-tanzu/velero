@@ -331,3 +331,132 @@ func TestGetConfigs(t *testing.T) {
 		})
 	}
 }
+
+func TestGetLabelValue(t *testing.T) {
+	daemonSet := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+	}
+
+	daemonSetWithOtherLabel := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"fake-other-label": "fake-value-1",
+					},
+				},
+			},
+		},
+	}
+
+	daemonSetWithLabel := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"fake-label": "fake-value-2",
+					},
+				},
+			},
+		},
+	}
+
+	daemonSetWithEmptyLabel := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"fake-label": "",
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name          string
+		kubeClientObj []runtime.Object
+		namespace     string
+		expectedValue string
+		expectErr     string
+	}{
+		{
+			name:      "ds get error",
+			namespace: "fake-ns",
+			expectErr: "error getting node-agent daemonset: daemonsets.apps \"node-agent\" not found",
+		},
+		{
+			name:      "no label",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectErr: ErrNodeAgentLabelNotFound.Error(),
+		},
+		{
+			name:      "no expecting label",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithOtherLabel,
+			},
+			expectErr: ErrNodeAgentLabelNotFound.Error(),
+		},
+		{
+			name:      "expecting label",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithLabel,
+			},
+			expectedValue: "fake-value-2",
+		},
+		{
+			name:      "expecting empty label",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithEmptyLabel,
+			},
+			expectedValue: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			value, err := GetLabelValue(context.TODO(), fakeKubeClient, test.namespace, "fake-label")
+			if test.expectErr == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, test.expectedValue, value)
+			} else {
+				assert.EqualError(t, err, test.expectErr)
+			}
+		})
+	}
+}
