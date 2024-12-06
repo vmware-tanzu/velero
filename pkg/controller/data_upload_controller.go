@@ -50,6 +50,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
@@ -806,11 +807,20 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			accessMode = exposer.AccessModeBlock
 		}
 
+		hostingPodLabels := map[string]string{velerov1api.DataUploadLabel: du.Name}
+		for _, k := range util.ThirdPartyLabels {
+			if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, du.Namespace, k); err != nil {
+				r.logger.WithError(err).Warnf("Failed to check existence of label from node-agent, skip adding label %s", k)
+			} else if v != "" {
+				hostingPodLabels[k] = v
+			}
+		}
+
 		return &exposer.CSISnapshotExposeParam{
 			SnapshotName:     du.Spec.CSISnapshot.VolumeSnapshot,
 			SourceNamespace:  du.Spec.SourceNamespace,
 			StorageClass:     du.Spec.CSISnapshot.StorageClass,
-			HostingPodLabels: map[string]string{velerov1api.DataUploadLabel: du.Name},
+			HostingPodLabels: hostingPodLabels,
 			AccessMode:       accessMode,
 			OperationTimeout: du.Spec.OperationTimeout.Duration,
 			ExposeTimeout:    r.preparingTimeout,

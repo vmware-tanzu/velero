@@ -161,3 +161,16 @@ func GetConfigs(ctx context.Context, namespace string, kubeClient kubernetes.Int
 
 	return configs, nil
 }
+
+func GetLabelValue(ctx context.Context, kubeClient kubernetes.Interface, namespace string, key string) (string, error) {
+	ds, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, daemonSet, metav1.GetOptions{})
+	if err != nil {
+		return "", errors.Wrap(err, "error getting node-agent daemonset")
+	}
+
+	if ds.Spec.Template.Labels == nil {
+		return "", nil
+	}
+
+	return ds.Spec.Template.Labels[key], nil
+}
