@@ -220,8 +220,15 @@ container:
 ifneq ($(BUILDX_ENABLED), true)
 	$(error $(BUILDX_ERROR))
 endif
+
+ifeq ($(BUILDX_INSTANCE),)
+	@echo creating a buildx instance
 	-docker buildx rm velero-builder || true
 	@docker buildx create --use --name=velero-builder
+else
+	@echo using a specified buildx instance $(BUILDX_INSTANCE)
+	@docker buildx use $(BUILDX_INSTANCE)
+endif
 
 	@mkdir -p _output
 
