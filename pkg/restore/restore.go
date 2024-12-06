@@ -78,6 +78,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
+const ObjectStatusRestoreAnnotationKey = "velero.io/restore-status"
+
 var resourceMustHave = []string{
 	"datauploads.velero.io",
 }
@@ -1655,15 +1657,23 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	// determine whether to restore status according to original GR
 	shouldRestoreStatus := ctx.resourceStatusIncludesExcludes != nil && ctx.resourceStatusIncludesExcludes.ShouldInclude(groupResource.String())
-	if shouldRestoreStatus && statusFieldErr != nil {
+
+	// Check for the object-level annotation on the resource object
+	objectAnnotation := obj.GetAnnotations()[ObjectStatusRestoreAnnotationKey]
+	shouldRestoreStatusForObject := objectAnnotation == "true"
+
+	// If either the resource type is included or the object-level annotation indicates restoration
+	if (shouldRestoreStatus || shouldRestoreStatusForObject) && statusFieldErr != nil {
 		err := fmt.Errorf("could not get status to be restored %s: %v", kube.NamespaceAndName(obj), statusFieldErr)
 		ctx.log.Errorf(err.Error())
 		errs.Add(namespace, err)
 		return warnings, errs, itemExists
 	}
-	ctx.log.Debugf("status field for %s: exists: %v, should restore: %v", newGR, statusFieldExists, shouldRestoreStatus)
-	// if it should restore status, run a UpdateStatus
-	if statusFieldExists && shouldRestoreStatus {
+
+	ctx.log.Debugf("status field for %s: exists: %v, should restore: %v, should restore by annotation: %v", newGR, statusFieldExists, shouldRestoreStatus, shouldRestoreStatusForObject)
+
+	// Proceed with status restoration if required by either resource type or annotation
+	if statusFieldExists && (shouldRestoreStatus || shouldRestoreStatusForObject) {
 		if err := unstructured.SetNestedField(obj.Object, objStatus, "status"); err != nil {
 			ctx.log.Errorf("could not set status field %s: %v", kube.NamespaceAndName(obj), err)
 			errs.Add(namespace, err)
