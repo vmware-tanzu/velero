@@ -30,7 +30,7 @@ func TestGetRepoIdentifier(t *testing.T) {
 		name               string
 		bsl                *velerov1api.BackupStorageLocation
 		repoName           string
-		getAWSBucketRegion func(string) (string, error)
+		getAWSBucketRegion func(s string, config map[string]string) (string, error)
 		expected           string
 		expectedErr        string
 	}{
@@ -101,7 +101,7 @@ func TestGetRepoIdentifier(t *testing.T) {
 				},
 			},
 			repoName: "repo-1",
-			getAWSBucketRegion: func(string) (string, error) {
+			getAWSBucketRegion: func(s string, config map[string]string) (string, error) {
 				return "", errors.New("no region found")
 			},
 			expected:    "",
@@ -120,7 +120,7 @@ func TestGetRepoIdentifier(t *testing.T) {
 				},
 			},
 			repoName: "repo-1",
-			getAWSBucketRegion: func(string) (string, error) {
+			getAWSBucketRegion: func(string, map[string]string) (string, error) {
 				return "eu-west-1", nil
 			},
 			expected: "s3:s3-eu-west-1.amazonaws.com/bucket/restic/repo-1",
@@ -139,7 +139,7 @@ func TestGetRepoIdentifier(t *testing.T) {
 				},
 			},
 			repoName: "repo-1",
-			getAWSBucketRegion: func(string) (string, error) {
+			getAWSBucketRegion: func(s string, config map[string]string) (string, error) {
 				return "eu-west-1", nil
 			},
 			expected: "s3:s3-eu-west-1.amazonaws.com/bucket/prefix/restic/repo-1",
@@ -161,7 +161,7 @@ func TestGetRepoIdentifier(t *testing.T) {
 				},
 			},
 			repoName: "repo-1",
-			getAWSBucketRegion: func(string) (string, error) {
+			getAWSBucketRegion: func(s string, config map[string]string) (string, error) {
 				return "eu-west-1", nil
 			},
 			expected: "s3:alternate-url/bucket/prefix/restic/repo-1",
@@ -183,7 +183,7 @@ func TestGetRepoIdentifier(t *testing.T) {
 				},
 			},
 			repoName: "aws-repo",
-			getAWSBucketRegion: func(string) (string, error) {
+			getAWSBucketRegion: func(s string, config map[string]string) (string, error) {
 				return "eu-west-1", nil
 			},
 			expected: "s3:s3-us-west-1.amazonaws.com/bucket/prefix/restic/aws-repo",
@@ -205,7 +205,7 @@ func TestGetRepoIdentifier(t *testing.T) {
 				},
 			},
 			repoName: "aws-repo",
-			getAWSBucketRegion: func(string) (string, error) {
+			getAWSBucketRegion: func(s string, config map[string]string) (string, error) {
 				return "eu-west-1", nil
 			},
 			expected: "s3:alternate-url-with-trailing-slash/bucket/prefix/restic/aws-repo",
