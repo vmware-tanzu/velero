@@ -1,1 +1,1 @@
-Fix issue #8433, add aks label to data mover pods
+Fix issue #8433, add third party labels to data mover pods when the same labels exist in node-agent pods
