@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -44,6 +46,7 @@ const (
 	defaultCPURequestLimit = "100m"
 	defaultMemRequestLimit = "128Mi"
 	defaultCommand         = "/velero-restore-helper"
+	restoreHelperUID       = 1000
 )
 
 type PodVolumeRestoreAction struct {
@@ -143,9 +146,15 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 
 	runAsUser, runAsGroup, allowPrivilegeEscalation, secCtx := getSecurityContext(log, config)
 
-	securityContext, err := kube.ParseSecurityContext(runAsUser, runAsGroup, allowPrivilegeEscalation, secCtx)
-	if err != nil {
-		log.Errorf("Using default securityContext values, couldn't parse securityContext requirements: %s.", err)
+	var securityContext corev1.SecurityContext
+	if runAsUser == "" && runAsGroup == "" && allowPrivilegeEscalation == "" && secCtx == "" {
+		securityContext = defaultSecurityCtx()
+	} else {
+		securityContext, err = kube.ParseSecurityContext(runAsUser, runAsGroup, allowPrivilegeEscalation, secCtx)
+		if err != nil {
+			log.Errorf("Using default securityContext values, couldn't parse securityContext requirements: %s.", err)
+			securityContext = defaultSecurityCtx()
+		}
 	}
 
 	initContainerBuilder := newRestoreInitContainerBuilder(image, string(input.Restore.UID))
@@ -281,4 +290,21 @@ func newRestoreInitContainerBuilder(image, restoreUID string) *builder.Container
 				},
 			},
 		}...)
+}
+
+// defaultSecurityCtx returns a default security context for the init container, which has the level "restricted" per
+// Pod Security Standards.
+func defaultSecurityCtx() corev1.SecurityContext {
+	uid := int64(restoreHelperUID)
+	return corev1.SecurityContext{
+		AllowPrivilegeEscalation: boolptr.False(),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		},
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+		RunAsUser:    &uid,
+		RunAsNonRoot: boolptr.True(),
+	}
 }
