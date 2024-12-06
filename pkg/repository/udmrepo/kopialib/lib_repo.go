@@ -72,9 +72,7 @@ type kopiaObjectWriter struct {
 	rawWriter object.Writer
 }
 
-type openOptions struct {
-	allowIndexWriteOnLoad bool
-}
+type openOptions struct{}
 
 const (
 	defaultLogInterval             = time.Second * 10
@@ -320,10 +318,11 @@ func (kr *kopiaRepository) NewObjectWriter(ctx context.Context, opt udmrepo.Obje
 	}
 
 	writer := kr.rawWriter.NewObjectWriter(kopia.SetupKopiaLog(ctx, kr.logger), object.WriterOptions{
-		Description: opt.Description,
-		Prefix:      index.IDPrefix(opt.Prefix),
-		AsyncWrites: opt.AsyncWrites,
-		Compressor:  getCompressorForObject(opt),
+		Description:        opt.Description,
+		Prefix:             index.IDPrefix(opt.Prefix),
+		AsyncWrites:        opt.AsyncWrites,
+		Compressor:         getCompressorForObject(opt),
+		MetadataCompressor: getMetadataCompressor(),
 	})
 
 	if writer == nil {
@@ -399,7 +398,9 @@ func (kr *kopiaRepository) ConcatenateObjects(ctx context.Context, objectIDs []u
 		rawIDs = append(rawIDs, rawID)
 	}
 
-	result, err := kr.rawWriter.ConcatenateObjects(ctx, rawIDs)
+	result, err := kr.rawWriter.ConcatenateObjects(ctx, rawIDs, repo.ConcatenateOptions{
+		Compressor: getMetadataCompressor(),
+	})
 	if err != nil {
 		return udmrepo.ID(""), errors.Wrap(err, "error to concatenate objects")
 	}
@@ -515,8 +516,13 @@ func (kow *kopiaObjectWriter) Close() error {
 }
 
 // getCompressorForObject returns the compressor for an object, at present, we don't support compression
-func getCompressorForObject(opt udmrepo.ObjectWriteOptions) compression.Name {
+func getCompressorForObject(_ udmrepo.ObjectWriteOptions) compression.Name {
 	return ""
+}
+
+// getMetadataCompressor returns the compressor for metadata, return kopia's default since we don't support compression
+func getMetadataCompressor() compression.Name {
+	return "zstd-fastest"
 }
 
 func getManifestEntryFromKopia(mani *manifest.EntryMetadata) *udmrepo.ManifestEntryMetadata {
@@ -554,13 +560,8 @@ func (lt *logThrottle) shouldLog() bool {
 	return false
 }
 
-func openKopiaRepo(ctx context.Context, configFile string, password string, options *openOptions) (repo.Repository, error) {
-	allowIndexWriteOnLoad := false
-	if options != nil {
-		allowIndexWriteOnLoad = options.allowIndexWriteOnLoad
-	}
-
-	r, err := kopiaRepoOpen(ctx, configFile, password, &repo.Options{AllowWriteOnIndexLoad: allowIndexWriteOnLoad})
+func openKopiaRepo(ctx context.Context, configFile string, password string, _ *openOptions) (repo.Repository, error) {
+	r, err := kopiaRepoOpen(ctx, configFile, password, &repo.Options{})
 	if os.IsNotExist(err) {
 		return nil, errors.Wrap(err, "error to open repo, repo doesn't exist")
 	}

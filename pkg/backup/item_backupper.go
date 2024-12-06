@@ -175,12 +175,12 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		name:      name,
 	}
 
-	if _, exists := ib.backupRequest.BackedUpItems[key]; exists {
+	if ib.backupRequest.BackedUpItems.Has(key) {
 		log.Info("Skipping item because it's already been backed up.")
 		// returning true since this item *is* in the backup, even though we're not backing it up here
 		return true, itemFiles, nil
 	}
-	ib.backupRequest.BackedUpItems[key] = struct{}{}
+	ib.backupRequest.BackedUpItems.AddItem(key)
 	log.Info("Backing up item")
 
 	var (
