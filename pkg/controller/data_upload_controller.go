@@ -55,8 +55,6 @@ import (
 
 const (
 	dataUploadDownloadRequestor = "snapshot-data-upload-download"
-	acceptNodeAnnoKey           = "velero.io/accepted-by"
-	acceptTimeAnnoKey           = "velero.io/accepted-at"
 	DataUploadDownloadFinalizer = "velero.io/data-upload-download-finalizer"
 	preparingMonitorFrequency   = time.Minute
 )
@@ -256,11 +254,9 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		} else if peekErr := ep.PeekExposed(ctx, getOwnerObject(du)); peekErr != nil {
 			r.tryCancelAcceptedDataUpload(ctx, du, fmt.Sprintf("found a dataupload %s/%s with expose error: %s. mark it as cancel", du.Namespace, du.Name, peekErr))
 			log.Errorf("Cancel du %s/%s because of expose error %s", du.Namespace, du.Name, peekErr)
-		} else if at, found := du.Annotations[acceptTimeAnnoKey]; found {
-			if t, err := time.Parse(time.RFC3339, at); err == nil {
-				if time.Since(t) >= r.preparingTimeout {
-					r.onPrepareTimeout(ctx, du)
-				}
+		} else if du.Status.AcceptedTimestamp != nil {
+			if time.Since(du.Status.AcceptedTimestamp.Time) >= r.preparingTimeout {
+				r.onPrepareTimeout(ctx, du)
 			}
 		}
 
@@ -704,13 +700,8 @@ func (r *DataUploadReconciler) acceptDataUpload(ctx context.Context, du *velerov
 
 	updateFunc := func(dataUpload *velerov2alpha1api.DataUpload) {
 		dataUpload.Status.Phase = velerov2alpha1api.DataUploadPhaseAccepted
-		annotations := dataUpload.GetAnnotations()
-		if annotations == nil {
-			annotations = make(map[string]string)
-		}
-		annotations[acceptNodeAnnoKey] = r.nodeName
-		annotations[acceptTimeAnnoKey] = r.Clock.Now().Format(time.RFC3339)
-		dataUpload.SetAnnotations(annotations)
+		dataUpload.Status.AcceptedByNode = r.nodeName
+		dataUpload.Status.AcceptedTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	}
 
 	succeeded, err := r.exclusiveUpdateDataUpload(ctx, updated, updateFunc)
