@@ -20,6 +20,8 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -113,8 +115,18 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 		defaultCPURequestLimit, defaultMemRequestLimit, // requests
 		defaultCPURequestLimit, defaultMemRequestLimit, // limits
 	)
-
-	securityContext, _ := kube.ParseSecurityContext("", "", "", "")
+	id := int64(1000)
+	securityContext := corev1api.SecurityContext{
+		AllowPrivilegeEscalation: boolptr.False(),
+		Capabilities: &corev1api.Capabilities{
+			Drop: []corev1api.Capability{"ALL"},
+		},
+		SeccompProfile: &corev1api.SeccompProfile{
+			Type: corev1api.SeccompProfileTypeRuntimeDefault,
+		},
+		RunAsUser:    &id,
+		RunAsNonRoot: boolptr.True(),
+	}
 
 	var (
 		restoreName = "my-restore"
