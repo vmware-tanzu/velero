@@ -72,7 +72,7 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) 
 			var err error
 			region := location.Spec.Config["region"]
 			if region == "" {
-				region, err = getAWSBucketRegion(bucket)
+				region, err = getAWSBucketRegion(bucket, location.Spec.Config)
 			}
 			if err != nil {
 				return "", errors.Wrapf(err, "failed to detect the region via bucket: %s", bucket)

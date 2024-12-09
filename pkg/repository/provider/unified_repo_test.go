@@ -222,7 +222,7 @@ func TestGetStorageVariables(t *testing.T) {
 		repoName          string
 		repoBackend       string
 		repoConfig        map[string]string
-		getS3BucketRegion func(string) (string, error)
+		getS3BucketRegion func(bucket string, config map[string]string) (string, error)
 		expected          map[string]string
 		expectedErr       string
 	}{
@@ -291,7 +291,7 @@ func TestGetStorageVariables(t *testing.T) {
 					},
 				},
 			},
-			getS3BucketRegion: func(bucket string) (string, error) {
+			getS3BucketRegion: func(bucket string, config map[string]string) (string, error) {
 				return "region from bucket: " + bucket, nil
 			},
 			repoBackend: "fake-repo-type",
@@ -313,7 +313,7 @@ func TestGetStorageVariables(t *testing.T) {
 					Config:   map[string]string{},
 				},
 			},
-			getS3BucketRegion: func(bucket string) (string, error) {
+			getS3BucketRegion: func(bucket string, config map[string]string) (string, error) {
 				return "", errors.New("fake error")
 			},
 			expected:    map[string]string{},
@@ -339,7 +339,7 @@ func TestGetStorageVariables(t *testing.T) {
 					},
 				},
 			},
-			getS3BucketRegion: func(bucket string) (string, error) {
+			getS3BucketRegion: func(bucket string, config map[string]string) (string, error) {
 				return "region from bucket: " + bucket, nil
 			},
 			repoBackend: "fake-repo-type",
@@ -374,7 +374,7 @@ func TestGetStorageVariables(t *testing.T) {
 					},
 				},
 			},
-			getS3BucketRegion: func(bucket string) (string, error) {
+			getS3BucketRegion: func(bucket string, config map[string]string) (string, error) {
 				return "region from bucket: " + bucket, nil
 			},
 			repoBackend: "fake-repo-type",
