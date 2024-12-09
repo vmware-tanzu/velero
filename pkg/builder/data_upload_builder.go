@@ -150,3 +150,15 @@ func (d *DataUploadBuilder) Node(node string) *DataUploadBuilder {
 	d.object.Status.Node = node
 	return d
 }
+
+// AcceptedByNode sets the DataUpload's AcceptedByNode.
+func (d *DataUploadBuilder) AcceptedByNode(node string) *DataUploadBuilder {
+	d.object.Status.AcceptedByNode = node
+	return d
+}
+
+// AcceptedTimestamp sets the DataUpload's AcceptedTimestamp.
+func (d *DataUploadBuilder) AcceptedTimestamp(acceptedTimestamp *metav1.Time) *DataUploadBuilder {
+	d.object.Status.AcceptedTimestamp = acceptedTimestamp
+	return d
+}
