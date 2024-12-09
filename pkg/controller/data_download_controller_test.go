@@ -349,7 +349,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 		},
 		{
 			name:     "prepare timeout",
-			dd:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).StartTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 5)}).Result(),
+			dd:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Annotations(map[string]string{acceptTimeAnnoKey: (time.Now().Add(-time.Minute * 5)).Format(time.RFC3339)}).Result(),
 			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Result(),
 		},
 		{
@@ -496,7 +496,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 
 			if test.expected != nil {
 				require.NoError(t, err)
-				assert.Equal(t, dd.Status.Phase, test.expected.Status.Phase)
+				assert.Equal(t, test.expected.Status.Phase, dd.Status.Phase)
 			}
 
 			if test.isGetExposeErr {
@@ -1003,22 +1003,22 @@ func TestAttemptDataDownloadResume(t *testing.T) {
 		},
 		{
 			name:                   "accepted DataDownload in the current node",
-			dd:                     dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Labels(map[string]string{acceptNodeLabelKey: "node-1"}).Result(),
+			dd:                     dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Annotations(map[string]string{acceptNodeAnnoKey: "node-1"}).Result(),
 			cancelledDataDownloads: []string{dataDownloadName},
 			acceptedDataDownloads:  []string{dataDownloadName},
 		},
 		{
 			name: "accepted DataDownload with dd label but is canceled",
-			dd: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Cancel(true).Labels(map[string]string{
-				acceptNodeLabelKey: "node-1",
+			dd: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Cancel(true).Annotations(map[string]string{
+				acceptNodeAnnoKey: "node-1",
 			}).Result(),
 			acceptedDataDownloads:  []string{dataDownloadName},
 			cancelledDataDownloads: []string{dataDownloadName},
 		},
 		{
 			name: "accepted DataDownload with dd label but cancel fail",
-			dd: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Labels(map[string]string{
-				acceptNodeLabelKey: "node-1",
+			dd: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Annotations(map[string]string{
+				acceptNodeAnnoKey: "node-1",
 			}).Result(),
 			needErrs:              []bool{false, false, true, false, false, false},
 			acceptedDataDownloads: []string{dataDownloadName},
