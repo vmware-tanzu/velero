@@ -247,7 +247,7 @@ func TestGetRepoIdentifier(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			getAWSBucketRegion = tc.getAWSBucketRegion
-			id, err := GetRepoIdentifier(tc.bsl, tc.repoName)
+			id, err := GetRepoIdentifier(tc.bsl, tc.repoName, "restic")
 			assert.Equal(t, tc.expected, id)
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)
