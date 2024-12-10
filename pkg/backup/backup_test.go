@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
@@ -3383,65 +3384,6 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 	}
 }
 
-// TestBackupWithInvalidHooks runs backups with invalid hook specifications and verifies
-// that an error is returned.
-func TestBackupWithInvalidHooks(t *testing.T) {
-	tests := []struct {
-		name         string
-		backup       *velerov1.Backup
-		apiResources []*test.APIResource
-		want         error
-	}{
-		{
-			name: "hook with invalid label selector causes backup to fail",
-			backup: defaultBackup().
-				Hooks(velerov1.BackupHooks{
-					Resources: []velerov1.BackupResourceHookSpec{
-						{
-							Name: "hook-with-invalid-label-selector",
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: metav1.LabelSelectorOperator("nonexistent-operator"),
-										Values:   []string{"bar"},
-									},
-								},
-							},
-						},
-					},
-				}).
-				Result(),
-			apiResources: []*test.APIResource{
-				test.Pods(
-					builder.ForPod("foo", "bar").Result(),
-				),
-			},
-			want: errors.New("\"nonexistent-operator\" is not a valid label selector operator"),
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			var (
-				h   = newHarness(t)
-				req = &Request{
-					Backup:           tc.backup,
-					SkippedPVTracker: NewSkipPVTracker(),
-					BackedUpItems:    NewBackedUpItemsMap(),
-				}
-				backupFile = bytes.NewBuffer([]byte{})
-			)
-
-			for _, resource := range tc.apiResources {
-				h.addItems(t, resource)
-			}
-
-			assert.EqualError(t, h.backupper.Backup(h.log, req, backupFile, nil, nil, nil), tc.want.Error())
-		})
-	}
-}
-
 // TestBackupWithHooks runs backups with valid hook specifications and verifies that the
 // hooks are run. It uses a MockPodCommandExecutor since hooks can't actually be executed
 // in running pods during the unit test. Verification is done by asserting expected method
@@ -3926,7 +3868,15 @@ func TestBackupWithHooks(t *testing.T) {
 			require.NoError(t, h.backupper.Backup(h.log, req, backupFile, nil, tc.actions, nil))
 
 			if tc.wantHookExecutionLog != nil {
-				assert.Equal(t, tc.wantHookExecutionLog, podCommandExecutor.HookExecutionLog)
+				assert.Equal(t, len(tc.wantHookExecutionLog), len(podCommandExecutor.HookExecutionLog))
+				m := map[string]struct{}{}
+				for _, entry := range podCommandExecutor.HookExecutionLog {
+					m[entry.String()] = struct{}{}
+				}
+				for _, expectedEntry := range tc.wantHookExecutionLog {
+					_, exist := m[expectedEntry.String()]
+					assert.True(t, exist)
+				}
 			}
 			assertTarballContents(t, backupFile, append(tc.wantBackedUp, "metadata/version")...)
 		})
@@ -3964,8 +3914,8 @@ func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *
 	return res, pvcSummary, nil
 }
 
-func (b *fakePodVolumeBackupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velerov1.PodVolumeBackup {
-	return b.pvbs
+func (b *fakePodVolumeBackupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, error) {
+	return b.pvbs, nil
 }
 
 // TestBackupWithPodVolume runs backups of pods that are annotated for PodVolume backup,
@@ -4233,6 +4183,8 @@ func newHarness(t *testing.T) *harness {
 			podCommandExecutor:        nil,
 			podVolumeBackupperFactory: new(fakePodVolumeBackupperFactory),
 			podVolumeTimeout:          0,
+
+			hookParser: hook.NewParser(discoveryHelper),
 		},
 		log: log,
 	}

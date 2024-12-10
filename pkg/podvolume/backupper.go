@@ -47,19 +47,21 @@ import (
 type Backupper interface {
 	// BackupPodVolumes backs up all specified volumes in a pod.
 	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, resPolicies *resourcepolicies.Policies, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, *PVCBackupSummary, []error)
-	WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velerov1api.PodVolumeBackup
+	WaitAllPodVolumesProcessed(log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, error)
 }
 
 type backupper struct {
-	ctx                 context.Context
-	repoLocker          *repository.RepoLocker
-	repoEnsurer         *repository.Ensurer
-	crClient            ctrlclient.Client
-	uploaderType        string
-	pvbInformer         ctrlcache.Informer
-	handlerRegistration cache.ResourceEventHandlerRegistration
-	wg                  sync.WaitGroup
-	result              []*velerov1api.PodVolumeBackup
+	*sync.Mutex
+	ctx                    context.Context
+	repoLocker             *repository.RepoLocker
+	repoEnsurer            *repository.Ensurer
+	crClient               ctrlclient.Client
+	uploaderType           string
+	pvbInformer            ctrlcache.Informer
+	handlerRegistration    cache.ResourceEventHandlerRegistration
+	wg                     sync.WaitGroup
+	result                 []*velerov1api.PodVolumeBackup
+	allPodVolumesProcessed bool
 }
 
 type skippedPVC struct {
@@ -119,6 +121,7 @@ func newBackupper(
 		pvbInformer:  pvbInformer,
 		wg:           sync.WaitGroup{},
 		result:       []*velerov1api.PodVolumeBackup{},
+		Mutex:        &sync.Mutex{},
 	}
 
 	b.handlerRegistration, _ = pvbInformer.AddEventHandler(
@@ -319,7 +322,13 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	return podVolumeBackups, pvcSummary, errs
 }
 
-func (b *backupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velerov1api.PodVolumeBackup {
+func (b *backupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, error) {
+	b.Lock()
+	defer b.Unlock()
+	if b.allPodVolumesProcessed {
+		return b.result, nil
+	}
+
 	defer func() {
 		if err := b.pvbInformer.RemoveEventHandler(b.handlerRegistration); err != nil {
 			log.Debugf("failed to remove the event handler for PVB: %v", err)
@@ -330,12 +339,15 @@ func (b *backupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velero
 	go func() {
 		defer close(done)
 		b.wg.Wait()
+		b.allPodVolumesProcessed = true
 	}()
 
 	var podVolumeBackups []*velerov1api.PodVolumeBackup
 	select {
 	case <-b.ctx.Done():
-		log.Error("timed out waiting for all PodVolumeBackups to complete")
+		err := fmt.Errorf("timed out waiting for all PodVolumeBackups to complete")
+		log.Error(err)
+		return nil, err
 	case <-done:
 		for _, pvb := range b.result {
 			podVolumeBackups = append(podVolumeBackups, pvb)
@@ -344,7 +356,7 @@ func (b *backupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velero
 			}
 		}
 	}
-	return podVolumeBackups
+	return podVolumeBackups, nil
 }
 
 func skipAllPodVolumes(pod *corev1api.Pod, volumesToBackup []string, err error, pvcSummary *PVCBackupSummary, log logrus.FieldLogger) {
