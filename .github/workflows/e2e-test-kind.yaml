@@ -42,8 +42,8 @@ jobs:
       - name: Build Velero Image
         if: steps.image-cache.outputs.cache-hit != 'true'
         run: |
-          IMAGE=velero VERSION=pr-test make container
-          docker save velero:pr-test -o ./velero.tar
+          IMAGE=velero VERSION=pr-test BUILD_OUTPUT_TYPE=docker make container
+          docker save velero:pr-test-linux-amd64 -o ./velero.tar
   # Create json of k8s versions to test
   # from guide: https://stackoverflow.com/a/65094398/4590470
   setup-test-matrix:
@@ -130,7 +130,7 @@ jobs:
               ADDITIONAL_BSL_CONFIG=region=minio,s3ForcePathStyle="true",s3Url=http://$(hostname -i):9000 \
               ADDITIONAL_CREDS_FILE=/tmp/credential \
               ADDITIONAL_BSL_BUCKET=additional-bucket \
-              VELERO_IMAGE=velero:pr-test \
+              VELERO_IMAGE=velero:pr-test-linux-amd64 \
               GINKGO_LABELS="${{ matrix.labels }}" \
               make -C test/ run-e2e
         timeout-minutes: 30

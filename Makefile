@@ -31,6 +31,7 @@ GCR_IMAGE ?= $(GCR_REGISTRY)/$(BIN)
 # We allow the Dockerfile to be configurable to enable the use of custom Dockerfiles
 # that pull base images from different registries.
 VELERO_DOCKERFILE ?= Dockerfile
+VELERO_DOCKERFILE_WINDOWS ?= Dockerfile-Windows
 BUILDER_IMAGE_DOCKERFILE ?= hack/build-image/Dockerfile
 
 # Calculate the realpath of the build-image Dockerfile as we `cd` into the hack/build
@@ -100,20 +101,31 @@ comma=,
 RESTIC_VERSION ?= 0.15.0
 
 CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le
-BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
-# Whether or not buildx should push the image to the registry, applies to when BUILDX_PLATFORMS has multiple platforms below.
-# false by default because most people do not have credentials to $(REGISTRY) nor should they push from their local development machine.
-# once you have set $(REGISTRY) or $(IMAGE) and have credentials to those registries, you can set BUILDX_PUSH=true
-BUILDX_PUSH ?= false
-# if BUILDX_PLATFORMS has multiple platforms, we need to use BUILDX_OUTPUT_TYPE=image and optionally BUILDX_OUTPUT_TYPE=image,push=true if BUILDX_PUSH is true
-# The default image store in Docker Engine doesn't support loading multi-platform images. So set BUILDX_PUSH=true to push the image to the registry if you need to use the
-# multi-platform output image. In the future, we may add containerd support for multi-platform images. https://docs.docker.com/engine/storage/containerd/
-# if BUILDX_PLATFORMS has only one platform, we can use BUILDX_OUTPUT_TYPE=docker to import the image to the local docker daemon
-ifeq ($(words $(subst $(comma), ,$(BUILDX_PLATFORMS))),1)
-	BUILDX_OUTPUT_TYPE ?= docker
+BUILD_OUTPUT_TYPE ?= docker
+BUILD_OS ?= linux
+BUILD_ARCH ?= amd64
+BUILD_TAG_GCR ?= false
+BUILD_WINDOWS_VERSION ?= ltsc2022
+
+ifeq ($(BUILD_OUTPUT_TYPE), docker)
+	ALL_OS = linux
+	ALL_ARCH.linux = $(word 2, $(subst -, ,$(shell go env GOOS)-$(shell go env GOARCH)))
 else
-	BUILDX_OUTPUT_TYPE ?= image$(subst false,,$(subst true,$(comma)push=true,$(BUILDX_PUSH)))
+	ALL_OS = $(subst $(comma), ,$(BUILD_OS))
+	ALL_ARCH.linux = $(subst $(comma), ,$(BUILD_ARCH))
 endif
+
+ALL_ARCH.windows = $(if $(filter windows,$(ALL_OS)),amd64,)
+ALL_OSVERSIONS.windows = $(if $(filter windows,$(ALL_OS)),$(BUILD_WINDOWS_VERSION),)
+ALL_OS_ARCH.linux =  $(foreach os, $(filter linux,$(ALL_OS)), $(foreach arch, ${ALL_ARCH.linux}, ${os}-$(arch)))
+ALL_OS_ARCH.windows = $(foreach os, $(filter windows,$(ALL_OS)), $(foreach arch, $(ALL_ARCH.windows), $(foreach osversion, ${ALL_OSVERSIONS.windows}, ${os}-${osversion}-${arch})))
+ALL_OS_ARCH = $(ALL_OS_ARCH.linux)$(ALL_OS_ARCH.windows)
+
+ALL_IMAGE_TAGS = $(IMAGE_TAGS)
+ifeq ($(BUILD_TAG_GCR), true)
+	ALL_IMAGE_TAGS += $(GCR_IMAGE_TAGS)
+endif
+
 # set git sha and tree state
 GIT_SHA = $(shell git rev-parse HEAD)
 ifneq ($(shell git status --porcelain 2> /dev/null),)
@@ -208,11 +220,38 @@ container:
 ifneq ($(BUILDX_ENABLED), true)
 	$(error $(BUILDX_ERROR))
 endif
+
+ifeq ($(BUILDX_INSTANCE),)
+	@echo creating a buildx instance
+	-docker buildx rm velero-builder || true
+	@docker buildx create --use --name=velero-builder
+else
+	@echo using a specified buildx instance $(BUILDX_INSTANCE)
+	@docker buildx use $(BUILDX_INSTANCE)
+endif
+
+	@mkdir -p _output
+
+	@for osarch in $(ALL_OS_ARCH); do \
+		$(MAKE) container-$${osarch}; \
+	done
+
+ifeq ($(BUILD_OUTPUT_TYPE), registry)
+	@for tag in $(ALL_IMAGE_TAGS); do \
+		IMAGE_TAG=$${tag} $(MAKE) push-manifest; \
+	done
+endif
+
+container-linux-%:
+	@BUILDX_ARCH=$* $(MAKE) container-linux
+
+container-linux:
+	@echo "building container: $(IMAGE):$(VERSION)-linux-$(BUILDX_ARCH)"
+
 	@docker buildx build --pull \
-	--output=type=$(BUILDX_OUTPUT_TYPE) \
-	--platform $(BUILDX_PLATFORMS) \
-	$(addprefix -t , $(IMAGE_TAGS)) \
-	$(addprefix -t , $(GCR_IMAGE_TAGS)) \
+	--output="type=$(BUILD_OUTPUT_TYPE)$(if $(findstring tar, $(BUILD_OUTPUT_TYPE)),$(comma)dest=_output/$(BIN)-$(VERSION)-linux-$(BUILDX_ARCH).tar,)" \
+	--platform="linux/$(BUILDX_ARCH)" \
+	$(addprefix -t , $(addsuffix "-linux-$(BUILDX_ARCH)",$(ALL_IMAGE_TAGS))) \
 	--build-arg=GOPROXY=$(GOPROXY) \
 	--build-arg=PKG=$(PKG) \
 	--build-arg=BIN=$(BIN) \
@@ -221,8 +260,54 @@ endif
 	--build-arg=GIT_TREE_STATE=$(GIT_TREE_STATE) \
 	--build-arg=REGISTRY=$(REGISTRY) \
 	--build-arg=RESTIC_VERSION=$(RESTIC_VERSION) \
+	--provenance=false \
+	--sbom=false \
 	-f $(VELERO_DOCKERFILE) .
-	@echo "container: $(IMAGE):$(VERSION)"
+
+	@echo "built container: $(IMAGE):$(VERSION)-linux-$(BUILDX_ARCH)"
+
+container-windows-%:
+	@BUILDX_OSVERSION=$(firstword $(subst -, ,$*)) BUILDX_ARCH=$(lastword $(subst -, ,$*)) $(MAKE) container-windows
+
+container-windows:
+	@echo "building container: $(IMAGE):$(VERSION)-windows-$(BUILDX_OSVERSION)-$(BUILDX_ARCH)"
+
+	@docker buildx build --pull \
+	--output="type=$(BUILD_OUTPUT_TYPE)$(if $(findstring tar, $(BUILD_OUTPUT_TYPE)),$(comma)dest=_output/$(BIN)-$(VERSION)-windows-$(BUILDX_OSVERSION)-$(BUILDX_ARCH).tar,)" \
+	--platform="windows/$(BUILDX_ARCH)" \
+	$(addprefix -t , $(addsuffix "-windows-$(BUILDX_OSVERSION)-$(BUILDX_ARCH)",$(ALL_IMAGE_TAGS))) \
+	--build-arg=GOPROXY=$(GOPROXY) \
+	--build-arg=PKG=$(PKG) \
+	--build-arg=BIN=$(BIN) \
+	--build-arg=VERSION=$(VERSION) \
+	--build-arg=OS_VERSION=$(BUILDX_OSVERSION) \
+	--build-arg=GIT_SHA=$(GIT_SHA) \
+    --build-arg=GIT_TREE_STATE=$(GIT_TREE_STATE) \
+	--build-arg=REGISTRY=$(REGISTRY) \
+	--provenance=false \
+	--sbom=false \
+	-f $(VELERO_DOCKERFILE_WINDOWS) .
+
+	@echo "built container: $(IMAGE):$(VERSION)-windows-$(BUILDX_OSVERSION)-$(BUILDX_ARCH)"
+
+push-manifest:
+	@echo "building manifest: $(IMAGE_TAG) for $(foreach osarch, $(ALL_OS_ARCH), $(IMAGE_TAG)-${osarch})"
+	@docker manifest create --amend $(IMAGE_TAG) $(foreach osarch, $(ALL_OS_ARCH), $(IMAGE_TAG)-${osarch})
+
+	@set -x; \
+	for arch in $(ALL_ARCH.windows); do \
+		for osversion in $(ALL_OSVERSIONS.windows); do \
+			BASEIMAGE=mcr.microsoft.com/windows/nanoserver:$${osversion}; \
+			full_version=`docker manifest inspect $${BASEIMAGE} | jq -r '.manifests[0].platform["os.version"]'`; \
+			docker manifest annotate --os windows --arch $${arch} --os-version $${full_version} $(IMAGE_TAG) $(IMAGE_TAG)-windows-$${osversion}-$${arch}; \
+		done; \
+	done
+
+	@echo "pushing manifest $(IMAGE_TAG)"
+	@docker manifest push --purge $(IMAGE_TAG)
+
+	@echo "pushed manifest $(IMAGE_TAG):"
+	@docker manifest inspect $(IMAGE_TAG)
 
 SKIP_TESTS ?=
 test: build-dirs
