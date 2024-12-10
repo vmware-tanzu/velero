@@ -367,6 +367,7 @@ func (b *backupSyncReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Filter all BSL events, because this controller is supposed to run periodically, not by event.
 		For(&velerov1api.BackupStorageLocation{}, builder.WithPredicates(kube.FalsePredicate{})).
 		WatchesRawSource(backupSyncSource).
+		Named(constant.ControllerBackupSync).
 		Complete(b)
 }
 
