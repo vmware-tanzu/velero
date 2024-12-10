@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -48,6 +49,10 @@ type GenericRestoreExposer interface {
 	// If the expose is incomplete but not recoverable, it returns an error.
 	// Otherwise, it returns nil immediately.
 	PeekExposed(context.Context, corev1.ObjectReference) error
+
+	// DiagnoseExpose generate the diagnostic info when the expose is not finished for a long time.
+	// If it finds any problem, it returns an string about the problem.
+	DiagnoseExpose(context.Context, corev1.ObjectReference) string
 
 	// RebindVolume unexposes the restored PV and rebind it to the target PVC
 	RebindVolume(context.Context, corev1.ObjectReference, string, string, time.Duration) error
@@ -193,6 +198,51 @@ func (e *genericRestoreExposer) PeekExposed(ctx context.Context, ownerObject cor
 	}
 
 	return nil
+}
+
+func (e *genericRestoreExposer) DiagnoseExpose(ctx context.Context, ownerObject corev1.ObjectReference) string {
+	restorePodName := ownerObject.Name
+	restorePVCName := ownerObject.Name
+
+	diag := "begin diagnose restore exposer\n"
+
+	pod, err := e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(ctx, restorePodName, metav1.GetOptions{})
+	if err != nil {
+		pod = nil
+		diag += fmt.Sprintf("error getting restore pod %s, err: %v\n", restorePodName, err)
+	}
+
+	pvc, err := e.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(ctx, restorePVCName, metav1.GetOptions{})
+	if err != nil {
+		pvc = nil
+		diag += fmt.Sprintf("error getting restore pvc %s, err: %v\n", restorePVCName, err)
+	}
+
+	if pod != nil {
+		diag += kube.DiagnosePod(pod)
+
+		if pod.Spec.NodeName != "" {
+			if err := nodeagent.KbClientIsRunningInNode(ctx, ownerObject.Namespace, pod.Spec.NodeName, e.kubeClient); err != nil {
+				diag += fmt.Sprintf("node-agent is not running in node %s, err: %v\n", pod.Spec.NodeName, err)
+			}
+		}
+	}
+
+	if pvc != nil {
+		diag += kube.DiagnosePVC(pvc)
+
+		if pvc.Spec.VolumeName != "" {
+			if pv, err := e.kubeClient.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{}); err != nil {
+				diag += fmt.Sprintf("error getting restore pv %s, err: %v\n", pvc.Spec.VolumeName, err)
+			} else {
+				diag += kube.DiagnosePV(pv)
+			}
+		}
+	}
+
+	diag += "end diagnose restore exposer"
+
+	return diag
 }
 
 func (e *genericRestoreExposer) CleanUp(ctx context.Context, ownerObject corev1.ObjectReference) {
