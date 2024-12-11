@@ -234,11 +234,9 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		} else if peekErr := r.restoreExposer.PeekExposed(ctx, getDataDownloadOwnerObject(dd)); peekErr != nil {
 			r.tryCancelAcceptedDataDownload(ctx, dd, fmt.Sprintf("found a dataupload %s/%s with expose error: %s. mark it as cancel", dd.Namespace, dd.Name, peekErr))
 			log.Errorf("Cancel dd %s/%s because of expose error %s", dd.Namespace, dd.Name, peekErr)
-		} else if at, found := dd.Annotations[acceptTimeAnnoKey]; found {
-			if t, err := time.Parse(time.RFC3339, at); err == nil {
-				if time.Since(t) >= r.preparingTimeout {
-					r.onPrepareTimeout(ctx, dd)
-				}
+		} else if dd.Status.AcceptedTimestamp != nil {
+			if time.Since(dd.Status.AcceptedTimestamp.Time) >= r.preparingTimeout {
+				r.onPrepareTimeout(ctx, dd)
 			}
 		}
 
@@ -647,13 +645,8 @@ func (r *DataDownloadReconciler) acceptDataDownload(ctx context.Context, dd *vel
 
 	updateFunc := func(datadownload *velerov2alpha1api.DataDownload) {
 		datadownload.Status.Phase = velerov2alpha1api.DataDownloadPhaseAccepted
-		annotations := datadownload.GetAnnotations()
-		if annotations == nil {
-			annotations = make(map[string]string)
-		}
-		annotations[acceptNodeAnnoKey] = r.nodeName
-		annotations[acceptTimeAnnoKey] = r.Clock.Now().Format(time.RFC3339)
-		datadownload.SetAnnotations(annotations)
+		datadownload.Status.AcceptedByNode = r.nodeName
+		datadownload.Status.AcceptedTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	}
 
 	succeeded, err := r.exclusiveUpdateDataDownload(ctx, updated, updateFunc)
