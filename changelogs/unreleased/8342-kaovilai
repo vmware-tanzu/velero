@@ -1,0 +1,1 @@
+breaking: Namespaces included by labelSelector act as IncludedNamespaces, all items including unlabeled under a namespace with labelSelector selected by backup selector will be included in the backup.
