@@ -418,6 +418,13 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		if err := appendUnstructured(resources, ds); err != nil {
 			fmt.Printf("error appending DaemonSet %s: %s\n", ds.GetName(), err.Error())
 		}
+
+		dsOpts = append(dsOpts, WithForWinows())
+
+		dsWin := DaemonSet(o.Namespace, dsOpts...)
+		if err := appendUnstructured(resources, dsWin); err != nil {
+			fmt.Printf("error appending DaemonSet %s: %s\n", dsWin.GetName(), err.Error())
+		}
 	}
 
 	return resources

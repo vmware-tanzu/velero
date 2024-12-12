@@ -58,6 +58,7 @@ type podTemplateConfig struct {
 	repoMaintenanceJobConfigMap     string
 	nodeAgentConfigMap              string
 	itemBlockWorkerCount            int
+	forWindows                      bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -216,6 +217,12 @@ func WithRepoMaintenanceJobConfigMap(repoMaintenanceJobConfigMap string) podTemp
 func WithItemBlockWorkerCount(itemBlockWorkerCount int) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.itemBlockWorkerCount = itemBlockWorkerCount
+	}
+}
+
+func WithForWinows() podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.forWindows = true
 	}
 }
 
