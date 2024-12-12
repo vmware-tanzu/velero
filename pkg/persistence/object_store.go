@@ -243,6 +243,16 @@ func (s *objectBackupStore) ListBackups() ([]string, error) {
 		// each of those off to get the backup name.
 		backupName := strings.TrimSuffix(strings.TrimPrefix(prefix, s.layout.subdirs["backups"]), "/")
 
+		// if a bucket is versioned, the s3 folder still exists, even if all s3 objects have been deleted.
+		// We should only take s3 folders having a velero-backup.json object.
+		if ok, errObjectExists := s.objectStore.ObjectExists(s.bucket, s.layout.getBackupMetadataKey(backupName)); !ok || errObjectExists != nil {
+			// velero-backup.json or error do not add to list
+			if errObjectExists != nil {
+				s.logger.WithError(errObjectExists).Debugf("could not check if %s/%s exists", s.bucket, s.layout.getBackupMetadataKey(backupName))
+			}
+			continue
+		}
+
 		output = append(output, backupName)
 	}
 
