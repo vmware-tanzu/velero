@@ -886,3 +886,49 @@ func TestToSystemAffinity(t *testing.T) {
 		})
 	}
 }
+
+func TestDiagnosePod(t *testing.T) {
+	testCases := []struct {
+		name     string
+		pod      *corev1api.Pod
+		expected string
+	}{
+		{
+			name: "pod with all info",
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-pod",
+					Namespace: "fake-ns",
+				},
+				Spec: corev1api.PodSpec{
+					NodeName: "fake-node",
+				},
+				Status: corev1api.PodStatus{
+					Phase: corev1api.PodPending,
+					Conditions: []corev1api.PodCondition{
+						{
+							Type:    corev1api.PodInitialized,
+							Status:  corev1api.ConditionTrue,
+							Reason:  "fake-reason-1",
+							Message: "fake-message-1",
+						},
+						{
+							Type:    corev1api.PodScheduled,
+							Status:  corev1api.ConditionFalse,
+							Reason:  "fake-reason-2",
+							Message: "fake-message-2",
+						},
+					},
+				},
+			},
+			expected: "Pod fake-ns/fake-pod, phase Pending, node name fake-node\nPod condition Initialized, status True, reason fake-reason-1, message fake-message-1\nPod condition PodScheduled, status False, reason fake-reason-2, message fake-message-2\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			diag := DiagnosePod(tc.pod)
+			assert.Equal(t, tc.expected, diag)
+		})
+	}
+}

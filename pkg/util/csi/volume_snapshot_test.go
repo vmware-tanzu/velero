@@ -1732,3 +1732,197 @@ func TestWaitUntilVSCHandleIsReady(t *testing.T) {
 		})
 	}
 }
+
+func TestDiagnoseVS(t *testing.T) {
+	vscName := "fake-vsc"
+	readyToUse := true
+	message := "fake-message"
+
+	testCases := []struct {
+		name     string
+		vs       *snapshotv1api.VolumeSnapshot
+		expected string
+	}{
+		{
+			name: "VS with no status",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-vs",
+					Namespace: "fake-ns",
+				},
+			},
+			expected: "VS fake-ns/fake-vs, bind to , readyToUse false, errMessage \n",
+		},
+		{
+			name: "VS with empty status",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-vs",
+					Namespace: "fake-ns",
+				},
+				Status: &snapshotv1api.VolumeSnapshotStatus{},
+			},
+			expected: "VS fake-ns/fake-vs, bind to , readyToUse false, errMessage \n",
+		},
+		{
+			name: "VS with VSC name",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-vs",
+					Namespace: "fake-ns",
+				},
+				Status: &snapshotv1api.VolumeSnapshotStatus{
+					BoundVolumeSnapshotContentName: &vscName,
+				},
+			},
+			expected: "VS fake-ns/fake-vs, bind to fake-vsc, readyToUse false, errMessage \n",
+		},
+		{
+			name: "VS with VSC name+ready",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-vs",
+					Namespace: "fake-ns",
+				},
+				Status: &snapshotv1api.VolumeSnapshotStatus{
+					BoundVolumeSnapshotContentName: &vscName,
+					ReadyToUse:                     &readyToUse,
+				},
+			},
+			expected: "VS fake-ns/fake-vs, bind to fake-vsc, readyToUse true, errMessage \n",
+		},
+		{
+			name: "VS with VSC name+ready+empty error",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-vs",
+					Namespace: "fake-ns",
+				},
+				Status: &snapshotv1api.VolumeSnapshotStatus{
+					BoundVolumeSnapshotContentName: &vscName,
+					ReadyToUse:                     &readyToUse,
+					Error:                          &snapshotv1api.VolumeSnapshotError{},
+				},
+			},
+			expected: "VS fake-ns/fake-vs, bind to fake-vsc, readyToUse true, errMessage \n",
+		},
+		{
+			name: "VS with VSC name+ready+error",
+			vs: &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-vs",
+					Namespace: "fake-ns",
+				},
+				Status: &snapshotv1api.VolumeSnapshotStatus{
+					BoundVolumeSnapshotContentName: &vscName,
+					ReadyToUse:                     &readyToUse,
+					Error: &snapshotv1api.VolumeSnapshotError{
+						Message: &message,
+					},
+				},
+			},
+			expected: "VS fake-ns/fake-vs, bind to fake-vsc, readyToUse true, errMessage fake-message\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			diag := DiagnoseVS(tc.vs)
+			assert.Equal(t, tc.expected, diag)
+		})
+	}
+}
+
+func TestDiagnoseVSC(t *testing.T) {
+	readyToUse := true
+	message := "fake-message"
+	handle := "fake-handle"
+
+	testCases := []struct {
+		name     string
+		vsc      *snapshotv1api.VolumeSnapshotContent
+		expected string
+	}{
+		{
+			name: "VS with no status",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-vsc",
+				},
+			},
+			expected: "VSC fake-vsc, readyToUse false, errMessage , handle \n",
+		},
+		{
+			name: "VSC with empty status",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-vsc",
+				},
+				Status: &snapshotv1api.VolumeSnapshotContentStatus{},
+			},
+			expected: "VSC fake-vsc, readyToUse false, errMessage , handle \n",
+		},
+		{
+			name: "VSC with ready",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-vsc",
+				},
+				Status: &snapshotv1api.VolumeSnapshotContentStatus{
+					ReadyToUse: &readyToUse,
+				},
+			},
+			expected: "VSC fake-vsc, readyToUse true, errMessage , handle \n",
+		},
+		{
+			name: "VSC with ready+handle",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-vsc",
+				},
+				Status: &snapshotv1api.VolumeSnapshotContentStatus{
+					ReadyToUse:     &readyToUse,
+					SnapshotHandle: &handle,
+				},
+			},
+			expected: "VSC fake-vsc, readyToUse true, errMessage , handle fake-handle\n",
+		},
+		{
+			name: "VSC with ready+handle+empty error",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-vsc",
+				},
+				Status: &snapshotv1api.VolumeSnapshotContentStatus{
+					ReadyToUse:     &readyToUse,
+					SnapshotHandle: &handle,
+					Error:          &snapshotv1api.VolumeSnapshotError{},
+				},
+			},
+			expected: "VSC fake-vsc, readyToUse true, errMessage , handle fake-handle\n",
+		},
+		{
+			name: "VSC with ready+handle+error",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-vsc",
+				},
+				Status: &snapshotv1api.VolumeSnapshotContentStatus{
+					ReadyToUse:     &readyToUse,
+					SnapshotHandle: &handle,
+					Error: &snapshotv1api.VolumeSnapshotError{
+						Message: &message,
+					},
+				},
+			},
+			expected: "VSC fake-vsc, readyToUse true, errMessage fake-message, handle fake-handle\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			diag := DiagnoseVSC(tc.vsc)
+			assert.Equal(t, tc.expected, diag)
+		})
+	}
+}
