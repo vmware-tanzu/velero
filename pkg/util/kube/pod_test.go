@@ -47,6 +47,14 @@ func TestEnsureDeletePod(t *testing.T) {
 		},
 	}
 
+	podObjectWithFinalizer := &corev1api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "fake-ns",
+			Name:       "fake-pod",
+			Finalizers: []string{"fake-finalizer-1", "fake-finalizer-2"},
+		},
+	}
+
 	tests := []struct {
 		name      string
 		clientObj []runtime.Object
@@ -60,6 +68,38 @@ func TestEnsureDeletePod(t *testing.T) {
 			podName:   "fake-pod",
 			namespace: "fake-ns",
 			err:       "error to delete pod fake-pod: pods \"fake-pod\" not found",
+		},
+		{
+			name:      "wait timeout",
+			podName:   "fake-pod",
+			namespace: "fake-ns",
+			clientObj: []runtime.Object{podObjectWithFinalizer},
+			reactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "pods",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, nil
+					},
+				},
+			},
+			err: "timeout to assure pod fake-pod is deleted, finalizers in pod [fake-finalizer-1 fake-finalizer-2]",
+		},
+		{
+			name:      "wait timeout, no finalizer",
+			podName:   "fake-pod",
+			namespace: "fake-ns",
+			clientObj: []runtime.Object{podObject},
+			reactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "pods",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, nil
+					},
+				},
+			},
+			err: "timeout to assure pod fake-pod is deleted, finalizers in pod []",
 		},
 		{
 			name:      "wait fail",

@@ -167,8 +167,9 @@ func EnsureDeleteVS(ctx context.Context, snapshotClient snapshotter.SnapshotV1In
 		return errors.Wrap(err, "error to delete volume snapshot")
 	}
 
+	var updated *snapshotv1api.VolumeSnapshot
 	err = wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
-		_, err := snapshotClient.VolumeSnapshots(vsNamespace).Get(ctx, vsName, metav1.GetOptions{})
+		vs, err := snapshotClient.VolumeSnapshots(vsNamespace).Get(ctx, vsName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -177,11 +178,16 @@ func EnsureDeleteVS(ctx context.Context, snapshotClient snapshotter.SnapshotV1In
 			return false, errors.Wrapf(err, fmt.Sprintf("error to get VolumeSnapshot %s", vsName))
 		}
 
+		updated = vs
 		return false, nil
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, "error to assure VolumeSnapshot is deleted, %s", vsName)
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.Errorf("timeout to assure VolumeSnapshot %s is deleted, finalizers in VS %v", vsName, updated.Finalizers)
+		} else {
+			return errors.Wrapf(err, "error to assure VolumeSnapshot is deleted, %s", vsName)
+		}
 	}
 
 	return nil
@@ -219,8 +225,10 @@ func EnsureDeleteVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1I
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrap(err, "error to delete volume snapshot content")
 	}
+
+	var updated *snapshotv1api.VolumeSnapshotContent
 	err = wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
-		_, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vscName, metav1.GetOptions{})
+		vsc, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vscName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -229,11 +237,16 @@ func EnsureDeleteVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1I
 			return false, errors.Wrapf(err, fmt.Sprintf("error to get VolumeSnapshotContent %s", vscName))
 		}
 
+		updated = vsc
 		return false, nil
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, "error to assure VolumeSnapshotContent is deleted, %s", vscName)
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.Errorf("timeout to assure VolumeSnapshotContent %s is deleted, finalizers in VSC %v", vscName, updated.Finalizers)
+		} else {
+			return errors.Wrapf(err, "error to assure VolumeSnapshotContent is deleted, %s", vscName)
+		}
 	}
 
 	return nil
