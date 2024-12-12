@@ -462,7 +462,7 @@ func TestDeletePVCIfAny(t *testing.T) {
 				},
 			},
 			ensureTimeout: time.Second,
-			logMessage:    "failed to delete pvc fake-namespace/fake-pvc with err error to ensure pvc deleted for fake-pvc: context deadline exceeded",
+			logMessage:    "failed to delete pvc fake-namespace/fake-pvc with err timeout to assure pvc fake-pvc is deleted, finalizers in pvc []",
 			logLevel:      "level=warning",
 		},
 		{
@@ -584,6 +584,14 @@ func TestEnsureDeletePVC(t *testing.T) {
 		},
 	}
 
+	pvcObjectWithFinalizer := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "fake-ns",
+			Name:       "fake-pvc",
+			Finalizers: []string{"fake-finalizer-1", "fake-finalizer-2"},
+		},
+	}
+
 	tests := []struct {
 		name      string
 		clientObj []runtime.Object
@@ -635,6 +643,23 @@ func TestEnsureDeletePVC(t *testing.T) {
 			name:      "wait timeout",
 			pvcName:   "fake-pvc",
 			namespace: "fake-ns",
+			clientObj: []runtime.Object{pvcObjectWithFinalizer},
+			timeout:   time.Millisecond,
+			reactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvcObject, nil
+					},
+				},
+			},
+			err: "timeout to assure pvc fake-pvc is deleted, finalizers in pvc [fake-finalizer-1 fake-finalizer-2]",
+		},
+		{
+			name:      "wait timeout, no finalizer",
+			pvcName:   "fake-pvc",
+			namespace: "fake-ns",
 			clientObj: []runtime.Object{pvcObject},
 			timeout:   time.Millisecond,
 			reactors: []reactor{
@@ -646,7 +671,7 @@ func TestEnsureDeletePVC(t *testing.T) {
 					},
 				},
 			},
-			err: "error to ensure pvc deleted for fake-pvc: context deadline exceeded",
+			err: "timeout to assure pvc fake-pvc is deleted, finalizers in pvc []",
 		},
 	}
 
