@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -687,6 +688,11 @@ func (r *DataDownloadReconciler) onPrepareTimeout(ctx context.Context, dd *veler
 	if !succeeded {
 		log.Warn("Dataupload has been updated by others")
 		return
+	}
+
+	diags := strings.Split(r.restoreExposer.DiagnoseExpose(ctx, getDataDownloadOwnerObject(dd)), "\n")
+	for _, diag := range diags {
+		log.Warnf("[Diagnose DD expose]%s", diag)
 	}
 
 	r.restoreExposer.CleanUp(ctx, getDataDownloadOwnerObject(dd))

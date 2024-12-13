@@ -773,3 +773,51 @@ func WaitUntilVSCHandleIsReady(
 
 	return vsc, nil
 }
+
+func DiagnoseVS(vs *snapshotv1api.VolumeSnapshot) string {
+	vscName := ""
+	readyToUse := false
+	errMessage := ""
+
+	if vs.Status != nil {
+		if vs.Status.BoundVolumeSnapshotContentName != nil {
+			vscName = *vs.Status.BoundVolumeSnapshotContentName
+		}
+
+		if vs.Status.ReadyToUse != nil {
+			readyToUse = *vs.Status.ReadyToUse
+		}
+
+		if vs.Status.Error != nil && vs.Status.Error.Message != nil {
+			errMessage = *vs.Status.Error.Message
+		}
+	}
+
+	diag := fmt.Sprintf("VS %s/%s, bind to %s, readyToUse %v, errMessage %s\n", vs.Namespace, vs.Name, vscName, readyToUse, errMessage)
+
+	return diag
+}
+
+func DiagnoseVSC(vsc *snapshotv1api.VolumeSnapshotContent) string {
+	handle := ""
+	readyToUse := false
+	errMessage := ""
+
+	if vsc.Status != nil {
+		if vsc.Status.SnapshotHandle != nil {
+			handle = *vsc.Status.SnapshotHandle
+		}
+
+		if vsc.Status.ReadyToUse != nil {
+			readyToUse = *vsc.Status.ReadyToUse
+		}
+
+		if vsc.Status.Error != nil && vsc.Status.Error.Message != nil {
+			errMessage = *vsc.Status.Error.Message
+		}
+	}
+
+	diag := fmt.Sprintf("VSC %s, readyToUse %v, errMessage %s, handle %s\n", vsc.Name, readyToUse, errMessage, handle)
+
+	return diag
+}

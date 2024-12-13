@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
@@ -756,6 +757,11 @@ func (r *DataUploadReconciler) onPrepareTimeout(ctx context.Context, du *velerov
 		var volumeSnapshotName string
 		if du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI { // Other exposer should have another condition
 			volumeSnapshotName = du.Spec.CSISnapshot.VolumeSnapshot
+		}
+
+		diags := strings.Split(ep.DiagnoseExpose(ctx, getOwnerObject(du)), "\n")
+		for _, diag := range diags {
+			log.Warnf("[Diagnose DU expose]%s", diag)
 		}
 
 		ep.CleanUp(ctx, getOwnerObject(du), volumeSnapshotName, du.Spec.SourceNamespace)
