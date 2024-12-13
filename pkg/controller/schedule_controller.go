@@ -31,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	bld "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -70,18 +71,20 @@ func NewScheduleReconciler(
 }
 
 func (c *scheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	s := kube.NewPeriodicalEnqueueSource(c.logger.WithField("controller", constant.ControllerSchedule), mgr.GetClient(), &velerov1.ScheduleList{}, scheduleSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
+	pred := kube.NewAllEventPredicate(func(obj client.Object) bool {
+		schedule := obj.(*velerov1.Schedule)
+		if pause := schedule.Spec.Paused; pause {
+			c.logger.Infof("schedule %s is paused, skip", schedule.Name)
+			return false
+		}
+		return true
+	})
+	s := kube.NewPeriodicalEnqueueSource(c.logger.WithField("controller", constant.ControllerSchedule), mgr.GetClient(), &velerov1.ScheduleList{}, scheduleSyncPeriod,
+		kube.PeriodicalEnqueueSourceOption{
+			Predicates: []predicate.Predicate{pred},
+		})
 	return ctrl.NewControllerManagedBy(mgr).
-		// global predicate, works for both For and Watch
-		WithEventFilter(kube.NewAllEventPredicate(func(obj client.Object) bool {
-			schedule := obj.(*velerov1.Schedule)
-			if pause := schedule.Spec.Paused; pause {
-				c.logger.Infof("schedule %s is paused, skip", schedule.Name)
-				return false
-			}
-			return true
-		})).
-		For(&velerov1.Schedule{}, bld.WithPredicates(kube.SpecChangePredicate{})).
+		For(&velerov1.Schedule{}, bld.WithPredicates(kube.SpecChangePredicate{}, pred)).
 		WatchesRawSource(s).
 		Complete(c)
 }
