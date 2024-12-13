@@ -43,26 +43,26 @@ type enqueueRequestsFromMapFunc struct {
 }
 
 // Create implements EventHandler.
-func (e *enqueueRequestsFromMapFunc) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *enqueueRequestsFromMapFunc) Create(ctx context.Context, evt event.TypedCreateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	e.mapAndEnqueue(ctx, q, evt.Object)
 }
 
 // Update implements EventHandler.
-func (e *enqueueRequestsFromMapFunc) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (e *enqueueRequestsFromMapFunc) Update(ctx context.Context, evt event.TypedUpdateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	e.mapAndEnqueue(ctx, q, evt.ObjectNew)
 }
 
 // Delete implements EventHandler.
-func (e *enqueueRequestsFromMapFunc) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (e *enqueueRequestsFromMapFunc) Delete(ctx context.Context, evt event.TypedDeleteEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	e.mapAndEnqueue(ctx, q, evt.Object)
 }
 
 // Generic implements EventHandler.
-func (e *enqueueRequestsFromMapFunc) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *enqueueRequestsFromMapFunc) Generic(ctx context.Context, evt event.TypedGenericEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	e.mapAndEnqueue(ctx, q, evt.Object)
 }
 
-func (e *enqueueRequestsFromMapFunc) mapAndEnqueue(ctx context.Context, q workqueue.RateLimitingInterface, object client.Object) {
+func (e *enqueueRequestsFromMapFunc) mapAndEnqueue(ctx context.Context, q workqueue.TypedRateLimitingInterface[reconcile.Request], object client.Object) {
 	reqs := map[reconcile.Request]struct{}{}
 
 	for _, req := range e.toRequests(ctx, object) {

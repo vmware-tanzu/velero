@@ -42,7 +42,7 @@ func TestStart(t *testing.T) {
 
 	ctx, cancelFunc := context.WithCancel(context.TODO())
 	client := (&fake.ClientBuilder{}).Build()
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue[reconcile.Request](workqueue.DefaultTypedItemBasedRateLimiter[reconcile.Request]())
 	source := NewPeriodicalEnqueueSource(logrus.WithContext(ctx).WithField("controller", "PES_TEST"), client, &velerov1.ScheduleList{}, 1*time.Second, PeriodicalEnqueueSourceOption{})
 
 	require.NoError(t, source.Start(ctx, queue))
@@ -74,7 +74,7 @@ func TestPredicate(t *testing.T) {
 
 	ctx, cancelFunc := context.WithCancel(context.TODO())
 	client := (&fake.ClientBuilder{}).Build()
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue[reconcile.Request](workqueue.DefaultTypedItemBasedRateLimiter[reconcile.Request]())
 
 	pred := NewGenericEventPredicate(func(object crclient.Object) bool {
 		location := object.(*velerov1.BackupStorageLocation)
@@ -118,7 +118,7 @@ func TestOrder(t *testing.T) {
 
 	ctx, cancelFunc := context.WithCancel(context.TODO())
 	client := (&fake.ClientBuilder{}).Build()
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())
+	queue := workqueue.NewTypedRateLimitingQueue[reconcile.Request](workqueue.DefaultTypedItemBasedRateLimiter[reconcile.Request]())
 	source := NewPeriodicalEnqueueSource(
 		logrus.WithContext(ctx).WithField("controller", "PES_TEST"),
 		client,
@@ -173,10 +173,12 @@ func TestOrder(t *testing.T) {
 	}))
 	time.Sleep(2 * time.Second)
 
-	first, _ := queue.Get()
+	first, shutdown := queue.Get()
+	require.False(t, shutdown, "queue should not be shutdown")
+
 	bsl := &velerov1.BackupStorageLocation{}
-	require.Equal(t, "location2", first.(reconcile.Request).Name)
-	require.NoError(t, client.Get(ctx, first.(reconcile.Request).NamespacedName, bsl))
+	require.Equal(t, "location2", first.Name)
+	require.NoError(t, client.Get(ctx, first.NamespacedName, bsl))
 	require.True(t, bsl.Spec.Default)
 
 	cancelFunc()
