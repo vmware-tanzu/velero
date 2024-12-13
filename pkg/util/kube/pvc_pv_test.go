@@ -1488,3 +1488,65 @@ func TestMakePodPVCAttachment(t *testing.T) {
 		})
 	}
 }
+
+func TestDiagnosePVC(t *testing.T) {
+	testCases := []struct {
+		name     string
+		pvc      *corev1api.PersistentVolumeClaim
+		expected string
+	}{
+		{
+			name: "pvc with all info",
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-pvc",
+					Namespace: "fake-ns",
+				},
+				Spec: corev1api.PersistentVolumeClaimSpec{
+					VolumeName: "fake-pv",
+				},
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimPending,
+				},
+			},
+			expected: "PVC fake-ns/fake-pvc, phase Pending, binding to fake-pv\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			diag := DiagnosePVC(tc.pvc)
+			assert.Equal(t, tc.expected, diag)
+		})
+	}
+}
+
+func TestDiagnosePV(t *testing.T) {
+	testCases := []struct {
+		name     string
+		pv       *corev1api.PersistentVolume
+		expected string
+	}{
+		{
+			name: "pv with all info",
+			pv: &corev1api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-pv",
+				},
+				Status: corev1api.PersistentVolumeStatus{
+					Phase:   corev1api.VolumePending,
+					Message: "fake-message",
+					Reason:  "fake-reason",
+				},
+			},
+			expected: "PV fake-pv, phase Pending, reason fake-reason, message fake-message\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			diag := DiagnosePV(tc.pv)
+			assert.Equal(t, tc.expected, diag)
+		})
+	}
+}
