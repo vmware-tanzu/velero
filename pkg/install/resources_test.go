@@ -115,5 +115,5 @@ func TestAllResources(t *testing.T) {
 	ds, exist := objects["DaemonSet"]
 	assert.True(t, exist)
 
-	assert.Equal(t, 2, len(ds))
+	assert.Len(t, ds, 2)
 }
