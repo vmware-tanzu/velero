@@ -16,6 +16,9 @@ limitations under the License.
 package test
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 
@@ -31,6 +34,10 @@ type MockPodCommandExecutor struct {
 type HookExecutionEntry struct {
 	Namespace, Name, HookName string
 	HookCommand               []string
+}
+
+func (h HookExecutionEntry) String() string {
+	return fmt.Sprintf("%s.%s.%s.%s", h.Namespace, h.Name, h.HookName, strings.Join(h.HookCommand, ","))
 }
 
 func (e *MockPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *v1.ExecHook) error {
