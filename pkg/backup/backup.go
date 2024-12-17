@@ -34,9 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
@@ -474,7 +477,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		addNextToBlock := i < len(items)-1 && items[i].orderedResource && items[i+1].orderedResource && items[i].groupResource == items[i+1].groupResource
 		if itemBlock != nil && len(itemBlock.Items) > 0 && !addNextToBlock {
 			log.Infof("Backing Up Item Block including %s %s/%s (%v items in block)", items[i].groupResource.String(), items[i].namespace, items[i].name, len(itemBlock.Items))
-			backedUpGRs := kb.backupItemBlock(*itemBlock)
+			backedUpGRs := kb.backupItemBlock(ctx, *itemBlock)
 			for _, backedUpGR := range backedUpGRs {
 				backedUpGroupResources[backedUpGR] = true
 			}
@@ -633,7 +636,7 @@ func (kb *kubernetesBackupper) executeItemBlockActions(
 	}
 }
 
-func (kb *kubernetesBackupper) backupItemBlock(itemBlock BackupItemBlock) []schema.GroupResource {
+func (kb *kubernetesBackupper) backupItemBlock(ctx context.Context, itemBlock BackupItemBlock) []schema.GroupResource {
 	// find pods in ItemBlock
 	// filter pods based on whether they still need to be backed up
 	// this list will be used to run pre/post hooks
@@ -656,7 +659,7 @@ func (kb *kubernetesBackupper) backupItemBlock(itemBlock BackupItemBlock) []sche
 			}
 		}
 	}
-	postHookPods, failedPods, errs := kb.handleItemBlockHooks(itemBlock, preHookPods, hook.PhasePre)
+	postHookPods, failedPods, errs := kb.handleItemBlockPreHooks(itemBlock, preHookPods)
 	for i, pod := range failedPods {
 		itemBlock.Log.WithError(errs[i]).WithField("name", pod.Item.GetName()).Error("Error running pre hooks for pod")
 		// if pre hook fails, flag pod as backed-up and move on
@@ -676,10 +679,9 @@ func (kb *kubernetesBackupper) backupItemBlock(itemBlock BackupItemBlock) []sche
 		}
 	}
 
-	itemBlock.Log.Debug("Executing post hooks")
-	_, failedPods, errs = kb.handleItemBlockHooks(itemBlock, postHookPods, hook.PhasePost)
-	for i, pod := range failedPods {
-		itemBlock.Log.WithError(errs[i]).WithField("name", pod.Item.GetName()).Error("Error running post  hooks for pod")
+	if len(postHookPods) > 0 {
+		itemBlock.Log.Debug("Executing post hooks")
+		go kb.handleItemBlockPostHooks(ctx, itemBlock, postHookPods)
 	}
 
 	return grList
@@ -698,12 +700,12 @@ func (kb *kubernetesBackupper) itemMetadataAndKey(item itemblock.ItemBlockItem) 
 	return metadata, key, nil
 }
 
-func (kb *kubernetesBackupper) handleItemBlockHooks(itemBlock BackupItemBlock, hookPods []itemblock.ItemBlockItem, phase hook.HookPhase) ([]itemblock.ItemBlockItem, []itemblock.ItemBlockItem, []error) {
+func (kb *kubernetesBackupper) handleItemBlockPreHooks(itemBlock BackupItemBlock, hookPods []itemblock.ItemBlockItem) ([]itemblock.ItemBlockItem, []itemblock.ItemBlockItem, []error) {
 	var successPods []itemblock.ItemBlockItem
 	var failedPods []itemblock.ItemBlockItem
 	var errs []error
 	for _, pod := range hookPods {
-		err := itemBlock.itemBackupper.itemHookHandler.HandleHooks(itemBlock.Log, pod.Gr, pod.Item, itemBlock.itemBackupper.backupRequest.ResourceHooks, phase, itemBlock.itemBackupper.hookTracker)
+		err := itemBlock.itemBackupper.itemHookHandler.HandleHooks(itemBlock.Log, pod.Gr, pod.Item, itemBlock.itemBackupper.backupRequest.ResourceHooks, hook.PhasePre, itemBlock.itemBackupper.hookTracker)
 		if err == nil {
 			successPods = append(successPods, pod)
 		} else {
@@ -712,6 +714,83 @@ func (kb *kubernetesBackupper) handleItemBlockHooks(itemBlock BackupItemBlock, h
 		}
 	}
 	return successPods, failedPods, errs
+}
+
+// The hooks cannot execute until the PVBs to be processed
+func (kb *kubernetesBackupper) handleItemBlockPostHooks(ctx context.Context, itemBlock BackupItemBlock, hookPods []itemblock.ItemBlockItem) {
+	log := itemBlock.Log
+	itemBlock.itemBackupper.hookTracker.AsyncItemBlocks.Add(1)
+	defer itemBlock.itemBackupper.hookTracker.AsyncItemBlocks.Done()
+
+	if err := kb.waitUntilPVBsProcessed(ctx, log, itemBlock, hookPods); err != nil {
+		log.WithError(err).Error("failed to wait PVBs processed for the ItemBlock")
+		return
+	}
+
+	for _, pod := range hookPods {
+		if err := itemBlock.itemBackupper.itemHookHandler.HandleHooks(itemBlock.Log, pod.Gr, pod.Item, itemBlock.itemBackupper.backupRequest.ResourceHooks,
+			hook.PhasePost, itemBlock.itemBackupper.hookTracker); err != nil {
+			log.WithError(err).WithField("name", pod.Item.GetName()).Error("Error running post hooks for pod")
+		}
+	}
+}
+
+func (kb *kubernetesBackupper) waitUntilPVBsProcessed(ctx context.Context, log logrus.FieldLogger, itemBlock BackupItemBlock, pods []itemblock.ItemBlockItem) error {
+	requirement, err := labels.NewRequirement(velerov1api.BackupUIDLabel, selection.Equals, []string{string(itemBlock.itemBackupper.backupRequest.UID)})
+	if err != nil {
+		return errors.Wrapf(err, "failed to create label requirement")
+	}
+	options := &kbclient.ListOptions{
+		LabelSelector: labels.NewSelector().Add(*requirement),
+	}
+	pvbList := &velerov1api.PodVolumeBackupList{}
+	if err := kb.kbClient.List(context.Background(), pvbList, options); err != nil {
+		return errors.Wrap(err, "failed to list PVBs")
+	}
+
+	podMap := map[string]struct{}{}
+	for _, pod := range pods {
+		podMap[string(pod.Item.GetUID())] = struct{}{}
+	}
+
+	pvbMap := map[*velerov1api.PodVolumeBackup]bool{}
+	for i, pvb := range pvbList.Items {
+		if _, exist := podMap[string(pvb.Spec.Pod.UID)]; !exist {
+			continue
+		}
+
+		processed := false
+		if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseCompleted ||
+			pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed {
+			processed = true
+		}
+		pvbMap[&pvbList.Items[i]] = processed
+	}
+
+	checkFunc := func(context.Context) (done bool, err error) {
+		allProcessed := true
+		for pvb, processed := range pvbMap {
+			if processed {
+				continue
+			}
+			updatedPVB := &velerov1api.PodVolumeBackup{}
+			if err := kb.kbClient.Get(ctx, kbclient.ObjectKeyFromObject(pvb), updatedPVB); err != nil {
+				allProcessed = false
+				log.Infof("failed to get PVB: %v", err)
+				continue
+			}
+			if updatedPVB.Status.Phase == velerov1api.PodVolumeBackupPhaseCompleted ||
+				updatedPVB.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed {
+				pvbMap[pvb] = true
+				continue
+			}
+			allProcessed = false
+		}
+
+		return allProcessed, nil
+	}
+
+	return wait.PollUntilContextCancel(ctx, 5*time.Second, false, checkFunc)
 }
 
 func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper, unstructured *unstructured.Unstructured, preferredGVR schema.GroupVersionResource, itemBlock *BackupItemBlock) bool {
