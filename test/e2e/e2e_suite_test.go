@@ -575,9 +575,9 @@ var _ = Describe(
 )
 
 var _ = Describe(
-	"Migrate resources between clusters by Restic",
-	Label("Migration", "Restic"),
-	MigrationWithRestic,
+	"Migrate resources between clusters by FileSystem backup",
+	Label("Migration", "FSB"),
+	MigrationWithFS,
 )
 var _ = Describe(
 	"Migrate resources between clusters by snapshot",

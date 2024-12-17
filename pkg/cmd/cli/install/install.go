@@ -42,34 +42,32 @@ import (
 
 // Options collects all the options for installing Velero into a Kubernetes cluster.
 type Options struct {
-	Namespace                 string
-	Image                     string
-	BucketName                string
-	Prefix                    string
-	ProviderName              string
-	PodAnnotations            flag.Map
-	PodLabels                 flag.Map
-	ServiceAccountAnnotations flag.Map
-	ServiceAccountName        string
-	VeleroPodCPURequest       string
-	VeleroPodMemRequest       string
-	VeleroPodCPULimit         string
-	VeleroPodMemLimit         string
-	NodeAgentPodCPURequest    string
-	NodeAgentPodMemRequest    string
-	NodeAgentPodCPULimit      string
-	NodeAgentPodMemLimit      string
-	RestoreOnly               bool
-	SecretFile                string
-	NoSecret                  bool
-	DryRun                    bool
-	BackupStorageConfig       flag.Map
-	VolumeSnapshotConfig      flag.Map
-	UseNodeAgent              bool
-	UseNodeAgentWindows       bool
-	PrivilegedNodeAgent       bool
-	//TODO remove UseRestic when migration test out of using it
-	UseRestic                       bool
+	Namespace                       string
+	Image                           string
+	BucketName                      string
+	Prefix                          string
+	ProviderName                    string
+	PodAnnotations                  flag.Map
+	PodLabels                       flag.Map
+	ServiceAccountAnnotations       flag.Map
+	ServiceAccountName              string
+	VeleroPodCPURequest             string
+	VeleroPodMemRequest             string
+	VeleroPodCPULimit               string
+	VeleroPodMemLimit               string
+	NodeAgentPodCPURequest          string
+	NodeAgentPodMemRequest          string
+	NodeAgentPodCPULimit            string
+	NodeAgentPodMemLimit            string
+	RestoreOnly                     bool
+	SecretFile                      string
+	NoSecret                        bool
+	DryRun                          bool
+	BackupStorageConfig             flag.Map
+	VolumeSnapshotConfig            flag.Map
+	UseNodeAgent                    bool
+	UseNodeAgentWindows             bool
+	PrivilegedNodeAgent             bool
 	Wait                            bool
 	UseVolumeSnapshots              bool
 	DefaultRepoMaintenanceFrequency time.Duration

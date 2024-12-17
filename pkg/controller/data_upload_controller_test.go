@@ -300,6 +300,10 @@ func (f *fakeSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev
 	return f.peekErr
 }
 
+func (f *fakeSnapshotExposer) DiagnoseExpose(context.Context, corev1.ObjectReference) string {
+	return ""
+}
+
 func (f *fakeSnapshotExposer) CleanUp(context.Context, corev1.ObjectReference, string, string) {
 }
 
@@ -475,7 +479,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:     "prepare timeout",
-			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).Annotations(map[string]string{acceptTimeAnnoKey: (time.Now().Add(-time.Minute * 5)).Format(time.RFC3339)}).Result(),
+			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).AcceptedTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 5)}).Result(),
 			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
 		},
 		{
@@ -1043,6 +1047,10 @@ func (dt *duResumeTestHelper) PeekExposed(context.Context, corev1.ObjectReferenc
 	return nil
 }
 
+func (dt *duResumeTestHelper) DiagnoseExpose(context.Context, corev1.ObjectReference) string {
+	return ""
+}
+
 func (dt *duResumeTestHelper) CleanUp(context.Context, corev1.ObjectReference, string, string) {}
 
 func (dt *duResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
@@ -1071,19 +1079,19 @@ func TestAttemptDataUploadResume(t *testing.T) {
 		},
 		{
 			name:                 "accepted DataUpload in the current node",
-			du:                   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Annotations(map[string]string{acceptNodeAnnoKey: "node-1"}).Result(),
+			du:                   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).AcceptedByNode("node-1").Result(),
 			cancelledDataUploads: []string{dataUploadName},
 			acceptedDataUploads:  []string{dataUploadName},
 		},
 		{
 			name:                 "accepted DataUpload in the current node but canceled",
-			du:                   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Annotations(map[string]string{acceptNodeAnnoKey: "node-1"}).Cancel(true).Result(),
+			du:                   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).AcceptedByNode("node-1").Cancel(true).Result(),
 			cancelledDataUploads: []string{dataUploadName},
 			acceptedDataUploads:  []string{dataUploadName},
 		},
 		{
 			name:                "accepted DataUpload in the current node but update error",
-			du:                  dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Annotations(map[string]string{acceptNodeAnnoKey: "node-1"}).Result(),
+			du:                  dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).AcceptedByNode("node-1").Result(),
 			needErrs:            []bool{false, false, true, false, false, false},
 			acceptedDataUploads: []string{dataUploadName},
 		},

@@ -136,6 +136,16 @@ spec:
           status:
             description: DataDownloadStatus is the current status of a DataDownload.
             properties:
+              acceptedByNode:
+                description: Node is name of the node where the DataUpload is prepared.
+                type: string
+              acceptedTimestamp:
+                description: |-
+                  AcceptedTimestamp records the time the DataUpload is to be prepared.
+                  The server's time is used for AcceptedTimestamp
+                format: date-time
+                nullable: true
+                type: string
               completionTimestamp:
                 description: |-
                   CompletionTimestamp records the time a restore was completed.

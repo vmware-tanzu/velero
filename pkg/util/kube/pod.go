@@ -105,8 +105,9 @@ func EnsureDeletePod(ctx context.Context, podGetter corev1client.CoreV1Interface
 		return errors.Wrapf(err, "error to delete pod %s", pod)
 	}
 
+	var updated *corev1api.Pod
 	err = wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
-		_, err := podGetter.Pods(namespace).Get(ctx, pod, metav1.GetOptions{})
+		po, err := podGetter.Pods(namespace).Get(ctx, pod, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -115,11 +116,16 @@ func EnsureDeletePod(ctx context.Context, podGetter corev1client.CoreV1Interface
 			return false, errors.Wrapf(err, "error to get pod %s", pod)
 		}
 
+		updated = po
 		return false, nil
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, "error to assure pod is deleted, %s", pod)
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.Errorf("timeout to assure pod %s is deleted, finalizers in pod %v", pod, updated.Finalizers)
+		} else {
+			return errors.Wrapf(err, "error to assure pod is deleted, %s", pod)
+		}
 	}
 
 	return nil
@@ -256,4 +262,14 @@ func ToSystemAffinity(loadAffinities []*LoadAffinity) *corev1api.Affinity {
 	}
 
 	return nil
+}
+
+func DiagnosePod(pod *corev1api.Pod) string {
+	diag := fmt.Sprintf("Pod %s/%s, phase %s, node name %s\n", pod.Namespace, pod.Name, pod.Status.Phase, pod.Spec.NodeName)
+
+	for _, condition := range pod.Status.Conditions {
+		diag += fmt.Sprintf("Pod condition %s, status %s, reason %s, message %s\n", condition.Type, condition.Status, condition.Reason, condition.Message)
+	}
+
+	return diag
 }
