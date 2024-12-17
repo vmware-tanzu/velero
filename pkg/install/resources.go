@@ -246,6 +246,7 @@ type VeleroOptions struct {
 	SecretData                      []byte
 	RestoreOnly                     bool
 	UseNodeAgent                    bool
+	UseNodeAgentWindows             bool
 	PrivilegedNodeAgent             bool
 	UseVolumeSnapshots              bool
 	BSLConfig                       map[string]string
@@ -395,7 +396,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		fmt.Printf("error appending Deployment %s: %s\n", deploy.GetName(), err.Error())
 	}
 
-	if o.UseNodeAgent {
+	if o.UseNodeAgent || o.UseNodeAgentWindows {
 		dsOpts := []podTemplateOption{
 			WithAnnotations(o.PodAnnotations),
 			WithLabels(o.PodLabels),
@@ -414,16 +415,20 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 			dsOpts = append(dsOpts, WithNodeAgentConfigMap(o.NodeAgentConfigMap))
 		}
 
-		ds := DaemonSet(o.Namespace, dsOpts...)
-		if err := appendUnstructured(resources, ds); err != nil {
-			fmt.Printf("error appending DaemonSet %s: %s\n", ds.GetName(), err.Error())
+		if o.UseNodeAgent {
+			ds := DaemonSet(o.Namespace, dsOpts...)
+			if err := appendUnstructured(resources, ds); err != nil {
+				fmt.Printf("error appending DaemonSet %s: %s\n", ds.GetName(), err.Error())
+			}
 		}
 
-		dsOpts = append(dsOpts, WithForWindows())
+		if o.UseNodeAgentWindows {
+			dsOpts = append(dsOpts, WithForWindows())
 
-		dsWin := DaemonSet(o.Namespace, dsOpts...)
-		if err := appendUnstructured(resources, dsWin); err != nil {
-			fmt.Printf("error appending DaemonSet %s: %s\n", dsWin.GetName(), err.Error())
+			dsWin := DaemonSet(o.Namespace, dsOpts...)
+			if err := appendUnstructured(resources, dsWin); err != nil {
+				fmt.Printf("error appending DaemonSet %s: %s\n", dsWin.GetName(), err.Error())
+			}
 		}
 	}
 
