@@ -486,3 +486,175 @@ func TestGetBackupRepositoryConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateRepoMaintenanceHistory(t *testing.T) {
+	standardTime := time.Now()
+
+	backupRepoWithoutHistory := &velerov1api.BackupRepository{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1api.DefaultNamespace,
+			Name:      "repo",
+		},
+	}
+
+	backupRepoWithHistory := &velerov1api.BackupRepository{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1api.DefaultNamespace,
+			Name:      "repo",
+		},
+		Status: velerov1api.BackupRepositoryStatus{
+			RecentMaintenanceStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 24)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 23)},
+					Message:           "fake-history-message-1",
+				},
+			},
+		},
+	}
+
+	backupRepoWithFullHistory := &velerov1api.BackupRepository{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1api.DefaultNamespace,
+			Name:      "repo",
+		},
+		Status: velerov1api.BackupRepositoryStatus{
+			RecentMaintenanceStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 24)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 23)},
+					Message:           "fake-history-message-2",
+				},
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 22)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 21)},
+					Message:           "fake-history-message-3",
+				},
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 20)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 19)},
+					Message:           "fake-history-message-4",
+				},
+			},
+		},
+	}
+
+	backupRepoWithOverFullHistory := &velerov1api.BackupRepository{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1api.DefaultNamespace,
+			Name:      "repo",
+		},
+		Status: velerov1api.BackupRepositoryStatus{
+			RecentMaintenanceStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 24)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 23)},
+					Message:           "fake-history-message-5",
+				},
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 22)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 21)},
+					Message:           "fake-history-message-6",
+				},
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 20)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 19)},
+					Message:           "fake-history-message-7",
+				},
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 18)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 17)},
+					Message:           "fake-history-message-8",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name            string
+		backupRepo      *velerov1api.BackupRepository
+		expectedHistory []velerov1api.BackupRepositoryMaintenanceStatus
+	}{
+		{
+			name:       "empty history",
+			backupRepo: backupRepoWithoutHistory,
+			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(time.Hour)},
+					Message:           "fake-message-0",
+				},
+			},
+		},
+		{
+			name:       "less than history queue length",
+			backupRepo: backupRepoWithHistory,
+			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 24)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 23)},
+					Message:           "fake-history-message-1",
+				},
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(time.Hour)},
+					Message:           "fake-message-0",
+				},
+			},
+		},
+		{
+			name:       "full history",
+			backupRepo: backupRepoWithFullHistory,
+			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 22)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 21)},
+					Message:           "fake-history-message-3",
+				},
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 20)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 19)},
+					Message:           "fake-history-message-4",
+				},
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(time.Hour)},
+					Message:           "fake-message-0",
+				},
+			},
+		},
+		{
+			name:       "over full history",
+			backupRepo: backupRepoWithOverFullHistory,
+			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 20)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 19)},
+					Message:           "fake-history-message-7",
+				},
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 18)},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 17)},
+					Message:           "fake-history-message-8",
+				},
+				{
+					StartTimestamp:    &metav1.Time{Time: standardTime},
+					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(time.Hour)},
+					Message:           "fake-message-0",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			updateRepoMaintenanceHistory(test.backupRepo, standardTime, standardTime.Add(time.Hour), "fake-message-0")
+
+			for at := range test.backupRepo.Status.RecentMaintenanceStatus {
+				assert.Equal(t, test.expectedHistory[at].StartTimestamp.Time, test.backupRepo.Status.RecentMaintenanceStatus[at].StartTimestamp.Time)
+				assert.Equal(t, test.expectedHistory[at].CompleteTimestamp.Time, test.backupRepo.Status.RecentMaintenanceStatus[at].CompleteTimestamp.Time)
+				assert.Equal(t, test.expectedHistory[at].Message, test.backupRepo.Status.RecentMaintenanceStatus[at].Message)
+			}
+		})
+	}
+}
