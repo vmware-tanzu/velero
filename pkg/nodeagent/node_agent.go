@@ -35,6 +35,9 @@ import (
 const (
 	// daemonSet is the name of the Velero node agent daemonset.
 	daemonSet = "node-agent"
+
+	// nodeAgentRole marks pods with node-agent role on all nodes.
+	nodeAgentRole = "node-agent"
 )
 
 var (
@@ -116,7 +119,7 @@ func isRunningInNode(ctx context.Context, namespace string, nodeName string, crC
 	}
 
 	pods := new(v1.PodList)
-	parsedSelector, err := labels.Parse(fmt.Sprintf("name=%s", daemonSet))
+	parsedSelector, err := labels.Parse(fmt.Sprintf("role=%s", nodeAgentRole))
 	if err != nil {
 		return errors.Wrap(err, "fail to parse selector")
 	}
@@ -128,7 +131,7 @@ func isRunningInNode(ctx context.Context, namespace string, nodeName string, crC
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "failed to list daemonset pods")
+		return errors.Wrap(err, "failed to list node-agent pods")
 	}
 
 	for i := range pods.Items {
