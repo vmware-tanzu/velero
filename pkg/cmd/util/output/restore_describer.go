@@ -150,6 +150,13 @@ func DescribeRestore(
 		d.Printf("\tCluster-scoped:\t%s\n", BoolPointerString(restore.Spec.IncludeClusterResources, "excluded", "included", "auto"))
 
 		d.Println()
+		s = emptyDisplay
+		if restore.Spec.DisabledPVReprovisioningStorageClasses != nil {
+			s = strings.Join(restore.Spec.IncludedNamespaces, ", ")
+		}
+		d.Printf("Disabled PV Re-provisioning StorageClasses:\t%s\n", s)
+
+		d.Println()
 		d.DescribeMap("Namespace mappings", restore.Spec.NamespaceMapping)
 
 		d.Println()
