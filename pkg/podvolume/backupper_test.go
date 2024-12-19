@@ -260,7 +260,7 @@ func createPodObj(running bool, withVolume bool, withVolumeMounted bool, volumeN
 
 func createNodeAgentPodObj(running bool) *corev1api.Pod {
 	podObj := builder.ForPod(velerov1api.DefaultNamespace, "fake-node-agent").Result()
-	podObj.Labels = map[string]string{"name": "node-agent"}
+	podObj.Labels = map[string]string{"role": "node-agent"}
 
 	if running {
 		podObj.Status.Phase = corev1api.PodRunning
@@ -301,6 +301,14 @@ func createPVBObj(fail bool, withSnapshot bool, index int, uploaderType string) 
 	pvbObj.Spec.UploaderType = uploaderType
 
 	return pvbObj
+}
+
+func createNodeObj() *corev1api.Node {
+	return builder.ForNode("fake-node-name").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
+}
+
+func createWindowsNodeObj() *corev1api.Node {
+	return builder.ForNode("fake-node-name").Labels(map[string]string{"kubernetes.io/os": "windows"}).Result()
 }
 
 func TestBackupPodVolumes(t *testing.T) {
@@ -359,12 +367,31 @@ func TestBackupPodVolumes(t *testing.T) {
 			bsl:           "fake-bsl",
 		},
 		{
+			name: "pod is not running on Linux node",
+			volumes: []string{
+				"fake-volume-1",
+				"fake-volume-2",
+			},
+			kubeClientObj: []runtime.Object{
+				createNodeAgentPodObj(true),
+				createWindowsNodeObj(),
+			},
+			sourcePod:    createPodObj(false, false, false, 2),
+			uploaderType: "kopia",
+			errs: []string{
+				"Pod fake-ns/fake-pod is not running in linux node(fake-node-name), skip",
+			},
+		},
+		{
 			name: "node-agent pod is not running in node",
 			volumes: []string{
 				"fake-volume-1",
 				"fake-volume-2",
 			},
-			sourcePod:    createPodObj(true, false, false, 2),
+			sourcePod: createPodObj(true, false, false, 2),
+			kubeClientObj: []runtime.Object{
+				createNodeObj(),
+			},
 			uploaderType: "kopia",
 			errs: []string{
 				"daemonset pod not found in running state in node fake-node-name",
@@ -379,6 +406,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			sourcePod: createPodObj(true, false, false, 2),
 			kubeClientObj: []runtime.Object{
 				createNodeAgentPodObj(true),
+				createNodeObj(),
 			},
 			uploaderType:          "kopia",
 			mockGetRepositoryType: true,
@@ -395,6 +423,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			sourcePod: createPodObj(true, false, false, 2),
 			kubeClientObj: []runtime.Object{
 				createNodeAgentPodObj(true),
+				createNodeObj(),
 			},
 			uploaderType: "kopia",
 			errs: []string{
@@ -410,6 +439,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			sourcePod: createPodObj(true, false, false, 2),
 			kubeClientObj: []runtime.Object{
 				createNodeAgentPodObj(true),
+				createNodeObj(),
 			},
 			ctlClientObj: []runtime.Object{
 				createBackupRepoObj(),
@@ -427,6 +457,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			sourcePod: createPodObj(true, true, false, 2),
 			kubeClientObj: []runtime.Object{
 				createNodeAgentPodObj(true),
+				createNodeObj(),
 			},
 			ctlClientObj: []runtime.Object{
 				createBackupRepoObj(),
@@ -448,6 +479,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			sourcePod: createPodObj(true, true, false, 2),
 			kubeClientObj: []runtime.Object{
 				createNodeAgentPodObj(true),
+				createNodeObj(),
 				createPVCObj(1),
 				createPVCObj(2),
 			},
@@ -471,6 +503,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			sourcePod: createPodObj(true, true, false, 2),
 			kubeClientObj: []runtime.Object{
 				createNodeAgentPodObj(true),
+				createNodeObj(),
 				createPVCObj(1),
 				createPVCObj(2),
 				createPVObj(1, true),
@@ -482,6 +515,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			runtimeScheme: scheme,
 			uploaderType:  "kopia",
 			bsl:           "fake-bsl",
+			errs:          []string{},
 		},
 		{
 			name: "volume not mounted by pod should be skipped",
@@ -492,6 +526,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			sourcePod: createPodObj(true, true, false, 2),
 			kubeClientObj: []runtime.Object{
 				createNodeAgentPodObj(true),
+				createNodeObj(),
 				createPVCObj(1),
 				createPVCObj(2),
 				createPVObj(1, false),
@@ -503,6 +538,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			runtimeScheme: scheme,
 			uploaderType:  "kopia",
 			bsl:           "fake-bsl",
+			errs:          []string{},
 		},
 		{
 			name: "return completed pvbs",
@@ -512,6 +548,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			sourcePod: createPodObj(true, true, true, 1),
 			kubeClientObj: []runtime.Object{
 				createNodeAgentPodObj(true),
+				createNodeObj(),
 				createPVCObj(1),
 				createPVObj(1, false),
 			},
@@ -522,6 +559,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			uploaderType:  "kopia",
 			bsl:           "fake-bsl",
 			pvbs:          1,
+			errs:          []string{},
 		},
 	}
 	// TODO add more verification around PVCBackupSummary returned by "BackupPodVolumes"
@@ -568,8 +606,8 @@ func TestBackupPodVolumes(t *testing.T) {
 
 			pvbs, _, errs := bp.BackupPodVolumes(backupObj, test.sourcePod, test.volumes, nil, velerotest.NewLogger())
 
-			if errs == nil {
-				assert.Nil(t, test.errs)
+			if test.errs == nil {
+				assert.NoError(t, err)
 			} else {
 				for i := 0; i < len(errs); i++ {
 					assert.EqualError(t, errs[i], test.errs[i])

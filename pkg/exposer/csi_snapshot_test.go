@@ -1146,7 +1146,7 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "node-agent-pod-1",
-			Labels:    map[string]string{"name": "node-agent"},
+			Labels:    map[string]string{"role": "node-agent"},
 		},
 		Spec: corev1.PodSpec{
 			NodeName: "fake-node",

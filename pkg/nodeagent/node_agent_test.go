@@ -40,7 +40,7 @@ type reactor struct {
 }
 
 func TestIsRunning(t *testing.T) {
-	daemonSet := &appsv1.DaemonSet{
+	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -80,7 +80,7 @@ func TestIsRunning(t *testing.T) {
 			name:      "succeed",
 			namespace: "fake-ns",
 			kubeClientObj: []runtime.Object{
-				daemonSet,
+				ds,
 			},
 		},
 	}
@@ -93,7 +93,7 @@ func TestIsRunning(t *testing.T) {
 				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
 			}
 
-			err := IsRunning(context.TODO(), fakeKubeClient, test.namespace)
+			err := isRunning(context.TODO(), fakeKubeClient, test.namespace, daemonSet)
 			if test.expectErr == "" {
 				assert.NoError(t, err)
 			} else {
@@ -108,11 +108,11 @@ func TestIsRunningInNode(t *testing.T) {
 	corev1.AddToScheme(scheme)
 
 	nonNodeAgentPod := builder.ForPod("fake-ns", "fake-pod").Result()
-	nodeAgentPodNotRunning := builder.ForPod("fake-ns", "fake-pod").Labels(map[string]string{"name": "node-agent"}).Result()
-	nodeAgentPodRunning1 := builder.ForPod("fake-ns", "fake-pod-1").Labels(map[string]string{"name": "node-agent"}).Phase(corev1.PodRunning).Result()
-	nodeAgentPodRunning2 := builder.ForPod("fake-ns", "fake-pod-2").Labels(map[string]string{"name": "node-agent"}).Phase(corev1.PodRunning).Result()
+	nodeAgentPodNotRunning := builder.ForPod("fake-ns", "fake-pod").Labels(map[string]string{"role": "node-agent"}).Result()
+	nodeAgentPodRunning1 := builder.ForPod("fake-ns", "fake-pod-1").Labels(map[string]string{"role": "node-agent"}).Phase(corev1.PodRunning).Result()
+	nodeAgentPodRunning2 := builder.ForPod("fake-ns", "fake-pod-2").Labels(map[string]string{"role": "node-agent"}).Phase(corev1.PodRunning).Result()
 	nodeAgentPodRunning3 := builder.ForPod("fake-ns", "fake-pod-3").
-		Labels(map[string]string{"name": "node-agent"}).
+		Labels(map[string]string{"role": "node-agent"}).
 		Phase(corev1.PodRunning).
 		NodeName("fake-node").
 		Result()
