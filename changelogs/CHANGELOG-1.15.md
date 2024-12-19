@@ -1,3 +1,30 @@
+## v1.15.1
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.15.1
+
+### Container Image
+`velero/velero:v1.15.1`
+
+### Documentation
+https://velero.io/docs/v1.15/
+
+### Upgrading
+https://velero.io/docs/v1.15/upgrade-to-1.15/
+
+### All Changes
+  * Fix backup post hook issue #8159 (caused by #7571): always execute backup post hooks after PVBs are handled (#8517, @ywk253100)
+  * Fix issue #8125, log diagnostic info for data mover exposers when expose timeout (#8511, @Lyndon-Li)
+  * Set hinting region to use for GetBucketRegion() in pkg/repository/config/aws.go (#8505, @kaovilai)
+  * Fix issue #8433, add third party labels to data mover pods when the same labels exist in node-agent pods (#8501, @Lyndon-Li)
+  * Fix issue #8485, add an accepted time so as to count the prepare timeout (#8496, @Lyndon-Li)
+  * Add SecurityContext to restore-helper (#8495, @reasonerjt)
+  * Add nil check for updating DataUpload VolumeInfo in finalizing phase. (#8465, @blackpiglet)
+  * Fix issue #8391, check ErrCancelled from suffix of data mover pod's termination message (#8404, @Lyndon-Li)
+  * Fix issue #8394, don't call closeDataPath in VGDP callbacks, otherwise, the VGDP cleanup will hang (#8402, @Lyndon-Li)
+  * Reduce minimum required go toolchain in release-1.15 go.mod (#8399, @kaovilai)
+
+
 ## v1.15
 
 ### Download
