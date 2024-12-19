@@ -61,6 +61,5 @@ func (c *CSIDataMoverVolumeInfo) Verify() error {
 	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
 	Expect(volumeInfo[0].SnapshotDataMovementInfo).NotTo(BeNil())
 
-	// Clean SC and VSC
-	return c.cleanResource()
+	return nil
 }

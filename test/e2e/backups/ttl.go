@@ -84,7 +84,7 @@ func TTLTest() {
 			ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 			defer ctxCancel()
 			if InstallVelero {
-				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
+				Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 			}
 			Expect(DeleteNamespace(ctx, client, test.testNS, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.testNS))
 		}

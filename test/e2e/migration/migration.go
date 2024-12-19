@@ -75,8 +75,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			By("Uninstall Velero", func() {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
-				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
-					veleroCfg.VeleroNamespace)).To(Succeed())
+				Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 			})
 		}
 	})
@@ -87,28 +86,72 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			By(fmt.Sprintf("Uninstall Velero on cluster %s", veleroCfg.DefaultClusterContext), func() {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
+
 				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
-				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
-					veleroCfg.VeleroNamespace)).To(Succeed())
-				DeleteNamespace(context.Background(), *veleroCfg.DefaultClient, migrationNamespace, true)
+				veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
+				veleroCfg.ClusterToInstallVelero = veleroCfg.DefaultClusterName
+				Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
+
+				By(fmt.Sprintf("Delete sample workload namespace %s", migrationNamespace), func() {
+					Expect(
+						DeleteNamespace(
+							context.Background(),
+							*veleroCfg.DefaultClient,
+							migrationNamespace,
+							true),
+					).To(Succeed())
+				})
 			})
 
 			By(fmt.Sprintf("Uninstall Velero on cluster %s", veleroCfg.StandbyClusterContext), func() {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
 				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyClusterContext)).To(Succeed())
-				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
-					veleroCfg.VeleroNamespace)).To(Succeed())
-				DeleteNamespace(context.Background(), *veleroCfg.StandbyClient, migrationNamespace, true)
+				veleroCfg.ClientToInstallVelero = veleroCfg.StandbyClient
+				veleroCfg.ClusterToInstallVelero = veleroCfg.StandbyClusterName
+
+				By("Delete StorageClasses created by E2E")
+				Expect(
+					DeleteStorageClass(
+						ctx,
+						*veleroCfg.ClientToInstallVelero,
+						StorageClassName,
+					),
+				).To(Succeed())
+				Expect(
+					DeleteStorageClass(
+						ctx,
+						*veleroCfg.ClientToInstallVelero,
+						StorageClassName2,
+					),
+				).To(Succeed())
+
+				if strings.EqualFold(veleroCfg.Features, FeatureCSI) &&
+					veleroCfg.UseVolumeSnapshots {
+					By("Delete VolumeSnapshotClass created by E2E")
+					Expect(
+						KubectlDeleteByFile(
+							ctx,
+							fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", veleroCfg.CloudProvider),
+						),
+					).To(Succeed())
+				}
+
+				Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
+
+				By(fmt.Sprintf("Delete sample workload namespace %s", migrationNamespace), func() {
+					Expect(
+						DeleteNamespace(
+							context.Background(),
+							*veleroCfg.StandbyClient,
+							migrationNamespace,
+							true,
+						),
+					).To(Succeed())
+				})
 			})
 
-			if InstallVelero {
-				By(fmt.Sprintf("Delete sample workload namespace %s", migrationNamespace), func() {
-					DeleteNamespace(context.Background(), *veleroCfg.StandbyClient, migrationNamespace, true)
-				})
-			}
-
-			By(fmt.Sprintf("Switch to default kubeconfig context %s", veleroCfg.DefaultClusterContext), func() {
+			By(fmt.Sprintf("Switch to default KubeConfig context %s", veleroCfg.DefaultClusterContext), func() {
 				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
 				veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
 				veleroCfg.ClusterToInstallVelero = veleroCfg.DefaultClusterName
@@ -297,6 +340,20 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 					veleroCfg.ObjectStoreProvider = veleroCfg.StandbyClusterObjectStoreProvider
 				}
 
+				By("Install StorageClass for E2E.")
+				Expect(InstallStorageClasses(veleroCfg.StandbyClusterCloudProvider)).To(Succeed())
+
+				if strings.EqualFold(veleroCfg.Features, FeatureCSI) &&
+					veleroCfg.UseVolumeSnapshots {
+					By("Install VolumeSnapshotClass for E2E.")
+					Expect(
+						KubectlApplyByFile(
+							context.Background(),
+							fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", veleroCfg.StandbyClusterCloudProvider),
+						),
+					).To(Succeed())
+				}
+
 				Expect(VeleroInstall(context.Background(), &veleroCfg, true)).To(Succeed())
 			})
 
@@ -307,16 +364,13 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 
 			By(fmt.Sprintf("Restore %s", migrationNamespace), func() {
 				if OriginVeleroCfg.SnapshotMoveData {
-					By(fmt.Sprintf("Create a storage class %s for restore PV provisioned by storage class %s on different cloud provider", StorageClassName, KibishiiStorageClassName), func() {
-						Expect(InstallStorageClass(context.Background(), fmt.Sprintf("../testdata/storage-class/%s.yaml", veleroCfg.StandbyClusterCloudProvider))).To(Succeed())
-					})
-					configmaptName := "datamover-storage-class-config"
+					cmName := "datamover-storage-class-config"
 					labels := map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
 						"velero.io/plugin-config": ""}
 					data := map[string]string{KibishiiStorageClassName: StorageClassName}
 
-					By(fmt.Sprintf("Create ConfigMap %s in namespace %s", configmaptName, veleroCfg.VeleroNamespace), func() {
-						_, err := CreateConfigMap(veleroCfg.StandbyClient.ClientGo, veleroCfg.VeleroNamespace, configmaptName, labels, data)
+					By(fmt.Sprintf("Create ConfigMap %s in namespace %s", cmName, veleroCfg.VeleroNamespace), func() {
+						_, err := CreateConfigMap(veleroCfg.StandbyClient.ClientGo, veleroCfg.VeleroNamespace, cmName, labels, data)
 						Expect(err).To(Succeed(), fmt.Sprintf("failed to create configmap in the namespace %q", veleroCfg.VeleroNamespace))
 					})
 				} else {
@@ -343,7 +397,7 @@ func MigrationTest(useVolumeSnapshots bool, veleroCLI2Version VeleroCLI2Version)
 			// TODO: delete backup created by case self, not all
 			By("Clean backups after test", func() {
 				veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
-				DeleteBackups(context.Background(), backupNames, &veleroCfg)
+				Expect(DeleteBackups(context.Background(), backupNames, &veleroCfg)).To(Succeed())
 			})
 		})
 	})

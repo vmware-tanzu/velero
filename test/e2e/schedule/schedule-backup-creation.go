@@ -10,13 +10,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
-	. "github.com/vmware-tanzu/velero/test/util/k8s"
-	. "github.com/vmware-tanzu/velero/test/util/velero"
+	"github.com/vmware-tanzu/velero/test"
+	framework "github.com/vmware-tanzu/velero/test/e2e/test"
+	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
+	veleroutil "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 type ScheduleBackupCreation struct {
-	TestCase
+	framework.TestCase
 	namespace        string
 	ScheduleName     string
 	ScheduleArgs     []string
@@ -30,7 +31,7 @@ type ScheduleBackupCreation struct {
 	podSleepDuration time.Duration
 }
 
-var ScheduleBackupCreationTest func() = TestFunc(&ScheduleBackupCreation{})
+var ScheduleBackupCreationTest func() = framework.TestFunc(&ScheduleBackupCreation{})
 
 func (s *ScheduleBackupCreation) Init() error {
 	s.TestCase.Init()
@@ -41,7 +42,7 @@ func (s *ScheduleBackupCreation) Init() error {
 	s.verifyTimes = 5 // More larger verify times more confidence we have
 	podSleepDurationStr := "300s"
 	s.podSleepDuration, _ = time.ParseDuration(podSleepDurationStr)
-	s.TestMsg = &TestMSG{
+	s.TestMsg = &framework.TestMSG{
 		Desc:      "Schedule controller wouldn't create a new backup when it still has pending or InProgress backup",
 		FailedMSG: "Failed to verify schedule back creation behavior",
 		Text:      "Schedule controller wouldn't create a new backup when it still has pending or InProgress backup",
@@ -64,14 +65,14 @@ func (s *ScheduleBackupCreation) Init() error {
 
 func (s *ScheduleBackupCreation) CreateResources() error {
 	By(fmt.Sprintf("Create namespace %s", s.namespace), func() {
-		Expect(CreateNamespace(s.Ctx, s.Client, s.namespace)).To(Succeed(),
+		Expect(k8sutil.CreateNamespace(s.Ctx, s.Client, s.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", s.namespace))
 	})
 
 	By(fmt.Sprintf("Create pod %s in namespace %s", s.podName, s.namespace), func() {
-		_, err := CreatePod(s.Client, s.namespace, s.podName, "default", s.pvcName, []string{s.volume}, nil, s.podAnn)
+		_, err := k8sutil.CreatePod(s.Client, s.namespace, s.podName, test.StorageClassName, s.pvcName, []string{s.volume}, nil, s.podAnn)
 		Expect(err).To(Succeed())
-		err = WaitForPods(s.Ctx, s.Client, s.namespace, []string{s.podName})
+		err = k8sutil.WaitForPods(s.Ctx, s.Client, s.namespace, []string{s.podName})
 		Expect(err).To(Succeed())
 	})
 	return nil
@@ -87,8 +88,8 @@ func (s *ScheduleBackupCreation) Backup() error {
 			now := time.Now().Minute()
 			triggerNow := now % s.Period
 			if triggerNow == 0 {
-				Expect(VeleroScheduleCreate(s.Ctx, s.VeleroCfg.VeleroCLI, s.VeleroCfg.VeleroNamespace, s.ScheduleName, s.ScheduleArgs)).To(Succeed(), func() string {
-					RunDebug(context.Background(), s.VeleroCfg.VeleroCLI, s.VeleroCfg.VeleroNamespace, "", "")
+				Expect(veleroutil.VeleroScheduleCreate(s.Ctx, s.VeleroCfg.VeleroCLI, s.VeleroCfg.VeleroNamespace, s.ScheduleName, s.ScheduleArgs)).To(Succeed(), func() string {
+					veleroutil.RunDebug(context.Background(), s.VeleroCfg.VeleroCLI, s.VeleroCfg.VeleroNamespace, "", "")
 					return "Fail to create schedule"
 				})
 				break
@@ -106,7 +107,7 @@ func (s *ScheduleBackupCreation) Backup() error {
 			mi, _ := time.ParseDuration("60s")
 			time.Sleep(s.podSleepDuration + mi)
 			bMap := make(map[string]string)
-			backupsInfo, err := GetScheduledBackupsCreationTime(s.Ctx, s.VeleroCfg.VeleroCLI, "default", s.ScheduleName)
+			backupsInfo, err := veleroutil.GetScheduledBackupsCreationTime(s.Ctx, s.VeleroCfg.VeleroCLI, "default", s.ScheduleName)
 			Expect(err).To(Succeed())
 			Expect(backupsInfo).To(HaveLen(i))
 			for index, bi := range backupsInfo {
@@ -129,7 +130,7 @@ func (s *ScheduleBackupCreation) Clean() error {
 	if CurrentSpecReport().Failed() && s.VeleroCfg.FailFast {
 		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
 	} else {
-		Expect(VeleroScheduleDelete(s.Ctx, s.VeleroCfg.VeleroCLI, s.VeleroCfg.VeleroNamespace, s.ScheduleName)).To(Succeed())
+		Expect(veleroutil.VeleroScheduleDelete(s.Ctx, s.VeleroCfg.VeleroCLI, s.VeleroCfg.VeleroNamespace, s.ScheduleName)).To(Succeed())
 		Expect(s.TestCase.Clean()).To(Succeed())
 	}
 

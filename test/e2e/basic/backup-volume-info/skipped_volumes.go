@@ -60,6 +60,5 @@ func (s *SkippedVolumeInfo) Verify() error {
 	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
 	Expect(volumeInfo[0].Skipped).To(BeIdenticalTo(true))
 
-	// Clean SC and VSC
-	return s.cleanResource()
+	return nil
 }

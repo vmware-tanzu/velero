@@ -110,7 +110,7 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 			if InstallVelero {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
-				err = VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)
+				err = VeleroUninstall(ctx, veleroCfg)
 				Expect(err).To(Succeed())
 			}
 		}
