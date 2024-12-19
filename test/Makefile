@@ -41,25 +41,41 @@ help:  ## Display this help
 
 TOOLS_DIR := $(REPO_ROOT)/hack/tools
 BIN_DIR := bin
+
 # Try to not modify PATH if possible
 GOBIN := $(REPO_ROOT)/.go/bin
+
 TOOLS_BIN_DIR := $(TOOLS_DIR)/$(BIN_DIR)
+
 GINKGO := $(GOBIN)/ginkgo
+
 KUSTOMIZE := $(TOOLS_BIN_DIR)/kustomize
+
 OUTPUT_DIR := _output/$(GOOS)/$(GOARCH)/bin
+
 # Please reference to this document for Ginkgo label spec format.
 # https://onsi.github.io/ginkgo/#spec-labels
 GINKGO_LABELS ?=
+
 # When --fail-fast is set, the entire suite will stop when the first failure occurs.
 # Enable --fail-fast by default.
 # https://onsi.github.io/ginkgo/#mental-model-how-ginkgo-handles-failure
 FAIL_FAST ?= false
+
 VELERO_CLI ?=$$(pwd)/../_output/bin/$(GOOS)/$(GOARCH)/velero
+
 VELERO_IMAGE ?= velero/velero:main
+
 PLUGINS ?=
+
+# Flag used to tell E2E whether the Velero vSphere plugin is installed.
+HAS_VSPHERE_PLUGIN ?= false
+
 RESTORE_HELPER_IMAGE ?=
+
 #Released version only
 UPGRADE_FROM_VELERO_VERSION ?= v1.13.2,v1.14.1
+
 # UPGRADE_FROM_VELERO_CLI can has the same format(a list divided by comma) with UPGRADE_FROM_VELERO_VERSION
 # Upgrade tests will be executed sequently according to the list by UPGRADE_FROM_VELERO_VERSION
 # So although length of UPGRADE_FROM_VELERO_CLI list is not equal with UPGRADE_FROM_VELERO_VERSION
@@ -150,7 +166,8 @@ COMMON_ARGS := --velerocli=$(VELERO_CLI) \
 	--velero-server-debug-mode=$(VELERO_SERVER_DEBUG_MODE) \
 	--uploader-type=$(UPLOADER_TYPE) \
 	--debug-velero-pod-restart=$(DEBUG_VELERO_POD_RESTART) \
-	--fail-fast=$(FAIL_FAST)
+	--fail-fast=$(FAIL_FAST) \
+	--has-vsphere-plugin=$(HAS_VSPHERE_PLUGIN)
 
 # Make sure ginkgo is in $GOBIN
 .PHONY:ginkgo
