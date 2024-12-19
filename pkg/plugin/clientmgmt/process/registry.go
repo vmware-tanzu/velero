@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -153,6 +154,7 @@ func (r *registry) readPluginsDir(dir string) ([]string, error) {
 		}
 
 		if !executable(file) {
+			r.logger.Warnf("Searching plugin skip file %s, not executable, mode %v, ext %s", file.Name(), file.Mode(), strings.ToLower(filepath.Ext(file.Name())))
 			continue
 		}
 
@@ -163,6 +165,15 @@ func (r *registry) readPluginsDir(dir string) ([]string, error) {
 
 // executable determines if a file is executable.
 func executable(info os.FileInfo) bool {
+	return executableLinux(info) || executableWindows(info)
+}
+
+func executableWindows(info os.FileInfo) bool {
+	ext := strings.ToLower(filepath.Ext(info.Name()))
+	return (ext == ".exe")
+}
+
+func executableLinux(info os.FileInfo) bool {
 	/*
 		When we AND the mode with 0111:
 

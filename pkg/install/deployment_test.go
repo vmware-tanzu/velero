@@ -99,4 +99,7 @@ func TestDeployment(t *testing.T) {
 	deploy = Deployment("velero", WithRepoMaintenanceJobConfigMap("test-repo-maintenance-config"))
 	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
 	assert.Equal(t, "--repo-maintenance-job-configmap=test-repo-maintenance-config", deploy.Spec.Template.Spec.Containers[0].Args[1])
+
+	assert.Equal(t, "linux", deploy.Spec.Template.Spec.NodeSelector["kubernetes.io/os"])
+	assert.Equal(t, "linux", string(deploy.Spec.Template.Spec.OS.Name))
 }

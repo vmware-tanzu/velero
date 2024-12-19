@@ -66,6 +66,7 @@ type Options struct {
 	BackupStorageConfig             flag.Map
 	VolumeSnapshotConfig            flag.Map
 	UseNodeAgent                    bool
+	UseNodeAgentWindows             bool
 	PrivilegedNodeAgent             bool
 	Wait                            bool
 	UseVolumeSnapshots              bool
@@ -117,7 +118,8 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.UseVolumeSnapshots, "use-volume-snapshots", o.UseVolumeSnapshots, "Whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.")
 	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "Run the server in restore-only mode. Optional.")
 	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "Generate resources, but don't send them to the cluster. Use with -o. Optional.")
-	flags.BoolVar(&o.UseNodeAgent, "use-node-agent", o.UseNodeAgent, "Create Velero node-agent daemonset. Optional. Velero node-agent hosts Velero modules that need to run in one or more nodes(i.e. Restic, Kopia).")
+	flags.BoolVar(&o.UseNodeAgent, "use-node-agent", o.UseNodeAgent, "Create Velero node-agent daemonset. Optional. Velero node-agent hosts and associates Velero modules that need to run in one or more Linux nodes.")
+	flags.BoolVar(&o.UseNodeAgentWindows, "use-node-agent-windows", o.UseNodeAgentWindows, "Create Velero node-agent-windows daemonset. Optional. Velero node-agent-windows hosts and associates Velero modules that need to run in one or more Windows nodes.")
 	flags.BoolVar(&o.PrivilegedNodeAgent, "privileged-node-agent", o.PrivilegedNodeAgent, "Use privileged mode for the node agent. Optional. Required to backup block devices.")
 	flags.BoolVar(&o.Wait, "wait", o.Wait, "Wait for Velero deployment to be ready. Optional.")
 	flags.DurationVar(&o.DefaultRepoMaintenanceFrequency, "default-repo-maintain-frequency", o.DefaultRepoMaintenanceFrequency, "How often 'maintain' is run for backup repositories by default. Optional.")
@@ -267,6 +269,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		SecretData:                      secretData,
 		RestoreOnly:                     o.RestoreOnly,
 		UseNodeAgent:                    o.UseNodeAgent,
+		UseNodeAgentWindows:             o.UseNodeAgentWindows,
 		PrivilegedNodeAgent:             o.PrivilegedNodeAgent,
 		UseVolumeSnapshots:              o.UseVolumeSnapshots,
 		BSLConfig:                       o.BackupStorageConfig.Data(),
@@ -392,7 +395,12 @@ func (o *Options) Run(c *cobra.Command, f client.Factory) error {
 
 		if o.UseNodeAgent {
 			fmt.Println("Waiting for node-agent daemonset to be ready.")
-			if _, err = install.DaemonSetIsReady(dynamicFactory, o.Namespace); err != nil {
+			if _, err = install.NodeAgentIsReady(dynamicFactory, o.Namespace); err != nil {
+				return errors.Wrap(err, errorMsg)
+			}
+
+			fmt.Println("Waiting for node-agent-windows daemonset to be ready.")
+			if _, err = install.NodeAgentWindowsIsReady(dynamicFactory, o.Namespace); err != nil {
 				return errors.Wrap(err, errorMsg)
 			}
 		}

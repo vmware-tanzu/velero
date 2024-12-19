@@ -77,21 +77,22 @@ func TestAllCRDs(t *testing.T) {
 
 func TestAllResources(t *testing.T) {
 	option := &VeleroOptions{
-		Namespace:          "velero",
-		SecretData:         []byte{'a'},
-		UseVolumeSnapshots: true,
-		UseNodeAgent:       true,
+		Namespace:           "velero",
+		SecretData:          []byte{'a'},
+		UseVolumeSnapshots:  true,
+		UseNodeAgent:        true,
+		UseNodeAgentWindows: true,
 	}
 	list := AllResources(option)
 
-	objects := map[string]unstructured.Unstructured{}
+	objects := map[string][]unstructured.Unstructured{}
 	for _, item := range list.Items {
-		objects[item.GetKind()] = item
+		objects[item.GetKind()] = append(objects[item.GetKind()], item)
 	}
 
 	ns, exist := objects["Namespace"]
 	require.True(t, exist)
-	assert.Equal(t, "velero", ns.GetName())
+	assert.Equal(t, "velero", ns[0].GetName())
 
 	_, exist = objects["ClusterRoleBinding"]
 	assert.True(t, exist)
@@ -111,6 +112,8 @@ func TestAllResources(t *testing.T) {
 	_, exist = objects["Deployment"]
 	assert.True(t, exist)
 
-	_, exist = objects["DaemonSet"]
+	ds, exist := objects["DaemonSet"]
 	assert.True(t, exist)
+
+	assert.Len(t, ds, 2)
 }
