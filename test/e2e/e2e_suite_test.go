@@ -543,18 +543,18 @@ var _ = Describe(
 
 var _ = Describe(
 	"Backup will be created periodically by schedule defined by a Cron expression",
-	Label("Schedule", "BR", "Pause", "LongTime"),
-	ScheduleBackupTest,
+	Label("Schedule", "Periodical", "Pause", "LongTime"),
+	SchedulePeriodicalTest,
 )
 var _ = Describe(
 	"Backup resources should follow the specific order in schedule",
-	Label("Schedule", "OrderedResources", "LongTime"),
+	Label("Schedule", "OrderedResources"),
 	ScheduleOrderedResources,
 )
 var _ = Describe(
 	"Schedule controller wouldn't create a new backup when it still has pending or InProgress backup",
-	Label("Schedule", "BackupCreation", "SKIP_KIND", "LongTime"),
-	ScheduleBackupCreationTest,
+	Label("Schedule", "InProgress", "SKIP_KIND", "LongTime"),
+	ScheduleInProgressTest,
 )
 
 var _ = Describe(
