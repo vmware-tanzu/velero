@@ -1,0 +1,13 @@
+---
+apiVersion: snapshot.storage.k8s.io/v1
+deletionPolicy: Delete
+driver: csi.vsphere.vmware.com
+kind: VolumeSnapshotClass
+metadata:
+  annotations:
+    snapshot.storage.kubernetes.io/is-default-class: "true"
+  labels:
+    velero.io/csi-volumesnapshot-class: "true"
+  name: volumesnapshotclass-delete
+parameters:
+  svVolumeSnapshotClass: volumesnapshotclass-delete

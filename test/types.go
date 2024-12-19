@@ -22,7 +22,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
-	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	"github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 const StorageClassName = "e2e-storage-class"
@@ -38,8 +38,17 @@ const AWS = "aws"
 const GCP = "gcp"
 const Vsphere = "vsphere"
 const CSI = "csi"
+const Velero = "velero"
+const VeleroRestoreHelper = "velero-restore-helper"
 
 const UploaderTypeRestic = "restic"
+
+const (
+	KubeSystemNamespace           = "kube-system"
+	VSphereCSIControllerNamespace = "vmware-system-csi"
+	VeleroVSphereSecretName       = "velero-vsphere-config-secret"
+	VeleroVSphereConfigMapName    = "velero-vsphere-plugin-config"
+)
 
 var PublicCloudProviders = []string{AWS, Azure, GCP, Vsphere}
 var LocalCloudProviders = []string{Kind, VanillaZFS}
@@ -88,9 +97,9 @@ type VeleroConfig struct {
 	GCFrequency                       string
 	DefaultClusterContext             string
 	StandbyClusterContext             string
-	ClientToInstallVelero             *TestClient
-	DefaultClient                     *TestClient
-	StandbyClient                     *TestClient
+	ClientToInstallVelero             *k8s.TestClient
+	DefaultClient                     *k8s.TestClient
+	StandbyClient                     *k8s.TestClient
 	ClusterToInstallVelero            string
 	DefaultClusterName                string
 	StandbyClusterName                string
@@ -111,6 +120,7 @@ type VeleroConfig struct {
 	ServiceAccountNameToInstall       string
 	EKSPolicyARN                      string
 	FailFast                          bool
+	HasVspherePlugin                  bool
 }
 
 type VeleroCfgInPerf struct {

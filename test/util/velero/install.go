@@ -39,14 +39,9 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	velerexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	. "github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test/util/eks"
-	. "github.com/vmware-tanzu/velero/test/util/k8s"
-)
-
-const (
-	KubeSystemNamespace           = "kube-system"
-	VSphereCSIControllerNamespace = "vmware-system-csi"
+	"github.com/vmware-tanzu/velero/test"
+	eksutil "github.com/vmware-tanzu/velero/test/util/eks"
+	"github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 // we provide more install options other than the standard install.InstallOptions in E2E test
@@ -58,7 +53,7 @@ type installOptions struct {
 	WithoutDisableInformerCacheParam bool
 }
 
-func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluster bool) error {
+func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyCluster bool) error {
 	fmt.Printf("Velero install %s\n", time.Now().Format("2006-01-02 15:04:05"))
 
 	// veleroCfg struct including a set of BSL params and a set of additional BSL params,
@@ -77,7 +72,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 		veleroCfg.CloudProvider = veleroCfg.StandbyClusterCloudProvider
 	}
 
-	if slices.Contains(PublicCloudProviders, veleroCfg.CloudProvider) {
+	if slices.Contains(test.PublicCloudProviders, veleroCfg.CloudProvider) {
 		fmt.Println("For public cloud platforms, object store plugin provider will be set as cloud provider")
 		// If ObjectStoreProvider is not provided, then using the value same as CloudProvider
 		if veleroCfg.ObjectStoreProvider == "" {
@@ -93,20 +88,29 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get provider plugins")
 	}
-	err = EnsureClusterExists(ctx)
+	err = k8s.EnsureClusterExists(ctx)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to ensure Kubernetes cluster exists")
 	}
 
 	// TODO - handle this better
-	if veleroCfg.CloudProvider == Vsphere {
+	if veleroCfg.CloudProvider == test.Vsphere {
 		// We overrider the ObjectStoreProvider here for vSphere because we want to use the aws plugin for the
 		// backup, but needed to pick up the provider plugins earlier.  vSphere plugin no longer needs a Volume
 		// Snapshot location specified
 		if veleroCfg.ObjectStoreProvider == "" {
-			veleroCfg.ObjectStoreProvider = AWS
+			veleroCfg.ObjectStoreProvider = test.AWS
 		}
-		if err := configvSpherePlugin(veleroCfg); err != nil {
+
+		if err := cleanVSpherePluginConfig(
+			veleroCfg.ClientToInstallVelero.ClientGo,
+			veleroCfg.VeleroNamespace,
+			test.VeleroVSphereSecretName,
+			test.VeleroVSphereConfigMapName,
+		); err != nil {
+			return errors.WithMessagef(err, "Failed to clear up vsphere plugin config %s namespace", veleroCfg.VeleroNamespace)
+		}
+		if err := generateVSpherePlugin(veleroCfg); err != nil {
 			return errors.WithMessagef(err, "Failed to config vsphere plugin")
 		}
 	}
@@ -118,11 +122,11 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 
 	// For AWS IRSA credential test, AWS IAM service account is required, so if ServiceAccountName and EKSPolicyARN
 	// are both provided, we assume IRSA test is running, otherwise skip this IAM service account creation part.
-	if veleroCfg.CloudProvider == AWS && veleroInstallOptions.ServiceAccountName != "" {
+	if veleroCfg.CloudProvider == test.AWS && veleroInstallOptions.ServiceAccountName != "" {
 		if veleroCfg.EKSPolicyARN == "" {
 			return errors.New("Please provide EKSPolicyARN for IRSA test.")
 		}
-		_, err = GetNamespace(ctx, *veleroCfg.ClientToInstallVelero, veleroCfg.VeleroNamespace)
+		_, err = k8s.GetNamespace(ctx, *veleroCfg.ClientToInstallVelero, veleroCfg.VeleroNamespace)
 		// We should uninstall Velero for a new service account creation.
 		if !apierrors.IsNotFound(err) {
 			if err := VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace); err != nil {
@@ -130,19 +134,19 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 			}
 		}
 		// If velero namespace does not exist, we should create it for service account creation
-		if err := KubectlCreateNamespace(ctx, veleroCfg.VeleroNamespace); err != nil {
+		if err := k8s.KubectlCreateNamespace(ctx, veleroCfg.VeleroNamespace); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s to install Velero", veleroCfg.VeleroNamespace)
 		}
-		if err := KubectlDeleteClusterRoleBinding(ctx, "velero-cluster-role"); err != nil {
+		if err := k8s.KubectlDeleteClusterRoleBinding(ctx, "velero-cluster-role"); err != nil {
 			return errors.Wrapf(err, "Failed to delete clusterrolebinding %s to %s namespace", "velero-cluster-role", veleroCfg.VeleroNamespace)
 		}
-		if err := KubectlCreateClusterRoleBinding(ctx, "velero-cluster-role", "cluster-admin", veleroCfg.VeleroNamespace, veleroInstallOptions.ServiceAccountName); err != nil {
+		if err := k8s.KubectlCreateClusterRoleBinding(ctx, "velero-cluster-role", "cluster-admin", veleroCfg.VeleroNamespace, veleroInstallOptions.ServiceAccountName); err != nil {
 			return errors.Wrapf(err, "Failed to create clusterrolebinding %s to %s namespace", "velero-cluster-role", veleroCfg.VeleroNamespace)
 		}
-		if err := KubectlDeleteIAMServiceAcount(ctx, veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace, veleroCfg.ClusterToInstallVelero); err != nil {
+		if err := eksutil.KubectlDeleteIAMServiceAcount(ctx, veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace, veleroCfg.ClusterToInstallVelero); err != nil {
 			return errors.Wrapf(err, "Failed to delete service account %s to %s namespace", veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace)
 		}
-		if err := EksctlCreateIAMServiceAcount(ctx, veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace, veleroCfg.EKSPolicyARN, veleroCfg.ClusterToInstallVelero); err != nil {
+		if err := eksutil.EksctlCreateIAMServiceAcount(ctx, veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace, veleroCfg.EKSPolicyARN, veleroCfg.ClusterToInstallVelero); err != nil {
 			return errors.Wrapf(err, "Failed to create service account %s to %s namespace", veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace)
 		}
 	}
@@ -163,45 +167,79 @@ func VeleroInstall(ctx context.Context, veleroCfg *VeleroConfig, isStandbyCluste
 	return nil
 }
 
-// configvSpherePlugin refers to https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
-func configvSpherePlugin(veleroCfg *VeleroConfig) error {
+// generateVSpherePlugin refers to
+// https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
+func generateVSpherePlugin(veleroCfg *test.VeleroConfig) error {
 	cli := veleroCfg.ClientToInstallVelero
-	var err error
-	vsphereSecret := "velero-vsphere-config-secret"
-	configmaptName := "velero-vsphere-plugin-config"
-	if err := clearupvSpherePluginConfig(cli.ClientGo, veleroCfg.VeleroNamespace, vsphereSecret, configmaptName); err != nil {
-		return errors.WithMessagef(err, "Failed to clear up vsphere plugin config %s namespace", veleroCfg.VeleroNamespace)
-	}
-	if err := CreateNamespace(context.Background(), *cli, veleroCfg.VeleroNamespace); err != nil {
-		return errors.WithMessagef(err, "Failed to create Velero %s namespace", veleroCfg.VeleroNamespace)
-	}
-	if err := createVCCredentialSecret(cli.ClientGo, veleroCfg.VeleroNamespace); err != nil {
-		return errors.WithMessagef(err, "Failed to create virtual center credential secret in %s namespace", veleroCfg.VeleroNamespace)
-	}
-	if err := WaitForSecretsComplete(cli.ClientGo, veleroCfg.VeleroNamespace, vsphereSecret); err != nil {
-		return errors.Wrap(err, "Failed to ensure velero-vsphere-config-secret secret completion in namespace kube-system")
-	}
-	_, err = CreateConfigMap(cli.ClientGo, veleroCfg.VeleroNamespace, configmaptName, map[string]string{
-		"cluster_flavor":           "VANILLA",
-		"vsphere_secret_name":      vsphereSecret,
-		"vsphere_secret_namespace": veleroCfg.VeleroNamespace,
-	}, nil)
-	if err != nil {
-		return errors.WithMessagef(err, "Failed to create velero-vsphere-plugin-config configmap in %s namespace", veleroCfg.VeleroNamespace)
+
+	if err := k8s.CreateNamespace(
+		context.Background(),
+		*cli,
+		veleroCfg.VeleroNamespace,
+	); err != nil {
+		return errors.WithMessagef(
+			err,
+			"Failed to create Velero %s namespace",
+			veleroCfg.VeleroNamespace,
+		)
 	}
 
-	err = WaitForConfigMapComplete(cli.ClientGo, veleroCfg.VeleroNamespace, configmaptName)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Failed to ensure configmap %s completion in namespace: %s", configmaptName, veleroCfg.VeleroNamespace))
+	clusterFlavor := "VANILLA"
+
+	if err := createVCCredentialSecret(cli.ClientGo, veleroCfg.VeleroNamespace); err != nil {
+		// For TKGs/uTKG the VC secret is not supposed to exist.
+		if apierrors.IsNotFound(err) {
+			clusterFlavor = "GUEST"
+		} else {
+			return errors.WithMessagef(
+				err,
+				"Failed to create virtual center credential secret in %s namespace",
+				veleroCfg.VeleroNamespace,
+			)
+		}
 	}
+
+	_, err := k8s.CreateConfigMap(
+		cli.ClientGo,
+		veleroCfg.VeleroNamespace,
+		test.VeleroVSphereConfigMapName,
+		nil,
+		map[string]string{
+			"cluster_flavor":           clusterFlavor,
+			"vsphere_secret_name":      test.VeleroVSphereSecretName,
+			"vsphere_secret_namespace": veleroCfg.VeleroNamespace,
+		},
+	)
+	if err != nil {
+		return errors.WithMessagef(
+			err,
+			"Failed to create velero-vsphere-plugin-config ConfigMap in %s namespace",
+			veleroCfg.VeleroNamespace,
+		)
+	}
+
+	if err := k8s.WaitForConfigMapComplete(
+		cli.ClientGo,
+		veleroCfg.VeleroNamespace,
+		test.VeleroVSphereConfigMapName,
+	); err != nil {
+		return errors.Wrap(
+			err,
+			fmt.Sprintf("Failed to ensure ConfigMap %s completion in namespace: %s",
+				test.VeleroVSphereConfigMapName,
+				veleroCfg.VeleroNamespace,
+			),
+		)
+	}
+
 	return nil
 }
 
-func clearupvSpherePluginConfig(c clientset.Interface, ns, secretName, configMapName string) error {
+func cleanVSpherePluginConfig(c clientset.Interface, ns, secretName, configMapName string) error {
 	//clear secret
-	_, err := GetSecret(c, ns, secretName)
+	_, err := k8s.GetSecret(c, ns, secretName)
 	if err == nil { //exist
-		if err := WaitForSecretDelete(c, ns, secretName); err != nil {
+		if err := k8s.WaitForSecretDelete(c, ns, secretName); err != nil {
 			return errors.WithMessagef(err, "Failed to clear up vsphere plugin secret in %s namespace", ns)
 		}
 	} else if !apierrors.IsNotFound(err) {
@@ -209,9 +247,9 @@ func clearupvSpherePluginConfig(c clientset.Interface, ns, secretName, configMap
 	}
 
 	//clear configmap
-	_, err = GetConfigmap(c, ns, configMapName)
+	_, err = k8s.GetConfigmap(c, ns, configMapName)
 	if err == nil {
-		if err := WaitForConfigmapDelete(c, ns, configMapName); err != nil {
+		if err := k8s.WaitForConfigmapDelete(c, ns, configMapName); err != nil {
 			return errors.WithMessagef(err, "Failed to clear up vsphere plugin configmap in %s namespace", ns)
 		}
 	} else if !apierrors.IsNotFound(err) {
@@ -282,10 +320,10 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 
 	if len(options.Features) > 0 {
 		args = append(args, "--features", options.Features)
-		if !strings.EqualFold(cloudProvider, Vsphere) && strings.EqualFold(options.Features, FeatureCSI) && options.UseVolumeSnapshots {
+		if strings.EqualFold(options.Features, test.FeatureCSI) && options.UseVolumeSnapshots {
 			// https://github.com/openebs/zfs-localpv/blob/develop/docs/snapshot.md
 			fmt.Printf("Start to install %s VolumeSnapshotClass ... \n", cloudProvider)
-			if err := KubectlApplyByFile(ctx, fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", cloudProvider)); err != nil {
+			if err := k8s.KubectlApplyByFile(ctx, fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", cloudProvider)); err != nil {
 				fmt.Println("Fail to install VolumeSnapshotClass when CSI feature is enabled: ", err)
 				return err
 			}
@@ -454,11 +492,11 @@ func patchResources(resources *unstructured.UnstructuredList, namespace string, 
 			i++
 		} else if options.VeleroServerDebugMode && resource.GetKind() == "Deployment" &&
 			resource.GetName() == "velero" {
-			deployJsonStr, err := json.Marshal(resource.Object)
+			deployJSONStr, err := json.Marshal(resource.Object)
 			if err != nil {
 				return errors.Wrapf(err, "failed to marshal velero deployment")
 			}
-			if err := json.Unmarshal(deployJsonStr, &deploy); err != nil {
+			if err := json.Unmarshal(deployJSONStr, &deploy); err != nil {
 				return errors.Wrapf(err, "failed to unmarshal velero deployment")
 			}
 			veleroDeployIndex := -1
@@ -565,7 +603,7 @@ func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) e
 	return nil
 }
 
-func IsVeleroReady(ctx context.Context, veleroCfg *VeleroConfig) (bool, error) {
+func IsVeleroReady(ctx context.Context, veleroCfg *test.VeleroConfig) (bool, error) {
 	namespace := veleroCfg.VeleroNamespace
 	useNodeAgent := veleroCfg.UseNodeAgent
 	if useNodeAgent {
@@ -599,7 +637,7 @@ func IsVeleroReady(ctx context.Context, veleroCfg *VeleroConfig) (bool, error) {
 	}
 
 	// Check BSL with poll
-	err = wait.PollUntilContextTimeout(ctx, PollInterval, time.Minute, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, k8s.PollInterval, time.Minute, true, func(ctx context.Context) (bool, error) {
 		return checkBSL(ctx, veleroCfg) == nil, nil
 	})
 	if err != nil {
@@ -608,7 +646,7 @@ func IsVeleroReady(ctx context.Context, veleroCfg *VeleroConfig) (bool, error) {
 	return true, nil
 }
 
-func checkBSL(ctx context.Context, veleroCfg *VeleroConfig) error {
+func checkBSL(ctx context.Context, veleroCfg *test.VeleroConfig) error {
 	namespace := veleroCfg.VeleroNamespace
 	stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "bsl", "default",
 		"-o", "json", "-n", namespace))
@@ -626,7 +664,7 @@ func checkBSL(ctx context.Context, veleroCfg *VeleroConfig) error {
 	return nil
 }
 
-func PrepareVelero(ctx context.Context, caseName string, veleroCfg VeleroConfig) error {
+func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroConfig) error {
 	ready, err := IsVeleroReady(context.Background(), &veleroCfg)
 	if err != nil {
 		fmt.Printf("error in checking velero status with %v", err)
@@ -653,17 +691,20 @@ func VeleroUninstall(ctx context.Context, cli, namespace string) error {
 	return nil
 }
 
-// createVCCredentialSecret refer to https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
+// createVCCredentialSecret refer to
+// https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
 func createVCCredentialSecret(c clientset.Interface, veleroNamespace string) error {
 	secret, err := getVCCredentialSecret(c)
 	if err != nil {
 		return err
 	}
+
 	vsphereCfg, exist := secret.Data["csi-vsphere.conf"]
 	if !exist {
 		return errors.New("failed to retrieve csi-vsphere config")
 	}
-	se := &corev1.Secret{
+
+	vsphereSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "velero-vsphere-config-secret",
 			Namespace: veleroNamespace,
@@ -671,17 +712,36 @@ func createVCCredentialSecret(c clientset.Interface, veleroNamespace string) err
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{"csi-vsphere.conf": vsphereCfg},
 	}
-	_, err = c.CoreV1().Secrets(veleroNamespace).Create(context.TODO(), se, metav1.CreateOptions{})
-	return err
+	_, err = c.CoreV1().Secrets(veleroNamespace).Create(
+		context.TODO(),
+		vsphereSecret,
+		metav1.CreateOptions{},
+	)
+	if err != nil {
+		return err
+	}
+
+	if err := k8s.WaitForSecretsComplete(
+		c,
+		veleroNamespace,
+		test.VeleroVSphereSecretName,
+	); err != nil {
+		return errors.Wrap(
+			err,
+			"Failed to ensure velero-vsphere-config-secret secret completion in namespace kube-system",
+		)
+	}
+
+	return nil
 }
 
 // Reference https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/main/docs/vanilla.md#create-vc-credential-secret
 // Read secret from kube-system namespace first, if not found, try with vmware-system-csi.
 func getVCCredentialSecret(c clientset.Interface) (secret *corev1.Secret, err error) {
-	secret, err = GetSecret(c, KubeSystemNamespace, "vsphere-config-secret")
+	secret, err = k8s.GetSecret(c, test.KubeSystemNamespace, "vsphere-config-secret")
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			secret, err = GetSecret(c, VSphereCSIControllerNamespace, "vsphere-config-secret")
+			secret, err = k8s.GetSecret(c, test.VSphereCSIControllerNamespace, "vsphere-config-secret")
 		}
 	}
 	return
