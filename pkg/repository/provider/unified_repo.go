@@ -444,6 +444,8 @@ func getStorageType(backupLocation *velerov1api.BackupStorageLocation) string {
 		return udmrepo.StorageTypeGcs
 	case repoconfig.FSBackend:
 		return udmrepo.StorageTypeFs
+	case repoconfig.PVCBackend:
+		return udmrepo.StorageTypeFs
 	default:
 		return ""
 	}
@@ -567,6 +569,15 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 	}
 	result[udmrepo.StoreOptionOssRegion] = strings.Trim(region, "/")
 	result[udmrepo.StoreOptionFsPath] = config["fspath"]
+	// LVP override fspath if empty
+	if backupLocation.Spec.Provider == "replicated.com/pvc" && result[udmrepo.StoreOptionFsPath] == "" {
+		result[udmrepo.StoreOptionFsPath] =
+			"/var/velero-local-volume-provider" + //default root https://github.com/replicatedhq/local-volume-provider/blob/7c78cfd4d12b7ad9614d5270413cb286fd081cae/pkg/plugin/util.go#L14C7-L14C18
+				backupLocation.Spec.ObjectStorage.Bucket +
+				backupLocation.Spec.ObjectStorage.Prefix
+		// on backuprepo create, this path will be created by
+		// /go/pkg/mod/github.com/project-velero/kopia@v0.0.0-20241016073907-939dae5f9001/repo/blob/filesystem/filesystem_storage.go L348
+	}
 
 	if backupRepoConfig != nil {
 		if v, found := backupRepoConfig[udmrepo.StoreOptionCacheLimit]; found {
