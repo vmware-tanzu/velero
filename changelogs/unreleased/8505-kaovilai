@@ -1,1 +1,0 @@
-Set hinting region to use for GetBucketRegion() in pkg/repository/config/aws.go
