@@ -335,6 +335,7 @@ type restoreContext struct {
 	backupReader                   io.Reader
 	restore                        *velerov1api.Restore
 	restoreDir                     string
+	restoreDirLongNames            map[string]string
 	resourceIncludesExcludes       *collections.IncludesExcludes
 	resourceStatusIncludesExcludes *collections.IncludesExcludes
 	namespaceIncludesExcludes      *collections.IncludesExcludes
@@ -425,7 +426,7 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 
 	ctx.log.Infof("Starting restore of backup %s", kube.NamespaceAndName(ctx.backup))
 
-	dir, err := archive.NewExtractor(ctx.log, ctx.fileSystem).UnzipAndExtractBackup(ctx.backupReader)
+	dir, longNames, err := archive.NewExtractor(ctx.log, ctx.fileSystem).UnzipAndExtractBackup(ctx.backupReader)
 	if err != nil {
 		ctx.log.Infof("error unzipping and extracting: %v", err)
 		errs.AddVeleroError(err)
@@ -455,8 +456,9 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 
 	// Need to set this for additionalItems to be restored.
 	ctx.restoreDir = dir
+	ctx.restoreDirLongNames = longNames
 
-	backupResources, err := archive.NewParser(ctx.log, ctx.fileSystem).Parse(ctx.restoreDir)
+	backupResources, err := archive.NewParser(ctx.log, ctx.fileSystem).Parse(ctx.restoreDir, ctx.restoreDirLongNames)
 	// If ErrNotExist occurs, it implies that the backup to be restored includes zero items.
 	// Need to add a warning about it and jump out of the function.
 	if errors.Cause(err) == archive.ErrNotExist {
