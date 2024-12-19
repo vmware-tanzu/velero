@@ -573,11 +573,13 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 	tests := []struct {
 		name            string
 		backupRepo      *velerov1api.BackupRepository
+		result          velerov1api.BackupRepositoryMaintenanceResult
 		expectedHistory []velerov1api.BackupRepositoryMaintenanceStatus
 	}{
 		{
 			name:       "empty history",
 			backupRepo: backupRepoWithoutHistory,
+			result:     velerov1api.BackupRepositoryMaintenanceSucceeded,
 			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
 				{
 					StartTimestamp:    &metav1.Time{Time: standardTime},
@@ -589,6 +591,7 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 		{
 			name:       "less than history queue length",
 			backupRepo: backupRepoWithHistory,
+			result:     velerov1api.BackupRepositoryMaintenanceSucceeded,
 			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
 				{
 					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 24)},
@@ -605,6 +608,7 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 		{
 			name:       "full history",
 			backupRepo: backupRepoWithFullHistory,
+			result:     velerov1api.BackupRepositoryMaintenanceFailed,
 			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
 				{
 					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 22)},
@@ -626,6 +630,7 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 		{
 			name:       "over full history",
 			backupRepo: backupRepoWithOverFullHistory,
+			result:     velerov1api.BackupRepositoryMaintenanceFailed,
 			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
 				{
 					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 20)},
@@ -648,7 +653,7 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			updateRepoMaintenanceHistory(test.backupRepo, standardTime, standardTime.Add(time.Hour), "fake-message-0")
+			updateRepoMaintenanceHistory(test.backupRepo, test.result, standardTime, standardTime.Add(time.Hour), "fake-message-0")
 
 			for at := range test.backupRepo.Status.RecentMaintenanceStatus {
 				assert.Equal(t, test.expectedHistory[at].StartTimestamp.Time, test.backupRepo.Status.RecentMaintenanceStatus[at].StartTimestamp.Time)

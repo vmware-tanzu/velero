@@ -81,7 +81,20 @@ type BackupRepositoryStatus struct {
 	RecentMaintenanceStatus []BackupRepositoryMaintenanceStatus `json:"recentMaintenanceStatus,omitempty"`
 }
 
+// BackupRepositoryMaintenanceResult represents the result of a repo maintenance.
+// +kubebuilder:validation:Enum=Succeeded;Failed
+type BackupRepositoryMaintenanceResult string
+
+const (
+	BackupRepositoryMaintenanceSucceeded BackupRepositoryMaintenanceResult = "Succeeded"
+	BackupRepositoryMaintenanceFailed    BackupRepositoryMaintenanceResult = "Failed"
+)
+
 type BackupRepositoryMaintenanceStatus struct {
+	// Result is the result of the repo maintenance.
+	// +optional
+	Result BackupRepositoryMaintenanceResult `json:"result,omitempty"`
+
 	// StartTimestamp is the start time of the repo maintenance.
 	// +optional
 	// +nullable

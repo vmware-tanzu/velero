@@ -316,18 +316,18 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 	if err := r.repositoryManager.PruneRepo(req); err != nil {
 		log.WithError(err).Warn("error pruning repository")
 		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
-			updateRepoMaintenanceHistory(rr, startTime, r.clock.Now(), err.Error())
+			updateRepoMaintenanceHistory(rr, velerov1api.BackupRepositoryMaintenanceFailed, startTime, r.clock.Now(), err.Error())
 		})
 	}
 
 	return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
 		completionTime := r.clock.Now()
 		rr.Status.LastMaintenanceTime = &metav1.Time{Time: completionTime}
-		updateRepoMaintenanceHistory(rr, startTime, completionTime, "")
+		updateRepoMaintenanceHistory(rr, velerov1api.BackupRepositoryMaintenanceSucceeded, startTime, completionTime, "")
 	})
 }
 
-func updateRepoMaintenanceHistory(repo *velerov1api.BackupRepository, startTime time.Time, completionTime time.Time, result string) {
+func updateRepoMaintenanceHistory(repo *velerov1api.BackupRepository, result velerov1api.BackupRepositoryMaintenanceResult, startTime time.Time, completionTime time.Time, message string) {
 	length := defaultMaintenanceStatusQueueLength
 	if len(repo.Status.RecentMaintenanceStatus) < defaultMaintenanceStatusQueueLength {
 		length = len(repo.Status.RecentMaintenanceStatus) + 1
@@ -342,9 +342,10 @@ func updateRepoMaintenanceHistory(repo *velerov1api.BackupRepository, startTime 
 	}
 
 	lru[length-1] = velerov1api.BackupRepositoryMaintenanceStatus{
+		Result:            result,
 		StartTimestamp:    &metav1.Time{Time: startTime},
 		CompleteTimestamp: &metav1.Time{Time: completionTime},
-		Message:           result,
+		Message:           message,
 	}
 
 	repo.Status.RecentMaintenanceStatus = lru

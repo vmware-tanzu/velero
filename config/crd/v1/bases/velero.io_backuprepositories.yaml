@@ -119,6 +119,12 @@ spec:
                       description: Message is a message about the current status of
                         the repo maintenance.
                       type: string
+                    result:
+                      description: Result is the result of the repo maintenance.
+                      enum:
+                      - Succeeded
+                      - Failed
+                      type: string
                     startTimestamp:
                       description: StartTimestamp is the start time of the repo maintenance.
                       format: date-time
