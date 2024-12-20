@@ -260,7 +260,7 @@ func createPodObj(running bool, withVolume bool, withVolumeMounted bool, volumeN
 
 func createNodeAgentPodObj(running bool) *corev1api.Pod {
 	podObj := builder.ForPod(velerov1api.DefaultNamespace, "fake-node-agent").Result()
-	podObj.Labels = map[string]string{"name": "node-agent"}
+	podObj.Labels = map[string]string{"role": "node-agent"}
 
 	if running {
 		podObj.Status.Phase = corev1api.PodRunning

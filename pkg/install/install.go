@@ -206,9 +206,19 @@ func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, e
 	return isReady, err
 }
 
-// DaemonSetIsReady will poll the Kubernetes API server to ensure the node-agent daemonset is ready, i.e. that
+// NodeAgentIsReady will poll the Kubernetes API server to ensure the node-agent daemonset is ready, i.e. that
 // pods are scheduled and available on all of the desired nodes.
-func DaemonSetIsReady(factory client.DynamicFactory, namespace string) (bool, error) {
+func NodeAgentIsReady(factory client.DynamicFactory, namespace string) (bool, error) {
+	return daemonSetIsReady(factory, namespace, "node-agent")
+}
+
+// NodeAgentWindowsIsReady will poll the Kubernetes API server to ensure the node-agent-windows daemonset is ready, i.e. that
+// pods are scheduled and available on all of the desired nodes.
+func NodeAgentWindowsIsReady(factory client.DynamicFactory, namespace string) (bool, error) {
+	return daemonSetIsReady(factory, namespace, "node-agent-windows")
+}
+
+func daemonSetIsReady(factory client.DynamicFactory, namespace string, name string) (bool, error) {
 	gvk := schema.FromAPIVersionAndKind(appsv1.SchemeGroupVersion.String(), "DaemonSet")
 	apiResource := metav1.APIResource{
 		Name:       "daemonsets",
@@ -225,7 +235,7 @@ func DaemonSetIsReady(factory client.DynamicFactory, namespace string) (bool, er
 	var readyObservations int32
 
 	err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
-		unstructuredDaemonSet, err := c.Get("node-agent", metav1.GetOptions{})
+		unstructuredDaemonSet, err := c.Get(name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		} else if err != nil {
