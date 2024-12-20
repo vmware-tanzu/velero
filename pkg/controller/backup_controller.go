@@ -147,6 +147,7 @@ func NewBackupReconciler(
 func (b *backupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Backup{}).
+		Named(constant.ControllerBackup).
 		Complete(b)
 }
 

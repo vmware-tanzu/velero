@@ -98,6 +98,7 @@ func (c *backupOperationsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Backup{}, builder.WithPredicates(kube.FalsePredicate{})).
 		WatchesRawSource(s).
+		Named(constant.ControllerBackupOperations).
 		Complete(c)
 }
 
