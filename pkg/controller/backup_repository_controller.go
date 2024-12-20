@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -40,6 +41,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
 	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -206,10 +208,93 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 		fallthrough
 	case velerov1api.BackupRepositoryPhaseReady:
+		if err := r.processUnrecordedMaintenance(ctx, backupRepo, log); err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "error handling incomplete repo maintenance jobs")
+		}
+
 		return ctrl.Result{}, r.runMaintenanceIfDue(ctx, backupRepo, log)
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *BackupRepoReconciler) processUnrecordedMaintenance(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
+	history, err := repository.WaitIncompleteMaintenance(ctx, r.Client, req, defaultMaintenanceStatusQueueLength, log)
+	if err != nil {
+		return errors.Wrapf(err, "error waiting incomplete repo maintenance job for repo %s", req.Name)
+	}
+
+	consolidated := consolidateHistory(history, req.Status.RecentMaintenance)
+	if consolidated == nil {
+		return nil
+	}
+
+	log.Warn("Updating backup repository because of unrecorded histories")
+
+	return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
+		rr.Status.RecentMaintenance = consolidated
+	})
+}
+
+func consolidateHistory(coming, cur []velerov1api.BackupRepositoryMaintenanceStatus) []velerov1api.BackupRepositoryMaintenanceStatus {
+	if len(coming) == 0 {
+		return nil
+	}
+
+	if isIdenticalHistories(coming, cur) {
+		return nil
+	}
+
+	truncated := []velerov1api.BackupRepositoryMaintenanceStatus{}
+	i := len(cur) - 1
+	j := len(coming) - 1
+	for i >= 0 || j >= 0 {
+		if len(truncated) == defaultMaintenanceStatusQueueLength {
+			break
+		}
+
+		if i >= 0 && j >= 0 {
+			if isEarlierHistory(cur[i], coming[j]) {
+				truncated = append(truncated, coming[j])
+				j--
+			} else {
+				truncated = append(truncated, cur[i])
+				i--
+			}
+		} else if i >= 0 {
+			truncated = append(truncated, cur[i])
+			i--
+		} else {
+			truncated = append(truncated, coming[j])
+			j--
+		}
+	}
+
+	slices.Reverse(truncated)
+
+	if isIdenticalHistories(truncated, cur) {
+		return nil
+	}
+
+	return truncated
+}
+
+func isIdenticalHistories(a, b []velerov1api.BackupRepositoryMaintenanceStatus) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := 0; i < len(a); i++ {
+		if !a[i].CompleteTimestamp.Equal(b[i].CompleteTimestamp) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isEarlierHistory(a, b velerov1api.BackupRepositoryMaintenanceStatus) bool {
+	return a.CompleteTimestamp.Before(b.CompleteTimestamp)
 }
 
 func (r *BackupRepoReconciler) getIdentiferByBSL(ctx context.Context, req *velerov1api.BackupRepository) (string, error) {

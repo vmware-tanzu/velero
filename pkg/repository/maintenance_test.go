@@ -458,3 +458,144 @@ func TestGetMaintenanceJobConfig(t *testing.T) {
 		})
 	}
 }
+
+// func TestWaitIncompleteMaintenance(t *testing.T) {
+// 	ctx, cancel := context.WithCancel(context.Background())
+
+// 	veleroNamespace := "velero"
+// 	repo := &velerov1api.BackupRepository{
+// 		ObjectMeta: metav1.ObjectMeta{
+// 			Namespace: veleroNamespace,
+// 			Name:      "fake-repo",
+// 		},
+// 		Spec: velerov1api.BackupRepositorySpec{
+// 			BackupStorageLocation: "default",
+// 			RepositoryType:        "kopia",
+// 			VolumeNamespace:       "test",
+// 		},
+// 	}
+
+// 	scheme := runtime.NewScheme()
+// 	batchv1.AddToScheme(scheme)
+
+// 	testCases := []struct {
+// 		name           string
+// 		ctx            context.Context
+// 		kubeClientObj  []runtime.Object
+// 		runtimeScheme  *runtime.Scheme
+// 		expectedStatus []velerov1api.BackupRepositoryMaintenanceStatus
+// 		expectedError  string
+// 	}{
+// 		{
+// 			name: "list job error",
+// 			expectedError: "error listing maintenance job for repo fake-repo",
+// 		},
+// 		{
+// 			name:          "job not exist",
+// 			runtimeScheme: scheme,
+// 		},
+// 		{
+// 			name:          "no matching job",
+// 			runtimeScheme: scheme,
+// 			kubeClientObj: []runtime.Object{
+// 				jobOtherLabel,
+// 			},
+// 		},
+// 		{
+// 			name:          "wait complete error",
+// 			ctx:           context.WithTimeout(context.TODO(), time.Second),
+// 			runtimeScheme: scheme,
+// 			kubeClientObj: []runtime.Object{
+// 				jobIncomplete,
+// 			},
+// 			expectedError: nil,
+// 		},
+// 		{
+// 			name: "Find config specific for global",
+// 			repoJobConfig: &v1.ConfigMap{
+// 				ObjectMeta: metav1.ObjectMeta{
+// 					Namespace: veleroNamespace,
+// 					Name:      repoMaintenanceJobConfig,
+// 				},
+// 				Data: map[string]string{
+// 					GlobalKeyForRepoMaintenanceJobCM: "{\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
+// 				},
+// 			},
+// 			expectedConfig: &JobConfigs{
+// 				PodResources: &kube.PodResources{
+// 					CPURequest:    "50m",
+// 					CPULimit:      "100m",
+// 					MemoryRequest: "50Mi",
+// 					MemoryLimit:   "100Mi",
+// 				},
+// 				LoadAffinities: []*kube.LoadAffinity{
+// 					{
+// 						NodeSelector: metav1.LabelSelector{
+// 							MatchExpressions: []metav1.LabelSelectorRequirement{
+// 								{
+// 									Key:      "cloud.google.com/machine-family",
+// 									Operator: metav1.LabelSelectorOpIn,
+// 									Values:   []string{"n2"},
+// 								},
+// 							},
+// 						},
+// 					},
+// 				},
+// 			},
+// 			expectedError: nil,
+// 		},
+// 		{
+// 			name: "Specific config supersede global config",
+// 			repoJobConfig: &v1.ConfigMap{
+// 				ObjectMeta: metav1.ObjectMeta{
+// 					Namespace: veleroNamespace,
+// 					Name:      repoMaintenanceJobConfig,
+// 				},
+// 				Data: map[string]string{
+// 					GlobalKeyForRepoMaintenanceJobCM: "{\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
+// 					"test-default-kopia":             "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}]}",
+// 				},
+// 			},
+// 			expectedConfig: &JobConfigs{
+// 				PodResources: &kube.PodResources{
+// 					CPURequest:    "100m",
+// 					CPULimit:      "200m",
+// 					MemoryRequest: "100Mi",
+// 					MemoryLimit:   "200Mi",
+// 				},
+// 				LoadAffinities: []*kube.LoadAffinity{
+// 					{
+// 						NodeSelector: metav1.LabelSelector{
+// 							MatchExpressions: []metav1.LabelSelectorRequirement{
+// 								{
+// 									Key:      "cloud.google.com/machine-family",
+// 									Operator: metav1.LabelSelectorOpIn,
+// 									Values:   []string{"e2"},
+// 								},
+// 							},
+// 						},
+// 					},
+// 				},
+// 			},
+// 			expectedError: nil,
+// 		},
+// 	}
+
+// 	for _, test := range testCases {
+// 		t.Run(test.name, func(t *testing.T) {
+// 			fakeClientBuilder := fake.NewClientBuilder()
+// 			if test.runtimeScheme != nil {
+// 				fakeClientBuilder = fakeClientBuilder.WithScheme(test.runtimeScheme)
+// 			}
+
+// 			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
+
+// 			if tc.expectedError != nil {
+// 				require.ErrorContains(t, err, tc.expectedError.Error())
+// 			} else {
+// 				require.NoError(t, err)
+// 			}
+// 			require.Equal(t, tc.expectedConfig, jobConfig)
+// 		})
+// 	}
+// }

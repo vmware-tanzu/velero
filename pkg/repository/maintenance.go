@@ -87,7 +87,7 @@ func DeleteOldMaintenanceJobs(cli client.Client, repo string, keep int) error {
 }
 
 func WaitForJobComplete(ctx context.Context, client client.Client, job *batchv1.Job) error {
-	return wait.PollUntilContextCancel(ctx, 1, true, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		err := client.Get(ctx, types.NamespacedName{Namespace: job.Namespace, Name: job.Name}, job)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -249,4 +249,63 @@ func GetMaintenanceJobConfig(
 	}
 
 	return result, nil
+}
+
+// WaitIncompleteMaintenance checks all the incomplete maintenance jobs of the specified repo and wait for them to complete,
+// and then return the maintenance jobs in the range of limit
+func WaitIncompleteMaintenance(ctx context.Context, cli client.Client, repo *velerov1api.BackupRepository, limit int, log logrus.FieldLogger) ([]velerov1api.BackupRepositoryMaintenanceStatus, error) {
+	jobList := &batchv1.JobList{}
+	err := cli.List(context.TODO(), jobList, &client.ListOptions{
+		Namespace: repo.Namespace,
+	},
+		client.MatchingLabels(map[string]string{RepositoryNameLabel: repo.Name}),
+	)
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "error listing maintenance job for repo %s", repo.Name)
+	}
+
+	if len(jobList.Items) == 0 {
+		return nil, nil
+	}
+
+	history := []velerov1api.BackupRepositoryMaintenanceStatus{}
+
+	for _, job := range jobList.Items {
+		if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
+			log.Infof("Waiting for maintenance job %s to complete", job.Name)
+
+			if err := WaitForJobComplete(ctx, cli, &job); err != nil {
+				return nil, errors.Wrapf(err, "error waiting maintenance job[%s] complete", job.Name)
+			}
+		}
+
+		result := velerov1api.BackupRepositoryMaintenanceSucceeded
+		if job.Status.Failed > 0 {
+			result = velerov1api.BackupRepositoryMaintenanceFailed
+		}
+
+		message, err := GetMaintenanceResultFromJob(cli, &job)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error getting maintenance job[%s] result", job.Name)
+		}
+
+		history = append(history, velerov1api.BackupRepositoryMaintenanceStatus{
+			Result:            result,
+			StartTimestamp:    &metav1.Time{Time: job.Status.StartTime.Time},
+			CompleteTimestamp: &metav1.Time{Time: job.Status.CompletionTime.Time},
+			Message:           message,
+		})
+	}
+
+	sort.Slice(history, func(i, j int) bool {
+		return history[i].CompleteTimestamp.Time.After(history[j].CompleteTimestamp.Time)
+	})
+
+	startPos := len(history) - limit
+	if startPos < 0 {
+		startPos = 0
+	}
+
+	return history[startPos:], nil
 }
