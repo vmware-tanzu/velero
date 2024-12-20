@@ -429,15 +429,15 @@ func (o *Options) Validate(c *cobra.Command, args []string, f client.Factory) er
 		return err
 	}
 
+	// If we're only installing CRDs, we can skip the rest of the validation.
+	if o.CRDsOnly {
+		return nil
+	}
+
 	if msg, err := uploader.ValidateUploaderType(o.UploaderType); err != nil {
 		return err
 	} else if msg != "" {
 		fmt.Printf("⚠️  %s\n", msg)
-	}
-
-	// If we're only installing CRDs, we can skip the rest of the validation.
-	if o.CRDsOnly {
-		return nil
 	}
 
 	// Our main 3 providers don't support bucket names starting with a dash, and a bucket name starting with one
