@@ -40,7 +40,7 @@ type reactor struct {
 }
 
 func TestIsRunning(t *testing.T) {
-	daemonSet := &appsv1.DaemonSet{
+	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -80,7 +80,7 @@ func TestIsRunning(t *testing.T) {
 			name:      "succeed",
 			namespace: "fake-ns",
 			kubeClientObj: []runtime.Object{
-				daemonSet,
+				ds,
 			},
 		},
 	}
@@ -93,7 +93,7 @@ func TestIsRunning(t *testing.T) {
 				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
 			}
 
-			err := IsRunning(context.TODO(), fakeKubeClient, test.namespace)
+			err := isRunning(context.TODO(), fakeKubeClient, test.namespace, daemonSet)
 			if test.expectErr == "" {
 				assert.NoError(t, err)
 			} else {

@@ -82,6 +82,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/restore"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
@@ -471,10 +472,20 @@ func (s *server) veleroResourcesExist() error {
 
 func (s *server) checkNodeAgent() {
 	// warn if node agent does not exist
-	if err := nodeagent.IsRunning(s.ctx, s.kubeClient, s.namespace); err == nodeagent.ErrDaemonSetNotFound {
-		s.logger.Warn("Velero node agent not found; pod volume backups/restores will not work until it's created")
-	} else if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero node agent")
+	if kube.WithLinuxNode(s.ctx, s.crClient, s.logger) {
+		if err := nodeagent.IsRunningOnLinux(s.ctx, s.kubeClient, s.namespace); err == nodeagent.ErrDaemonSetNotFound {
+			s.logger.Warn("Velero node agent not found for linux nodes; pod volume backups/restores and data mover backups/restores will not work until it's created")
+		} else if err != nil {
+			s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero node agent for linux nodes")
+		}
+	}
+
+	if kube.WithWindowsNode(s.ctx, s.crClient, s.logger) {
+		if err := nodeagent.IsRunningOnWindows(s.ctx, s.kubeClient, s.namespace); err == nodeagent.ErrDaemonSetNotFound {
+			s.logger.Warn("Velero node agent not found for Windows nodes; pod volume backups/restores and data mover backups/restores will not work until it's created")
+		} else if err != nil {
+			s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero node agent for Windows nodes")
+		}
 	}
 }
 
