@@ -1,7 +1,0 @@
-*.pprof
-*.test
-*.txt
-*.out
-
-/upstream
-/go.work
