@@ -58,6 +58,7 @@ type podTemplateConfig struct {
 	repoMaintenanceJobConfigMap     string
 	nodeAgentConfigMap              string
 	itemBlockWorkerCount            int
+	forWindows                      bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -219,6 +220,12 @@ func WithItemBlockWorkerCount(itemBlockWorkerCount int) podTemplateOption {
 	}
 }
 
+func WithForWindows() podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.forWindows = true
+	}
+}
+
 func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment {
 	// TODO: Add support for server args
 	c := &podTemplateConfig{
@@ -324,6 +331,12 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyAlways,
 					ServiceAccountName: c.serviceAccountName,
+					NodeSelector: map[string]string{
+						"kubernetes.io/os": "linux",
+					},
+					OS: &corev1.PodOS{
+						Name: "linux",
+					},
 					Containers: []corev1.Container{
 						{
 							Name:            "velero",
