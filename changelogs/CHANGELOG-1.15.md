@@ -23,6 +23,7 @@ https://velero.io/docs/v1.15/upgrade-to-1.15/
   * Fix issue #8391, check ErrCancelled from suffix of data mover pod's termination message (#8404, @Lyndon-Li)
   * Fix issue #8394, don't call closeDataPath in VGDP callbacks, otherwise, the VGDP cleanup will hang (#8402, @Lyndon-Li)
   * Reduce minimum required go toolchain in release-1.15 go.mod (#8399, @kaovilai)
+  * Fix issue #8539, validate uploader types when o.CRDsOnly is set to false only since CRD installation doesn't rely on uploader types (#8540, @Lyndon-Li)
 
 
 ## v1.15
