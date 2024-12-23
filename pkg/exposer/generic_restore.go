@@ -35,10 +35,31 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
+// GenericRestoreExposeParam define the input param for Generic Restore Expose
+type GenericRestoreExposeParam struct {
+	// TargetPVCName is the target volume name to be restored
+	TargetPVCName string
+
+	// SourceNamespace is the original namespace of the volume that the snapshot is taken for
+	SourceNamespace string
+
+	// HostingPodLabels is the labels that are going to apply to the hosting pod
+	HostingPodLabels map[string]string
+
+	// Resources defines the resource requirements of the hosting pod
+	Resources corev1.ResourceRequirements
+
+	// ExposeTimeout specifies the timeout for the entire expose process
+	ExposeTimeout time.Duration
+
+	// RestorePVCConfig is the config for restorePVC (intermediate PVC) of generic restore
+	RestorePVCConfig nodeagent.RestorePVC
+}
+
 // GenericRestoreExposer is the interfaces for a generic restore exposer
 type GenericRestoreExposer interface {
 	// Expose starts the process to a restore expose, the expose process may take long time
-	Expose(context.Context, corev1.ObjectReference, string, string, map[string]string, corev1.ResourceRequirements, time.Duration) error
+	Expose(context.Context, corev1.ObjectReference, GenericRestoreExposeParam) error
 
 	// GetExposed polls the status of the expose.
 	// If the expose is accessible by the current caller, it waits the expose ready and returns the expose result.
@@ -74,25 +95,25 @@ type genericRestoreExposer struct {
 	log        logrus.FieldLogger
 }
 
-func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, targetPVCName string, sourceNamespace string, hostingPodLabels map[string]string, resources corev1.ResourceRequirements, timeout time.Duration) error {
+func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param GenericRestoreExposeParam) error {
 	curLog := e.log.WithFields(logrus.Fields{
 		"owner":            ownerObject.Name,
-		"target PVC":       targetPVCName,
-		"source namespace": sourceNamespace,
+		"target PVC":       param.TargetPVCName,
+		"source namespace": param.SourceNamespace,
 	})
 
-	selectedNode, targetPVC, err := kube.WaitPVCConsumed(ctx, e.kubeClient.CoreV1(), targetPVCName, sourceNamespace, e.kubeClient.StorageV1(), timeout)
+	selectedNode, targetPVC, err := kube.WaitPVCConsumed(ctx, e.kubeClient.CoreV1(), param.TargetPVCName, param.SourceNamespace, e.kubeClient.StorageV1(), param.ExposeTimeout, param.RestorePVCConfig.IgnoreDelayBinding)
 	if err != nil {
-		return errors.Wrapf(err, "error to wait target PVC consumed, %s/%s", sourceNamespace, targetPVCName)
+		return errors.Wrapf(err, "error to wait target PVC consumed, %s/%s", param.SourceNamespace, param.TargetPVCName)
 	}
 
-	curLog.WithField("target PVC", targetPVCName).WithField("selected node", selectedNode).Info("Target PVC is consumed")
+	curLog.WithField("target PVC", param.TargetPVCName).WithField("selected node", selectedNode).Info("Target PVC is consumed")
 
 	if kube.IsPVCBound(targetPVC) {
-		return errors.Errorf("Target PVC %s/%s has already been bound, abort", sourceNamespace, targetPVCName)
+		return errors.Errorf("Target PVC %s/%s has already been bound, abort", param.SourceNamespace, param.TargetPVCName)
 	}
 
-	restorePod, err := e.createRestorePod(ctx, ownerObject, targetPVC, timeout, hostingPodLabels, selectedNode, resources)
+	restorePod, err := e.createRestorePod(ctx, ownerObject, targetPVC, param.ExposeTimeout, param.HostingPodLabels, selectedNode, param.Resources)
 	if err != nil {
 		return errors.Wrapf(err, "error to create restore pod")
 	}
