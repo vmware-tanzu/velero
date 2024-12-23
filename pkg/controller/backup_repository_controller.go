@@ -328,27 +328,19 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 }
 
 func updateRepoMaintenanceHistory(repo *velerov1api.BackupRepository, result velerov1api.BackupRepositoryMaintenanceResult, startTime time.Time, completionTime time.Time, message string) {
-	length := defaultMaintenanceStatusQueueLength
-	if len(repo.Status.RecentMaintenanceStatus) < defaultMaintenanceStatusQueueLength {
-		length = len(repo.Status.RecentMaintenanceStatus) + 1
-	}
-
-	lru := make([]velerov1api.BackupRepositoryMaintenanceStatus, length)
-
-	if len(repo.Status.RecentMaintenanceStatus) >= defaultMaintenanceStatusQueueLength {
-		copy(lru[:length-1], repo.Status.RecentMaintenanceStatus[len(repo.Status.RecentMaintenanceStatus)-defaultMaintenanceStatusQueueLength+1:])
-	} else {
-		copy(lru[:length-1], repo.Status.RecentMaintenanceStatus[:])
-	}
-
-	lru[length-1] = velerov1api.BackupRepositoryMaintenanceStatus{
+	latest := velerov1api.BackupRepositoryMaintenanceStatus{
 		Result:            result,
 		StartTimestamp:    &metav1.Time{Time: startTime},
 		CompleteTimestamp: &metav1.Time{Time: completionTime},
 		Message:           message,
 	}
 
-	repo.Status.RecentMaintenanceStatus = lru
+	startingPos := 0
+	if len(repo.Status.RecentMaintenance) >= defaultMaintenanceStatusQueueLength {
+		startingPos = len(repo.Status.RecentMaintenance) - defaultMaintenanceStatusQueueLength + 1
+	}
+
+	repo.Status.RecentMaintenance = append(repo.Status.RecentMaintenance[startingPos:], latest)
 }
 
 func dueForMaintenance(req *velerov1api.BackupRepository, now time.Time) bool {

@@ -503,7 +503,7 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 			Name:      "repo",
 		},
 		Status: velerov1api.BackupRepositoryStatus{
-			RecentMaintenanceStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
+			RecentMaintenance: []velerov1api.BackupRepositoryMaintenanceStatus{
 				{
 					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 24)},
 					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 23)},
@@ -519,7 +519,7 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 			Name:      "repo",
 		},
 		Status: velerov1api.BackupRepositoryStatus{
-			RecentMaintenanceStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
+			RecentMaintenance: []velerov1api.BackupRepositoryMaintenanceStatus{
 				{
 					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 24)},
 					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 23)},
@@ -545,7 +545,7 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 			Name:      "repo",
 		},
 		Status: velerov1api.BackupRepositoryStatus{
-			RecentMaintenanceStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
+			RecentMaintenance: []velerov1api.BackupRepositoryMaintenanceStatus{
 				{
 					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 24)},
 					CompleteTimestamp: &metav1.Time{Time: standardTime.Add(-time.Hour * 23)},
@@ -655,10 +655,10 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			updateRepoMaintenanceHistory(test.backupRepo, test.result, standardTime, standardTime.Add(time.Hour), "fake-message-0")
 
-			for at := range test.backupRepo.Status.RecentMaintenanceStatus {
-				assert.Equal(t, test.expectedHistory[at].StartTimestamp.Time, test.backupRepo.Status.RecentMaintenanceStatus[at].StartTimestamp.Time)
-				assert.Equal(t, test.expectedHistory[at].CompleteTimestamp.Time, test.backupRepo.Status.RecentMaintenanceStatus[at].CompleteTimestamp.Time)
-				assert.Equal(t, test.expectedHistory[at].Message, test.backupRepo.Status.RecentMaintenanceStatus[at].Message)
+			for at := range test.backupRepo.Status.RecentMaintenance {
+				assert.Equal(t, test.expectedHistory[at].StartTimestamp.Time, test.backupRepo.Status.RecentMaintenance[at].StartTimestamp.Time)
+				assert.Equal(t, test.expectedHistory[at].CompleteTimestamp.Time, test.backupRepo.Status.RecentMaintenance[at].CompleteTimestamp.Time)
+				assert.Equal(t, test.expectedHistory[at].Message, test.backupRepo.Status.RecentMaintenance[at].Message)
 			}
 		})
 	}
