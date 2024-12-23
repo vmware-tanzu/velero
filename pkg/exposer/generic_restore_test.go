@@ -180,7 +180,12 @@ func TestRestoreExpose(t *testing.T) {
 				}
 			}
 
-			err := exposer.Expose(context.Background(), ownerObject, test.targetPVCName, test.sourceNamespace, map[string]string{}, corev1.ResourceRequirements{}, time.Millisecond)
+			err := exposer.Expose(context.Background(), ownerObject, GenericRestoreExposeParam{
+				TargetPVCName:    test.targetPVCName,
+				SourceNamespace:  test.sourceNamespace,
+				HostingPodLabels: map[string]string{},
+				Resources:        corev1.ResourceRequirements{},
+				ExposeTimeout:    time.Millisecond})
 			assert.EqualError(t, err, test.err)
 		})
 	}
