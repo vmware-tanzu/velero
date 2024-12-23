@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -411,6 +412,15 @@ func createVeleroResources(ctx context.Context, cli, namespace string, args []st
 	stdout, stderr, err = velerexec.RunCommand(cmd)
 	if err != nil {
 		return errors.Wrapf(err, "failed to run velero install dry run command, stdout=%s, stderr=%s", stdout, stderr)
+	}
+
+	// From v1.15, the Restic uploader is deprecated,
+	// and a warning message is printed for the install CLI.
+	// Need to skip the deprecation of Restic message before the generated JSON.
+	// Redirect to the stdout to the first curly bracket to skip the warning.
+	if stdout[0] != '{' {
+		newIndex := strings.Index(stdout, "{")
+		stdout = stdout[newIndex:]
 	}
 
 	resources := &unstructured.UnstructuredList{}
