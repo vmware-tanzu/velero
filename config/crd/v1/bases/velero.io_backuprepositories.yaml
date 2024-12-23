@@ -89,7 +89,7 @@ spec:
             properties:
               lastMaintenanceTime:
                 description: LastMaintenanceTime is the last time repo maintenance
-                  completed.
+                  succeeded.
                 format: date-time
                 nullable: true
                 type: string
@@ -104,9 +104,8 @@ spec:
                 - Ready
                 - NotReady
                 type: string
-              recentMaintenanceStatus:
-                description: RecentMaintenanceStatus is status of the recent repo
-                  maintenance.
+              recentMaintenance:
+                description: RecentMaintenance is status of the recent repo maintenance.
                 items:
                   properties:
                     completeTimestamp:

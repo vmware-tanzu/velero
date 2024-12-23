@@ -218,8 +218,8 @@ func (in *BackupRepositoryStatus) DeepCopyInto(out *BackupRepositoryStatus) {
 		in, out := &in.LastMaintenanceTime, &out.LastMaintenanceTime
 		*out = (*in).DeepCopy()
 	}
-	if in.RecentMaintenanceStatus != nil {
-		in, out := &in.RecentMaintenanceStatus, &out.RecentMaintenanceStatus
+	if in.RecentMaintenance != nil {
+		in, out := &in.RecentMaintenance, &out.RecentMaintenance
 		*out = make([]BackupRepositoryMaintenanceStatus, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

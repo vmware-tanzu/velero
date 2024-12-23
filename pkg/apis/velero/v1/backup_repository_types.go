@@ -71,14 +71,14 @@ type BackupRepositoryStatus struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
-	// LastMaintenanceTime is the last time repo maintenance completed.
+	// LastMaintenanceTime is the last time repo maintenance succeeded.
 	// +optional
 	// +nullable
 	LastMaintenanceTime *metav1.Time `json:"lastMaintenanceTime,omitempty"`
 
-	// RecentMaintenanceStatus is status of the recent repo maintenance.
+	// RecentMaintenance is status of the recent repo maintenance.
 	// +optional
-	RecentMaintenanceStatus []BackupRepositoryMaintenanceStatus `json:"recentMaintenanceStatus,omitempty"`
+	RecentMaintenance []BackupRepositoryMaintenanceStatus `json:"recentMaintenance,omitempty"`
 }
 
 // BackupRepositoryMaintenanceResult represents the result of a repo maintenance.
