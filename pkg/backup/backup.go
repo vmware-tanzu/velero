@@ -681,6 +681,7 @@ func (kb *kubernetesBackupper) backupItemBlock(ctx context.Context, itemBlock Ba
 
 	if len(postHookPods) > 0 {
 		itemBlock.Log.Debug("Executing post hooks")
+		itemBlock.itemBackupper.hookTracker.AsyncItemBlocks.Add(1)
 		go kb.handleItemBlockPostHooks(ctx, itemBlock, postHookPods)
 	}
 
@@ -719,7 +720,6 @@ func (kb *kubernetesBackupper) handleItemBlockPreHooks(itemBlock BackupItemBlock
 // The hooks cannot execute until the PVBs to be processed
 func (kb *kubernetesBackupper) handleItemBlockPostHooks(ctx context.Context, itemBlock BackupItemBlock, hookPods []itemblock.ItemBlockItem) {
 	log := itemBlock.Log
-	itemBlock.itemBackupper.hookTracker.AsyncItemBlocks.Add(1)
 	defer itemBlock.itemBackupper.hookTracker.AsyncItemBlocks.Done()
 
 	if err := kb.waitUntilPVBsProcessed(ctx, log, itemBlock, hookPods); err != nil {
@@ -790,7 +790,7 @@ func (kb *kubernetesBackupper) waitUntilPVBsProcessed(ctx context.Context, log l
 		return allProcessed, nil
 	}
 
-	return wait.PollUntilContextCancel(ctx, 5*time.Second, false, checkFunc)
+	return wait.PollUntilContextCancel(ctx, 5*time.Second, true, checkFunc)
 }
 
 func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper, unstructured *unstructured.Unstructured, preferredGVR schema.GroupVersionResource, itemBlock *BackupItemBlock) bool {

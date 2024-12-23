@@ -3433,59 +3433,57 @@ func TestBackupWithHooks(t *testing.T) {
 		wantBackedUp               []string
 		wantHookExecutionLog       []test.HookExecutionEntry
 	}{
-		/*
-			{
-				name: "pre hook with no resource filters runs for all pods",
-				backup: defaultBackup().
-					Hooks(velerov1.BackupHooks{
-						Resources: []velerov1.BackupResourceHookSpec{
-							{
-								Name: "hook-1",
-								PreHooks: []velerov1.BackupResourceHook{
-									{
-										Exec: &velerov1.ExecHook{
-											Command: []string{"ls", "/tmp"},
-										},
+		{
+			name: "pre hook with no resource filters runs for all pods",
+			backup: defaultBackup().
+				Hooks(velerov1.BackupHooks{
+					Resources: []velerov1.BackupResourceHookSpec{
+						{
+							Name: "hook-1",
+							PreHooks: []velerov1.BackupResourceHook{
+								{
+									Exec: &velerov1.ExecHook{
+										Command: []string{"ls", "/tmp"},
 									},
 								},
 							},
 						},
-					}).
-					Result(),
-				apiResources: []*test.APIResource{
-					test.Pods(
-						builder.ForPod("ns-1", "pod-1").Result(),
-						builder.ForPod("ns-2", "pod-2").Result(),
-					),
-				},
-				wantExecutePodCommandCalls: []*expectedCall{
-					{
-						podNamespace: "ns-1",
-						podName:      "pod-1",
-						hookName:     "hook-1",
-						hook: &velerov1.ExecHook{
-							Command: []string{"ls", "/tmp"},
-						},
-						err: nil,
 					},
-					{
-						podNamespace: "ns-2",
-						podName:      "pod-2",
-						hookName:     "hook-1",
-						hook: &velerov1.ExecHook{
-							Command: []string{"ls", "/tmp"},
-						},
-						err: nil,
+				}).
+				Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				),
+			},
+			wantExecutePodCommandCalls: []*expectedCall{
+				{
+					podNamespace: "ns-1",
+					podName:      "pod-1",
+					hookName:     "hook-1",
+					hook: &velerov1.ExecHook{
+						Command: []string{"ls", "/tmp"},
 					},
+					err: nil,
 				},
-				wantBackedUp: []string{
-					"resources/pods/namespaces/ns-1/pod-1.json",
-					"resources/pods/namespaces/ns-2/pod-2.json",
-					"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
-					"resources/pods/v1-preferredversion/namespaces/ns-2/pod-2.json",
+				{
+					podNamespace: "ns-2",
+					podName:      "pod-2",
+					hookName:     "hook-1",
+					hook: &velerov1.ExecHook{
+						Command: []string{"ls", "/tmp"},
+					},
+					err: nil,
 				},
 			},
-		*/
+			wantBackedUp: []string{
+				"resources/pods/namespaces/ns-1/pod-1.json",
+				"resources/pods/namespaces/ns-2/pod-2.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-2.json",
+			},
+		},
 		{
 			name: "post hook with no resource filters runs for all pods",
 			backup: defaultBackup().
