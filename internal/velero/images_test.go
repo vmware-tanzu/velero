@@ -134,7 +134,3 @@ func testDefaultImage(t *testing.T, defaultImageFn func() string, imageName stri
 func TestDefaultVeleroImage(t *testing.T) {
 	testDefaultImage(t, DefaultVeleroImage, "velero")
 }
-
-func TestDefaultRestoreHelperImage(t *testing.T) {
-	testDefaultImage(t, DefaultRestoreHelperImage, "velero-restore-helper")
-}
