@@ -31,6 +31,7 @@ import (
 	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 type reactor struct {
@@ -229,7 +230,7 @@ func TestGetPodSpec(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
 
-			spec, err := GetPodSpec(context.TODO(), fakeKubeClient, test.namespace)
+			spec, err := GetPodSpec(context.TODO(), fakeKubeClient, test.namespace, kube.NodeOSLinux)
 			if test.expectErr == "" {
 				assert.NoError(t, err)
 				assert.Equal(t, *spec, test.expectSpec)
@@ -450,7 +451,7 @@ func TestGetLabelValue(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
 
-			value, err := GetLabelValue(context.TODO(), fakeKubeClient, test.namespace, "fake-label")
+			value, err := GetLabelValue(context.TODO(), fakeKubeClient, test.namespace, "fake-label", kube.NodeOSLinux)
 			if test.expectErr == "" {
 				assert.NoError(t, err)
 				assert.Equal(t, test.expectedValue, value)

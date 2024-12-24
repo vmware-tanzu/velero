@@ -182,7 +182,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		hostingPodLabels := map[string]string{velerov1api.DataDownloadLabel: dd.Name}
 		for _, k := range util.ThirdPartyLabels {
-			if v, err := nodeagent.GetLabelValue(ctx, r.kubeClient, dd.Namespace, k); err != nil {
+			if v, err := nodeagent.GetLabelValue(ctx, r.kubeClient, dd.Namespace, k, kube.NodeOSLinux); err != nil {
 				if err != nodeagent.ErrNodeAgentLabelNotFound {
 					log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
 				}

@@ -38,10 +38,10 @@ type inheritedPodInfo struct {
 	logFormatArgs  []string
 }
 
-func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veleroNamespace string) (inheritedPodInfo, error) {
+func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veleroNamespace string, osType string) (inheritedPodInfo, error) {
 	podInfo := inheritedPodInfo{}
 
-	podSpec, err := nodeagent.GetPodSpec(ctx, client, veleroNamespace)
+	podSpec, err := nodeagent.GetPodSpec(ctx, client, veleroNamespace, osType)
 	if err != nil {
 		return podInfo, errors.Wrap(err, "error to get node-agent pod template")
 	}

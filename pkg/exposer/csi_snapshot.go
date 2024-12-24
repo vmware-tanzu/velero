@@ -73,6 +73,9 @@ type CSISnapshotExposeParam struct {
 
 	// Resources defines the resource requirements of the hosting pod
 	Resources corev1.ResourceRequirements
+
+	// NodeOS specifies the OS of node that the source volume is attaching
+	NodeOS string
 }
 
 // CSISnapshotExposeWaitParam define the input param for WaitExposed of CSI snapshots
@@ -212,6 +215,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		csiExposeParam.Resources,
 		backupPVCReadOnly,
 		spcNoRelabeling,
+		csiExposeParam.NodeOS,
 	)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
@@ -517,13 +521,14 @@ func (e *csiSnapshotExposer) createBackupPod(
 	resources corev1.ResourceRequirements,
 	backupPVCReadOnly bool,
 	spcNoRelabeling bool,
+	nodeOS string,
 ) (*corev1.Pod, error) {
 	podName := ownerObject.Name
 
 	containerName := string(ownerObject.UID)
 	volumeName := string(ownerObject.UID)
 
-	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace)
+	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, nodeOS)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
 	}
@@ -567,11 +572,38 @@ func (e *csiSnapshotExposer) createBackupPod(
 	args = append(args, podInfo.logFormatArgs...)
 	args = append(args, podInfo.logLevelArgs...)
 
-	userID := int64(0)
-
 	affinityList := make([]*kube.LoadAffinity, 0)
 	if affinity != nil {
 		affinityList = append(affinityList, affinity)
+	}
+
+	var securityCtx *corev1.PodSecurityContext
+	nodeSelector := map[string]string{}
+	podOS := corev1.PodOS{}
+	if nodeOS == kube.NodeOSWindows {
+		userID := "ContainerAdministrator"
+		securityCtx = &corev1.PodSecurityContext{
+			WindowsOptions: &corev1.WindowsSecurityContextOptions{
+				RunAsUserName: &userID,
+			},
+		}
+
+		nodeSelector[kube.NodeOSLabel] = kube.NodeOSWindows
+		podOS.Name = kube.NodeOSWindows
+	} else {
+		userID := int64(0)
+		securityCtx = &corev1.PodSecurityContext{
+			RunAsUser: &userID,
+		}
+
+		if spcNoRelabeling {
+			securityCtx.SELinuxOptions = &corev1.SELinuxOptions{
+				Type: "spc_t",
+			}
+		}
+
+		nodeSelector[kube.NodeOSLabel] = kube.NodeOSLinux
+		podOS.Name = kube.NodeOSLinux
 	}
 
 	pod := &corev1.Pod{
@@ -602,7 +634,9 @@ func (e *csiSnapshotExposer) createBackupPod(
 					},
 				},
 			},
-			Affinity: kube.ToSystemAffinity(affinityList),
+			NodeSelector: nodeSelector,
+			OS:           &podOS,
+			Affinity:     kube.ToSystemAffinity(affinityList),
 			Containers: []corev1.Container{
 				{
 					Name:            containerName,
@@ -625,16 +659,8 @@ func (e *csiSnapshotExposer) createBackupPod(
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes:                       volumes,
 			RestartPolicy:                 corev1.RestartPolicyNever,
-			SecurityContext: &corev1.PodSecurityContext{
-				RunAsUser: &userID,
-			},
+			SecurityContext:               securityCtx,
 		},
-	}
-
-	if spcNoRelabeling {
-		pod.Spec.SecurityContext.SELinuxOptions = &corev1.SELinuxOptions{
-			Type: "spc_t",
-		}
 	}
 
 	return e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Create(ctx, pod, metav1.CreateOptions{})
