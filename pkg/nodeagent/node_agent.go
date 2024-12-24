@@ -33,8 +33,11 @@ import (
 )
 
 const (
-	// daemonSet is the name of the Velero node agent daemonset.
+	// daemonSet is the name of the Velero node agent daemonset on linux nodes.
 	daemonSet = "node-agent"
+
+	// daemonsetWindows is the name of the Velero node agent daemonset on Windows nodes.
+	daemonsetWindows = "node-agent-windows"
 
 	// nodeAgentRole marks pods with node-agent role on all nodes.
 	nodeAgentRole = "node-agent"
@@ -92,9 +95,16 @@ type Configs struct {
 	PodResources *kube.PodResources `json:"podResources,omitempty"`
 }
 
-// IsRunning checks if the node agent daemonset is running properly. If not, return the error found
-func IsRunning(ctx context.Context, kubeClient kubernetes.Interface, namespace string) error {
-	if _, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, daemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+func IsRunningOnLinux(ctx context.Context, kubeClient kubernetes.Interface, namespace string) error {
+	return isRunning(ctx, kubeClient, namespace, daemonSet)
+}
+
+func IsRunningOnWindows(ctx context.Context, kubeClient kubernetes.Interface, namespace string) error {
+	return isRunning(ctx, kubeClient, namespace, daemonsetWindows)
+}
+
+func isRunning(ctx context.Context, kubeClient kubernetes.Interface, namespace string, daemonset string) error {
+	if _, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, daemonset, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		return ErrDaemonSetNotFound
 	} else if err != nil {
 		return err

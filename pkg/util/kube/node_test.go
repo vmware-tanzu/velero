@@ -1,0 +1,132 @@
+/*
+Copyright The Velero Contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package kube
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/vmware-tanzu/velero/pkg/builder"
+
+	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+)
+
+func TestIsLinuxNode(t *testing.T) {
+	nodeNoOSLabel := builder.ForNode("fake-node").Result()
+	nodeWindows := builder.ForNode("fake-node").Labels(map[string]string{"kubernetes.io/os": "windows"}).Result()
+	nodeLinux := builder.ForNode("fake-node").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
+
+	scheme := runtime.NewScheme()
+	corev1.AddToScheme(scheme)
+
+	tests := []struct {
+		name          string
+		kubeClientObj []runtime.Object
+		err           string
+	}{
+		{
+			name: "error getting node",
+			err:  "error getting node fake-node: nodes \"fake-node\" not found",
+		},
+		{
+			name: "no os label",
+			kubeClientObj: []runtime.Object{
+				nodeNoOSLabel,
+			},
+			err: "no os type label for node fake-node",
+		},
+		{
+			name: "os label does not match",
+			kubeClientObj: []runtime.Object{
+				nodeWindows,
+			},
+			err: "os type windows for node fake-node is not linux",
+		},
+		{
+			name: "succeed",
+			kubeClientObj: []runtime.Object{
+				nodeLinux,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClientBuilder := clientFake.NewClientBuilder()
+			fakeClientBuilder = fakeClientBuilder.WithScheme(scheme)
+
+			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
+
+			err := IsLinuxNode(context.TODO(), "fake-node", fakeClient)
+			if err != nil {
+				assert.EqualError(t, err, test.err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestWithLinuxNode(t *testing.T) {
+	nodeWindows := builder.ForNode("fake-node-1").Labels(map[string]string{"kubernetes.io/os": "windows"}).Result()
+	nodeLinux := builder.ForNode("fake-node-2").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
+
+	scheme := runtime.NewScheme()
+	corev1.AddToScheme(scheme)
+
+	tests := []struct {
+		name          string
+		kubeClientObj []runtime.Object
+		result        bool
+	}{
+		{
+			name: "error listing node",
+		},
+		{
+			name: "with node of other type",
+			kubeClientObj: []runtime.Object{
+				nodeWindows,
+			},
+		},
+		{
+			name: "with node of the same type",
+			kubeClientObj: []runtime.Object{
+				nodeWindows,
+				nodeLinux,
+			},
+			result: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClientBuilder := clientFake.NewClientBuilder()
+			fakeClientBuilder = fakeClientBuilder.WithScheme(scheme)
+
+			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
+
+			result := withOSNode(context.TODO(), fakeClient, "linux", velerotest.NewLogger())
+			assert.Equal(t, test.result, result)
+		})
+	}
+}
