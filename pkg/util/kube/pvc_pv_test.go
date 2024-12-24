@@ -188,14 +188,15 @@ func TestWaitPVCConsumed(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		pvcName       string
-		pvcNamespace  string
-		kubeClientObj []runtime.Object
-		kubeReactors  []reactor
-		expectedPVC   *corev1api.PersistentVolumeClaim
-		selectedNode  string
-		err           string
+		name                       string
+		pvcName                    string
+		pvcNamespace               string
+		kubeClientObj              []runtime.Object
+		kubeReactors               []reactor
+		expectedPVC                *corev1api.PersistentVolumeClaim
+		selectedNode               string
+		ignoreWaitForFirstConsumer bool
+		err                        string
 	}{
 		{
 			name:         "get pvc error",
@@ -211,6 +212,16 @@ func TestWaitPVCConsumed(t *testing.T) {
 				pvcObject,
 			},
 			expectedPVC: pvcObject,
+		},
+		{
+			name:                       "success when ignore wait for first consumer",
+			pvcName:                    "fake-pvc-2",
+			pvcNamespace:               "fake-namespace",
+			ignoreWaitForFirstConsumer: true,
+			kubeClientObj: []runtime.Object{
+				pvcObjectWithSC,
+			},
+			expectedPVC: pvcObjectWithSC,
 		},
 		{
 			name:         "get sc fail",
@@ -274,7 +285,7 @@ func TestWaitPVCConsumed(t *testing.T) {
 
 			var kubeClient kubernetes.Interface = fakeKubeClient
 
-			selectedNode, pvc, err := WaitPVCConsumed(context.Background(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, kubeClient.StorageV1(), time.Millisecond)
+			selectedNode, pvc, err := WaitPVCConsumed(context.Background(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, kubeClient.StorageV1(), time.Millisecond, test.ignoreWaitForFirstConsumer)
 
 			if err != nil {
 				assert.EqualError(t, err, test.err)
