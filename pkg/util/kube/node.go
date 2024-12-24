@@ -21,8 +21,16 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	NodeOSLinux   = "linux"
+	NodeOSWindows = "windows"
+	NodeOSLabel   = "kubernetes.io/os"
 )
 
 func IsLinuxNode(ctx context.Context, nodeName string, client client.Client) error {
@@ -31,13 +39,13 @@ func IsLinuxNode(ctx context.Context, nodeName string, client client.Client) err
 		return errors.Wrapf(err, "error getting node %s", nodeName)
 	}
 
-	os, found := node.Labels["kubernetes.io/os"]
+	os, found := node.Labels[NodeOSLabel]
 
 	if !found {
 		return errors.Errorf("no os type label for node %s", nodeName)
 	}
 
-	if os != "linux" {
+	if os != NodeOSLinux {
 		return errors.Errorf("os type %s for node %s is not linux", os, nodeName)
 	}
 
@@ -45,11 +53,11 @@ func IsLinuxNode(ctx context.Context, nodeName string, client client.Client) err
 }
 
 func WithLinuxNode(ctx context.Context, client client.Client, log logrus.FieldLogger) bool {
-	return withOSNode(ctx, client, "linux", log)
+	return withOSNode(ctx, client, NodeOSLinux, log)
 }
 
 func WithWindowsNode(ctx context.Context, client client.Client, log logrus.FieldLogger) bool {
-	return withOSNode(ctx, client, "windows", log)
+	return withOSNode(ctx, client, NodeOSWindows, log)
 }
 
 func withOSNode(ctx context.Context, client client.Client, osType string, log logrus.FieldLogger) bool {
@@ -61,7 +69,7 @@ func withOSNode(ctx context.Context, client client.Client, osType string, log lo
 
 	allNodeLabeled := true
 	for _, node := range nodeList.Items {
-		os, found := node.Labels["kubernetes.io/os"]
+		os, found := node.Labels[NodeOSLabel]
 
 		if os == osType {
 			return true
@@ -77,4 +85,17 @@ func withOSNode(ctx context.Context, client client.Client, osType string, log lo
 	}
 
 	return false
+}
+
+func GetNodeOS(ctx context.Context, nodeName string, nodeClient corev1client.CoreV1Interface) (string, error) {
+	node, err := nodeClient.Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+	if err != nil {
+		return "", errors.Wrapf(err, "error getting node %s", nodeName)
+	}
+
+	if node.Labels == nil {
+		return "", nil
+	}
+
+	return node.Labels[NodeOSLabel], nil
 }
