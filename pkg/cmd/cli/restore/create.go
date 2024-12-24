@@ -78,31 +78,32 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type CreateOptions struct {
-	BackupName                string
-	ScheduleName              string
-	RestoreName               string
-	RestoreVolumes            flag.OptionalBool
-	PreserveNodePorts         flag.OptionalBool
-	Labels                    flag.Map
-	Annotations               flag.Map
-	IncludeNamespaces         flag.StringArray
-	ExcludeNamespaces         flag.StringArray
-	ExistingResourcePolicy    string
-	IncludeResources          flag.StringArray
-	ExcludeResources          flag.StringArray
-	StatusIncludeResources    flag.StringArray
-	StatusExcludeResources    flag.StringArray
-	NamespaceMappings         flag.Map
-	Selector                  flag.LabelSelector
-	OrSelector                flag.OrLabelSelector
-	IncludeClusterResources   flag.OptionalBool
-	Wait                      bool
-	AllowPartiallyFailed      flag.OptionalBool
-	ItemOperationTimeout      time.Duration
-	ResourceModifierConfigMap string
-	WriteSparseFiles          flag.OptionalBool
-	ParallelFilesDownload     int
-	client                    kbclient.WithWatch
+	BackupName                             string
+	ScheduleName                           string
+	RestoreName                            string
+	RestoreVolumes                         flag.OptionalBool
+	PreserveNodePorts                      flag.OptionalBool
+	Labels                                 flag.Map
+	Annotations                            flag.Map
+	IncludeNamespaces                      flag.StringArray
+	ExcludeNamespaces                      flag.StringArray
+	ExistingResourcePolicy                 string
+	IncludeResources                       flag.StringArray
+	ExcludeResources                       flag.StringArray
+	StatusIncludeResources                 flag.StringArray
+	StatusExcludeResources                 flag.StringArray
+	NamespaceMappings                      flag.Map
+	Selector                               flag.LabelSelector
+	OrSelector                             flag.OrLabelSelector
+	IncludeClusterResources                flag.OptionalBool
+	Wait                                   bool
+	AllowPartiallyFailed                   flag.OptionalBool
+	ItemOperationTimeout                   time.Duration
+	ResourceModifierConfigMap              string
+	WriteSparseFiles                       flag.OptionalBool
+	ParallelFilesDownload                  int
+	client                                 kbclient.WithWatch
+	DisabledPVReprovisioningStorageClasses flag.StringArray
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -158,6 +159,8 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f.NoOptDefVal = cmd.TRUE
 
 	flags.IntVar(&o.ParallelFilesDownload, "parallel-files-download", 0, "The number of restore operations to run in parallel. If set to 0, the default parallelism will be the number of CPUs for the node that node agent pod is running.")
+
+	flags.Var(&o.DisabledPVReprovisioningStorageClasses, "disable-pv-reprovisioning-storageclasses", "PV with no snaptshot that has a StorageClass specified by this flag will not be re-provisionned.")
 }
 
 func (o *CreateOptions) Complete(args []string, f client.Factory) error {
@@ -339,6 +342,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				WriteSparseFiles:      o.WriteSparseFiles.Value,
 				ParallelFilesDownload: o.ParallelFilesDownload,
 			},
+			DisabledPVReprovisioningStorageClasses: o.DisabledPVReprovisioningStorageClasses,
 		},
 	}
 
