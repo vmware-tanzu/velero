@@ -31,13 +31,17 @@ func IsLinuxNode(ctx context.Context, nodeName string, client client.Client) err
 		return errors.Wrapf(err, "error getting node %s", nodeName)
 	}
 
-	if os, found := node.Labels["kubernetes.io/os"]; !found {
+	os, found := node.Labels["kubernetes.io/os"]
+
+	if !found {
 		return errors.Errorf("no os type label for node %s", nodeName)
-	} else if os != "linux" {
-		return errors.Errorf("os type %s for node %s is not linux", os, nodeName)
-	} else {
-		return nil
 	}
+
+	if os != "linux" {
+		return errors.Errorf("os type %s for node %s is not linux", os, nodeName)
+	}
+
+	return nil
 }
 
 func WithLinuxNode(ctx context.Context, client client.Client, log logrus.FieldLogger) bool {
@@ -51,16 +55,25 @@ func WithWindowsNode(ctx context.Context, client client.Client, log logrus.Field
 func withOSNode(ctx context.Context, client client.Client, osType string, log logrus.FieldLogger) bool {
 	nodeList := new(corev1api.NodeList)
 	if err := client.List(ctx, nodeList); err != nil {
-		log.Warn("Failed to list nodes, cannot decide existence of windows nodes")
+		log.Warnf("Failed to list nodes, cannot decide existence of nodes of OS %s", osType)
 		return false
 	}
 
+	allNodeLabeled := true
 	for _, node := range nodeList.Items {
-		if os, found := node.Labels["kubernetes.io/os"]; !found {
-			log.Warnf("Node %s doesn't have os type label, cannot decide existence of windows nodes")
-		} else if os == osType {
+		os, found := node.Labels["kubernetes.io/os"]
+
+		if os == osType {
 			return true
 		}
+
+		if !found {
+			allNodeLabeled = false
+		}
+	}
+
+	if !allNodeLabeled {
+		log.Warnf("Not all nodes have os type label, cannot decide existence of nodes of OS %s", osType)
 	}
 
 	return false
