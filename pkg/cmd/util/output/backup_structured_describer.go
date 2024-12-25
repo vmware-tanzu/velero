@@ -30,6 +30,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/cacert"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
@@ -272,11 +273,19 @@ func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *
 }
 
 func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Client, backupStatusInfo map[string]any, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) {
+	// Get BSL cacert if available
+	bslCACert, err := cacert.GetCACertFromBackup(ctx, kbClient, backup.Namespace, backup)
+	if err != nil {
+		// Log the error but don't fail - we can still try to download without the BSL cacert
+		backupStatusInfo["warningGettingBSLCACert"] = fmt.Sprintf("Warning: Error getting cacert from BSL: %v", err)
+		bslCACert = ""
+	}
+
 	// In consideration of decoding structured output conveniently, the two separate fields were created here(in func describeBackupResourceList, there is only one field describing either error message or resource list)
 	// the field of 'errorGettingResourceList' gives specific error message when it fails to get resources list
 	// the field of 'resourceList' lists the rearranged resources
 	buf := new(bytes.Buffer)
-	if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
+	if err := downloadrequest.StreamWithBSLCACert(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath, bslCACert); err != nil {
 		if err == downloadrequest.ErrNotFound {
 			// the backup resource list could be missing if (other reasons may exist as well):
 			//	- the backup was taken prior to v1.1; or
@@ -302,20 +311,28 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackupCRs []velerov1api.PodVolumeBackup, backupStatusInfo map[string]any) {
 	backupVolumes := make(map[string]any)
 
+	// Get BSL cacert if available
+	bslCACert, err := cacert.GetCACertFromBackup(ctx, kbClient, backup.Namespace, backup)
+	if err != nil {
+		// Log the error but don't fail - we can still try to download without the BSL cacert
+		backupVolumes["warningGettingBSLCACert"] = fmt.Sprintf("Warning: Error getting cacert from BSL: %v", err)
+		bslCACert = ""
+	}
+
 	nativeSnapshots := []*volume.BackupVolumeInfo{}
 	csiSnapshots := []*volume.BackupVolumeInfo{}
 	legacyInfoSource := false
 
 	buf := new(bytes.Buffer)
-	err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeInfos, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath)
+	err = downloadrequest.StreamWithBSLCACert(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeInfos, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath, bslCACert)
 	if err == downloadrequest.ErrNotFound {
-		nativeSnapshots, err = retrieveNativeSnapshotLegacy(ctx, kbClient, backup, insecureSkipTLSVerify, caCertPath)
+		nativeSnapshots, err = retrieveNativeSnapshotLegacy(ctx, kbClient, backup, insecureSkipTLSVerify, caCertPath, bslCACert)
 		if err != nil {
 			backupVolumes["errorConcludeNativeSnapshot"] = fmt.Sprintf("error concluding native snapshot info: %v", err)
 			return
 		}
 
-		csiSnapshots, err = retrieveCSISnapshotLegacy(ctx, kbClient, backup, insecureSkipTLSVerify, caCertPath)
+		csiSnapshots, err = retrieveCSISnapshotLegacy(ctx, kbClient, backup, insecureSkipTLSVerify, caCertPath, bslCACert)
 		if err != nil {
 			backupVolumes["errorConcludeCSISnapshot"] = fmt.Sprintf("error concluding CSI snapshot info: %v", err)
 			return
@@ -538,6 +555,16 @@ func DescribeBackupResultsInSF(ctx context.Context, kbClient kbclient.Client, d 
 		return
 	}
 
+	// Get BSL cacert if available
+	bslCACert, err := cacert.GetCACertFromBackup(ctx, kbClient, backup.Namespace, backup)
+	if err != nil {
+		// Log the error but don't fail - we can still try to download without the BSL cacert
+		warnings := make(map[string]any)
+		warnings["warningGettingBSLCACert"] = fmt.Sprintf("Warning: Error getting cacert from BSL: %v", err)
+		d.Describe("warningsGettingBSLCACert", warnings)
+		bslCACert = ""
+	}
+
 	var buf bytes.Buffer
 	var resultMap map[string]results.Result
 
@@ -549,7 +576,7 @@ func DescribeBackupResultsInSF(ctx context.Context, kbClient kbclient.Client, d 
 
 	// If 'ErrNotFound' occurs, it means the backup bundle in the bucket has already been there before the backup-result file is introduced.
 	// We only display the count of errors and warnings in this case.
-	err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResults, &buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath)
+	err = downloadrequest.StreamWithBSLCACert(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResults, &buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath, bslCACert)
 	if err == downloadrequest.ErrNotFound {
 		errors["count"] = backup.Status.Errors
 		warnings["count"] = backup.Status.Warnings

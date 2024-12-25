@@ -51,6 +51,22 @@ func Stream(
 	insecureSkipTLSVerify bool,
 	caCertFile string,
 ) error {
+	return StreamWithBSLCACert(ctx, kbClient, namespace, name, kind, w, timeout, insecureSkipTLSVerify, caCertFile, "")
+}
+
+// StreamWithBSLCACert is like Stream but accepts an additional bslCACert parameter
+// that contains the cacert from the BackupStorageLocation config
+func StreamWithBSLCACert(
+	ctx context.Context,
+	kbClient kbclient.Client,
+	namespace, name string,
+	kind veleroV1api.DownloadTargetKind,
+	w io.Writer,
+	timeout time.Duration,
+	insecureSkipTLSVerify bool,
+	caCertFile string,
+	bslCACert string,
+) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -59,7 +75,7 @@ func Stream(
 		return err
 	}
 
-	if err := download(ctx, downloadURL, kind, w, insecureSkipTLSVerify, caCertFile); err != nil {
+	if err := download(ctx, downloadURL, kind, w, insecureSkipTLSVerify, caCertFile, bslCACert); err != nil {
 		return err
 	}
 
@@ -109,21 +125,35 @@ func download(
 	w io.Writer,
 	insecureSkipTLSVerify bool,
 	caCertFile string,
+	caCertByteString string,
 ) error {
 	var caPool *x509.CertPool
+	var err error
+
+	// Initialize caPool once
+	caPool, err = x509.SystemCertPool()
+	if err != nil {
+		caPool = x509.NewCertPool()
+	}
+
+	// Try to load CA cert from file first
 	if len(caCertFile) > 0 {
 		caCert, err := os.ReadFile(caCertFile)
 		if err != nil {
-			return errors.Wrapf(err, "couldn't open cacert")
+			// If caCertFile fails and BSL cert is available, fall back to it
+			if len(caCertByteString) > 0 {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to open CA certificate file %s: %v. Using CA certificate from backup storage location instead.\n", caCertFile, err)
+				caPool.AppendCertsFromPEM([]byte(caCertByteString))
+			} else {
+				// If no BSL cert available, return the original error
+				return errors.Wrapf(err, "couldn't open cacert")
+			}
+		} else {
+			caPool.AppendCertsFromPEM(caCert)
 		}
-		// bundle the passed in cert with the system cert pool
-		// if it's available, otherwise create a new pool just
-		// for this.
-		caPool, err = x509.SystemCertPool()
-		if err != nil {
-			caPool = x509.NewCertPool()
-		}
-		caPool.AppendCertsFromPEM(caCert)
+	} else if len(caCertByteString) > 0 {
+		// If no caCertFile specified, use BSL cert if available
+		caPool.AppendCertsFromPEM([]byte(caCertByteString))
 	}
 
 	defaultTransport := http.DefaultTransport.(*http.Transport)
