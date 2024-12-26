@@ -356,26 +356,26 @@ func (m *migrationE2E) Restore() error {
 	})
 
 	By(fmt.Sprintf("Restore %s", m.CaseBaseName), func() {
-		if m.VeleroCfg.SnapshotMoveData {
-			cmName := "datamover-storage-class-config"
-			labels := map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
-				"velero.io/plugin-config": ""}
-			data := map[string]string{kibishii.KibishiiStorageClassName: test.StorageClassName}
+		// Use the e2e-storage-class SC instead of the kibishii-storage-class,
+		// because the Standby cluster doesn't have a chance to create the kibishii resource.
+		cmName := "datamover-storage-class-config"
+		labels := map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
+			"velero.io/plugin-config": ""}
+		data := map[string]string{kibishii.KibishiiStorageClassName: test.StorageClassName}
 
-			By(fmt.Sprintf("Create ConfigMap %s in namespace %s",
-				cmName, StandbyVeleroCfg.VeleroNamespace), func() {
-				_, err := k8sutil.CreateConfigMap(
-					StandbyVeleroCfg.StandbyClient.ClientGo,
-					StandbyVeleroCfg.VeleroNamespace,
-					cmName,
-					labels,
-					data,
-				)
-				Expect(err).To(Succeed(), fmt.Sprintf(
-					"failed to create ConfigMap in the namespace %q",
-					StandbyVeleroCfg.VeleroNamespace))
-			})
-		}
+		By(fmt.Sprintf("Create ConfigMap %s in namespace %s",
+			cmName, StandbyVeleroCfg.VeleroNamespace), func() {
+			_, err := k8sutil.CreateConfigMap(
+				StandbyVeleroCfg.StandbyClient.ClientGo,
+				StandbyVeleroCfg.VeleroNamespace,
+				cmName,
+				labels,
+				data,
+			)
+			Expect(err).To(Succeed(), fmt.Sprintf(
+				"failed to create ConfigMap in the namespace %q",
+				StandbyVeleroCfg.VeleroNamespace))
+		})
 
 		Expect(veleroutil.VeleroRestore(
 			m.Ctx,
