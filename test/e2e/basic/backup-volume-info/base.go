@@ -28,13 +28,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	. "github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 type BackupVolumeInfo struct {
-	TestCase
+	BRCase
 	SnapshotVolumes          bool
 	DefaultVolumesToFSBackup bool
 	SnapshotMoveData         bool
@@ -42,7 +42,25 @@ type BackupVolumeInfo struct {
 }
 
 func (v *BackupVolumeInfo) Init() error {
-	v.TestCase.Init()
+	v.BRCase.Init()
+
+	if v.VeleroCfg.CloudProvider == Vsphere && (!strings.Contains(v.CaseBaseName, "fs-upload") && !strings.Contains(v.CaseBaseName, "skipped")) {
+		fmt.Printf("Skip snapshot case %s for vsphere environment.\n", v.CaseBaseName)
+		Skip("Skip snapshot case due to vsphere environment doesn't cover the CSI test, and it doesn't have a Velero native snapshot plugin.")
+	}
+
+	if strings.Contains(v.VeleroCfg.Features, FeatureCSI) {
+		if strings.Contains(v.CaseBaseName, "native-snapshot") {
+			fmt.Printf("Skip native snapshot case %s when the CSI feature is enabled.\n", v.CaseBaseName)
+			Skip("Skip native snapshot case due to CSI feature is enabled.")
+		}
+	} else {
+		if strings.Contains(v.CaseBaseName, "csi") {
+			fmt.Printf("Skip CSI related case %s when the CSI feature is not enabled.\n", v.CaseBaseName)
+			Skip("Skip CSI cases due to CSI feature is not enabled.")
+		}
+	}
+
 	v.CaseBaseName = v.CaseBaseName + v.UUIDgen
 	v.BackupName = "backup-" + v.CaseBaseName
 	v.RestoreName = "restore-" + v.CaseBaseName
@@ -76,26 +94,6 @@ func (v *BackupVolumeInfo) Init() error {
 	return nil
 }
 
-func (v *BackupVolumeInfo) Start() error {
-	if v.VeleroCfg.CloudProvider == Vsphere && (!strings.Contains(v.CaseBaseName, "fs-upload") && !strings.Contains(v.CaseBaseName, "skipped")) {
-		fmt.Printf("Skip snapshot case %s for vsphere environment.\n", v.CaseBaseName)
-		Skip("Skip snapshot case due to vsphere environment doesn't cover the CSI test, and it doesn't have a Velero native snapshot plugin.")
-	}
-
-	if strings.Contains(v.VeleroCfg.Features, FeatureCSI) {
-		if strings.Contains(v.CaseBaseName, "native-snapshot") {
-			fmt.Printf("Skip native snapshot case %s when the CSI feature is enabled.\n", v.CaseBaseName)
-			Skip("Skip native snapshot case due to CSI feature is enabled.")
-		}
-	} else {
-		if strings.Contains(v.CaseBaseName, "csi") {
-			fmt.Printf("Skip CSI related case %s when the CSI feature is not enabled.\n", v.CaseBaseName)
-			Skip("Skip CSI cases due to CSI feature is not enabled.")
-		}
-	}
-	v.TestCase.Start()
-	return nil
-}
 func (v *BackupVolumeInfo) CreateResources() error {
 	labels := map[string]string{
 		"volume-info": "true",
@@ -147,7 +145,7 @@ func (v *BackupVolumeInfo) CreateResources() error {
 	return nil
 }
 
-func (v *BackupVolumeInfo) Destroy() error {
+func (v *BackupVolumeInfo) DeleteResources() error {
 	err := CleanupNamespaces(v.Ctx, v.Client, v.CaseBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could cleanup retrieve namespaces")
