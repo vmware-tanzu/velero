@@ -1388,6 +1388,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			additionalObj, err := archive.Unmarshal(ctx.fileSystem, itemPath)
 			if err != nil {
 				errs.Add(namespace, errors.Wrapf(err, "error restoring additional item %s", additionalResourceID))
+				continue
 			}
 
 			additionalItemNamespace := additionalItem.Namespace
