@@ -1021,7 +1021,7 @@ func TestInvalidTarballContents(t *testing.T) {
 			},
 			wantErrs: Result{
 				Namespaces: map[string][]string{
-					"ns-1": {"error restoring additional item persistentvolumes/pv-1"},
+					"ns-1": {"Could not unmarshal additional item: persistentvolumes/pv-1"},
 				},
 			},
 		},
