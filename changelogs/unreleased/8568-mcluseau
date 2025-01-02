@@ -1,0 +1,1 @@
+fix(pkg/repository/maintenance): don't panic when there's no container statuses
