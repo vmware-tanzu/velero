@@ -1,3 +1,21 @@
+## v1.15.2
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.15.2
+
+### Container Image
+`velero/velero:v1.15.2`
+
+### Documentation
+https://velero.io/docs/v1.15/
+
+### Upgrading
+https://velero.io/docs/v1.15/upgrade-to-1.15/
+
+### All Changes
+* fix(pkg/repository/maintenance): don't panic when there's no container statuses (#8568, @mcluseau)
+
+
 ## v1.15.1
 
 ### Download
