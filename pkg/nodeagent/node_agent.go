@@ -157,10 +157,15 @@ func isRunningInNode(ctx context.Context, namespace string, nodeName string, crC
 	return errors.Errorf("daemonset pod not found in running state in node %s", nodeName)
 }
 
-func GetPodSpec(ctx context.Context, kubeClient kubernetes.Interface, namespace string) (*v1.PodSpec, error) {
-	ds, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, daemonSet, metav1.GetOptions{})
+func GetPodSpec(ctx context.Context, kubeClient kubernetes.Interface, namespace string, osType string) (*v1.PodSpec, error) {
+	dsName := daemonSet
+	if osType == kube.NodeOSWindows {
+		dsName = daemonsetWindows
+	}
+
+	ds, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, dsName, metav1.GetOptions{})
 	if err != nil {
-		return nil, errors.Wrap(err, "error to get node-agent daemonset")
+		return nil, errors.Wrapf(err, "error to get %s daemonset", dsName)
 	}
 
 	return &ds.Spec.Template.Spec, nil
@@ -190,10 +195,15 @@ func GetConfigs(ctx context.Context, namespace string, kubeClient kubernetes.Int
 	return configs, nil
 }
 
-func GetLabelValue(ctx context.Context, kubeClient kubernetes.Interface, namespace string, key string) (string, error) {
-	ds, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, daemonSet, metav1.GetOptions{})
+func GetLabelValue(ctx context.Context, kubeClient kubernetes.Interface, namespace string, key string, osType string) (string, error) {
+	dsName := daemonSet
+	if osType == kube.NodeOSWindows {
+		dsName = daemonsetWindows
+	}
+
+	ds, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, dsName, metav1.GetOptions{})
 	if err != nil {
-		return "", errors.Wrap(err, "error getting node-agent daemonset")
+		return "", errors.Wrapf(err, "error getting %s daemonset", dsName)
 	}
 
 	if ds.Spec.Template.Labels == nil {
