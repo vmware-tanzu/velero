@@ -54,7 +54,7 @@ type Manager interface {
 	PrepareRepo(repo *velerov1api.BackupRepository) error
 
 	// PruneRepo deletes unused data from a repo.
-	PruneRepo(repo *velerov1api.BackupRepository) error
+	PruneRepo(repo *velerov1api.BackupRepository) (velerov1api.BackupRepositoryMaintenanceStatus, error)
 
 	// UnlockRepo removes stale locks from a repo.
 	UnlockRepo(repo *velerov1api.BackupRepository) error
@@ -172,13 +172,13 @@ func (m *manager) PrepareRepo(repo *velerov1api.BackupRepository) error {
 	return prd.PrepareRepo(context.Background(), param)
 }
 
-func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
+func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
 	m.repoLocker.LockExclusive(repo.Name)
 	defer m.repoLocker.UnlockExclusive(repo.Name)
 
 	param, err := m.assembleRepoParam(repo)
 	if err != nil {
-		return errors.WithStack(err)
+		return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.WithStack(err)
 	}
 
 	log := m.log.WithFields(logrus.Fields{
@@ -190,12 +190,12 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 
 	job, err := repository.GetLatestMaintenanceJob(m.client, m.namespace)
 	if err != nil {
-		return errors.WithStack(err)
+		return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.WithStack(err)
 	}
 
 	if job != nil && job.Status.Succeeded == 0 && job.Status.Failed == 0 {
 		log.Debugf("There already has a unfinished maintenance job %s/%s for repository %s, please wait for it to complete", job.Namespace, job.Name, param.BackupRepo.Name)
-		return nil
+		return velerov1api.BackupRepositoryMaintenanceStatus{}, nil
 	}
 
 	jobConfig, err := repository.GetMaintenanceJobConfig(
@@ -220,13 +220,13 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 		param,
 	)
 	if err != nil {
-		return errors.Wrap(err, "error to build maintenance job")
+		return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.Wrap(err, "error to build maintenance job")
 	}
 
 	log = log.WithField("job", fmt.Sprintf("%s/%s", maintenanceJob.Namespace, maintenanceJob.Name))
 
 	if err := m.client.Create(context.TODO(), maintenanceJob); err != nil {
-		return errors.Wrap(err, "error to create maintenance job")
+		return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.Wrap(err, "error to create maintenance job")
 	}
 	log.Debug("Creating maintenance job")
 
@@ -240,27 +240,18 @@ func (m *manager) PruneRepo(repo *velerov1api.BackupRepository) error {
 		}
 	}()
 
-	var jobErr error
-	if err := repository.WaitForJobComplete(context.TODO(), m.client, maintenanceJob); err != nil {
-		log.WithError(err).Error("Error to wait for maintenance job complete")
-		jobErr = err // we won't return here for job may failed by maintenance failure, we want return the actual error
+	maintenanceJob, err = repository.WaitForJobComplete(context.TODO(), m.client, maintenanceJob.Namespace, maintenanceJob.Name)
+	if err != nil {
+		return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.Wrap(err, "error to wait for maintenance job complete")
 	}
 
 	result, err := repository.GetMaintenanceResultFromJob(m.client, maintenanceJob)
 	if err != nil {
-		return errors.Wrap(err, "error to get maintenance job result")
-	}
-
-	if result != "" {
-		return errors.New(fmt.Sprintf("Maintenance job %s failed: %s", maintenanceJob.Name, result))
-	}
-
-	if jobErr != nil {
-		return errors.Wrap(jobErr, "error to wait for maintenance job complete")
+		return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.Wrap(err, "error to get maintenance job result")
 	}
 
 	log.Info("Maintenance repo complete")
-	return nil
+	return repository.ComposeMaintenanceStatusFromJob(maintenanceJob, result), nil
 }
 
 func (m *manager) UnlockRepo(repo *velerov1api.BackupRepository) error {

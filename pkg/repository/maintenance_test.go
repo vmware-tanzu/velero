@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -167,7 +168,7 @@ func TestWaitForJobComplete(t *testing.T) {
 			// Create a fake Kubernetes client
 			cli := fake.NewClientBuilder().WithObjects(job).Build()
 			// Call the function
-			err := WaitForJobComplete(context.Background(), cli, job)
+			_, err := WaitForJobComplete(context.Background(), cli, job.Namespace, job.Name)
 
 			// Check if the error matches the expectation
 			if tc.expectError {
@@ -459,143 +460,291 @@ func TestGetMaintenanceJobConfig(t *testing.T) {
 	}
 }
 
-// func TestWaitIncompleteMaintenance(t *testing.T) {
-// 	ctx, cancel := context.WithCancel(context.Background())
+func TestWaitIncompleteMaintenance(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 
-// 	veleroNamespace := "velero"
-// 	repo := &velerov1api.BackupRepository{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Namespace: veleroNamespace,
-// 			Name:      "fake-repo",
-// 		},
-// 		Spec: velerov1api.BackupRepositorySpec{
-// 			BackupStorageLocation: "default",
-// 			RepositoryType:        "kopia",
-// 			VolumeNamespace:       "test",
-// 		},
-// 	}
+	veleroNamespace := "velero"
+	repo := &velerov1api.BackupRepository{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: veleroNamespace,
+			Name:      "fake-repo",
+		},
+		Spec: velerov1api.BackupRepositorySpec{
+			BackupStorageLocation: "default",
+			RepositoryType:        "kopia",
+			VolumeNamespace:       "test",
+		},
+	}
 
-// 	scheme := runtime.NewScheme()
-// 	batchv1.AddToScheme(scheme)
+	now := time.Now().Round(time.Second)
 
-// 	testCases := []struct {
-// 		name           string
-// 		ctx            context.Context
-// 		kubeClientObj  []runtime.Object
-// 		runtimeScheme  *runtime.Scheme
-// 		expectedStatus []velerov1api.BackupRepositoryMaintenanceStatus
-// 		expectedError  string
-// 	}{
-// 		{
-// 			name: "list job error",
-// 			expectedError: "error listing maintenance job for repo fake-repo",
-// 		},
-// 		{
-// 			name:          "job not exist",
-// 			runtimeScheme: scheme,
-// 		},
-// 		{
-// 			name:          "no matching job",
-// 			runtimeScheme: scheme,
-// 			kubeClientObj: []runtime.Object{
-// 				jobOtherLabel,
-// 			},
-// 		},
-// 		{
-// 			name:          "wait complete error",
-// 			ctx:           context.WithTimeout(context.TODO(), time.Second),
-// 			runtimeScheme: scheme,
-// 			kubeClientObj: []runtime.Object{
-// 				jobIncomplete,
-// 			},
-// 			expectedError: nil,
-// 		},
-// 		{
-// 			name: "Find config specific for global",
-// 			repoJobConfig: &v1.ConfigMap{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Namespace: veleroNamespace,
-// 					Name:      repoMaintenanceJobConfig,
-// 				},
-// 				Data: map[string]string{
-// 					GlobalKeyForRepoMaintenanceJobCM: "{\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
-// 				},
-// 			},
-// 			expectedConfig: &JobConfigs{
-// 				PodResources: &kube.PodResources{
-// 					CPURequest:    "50m",
-// 					CPULimit:      "100m",
-// 					MemoryRequest: "50Mi",
-// 					MemoryLimit:   "100Mi",
-// 				},
-// 				LoadAffinities: []*kube.LoadAffinity{
-// 					{
-// 						NodeSelector: metav1.LabelSelector{
-// 							MatchExpressions: []metav1.LabelSelectorRequirement{
-// 								{
-// 									Key:      "cloud.google.com/machine-family",
-// 									Operator: metav1.LabelSelectorOpIn,
-// 									Values:   []string{"n2"},
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			expectedError: nil,
-// 		},
-// 		{
-// 			name: "Specific config supersede global config",
-// 			repoJobConfig: &v1.ConfigMap{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Namespace: veleroNamespace,
-// 					Name:      repoMaintenanceJobConfig,
-// 				},
-// 				Data: map[string]string{
-// 					GlobalKeyForRepoMaintenanceJobCM: "{\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
-// 					"test-default-kopia":             "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}]}",
-// 				},
-// 			},
-// 			expectedConfig: &JobConfigs{
-// 				PodResources: &kube.PodResources{
-// 					CPURequest:    "100m",
-// 					CPULimit:      "200m",
-// 					MemoryRequest: "100Mi",
-// 					MemoryLimit:   "200Mi",
-// 				},
-// 				LoadAffinities: []*kube.LoadAffinity{
-// 					{
-// 						NodeSelector: metav1.LabelSelector{
-// 							MatchExpressions: []metav1.LabelSelectorRequirement{
-// 								{
-// 									Key:      "cloud.google.com/machine-family",
-// 									Operator: metav1.LabelSelectorOpIn,
-// 									Values:   []string{"e2"},
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			expectedError: nil,
-// 		},
-// 	}
+	jobOtherLabel := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "job1",
+			Namespace:         veleroNamespace,
+			Labels:            map[string]string{RepositoryNameLabel: "other-repo"},
+			CreationTimestamp: metav1.Time{Time: now},
+		},
+	}
 
-// 	for _, test := range testCases {
-// 		t.Run(test.name, func(t *testing.T) {
-// 			fakeClientBuilder := fake.NewClientBuilder()
-// 			if test.runtimeScheme != nil {
-// 				fakeClientBuilder = fakeClientBuilder.WithScheme(test.runtimeScheme)
-// 			}
+	jobIncomplete := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "job1",
+			Namespace:         veleroNamespace,
+			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			CreationTimestamp: metav1.Time{Time: now},
+		},
+	}
 
-// 			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
+	jobSucceeded1 := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "job1",
+			Namespace:         veleroNamespace,
+			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			CreationTimestamp: metav1.Time{Time: now},
+		},
+		Status: batchv1.JobStatus{
+			StartTime:      &metav1.Time{Time: now},
+			CompletionTime: &metav1.Time{Time: now.Add(time.Hour)},
+			Succeeded:      1,
+		},
+	}
 
-// 			if tc.expectedError != nil {
-// 				require.ErrorContains(t, err, tc.expectedError.Error())
-// 			} else {
-// 				require.NoError(t, err)
-// 			}
-// 			require.Equal(t, tc.expectedConfig, jobConfig)
-// 		})
-// 	}
-// }
+	jobPodSucceeded1 := builder.ForPod(veleroNamespace, "job1").Labels(map[string]string{"job-name": "job1"}).ContainerStatuses(&v1.ContainerStatus{
+		State: v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{},
+		},
+	}).Result()
+
+	jobFailed1 := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "job2",
+			Namespace:         veleroNamespace,
+			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour)},
+		},
+		Status: batchv1.JobStatus{
+			StartTime:      &metav1.Time{Time: now.Add(time.Hour)},
+			CompletionTime: &metav1.Time{Time: now.Add(time.Hour * 2)},
+			Failed:         1,
+		},
+	}
+
+	jobPodFailed1 := builder.ForPod(veleroNamespace, "job2").Labels(map[string]string{"job-name": "job2"}).ContainerStatuses(&v1.ContainerStatus{
+		State: v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{
+				Message: "fake-message-2",
+			},
+		},
+	}).Result()
+
+	jobSucceeded2 := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "job3",
+			Namespace:         veleroNamespace,
+			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour * 2)},
+		},
+		Status: batchv1.JobStatus{
+			StartTime:      &metav1.Time{Time: now.Add(time.Hour * 2)},
+			CompletionTime: &metav1.Time{Time: now.Add(time.Hour * 3)},
+			Succeeded:      1,
+		},
+	}
+
+	jobPodSucceeded2 := builder.ForPod(veleroNamespace, "job3").Labels(map[string]string{"job-name": "job3"}).ContainerStatuses(&v1.ContainerStatus{
+		State: v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{},
+		},
+	}).Result()
+
+	jobSucceeded3 := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "job4",
+			Namespace:         veleroNamespace,
+			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
+			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour * 3)},
+		},
+		Status: batchv1.JobStatus{
+			StartTime:      &metav1.Time{Time: now.Add(time.Hour * 3)},
+			CompletionTime: &metav1.Time{Time: now.Add(time.Hour * 4)},
+			Succeeded:      1,
+		},
+	}
+
+	jobPodSucceeded3 := builder.ForPod(veleroNamespace, "job4").Labels(map[string]string{"job-name": "job4"}).ContainerStatuses(&v1.ContainerStatus{
+		State: v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{},
+		},
+	}).Result()
+
+	schemeFail := runtime.NewScheme()
+
+	scheme := runtime.NewScheme()
+	batchv1.AddToScheme(scheme)
+	v1.AddToScheme(scheme)
+
+	testCases := []struct {
+		name           string
+		ctx            context.Context
+		kubeClientObj  []runtime.Object
+		runtimeScheme  *runtime.Scheme
+		expectedStatus []velerov1api.BackupRepositoryMaintenanceStatus
+		expectedError  string
+	}{
+		{
+			name:          "list job error",
+			runtimeScheme: schemeFail,
+			expectedError: "error listing maintenance job for repo fake-repo: no kind is registered for the type v1.JobList in scheme \"pkg/runtime/scheme.go:100\"",
+		},
+		{
+			name:          "job not exist",
+			runtimeScheme: scheme,
+		},
+		{
+			name:          "no matching job",
+			runtimeScheme: scheme,
+			kubeClientObj: []runtime.Object{
+				jobOtherLabel,
+			},
+		},
+		{
+			name:          "wait complete error",
+			ctx:           ctx,
+			runtimeScheme: scheme,
+			kubeClientObj: []runtime.Object{
+				jobIncomplete,
+			},
+			expectedError: "error waiting maintenance job[job1] complete: context deadline exceeded",
+		},
+		{
+			name:          "get result error",
+			ctx:           context.TODO(),
+			runtimeScheme: scheme,
+			kubeClientObj: []runtime.Object{
+				jobSucceeded1,
+			},
+			expectedError: "error getting maintenance job[job1] result: no pod found for job job1",
+		},
+		{
+			name:          "less than limit",
+			ctx:           context.TODO(),
+			runtimeScheme: scheme,
+			kubeClientObj: []runtime.Object{
+				jobFailed1,
+				jobSucceeded1,
+				jobPodSucceeded1,
+				jobPodFailed1,
+			},
+			expectedStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+					StartTimestamp:    &metav1.Time{Time: now},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
+				},
+				{
+					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
+					Message:           "fake-message-2",
+				},
+			},
+		},
+		{
+			name:          "equal to limit",
+			ctx:           context.TODO(),
+			runtimeScheme: scheme,
+			kubeClientObj: []runtime.Object{
+				jobSucceeded2,
+				jobFailed1,
+				jobSucceeded1,
+				jobPodSucceeded1,
+				jobPodFailed1,
+				jobPodSucceeded2,
+			},
+			expectedStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+					StartTimestamp:    &metav1.Time{Time: now},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
+				},
+				{
+					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
+					Message:           "fake-message-2",
+				},
+				{
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour * 2)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 3)},
+				},
+			},
+		},
+		{
+			name:          "more than limit",
+			ctx:           context.TODO(),
+			runtimeScheme: scheme,
+			kubeClientObj: []runtime.Object{
+				jobSucceeded3,
+				jobSucceeded2,
+				jobFailed1,
+				jobSucceeded1,
+				jobPodSucceeded1,
+				jobPodFailed1,
+				jobPodSucceeded2,
+				jobPodSucceeded3,
+			},
+			expectedStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+					StartTimestamp:    &metav1.Time{Time: now},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
+				},
+				{
+					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
+					Message:           "fake-message-2",
+				},
+				{
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour * 2)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 3)},
+				},
+				{
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour * 3)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 4)},
+				},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClientBuilder := fake.NewClientBuilder()
+			fakeClientBuilder = fakeClientBuilder.WithScheme(test.runtimeScheme)
+
+			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
+
+			history, err := WaitIncompleteMaintenance(test.ctx, fakeClient, repo, 3, velerotest.NewLogger())
+
+			if test.expectedError != "" {
+				assert.EqualError(t, err, test.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Len(t, history, len(test.expectedStatus))
+			for i := 0; i < len(test.expectedStatus); i++ {
+				assert.Equal(t, test.expectedStatus[i].Result, history[i].Result)
+				assert.Equal(t, test.expectedStatus[i].Message, history[i].Message)
+				assert.Equal(t, test.expectedStatus[i].StartTimestamp.Time, history[i].StartTimestamp.Time)
+				assert.Equal(t, test.expectedStatus[i].CompleteTimestamp.Time, history[i].CompleteTimestamp.Time)
+			}
+		})
+	}
+
+	cancel()
+}

@@ -37,11 +37,11 @@ import (
 
 const testMaintenanceFrequency = 10 * time.Minute
 
-func mockBackupRepoReconciler(t *testing.T, mockOn string, arg interface{}, ret interface{}) *BackupRepoReconciler {
+func mockBackupRepoReconciler(t *testing.T, mockOn string, arg interface{}, ret ...interface{}) *BackupRepoReconciler {
 	t.Helper()
 	mgr := &repomokes.Manager{}
 	if mockOn != "" {
-		mgr.On(mockOn, arg).Return(ret)
+		mgr.On(mockOn, arg).Return(ret...)
 	}
 	return NewBackupRepoReconciler(
 		velerov1api.DefaultNamespace,
@@ -106,7 +106,10 @@ func TestCheckNotReadyRepo(t *testing.T) {
 
 func TestRunMaintenanceIfDue(t *testing.T) {
 	rr := mockBackupRepositoryCR()
-	reconciler := mockBackupRepoReconciler(t, "PruneRepo", rr, nil)
+	reconciler := mockBackupRepoReconciler(t, "PruneRepo", rr, velerov1api.BackupRepositoryMaintenanceStatus{
+		StartTimestamp:    &metav1.Time{},
+		CompleteTimestamp: &metav1.Time{},
+	}, nil)
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	lastTm := rr.Status.LastMaintenanceTime

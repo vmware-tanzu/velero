@@ -86,22 +86,26 @@ func DeleteOldMaintenanceJobs(cli client.Client, repo string, keep int) error {
 	return nil
 }
 
-func WaitForJobComplete(ctx context.Context, client client.Client, job *batchv1.Job) error {
-	return wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
-		err := client.Get(ctx, types.NamespacedName{Namespace: job.Namespace, Name: job.Name}, job)
+// WaitForJobComplete wait for completion of the specified job and update the latest job object
+func WaitForJobComplete(ctx context.Context, client client.Client, ns string, job string) (*batchv1.Job, error) {
+	updated := &batchv1.Job{}
+	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+		err := client.Get(ctx, types.NamespacedName{Namespace: ns, Name: job}, updated)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
 
-		if job.Status.Succeeded > 0 {
+		if updated.Status.Succeeded > 0 {
 			return true, nil
 		}
 
-		if job.Status.Failed > 0 {
-			return true, fmt.Errorf("maintenance job %s/%s failed", job.Namespace, job.Name)
+		if updated.Status.Failed > 0 {
+			return true, fmt.Errorf("maintenance job %s/%s failed", job, job)
 		}
 		return false, nil
 	})
+
+	return updated, err
 }
 
 func GetMaintenanceResultFromJob(cli client.Client, job *batchv1.Job) (string, error) {
@@ -269,43 +273,52 @@ func WaitIncompleteMaintenance(ctx context.Context, cli client.Client, repo *vel
 		return nil, nil
 	}
 
-	history := []velerov1api.BackupRepositoryMaintenanceStatus{}
-
-	for _, job := range jobList.Items {
-		if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
-			log.Infof("Waiting for maintenance job %s to complete", job.Name)
-
-			if err := WaitForJobComplete(ctx, cli, &job); err != nil {
-				return nil, errors.Wrapf(err, "error waiting maintenance job[%s] complete", job.Name)
-			}
-		}
-
-		result := velerov1api.BackupRepositoryMaintenanceSucceeded
-		if job.Status.Failed > 0 {
-			result = velerov1api.BackupRepositoryMaintenanceFailed
-		}
-
-		message, err := GetMaintenanceResultFromJob(cli, &job)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error getting maintenance job[%s] result", job.Name)
-		}
-
-		history = append(history, velerov1api.BackupRepositoryMaintenanceStatus{
-			Result:            result,
-			StartTimestamp:    &metav1.Time{Time: job.Status.StartTime.Time},
-			CompleteTimestamp: &metav1.Time{Time: job.Status.CompletionTime.Time},
-			Message:           message,
-		})
-	}
-
-	sort.Slice(history, func(i, j int) bool {
-		return history[i].CompleteTimestamp.Time.After(history[j].CompleteTimestamp.Time)
+	sort.Slice(jobList.Items, func(i, j int) bool {
+		return jobList.Items[i].CreationTimestamp.Time.Before(jobList.Items[j].CreationTimestamp.Time)
 	})
+
+	history := []velerov1api.BackupRepositoryMaintenanceStatus{}
 
 	startPos := len(history) - limit
 	if startPos < 0 {
 		startPos = 0
 	}
 
-	return history[startPos:], nil
+	for i := startPos; i < len(jobList.Items); i++ {
+		job := &jobList.Items[i]
+
+		if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
+			log.Infof("Waiting for maintenance job %s to complete", job.Name)
+
+			updated, err := WaitForJobComplete(ctx, cli, job.Namespace, job.Name)
+			if err != nil {
+				return nil, errors.Wrapf(err, "error waiting maintenance job[%s] complete", job.Name)
+			}
+
+			job = updated
+		}
+
+		message, err := GetMaintenanceResultFromJob(cli, job)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error getting maintenance job[%s] result", job.Name)
+		}
+
+		history = append(history, ComposeMaintenanceStatusFromJob(job, message))
+	}
+
+	return history, nil
+}
+
+func ComposeMaintenanceStatusFromJob(job *batchv1.Job, message string) velerov1api.BackupRepositoryMaintenanceStatus {
+	result := velerov1api.BackupRepositoryMaintenanceSucceeded
+	if job.Status.Failed > 0 {
+		result = velerov1api.BackupRepositoryMaintenanceFailed
+	}
+
+	return velerov1api.BackupRepositoryMaintenanceStatus{
+		Result:            result,
+		StartTimestamp:    &metav1.Time{Time: job.CreationTimestamp.Time},
+		CompleteTimestamp: &metav1.Time{Time: job.Status.CompletionTime.Time},
+		Message:           message,
+	}
 }

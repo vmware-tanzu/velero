@@ -138,21 +138,31 @@ func (_m *Manager) PrepareRepo(repo *v1.BackupRepository) error {
 }
 
 // PruneRepo provides a mock function with given fields: repo
-func (_m *Manager) PruneRepo(repo *v1.BackupRepository) error {
+func (_m *Manager) PruneRepo(repo *v1.BackupRepository) (v1.BackupRepositoryMaintenanceStatus, error) {
 	ret := _m.Called(repo)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PruneRepo")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*v1.BackupRepository) error); ok {
+	var r0 v1.BackupRepositoryMaintenanceStatus
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*v1.BackupRepository) (v1.BackupRepositoryMaintenanceStatus, error)); ok {
+		return rf(repo)
+	}
+	if rf, ok := ret.Get(0).(func(*v1.BackupRepository) v1.BackupRepositoryMaintenanceStatus); ok {
 		r0 = rf(repo)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(v1.BackupRepositoryMaintenanceStatus)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(*v1.BackupRepository) error); ok {
+		r1 = rf(repo)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // UnlockRepo provides a mock function with given fields: repo
