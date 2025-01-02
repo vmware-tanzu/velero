@@ -1564,6 +1564,17 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 		},
 	}
 
+	blockMode := corev1api.PersistentVolumeBlock
+	pvcObjBlockMode := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeMode: &blockMode,
+		},
+	}
+
 	pvcObjWithNode := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   "fake-namespace",
@@ -1610,7 +1621,6 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 		name           string
 		pvc            *corev1api.PersistentVolumeClaim
 		kubeClientObj  []runtime.Object
-		blockAccess    bool
 		expectedNodeOS string
 		err            string
 	}{
@@ -1665,8 +1675,7 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 		},
 		{
 			name:           "block access",
-			pvc:            pvcObjWithBoth,
-			blockAccess:    true,
+			pvc:            pvcObjBlockMode,
 			expectedNodeOS: NodeOSLinux,
 		},
 	}
@@ -1676,7 +1685,7 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 
 			var kubeClient kubernetes.Interface = fakeKubeClient
 
-			nodeOS, err := GetPVCAttachingNodeOS(test.pvc, test.blockAccess, kubeClient.CoreV1(), kubeClient.StorageV1(), velerotest.NewLogger())
+			nodeOS, err := GetPVCAttachingNodeOS(test.pvc, kubeClient.CoreV1(), kubeClient.StorageV1(), velerotest.NewLogger())
 
 			if err != nil {
 				assert.EqualError(t, err, test.err)
