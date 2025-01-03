@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -239,6 +240,7 @@ func newServer(f client.Factory, config *config.Config, logger *logrus.Logger) (
 	}
 
 	ctrl.SetLogger(logrusr.New(logger))
+	klog.SetLogger(logrusr.New(logger)) // klog.Logger is used by k8s.io/client-go
 
 	var mgr manager.Manager
 	retry := 10
