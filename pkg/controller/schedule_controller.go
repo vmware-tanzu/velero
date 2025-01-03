@@ -128,6 +128,7 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		schedule.Status.ValidationErrors = errs
 	} else {
 		schedule.Status.Phase = velerov1.SchedulePhaseEnabled
+		schedule.Status.ValidationErrors = nil
 	}
 
 	scheduleNeedsPatch := false
