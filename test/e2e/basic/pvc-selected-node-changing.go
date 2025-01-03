@@ -9,13 +9,13 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	. "github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 type PVCSelectedNodeChanging struct {
-	TestCase
+	BRCase
 	labels         map[string]string
 	data           map[string]string
 	configmaptName string
@@ -32,7 +32,7 @@ type PVCSelectedNodeChanging struct {
 var PVCSelectedNodeChangingTest func() = TestFunc(&PVCSelectedNodeChanging{})
 
 func (p *PVCSelectedNodeChanging) Init() error {
-	p.TestCase.Init()
+	p.BRCase.Init()
 	p.CaseBaseName = "psnc-" + p.UUIDgen
 	p.namespace = p.CaseBaseName
 	p.mappedNS = p.namespace + "-mapped"
@@ -104,7 +104,7 @@ func (p *PVCSelectedNodeChanging) CreateResources() error {
 	return nil
 }
 
-func (p *PVCSelectedNodeChanging) Destroy() error {
+func (p *PVCSelectedNodeChanging) DeleteResources() error {
 	By(fmt.Sprintf("Start to destroy namespace %s......", p.CaseBaseName), func() {
 		Expect(CleanupNamespacesWithPoll(p.Ctx, p.Client, p.CaseBaseName)).To(Succeed(),
 			fmt.Sprintf("Failed to delete namespace %s", p.CaseBaseName))
@@ -144,7 +144,7 @@ func (p *PVCSelectedNodeChanging) Clean() error {
 	if CurrentSpecReport().Failed() && p.VeleroCfg.FailFast {
 		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
 	} else {
-		p.TestCase.Clean()
+		p.BRCase.Clean()
 		By(fmt.Sprintf("Clean namespace with prefix %s after test", p.mappedNS), func() {
 			CleanupNamespaces(p.Ctx, p.Client, p.mappedNS)
 		})

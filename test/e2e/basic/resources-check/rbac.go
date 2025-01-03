@@ -39,16 +39,16 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/pkg/errors"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 type RBACCase struct {
-	TestCase
+	BRCase
 }
 
 func (r *RBACCase) Init() error {
-	r.TestCase.Init()
+	r.BRCase.Init()
 	r.CaseBaseName = "rabc-" + r.UUIDgen
 	r.BackupName = "backup-" + r.CaseBaseName
 	r.RestoreName = "restore-" + r.CaseBaseName
@@ -155,7 +155,7 @@ func (r *RBACCase) Verify() error {
 	return nil
 }
 
-func (r *RBACCase) Destroy() error {
+func (r *RBACCase) DeleteResources() error {
 	//cleanup clusterrole
 	err := CleanupClusterRole(r.Ctx, r.Client, r.CaseBaseName)
 	if err != nil {
@@ -180,7 +180,7 @@ func (r *RBACCase) Clean() error {
 	if CurrentSpecReport().Failed() && r.VeleroCfg.FailFast {
 		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
 	} else {
-		return r.Destroy()
+		return r.DeleteResources()
 	}
 
 	return nil

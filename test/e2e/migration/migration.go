@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/vmware-tanzu/velero/test"
-	framework "github.com/vmware-tanzu/velero/test/e2e/test"
+	framework "github.com/vmware-tanzu/velero/test/e2e/framework"
 	util "github.com/vmware-tanzu/velero/test/util/csi"
 	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
 	"github.com/vmware-tanzu/velero/test/util/kibishii"
@@ -34,7 +34,7 @@ import (
 )
 
 type migrationE2E struct {
-	framework.TestCase
+	framework.BRCase
 	useVolumeSnapshots bool
 	veleroCLI2Version  test.VeleroCLI2Version
 	kibishiiData       kibishii.KibishiiData
@@ -68,7 +68,7 @@ func MigrationWithFS() {
 
 func (m *migrationE2E) Init() error {
 	By("Call the base E2E init", func() {
-		Expect(m.TestCase.Init()).To(Succeed())
+		Expect(m.BRCase.Init()).To(Succeed())
 	})
 
 	By("Skip check", func() {
@@ -411,7 +411,7 @@ func (m *migrationE2E) Verify() error {
 
 func (m *migrationE2E) Clean() error {
 	By("Clean resource on default cluster.", func() {
-		Expect(m.TestCase.Clean()).To(Succeed())
+		Expect(m.BRCase.Clean()).To(Succeed())
 	})
 
 	By("Clean resource on standby cluster.", func() {
