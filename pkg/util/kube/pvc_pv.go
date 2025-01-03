@@ -271,7 +271,7 @@ func SetPVReclaimPolicy(ctx context.Context, pvGetter corev1client.CoreV1Interfa
 // nothing if the consuming doesn't affect the PV provision.
 // The latest PVC and the selected node will be returned.
 func WaitPVCConsumed(ctx context.Context, pvcGetter corev1client.CoreV1Interface, pvc string, namespace string,
-	storageClient storagev1.StorageV1Interface, timeout time.Duration) (string, *corev1api.PersistentVolumeClaim, error) {
+	storageClient storagev1.StorageV1Interface, timeout time.Duration, ignoreConsume bool) (string, *corev1api.PersistentVolumeClaim, error) {
 	selectedNode := ""
 	var updated *corev1api.PersistentVolumeClaim
 	var storageClass *storagev1api.StorageClass
@@ -282,18 +282,20 @@ func WaitPVCConsumed(ctx context.Context, pvcGetter corev1client.CoreV1Interface
 			return false, errors.Wrapf(err, "error to get pvc %s/%s", namespace, pvc)
 		}
 
-		if tmpPVC.Spec.StorageClassName != nil && storageClass == nil {
-			storageClass, err = storageClient.StorageClasses().Get(ctx, *tmpPVC.Spec.StorageClassName, metav1.GetOptions{})
-			if err != nil {
-				return false, errors.Wrapf(err, "error to get storage class %s", *tmpPVC.Spec.StorageClassName)
+		if !ignoreConsume {
+			if tmpPVC.Spec.StorageClassName != nil && storageClass == nil {
+				storageClass, err = storageClient.StorageClasses().Get(ctx, *tmpPVC.Spec.StorageClassName, metav1.GetOptions{})
+				if err != nil {
+					return false, errors.Wrapf(err, "error to get storage class %s", *tmpPVC.Spec.StorageClassName)
+				}
 			}
-		}
 
-		if storageClass != nil {
-			if storageClass.VolumeBindingMode != nil && *storageClass.VolumeBindingMode == storagev1api.VolumeBindingWaitForFirstConsumer {
-				selectedNode = tmpPVC.Annotations[KubeAnnSelectedNode]
-				if selectedNode == "" {
-					return false, nil
+			if storageClass != nil {
+				if storageClass.VolumeBindingMode != nil && *storageClass.VolumeBindingMode == storagev1api.VolumeBindingWaitForFirstConsumer {
+					selectedNode = tmpPVC.Annotations[KubeAnnSelectedNode]
+					if selectedNode == "" {
+						return false, nil
+					}
 				}
 			}
 		}
