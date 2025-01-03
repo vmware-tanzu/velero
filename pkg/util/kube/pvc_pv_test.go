@@ -1564,6 +1564,17 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 		},
 	}
 
+	blockMode := corev1api.PersistentVolumeBlock
+	pvcObjBlockMode := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeMode: &blockMode,
+		},
+	}
+
 	pvcObjWithNode := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   "fake-namespace",
@@ -1661,6 +1672,11 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 				scObjWithFSType,
 			},
 			expectedNodeOS: NodeOSWindows,
+		},
+		{
+			name:           "block access",
+			pvc:            pvcObjBlockMode,
+			expectedNodeOS: NodeOSLinux,
 		},
 	}
 	for _, test := range tests {

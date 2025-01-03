@@ -434,6 +434,11 @@ func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, nodeClient core
 	var nodeOS string
 	var scFsType string
 
+	if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == corev1api.PersistentVolumeBlock {
+		log.Infof("Use linux node for block mode PVC %s/%s", pvc.Namespace, pvc.Name)
+		return NodeOSLinux, nil
+	}
+
 	if value := pvc.Annotations[KubeAnnSelectedNode]; value != "" {
 		os, err := GetNodeOS(context.Background(), value, nodeClient)
 		if err != nil {
