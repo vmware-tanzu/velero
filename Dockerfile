@@ -42,6 +42,8 @@ RUN mkdir -p /output/usr/bin && \
     export GOARM=$( echo "${GOARM}" | cut -c2-) && \
     go build -o /output/${BIN} \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN} && \
+    go build -o /output/velero-restore-helper \
+    -ldflags "${LDFLAGS}" ${PKG}/cmd/velero-restore-helper && \
     go build -o /output/velero-helper \
     -ldflags "${LDFLAGS}" ${PKG}/cmd/velero-helper && \
     go clean -modcache -cache

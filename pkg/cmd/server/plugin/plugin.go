@@ -295,7 +295,7 @@ func newPodVolumeRestoreItemAction(f client.Factory) plugincommon.HandlerInitial
 			return nil, err
 		}
 
-		return ria.NewPodVolumeRestoreAction(logger, client.CoreV1().ConfigMaps(f.Namespace()), crClient), nil
+		return ria.NewPodVolumeRestoreAction(logger, client.CoreV1().ConfigMaps(f.Namespace()), crClient, f.Namespace())
 	}
 }
 

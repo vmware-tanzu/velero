@@ -43,9 +43,3 @@ func ImageTag() string {
 func DefaultVeleroImage() string {
 	return fmt.Sprintf("%s/%s:%s", imageRegistry(), "velero", ImageTag())
 }
-
-// DefaultRestoreHelperImage returns the default container image to use for the restore helper
-// for this version of Velero.
-func DefaultRestoreHelperImage() string {
-	return fmt.Sprintf("%s/%s:%s", imageRegistry(), "velero-restore-helper", ImageTag())
-}

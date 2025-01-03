@@ -25,9 +25,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -40,6 +42,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/restorehelper"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 const (
@@ -50,17 +53,24 @@ const (
 )
 
 type PodVolumeRestoreAction struct {
-	logger   logrus.FieldLogger
-	client   corev1client.ConfigMapInterface
-	crClient ctrlclient.Client
+	logger      logrus.FieldLogger
+	client      corev1client.ConfigMapInterface
+	crClient    ctrlclient.Client
+	veleroImage string
 }
 
-func NewPodVolumeRestoreAction(logger logrus.FieldLogger, client corev1client.ConfigMapInterface, crClient ctrlclient.Client) *PodVolumeRestoreAction {
-	return &PodVolumeRestoreAction{
-		logger:   logger,
-		client:   client,
-		crClient: crClient,
+func NewPodVolumeRestoreAction(logger logrus.FieldLogger, client corev1client.ConfigMapInterface, crClient ctrlclient.Client, namespace string) (*PodVolumeRestoreAction, error) {
+	deployment := &appsv1.Deployment{}
+	if err := crClient.Get(context.TODO(), types.NamespacedName{Name: "velero", Namespace: namespace}, deployment); err != nil {
+		return nil, err
 	}
+	image := veleroutil.GetVeleroServerImage(deployment)
+	return &PodVolumeRestoreAction{
+		logger:      logger,
+		client:      client,
+		crClient:    crClient,
+		veleroImage: image,
+	}, nil
 }
 
 func (a *PodVolumeRestoreAction) AppliesTo() (velero.ResourceSelector, error) {
@@ -117,7 +127,7 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 		return nil, err
 	}
 
-	image := getImage(log, config)
+	image := getImage(log, config, a.veleroImage)
 	log.Infof("Using image %q", image)
 
 	cpuRequest, memRequest := getResourceRequests(log, config)
@@ -200,16 +210,16 @@ func getCommand(log logrus.FieldLogger, config *corev1.ConfigMap) []string {
 	return []string{config.Data["command"]}
 }
 
-func getImage(log logrus.FieldLogger, config *corev1.ConfigMap) string {
+func getImage(log logrus.FieldLogger, config *corev1.ConfigMap, defaultImage string) string {
 	if config == nil {
 		log.Debug("No config found for plugin")
-		return veleroimage.DefaultRestoreHelperImage()
+		return defaultImage
 	}
 
 	image := config.Data["image"]
 	if image == "" {
 		log.Debugf("No custom image configured")
-		return veleroimage.DefaultRestoreHelperImage()
+		return defaultImage
 	}
 
 	log = log.WithField("image", image)
@@ -217,7 +227,6 @@ func getImage(log logrus.FieldLogger, config *corev1.ConfigMap) string {
 	parts := strings.Split(image, "/")
 
 	if len(parts) == 1 {
-		defaultImage := veleroimage.DefaultRestoreHelperImage()
 		// Image supplied without registry part
 		log.Infof("Plugin config contains image name without registry name. Using default init container image: %q", defaultImage)
 		return defaultImage
