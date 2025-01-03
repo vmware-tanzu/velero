@@ -88,8 +88,8 @@ spec:
             description: BackupRepositoryStatus is the current status of a BackupRepository.
             properties:
               lastMaintenanceTime:
-                description: LastMaintenanceTime is the last time maintenance was
-                  run.
+                description: LastMaintenanceTime is the last time repo maintenance
+                  succeeded.
                 format: date-time
                 nullable: true
                 type: string
@@ -104,6 +104,33 @@ spec:
                 - Ready
                 - NotReady
                 type: string
+              recentMaintenance:
+                description: RecentMaintenance is status of the recent repo maintenance.
+                items:
+                  properties:
+                    completeTimestamp:
+                      description: CompleteTimestamp is the completion time of the
+                        repo maintenance.
+                      format: date-time
+                      nullable: true
+                      type: string
+                    message:
+                      description: Message is a message about the current status of
+                        the repo maintenance.
+                      type: string
+                    result:
+                      description: Result is the result of the repo maintenance.
+                      enum:
+                      - Succeeded
+                      - Failed
+                      type: string
+                    startTimestamp:
+                      description: StartTimestamp is the start time of the repo maintenance.
+                      format: date-time
+                      nullable: true
+                      type: string
+                  type: object
+                type: array
             type: object
         type: object
     served: true

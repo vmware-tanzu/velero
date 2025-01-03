@@ -375,7 +375,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	containerName := string(ownerObject.UID)
 	volumeName := string(ownerObject.UID)
 
-	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace)
+	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, kube.NodeOSLinux)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
 	}

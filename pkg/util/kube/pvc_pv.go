@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
@@ -428,4 +429,48 @@ func DiagnosePVC(pvc *corev1api.PersistentVolumeClaim) string {
 func DiagnosePV(pv *corev1api.PersistentVolume) string {
 	diag := fmt.Sprintf("PV %s, phase %s, reason %s, message %s\n", pv.Name, pv.Status.Phase, pv.Status.Reason, pv.Status.Message)
 	return diag
+}
+
+func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, nodeClient corev1client.CoreV1Interface,
+	storageClient storagev1.StorageV1Interface, log logrus.FieldLogger) (string, error) {
+	var nodeOS string
+	var scFsType string
+
+	if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == corev1api.PersistentVolumeBlock {
+		log.Infof("Use linux node for block mode PVC %s/%s", pvc.Namespace, pvc.Name)
+		return NodeOSLinux, nil
+	}
+
+	if value := pvc.Annotations[KubeAnnSelectedNode]; value != "" {
+		os, err := GetNodeOS(context.Background(), value, nodeClient)
+		if err != nil {
+			return "", errors.Wrapf(err, "error to get os from node %s for PVC %s/%s", value, pvc.Namespace, pvc.Name)
+		}
+
+		nodeOS = os
+	}
+
+	if pvc.Spec.StorageClassName != nil {
+		sc, err := storageClient.StorageClasses().Get(context.Background(), *pvc.Spec.StorageClassName, metav1.GetOptions{})
+		if err != nil {
+			return "", errors.Wrapf(err, "error to get storage class %s", *pvc.Spec.StorageClassName)
+		}
+
+		if sc.Parameters != nil {
+			scFsType = strings.ToLower(sc.Parameters["csi.storage.k8s.io/fstype"])
+		}
+	}
+
+	if nodeOS != "" {
+		log.Infof("Deduced node os %s from selected node for PVC %s/%s (fsType %s)", nodeOS, pvc.Namespace, pvc.Name, scFsType)
+		return nodeOS, nil
+	}
+
+	if scFsType == "ntfs" {
+		log.Infof("Deduced Windows node os from fsType for PVC %s/%s", pvc.Namespace, pvc.Name)
+		return NodeOSWindows, nil
+	}
+
+	log.Warnf("Cannot deduce node os for PVC %s/%s, default to linux", pvc.Namespace, pvc.Name)
+	return NodeOSLinux, nil
 }

@@ -59,6 +59,7 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const dataUploadName = "dataupload-1"
@@ -187,6 +188,8 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		},
 	}
 
+	node := builder.ForNode("fake-node").Labels(map[string]string{kube.NodeOSLabel: kube.NodeOSLinux}).Result()
+
 	dataPathMgr := datapath.NewManager(1)
 
 	now, err := time.Parse(time.RFC1123, time.RFC1123)
@@ -229,7 +232,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 	}
 
 	fakeSnapshotClient := snapshotFake.NewSimpleClientset(vsObject, vscObj)
-	fakeKubeClient := clientgofake.NewSimpleClientset(daemonSet)
+	fakeKubeClient := clientgofake.NewSimpleClientset(daemonSet, node)
 
 	return NewDataUploadReconciler(
 		fakeClient,
