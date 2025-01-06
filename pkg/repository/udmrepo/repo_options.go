@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
@@ -70,7 +71,18 @@ const (
 	ThrottleOptionListOps       = "listOPS"
 	ThrottleOptionUploadBytes   = "uploadBytes"
 	ThrottleOptionDownloadBytes = "downloadBytes"
+	// FullMaintenanceInterval will overwrite kopia maintenance interval
+	// options are fastGC for 12 hours, eagerGC for 6 hours, normalGC for 24 hours
+	StoreOptionKeyFullMaintenanceInterval                                = "fullMaintenanceInterval"
+	FastGC                                FullMaintenanceIntervalOptions = "fastGC"
+	FastGCInterval                        time.Duration                  = 12 * time.Hour
+	EagerGC                               FullMaintenanceIntervalOptions = "eagerGC"
+	EagerGCInterval                       time.Duration                  = 6 * time.Hour
+	NormalGC                              FullMaintenanceIntervalOptions = "normalGC"
+	NormalGCInterval                      time.Duration                  = 24 * time.Hour
 )
+
+type FullMaintenanceIntervalOptions string
 
 const (
 	defaultUsername = "default"
