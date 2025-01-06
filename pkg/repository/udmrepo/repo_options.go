@@ -70,6 +70,8 @@ const (
 	ThrottleOptionListOps       = "listOPS"
 	ThrottleOptionUploadBytes   = "uploadBytes"
 	ThrottleOptionDownloadBytes = "downloadBytes"
+
+	EagerGC = "eagerGC"
 )
 
 const (
@@ -88,6 +90,8 @@ type RepoOptions struct {
 	GeneralOptions map[string]string
 	// StorageOptions takes storage specific options
 	StorageOptions map[string]string
+	// EagerGC will overwrite kopia maintenance interval to 12/6 hours
+	EagerGC bool
 
 	// Description is a description of the backup repository/backup repository operation.
 	// It is for logging/debugging purpose only and doesn't control any behavior of the backup repository.

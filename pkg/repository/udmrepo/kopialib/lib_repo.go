@@ -79,6 +79,8 @@ const (
 	defaultMaintainCheckPeriod     = time.Hour
 	overwriteFullMaintainInterval  = time.Duration(0)
 	overwriteQuickMaintainInterval = time.Duration(0)
+	eagerGCFullInterval = time.Duration(12)
+	eagerGCQuickInterval = time.Duration(6)
 )
 
 var kopiaRepoOpen = repo.Open
@@ -595,12 +597,18 @@ func writeInitParameters(ctx context.Context, repoOption udmrepo.RepoOptions, lo
 			logger.Infof("Full maintenance interval change from %v to %v", p.FullCycle.Interval, overwriteFullMaintainInterval)
 			p.FullCycle.Interval = overwriteFullMaintainInterval
 		}
-
+		
 		if overwriteQuickMaintainInterval != time.Duration(0) {
 			logger.Infof("Quick maintenance interval change from %v to %v", p.QuickCycle.Interval, overwriteQuickMaintainInterval)
 			p.QuickCycle.Interval = overwriteQuickMaintainInterval
 		}
+		if repoOption.EagerGC {
+			logger.Infof("Full maintenance interval change from %v to %v", p.FullCycle.Interval, eagerGCFullInterval)
+			p.FullCycle.Interval = eagerGCFullInterval
+			logger.Infof("Quick maintenance interval change from %v to %v", p.QuickCycle.Interval, eagerGCQuickInterval)
+			p.QuickCycle.Interval = eagerGCQuickInterval
 
+		}
 		p.Owner = r.ClientOptions().UsernameAtHost()
 
 		if err := maintenance.SetParams(ctx, w, &p); err != nil {
