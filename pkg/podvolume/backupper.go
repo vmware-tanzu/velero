@@ -206,6 +206,12 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		return nil, pvcSummary, nil
 	}
 
+	if err := kube.IsLinuxNode(b.ctx, pod.Spec.NodeName, b.crClient); err != nil {
+		err := errors.Wrapf(err, "Pod %s/%s is not running in linux node(%s), skip", pod.Namespace, pod.Name, pod.Spec.NodeName)
+		skipAllPodVolumes(pod, volumesToBackup, err, pvcSummary, log)
+		return nil, pvcSummary, []error{err}
+	}
+
 	err := nodeagent.IsRunningInNode(b.ctx, backup.Namespace, pod.Spec.NodeName, b.crClient)
 	if err != nil {
 		skipAllPodVolumes(pod, volumesToBackup, err, pvcSummary, log)

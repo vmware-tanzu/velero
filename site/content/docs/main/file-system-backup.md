@@ -356,8 +356,7 @@ with an infinite sleep) to mount these PVC/PV pairs prior taking a Velero backup
 
 ## Customize Restore Helper Container
 
-Velero uses a helper init container when performing a FSB restore. By default, the image for this container is 
-`velero/velero-restore-helper:<VERSION>`, where `VERSION` matches the version/tag of the main Velero image. 
+Velero uses a helper init container when performing a FSB restore. By default, the image for this container is same with the Velero server container. 
 You can customize the image that is used for this helper by creating a ConfigMap in the Velero namespace with the alternate image.  
 
 In addition, you can customize the resource requirements for the init container, should you need.  

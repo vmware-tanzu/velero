@@ -65,6 +65,8 @@ func (o *Options) Run(f velerocli.Factory) {
 	logger := logging.DefaultLogger(o.LogLevelFlag.Parse(), o.FormatFlag.Parse())
 	logger.SetOutput(os.Stdout)
 
+	time.Sleep(time.Minute)
+
 	pruneError := o.runRepoPrune(f, f.Namespace(), logger)
 	defer func() {
 		if pruneError != nil {

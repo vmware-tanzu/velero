@@ -67,8 +67,12 @@ func MigrationWithFS() {
 }
 
 func (m *migrationE2E) Init() error {
+	By("Call the base E2E init", func() {
+		Expect(m.TestCase.Init()).To(Succeed())
+	})
+
 	By("Skip check", func() {
-		if m.VeleroCfg.DefaultClusterContext == "" && m.VeleroCfg.StandbyClusterContext == "" {
+		if m.VeleroCfg.DefaultClusterContext == "" || m.VeleroCfg.StandbyClusterContext == "" {
 			Skip("Migration test needs 2 clusters")
 		}
 
@@ -79,10 +83,6 @@ func (m *migrationE2E) Init() error {
 		if m.VeleroCfg.SnapshotMoveData && !m.useVolumeSnapshots {
 			Skip("FSB migration test is not needed in data mover scenario")
 		}
-	})
-
-	By("Call the base E2E init", func() {
-		Expect(m.TestCase.Init()).To(Succeed())
 	})
 
 	m.kibishiiData = *kibishii.DefaultKibishiiData

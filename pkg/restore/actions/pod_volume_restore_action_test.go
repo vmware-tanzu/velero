@@ -25,12 +25,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 
-	veleroimage "github.com/vmware-tanzu/velero/internal/velero"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
@@ -48,7 +49,7 @@ func TestGetImage(t *testing.T) {
 		}
 	}
 
-	defaultImage := veleroimage.DefaultRestoreHelperImage()
+	defaultImage := "velero/velero:v1.0"
 
 	tests := []struct {
 		name             string
@@ -104,7 +105,7 @@ func TestGetImage(t *testing.T) {
 					buildinfo.Version = originalVersion
 				}()
 			}
-			assert.Equal(t, test.want, getImage(velerotest.NewLogger(), test.configMap))
+			assert.Equal(t, test.want, getImage(velerotest.NewLogger(), test.configMap, defaultImage))
 		})
 	}
 }
@@ -134,7 +135,7 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 		veleroNs    = "velero"
 	)
 
-	defaultRestoreHelperImage := veleroimage.DefaultRestoreHelperImage()
+	defaultRestoreHelperImage := "velero/velero:v1.0"
 
 	tests := []struct {
 		name             string
@@ -265,10 +266,34 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 		},
 	}
 
+	veleroDeployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+			Kind:       "Deployment",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "velero",
+			Name:      "velero",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
+						{
+							Image: "velero/velero:v1.0",
+						},
+					},
+				},
+			},
+		},
+	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			clientset := fake.NewSimpleClientset()
-			crClient := velerotest.NewFakeControllerRuntimeClient(t, tc.podVolumeBackups...)
+
+			objects := []runtime.Object{veleroDeployment}
+			objects = append(objects, tc.podVolumeBackups...)
+			crClient := velerotest.NewFakeControllerRuntimeClient(t, objects...)
 
 			unstructuredPod, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pod)
 			require.NoError(t, err)
@@ -295,11 +320,13 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 					Result(),
 			}
 
-			a := NewPodVolumeRestoreAction(
+			a, err := NewPodVolumeRestoreAction(
 				logrus.StandardLogger(),
 				clientset.CoreV1().ConfigMaps(veleroNs),
 				crClient,
+				"velero",
 			)
+			require.NoError(t, err)
 
 			// method under test
 			res, err := a.Execute(input)

@@ -33,6 +33,7 @@ import (
 
 	clientTesting "k8s.io/client-go/testing"
 
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -1547,6 +1548,152 @@ func TestDiagnosePV(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			diag := DiagnosePV(tc.pv)
 			assert.Equal(t, tc.expected, diag)
+		})
+	}
+}
+
+func TestGetPVCAttachingNodeOS(t *testing.T) {
+	storageClass := "fake-storage-class"
+	nodeNoOSLabel := builder.ForNode("fake-node").Result()
+	nodeWindows := builder.ForNode("fake-node").Labels(map[string]string{"kubernetes.io/os": "windows"}).Result()
+
+	pvcObj := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc",
+		},
+	}
+
+	blockMode := corev1api.PersistentVolumeBlock
+	pvcObjBlockMode := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeMode: &blockMode,
+		},
+	}
+
+	pvcObjWithNode := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "fake-namespace",
+			Name:        "fake-pvc",
+			Annotations: map[string]string{KubeAnnSelectedNode: "fake-node"},
+		},
+	}
+
+	pvcObjWithStorageClass := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+		},
+	}
+
+	pvcObjWithBoth := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "fake-namespace",
+			Name:        "fake-pvc",
+			Annotations: map[string]string{KubeAnnSelectedNode: "fake-node"},
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+		},
+	}
+
+	scObjWithoutFSType := &storagev1api.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-storage-class",
+		},
+	}
+
+	scObjWithFSType := &storagev1api.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-storage-class",
+		},
+		Parameters: map[string]string{"csi.storage.k8s.io/fstype": "ntfs"},
+	}
+
+	tests := []struct {
+		name           string
+		pvc            *corev1api.PersistentVolumeClaim
+		kubeClientObj  []runtime.Object
+		expectedNodeOS string
+		err            string
+	}{
+		{
+			name:           "no selected node and storage class",
+			pvc:            pvcObj,
+			expectedNodeOS: NodeOSLinux,
+		},
+		{
+			name: "node doesn't exist",
+			pvc:  pvcObjWithNode,
+			err:  "error to get os from node fake-node for PVC fake-namespace/fake-pvc: error getting node fake-node: nodes \"fake-node\" not found",
+		},
+		{
+			name: "node without os label",
+			pvc:  pvcObjWithNode,
+			kubeClientObj: []runtime.Object{
+				nodeNoOSLabel,
+			},
+			expectedNodeOS: NodeOSLinux,
+		},
+		{
+			name: "sc doesn't exist",
+			pvc:  pvcObjWithStorageClass,
+			err:  "error to get storage class fake-storage-class: storageclasses.storage.k8s.io \"fake-storage-class\" not found",
+		},
+		{
+			name: "sc without fsType",
+			pvc:  pvcObjWithStorageClass,
+			kubeClientObj: []runtime.Object{
+				scObjWithoutFSType,
+			},
+			expectedNodeOS: NodeOSLinux,
+		},
+		{
+			name: "deduce from node os",
+			pvc:  pvcObjWithBoth,
+			kubeClientObj: []runtime.Object{
+				nodeWindows,
+				scObjWithFSType,
+			},
+			expectedNodeOS: NodeOSWindows,
+		},
+		{
+			name: "deduce from sc",
+			pvc:  pvcObjWithBoth,
+			kubeClientObj: []runtime.Object{
+				nodeNoOSLabel,
+				scObjWithFSType,
+			},
+			expectedNodeOS: NodeOSWindows,
+		},
+		{
+			name:           "block access",
+			pvc:            pvcObjBlockMode,
+			expectedNodeOS: NodeOSLinux,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			nodeOS, err := GetPVCAttachingNodeOS(test.pvc, kubeClient.CoreV1(), kubeClient.StorageV1(), velerotest.NewLogger())
+
+			if err != nil {
+				assert.EqualError(t, err, test.err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, test.expectedNodeOS, nodeOS)
 		})
 	}
 }
