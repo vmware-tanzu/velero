@@ -45,6 +45,7 @@ import (
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
 	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
 const (
@@ -55,16 +56,22 @@ const (
 
 type BackupRepoReconciler struct {
 	client.Client
-	namespace            string
-	logger               logrus.FieldLogger
-	clock                clocks.WithTickerAndDelayedExecution
-	maintenanceFrequency time.Duration
-	backupRepoConfig     string
-	repositoryManager    repomanager.Manager
+	namespace                 string
+	logger                    logrus.FieldLogger
+	clock                     clocks.WithTickerAndDelayedExecution
+	maintenanceFrequency      time.Duration
+	backupRepoConfig          string
+	repositoryManager         repomanager.Manager
+	keepLatestMaintenanceJobs int
+	repoMaintenanceConfig     string
+	podResources              kube.PodResources
+	logLevel                  logrus.Level
+	logFormat                 *logging.FormatFlag
 }
 
-func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client,
-	maintenanceFrequency time.Duration, backupRepoConfig string, repositoryManager repomanager.Manager) *BackupRepoReconciler {
+func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client, repositoryManager repomanager.Manager,
+	maintenanceFrequency time.Duration, backupRepoConfig string, keepLatestMaintenanceJobs int, repoMaintenanceConfig string, podResources kube.PodResources,
+	logLevel logrus.Level, logFormat *logging.FormatFlag) *BackupRepoReconciler {
 	c := &BackupRepoReconciler{
 		client,
 		namespace,
@@ -73,6 +80,11 @@ func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client
 		maintenanceFrequency,
 		backupRepoConfig,
 		repositoryManager,
+		keepLatestMaintenanceJobs,
+		repoMaintenanceConfig,
+		podResources,
+		logLevel,
+		logFormat,
 	}
 
 	return c
@@ -212,7 +224,13 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, errors.Wrap(err, "error handling incomplete repo maintenance jobs")
 		}
 
-		return ctrl.Result{}, r.runMaintenanceIfDue(ctx, backupRepo, log)
+		if err := r.runMaintenanceIfDue(ctx, backupRepo, log); err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "error check and run repo maintenance jobs")
+		}
+
+		if err := repository.DeleteOldMaintenanceJobs(r.Client, req.Name, r.keepLatestMaintenanceJobs); err != nil {
+			log.WithError(err).Warn("Failed to delete old maintenance jobs")
+		}
 	}
 
 	return ctrl.Result{}, nil
@@ -306,7 +324,7 @@ func ensureRepo(repo *velerov1api.BackupRepository, repoManager repomanager.Mana
 }
 
 func (r *BackupRepoReconciler) recallMaintenance(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
-	history, err := repository.WaitIncompleteMaintenance(ctx, r.Client, req, defaultMaintenanceStatusQueueLength, log)
+	history, err := repository.WaitAllMaintenanceJobComplete(ctx, r.Client, req, defaultMaintenanceStatusQueueLength, log)
 	if err != nil {
 		return errors.Wrapf(err, "error waiting incomplete repo maintenance job for repo %s", req.Name)
 	}
@@ -380,7 +398,11 @@ func getLastMaintenanceTimeFromHistory(history []velerov1api.BackupRepositoryMai
 	time := history[0].CompleteTimestamp
 
 	for i := range history {
-		if time.Before(history[i].CompleteTimestamp) {
+		if history[i].CompleteTimestamp == nil {
+			continue
+		}
+
+		if time == nil || time.Before(history[i].CompleteTimestamp) {
 			time = history[i].CompleteTimestamp
 		}
 	}
@@ -406,8 +428,13 @@ func isEarlierMaintenanceStatus(a, b velerov1api.BackupRepositoryMaintenanceStat
 	return a.StartTimestamp.Before(b.StartTimestamp)
 }
 
+var funcStartMaintenanceJob = repository.StartMaintenanceJob
+var funcWaitMaintenanceJobComplete = repository.WaitMaintenanceJobComplete
+
 func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
-	if !dueForMaintenance(req, r.clock.Now()) {
+	startTime := r.clock.Now()
+
+	if !dueForMaintenance(req, startTime) {
 		log.Debug("not due for maintenance")
 		return nil
 	}
@@ -418,31 +445,39 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 	// should not cause the repo to move to `NotReady`.
 	log.Debug("Pruning repo")
 
-	// when PruneRepo fails, the maintenance result will be left temporarily
-	// If the maintenenance still completes later, recallMaintenance recalls the left onces and update LastMaintenanceTime and history
-	status, err := r.repositoryManager.PruneRepo(req)
+	job, err := funcStartMaintenanceJob(r.Client, ctx, req, r.repoMaintenanceConfig, r.podResources, r.logLevel, r.logFormat, log)
 	if err != nil {
-		return errors.Wrapf(err, "error pruning repository")
+		log.WithError(err).Warn("Starting repo maintenance failed")
+		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
+			updateRepoMaintenanceHistory(rr, velerov1api.BackupRepositoryMaintenanceFailed, &metav1.Time{Time: startTime}, nil, fmt.Sprintf("Failed to start maintenance job, err: %v", err))
+		})
+	}
+
+	// when WaitMaintenanceJobComplete fails, the maintenance result will be left temporarily
+	// If the maintenenance still completes later, recallMaintenance recalls the left onces and update LastMaintenanceTime and history
+	status, err := funcWaitMaintenanceJobComplete(r.Client, ctx, job, r.namespace, log)
+	if err != nil {
+		return errors.Wrapf(err, "error waiting repo maintenance completion status")
 	}
 
 	if status.Result == velerov1api.BackupRepositoryMaintenanceFailed {
 		log.WithError(err).Warn("Pruning repository failed")
 		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
-			updateRepoMaintenanceHistory(rr, velerov1api.BackupRepositoryMaintenanceFailed, status.StartTimestamp.Time, status.CompleteTimestamp.Time, status.Message)
+			updateRepoMaintenanceHistory(rr, velerov1api.BackupRepositoryMaintenanceFailed, status.StartTimestamp, status.CompleteTimestamp, status.Message)
 		})
 	}
 
 	return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
 		rr.Status.LastMaintenanceTime = &metav1.Time{Time: status.CompleteTimestamp.Time}
-		updateRepoMaintenanceHistory(rr, velerov1api.BackupRepositoryMaintenanceSucceeded, status.StartTimestamp.Time, status.CompleteTimestamp.Time, status.Message)
+		updateRepoMaintenanceHistory(rr, velerov1api.BackupRepositoryMaintenanceSucceeded, status.StartTimestamp, status.CompleteTimestamp, status.Message)
 	})
 }
 
-func updateRepoMaintenanceHistory(repo *velerov1api.BackupRepository, result velerov1api.BackupRepositoryMaintenanceResult, startTime time.Time, completionTime time.Time, message string) {
+func updateRepoMaintenanceHistory(repo *velerov1api.BackupRepository, result velerov1api.BackupRepositoryMaintenanceResult, startTime, completionTime *metav1.Time, message string) {
 	latest := velerov1api.BackupRepositoryMaintenanceStatus{
 		Result:            result,
-		StartTimestamp:    &metav1.Time{Time: startTime},
-		CompleteTimestamp: &metav1.Time{Time: completionTime},
+		StartTimestamp:    startTime,
+		CompleteTimestamp: completionTime,
 		Message:           message,
 	}
 

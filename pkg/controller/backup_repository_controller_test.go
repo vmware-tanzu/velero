@@ -19,20 +19,30 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/repository"
 	repomokes "github.com/vmware-tanzu/velero/pkg/repository/mocks"
 	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	batchv1 "k8s.io/api/batch/v1"
 )
 
 const testMaintenanceFrequency = 10 * time.Minute
@@ -47,9 +57,14 @@ func mockBackupRepoReconciler(t *testing.T, mockOn string, arg interface{}, ret 
 		velerov1api.DefaultNamespace,
 		velerotest.NewLogger(),
 		velerotest.NewFakeControllerRuntimeClient(t),
+		mgr,
 		testMaintenanceFrequency,
 		"fake-repo-config",
-		mgr,
+		3,
+		"",
+		kube.PodResources{},
+		logrus.InfoLevel,
+		nil,
 	)
 }
 
@@ -104,24 +119,71 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
 }
 
+func startMaintenanceJobFail(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
+	return "", errors.New("fake-start-error")
+}
+
+func startMaintenanceJobSucceed(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
+	return "fake-job-name", nil
+}
+
+func waitMaintenanceJobCompleteFail(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
+	return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.New("fake-wait-error")
+}
+
+func waitMaintenanceJobCompleteSucceed(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
+	return velerov1api.BackupRepositoryMaintenanceStatus{
+		StartTimestamp:    &metav1.Time{Time: time.Now()},
+		CompleteTimestamp: &metav1.Time{Time: time.Now().Add(time.Hour)},
+	}, nil
+}
+
 func TestRunMaintenanceIfDue(t *testing.T) {
 	rr := mockBackupRepositoryCR()
-	reconciler := mockBackupRepoReconciler(t, "PruneRepo", rr, velerov1api.BackupRepositoryMaintenanceStatus{
-		StartTimestamp:    &metav1.Time{},
-		CompleteTimestamp: &metav1.Time{},
-	}, nil)
+	reconciler := mockBackupRepoReconciler(t, "", rr, nil)
+	funcStartMaintenanceJob = startMaintenanceJobFail
 	err := reconciler.Client.Create(context.TODO(), rr)
 	assert.NoError(t, err)
 	lastTm := rr.Status.LastMaintenanceTime
-	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
-	assert.NoError(t, err)
-	assert.NotEqual(t, rr.Status.LastMaintenanceTime, lastTm)
-
-	rr.Status.LastMaintenanceTime = &metav1.Time{Time: time.Now()}
-	lastTm = rr.Status.LastMaintenanceTime
+	history := rr.Status.RecentMaintenance
 	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
 	assert.NoError(t, err)
 	assert.Equal(t, rr.Status.LastMaintenanceTime, lastTm)
+	assert.NotEqual(t, rr.Status.RecentMaintenance, history)
+
+	rr = mockBackupRepositoryCR()
+	reconciler = mockBackupRepoReconciler(t, "", rr, nil)
+	funcStartMaintenanceJob = startMaintenanceJobSucceed
+	funcWaitMaintenanceJobComplete = waitMaintenanceJobCompleteFail
+	err = reconciler.Client.Create(context.TODO(), rr)
+	assert.NoError(t, err)
+	lastTm = rr.Status.LastMaintenanceTime
+	history = rr.Status.RecentMaintenance
+	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
+	assert.EqualError(t, err, "error waiting repo maintenance completion status: fake-wait-error")
+	assert.Equal(t, rr.Status.LastMaintenanceTime, lastTm)
+	assert.Equal(t, rr.Status.RecentMaintenance, history)
+
+	rr = mockBackupRepositoryCR()
+	reconciler = mockBackupRepoReconciler(t, "", rr, nil)
+	funcStartMaintenanceJob = startMaintenanceJobSucceed
+	funcWaitMaintenanceJobComplete = waitMaintenanceJobCompleteSucceed
+	err = reconciler.Client.Create(context.TODO(), rr)
+	assert.NoError(t, err)
+	lastTm = rr.Status.LastMaintenanceTime
+	history = rr.Status.RecentMaintenance
+	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
+	assert.NoError(t, err)
+	assert.NotEqual(t, rr.Status.LastMaintenanceTime, lastTm)
+	assert.NotEqual(t, rr.Status.RecentMaintenance, history)
+
+	rr.Status.LastMaintenanceTime = &metav1.Time{Time: time.Now()}
+	lastTm = rr.Status.LastMaintenanceTime
+	history = rr.Status.RecentMaintenance
+	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
+	assert.NoError(t, err)
+	assert.Equal(t, rr.Status.LastMaintenanceTime, lastTm)
+	assert.Equal(t, rr.Status.RecentMaintenance, history)
 }
 
 func TestInitializeRepo(t *testing.T) {
@@ -251,9 +313,14 @@ func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
 				velerov1api.DefaultNamespace,
 				velerotest.NewLogger(),
 				velerotest.NewFakeControllerRuntimeClient(t),
+				&mgr,
 				test.userDefinedFreq,
 				"",
-				&mgr,
+				3,
+				"",
+				kube.PodResources{},
+				logrus.InfoLevel,
+				nil,
 			)
 
 			freq := reconciler.getRepositoryMaintenanceFrequency(test.repo)
@@ -380,7 +447,14 @@ func TestNeedInvalidBackupRepo(t *testing.T) {
 				velerov1api.DefaultNamespace,
 				velerotest.NewLogger(),
 				velerotest.NewFakeControllerRuntimeClient(t),
-				time.Duration(0), "", nil)
+				nil,
+				time.Duration(0),
+				"",
+				3,
+				"",
+				kube.PodResources{},
+				logrus.InfoLevel,
+				nil)
 
 			need := reconciler.needInvalidBackupRepo(test.oldBSL, test.newBSL)
 			assert.Equal(t, test.expect, need)
@@ -656,12 +730,118 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			updateRepoMaintenanceHistory(test.backupRepo, test.result, standardTime, standardTime.Add(time.Hour), "fake-message-0")
+			updateRepoMaintenanceHistory(test.backupRepo, test.result, &metav1.Time{Time: standardTime}, &metav1.Time{Time: standardTime.Add(time.Hour)}, "fake-message-0")
 
 			for at := range test.backupRepo.Status.RecentMaintenance {
 				assert.Equal(t, test.expectedHistory[at].StartTimestamp.Time, test.backupRepo.Status.RecentMaintenance[at].StartTimestamp.Time)
 				assert.Equal(t, test.expectedHistory[at].CompleteTimestamp.Time, test.backupRepo.Status.RecentMaintenance[at].CompleteTimestamp.Time)
 				assert.Equal(t, test.expectedHistory[at].Message, test.backupRepo.Status.RecentMaintenance[at].Message)
+			}
+		})
+	}
+}
+
+func TestRecallMaintenance(t *testing.T) {
+	now := time.Now()
+
+	schemeFail := runtime.NewScheme()
+	velerov1api.AddToScheme(schemeFail)
+
+	scheme := runtime.NewScheme()
+	batchv1.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
+	velerov1api.AddToScheme(scheme)
+
+	jobSucceeded := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "job1",
+			Namespace:         velerov1api.DefaultNamespace,
+			Labels:            map[string]string{repository.RepositoryNameLabel: "repo"},
+			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour)},
+		},
+		Status: batchv1.JobStatus{
+			StartTime:      &metav1.Time{Time: now.Add(time.Hour)},
+			CompletionTime: &metav1.Time{Time: now.Add(time.Hour * 2)},
+			Succeeded:      1,
+		},
+	}
+
+	jobPodSucceeded := builder.ForPod(velerov1api.DefaultNamespace, "job1").Labels(map[string]string{"job-name": "job1"}).ContainerStatuses(&v1.ContainerStatus{
+		State: v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{},
+		},
+	}).Result()
+
+	tests := []struct {
+		name               string
+		kubeClientObj      []runtime.Object
+		runtimeScheme      *runtime.Scheme
+		repoLastMatainTime metav1.Time
+		expectNewHistory   bool
+		expectTimeUpdate   bool
+		expectedErr        string
+	}{
+		{
+			name:          "wait completion error",
+			runtimeScheme: schemeFail,
+			expectedErr:   "error waiting incomplete repo maintenance job for repo repo: error listing maintenance job for repo repo: no kind is registered for the type v1.JobList in scheme \"pkg/runtime/scheme.go:100\"",
+		},
+		{
+			name:          "no consolidate result",
+			runtimeScheme: scheme,
+		},
+		{
+			name:          "no update last time",
+			runtimeScheme: scheme,
+			kubeClientObj: []runtime.Object{
+				jobSucceeded,
+				jobPodSucceeded,
+			},
+			repoLastMatainTime: metav1.Time{Time: now.Add(time.Hour * 5)},
+			expectNewHistory:   true,
+		},
+		{
+			name:          "update last time",
+			runtimeScheme: scheme,
+			kubeClientObj: []runtime.Object{
+				jobSucceeded,
+				jobPodSucceeded,
+			},
+			expectNewHistory: true,
+			expectTimeUpdate: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := mockBackupRepoReconciler(t, "", nil, nil)
+
+			backupRepo := mockBackupRepositoryCR()
+			backupRepo.Status.LastMaintenanceTime = &test.repoLastMatainTime
+
+			test.kubeClientObj = append(test.kubeClientObj, backupRepo)
+
+			fakeClientBuilder := fake.NewClientBuilder()
+			fakeClientBuilder = fakeClientBuilder.WithScheme(test.runtimeScheme)
+			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
+			r.Client = fakeClient
+
+			lastTm := backupRepo.Status.LastMaintenanceTime
+			history := backupRepo.Status.RecentMaintenance
+
+			err := r.recallMaintenance(context.TODO(), backupRepo, velerotest.NewLogger())
+			if test.expectedErr != "" {
+				assert.EqualError(t, err, test.expectedErr)
+			} else {
+				assert.NoError(t, err)
+
+				if test.expectNewHistory {
+					assert.NotEqual(t, history, backupRepo.Status.RecentMaintenance)
+				}
+
+				if test.expectTimeUpdate {
+					assert.NotEqual(t, lastTm, backupRepo.Status.LastMaintenanceTime)
+				}
 			}
 		})
 	}

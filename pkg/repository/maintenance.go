@@ -35,6 +35,12 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+
+	appsv1 "k8s.io/api/apps/v1"
+
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
+
+	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
 const (
@@ -86,29 +92,34 @@ func DeleteOldMaintenanceJobs(cli client.Client, repo string, keep int) error {
 	return nil
 }
 
-// WaitForJobComplete wait for completion of the specified job and update the latest job object
-func WaitForJobComplete(ctx context.Context, client client.Client, ns string, job string) (*batchv1.Job, error) {
-	updated := &batchv1.Job{}
+// waitForJobComplete wait for completion of the specified job and update the latest job object
+func waitForJobComplete(ctx context.Context, client client.Client, ns string, job string) (*batchv1.Job, error) {
+	var ret *batchv1.Job
+
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+		updated := &batchv1.Job{}
 		err := client.Get(ctx, types.NamespacedName{Namespace: ns, Name: job}, updated)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
+
+		ret = updated
 
 		if updated.Status.Succeeded > 0 {
 			return true, nil
 		}
 
 		if updated.Status.Failed > 0 {
-			return true, fmt.Errorf("maintenance job %s/%s failed", job, job)
+			return true, nil
 		}
+
 		return false, nil
 	})
 
-	return updated, err
+	return ret, err
 }
 
-func GetMaintenanceResultFromJob(cli client.Client, job *batchv1.Job) (string, error) {
+func getMaintenanceResultFromJob(cli client.Client, job *batchv1.Job) (string, error) {
 	// Get the maintenance job related pod by label selector
 	podList := &v1.PodList{}
 	err := cli.List(context.TODO(), podList, client.InNamespace(job.Namespace), client.MatchingLabels(map[string]string{"job-name": job.Name}))
@@ -137,7 +148,7 @@ func GetMaintenanceResultFromJob(cli client.Client, job *batchv1.Job) (string, e
 	return terminated.Message, nil
 }
 
-func GetLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error) {
+func getLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error) {
 	// Get the maintenance job list by label
 	jobList := &batchv1.JobList{}
 	err := cli.List(context.TODO(), jobList, &client.ListOptions{
@@ -162,7 +173,7 @@ func GetLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error)
 	return &jobList.Items[0], nil
 }
 
-// GetMaintenanceJobConfig is called to get the Maintenance Job Config for the
+// getMaintenanceJobConfig is called to get the Maintenance Job Config for the
 // BackupRepository specified by the repo parameter.
 //
 // Params:
@@ -173,7 +184,7 @@ func GetLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error)
 //	veleroNamespace: the Velero-installed namespace. It's used to retrieve the BackupRepository.
 //	repoMaintenanceJobConfig: the repository maintenance job ConfigMap name.
 //	repo: the BackupRepository needs to run the maintenance Job.
-func GetMaintenanceJobConfig(
+func getMaintenanceJobConfig(
 	ctx context.Context,
 	client client.Client,
 	logger logrus.FieldLogger,
@@ -255,9 +266,27 @@ func GetMaintenanceJobConfig(
 	return result, nil
 }
 
-// WaitIncompleteMaintenance checks all the incomplete maintenance jobs of the specified repo and wait for them to complete,
+func WaitMaintenanceJobComplete(cli client.Client, ctx context.Context, jobName, ns string, logger logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
+	log := logger.WithField("job name", jobName)
+
+	maintenanceJob, err := waitForJobComplete(ctx, cli, ns, jobName)
+	if err != nil {
+		return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.Wrap(err, "error to wait for maintenance job complete")
+	}
+
+	log.Info("Maintenance repo complete")
+
+	result, err := getMaintenanceResultFromJob(cli, maintenanceJob)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get maintenance job result")
+	}
+
+	return composeMaintenanceStatusFromJob(maintenanceJob, result), nil
+}
+
+// WaitAllMaintenanceJobComplete checks all the incomplete maintenance jobs of the specified repo and wait for them to complete,
 // and then return the maintenance jobs in the range of limit
-func WaitIncompleteMaintenance(ctx context.Context, cli client.Client, repo *velerov1api.BackupRepository, limit int, log logrus.FieldLogger) ([]velerov1api.BackupRepositoryMaintenanceStatus, error) {
+func WaitAllMaintenanceJobComplete(ctx context.Context, cli client.Client, repo *velerov1api.BackupRepository, limit int, log logrus.FieldLogger) ([]velerov1api.BackupRepositoryMaintenanceStatus, error) {
 	jobList := &batchv1.JobList{}
 	err := cli.List(context.TODO(), jobList, &client.ListOptions{
 		Namespace: repo.Namespace,
@@ -290,7 +319,7 @@ func WaitIncompleteMaintenance(ctx context.Context, cli client.Client, repo *vel
 		if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
 			log.Infof("Waiting for maintenance job %s to complete", job.Name)
 
-			updated, err := WaitForJobComplete(ctx, cli, job.Namespace, job.Name)
+			updated, err := waitForJobComplete(ctx, cli, job.Namespace, job.Name)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error waiting maintenance job[%s] complete", job.Name)
 			}
@@ -298,18 +327,182 @@ func WaitIncompleteMaintenance(ctx context.Context, cli client.Client, repo *vel
 			job = updated
 		}
 
-		message, err := GetMaintenanceResultFromJob(cli, job)
+		message, err := getMaintenanceResultFromJob(cli, job)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error getting maintenance job[%s] result", job.Name)
 		}
 
-		history = append(history, ComposeMaintenanceStatusFromJob(job, message))
+		history = append(history, composeMaintenanceStatusFromJob(job, message))
 	}
 
 	return history, nil
 }
 
-func ComposeMaintenanceStatusFromJob(job *batchv1.Job, message string) velerov1api.BackupRepositoryMaintenanceStatus {
+func StartMaintenanceJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, repoMaintenanceJobConfig string,
+	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag, logger logrus.FieldLogger) (string, error) {
+	bsl := &velerov1api.BackupStorageLocation{}
+	if err := cli.Get(ctx, client.ObjectKey{Namespace: repo.Namespace, Name: repo.Spec.BackupStorageLocation}, bsl); err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	log := logger.WithFields(logrus.Fields{
+		"BSL name":  bsl.Name,
+		"repo type": repo.Spec.RepositoryType,
+		"repo name": repo.Name,
+		"repo UID":  repo.UID,
+	})
+
+	jobConfig, err := getMaintenanceJobConfig(
+		ctx,
+		cli,
+		log,
+		repo.Namespace,
+		repoMaintenanceJobConfig,
+		repo,
+	)
+	if err != nil {
+		log.Warnf("Fail to find the ConfigMap %s to build maintenance job with error: %s. Use default value.",
+			repo.Namespace+"/"+repoMaintenanceJobConfig,
+			err.Error(),
+		)
+	}
+
+	log.Info("Starting maintenance repo")
+
+	maintenanceJob, err := buildMaintenanceJob(cli, ctx, repo, bsl.Name, jobConfig, podResources, logLevel, logFormat)
+	if err != nil {
+		return "", errors.Wrap(err, "error to build maintenance job")
+	}
+
+	log = log.WithField("job", fmt.Sprintf("%s/%s", maintenanceJob.Namespace, maintenanceJob.Name))
+
+	if err := cli.Create(context.TODO(), maintenanceJob); err != nil {
+		return "", errors.Wrap(err, "error to create maintenance job")
+	}
+
+	log.Info("Repo maintenance job started")
+
+	return maintenanceJob.Name, nil
+}
+
+func buildMaintenanceJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, bslName string, config *JobConfigs,
+	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag) (*batchv1.Job, error) {
+	// Get the Velero server deployment
+	deployment := &appsv1.Deployment{}
+	err := cli.Get(ctx, types.NamespacedName{Name: "velero", Namespace: repo.Namespace}, deployment)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the environment variables from the Velero server deployment
+	envVars := veleroutil.GetEnvVarsFromVeleroServer(deployment)
+
+	// Get the referenced storage from the Velero server deployment
+	envFromSources := veleroutil.GetEnvFromSourcesFromVeleroServer(deployment)
+
+	// Get the volume mounts from the Velero server deployment
+	volumeMounts := veleroutil.GetVolumeMountsFromVeleroServer(deployment)
+
+	// Get the volumes from the Velero server deployment
+	volumes := veleroutil.GetVolumesFromVeleroServer(deployment)
+
+	// Get the service account from the Velero server deployment
+	serviceAccount := veleroutil.GetServiceAccountFromVeleroServer(deployment)
+
+	// Get image
+	image := veleroutil.GetVeleroServerImage(deployment)
+
+	// Set resource limits and requests
+	cpuRequest := podResources.CPURequest
+	memRequest := podResources.MemoryRequest
+	cpuLimit := podResources.CPULimit
+	memLimit := podResources.MemoryLimit
+	if config != nil && config.PodResources != nil {
+		cpuRequest = config.PodResources.CPURequest
+		memRequest = config.PodResources.MemoryRequest
+		cpuLimit = config.PodResources.CPULimit
+		memLimit = config.PodResources.MemoryLimit
+	}
+	resources, err := kube.ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse resource requirements for maintenance job")
+	}
+
+	// Set arguments
+	args := []string{"repo-maintenance"}
+	args = append(args, fmt.Sprintf("--repo-name=%s", repo.Spec.VolumeNamespace))
+	args = append(args, fmt.Sprintf("--repo-type=%s", repo.Spec.RepositoryType))
+	args = append(args, fmt.Sprintf("--backup-storage-location=%s", bslName))
+	args = append(args, fmt.Sprintf("--log-level=%s", logLevel.String()))
+	args = append(args, fmt.Sprintf("--log-format=%s", logFormat.String()))
+
+	// build the maintenance job
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      GenerateJobName(repo.Name),
+			Namespace: repo.Namespace,
+			Labels: map[string]string{
+				RepositoryNameLabel: repo.Name,
+			},
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: new(int32), // Never retry
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "velero-repo-maintenance-pod",
+					Labels: map[string]string{
+						RepositoryNameLabel: repo.Name,
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "velero-repo-maintenance-container",
+							Image: image,
+							Command: []string{
+								"/velero",
+							},
+							Args:            args,
+							ImagePullPolicy: v1.PullIfNotPresent,
+							Env:             envVars,
+							EnvFrom:         envFromSources,
+							VolumeMounts:    volumeMounts,
+							Resources:       resources,
+						},
+					},
+					RestartPolicy:      v1.RestartPolicyNever,
+					Volumes:            volumes,
+					ServiceAccountName: serviceAccount,
+				},
+			},
+		},
+	}
+
+	if config != nil && len(config.LoadAffinities) > 0 {
+		affinity := kube.ToSystemAffinity(config.LoadAffinities)
+		job.Spec.Template.Spec.Affinity = affinity
+	}
+
+	if tolerations := veleroutil.GetTolerationsFromVeleroServer(deployment); tolerations != nil {
+		job.Spec.Template.Spec.Tolerations = tolerations
+	}
+
+	if nodeSelector := veleroutil.GetNodeSelectorFromVeleroServer(deployment); nodeSelector != nil {
+		job.Spec.Template.Spec.NodeSelector = nodeSelector
+	}
+
+	if labels := veleroutil.GetVeleroServerLables(deployment); len(labels) > 0 {
+		job.Spec.Template.Labels = labels
+	}
+
+	if annotations := veleroutil.GetVeleroServerAnnotations(deployment); len(annotations) > 0 {
+		job.Spec.Template.Annotations = annotations
+	}
+
+	return job, nil
+}
+
+func composeMaintenanceStatusFromJob(job *batchv1.Job, message string) velerov1api.BackupRepositoryMaintenanceStatus {
 	result := velerov1api.BackupRepositoryMaintenanceSucceeded
 	if job.Status.Failed > 0 {
 		result = velerov1api.BackupRepositoryMaintenanceFailed
