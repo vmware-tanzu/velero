@@ -21,7 +21,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/providers"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -29,7 +29,7 @@ import (
 var SkippedVolumeInfoTest func() = TestFunc(&SkippedVolumeInfo{
 	BackupVolumeInfo{
 		SnapshotVolumes: false,
-		TestCase: TestCase{
+		BRCase: BRCase{
 			CaseBaseName: "skipped-volumes-volumeinfo",
 			TestMsg: &TestMSG{
 				Desc: "Test backup's VolumeInfo metadata content for volume-skipped case.",

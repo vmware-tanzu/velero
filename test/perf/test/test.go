@@ -98,7 +98,7 @@ func (t *TestCase) Init() error {
 	t.Ctx, t.CtxCancel = context.WithTimeout(context.Background(), 6*time.Hour)
 	t.NSExcluded = &[]string{"kube-system", "velero", "default", "kube-public", "kube-node-lease"}
 	t.UUIDgen = t.GenerateUUID()
-	t.Client = *VeleroCfg.DefaultClient
+	t.Client = *VeleroCfg.ActiveClient
 	t.timer = &metrics.TimeMetrics{
 		Name: "Total time cost",
 		TimeInfo: map[string]metrics.TimeSpan{"Total time cost": {
@@ -281,7 +281,7 @@ func (t *TestCase) MonitorMetircs(ctx context.Context, collectors *metrics.Metri
 		for _, pod := range veleroPodList {
 			podMetrics := &metrics.PodMetrics{
 				Ctx:       ctx,
-				Client:    VeleroCfg.DefaultClient.MetricsClient,
+				Client:    VeleroCfg.ActiveClient.MetricsClient,
 				Metrics:   make(map[string]int64),
 				PodName:   pod,
 				Namespace: VeleroCfg.VeleroNamespace,

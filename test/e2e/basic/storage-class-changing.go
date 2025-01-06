@@ -9,13 +9,13 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	. "github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 type StorageClasssChanging struct {
-	TestCase
+	BRCase
 	labels          map[string]string
 	data            map[string]string
 	cmName          string
@@ -34,7 +34,7 @@ const SCCBaseName string = "scc-"
 var StorageClasssChangingTest func() = TestFunc(&StorageClasssChanging{})
 
 func (s *StorageClasssChanging) Init() error {
-	s.TestCase.Init()
+	s.BRCase.Init()
 	s.CaseBaseName = SCCBaseName + s.UUIDgen
 	s.namespace = s.CaseBaseName
 	s.BackupName = "backup-" + s.CaseBaseName
@@ -97,7 +97,7 @@ func (s *StorageClasssChanging) CreateResources() error {
 	return nil
 }
 
-func (s *StorageClasssChanging) Destroy() error {
+func (s *StorageClasssChanging) DeleteResources() error {
 	By(fmt.Sprintf("Expect storage class of PV %s to be %s ", s.volume, s.srcStorageClass), func() {
 		pvName, err := GetPVByPVCName(s.Client, s.namespace, s.pvcName)
 		Expect(err).To(Succeed(), fmt.Sprintf("Failed to get PV name by PVC name %s", s.pvcName))
@@ -146,7 +146,7 @@ func (s *StorageClasssChanging) Clean() error {
 				fmt.Sprintf("Failed to delete namespace %s", s.CaseBaseName))
 		})
 		DeleteConfigMap(s.Client.ClientGo, s.VeleroCfg.VeleroNamespace, s.cmName)
-		s.TestCase.Clean()
+		s.BRCase.Clean()
 	}
 
 	return nil

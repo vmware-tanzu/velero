@@ -23,12 +23,12 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 type FilteringCase struct {
-	TestCase
+	BRCase
 	IsTestInBackup bool
 	replica        int32
 	labels         map[string]string
@@ -39,7 +39,7 @@ var testInBackup = FilteringCase{IsTestInBackup: true}
 var testInRestore = FilteringCase{IsTestInBackup: false}
 
 func (f *FilteringCase) Init() error {
-	f.TestCase.Init()
+	f.BRCase.Init()
 
 	f.replica = int32(2)
 	f.labels = map[string]string{"resourcefiltering": "true"}

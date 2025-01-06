@@ -33,11 +33,11 @@ limitations under the License.
 package basic
 
 import (
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 )
 
-func GetResourcesCheckTestCases() []VeleroBackupRestoreTest {
-	return []VeleroBackupRestoreTest{
+func GetResourcesCheckTestCases() []BackupRestoreTest {
+	return []BackupRestoreTest{
 		&NSAnnotationCase{},
 		&MultiNSBackup{IsScalTest: false},
 		&RBACCase{},

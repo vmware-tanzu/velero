@@ -78,7 +78,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
 		} else {
 			By("Clean backups after test", func() {
-				veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
+				veleroCfg.ClientToInstallVelero = veleroCfg.ActiveClient
 				DeleteAllBackups(context.Background(), &veleroCfg)
 			})
 			By(fmt.Sprintf("Delete sample workload namespace %s", bslDeletionTestNs), func() {
