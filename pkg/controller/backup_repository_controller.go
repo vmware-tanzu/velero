@@ -338,12 +338,9 @@ func (r *BackupRepoReconciler) recallMaintenance(ctx context.Context, req *veler
 
 	log.Warn("Updating backup repository because of unrecorded histories")
 
-	if lastMaintenanceTime.After(req.Status.LastMaintenanceTime.Time) {
-		log.Warnf("Updating backup repository last maintenance time (%v) from history (%v)", req.Status.LastMaintenanceTime.Time, lastMaintenanceTime.Time)
-	}
-
 	return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
 		if lastMaintenanceTime.After(rr.Status.LastMaintenanceTime.Time) {
+			log.Warnf("Updating backup repository last maintenance time (%v) from history (%v)", rr.Status.LastMaintenanceTime.Time, lastMaintenanceTime.Time)
 			rr.Status.LastMaintenanceTime = lastMaintenanceTime
 		}
 
@@ -453,8 +450,8 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 		})
 	}
 
-	// when WaitMaintenanceJobComplete fails, the maintenance result will be left temporarily
-	// If the maintenenance still completes later, recallMaintenance recalls the left onces and update LastMaintenanceTime and history
+	// when WaitMaintenanceJobComplete fails, the maintenance result will be left aside temporarily
+	// If the maintenenance still completes later, recallMaintenance recalls the left once and update LastMaintenanceTime and history
 	status, err := funcWaitMaintenanceJobComplete(r.Client, ctx, job, r.namespace, log)
 	if err != nil {
 		return errors.Wrapf(err, "error waiting repo maintenance completion status")

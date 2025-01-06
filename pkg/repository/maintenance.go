@@ -148,31 +148,6 @@ func getMaintenanceResultFromJob(cli client.Client, job *batchv1.Job) (string, e
 	return terminated.Message, nil
 }
 
-func getLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error) {
-	// Get the maintenance job list by label
-	jobList := &batchv1.JobList{}
-	err := cli.List(context.TODO(), jobList, &client.ListOptions{
-		Namespace: ns,
-	},
-		&client.HasLabels{RepositoryNameLabel},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if len(jobList.Items) == 0 {
-		return nil, nil
-	}
-
-	// Get the latest maintenance job
-	sort.Slice(jobList.Items, func(i, j int) bool {
-		return jobList.Items[i].CreationTimestamp.Time.After(jobList.Items[j].CreationTimestamp.Time)
-	})
-
-	return &jobList.Items[0], nil
-}
-
 // getMaintenanceJobConfig is called to get the Maintenance Job Config for the
 // BackupRepository specified by the repo parameter.
 //
@@ -266,6 +241,7 @@ func getMaintenanceJobConfig(
 	return result, nil
 }
 
+// WaitMaintenanceJobComplete waits the completion of the specified maintenance job and return the BackupRepositoryMaintenanceStatus
 func WaitMaintenanceJobComplete(cli client.Client, ctx context.Context, jobName, ns string, logger logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
 	log := logger.WithField("job name", jobName)
 
@@ -285,7 +261,7 @@ func WaitMaintenanceJobComplete(cli client.Client, ctx context.Context, jobName,
 }
 
 // WaitAllMaintenanceJobComplete checks all the incomplete maintenance jobs of the specified repo and wait for them to complete,
-// and then return the maintenance jobs in the range of limit
+// and then return the maintenance jobs' status in the range of limit
 func WaitAllMaintenanceJobComplete(ctx context.Context, cli client.Client, repo *velerov1api.BackupRepository, limit int, log logrus.FieldLogger) ([]velerov1api.BackupRepositoryMaintenanceStatus, error) {
 	jobList := &batchv1.JobList{}
 	err := cli.List(context.TODO(), jobList, &client.ListOptions{
@@ -338,6 +314,7 @@ func WaitAllMaintenanceJobComplete(ctx context.Context, cli client.Client, repo 
 	return history, nil
 }
 
+// StartMaintenanceJob creates a new maintenance job
 func StartMaintenanceJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, repoMaintenanceJobConfig string,
 	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag, logger logrus.FieldLogger) (string, error) {
 	bsl := &velerov1api.BackupStorageLocation{}

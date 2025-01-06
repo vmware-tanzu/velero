@@ -269,50 +269,6 @@ func TestGetMaintenanceResultFromJob(t *testing.T) {
 	assert.Equal(t, "test message", result)
 }
 
-func TestGetLatestMaintenanceJob(t *testing.T) {
-	// Set up test repo
-	repo := "test-repo"
-
-	// Create some maintenance jobs for testing
-	var objs []client.Object
-	// Create a newer job
-	newerJob := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "job1",
-			Namespace: "default",
-			Labels:    map[string]string{RepositoryNameLabel: repo},
-			CreationTimestamp: metav1.Time{
-				Time: metav1.Now().Add(time.Duration(-24) * time.Hour),
-			},
-		},
-		Spec: batchv1.JobSpec{},
-	}
-	objs = append(objs, newerJob)
-
-	// Create an older job
-	olderJob := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "job2",
-			Namespace: "default",
-			Labels:    map[string]string{RepositoryNameLabel: repo},
-		},
-		Spec: batchv1.JobSpec{},
-	}
-	objs = append(objs, olderJob)
-
-	// Create a fake Kubernetes client
-	scheme := runtime.NewScheme()
-	_ = batchv1.AddToScheme(scheme)
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
-
-	// Call the function
-	job, err := getLatestMaintenanceJob(cli, "default")
-	assert.NoError(t, err)
-
-	// We expect the returned job to be the newer job
-	assert.Equal(t, newerJob.Name, job.Name)
-}
-
 func TestGetMaintenanceJobConfig(t *testing.T) {
 	ctx := context.Background()
 	logger := logrus.New()

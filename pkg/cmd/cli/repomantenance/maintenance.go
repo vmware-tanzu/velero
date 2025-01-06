@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
@@ -88,41 +87,36 @@ func (o *Options) Run(f velerocli.Factory) {
 	}
 }
 
-func (o *Options) initClient(f velerocli.Factory) (client.Client, kubernetes.Interface, error) {
+func (o *Options) initClient(f velerocli.Factory) (client.Client, error) {
 	scheme := runtime.NewScheme()
 	err := velerov1api.AddToScheme(scheme)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to add velero scheme")
+		return nil, errors.Wrap(err, "failed to add velero scheme")
 	}
 
 	err = v1.AddToScheme(scheme)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to add api core scheme")
+		return nil, errors.Wrap(err, "failed to add api core scheme")
 	}
 
 	config, err := f.ClientConfig()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to get client config")
+		return nil, errors.Wrap(err, "failed to get client config")
 	}
 
 	cli, err := client.New(config, client.Options{
 		Scheme: scheme,
 	})
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create client")
+		return nil, errors.Wrap(err, "failed to create client")
 	}
 
-	kubeClient, err := f.KubeClient()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create kube client")
-	}
-
-	return cli, kubeClient, nil
+	return cli, nil
 }
 
-func initRepoManager(namespace string, kubeClient kubernetes.Interface, cli client.Client, logger logrus.FieldLogger) (repomanager.Manager, error) {
+func initRepoManager(namespace string, cli client.Client, logger logrus.FieldLogger) (repomanager.Manager, error) {
 	// ensure the repo key secret is set up
-	if err := repokey.EnsureCommonRepositoryKey(kubeClient.CoreV1(), namespace); err != nil {
+	if err := repokey.EnsureCommonRepositoryKey(cli, namespace); err != nil {
 		return nil, errors.Wrap(err, "failed to ensure repository key")
 	}
 
@@ -154,12 +148,12 @@ func initRepoManager(namespace string, kubeClient kubernetes.Interface, cli clie
 }
 
 func (o *Options) runRepoPrune(f velerocli.Factory, namespace string, logger logrus.FieldLogger) error {
-	cli, kubeClient, err := o.initClient(f)
+	cli, err := o.initClient(f)
 	if err != nil {
 		return err
 	}
 
-	manager, err := initRepoManager(namespace, kubeClient, cli, logger)
+	manager, err := initRepoManager(namespace, cli, logger)
 	if err != nil {
 		return err
 	}

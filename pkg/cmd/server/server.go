@@ -480,7 +480,7 @@ func (s *server) checkNodeAgent() {
 
 func (s *server) initRepoManager() error {
 	// ensure the repo key secret is set up
-	if err := repokey.EnsureCommonRepositoryKey(s.kubeClient.CoreV1(), s.namespace); err != nil {
+	if err := repokey.EnsureCommonRepositoryKey(s.mgr.GetClient(), s.namespace); err != nil {
 		return err
 	}
 
