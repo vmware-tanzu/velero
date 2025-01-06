@@ -24,11 +24,9 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -38,13 +36,11 @@ const (
 	encryptionKey = "static-passw0rd"
 )
 
-func EnsureCommonRepositoryKey(cli client.Client, namespace string) error {
-	existing := &corev1api.Secret{}
-	err := cli.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: credentialsSecretName}, existing)
+func EnsureCommonRepositoryKey(secretClient corev1client.SecretsGetter, namespace string) error {
+	_, err := secretClient.Secrets(namespace).Get(context.TODO(), credentialsSecretName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.WithStack(err)
 	}
-
 	if err == nil {
 		return nil
 	}
@@ -62,7 +58,7 @@ func EnsureCommonRepositoryKey(cli client.Client, namespace string) error {
 		},
 	}
 
-	if err := cli.Create(context.TODO(), secret); err != nil {
+	if _, err = secretClient.Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 		return errors.Wrapf(err, "error creating %s secret", credentialsSecretName)
 	}
 

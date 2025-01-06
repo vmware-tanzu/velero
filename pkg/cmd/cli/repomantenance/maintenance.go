@@ -13,7 +13,10 @@ import (
 	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -64,6 +67,8 @@ func NewCommand(f velerocli.Factory) *cobra.Command {
 func (o *Options) Run(f velerocli.Factory) {
 	logger := logging.DefaultLogger(o.LogLevelFlag.Parse(), o.FormatFlag.Parse())
 	logger.SetOutput(os.Stdout)
+
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	time.Sleep(time.Minute)
 
@@ -116,9 +121,9 @@ func (o *Options) initClient(f velerocli.Factory) (client.Client, error) {
 	return cli, nil
 }
 
-func initRepoManager(namespace string, cli client.Client, logger logrus.FieldLogger) (repomanager.Manager, error) {
+func initRepoManager(namespace string, cli client.Client, kubeClient kubernetes.Interface, logger logrus.FieldLogger) (repomanager.Manager, error) {
 	// ensure the repo key secret is set up
-	if err := repokey.EnsureCommonRepositoryKey(cli, namespace); err != nil {
+	if err := repokey.EnsureCommonRepositoryKey(kubeClient.CoreV1(), namespace); err != nil {
 		return nil, errors.Wrap(err, "failed to ensure repository key")
 	}
 
@@ -155,7 +160,12 @@ func (o *Options) runRepoPrune(f velerocli.Factory, namespace string, logger log
 		return err
 	}
 
-	manager, err := initRepoManager(namespace, cli, logger)
+	kubeClient, err := f.KubeClient()
+	if err != nil {
+		return err
+	}
+
+	manager, err := initRepoManager(namespace, cli, kubeClient, logger)
 	if err != nil {
 		return err
 	}

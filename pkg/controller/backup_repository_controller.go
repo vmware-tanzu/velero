@@ -25,6 +25,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/petar/GoLLRB/llrb"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -348,43 +349,45 @@ func (r *BackupRepoReconciler) recallMaintenance(ctx context.Context, req *veler
 	})
 }
 
+type maintenanceStatusWrapper struct {
+	status *velerov1api.BackupRepositoryMaintenanceStatus
+}
+
+func (w maintenanceStatusWrapper) Less(other llrb.Item) bool {
+	return w.status.StartTimestamp.Before(other.(maintenanceStatusWrapper).status.StartTimestamp)
+}
+
 func consolidateHistory(coming, cur []velerov1api.BackupRepositoryMaintenanceStatus) []velerov1api.BackupRepositoryMaintenanceStatus {
 	if len(coming) == 0 {
 		return nil
 	}
 
-	if isIdenticalHistory(coming, cur) {
+	if isIdenticalHistory(cur, coming) {
 		return nil
 	}
 
+	consolidator := llrb.New()
+	for i := range cur {
+		consolidator.ReplaceOrInsert(maintenanceStatusWrapper{&cur[i]})
+	}
+
+	for i := range coming {
+		consolidator.ReplaceOrInsert(maintenanceStatusWrapper{&coming[i]})
+	}
+
 	truncated := []velerov1api.BackupRepositoryMaintenanceStatus{}
-	i := len(cur) - 1
-	j := len(coming) - 1
-	for i >= 0 || j >= 0 {
+	for consolidator.Len() > 0 {
 		if len(truncated) == defaultMaintenanceStatusQueueLength {
 			break
 		}
 
-		if i >= 0 && j >= 0 {
-			if isEarlierMaintenanceStatus(cur[i], coming[j]) {
-				truncated = append(truncated, coming[j])
-				j--
-			} else {
-				truncated = append(truncated, cur[i])
-				i--
-			}
-		} else if i >= 0 {
-			truncated = append(truncated, cur[i])
-			i--
-		} else {
-			truncated = append(truncated, coming[j])
-			j--
-		}
+		item := consolidator.DeleteMax()
+		truncated = append(truncated, *item.(maintenanceStatusWrapper).status)
 	}
 
 	slices.Reverse(truncated)
 
-	if isIdenticalHistory(truncated, cur) {
+	if isIdenticalHistory(cur, truncated) {
 		return nil
 	}
 
@@ -421,10 +424,6 @@ func isIdenticalHistory(a, b []velerov1api.BackupRepositoryMaintenanceStatus) bo
 	return true
 }
 
-func isEarlierMaintenanceStatus(a, b velerov1api.BackupRepositoryMaintenanceStatus) bool {
-	return a.StartTimestamp.Before(b.StartTimestamp)
-}
-
 var funcStartMaintenanceJob = repository.StartMaintenanceJob
 var funcWaitMaintenanceJobComplete = repository.WaitMaintenanceJobComplete
 
@@ -437,10 +436,6 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 	}
 
 	log.Info("Running maintenance on backup repository")
-
-	// prune failures should be displayed in the `.status.message` field but
-	// should not cause the repo to move to `NotReady`.
-	log.Debug("Pruning repo")
 
 	job, err := funcStartMaintenanceJob(r.Client, ctx, req, r.repoMaintenanceConfig, r.podResources, r.logLevel, r.logFormat, log)
 	if err != nil {
