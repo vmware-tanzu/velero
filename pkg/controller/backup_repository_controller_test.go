@@ -23,15 +23,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/repository"
+	"github.com/vmware-tanzu/velero/pkg/repository/maintenance"
 	repomokes "github.com/vmware-tanzu/velero/pkg/repository/mocks"
 	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -39,7 +39,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -131,59 +130,268 @@ func waitMaintenanceJobCompleteFail(client.Client, context.Context, string, stri
 	return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.New("fake-wait-error")
 }
 
-func waitMaintenanceJobCompleteSucceed(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
-	return velerov1api.BackupRepositoryMaintenanceStatus{
-		StartTimestamp:    &metav1.Time{Time: time.Now()},
-		CompleteTimestamp: &metav1.Time{Time: time.Now().Add(time.Hour)},
-	}, nil
+func waitMaintenanceJobCompleteFunc(now time.Time, result velerov1api.BackupRepositoryMaintenanceResult, message string) func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
+	return func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
+		return velerov1api.BackupRepositoryMaintenanceStatus{
+			StartTimestamp:    &metav1.Time{Time: now},
+			CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
+			Result:            result,
+			Message:           message,
+		}, nil
+	}
+}
+
+type fakeClock struct {
+	now time.Time
+}
+
+func (f *fakeClock) After(time.Duration) <-chan time.Time {
+	return nil
+}
+
+func (f *fakeClock) NewTicker(time.Duration) clock.Ticker {
+	return nil
+}
+func (f *fakeClock) NewTimer(time.Duration) clock.Timer {
+	return nil
+}
+
+func (f *fakeClock) Now() time.Time {
+	return f.now
+}
+
+func (f *fakeClock) Since(time.Time) time.Duration {
+	return 0
+}
+
+func (f *fakeClock) Sleep(time.Duration) {}
+
+func (f *fakeClock) Tick(time.Duration) <-chan time.Time {
+	return nil
+}
+
+func (f *fakeClock) AfterFunc(time.Duration, func()) clock.Timer {
+	return nil
 }
 
 func TestRunMaintenanceIfDue(t *testing.T) {
-	rr := mockBackupRepositoryCR()
-	reconciler := mockBackupRepoReconciler(t, "", rr, nil)
-	funcStartMaintenanceJob = startMaintenanceJobFail
-	err := reconciler.Client.Create(context.TODO(), rr)
-	assert.NoError(t, err)
-	lastTm := rr.Status.LastMaintenanceTime
-	history := rr.Status.RecentMaintenance
-	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
-	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.LastMaintenanceTime, lastTm)
-	assert.NotEqual(t, rr.Status.RecentMaintenance, history)
+	now := time.Now().Round(time.Second)
 
-	rr = mockBackupRepositoryCR()
-	reconciler = mockBackupRepoReconciler(t, "", rr, nil)
-	funcStartMaintenanceJob = startMaintenanceJobSucceed
-	funcWaitMaintenanceJobComplete = waitMaintenanceJobCompleteFail
-	err = reconciler.Client.Create(context.TODO(), rr)
-	assert.NoError(t, err)
-	lastTm = rr.Status.LastMaintenanceTime
-	history = rr.Status.RecentMaintenance
-	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
-	assert.EqualError(t, err, "error waiting repo maintenance completion status: fake-wait-error")
-	assert.Equal(t, rr.Status.LastMaintenanceTime, lastTm)
-	assert.Equal(t, rr.Status.RecentMaintenance, history)
+	tests := []struct {
+		name                    string
+		repo                    *velerov1api.BackupRepository
+		startJobFunc            func(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error)
+		waitJobFunc             func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error)
+		expectedMaintenanceTime time.Time
+		expectedHistory         []velerov1api.BackupRepositoryMaintenanceStatus
+		expectedErr             string
+	}{
+		{
+			name: "not due",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "repo",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					LastMaintenanceTime: &metav1.Time{Time: now},
+					RecentMaintenance: []velerov1api.BackupRepositoryMaintenanceStatus{
+						{
+							StartTimestamp:    &metav1.Time{Time: now.Add(-time.Hour)},
+							CompleteTimestamp: &metav1.Time{Time: now},
+							Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+						},
+					},
+				},
+			},
+			expectedMaintenanceTime: now,
+			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: now.Add(-time.Hour)},
+					CompleteTimestamp: &metav1.Time{Time: now},
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+				},
+			},
+		},
+		{
+			name: "start failed",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "repo",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					LastMaintenanceTime: &metav1.Time{Time: now.Add(-time.Hour - time.Minute)},
+					RecentMaintenance: []velerov1api.BackupRepositoryMaintenanceStatus{
+						{
+							StartTimestamp:    &metav1.Time{Time: now.Add(-time.Hour * 2)},
+							CompleteTimestamp: &metav1.Time{Time: now.Add(-time.Hour)},
+							Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+						},
+					},
+				},
+			},
+			startJobFunc:            startMaintenanceJobFail,
+			expectedMaintenanceTime: now.Add(-time.Hour - time.Minute),
+			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: now.Add(-time.Hour * 2)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(-time.Hour)},
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+				},
+				{
+					StartTimestamp: &metav1.Time{Time: now},
+					Result:         velerov1api.BackupRepositoryMaintenanceFailed,
+					Message:        "Failed to start maintenance job, err: fake-start-error",
+				},
+			},
+		},
+		{
+			name: "wait failed",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "repo",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					LastMaintenanceTime: &metav1.Time{Time: now.Add(-time.Hour - time.Minute)},
+					RecentMaintenance: []velerov1api.BackupRepositoryMaintenanceStatus{
+						{
+							StartTimestamp:    &metav1.Time{Time: now.Add(-time.Hour * 2)},
+							CompleteTimestamp: &metav1.Time{Time: now.Add(-time.Hour)},
+							Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+						},
+					},
+				},
+			},
+			startJobFunc:            startMaintenanceJobSucceed,
+			waitJobFunc:             waitMaintenanceJobCompleteFail,
+			expectedErr:             "error waiting repo maintenance completion status: fake-wait-error",
+			expectedMaintenanceTime: now.Add(-time.Hour - time.Minute),
+			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: now.Add(-time.Hour * 2)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(-time.Hour)},
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+				},
+			},
+		},
+		{
+			name: "maintenance failed",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "repo",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					LastMaintenanceTime: &metav1.Time{Time: now.Add(-time.Hour - time.Minute)},
+					RecentMaintenance: []velerov1api.BackupRepositoryMaintenanceStatus{
+						{
+							StartTimestamp:    &metav1.Time{Time: now.Add(-time.Hour * 2)},
+							CompleteTimestamp: &metav1.Time{Time: now.Add(-time.Hour)},
+							Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+						},
+					},
+				},
+			},
+			startJobFunc:            startMaintenanceJobSucceed,
+			waitJobFunc:             waitMaintenanceJobCompleteFunc(now, velerov1api.BackupRepositoryMaintenanceFailed, "fake-maintenance-message"),
+			expectedMaintenanceTime: now.Add(-time.Hour - time.Minute),
+			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: now.Add(-time.Hour * 2)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(-time.Hour)},
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+				},
+				{
+					StartTimestamp:    &metav1.Time{Time: now},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
+					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					Message:           "fake-maintenance-message",
+				},
+			},
+		},
+		{
+			name: "maintenance succeeded",
+			repo: &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "repo",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					MaintenanceFrequency: metav1.Duration{Duration: time.Hour},
+				},
+				Status: velerov1api.BackupRepositoryStatus{
+					LastMaintenanceTime: &metav1.Time{Time: now.Add(-time.Hour - time.Minute)},
+					RecentMaintenance: []velerov1api.BackupRepositoryMaintenanceStatus{
+						{
+							StartTimestamp:    &metav1.Time{Time: now.Add(-time.Hour * 2)},
+							CompleteTimestamp: &metav1.Time{Time: now.Add(-time.Hour)},
+							Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+						},
+					},
+				},
+			},
+			startJobFunc:            startMaintenanceJobSucceed,
+			waitJobFunc:             waitMaintenanceJobCompleteFunc(now, velerov1api.BackupRepositoryMaintenanceSucceeded, ""),
+			expectedMaintenanceTime: now.Add(time.Hour),
+			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: now.Add(-time.Hour * 2)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(-time.Hour)},
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+				},
+				{
+					StartTimestamp:    &metav1.Time{Time: now},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			reconciler := mockBackupRepoReconciler(t, "", test.repo, nil)
+			reconciler.clock = &fakeClock{now}
+			err := reconciler.Client.Create(context.TODO(), test.repo)
+			assert.NoError(t, err)
 
-	rr = mockBackupRepositoryCR()
-	reconciler = mockBackupRepoReconciler(t, "", rr, nil)
-	funcStartMaintenanceJob = startMaintenanceJobSucceed
-	funcWaitMaintenanceJobComplete = waitMaintenanceJobCompleteSucceed
-	err = reconciler.Client.Create(context.TODO(), rr)
-	assert.NoError(t, err)
-	lastTm = rr.Status.LastMaintenanceTime
-	history = rr.Status.RecentMaintenance
-	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
-	assert.NoError(t, err)
-	assert.NotEqual(t, rr.Status.LastMaintenanceTime, lastTm)
-	assert.NotEqual(t, rr.Status.RecentMaintenance, history)
+			funcStartMaintenanceJob = test.startJobFunc
+			funcWaitMaintenanceJobComplete = test.waitJobFunc
 
-	rr.Status.LastMaintenanceTime = &metav1.Time{Time: time.Now()}
-	lastTm = rr.Status.LastMaintenanceTime
-	history = rr.Status.RecentMaintenance
-	err = reconciler.runMaintenanceIfDue(context.TODO(), rr, reconciler.logger)
-	assert.NoError(t, err)
-	assert.Equal(t, rr.Status.LastMaintenanceTime, lastTm)
-	assert.Equal(t, rr.Status.RecentMaintenance, history)
+			err = reconciler.runMaintenanceIfDue(context.TODO(), test.repo, velerotest.NewLogger())
+			if test.expectedErr == "" {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, test.expectedMaintenanceTime, test.repo.Status.LastMaintenanceTime.Time)
+			assert.Len(t, test.repo.Status.RecentMaintenance, len(test.expectedHistory))
+
+			for i := 0; i < len(test.expectedHistory); i++ {
+				assert.Equal(t, test.expectedHistory[i].StartTimestamp.Time, test.repo.Status.RecentMaintenance[i].StartTimestamp.Time)
+				if test.expectedHistory[i].CompleteTimestamp == nil {
+					assert.Nil(t, test.repo.Status.RecentMaintenance[i].CompleteTimestamp)
+				} else {
+					assert.Equal(t, test.expectedHistory[i].CompleteTimestamp.Time, test.repo.Status.RecentMaintenance[i].CompleteTimestamp.Time)
+				}
+
+				assert.Equal(t, test.expectedHistory[i].Result, test.repo.Status.RecentMaintenance[i].Result)
+				assert.Equal(t, test.expectedHistory[i].Message, test.repo.Status.RecentMaintenance[i].Message)
+			}
+		})
+	}
 }
 
 func TestInitializeRepo(t *testing.T) {
@@ -742,7 +950,7 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 }
 
 func TestRecallMaintenance(t *testing.T) {
-	now := time.Now()
+	now := time.Now().Round(time.Second)
 
 	schemeFail := runtime.NewScheme()
 	velerov1api.AddToScheme(schemeFail)
@@ -756,7 +964,7 @@ func TestRecallMaintenance(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job1",
 			Namespace:         velerov1api.DefaultNamespace,
-			Labels:            map[string]string{repository.RepositoryNameLabel: "repo"},
+			Labels:            map[string]string{maintenance.RepositoryNameLabel: "repo"},
 			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour)},
 		},
 		Status: batchv1.JobStatus{
@@ -766,9 +974,9 @@ func TestRecallMaintenance(t *testing.T) {
 		},
 	}
 
-	jobPodSucceeded := builder.ForPod(velerov1api.DefaultNamespace, "job1").Labels(map[string]string{"job-name": "job1"}).ContainerStatuses(&v1.ContainerStatus{
-		State: v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{},
+	jobPodSucceeded := builder.ForPod(velerov1api.DefaultNamespace, "job1").Labels(map[string]string{"job-name": "job1"}).ContainerStatuses(&corev1.ContainerStatus{
+		State: corev1.ContainerState{
+			Terminated: &corev1.ContainerStateTerminated{},
 		},
 	}).Result()
 
@@ -777,8 +985,8 @@ func TestRecallMaintenance(t *testing.T) {
 		kubeClientObj      []runtime.Object
 		runtimeScheme      *runtime.Scheme
 		repoLastMatainTime metav1.Time
-		expectNewHistory   bool
-		expectTimeUpdate   bool
+		expectNewHistory   []velerov1api.BackupRepositoryMaintenanceStatus
+		expectTimeUpdate   *metav1.Time
 		expectedErr        string
 	}{
 		{
@@ -798,7 +1006,13 @@ func TestRecallMaintenance(t *testing.T) {
 				jobPodSucceeded,
 			},
 			repoLastMatainTime: metav1.Time{Time: now.Add(time.Hour * 5)},
-			expectNewHistory:   true,
+			expectNewHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+				},
+			},
 		},
 		{
 			name:          "update last time",
@@ -807,8 +1021,14 @@ func TestRecallMaintenance(t *testing.T) {
 				jobSucceeded,
 				jobPodSucceeded,
 			},
-			expectNewHistory: true,
-			expectTimeUpdate: true,
+			expectNewHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+				},
+			},
+			expectTimeUpdate: &metav1.Time{Time: now.Add(time.Hour * 2)},
 		},
 	}
 
@@ -821,13 +1041,12 @@ func TestRecallMaintenance(t *testing.T) {
 
 			test.kubeClientObj = append(test.kubeClientObj, backupRepo)
 
-			fakeClientBuilder := fake.NewClientBuilder()
+			fakeClientBuilder := clientFake.NewClientBuilder()
 			fakeClientBuilder = fakeClientBuilder.WithScheme(test.runtimeScheme)
 			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
 			r.Client = fakeClient
 
 			lastTm := backupRepo.Status.LastMaintenanceTime
-			history := backupRepo.Status.RecentMaintenance
 
 			err := r.recallMaintenance(context.TODO(), backupRepo, velerotest.NewLogger())
 			if test.expectedErr != "" {
@@ -835,12 +1054,22 @@ func TestRecallMaintenance(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 
-				if test.expectNewHistory {
-					assert.NotEqual(t, history, backupRepo.Status.RecentMaintenance)
+				if test.expectNewHistory == nil {
+					assert.Nil(t, backupRepo.Status.RecentMaintenance)
+				} else {
+					assert.Len(t, backupRepo.Status.RecentMaintenance, len(test.expectNewHistory))
+					for i := 0; i < len(test.expectNewHistory); i++ {
+						assert.Equal(t, test.expectNewHistory[i].StartTimestamp.Time, backupRepo.Status.RecentMaintenance[i].StartTimestamp.Time)
+						assert.Equal(t, test.expectNewHistory[i].CompleteTimestamp.Time, backupRepo.Status.RecentMaintenance[i].CompleteTimestamp.Time)
+						assert.Equal(t, test.expectNewHistory[i].Result, backupRepo.Status.RecentMaintenance[i].Result)
+						assert.Equal(t, test.expectNewHistory[i].Message, backupRepo.Status.RecentMaintenance[i].Message)
+					}
 				}
 
-				if test.expectTimeUpdate {
-					assert.NotEqual(t, lastTm, backupRepo.Status.LastMaintenanceTime)
+				if test.expectTimeUpdate != nil {
+					assert.Equal(t, test.expectTimeUpdate.Time, backupRepo.Status.LastMaintenanceTime.Time)
+				} else {
+					assert.Equal(t, lastTm, backupRepo.Status.LastMaintenanceTime)
 				}
 			}
 		})

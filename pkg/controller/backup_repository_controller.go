@@ -42,8 +42,8 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/label"
-	"github.com/vmware-tanzu/velero/pkg/repository"
 	repoconfig "github.com/vmware-tanzu/velero/pkg/repository/config"
+	"github.com/vmware-tanzu/velero/pkg/repository/maintenance"
 	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -229,7 +229,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, errors.Wrap(err, "error check and run repo maintenance jobs")
 		}
 
-		if err := repository.DeleteOldMaintenanceJobs(r.Client, req.Name, r.keepLatestMaintenanceJobs); err != nil {
+		if err := maintenance.DeleteOldJobs(r.Client, req.Name, r.keepLatestMaintenanceJobs); err != nil {
 			log.WithError(err).Warn("Failed to delete old maintenance jobs")
 		}
 	}
@@ -325,7 +325,7 @@ func ensureRepo(repo *velerov1api.BackupRepository, repoManager repomanager.Mana
 }
 
 func (r *BackupRepoReconciler) recallMaintenance(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
-	history, err := repository.WaitAllMaintenanceJobComplete(ctx, r.Client, req, defaultMaintenanceStatusQueueLength, log)
+	history, err := maintenance.WaitAllJobsComplete(ctx, r.Client, req, defaultMaintenanceStatusQueueLength, log)
 	if err != nil {
 		return errors.Wrapf(err, "error waiting incomplete repo maintenance job for repo %s", req.Name)
 	}
@@ -362,7 +362,9 @@ func consolidateHistory(coming, cur []velerov1api.BackupRepositoryMaintenanceSta
 		return nil
 	}
 
-	if isIdenticalHistory(cur, coming) {
+	if slices.EqualFunc(cur, coming, func(a, b velerov1api.BackupRepositoryMaintenanceStatus) bool {
+		return a.StartTimestamp.Equal(b.StartTimestamp)
+	}) {
 		return nil
 	}
 
@@ -387,7 +389,9 @@ func consolidateHistory(coming, cur []velerov1api.BackupRepositoryMaintenanceSta
 
 	slices.Reverse(truncated)
 
-	if isIdenticalHistory(cur, truncated) {
+	if slices.EqualFunc(cur, truncated, func(a, b velerov1api.BackupRepositoryMaintenanceStatus) bool {
+		return a.StartTimestamp.Equal(b.StartTimestamp)
+	}) {
 		return nil
 	}
 
@@ -410,22 +414,8 @@ func getLastMaintenanceTimeFromHistory(history []velerov1api.BackupRepositoryMai
 	return time
 }
 
-func isIdenticalHistory(a, b []velerov1api.BackupRepositoryMaintenanceStatus) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i := 0; i < len(a); i++ {
-		if !a[i].StartTimestamp.Equal(b[i].StartTimestamp) {
-			return false
-		}
-	}
-
-	return true
-}
-
-var funcStartMaintenanceJob = repository.StartMaintenanceJob
-var funcWaitMaintenanceJobComplete = repository.WaitMaintenanceJobComplete
+var funcStartMaintenanceJob = maintenance.StartNewJob
+var funcWaitMaintenanceJobComplete = maintenance.WaitJobComplete
 
 func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
 	startTime := r.clock.Now()

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package repository
+package maintenance
 
 import (
 	"context"
@@ -76,7 +76,7 @@ func TestGenerateJobName1(t *testing.T) {
 		})
 	}
 }
-func TestDeleteOldMaintenanceJobs(t *testing.T) {
+func TestDeleteOldJobs(t *testing.T) {
 	// Set up test repo and keep value
 	repo := "test-repo"
 	keep := 2
@@ -114,7 +114,7 @@ func TestDeleteOldMaintenanceJobs(t *testing.T) {
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	// Call the function
-	err := DeleteOldMaintenanceJobs(cli, repo, keep)
+	err := DeleteOldJobs(cli, repo, keep)
 	assert.NoError(t, err)
 
 	// Get the remaining jobs
@@ -208,7 +208,7 @@ func TestWaitForJobComplete(t *testing.T) {
 	}
 }
 
-func TestGetMaintenanceResultFromJob(t *testing.T) {
+func TestGetResultFromJob(t *testing.T) {
 	// Set up test job
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -230,7 +230,7 @@ func TestGetMaintenanceResultFromJob(t *testing.T) {
 	cli := fake.NewClientBuilder().WithObjects(job, pod).Build()
 
 	// test an error should be returned
-	result, err := getMaintenanceResultFromJob(cli, job)
+	result, err := getResultFromJob(cli, job)
 	assert.Error(t, err)
 	assert.Equal(t, "", result)
 
@@ -245,7 +245,7 @@ func TestGetMaintenanceResultFromJob(t *testing.T) {
 
 	// Test an error should be returned
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
-	result, err = getMaintenanceResultFromJob(cli, job)
+	result, err = getResultFromJob(cli, job)
 	assert.Error(t, err)
 	assert.Equal(t, "", result)
 
@@ -264,12 +264,12 @@ func TestGetMaintenanceResultFromJob(t *testing.T) {
 
 	// This call should return the termination message with no error
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
-	result, err = getMaintenanceResultFromJob(cli, job)
+	result, err = getResultFromJob(cli, job)
 	assert.NoError(t, err)
 	assert.Equal(t, "test message", result)
 }
 
-func TestGetMaintenanceJobConfig(t *testing.T) {
+func TestGetJobConfig(t *testing.T) {
 	ctx := context.Background()
 	logger := logrus.New()
 	veleroNamespace := "velero"
@@ -425,7 +425,7 @@ func TestGetMaintenanceJobConfig(t *testing.T) {
 				fakeClient = velerotest.NewFakeControllerRuntimeClient(t)
 			}
 
-			jobConfig, err := getMaintenanceJobConfig(
+			jobConfig, err := getJobConfig(
 				ctx,
 				fakeClient,
 				logger,
@@ -444,7 +444,7 @@ func TestGetMaintenanceJobConfig(t *testing.T) {
 	}
 }
 
-func TestWaitAllMaintenanceJobComplete(t *testing.T) {
+func TestWaitAlJobsComplete(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 
 	veleroNamespace := "velero"
@@ -712,7 +712,7 @@ func TestWaitAllMaintenanceJobComplete(t *testing.T) {
 
 			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
 
-			history, err := WaitAllMaintenanceJobComplete(test.ctx, fakeClient, repo, 3, velerotest.NewLogger())
+			history, err := WaitAllJobsComplete(test.ctx, fakeClient, repo, 3, velerotest.NewLogger())
 
 			if test.expectedError != "" {
 				assert.EqualError(t, err, test.expectedError)
@@ -733,7 +733,7 @@ func TestWaitAllMaintenanceJobComplete(t *testing.T) {
 	cancel()
 }
 
-func TestBuildMaintenanceJob(t *testing.T) {
+func TestBuildJob(t *testing.T) {
 	testCases := []struct {
 		name            string
 		m               *JobConfigs
@@ -872,7 +872,7 @@ func TestBuildMaintenanceJob(t *testing.T) {
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 
 			// Call the function to test
-			job, err := buildMaintenanceJob(cli, context.TODO(), param.BackupRepo, param.BackupLocation.Name, tc.m, *tc.m.PodResources, tc.logLevel, tc.logFormat)
+			job, err := buildJob(cli, context.TODO(), param.BackupRepo, param.BackupLocation.Name, tc.m, *tc.m.PodResources, tc.logLevel, tc.logFormat)
 
 			// Check the error
 			if tc.expectedError {

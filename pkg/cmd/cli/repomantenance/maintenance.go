@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bombsimon/logrusr/v3"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -16,7 +17,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -68,9 +68,7 @@ func (o *Options) Run(f velerocli.Factory) {
 	logger := logging.DefaultLogger(o.LogLevelFlag.Parse(), o.FormatFlag.Parse())
 	logger.SetOutput(os.Stdout)
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
-
-	time.Sleep(time.Minute)
+	ctrl.SetLogger(logrusr.New(logger))
 
 	pruneError := o.runRepoPrune(f, f.Namespace(), logger)
 	defer func() {
