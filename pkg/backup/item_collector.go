@@ -176,7 +176,9 @@ type kubernetesResource struct {
 	preferredGVR          schema.GroupVersionResource
 	namespace, name, path string
 	orderedResource       bool
-	inItemBlock           bool // set to true during backup processing when added to an ItemBlock
+	// set to true during backup processing when added to an ItemBlock
+	// or if the item is excluded from backup.
+	inItemBlockOrExcluded bool
 }
 
 // getItemsFromResourceIdentifiers get the kubernetesResources
