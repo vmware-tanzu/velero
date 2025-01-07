@@ -320,7 +320,9 @@ func (ms *microServiceBRWatcher) startWatch() {
 		logger.Info("Calling callback on data path pod termination")
 
 		if lastPod.Status.Phase == v1.PodSucceeded {
-			ms.callbacks.OnCompleted(ms.ctx, ms.namespace, ms.taskName, funcGetResultFromMessage(ms.taskType, terminateMessage, ms.log))
+			result := funcGetResultFromMessage(ms.taskType, terminateMessage, ms.log)
+			ms.callbacks.OnProgress(ms.ctx, ms.namespace, ms.taskName, getCompletionProgressFromResult(ms.taskType, result))
+			ms.callbacks.OnCompleted(ms.ctx, ms.namespace, ms.taskName, result)
 		} else {
 			if strings.HasSuffix(terminateMessage, ErrCancelled) {
 				ms.callbacks.OnCancelled(ms.ctx, ms.namespace, ms.taskName)
@@ -385,6 +387,19 @@ func getProgressFromMessage(message string, logger logrus.FieldLogger) *uploader
 	err := json.Unmarshal([]byte(message), progress)
 	if err != nil {
 		logger.WithError(err).Debugf("Failed to unmarshal progress message %s", message)
+	}
+
+	return progress
+}
+
+func getCompletionProgressFromResult(taskType string, result Result) *uploader.Progress {
+	progress := &uploader.Progress{}
+	if taskType == TaskTypeBackup {
+		progress.BytesDone = result.Backup.TotalBytes
+		progress.TotalBytes = result.Backup.TotalBytes
+	} else {
+		progress.BytesDone = result.Restore.TotalBytes
+		progress.TotalBytes = result.Restore.TotalBytes
 	}
 
 	return progress

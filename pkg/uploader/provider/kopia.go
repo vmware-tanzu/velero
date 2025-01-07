@@ -120,13 +120,13 @@ func (kp *kopiaProvider) RunBackup(
 	parentSnapshot string,
 	volMode uploader.PersistentVolumeMode,
 	uploaderCfg map[string]string,
-	updater uploader.ProgressUpdater) (string, bool, error) {
+	updater uploader.ProgressUpdater) (string, bool, int64, error) {
 	if updater == nil {
-		return "", false, errors.New("Need to initial backup progress updater first")
+		return "", false, 0, errors.New("Need to initial backup progress updater first")
 	}
 
 	if path == "" {
-		return "", false, errors.New("path is empty")
+		return "", false, 0, errors.New("path is empty")
 	}
 
 	log := kp.log.WithFields(logrus.Fields{
@@ -175,9 +175,9 @@ func (kp *kopiaProvider) RunBackup(
 
 		if kpUploader.IsCanceled() {
 			log.Warn("Kopia backup is canceled")
-			return snapshotID, false, ErrorCanceled
+			return snapshotID, false, 0, ErrorCanceled
 		}
-		return snapshotID, false, errors.Wrapf(err, "Failed to run kopia backup")
+		return snapshotID, false, 0, errors.Wrapf(err, "Failed to run kopia backup")
 	}
 
 	// which ensure that the statistic data of TotalBytes equal to BytesDone when finished
@@ -189,7 +189,7 @@ func (kp *kopiaProvider) RunBackup(
 	)
 
 	log.Debugf("Kopia backup finished, snapshot ID %s, backup size %d", snapshotInfo.ID, snapshotInfo.Size)
-	return snapshotInfo.ID, false, nil
+	return snapshotInfo.ID, false, snapshotInfo.Size, nil
 }
 
 func (kp *kopiaProvider) GetPassword(param interface{}) (string, error) {
@@ -211,7 +211,7 @@ func (kp *kopiaProvider) RunRestore(
 	volumePath string,
 	volMode uploader.PersistentVolumeMode,
 	uploaderCfg map[string]string,
-	updater uploader.ProgressUpdater) error {
+	updater uploader.ProgressUpdater) (int64, error) {
 	log := kp.log.WithFields(logrus.Fields{
 		"snapshotID": snapshotID,
 		"volumePath": volumePath,
@@ -235,12 +235,12 @@ func (kp *kopiaProvider) RunRestore(
 	size, fileCount, err := RestoreFunc(context.Background(), repoWriter, progress, snapshotID, volumePath, volMode, uploaderCfg, log, restoreCancel)
 
 	if err != nil {
-		return errors.Wrapf(err, "Failed to run kopia restore")
+		return 0, errors.Wrapf(err, "Failed to run kopia restore")
 	}
 
 	if atomic.LoadInt32(&kp.canceling) == 1 {
 		log.Error("Kopia restore is canceled")
-		return ErrorCanceled
+		return 0, ErrorCanceled
 	}
 
 	// which ensure that the statistic data of TotalBytes equal to BytesDone when finished
@@ -253,5 +253,5 @@ func (kp *kopiaProvider) RunRestore(
 
 	log.Info(output)
 
-	return nil
+	return size, nil
 }
