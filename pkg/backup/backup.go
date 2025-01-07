@@ -441,8 +441,8 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 			"name":      items[i].name,
 		}).Infof("Processing item")
 
-		// Skip if this item has already been added to an ItemBlock
-		if items[i].inItemBlock {
+		// Skip if this item has already been processed (in a block or previously excluded)
+		if items[i].inItemBlockOrExcluded {
 			log.Debugf("Not creating new ItemBlock for %s %s/%s because it's already in an ItemBlock", items[i].groupResource.String(), items[i].namespace, items[i].name)
 		} else {
 			if itemBlock == nil {
@@ -623,12 +623,23 @@ func (kb *kubernetesBackupper) executeItemBlockActions(
 				continue
 			}
 			itemsMap[relatedItem] = append(itemsMap[relatedItem], &kubernetesResource{
-				groupResource: relatedItem.GroupResource,
-				preferredGVR:  gvr,
-				namespace:     relatedItem.Namespace,
-				name:          relatedItem.Name,
-				inItemBlock:   true,
+				groupResource:         relatedItem.GroupResource,
+				preferredGVR:          gvr,
+				namespace:             relatedItem.Namespace,
+				name:                  relatedItem.Name,
+				inItemBlockOrExcluded: true,
 			})
+
+			relatedItemMetadata, err := meta.Accessor(item)
+			if err != nil {
+				log.WithError(errors.WithStack(err)).Warn("Failed to get object metadata.")
+				continue
+			}
+			// Don't add to ItemBlock if item is excluded
+			// itemInclusionChecks logs the reason
+			if !itemBlock.itemBackupper.itemInclusionChecks(log, false, relatedItemMetadata, item, relatedItem.GroupResource) {
+				continue
+			}
 			log.Infof("adding %s %s/%s to ItemBlock", relatedItem.GroupResource, relatedItem.Namespace, relatedItem.Name)
 			itemBlock.AddUnstructured(relatedItem.GroupResource, item, gvr)
 			kb.executeItemBlockActions(log, item, relatedItem.GroupResource, relatedItem.Name, relatedItem.Namespace, itemsMap, itemBlock)
@@ -644,13 +655,9 @@ func (kb *kubernetesBackupper) backupItemBlock(ctx context.Context, itemBlock Ba
 	itemBlock.Log.Debug("Executing pre hooks")
 	for _, item := range itemBlock.Items {
 		if item.Gr == kuberesource.Pods {
-			metadata, key, err := kb.itemMetadataAndKey(item)
+			key, err := kb.getItemKey(item)
 			if err != nil {
 				itemBlock.Log.WithError(errors.WithStack(err)).Error("Error accessing pod metadata")
-				continue
-			}
-			// Don't run hooks if pod is excluded
-			if !itemBlock.itemBackupper.itemInclusionChecks(itemBlock.Log, false, metadata, item.Item, item.Gr) {
 				continue
 			}
 			// Don't run hooks if pod has already been backed up
@@ -663,7 +670,7 @@ func (kb *kubernetesBackupper) backupItemBlock(ctx context.Context, itemBlock Ba
 	for i, pod := range failedPods {
 		itemBlock.Log.WithError(errs[i]).WithField("name", pod.Item.GetName()).Error("Error running pre hooks for pod")
 		// if pre hook fails, flag pod as backed-up and move on
-		_, key, err := kb.itemMetadataAndKey(pod)
+		key, err := kb.getItemKey(pod)
 		if err != nil {
 			itemBlock.Log.WithError(errors.WithStack(err)).Error("Error accessing pod metadata")
 			continue
@@ -688,17 +695,17 @@ func (kb *kubernetesBackupper) backupItemBlock(ctx context.Context, itemBlock Ba
 	return grList
 }
 
-func (kb *kubernetesBackupper) itemMetadataAndKey(item itemblock.ItemBlockItem) (metav1.Object, itemKey, error) {
+func (kb *kubernetesBackupper) getItemKey(item itemblock.ItemBlockItem) (itemKey, error) {
 	metadata, err := meta.Accessor(item.Item)
 	if err != nil {
-		return nil, itemKey{}, err
+		return itemKey{}, err
 	}
 	key := itemKey{
 		resource:  resourceKey(item.Item),
 		namespace: metadata.GetNamespace(),
 		name:      metadata.GetName(),
 	}
-	return metadata, key, nil
+	return key, nil
 }
 
 func (kb *kubernetesBackupper) handleItemBlockPreHooks(itemBlock BackupItemBlock, hookPods []itemblock.ItemBlockItem) ([]itemblock.ItemBlockItem, []itemblock.ItemBlockItem, []error) {

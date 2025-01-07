@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/vmware-tanzu/velero/pkg/itemblock"
@@ -41,12 +42,12 @@ func NewBackupItemBlock(log logrus.FieldLogger, itemBackupper *itemBackupper) *B
 }
 
 func (b *BackupItemBlock) addKubernetesResource(item *kubernetesResource, log logrus.FieldLogger) *unstructured.Unstructured {
-	// no-op if item is already in a block
-	if item.inItemBlock {
+	// no-op if item has already been processed (in a block or previously excluded)
+	if item.inItemBlockOrExcluded {
 		return nil
 	}
 	var unstructured unstructured.Unstructured
-	item.inItemBlock = true
+	item.inItemBlockOrExcluded = true
 
 	f, err := os.Open(item.path)
 	if err != nil {
@@ -60,6 +61,18 @@ func (b *BackupItemBlock) addKubernetesResource(item *kubernetesResource, log lo
 		log.WithError(errors.WithStack(err)).Error("Error decoding JSON from file")
 		return nil
 	}
+
+	metadata, err := meta.Accessor(&unstructured)
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Warn("Error accessing item metadata")
+		return nil
+	}
+	// Don't add to ItemBlock if item is excluded
+	// itemInclusionChecks logs the reason
+	if !b.itemBackupper.itemInclusionChecks(log, false, metadata, &unstructured, item.groupResource) {
+		return nil
+	}
+
 	log.Infof("adding %s %s/%s to ItemBlock", item.groupResource, item.namespace, item.name)
 	b.AddUnstructured(item.groupResource, &unstructured, item.preferredGVR)
 	return &unstructured
