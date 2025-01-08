@@ -16,6 +16,7 @@ limitations under the License.
 package kube
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -60,6 +61,9 @@ func NewEventRecorder(kubeClient kubernetes.Interface, scheme *runtime.Scheme, e
 	}
 
 	res.broadcaster = record.NewBroadcasterWithCorrelatorOptions(record.CorrelatorOptions{
+		// Bypass the built-in EventCorrelator's rate filtering, otherwise, the event will be abandoned if the rate exceeds.
+		// The callers (i.e., data mover pods) have controlled the rate and total number outside. E.g., the progress is designed to be updated every 10 seconds and is changeable.
+		BurstSize: math.MaxInt32,
 		MaxEvents: 1,
 		MessageFunc: func(event *v1.Event) string {
 			return event.Message
