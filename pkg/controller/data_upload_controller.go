@@ -285,6 +285,10 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, nil
 		}
 
+		if res.ByPod.NodeOS == nil {
+			return r.errorOut(ctx, du, errors.New("unsupported ambiguous node OS"), "invalid expose result", log)
+		}
+
 		log.Info("Exposed snapshot is ready and creating data path routine")
 
 		// Need to first create file system BR and get data path instance then update data upload status
@@ -317,6 +321,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		original := du.DeepCopy()
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseInProgress
 		du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
+		du.Status.NodeOS = velerov2alpha1api.NodeOS(*res.ByPod.NodeOS)
 		if err := r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Warnf("Failed to update dataupload %s to InProgress, will data path close and retry", du.Name)
 
@@ -792,6 +797,8 @@ func (r *DataUploadReconciler) closeDataPath(ctx context.Context, duName string)
 }
 
 func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload) (interface{}, error) {
+	log := r.logger.WithField("dataupload", du.Name)
+
 	if du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
 		pvc := &corev1.PersistentVolumeClaim{}
 		err := r.client.Get(context.Background(), types.NamespacedName{
@@ -803,7 +810,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			return nil, errors.Wrapf(err, "failed to get PVC %s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC)
 		}
 
-		nodeOS, err := kube.GetPVCAttachingNodeOS(pvc, r.kubeClient.CoreV1(), r.kubeClient.StorageV1(), r.logger)
+		nodeOS, err := kube.GetPVCAttachingNodeOS(pvc, r.kubeClient.CoreV1(), r.kubeClient.StorageV1(), log)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get attaching node OS for PVC %s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC)
 		}
@@ -821,7 +828,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 		for _, k := range util.ThirdPartyLabels {
 			if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, du.Namespace, k, nodeOS); err != nil {
 				if err != nodeagent.ErrNodeAgentLabelNotFound {
-					r.logger.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
+					log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
 				}
 			} else {
 				hostingPodLabels[k] = v
@@ -843,6 +850,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			NodeOS:           nodeOS,
 		}, nil
 	}
+
 	return nil, nil
 }
 

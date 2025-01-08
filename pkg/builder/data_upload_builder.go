@@ -151,6 +151,12 @@ func (d *DataUploadBuilder) Node(node string) *DataUploadBuilder {
 	return d
 }
 
+// NodeOS sets the DataUpload's Node OS.
+func (d *DataUploadBuilder) NodeOS(nodeOS velerov2alpha1api.NodeOS) *DataUploadBuilder {
+	d.object.Status.NodeOS = nodeOS
+	return d
+}
+
 // AcceptedByNode sets the DataUpload's AcceptedByNode.
 func (d *DataUploadBuilder) AcceptedByNode(node string) *DataUploadBuilder {
 	d.object.Status.AcceptedByNode = node

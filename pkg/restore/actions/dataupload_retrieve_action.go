@@ -78,6 +78,7 @@ func (d *DataUploadRetrieveAction) Execute(input *velero.RestoreItemActionExecut
 		SnapshotID:            dataUpload.Status.SnapshotID,
 		SourceNamespace:       dataUpload.Spec.SourceNamespace,
 		DataMoverResult:       dataUpload.Status.DataMoverResult,
+		NodeOS:                dataUpload.Status.NodeOS,
 	}
 
 	jsonBytes, err := json.Marshal(dataUploadResult)

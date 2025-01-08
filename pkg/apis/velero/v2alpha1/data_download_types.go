@@ -54,6 +54,10 @@ type DataDownloadSpec struct {
 	// OperationTimeout specifies the time used to wait internal operations,
 	// before returning error as timeout.
 	OperationTimeout metav1.Duration `json:"operationTimeout"`
+
+	// NodeOS is OS of the node where the DataDownload is processed.
+	// +optional
+	NodeOS NodeOS `json:"nodeOS,omitempty"`
 }
 
 // TargetVolumeSpec is the specification for a target PVC.

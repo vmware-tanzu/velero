@@ -478,6 +478,7 @@ func newDataDownload(
 			SnapshotID:            dataUploadResult.SnapshotID,
 			SourceNamespace:       dataUploadResult.SourceNamespace,
 			OperationTimeout:      backup.Spec.CSISnapshotTimeout,
+			NodeOS:                dataUploadResult.NodeOS,
 		},
 	}
 	if restore.Spec.UploaderConfig != nil {

@@ -53,6 +53,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
 	exposermockes "github.com/vmware-tanzu/velero/pkg/exposer/mocks"
 )
@@ -67,7 +68,7 @@ func dataDownloadBuilder() *builder.DataDownloadBuilder {
 		PV:        "test-pv",
 		PVC:       "test-pvc",
 		Namespace: "test-ns",
-	})
+	}).NodeOS(velerov2alpha1api.NodeOS("linux"))
 }
 
 func initDataDownloadReconciler(objects []runtime.Object, needError ...bool) (*DataDownloadReconciler, error) {
@@ -166,6 +167,8 @@ func TestDataDownloadReconcile(t *testing.T) {
 			},
 		},
 	}
+
+	node := builder.ForNode("fake-node").Labels(map[string]string{kube.NodeOSLabel: kube.NodeOSLinux}).Result()
 
 	tests := []struct {
 		name              string
@@ -326,8 +329,14 @@ func TestDataDownloadReconcile(t *testing.T) {
 		},
 		{
 			name:      "Restore is exposed",
-			dd:        dataDownloadBuilder().Result(),
+			dd:        dataDownloadBuilder().NodeOS(velerov2alpha1api.NodeOSLinux).Result(),
 			targetPVC: builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+		},
+		{
+			name:              "Expected node doesn't exist",
+			dd:                dataDownloadBuilder().NodeOS(velerov2alpha1api.NodeOSWindows).Result(),
+			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			expectedStatusMsg: "no appropriate node to run datadownload",
 		},
 		{
 			name:      "Get empty restore exposer",
@@ -388,9 +397,9 @@ func TestDataDownloadReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var objs []runtime.Object
+			objs := []runtime.Object{daemonSet, node}
 			if test.targetPVC != nil {
-				objs = []runtime.Object{test.targetPVC, daemonSet}
+				objs = append(objs, test.targetPVC)
 			}
 			r, err := initDataDownloadReconciler(objs, test.needErrs...)
 			require.NoError(t, err)
