@@ -34,10 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/selection"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -301,7 +299,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 
 	var podVolumeBackupper podvolume.Backupper
 	if kb.podVolumeBackupperFactory != nil {
-		podVolumeBackupper, err = kb.podVolumeBackupperFactory.NewBackupper(ctx, backupRequest.Backup, kb.uploaderType)
+		podVolumeBackupper, err = kb.podVolumeBackupperFactory.NewBackupper(ctx, log, backupRequest.Backup, kb.uploaderType)
 		if err != nil {
 			log.WithError(errors.WithStack(err)).Debugf("Error from NewBackupper")
 			return errors.WithStack(err)
@@ -729,6 +727,7 @@ func (kb *kubernetesBackupper) handleItemBlockPostHooks(ctx context.Context, ite
 	log := itemBlock.Log
 	defer itemBlock.itemBackupper.hookTracker.AsyncItemBlocks.Done()
 
+	// the post hooks will not execute until all PVBs of the item block pods are processed
 	if err := kb.waitUntilPVBsProcessed(ctx, log, itemBlock, hookPods); err != nil {
 		log.WithError(err).Error("failed to wait PVBs processed for the ItemBlock")
 		return
@@ -742,36 +741,19 @@ func (kb *kubernetesBackupper) handleItemBlockPostHooks(ctx context.Context, ite
 	}
 }
 
+// wait all PVBs of the item block pods to be processed
 func (kb *kubernetesBackupper) waitUntilPVBsProcessed(ctx context.Context, log logrus.FieldLogger, itemBlock BackupItemBlock, pods []itemblock.ItemBlockItem) error {
-	requirement, err := labels.NewRequirement(velerov1api.BackupUIDLabel, selection.Equals, []string{string(itemBlock.itemBackupper.backupRequest.UID)})
-	if err != nil {
-		return errors.Wrapf(err, "failed to create label requirement")
-	}
-	options := &kbclient.ListOptions{
-		LabelSelector: labels.NewSelector().Add(*requirement),
-	}
-	pvbList := &velerov1api.PodVolumeBackupList{}
-	if err := kb.kbClient.List(context.Background(), pvbList, options); err != nil {
-		return errors.Wrap(err, "failed to list PVBs")
-	}
-
-	podMap := map[string]struct{}{}
-	for _, pod := range pods {
-		podMap[string(pod.Item.GetUID())] = struct{}{}
-	}
-
 	pvbMap := map[*velerov1api.PodVolumeBackup]bool{}
-	for i, pvb := range pvbList.Items {
-		if _, exist := podMap[string(pvb.Spec.Pod.UID)]; !exist {
-			continue
+	for _, pod := range pods {
+		namespace, name := pod.Item.GetNamespace(), pod.Item.GetName()
+		pvbs, err := itemBlock.itemBackupper.podVolumeBackupper.ListPodVolumeBackupsByPod(namespace, name)
+		if err != nil {
+			return errors.Wrapf(err, "failed to list PodVolumeBackups for pod %s/%s", namespace, name)
 		}
-
-		processed := false
-		if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseCompleted ||
-			pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed {
-			processed = true
+		for _, pvb := range pvbs {
+			pvbMap[pvb] = pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseCompleted ||
+				pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed
 		}
-		pvbMap[&pvbList.Items[i]] = processed
 	}
 
 	checkFunc := func(context.Context) (done bool, err error) {
@@ -780,8 +762,8 @@ func (kb *kubernetesBackupper) waitUntilPVBsProcessed(ctx context.Context, log l
 			if processed {
 				continue
 			}
-			updatedPVB := &velerov1api.PodVolumeBackup{}
-			if err := kb.kbClient.Get(ctx, kbclient.ObjectKeyFromObject(pvb), updatedPVB); err != nil {
+			updatedPVB, err := itemBlock.itemBackupper.podVolumeBackupper.GetPodVolumeBackup(pvb.Namespace, pvb.Name)
+			if err != nil {
 				allProcessed = false
 				log.Infof("failed to get PVB: %v", err)
 				continue
