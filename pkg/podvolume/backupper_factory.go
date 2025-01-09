@@ -32,7 +32,7 @@ import (
 // BackupperFactory can construct pod volumes backuppers.
 type BackupperFactory interface {
 	// NewBackupper returns a pod volumes backupper for use during a single Velero backup.
-	NewBackupper(context.Context, *velerov1api.Backup, string) (Backupper, error)
+	NewBackupper(context.Context, logrus.FieldLogger, *velerov1api.Backup, string) (Backupper, error)
 }
 
 func NewBackupperFactory(
@@ -59,8 +59,8 @@ type backupperFactory struct {
 	log         logrus.FieldLogger
 }
 
-func (bf *backupperFactory) NewBackupper(ctx context.Context, backup *velerov1api.Backup, uploaderType string) (Backupper, error) {
-	b := newBackupper(ctx, bf.repoLocker, bf.repoEnsurer, bf.pvbInformer, bf.crClient, uploaderType, backup)
+func (bf *backupperFactory) NewBackupper(ctx context.Context, log logrus.FieldLogger, backup *velerov1api.Backup, uploaderType string) (Backupper, error) {
+	b := newBackupper(ctx, log, bf.repoLocker, bf.repoEnsurer, bf.pvbInformer, bf.crClient, uploaderType, backup)
 
 	if !cache.WaitForCacheSync(ctx.Done(), bf.pvbInformer.HasSynced) {
 		return nil, errors.New("timed out waiting for caches to sync")
