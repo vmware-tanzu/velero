@@ -209,6 +209,7 @@ func (r *backupStorageLocationReconciler) SetupWithManager(mgr ctrl.Manager) err
 		// As the "status.LastValidationTime" field is always updated, this triggers new reconciling process, skip the update event that include no spec change to avoid the reconcile loop
 		For(&velerov1api.BackupStorageLocation{}, builder.WithPredicates(kube.SpecChangePredicate{})).
 		WatchesRawSource(g).
+		Named(constant.ControllerBackupStorageLocation).
 		Complete(r)
 }
 
