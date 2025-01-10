@@ -338,7 +338,6 @@ issues:
       text: "DefaultVolumesToRestic" # No need to report deprecate for DefaultVolumesToRestic.
     - path: ".*_test.go$"
       linters:
-        - dupword
         - errcheck
         - goconst
         - gosec
@@ -349,7 +348,6 @@ issues:
         - unused
     - path: test/
       linters:
-        - dupword
         - errcheck
         - goconst
         - gosec
@@ -358,6 +356,14 @@ issues:
         - stylecheck
         - unparam
         - unused
+    - path: data_upload_controller_test.go
+      linters:
+        - dupword
+      text: "Duplicate words (type)"
+    - path: config_test.go
+      linters:
+        - dupword
+      text: "Duplicate words (bucket:)"
 
   # The list of ids of default excludes to include or disable. By default it's empty.
   include:

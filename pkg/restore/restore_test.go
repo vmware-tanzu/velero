@@ -1709,7 +1709,7 @@ func (a *pluggableAction) AreAdditionalItemsReady(additionalItems []velero.Resou
 }
 
 // TestRestoreActionModifications runs restores with restore item actions that modify resources, and
-// verifies that that the modified item is correctly created in the API. Verification is done by looking
+// verifies that the modified item is correctly created in the API. Verification is done by looking
 // at the full object in the API.
 func TestRestoreActionModifications(t *testing.T) {
 	// modifyingActionGetter is a helper function that returns a *pluggableAction, whose Execute(...)
@@ -2006,7 +2006,7 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 }
 
 // TestRestoreActionAdditionalItems runs restores with restore item actions that return additional items
-// to be restored, and verifies that that the correct set of items is created in the API. Verification is
+// to be restored, and verifies that the correct set of items is created in the API. Verification is
 // done by looking at the namespaces/names of the items in the API; contents are not checked.
 func TestRestoreActionAdditionalItems(t *testing.T) {
 	tests := []struct {
