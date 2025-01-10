@@ -1,0 +1,1 @@
+Fix issue #8067, add tmp folder (/tmp for linux, C:\Windows\Temp for Windows) as an alternative of udmrepo's config file location
