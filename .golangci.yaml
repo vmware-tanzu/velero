@@ -356,11 +356,11 @@ issues:
         - stylecheck
         - unparam
         - unused
-    - path: data_upload_controller_test.go
+    - path: ".*data_upload_controller_test.go$"
       linters:
         - dupword
       text: "Duplicate words (type)"
-    - path: config_test.go
+    - path: ".*config_test.go$"
       linters:
         - dupword
       text: "Duplicate words (bucket:)"
