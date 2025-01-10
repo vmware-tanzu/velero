@@ -227,6 +227,12 @@ linters-settings:
     require-explanation: true
     # Enable to require nolint directives to mention the specific linter being suppressed. Default is false.
     require-specific: true
+  perfsprint:
+    strconcat: false
+    sprintf1: false
+    errorf: false
+    int-conversion: true
+    fiximports: true
   revive:
     rules:
       - name: unexported-return
@@ -310,6 +316,7 @@ linters:
     - nilerr
     - noctx
     - nolintlint
+    - perfsprint
     - revive
     - staticcheck
     - stylecheck
