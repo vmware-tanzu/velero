@@ -3913,7 +3913,7 @@ func TestBackupWithHooks(t *testing.T) {
 
 type fakePodVolumeBackupperFactory struct{}
 
-func (f *fakePodVolumeBackupperFactory) NewBackupper(context.Context, *velerov1.Backup, string) (podvolume.Backupper, error) {
+func (f *fakePodVolumeBackupperFactory) NewBackupper(context.Context, logrus.FieldLogger, *velerov1.Backup, string) (podvolume.Backupper, error) {
 	return &fakePodVolumeBackupper{}, nil
 }
 
@@ -3944,6 +3944,24 @@ func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *
 
 func (b *fakePodVolumeBackupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velerov1.PodVolumeBackup {
 	return b.pvbs
+}
+
+func (b *fakePodVolumeBackupper) GetPodVolumeBackup(namespace, name string) (*velerov1.PodVolumeBackup, error) {
+	for _, pvb := range b.pvbs {
+		if pvb.Namespace == namespace && pvb.Name == name {
+			return pvb, nil
+		}
+	}
+	return nil, nil
+}
+func (b *fakePodVolumeBackupper) ListPodVolumeBackupsByPod(podNamespace, podName string) ([]*velerov1.PodVolumeBackup, error) {
+	var pvbs []*velerov1.PodVolumeBackup
+	for _, pvb := range b.pvbs {
+		if pvb.Spec.Pod.Namespace == podNamespace && pvb.Spec.Pod.Name == podName {
+			pvbs = append(pvbs, pvb)
+		}
+	}
+	return pvbs, nil
 }
 
 // TestBackupWithPodVolume runs backups of pods that are annotated for PodVolume backup,
