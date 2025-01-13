@@ -1,0 +1,7 @@
+kind: bug
+area: restore
+title: Fix namespace metadata not being restored with existing-resource-policy
+issue: 7519
+note: |
+  Fixes an issue where namespace labels and annotations from backup bundles
+  were not being restored even when --existing-resource-policy was set to "update"

@@ -749,6 +749,88 @@ func (ctx *restoreContext) processSelectedResource(
 			}
 			// For namespaces resources we don't need to following steps
 			if groupResource == kuberesource.Namespaces {
+				if existingNamespaces.Has(targetNS) {
+					// Check if the existing resource policy is set to 'update'
+					if len(ctx.restore.Spec.ExistingResourcePolicy) == 0 || ctx.restore.Spec.ExistingResourcePolicy != velerov1api.PolicyTypeUpdate {
+						ctx.log.Infof("Skipping update for existing namespace %s because existing resource policy is not 'update'", targetNS)
+						continue
+					}
+
+					// Fetch the current namespace from the cluster
+					existingNS, err := ctx.namespaceClient.Get(go_context.TODO(), targetNS, metav1.GetOptions{})
+					if err != nil {
+						errs.AddVeleroError(errors.Wrap(err, "fetching existing namespace"))
+						continue
+					}
+
+					// Retrieve the backup namespace definition
+					backupNS := getNamespace(
+						ctx.log.WithField("namespace", namespace),
+						archive.GetItemFilePath(ctx.restoreDir, "namespaces", "", namespace),
+						targetNS,
+					)
+
+					// Convert both namespaces to unstructured for patching
+					existingNSUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(existingNS)
+					if err != nil {
+						errs.AddVeleroError(errors.Wrap(err, "converting existing namespace to unstructured"))
+						continue
+					}
+					backupNSUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(backupNS)
+					if err != nil {
+						errs.AddVeleroError(errors.Wrap(err, "converting backup namespace to unstructured"))
+						continue
+					}
+
+					// Construct the GroupResource for namespaces
+					namespaceGR := schema.GroupResource{Group: "", Resource: "namespaces"}
+
+					// Use getResourceClient to obtain a dynamic client for the namespace resource
+					resourceClient, err := ctx.getResourceClient(namespaceGR, &unstructured.Unstructured{Object: backupNSUnstructured}, "")
+					if err != nil {
+						errs.AddVeleroError(errors.Wrap(err, "getting dynamic client for Namespace resource"))
+						continue
+					}
+
+					// Process the update policy using the existing function
+					warningsFromUpdateRP, errsFromUpdateRP := ctx.processUpdateResourcePolicy(
+						&unstructured.Unstructured{Object: existingNSUnstructured},
+						&unstructured.Unstructured{Object: existingNSUnstructured}, // Pass existingNS with restore labels for the second parameter
+						&unstructured.Unstructured{Object: backupNSUnstructured},
+						targetNS,
+						resourceClient,
+					)
+
+					// Fall back to manual label/annotation update if the patch fails
+					if !errsFromUpdateRP.IsEmpty() {
+						ctx.log.Warnf("Patch failed for namespace %s, falling back to manual label/annotation update", targetNS)
+
+						// Ensure existingNS.Labels and Annotations are not nil
+						if existingNS.Labels == nil {
+							existingNS.Labels = make(map[string]string)
+						}
+						if existingNS.Annotations == nil {
+							existingNS.Annotations = make(map[string]string)
+						}
+
+						// Merge labels and annotations
+						for k, v := range backupNS.Labels {
+							existingNS.Labels[k] = v
+						}
+						for k, v := range backupNS.Annotations {
+							existingNS.Annotations[k] = v
+						}
+
+						// Apply the updated namespace
+						_, err = ctx.namespaceClient.Update(go_context.TODO(), existingNS, metav1.UpdateOptions{})
+						if err != nil {
+							errs.AddVeleroError(errors.Wrap(err, "updating namespace manually"))
+						}
+					}
+
+					warnings.Merge(&warningsFromUpdateRP)
+					errs.Merge(&errsFromUpdateRP)
+				}
 				continue
 			}
 
@@ -2257,7 +2339,9 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 				continue
 			}
 
-			if namespace == "" && !boolptr.IsSetToTrue(ctx.restore.Spec.IncludeClusterResources) && !ctx.namespaceIncludesExcludes.IncludeEverything() {
+			if groupResource.Resource == "namespaces" {
+				ctx.log.Infof("Including resource namespaces despite being cluster-scoped")
+			} else if namespace == "" && !boolptr.IsSetToTrue(ctx.restore.Spec.IncludeClusterResources) && !ctx.namespaceIncludesExcludes.IncludeEverything() {
 				ctx.log.Infof("Skipping resource %s because it's cluster-scoped and only specific namespaces are included in the restore", resource)
 				continue
 			}
