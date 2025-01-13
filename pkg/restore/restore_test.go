@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	kubetesting "k8s.io/client-go/testing"
 
+	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
@@ -4136,6 +4137,175 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			require.Equal(t, tc.expectedResult, hasSnapshotDataUpload(ctx, tc.obj))
+		})
+	}
+}
+
+func TestRestoreResourceModifiers(t *testing.T) {
+	tests := []struct {
+		name                 string
+		restore              *velerov1api.Restore
+		backup               *velerov1api.Backup
+		apiResources         []*test.APIResource
+		tarball              io.Reader
+		want                 []*test.APIResource
+		expectedRestoreItems map[itemKey]restoredItemStatus
+		resourceModifiers    *resourcemodifiers.ResourceModifiers
+	}{
+		{
+			name:    "modify image",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			resourceModifiers: &resourcemodifiers.ResourceModifiers{
+				ResourceModifierRules: []resourcemodifiers.ResourceModifierRule{
+					{
+						Conditions: resourcemodifiers.Conditions{
+							GroupResource: "pods",
+						},
+						StrategicPatches: []resourcemodifiers.StrategicMergePatch{
+							{
+								PatchData: `{"spec":{"containers":[{"name":"test-container","image":"nginx1"}]}}`,
+							},
+						},
+					},
+				},
+			},
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").
+						Containers(&corev1api.Container{Name: "test-container", Image: "nginx"}).
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").
+						Containers(&corev1api.Container{Name: "test-container", Image: "nginx1"}).
+						ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1", velerov1api.RestoreNameLabel, "restore-1")).
+						Result(),
+				),
+			},
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}: {action: "created", itemExists: true},
+				{resource: "v1/Pod", namespace: "ns-1", name: "pod-1"}:  {action: "created", itemExists: true},
+			},
+		},
+		{
+			name:    "update label using another label",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			resourceModifiers: &resourcemodifiers.ResourceModifiers{
+				ResourceModifierRules: []resourcemodifiers.ResourceModifierRule{
+					{
+						Conditions: resourcemodifiers.Conditions{
+							GroupResource: "pods",
+						},
+						Patches: []resourcemodifiers.JSONPatch{
+							{
+								Operation: "copy",
+								Path:      "/metadata/labels/test-annotation-2",
+								From:      "/metadata/labels/test-annotation-1",
+							},
+						},
+					},
+				},
+			},
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").
+						ObjectMeta(builder.WithLabels("test-annotation-1", "something")).
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1", velerov1api.RestoreNameLabel, "restore-1", "test-annotation-1", "something", "test-annotation-2", "something")).Result(),
+				),
+			},
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}: {action: "created", itemExists: true},
+				{resource: "v1/Pod", namespace: "ns-1", name: "pod-1"}:  {action: "created", itemExists: true},
+			},
+		},
+		{
+			name:    "update label using status field",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			resourceModifiers: &resourcemodifiers.ResourceModifiers{
+				Version: "v1",
+				ResourceModifierRules: []resourcemodifiers.ResourceModifierRule{
+					{
+						Conditions: resourcemodifiers.Conditions{
+							GroupResource: "pods",
+						},
+						Patches: []resourcemodifiers.JSONPatch{
+							{
+								Operation: "copy",
+								Path:      "/metadata/labels/test-annotation-1",
+								From:      "/status/message",
+							},
+						},
+					},
+				},
+			},
+			tarball: test.NewTarWriter(t).
+				AddItems("pods",
+					builder.ForPod("ns-1", "pod-1").
+						ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1", velerov1api.RestoreNameLabel, "restore-1", "test-annotation-1", "another thing")).
+						Status(corev1api.PodStatus{Message: "something"}).
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1", velerov1api.RestoreNameLabel, "restore-1", "test-annotation-1", "something")).Result(),
+				),
+			},
+			expectedRestoreItems: map[itemKey]restoredItemStatus{
+				{resource: "v1/Namespace", namespace: "", name: "ns-1"}: {action: "created", itemExists: true},
+				{resource: "v1/Pod", namespace: "ns-1", name: "pod-1"}:  {action: "created", itemExists: true},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.AddItems(t, r)
+			}
+
+			data := &Request{
+				Log:               h.log,
+				Restore:           tc.restore,
+				Backup:            tc.backup,
+				PodVolumeBackups:  nil,
+				VolumeSnapshots:   nil,
+				BackupReader:      tc.tarball,
+				RestoredItems:     map[itemKey]restoredItemStatus{},
+				ResourceModifiers: tc.resourceModifiers,
+			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				nil, // restoreItemActions
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+			assertRestoredItems(t, h, tc.want)
+			if len(tc.expectedRestoreItems) > 0 {
+				assert.EqualValues(t, tc.expectedRestoreItems, data.RestoredItems)
+			}
 		})
 	}
 }

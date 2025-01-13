@@ -58,6 +58,11 @@ resourceModifierRules:
 - copy
 - test (covered below)
 
+### Limitations of Resource Modifiers
+
+Resource modifiers cannot patch the status field of a resource. The patch will not be taken into account when doing so.
+However, resource modifiers patch can use values from the status field of a resource to patch other fields.
+
 ### Advanced scenarios
 #### **Conditional patches using test operation**
  The `test` operation can be used to check if a particular value is present in the resource. If the value is present, the patch will be applied. If the value is not present, the patch will not be applied. This can be used to apply a patch only if a particular value is present in the resource. For example, if you wish to change the storage class of a PVC only if the PVC is using a particular storage class, you can use the following configmap.
