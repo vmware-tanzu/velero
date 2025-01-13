@@ -144,7 +144,8 @@ spec:
             description: DataUploadStatus is the current status of a DataUpload.
             properties:
               acceptedByNode:
-                description: Node is name of the node where the DataUpload is prepared.
+                description: AcceptedByNode is name of the node where the DataUpload
+                  is prepared.
                 type: string
               acceptedTimestamp:
                 description: |-
@@ -174,6 +175,13 @@ spec:
                 type: string
               node:
                 description: Node is name of the node where the DataUpload is processed.
+                type: string
+              nodeOS:
+                description: NodeOS is OS of the node where the DataUpload is processed.
+                enum:
+                - auto
+                - linux
+                - windows
                 type: string
               path:
                 description: Path is the full path of the snapshot volume being backed

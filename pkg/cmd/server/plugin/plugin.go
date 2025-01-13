@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/cobra"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/datamover"
 
 	dia "github.com/vmware-tanzu/velero/internal/delete/actions/csi"
@@ -162,7 +163,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 					newVolumeSnapshotClassBackupItemAction,
 				).
 				RegisterRestoreItemActionV2(
-					"velero.io/csi-pvc-restorer",
+					constant.PluginCSIPVCRestoreRIA,
 					newPvcRestoreItemAction(f),
 				).
 				RegisterRestoreItemActionV2(

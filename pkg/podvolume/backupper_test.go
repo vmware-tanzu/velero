@@ -315,6 +315,7 @@ func TestBackupPodVolumes(t *testing.T) {
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
 	corev1api.AddToScheme(scheme)
+	log := logrus.New()
 
 	tests := []struct {
 		name                  string
@@ -594,7 +595,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			backupObj.Spec.StorageLocation = test.bsl
 
 			factory := NewBackupperFactory(repository.NewRepoLocker(), ensurer, fakeCtrlClient, pvbInformer, velerotest.NewLogger())
-			bp, err := factory.NewBackupper(ctx, backupObj, test.uploaderType)
+			bp, err := factory.NewBackupper(ctx, log, backupObj, test.uploaderType)
 
 			require.NoError(t, err)
 
@@ -619,6 +620,91 @@ func TestBackupPodVolumes(t *testing.T) {
 	}
 }
 
+func TestGetPodVolumeBackup(t *testing.T) {
+	backupper := &backupper{
+		pvbIndexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+			indexNamePod: podIndexFunc,
+		}),
+	}
+
+	obj := &velerov1api.PodVolumeBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "velero",
+			Name:      "pvb",
+		},
+		Spec: velerov1api.PodVolumeBackupSpec{
+			Pod: corev1api.ObjectReference{
+				Kind:      "Pod",
+				Namespace: "default",
+				Name:      "pod",
+			},
+		},
+	}
+
+	err := backupper.pvbIndexer.Add(obj)
+	require.NoError(t, err)
+
+	// not exist PVB
+	pvb, err := backupper.GetPodVolumeBackup("invalid-namespace", "invalid-name")
+	require.NoError(t, err)
+	assert.Nil(t, pvb)
+
+	// exist PVB
+	pvb, err = backupper.GetPodVolumeBackup("velero", "pvb")
+	require.NoError(t, err)
+	assert.NotNil(t, pvb)
+}
+
+func TestListPodVolumeBackupsByPodp(t *testing.T) {
+	backupper := &backupper{
+		pvbIndexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+			indexNamePod: podIndexFunc,
+		}),
+	}
+
+	obj1 := &velerov1api.PodVolumeBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "velero",
+			Name:      "pvb1",
+		},
+		Spec: velerov1api.PodVolumeBackupSpec{
+			Pod: corev1api.ObjectReference{
+				Kind:      "Pod",
+				Namespace: "default",
+				Name:      "pod",
+			},
+		},
+	}
+	obj2 := &velerov1api.PodVolumeBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "velero",
+			Name:      "pvb2",
+		},
+		Spec: velerov1api.PodVolumeBackupSpec{
+			Pod: corev1api.ObjectReference{
+				Kind:      "Pod",
+				Namespace: "default",
+				Name:      "pod",
+			},
+		},
+	}
+
+	err := backupper.pvbIndexer.Add(obj1)
+	require.NoError(t, err)
+	err = backupper.pvbIndexer.Add(obj2)
+	require.NoError(t, err)
+
+	// not exist PVBs
+	pvbs, err := backupper.ListPodVolumeBackupsByPod("invalid-namespace", "invalid-name")
+	require.NoError(t, err)
+	assert.Empty(t, pvbs)
+
+	// exist PVBs
+	pvbs, err = backupper.ListPodVolumeBackupsByPod("default", "pod")
+	require.NoError(t, err)
+	assert.Len(t, pvbs, 2)
+}
+
 type logHook struct {
 	entry *logrus.Entry
 }
@@ -636,6 +722,7 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 	defer func() {
 		cancelFunc()
 	}()
+	log := logrus.New()
 	cases := []struct {
 		name              string
 		ctx               context.Context
@@ -691,7 +778,7 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 		logHook := &logHook{}
 		logger.Hooks.Add(logHook)
 
-		backuper := newBackupper(c.ctx, nil, nil, informer, nil, "", &velerov1api.Backup{})
+		backuper := newBackupper(c.ctx, log, nil, nil, informer, nil, "", &velerov1api.Backup{})
 		backuper.wg.Add(1)
 
 		if c.statusToBeUpdated != nil {

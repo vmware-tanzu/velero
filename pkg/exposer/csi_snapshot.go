@@ -281,10 +281,16 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.
 
 	curLog.WithField("pod", pod.Name).Infof("Backup volume is found in pod at index %v", i)
 
+	var nodeOS *string
+	if os, found := pod.Spec.NodeSelector[kube.NodeOSLabel]; found {
+		nodeOS = &os
+	}
+
 	return &ExposeResult{ByPod: ExposeByPod{
 		HostingPod:       pod,
 		HostingContainer: containerName,
 		VolumeName:       volumeName,
+		NodeOS:           nodeOS,
 	}}, nil
 }
 
@@ -580,6 +586,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	var securityCtx *corev1.PodSecurityContext
 	nodeSelector := map[string]string{}
 	podOS := corev1.PodOS{}
+	toleration := []corev1.Toleration{}
 	if nodeOS == kube.NodeOSWindows {
 		userID := "ContainerAdministrator"
 		securityCtx = &corev1.PodSecurityContext{
@@ -590,6 +597,13 @@ func (e *csiSnapshotExposer) createBackupPod(
 
 		nodeSelector[kube.NodeOSLabel] = kube.NodeOSWindows
 		podOS.Name = kube.NodeOSWindows
+
+		toleration = append(toleration, corev1.Toleration{
+			Key:      "os",
+			Operator: "Equal",
+			Effect:   "NoSchedule",
+			Value:    "windows",
+		})
 	} else {
 		userID := int64(0)
 		securityCtx = &corev1.PodSecurityContext{
@@ -660,6 +674,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 			Volumes:                       volumes,
 			RestartPolicy:                 corev1.RestartPolicyNever,
 			SecurityContext:               securityCtx,
+			Tolerations:                   toleration,
 		},
 	}
 

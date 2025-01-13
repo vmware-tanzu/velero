@@ -81,6 +81,11 @@ type BackupPVC struct {
 	SPCNoRelabeling bool `json:"spcNoRelabeling,omitempty"`
 }
 
+type RestorePVC struct {
+	// IgnoreDelayBinding indicates to ignore delay binding the restorePVC when it is in WaitForFirstConsumer mode
+	IgnoreDelayBinding bool `json:"ignoreDelayBinding,omitempty"`
+}
+
 type Configs struct {
 	// LoadConcurrency is the config for data path load concurrency per node.
 	LoadConcurrency *LoadConcurrency `json:"loadConcurrency,omitempty"`
@@ -90,6 +95,9 @@ type Configs struct {
 
 	// BackupPVCConfig is the config for backupPVC (intermediate PVC) of snapshot data movement
 	BackupPVCConfig map[string]BackupPVC `json:"backupPVC,omitempty"`
+
+	// RestoreVCConfig is the config for restorePVC (intermediate PVC) of generic restore
+	RestorePVCConfig *RestorePVC `json:"restorePVC,omitempty"`
 
 	// PodResources is the resource config for various types of pods launched by node-agent, i.e., data mover pods.
 	PodResources *kube.PodResources `json:"podResources,omitempty"`

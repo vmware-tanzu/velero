@@ -38,4 +38,5 @@ type ExposeByPod struct {
 	HostingPod       *corev1.Pod
 	HostingContainer string
 	VolumeName       string
+	NodeOS           *string
 }
