@@ -418,6 +418,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	var securityCtx *corev1.PodSecurityContext
 	nodeSelector := map[string]string{}
 	podOS := corev1.PodOS{}
+	toleration := []corev1.Toleration{}
 	if nodeType == kube.NodeOSWindows {
 		userID := "ContainerAdministrator"
 		securityCtx = &corev1.PodSecurityContext{
@@ -428,6 +429,13 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 
 		nodeSelector[kube.NodeOSLabel] = kube.NodeOSWindows
 		podOS.Name = kube.NodeOSWindows
+
+		toleration = append(toleration, corev1.Toleration{
+			Key:      "os",
+			Operator: "Equal",
+			Effect:   "NoSchedule",
+			Value:    "windows",
+		})
 	} else {
 		userID := int64(0)
 		securityCtx = &corev1.PodSecurityContext{
@@ -480,6 +488,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 			NodeName:                      selectedNode,
 			RestartPolicy:                 corev1.RestartPolicyNever,
 			SecurityContext:               securityCtx,
+			Tolerations:                   toleration,
 		},
 	}
 
