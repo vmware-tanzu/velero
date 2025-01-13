@@ -183,28 +183,15 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, nil
 		}
 
-		hostingPodLabels := map[string]string{velerov1api.DataDownloadLabel: dd.Name}
-		for _, k := range util.ThirdPartyLabels {
-			if v, err := nodeagent.GetLabelValue(ctx, r.kubeClient, dd.Namespace, k, kube.NodeOSLinux); err != nil {
-				if err != nodeagent.ErrNodeAgentLabelNotFound {
-					log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
-				}
-			} else {
-				hostingPodLabels[k] = v
-			}
+		exposeParam, err := r.setupExposeParam(dd)
+		if err != nil {
+			return r.errorOut(ctx, dd, err, "failed to set exposer parameters", log)
 		}
 
 		// Expose() will trigger to create one pod whose volume is restored by a given volume snapshot,
 		// but the pod maybe is not in the same node of the current controller, so we need to return it here.
 		// And then only the controller who is in the same node could do the rest work.
-		err = r.restoreExposer.Expose(ctx, getDataDownloadOwnerObject(dd), exposer.GenericRestoreExposeParam{
-			TargetPVCName:    dd.Spec.TargetVolume.PVC,
-			SourceNamespace:  dd.Spec.TargetVolume.Namespace,
-			HostingPodLabels: hostingPodLabels,
-			Resources:        r.podResources,
-			ExposeTimeout:    dd.Spec.OperationTimeout.Duration,
-			RestorePVCConfig: r.restorePVCConfig,
-		})
+		err = r.restoreExposer.Expose(ctx, getDataDownloadOwnerObject(dd), exposeParam)
 		if err != nil {
 			if err := r.client.Get(ctx, req.NamespacedName, dd); err != nil {
 				if !apierrors.IsNotFound(err) {
@@ -243,7 +230,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Debugf("Data download is been canceled %s in Phase %s", dd.GetName(), dd.Status.Phase)
 			r.tryCancelAcceptedDataDownload(ctx, dd, "")
 		} else if peekErr := r.restoreExposer.PeekExposed(ctx, getDataDownloadOwnerObject(dd)); peekErr != nil {
-			r.tryCancelAcceptedDataDownload(ctx, dd, fmt.Sprintf("found a dataupload %s/%s with expose error: %s. mark it as cancel", dd.Namespace, dd.Name, peekErr))
+			r.tryCancelAcceptedDataDownload(ctx, dd, fmt.Sprintf("found a datadownload %s/%s with expose error: %s. mark it as cancel", dd.Namespace, dd.Name, peekErr))
 			log.Errorf("Cancel dd %s/%s because of expose error %s", dd.Namespace, dd.Name, peekErr)
 		} else if dd.Status.AcceptedTimestamp != nil {
 			if time.Since(dd.Status.AcceptedTimestamp.Time) >= r.preparingTimeout {
@@ -735,6 +722,42 @@ func (r *DataDownloadReconciler) closeDataPath(ctx context.Context, ddName strin
 	}
 
 	r.dataPathMgr.RemoveAsyncBR(ddName)
+}
+
+func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDownload) (exposer.GenericRestoreExposeParam, error) {
+	log := r.logger.WithField("datadownload", dd.Name)
+
+	nodeOS := string(dd.Spec.NodeOS)
+	if nodeOS == "" {
+		log.Info("nodeOS is empty in DD, fallback to linux")
+		nodeOS = kube.NodeOSLinux
+	}
+
+	if err := kube.HasNodeWithOS(context.Background(), nodeOS, r.kubeClient.CoreV1()); err != nil {
+		return exposer.GenericRestoreExposeParam{}, errors.Wrapf(err, "no appropriate node to run datadownload %s/%s", dd.Namespace, dd.Name)
+	}
+
+	hostingPodLabels := map[string]string{velerov1api.DataDownloadLabel: dd.Name}
+	for _, k := range util.ThirdPartyLabels {
+		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, dd.Namespace, k, nodeOS); err != nil {
+			if err != nodeagent.ErrNodeAgentLabelNotFound {
+				log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
+			}
+		} else {
+			hostingPodLabels[k] = v
+		}
+	}
+
+	return exposer.GenericRestoreExposeParam{
+		TargetPVCName:    dd.Spec.TargetVolume.PVC,
+		TargetNamespace:  dd.Spec.TargetVolume.Namespace,
+		HostingPodLabels: hostingPodLabels,
+		Resources:        r.podResources,
+		OperationTimeout: dd.Spec.OperationTimeout.Duration,
+		ExposeTimeout:    r.preparingTimeout,
+		NodeOS:           nodeOS,
+		RestorePVCConfig: r.restorePVCConfig,
+	}, nil
 }
 
 func getDataDownloadOwnerObject(dd *velerov2alpha1api.DataDownload) v1.ObjectReference {

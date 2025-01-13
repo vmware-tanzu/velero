@@ -281,10 +281,16 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.
 
 	curLog.WithField("pod", pod.Name).Infof("Backup volume is found in pod at index %v", i)
 
+	var nodeOS *string
+	if os, found := pod.Spec.NodeSelector[kube.NodeOSLabel]; found {
+		nodeOS = &os
+	}
+
 	return &ExposeResult{ByPod: ExposeByPod{
 		HostingPod:       pod,
 		HostingContainer: containerName,
 		VolumeName:       volumeName,
+		NodeOS:           nodeOS,
 	}}, nil
 }
 

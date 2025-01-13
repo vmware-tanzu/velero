@@ -160,7 +160,24 @@ func newdataMoverRestore(logger logrus.FieldLogger, factory client.Factory, conf
 		return nil, errors.Wrap(err, "error to create client")
 	}
 
-	cache, err := ctlcache.New(clientConfig, cacheOption)
+	var cache ctlcache.Cache
+	retry := 10
+	for {
+		cache, err = ctlcache.New(clientConfig, cacheOption)
+		if err == nil {
+			break
+		}
+
+		retry--
+		if retry == 0 {
+			break
+		}
+
+		logger.WithError(err).Warn("Failed to create client cache, need retry")
+
+		time.Sleep(time.Second)
+	}
+
 	if err != nil {
 		cancelFunc()
 		return nil, errors.Wrap(err, "error to create client cache")

@@ -31,7 +31,6 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	corev1api "k8s.io/api/core/v1"
 	clientTesting "k8s.io/client-go/testing"
 )
@@ -76,9 +75,9 @@ func TestRestoreExpose(t *testing.T) {
 			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
 		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
 						{
 							Image: "fake-image",
 						},
@@ -93,21 +92,21 @@ func TestRestoreExpose(t *testing.T) {
 		kubeClientObj   []runtime.Object
 		ownerRestore    *velerov1.Restore
 		targetPVCName   string
-		sourceNamespace string
+		targetNamespace string
 		kubeReactors    []reactor
 		err             string
 	}{
 		{
 			name:            "wait target pvc consumed fail",
 			targetPVCName:   "fake-target-pvc",
-			sourceNamespace: "fake-ns",
+			targetNamespace: "fake-ns",
 			ownerRestore:    restore,
 			err:             "error to wait target PVC consumed, fake-ns/fake-target-pvc: error to wait for PVC: error to get pvc fake-ns/fake-target-pvc: persistentvolumeclaims \"fake-target-pvc\" not found",
 		},
 		{
 			name:            "target pvc is already bound",
 			targetPVCName:   "fake-target-pvc",
-			sourceNamespace: "fake-ns",
+			targetNamespace: "fake-ns",
 			ownerRestore:    restore,
 			kubeClientObj: []runtime.Object{
 				targetPVCObjBound,
@@ -117,7 +116,7 @@ func TestRestoreExpose(t *testing.T) {
 		{
 			name:            "create restore pod fail",
 			targetPVCName:   "fake-target-pvc",
-			sourceNamespace: "fake-ns",
+			targetNamespace: "fake-ns",
 			ownerRestore:    restore,
 			kubeClientObj: []runtime.Object{
 				targetPVCObj,
@@ -137,7 +136,7 @@ func TestRestoreExpose(t *testing.T) {
 		{
 			name:            "create restore pvc fail",
 			targetPVCName:   "fake-target-pvc",
-			sourceNamespace: "fake-ns",
+			targetNamespace: "fake-ns",
 			ownerRestore:    restore,
 			kubeClientObj: []runtime.Object{
 				targetPVCObj,
@@ -182,9 +181,9 @@ func TestRestoreExpose(t *testing.T) {
 
 			err := exposer.Expose(context.Background(), ownerObject, GenericRestoreExposeParam{
 				TargetPVCName:    test.targetPVCName,
-				SourceNamespace:  test.sourceNamespace,
+				TargetNamespace:  test.targetNamespace,
 				HostingPodLabels: map[string]string{},
-				Resources:        corev1.ResourceRequirements{},
+				Resources:        corev1api.ResourceRequirements{},
 				ExposeTimeout:    time.Millisecond})
 			assert.EqualError(t, err, test.err)
 		})
@@ -244,21 +243,21 @@ func TestRebindVolume(t *testing.T) {
 		kubeClientObj   []runtime.Object
 		ownerRestore    *velerov1.Restore
 		targetPVCName   string
-		sourceNamespace string
+		targetNamespace string
 		kubeReactors    []reactor
 		err             string
 	}{
 		{
 			name:            "get target pvc fail",
 			targetPVCName:   "fake-target-pvc",
-			sourceNamespace: "fake-ns",
+			targetNamespace: "fake-ns",
 			ownerRestore:    restore,
 			err:             "error to get target PVC fake-ns/fake-target-pvc: persistentvolumeclaims \"fake-target-pvc\" not found",
 		},
 		{
 			name:            "wait restore pvc bound fail",
 			targetPVCName:   "fake-target-pvc",
-			sourceNamespace: "fake-ns",
+			targetNamespace: "fake-ns",
 			ownerRestore:    restore,
 			kubeClientObj: []runtime.Object{
 				targetPVCObj,
@@ -268,7 +267,7 @@ func TestRebindVolume(t *testing.T) {
 		{
 			name:            "retain target pv fail",
 			targetPVCName:   "fake-target-pvc",
-			sourceNamespace: "fake-ns",
+			targetNamespace: "fake-ns",
 			ownerRestore:    restore,
 			kubeClientObj: []runtime.Object{
 				targetPVCObj,
@@ -289,7 +288,7 @@ func TestRebindVolume(t *testing.T) {
 		{
 			name:            "delete restore pod fail",
 			targetPVCName:   "fake-target-pvc",
-			sourceNamespace: "fake-ns",
+			targetNamespace: "fake-ns",
 			ownerRestore:    restore,
 			kubeClientObj: []runtime.Object{
 				targetPVCObj,
@@ -311,7 +310,7 @@ func TestRebindVolume(t *testing.T) {
 		{
 			name:            "delete restore pvc fail",
 			targetPVCName:   "fake-target-pvc",
-			sourceNamespace: "fake-ns",
+			targetNamespace: "fake-ns",
 			ownerRestore:    restore,
 			kubeClientObj: []runtime.Object{
 				targetPVCObj,
@@ -333,7 +332,7 @@ func TestRebindVolume(t *testing.T) {
 		{
 			name:            "rebind target pvc fail",
 			targetPVCName:   "fake-target-pvc",
-			sourceNamespace: "fake-ns",
+			targetNamespace: "fake-ns",
 			ownerRestore:    restore,
 			kubeClientObj: []runtime.Object{
 				targetPVCObj,
@@ -355,7 +354,7 @@ func TestRebindVolume(t *testing.T) {
 		{
 			name:            "reset pv binding fail",
 			targetPVCName:   "fake-target-pvc",
-			sourceNamespace: "fake-ns",
+			targetNamespace: "fake-ns",
 			ownerRestore:    restore,
 			kubeClientObj: []runtime.Object{
 				targetPVCObj,
@@ -382,7 +381,7 @@ func TestRebindVolume(t *testing.T) {
 		{
 			name:            "wait restore PV bound fail",
 			targetPVCName:   "fake-target-pvc",
-			sourceNamespace: "fake-ns",
+			targetNamespace: "fake-ns",
 			ownerRestore:    restore,
 			kubeClientObj: []runtime.Object{
 				targetPVCObj,
@@ -420,7 +419,7 @@ func TestRebindVolume(t *testing.T) {
 
 			hookCount = 0
 
-			err := exposer.RebindVolume(context.Background(), ownerObject, test.targetPVCName, test.sourceNamespace, time.Millisecond)
+			err := exposer.RebindVolume(context.Background(), ownerObject, test.targetPVCName, test.targetNamespace, time.Millisecond)
 			assert.EqualError(t, err, test.err)
 		})
 	}
@@ -526,7 +525,7 @@ func Test_ReastoreDiagnoseExpose(t *testing.T) {
 		},
 	}
 
-	restorePodWithoutNodeName := corev1.Pod{
+	restorePodWithoutNodeName := corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-restore",
@@ -539,19 +538,19 @@ func Test_ReastoreDiagnoseExpose(t *testing.T) {
 				},
 			},
 		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodPending,
-			Conditions: []corev1.PodCondition{
+		Status: corev1api.PodStatus{
+			Phase: corev1api.PodPending,
+			Conditions: []corev1api.PodCondition{
 				{
-					Type:    corev1.PodInitialized,
-					Status:  corev1.ConditionTrue,
+					Type:    corev1api.PodInitialized,
+					Status:  corev1api.ConditionTrue,
 					Message: "fake-pod-message",
 				},
 			},
 		},
 	}
 
-	restorePodWithNodeName := corev1.Pod{
+	restorePodWithNodeName := corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-restore",
@@ -564,22 +563,22 @@ func Test_ReastoreDiagnoseExpose(t *testing.T) {
 				},
 			},
 		},
-		Spec: corev1.PodSpec{
+		Spec: corev1api.PodSpec{
 			NodeName: "fake-node",
 		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodPending,
-			Conditions: []corev1.PodCondition{
+		Status: corev1api.PodStatus{
+			Phase: corev1api.PodPending,
+			Conditions: []corev1api.PodCondition{
 				{
-					Type:    corev1.PodInitialized,
-					Status:  corev1.ConditionTrue,
+					Type:    corev1api.PodInitialized,
+					Status:  corev1api.ConditionTrue,
 					Message: "fake-pod-message",
 				},
 			},
 		},
 	}
 
-	restorePVCWithoutVolumeName := corev1.PersistentVolumeClaim{
+	restorePVCWithoutVolumeName := corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-restore",
@@ -592,12 +591,12 @@ func Test_ReastoreDiagnoseExpose(t *testing.T) {
 				},
 			},
 		},
-		Status: corev1.PersistentVolumeClaimStatus{
-			Phase: corev1.ClaimPending,
+		Status: corev1api.PersistentVolumeClaimStatus{
+			Phase: corev1api.ClaimPending,
 		},
 	}
 
-	restorePVCWithVolumeName := corev1.PersistentVolumeClaim{
+	restorePVCWithVolumeName := corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-restore",
@@ -610,35 +609,35 @@ func Test_ReastoreDiagnoseExpose(t *testing.T) {
 				},
 			},
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
+		Spec: corev1api.PersistentVolumeClaimSpec{
 			VolumeName: "fake-pv",
 		},
-		Status: corev1.PersistentVolumeClaimStatus{
-			Phase: corev1.ClaimPending,
+		Status: corev1api.PersistentVolumeClaimStatus{
+			Phase: corev1api.ClaimPending,
 		},
 	}
 
-	restorePV := corev1.PersistentVolume{
+	restorePV := corev1api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "fake-pv",
 		},
-		Status: corev1.PersistentVolumeStatus{
-			Phase:   corev1.VolumePending,
+		Status: corev1api.PersistentVolumeStatus{
+			Phase:   corev1api.VolumePending,
 			Message: "fake-pv-message",
 		},
 	}
 
-	nodeAgentPod := corev1.Pod{
+	nodeAgentPod := corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "node-agent-pod-1",
 			Labels:    map[string]string{"role": "node-agent"},
 		},
-		Spec: corev1.PodSpec{
+		Spec: corev1api.PodSpec{
 			NodeName: "fake-node",
 		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodRunning,
+		Status: corev1api.PodStatus{
+			Phase: corev1api.PodRunning,
 		},
 	}
 
