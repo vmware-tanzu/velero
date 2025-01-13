@@ -203,6 +203,7 @@ func TestStartWatch(t *testing.T) {
 			expectStartEvent:     true,
 			expectTerminateEvent: true,
 			expectComplete:       true,
+			expectProgress:       1,
 		},
 		{
 			name:          "completed",
@@ -223,6 +224,7 @@ func TestStartWatch(t *testing.T) {
 			expectStartEvent:     true,
 			expectTerminateEvent: true,
 			expectComplete:       true,
+			expectProgress:       1,
 		},
 		{
 			name:          "completed with redirect error",
@@ -244,6 +246,7 @@ func TestStartWatch(t *testing.T) {
 			expectStartEvent:     true,
 			expectTerminateEvent: true,
 			expectComplete:       true,
+			expectProgress:       1,
 		},
 		{
 			name:          "complete but terminated event not received in time",
@@ -263,6 +266,7 @@ func TestStartWatch(t *testing.T) {
 			},
 			expectStartEvent: true,
 			expectComplete:   true,
+			expectProgress:   1,
 		},
 		{
 			name:          "complete but terminated event not received immediately",
@@ -286,6 +290,7 @@ func TestStartWatch(t *testing.T) {
 			expectStartEvent:     true,
 			expectTerminateEvent: true,
 			expectComplete:       true,
+			expectProgress:       1,
 		},
 		{
 			name:          "completed with progress",
@@ -313,7 +318,7 @@ func TestStartWatch(t *testing.T) {
 			expectStartEvent:     true,
 			expectTerminateEvent: true,
 			expectComplete:       true,
-			expectProgress:       2,
+			expectProgress:       3,
 		},
 		{
 			name:          "failed",

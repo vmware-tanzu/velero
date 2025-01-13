@@ -155,7 +155,7 @@ func TestOnDataUploadCompleted(t *testing.T) {
 		{
 			name:        "marshal fail",
 			marshalErr:  errors.New("fake-marshal-error"),
-			expectedErr: "Failed to marshal backup result { false { }}: fake-marshal-error",
+			expectedErr: "Failed to marshal backup result { false { } 0}: fake-marshal-error",
 		},
 		{
 			name:                "succeed",

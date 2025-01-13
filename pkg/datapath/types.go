@@ -33,11 +33,13 @@ type BackupResult struct {
 	SnapshotID    string      `json:"snapshotID"`
 	EmptySnapshot bool        `json:"emptySnapshot"`
 	Source        AccessPoint `json:"source,omitempty"`
+	TotalBytes    int64       `json:"totalBytes,omitempty"`
 }
 
 // RestoreResult represents the result of a restore
 type RestoreResult struct {
-	Target AccessPoint `json:"target,omitempty"`
+	Target     AccessPoint `json:"target,omitempty"`
+	TotalBytes int64       `json:"totalBytes,omitempty"`
 }
 
 // Callbacks defines the collection of callbacks during backup/restore
