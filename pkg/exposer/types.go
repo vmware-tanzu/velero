@@ -21,10 +21,11 @@ import (
 )
 
 const (
-	AccessModeFileSystem = "by-file-system"
-	AccessModeBlock      = "by-block-device"
-	podGroupLabel        = "velero.io/exposer-pod-group"
-	podGroupSnapshot     = "snapshot-exposer"
+	AccessModeFileSystem   = "by-file-system"
+	AccessModeBlock        = "by-block-device"
+	podGroupLabel          = "velero.io/exposer-pod-group"
+	podGroupSnapshot       = "snapshot-exposer"
+	podGroupGenericRestore = "generic-restore-exposer"
 )
 
 // ExposeResult defines the result of expose.
