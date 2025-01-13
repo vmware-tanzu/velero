@@ -25,19 +25,19 @@ import (
 	"github.com/pkg/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 type MultiNSBackup struct {
-	TestCase
+	BRCase
 	IsScalTest      bool
 	NSExcluded      *[]string
 	TimeoutDuration time.Duration
 }
 
 func (m *MultiNSBackup) Init() error {
-	m.TestCase.Init()
+	m.BRCase.Init()
 	m.CaseBaseName = "nstest-" + m.UUIDgen
 	m.BackupName = "backup-" + m.CaseBaseName
 	m.RestoreName = "restore-" + m.CaseBaseName
@@ -111,7 +111,7 @@ func (m *MultiNSBackup) Verify() error {
 	return nil
 }
 
-func (m *MultiNSBackup) Destroy() error {
+func (m *MultiNSBackup) DeleteResources() error {
 	err := CleanupNamespaces(m.Ctx, m.Client, m.CaseBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could cleanup retrieve namespaces")
