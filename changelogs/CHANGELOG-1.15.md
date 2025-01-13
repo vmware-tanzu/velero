@@ -15,6 +15,7 @@ https://velero.io/docs/v1.15/upgrade-to-1.15/
 ### All Changes
 * fix(pkg/repository/maintenance): don't panic when there's no container statuses (#8568, @mcluseau)
 * Don't include excluded items in ItemBlocks (#8585, @kaovilai)
+* Check the PVB status via podvolume Backupper rather than calling API server to avoid API server issue (#8596, @ywk253100)
 
 
 ## v1.15.1
