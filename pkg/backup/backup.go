@@ -221,7 +221,8 @@ type VolumeSnapshotterGetter interface {
 // back up individual resources that don't prevent the backup from continuing to be processed) are logged
 // to the backup log.
 func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer,
-	actions []biav2.BackupItemAction, itemBlockActions []ibav1.ItemBlockAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
+	actions []biav2.BackupItemAction, itemBlockActions []ibav1.ItemBlockAction, volumeSnapshotterGetter VolumeSnapshotterGetter,
+) error {
 	backupItemActions := framework.NewBackupItemActionResolverV2(actions)
 	itemBlockActionResolver := framework.NewItemBlockActionResolver(itemBlockActions)
 	return kb.BackupWithResolvers(log, backupRequest, backupFile, backupItemActions, itemBlockActionResolver, volumeSnapshotterGetter)
@@ -891,7 +892,7 @@ func (kb *kubernetesBackupper) writeBackupVersion(tw *tar.Writer) error {
 		Name:     versionFile,
 		Size:     int64(len(versionString)),
 		Typeflag: tar.TypeReg,
-		Mode:     0755,
+		Mode:     0o755,
 		ModTime:  time.Now(),
 	}
 	if err := tw.WriteHeader(hdr); err != nil {

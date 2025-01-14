@@ -121,7 +121,7 @@ func (c *FakeClient) List(ctx context.Context, list kbclient.ObjectList, opts ..
 }
 
 func initDataUploaderReconciler(needError ...bool) (*DataUploadReconciler, error) {
-	var errs = make([]error, 6)
+	errs := make([]error, 6)
 	for k, isError := range needError {
 		if k == 0 && isError {
 			errs[0] = fmt.Errorf("Get error")
@@ -826,7 +826,8 @@ func TestFindDataUploadForPod(t *testing.T) {
 				assert.Equal(t, du.Namespace, requests[0].Namespace)
 				assert.Equal(t, du.Name, requests[0].Name)
 			},
-		}, {
+		},
+		{
 			name: "no selected label found for pod",
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Result(),
@@ -834,7 +835,8 @@ func TestFindDataUploadForPod(t *testing.T) {
 				// Assert that the function returns a single request
 				assert.Empty(t, requests)
 			},
-		}, {
+		},
+		{
 			name: "no matched pod",
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Labels(map[string]string{velerov1api.DataUploadLabel: "non-existing-dataupload"}).Result(),
@@ -1106,7 +1108,8 @@ func (dt *duResumeTestHelper) DiagnoseExpose(context.Context, corev1.ObjectRefer
 func (dt *duResumeTestHelper) CleanUp(context.Context, corev1.ObjectReference, string, string) {}
 
 func (dt *duResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
-	datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
+	datapath.Callbacks, logrus.FieldLogger,
+) datapath.AsyncBR {
 	return dt.asyncBR
 }
 

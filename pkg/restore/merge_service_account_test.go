@@ -316,7 +316,7 @@ func stripWhitespace(s string) string {
 }
 
 func TestMergeMaps(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		name        string
 		source      map[string]string
 		destination map[string]string

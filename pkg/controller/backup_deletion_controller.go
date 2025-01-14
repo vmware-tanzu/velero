@@ -619,7 +619,7 @@ func (r *backupDeletionReconciler) patchDeleteBackupRequestWithError(ctx context
 }
 
 func (r *backupDeletionReconciler) patchBackup(ctx context.Context, backup *velerov1api.Backup, mutate func(*velerov1api.Backup)) (*velerov1api.Backup, error) {
-	//TODO: The patchHelper can't be used here because the `backup/xxx/status` does not exist, until the backup resource is refactored
+	// TODO: The patchHelper can't be used here because the `backup/xxx/status` does not exist, until the backup resource is refactored
 
 	// Record original json
 	oldData, err := json.Marshal(backup)
@@ -663,7 +663,8 @@ func getSnapshotsInBackup(ctx context.Context, backup *velerov1api.Backup, kbCli
 }
 
 func batchDeleteSnapshots(ctx context.Context, repoEnsurer *repository.Ensurer, repoMgr repomanager.Manager,
-	directSnapshots map[string][]repotypes.SnapshotIdentifier, backup *velerov1api.Backup, logger logrus.FieldLogger) []error {
+	directSnapshots map[string][]repotypes.SnapshotIdentifier, backup *velerov1api.Backup, logger logrus.FieldLogger,
+) []error {
 	var errs []error
 	for volumeNamespace, snapshots := range directSnapshots {
 		batchForget := []string{}

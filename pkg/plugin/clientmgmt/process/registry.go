@@ -183,7 +183,7 @@ func executableLinux(info os.FileInfo) bool {
 
 		the result will be 0 if and only if none of the executable bits is set.
 	*/
-	return (info.Mode() & 0111) != 0
+	return (info.Mode() & 0o111) != 0
 }
 
 // listPlugins executes command, queries it for registered plugins, and returns the list of PluginIdentifiers.

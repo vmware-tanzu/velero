@@ -90,7 +90,8 @@ func (a *PodAction) Execute(input *velero.RestoreItemActionExecuteInput) (*veler
 	if pod.Spec.PriorityClassName != "" {
 		a.logger.Infof("Adding priorityclass %s to AdditionalItems", pod.Spec.PriorityClassName)
 		restoreExecuteOutput.AdditionalItems = []velero.ResourceIdentifier{
-			{GroupResource: kuberesource.PriorityClasses, Name: pod.Spec.PriorityClassName}}
+			{GroupResource: kuberesource.PriorityClasses, Name: pod.Spec.PriorityClassName},
+		}
 	}
 	return restoreExecuteOutput, nil
 }

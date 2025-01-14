@@ -101,7 +101,6 @@ func TestSetCommand_Execute(t *testing.T) {
 	cmd := exec.Command(os.Args[0], []string{"-test.run=TestSetCommand_Execute"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
 	_, stderr, err := veleroexec.RunCommand(cmd)
-
 	if err != nil {
 		assert.Contains(t, stderr, "backupstoragelocations.velero.io \"bsl-1\" not found")
 		return

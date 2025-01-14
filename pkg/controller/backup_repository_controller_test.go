@@ -157,6 +157,7 @@ func (f *fakeClock) After(time.Duration) <-chan time.Time {
 func (f *fakeClock) NewTicker(time.Duration) clock.Ticker {
 	return nil
 }
+
 func (f *fakeClock) NewTimer(time.Duration) clock.Timer {
 	return nil
 }

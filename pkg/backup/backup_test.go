@@ -352,8 +352,12 @@ func TestBackupOldResourceFiltering(t *testing.T) {
 		{
 			name: "OrLabelSelector only backs up matching resources",
 			backup: defaultBackup().
-				OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}},
-					{MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).
+				OrLabelSelector([]*metav1.LabelSelector{
+					{MatchLabels: map[string]string{"a1": "b1"}},
+					{MatchLabels: map[string]string{"a2": "b2"}},
+					{MatchLabels: map[string]string{"a3": "b3"}},
+					{MatchLabels: map[string]string{"a4": "b4"}},
+				}).
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -3300,7 +3304,8 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 						ResourceIdentifier: velero.ResourceIdentifier{
 							GroupResource: kuberesource.Pods,
 							Namespace:     "ns-1",
-							Name:          "pod-1"},
+							Name:          "pod-1",
+						},
 						OperationID: "pod-1-1",
 					},
 					Status: itemoperation.OperationStatus{
@@ -3331,7 +3336,8 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 						ResourceIdentifier: velero.ResourceIdentifier{
 							GroupResource: kuberesource.Pods,
 							Namespace:     "ns-1",
-							Name:          "pod-2"},
+							Name:          "pod-2",
+						},
 						OperationID: "pod-2-1",
 					},
 					Status: itemoperation.OperationStatus{
@@ -3986,6 +3992,7 @@ func (b *fakePodVolumeBackupper) GetPodVolumeBackup(namespace, name string) (*ve
 	}
 	return nil, nil
 }
+
 func (b *fakePodVolumeBackupper) ListPodVolumeBackupsByPod(podNamespace, podName string) ([]*velerov1.PodVolumeBackup, error) {
 	var pvbs []*velerov1.PodVolumeBackup
 	for _, pvb := range b.pvbs {

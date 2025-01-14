@@ -348,6 +348,7 @@ func newChangeImageNameRestoreItemAction(f client.Factory) plugincommon.HandlerI
 		), nil
 	}
 }
+
 func newRoleBindingItemAction(logger logrus.FieldLogger) (any, error) {
 	return ria.NewRoleBindingAction(logger), nil
 }

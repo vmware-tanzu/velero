@@ -46,8 +46,10 @@ type dataPathService interface {
 	Shutdown()
 }
 
-var funcExit = os.Exit
-var funcCreateFile = os.Create
+var (
+	funcExit       = os.Exit
+	funcCreateFile = os.Create
+)
 
 func exitWithMessage(logger logrus.FieldLogger, succeed bool, message string, a ...any) {
 	exitCode := 0

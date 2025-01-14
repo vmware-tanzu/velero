@@ -372,7 +372,6 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 						scName := *pvc.Spec.StorageClassName
 						sc := &storagev1api.StorageClass{}
 						err = ctx.crClient.Get(context.Background(), client.ObjectKey{Name: scName}, sc)
-
 						if err != nil {
 							errs.Add(restoredNamespace, err)
 							return false, err
@@ -426,7 +425,6 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 
 					return true, nil
 				})
-
 				if err != nil {
 					err = fmt.Errorf("fail to patch dynamic PV, err: %s, PVC: %s, PV: %s", err, volInfo.PVCName, volInfo.PVName)
 					ctx.logger.WithError(errors.WithStack((err))).Error("err patching dynamic PV using volume info")

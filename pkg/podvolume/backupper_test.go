@@ -193,7 +193,7 @@ func Test_backupper_BackupPodVolumes_log_test(t *testing.T) {
 				ctx: context.Background(),
 			}
 			logOutput := bytes.Buffer{}
-			var log = logrus.New()
+			log := logrus.New()
 			log.SetOutput(&logOutput)
 			b.BackupPodVolumes(tt.args.backup, tt.args.pod, tt.args.volumesToBackup, tt.args.resPolicies, log)
 			fmt.Println(logOutput.String())
@@ -712,6 +712,7 @@ type logHook struct {
 func (l *logHook) Levels() []logrus.Level {
 	return []logrus.Level{logrus.ErrorLevel}
 }
+
 func (l *logHook) Fire(entry *logrus.Entry) error {
 	l.entry = entry
 	return nil

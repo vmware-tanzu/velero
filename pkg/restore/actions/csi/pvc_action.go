@@ -68,7 +68,7 @@ type pvcRestoreItemAction struct {
 func (p *pvcRestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"persistentvolumeclaims"},
-		//TODO: add label selector volumeSnapshotLabel
+		// TODO: add label selector volumeSnapshotLabel
 	}, nil
 }
 
@@ -188,7 +188,6 @@ func (p *pvcRestoreItemAction) Execute(
 			},
 			backup,
 		)
-
 		if err != nil {
 			logger.Error("Fail to get backup for restore.")
 			return nil, fmt.Errorf("fail to get backup for restore: %s", err.Error())
@@ -312,7 +311,8 @@ func (p *pvcRestoreItemAction) Progress(
 }
 
 func (p *pvcRestoreItemAction) Cancel(
-	operationID string, restore *velerov1api.Restore) error {
+	operationID string, restore *velerov1api.Restore,
+) error {
 	if operationID == "" {
 		return riav2.InvalidOperationIDError(operationID)
 	}
@@ -431,7 +431,8 @@ func getDataDownload(
 }
 
 func cancelDataDownload(ctx context.Context, crClient crclient.Client,
-	dataDownload *velerov2alpha1.DataDownload) error {
+	dataDownload *velerov2alpha1.DataDownload,
+) error {
 	updatedDataDownload := dataDownload.DeepCopy()
 	updatedDataDownload.Spec.Cancel = true
 

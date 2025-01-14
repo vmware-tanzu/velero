@@ -992,7 +992,6 @@ func (ctx *restoreContext) itemsAvailable(action framework.RestoreItemResolvedAc
 	err := wait.PollUntilContextTimeout(go_context.Background(), time.Second, timeout, true, func(go_context.Context) (bool, error) {
 		var err error
 		available, err = action.AreAdditionalItemsReady(restoreItemOut.AdditionalItems, ctx.restore)
-
 		if err != nil {
 			return true, err
 		}
@@ -1019,6 +1018,7 @@ func getResourceClientKey(groupResource schema.GroupResource, version, namespace
 		namespace: namespace,
 	}
 }
+
 func (ctx *restoreContext) getResourceClient(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace string) (client.Dynamic, error) {
 	key := getResourceClientKey(groupResource, obj.GroupVersionKind().Version, namespace)
 
@@ -1148,7 +1148,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	// Make a copy of object retrieved from backup to make it available unchanged
-	//inside restore actions.
+	// inside restore actions.
 	itemFromBackup := obj.DeepCopy()
 
 	complete, err := isCompleted(obj, groupResource)
@@ -1591,7 +1591,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 					if len(ctx.restore.Spec.ExistingResourcePolicy) > 0 && ctx.restore.Spec.ExistingResourcePolicy == velerov1api.PolicyTypeUpdate {
 						// remove restore labels so that we apply the latest backup/restore names on the object via patch
 						removeRestoreLabels(fromCluster)
-						//try patching just the backup/restore labels
+						// try patching just the backup/restore labels
 						warningsFromUpdate, errsFromUpdate := ctx.updateBackupRestoreLabels(fromCluster, fromClusterWithLabels, namespace, resourceClient)
 						warnings.Merge(&warningsFromUpdate)
 						errs.Merge(&errsFromUpdate)
@@ -1633,7 +1633,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			return warnings, errs, itemExists
 		}
 
-		//update backup/restore labels on the unchanged resources if existingResourcePolicy is set as update
+		// update backup/restore labels on the unchanged resources if existingResourcePolicy is set as update
 		if ctx.restore.Spec.ExistingResourcePolicy == velerov1api.PolicyTypeUpdate {
 			resourcePolicy := ctx.restore.Spec.ExistingResourcePolicy
 			ctx.log.Infof("restore API has resource policy defined %s , executing restore workflow accordingly for unchanged resource %s %s ", resourcePolicy, obj.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
@@ -2340,8 +2340,8 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource string, original
 
 			// Processing OrLabelSelectors when specified in the restore request. LabelSelectors as well as OrLabelSelectors
 			// cannot co-exist, only one of them can be specified
-			var skipItem = false
-			var skip = 0
+			skipItem := false
+			skip := 0
 			ctx.log.Debugf("orSelectors specified: %s for item: %s", ctx.OrSelectors, item)
 			for _, s := range ctx.OrSelectors {
 				if !s.Matches(labels.Set(obj.GetLabels())) {
@@ -2366,8 +2366,7 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource string, original
 			targetNamespace: targetNamespace,
 			version:         obj.GroupVersionKind().Version,
 		}
-		restorable.selectedItemsByNamespace[originalNamespace] =
-			append(restorable.selectedItemsByNamespace[originalNamespace], selectedItem)
+		restorable.selectedItemsByNamespace[originalNamespace] = append(restorable.selectedItemsByNamespace[originalNamespace], selectedItem)
 		restorable.totalItems++
 	}
 	return restorable, warnings, errs

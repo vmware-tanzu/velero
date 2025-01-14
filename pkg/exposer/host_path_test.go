@@ -70,7 +70,8 @@ func TestGetPodVolumeHostPath(t *testing.T) {
 		{
 			name: "get block volume dir success",
 			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (
-				string, error) {
+				string, error,
+			) {
 				return "fake-pvc-1", nil
 			},
 			pathMatchFunc: func(string, filesystem.Interface, logrus.FieldLogger) (string, error) {

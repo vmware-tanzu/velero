@@ -35,8 +35,7 @@ const (
 // It hooks a log with ListeningMessage message, once the message is hit it replaces
 // the logger's output to HookWriter so that HookWriter retrieves the logs from a file indicated
 // by LogSourceKey field.
-type MergeHook struct {
-}
+type MergeHook struct{}
 
 type hookWriter struct {
 	orgWriter io.Writer
@@ -80,7 +79,7 @@ func (w *hookWriter) Write(p []byte) (n int, err error) {
 		w.logger.Out = w.orgWriter
 	}()
 
-	sourceFile, err := os.OpenFile(w.source, os.O_RDONLY, 0400)
+	sourceFile, err := os.OpenFile(w.source, os.O_RDONLY, 0o400)
 	if err != nil {
 		return 0, err
 	}

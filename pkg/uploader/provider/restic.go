@@ -35,13 +35,15 @@ import (
 )
 
 // resticBackupCMDFunc and resticRestoreCMDFunc are mainly used to make testing more convenient
-var resticBackupCMDFunc = restic.BackupCommand
-var resticBackupFunc = restic.RunBackup
-var resticGetSnapshotFunc = restic.GetSnapshotCommand
-var resticGetSnapshotIDFunc = restic.GetSnapshotID
-var resticRestoreCMDFunc = restic.RestoreCommand
-var resticTempCACertFileFunc = restic.TempCACertFile
-var resticCmdEnvFunc = restic.CmdEnv
+var (
+	resticBackupCMDFunc      = restic.BackupCommand
+	resticBackupFunc         = restic.RunBackup
+	resticGetSnapshotFunc    = restic.GetSnapshotCommand
+	resticGetSnapshotIDFunc  = restic.GetSnapshotID
+	resticRestoreCMDFunc     = restic.RestoreCommand
+	resticTempCACertFileFunc = restic.TempCACertFile
+	resticCmdEnvFunc         = restic.CmdEnv
+)
 
 type resticProvider struct {
 	repoIdentifier  string
@@ -124,7 +126,8 @@ func (rp *resticProvider) RunBackup(
 	parentSnapshot string,
 	volMode uploader.PersistentVolumeMode,
 	uploaderCfg map[string]string,
-	updater uploader.ProgressUpdater) (string, bool, int64, error) {
+	updater uploader.ProgressUpdater,
+) (string, bool, int64, error) {
 	if updater == nil {
 		return "", false, 0, errors.New("Need to initial backup progress updater first")
 	}
@@ -198,7 +201,8 @@ func (rp *resticProvider) RunRestore(
 	volumePath string,
 	volMode uploader.PersistentVolumeMode,
 	uploaderCfg map[string]string,
-	updater uploader.ProgressUpdater) (int64, error) {
+	updater uploader.ProgressUpdater,
+) (int64, error) {
 	if updater == nil {
 		return 0, errors.New("Need to initial backup progress updater first")
 	}

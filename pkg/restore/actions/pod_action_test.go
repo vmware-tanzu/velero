@@ -215,8 +215,9 @@ func TestPodActionExecute(t *testing.T) {
 				},
 			},
 			additionalItems: []velero.ResourceIdentifier{
-				{GroupResource: kuberesource.PriorityClasses,
-					Name: "testPriorityClass",
+				{
+					GroupResource: kuberesource.PriorityClasses,
+					Name:          "testPriorityClass",
 				},
 			},
 		},

@@ -47,21 +47,21 @@ func (t *Throttle) ShouldOutput() bool {
 type Progress struct {
 	// all int64 must precede all int32 due to alignment requirements on ARM
 	// +checkatomic
-	uploadedBytes int64 //the total bytes has uploaded
-	cachedBytes   int64 //the total bytes has cached
-	hashededBytes int64 //the total bytes has hashed
+	uploadedBytes int64 // the total bytes has uploaded
+	cachedBytes   int64 // the total bytes has cached
+	hashededBytes int64 // the total bytes has hashed
 	// +checkatomic
-	uploadedFiles int32 //the total files has ignored
+	uploadedFiles int32 // the total files has ignored
 	// +checkatomic
-	ignoredErrorCount int32 //the total errors has ignored
+	ignoredErrorCount int32 // the total errors has ignored
 	// +checkatomic
-	fatalErrorCount     int32 //the total errors has occurred
+	fatalErrorCount     int32 // the total errors has occurred
 	estimatedFileCount  int64 // +checklocksignore the total count of files to be processed
 	estimatedTotalBytes int64 // +checklocksignore	the total size of files to be processed
 	// +checkatomic
 	processedBytes  int64                    // which statistic all bytes has been processed currently
 	outputThrottle  Throttle                 // which control the frequency of update progress
-	updater         uploader.ProgressUpdater //which kopia progress will call the UpdateProgress interface, the third party will implement the interface to do the progress update
+	updater         uploader.ProgressUpdater // which kopia progress will call the UpdateProgress interface, the third party will implement the interface to do the progress update
 	log             logrus.FieldLogger       // output info into log when backup
 	estimationParam snapshotfs.EstimationParameters
 }

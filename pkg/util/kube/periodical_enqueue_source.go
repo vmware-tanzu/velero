@@ -39,7 +39,8 @@ func NewPeriodicalEnqueueSource(
 	client client.Client,
 	objList client.ObjectList,
 	period time.Duration,
-	option PeriodicalEnqueueSourceOption) *PeriodicalEnqueueSource {
+	option PeriodicalEnqueueSourceOption,
+) *PeriodicalEnqueueSource {
 	return &PeriodicalEnqueueSource{
 		logger:  logger.WithField("resource", reflect.TypeOf(objList).String()),
 		Client:  client,

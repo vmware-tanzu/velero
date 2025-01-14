@@ -223,7 +223,8 @@ func (c *backupOperationsReconciler) updateBackupAndOperationsJSON(
 	backupStore persistence.BackupStore,
 	operations *itemoperationmap.OperationsForBackup,
 	changes bool,
-	completionChanges bool) error {
+	completionChanges bool,
+) error {
 	backupScheduleName := backup.GetLabels()[velerov1api.ScheduleNameLabel]
 
 	if len(operations.ErrsSinceUpdate) > 0 {
@@ -288,7 +289,8 @@ func (c *backupOperationsReconciler) updateBackupAndOperationsJSON(
 func getBackupItemOperationProgress(
 	backup *velerov1api.Backup,
 	pluginManager clientmgmt.Manager,
-	operationsList []*itemoperation.BackupOperation) (bool, bool, int, int, []string) {
+	operationsList []*itemoperation.BackupOperation,
+) (bool, bool, int, int, []string) {
 	inProgressOperations := false
 	changes := false
 	var errs []string

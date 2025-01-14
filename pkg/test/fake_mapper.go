@@ -77,7 +77,7 @@ func (m *FakeMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta
 	}
 
 	for _, gvk := range potentialGVK {
-		//Ensure we have a REST mapping
+		// Ensure we have a REST mapping
 		res, ok := m.KindToPluralResource[gvk]
 		if !ok {
 			continue

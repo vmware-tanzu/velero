@@ -114,27 +114,27 @@ func (a *ChangeImageNameAction) Execute(input *velero.RestoreItemActionExecuteIn
 			return nil, errors.Wrap(err, "error getting item's spec.containers")
 		}
 	} else if obj.GetKind() == "CronJob" {
-		//handle containers
+		// handle containers
 		err = a.replaceImageName(obj, config, "spec", "jobTemplate", "spec", "template", "spec", "containers")
 		if err != nil {
 			a.logger.Infof("replace image name meet error: %v", err)
 			return nil, errors.Wrap(err, "error getting item's spec.containers")
 		}
-		//handle initContainers
+		// handle initContainers
 		err = a.replaceImageName(obj, config, "spec", "jobTemplate", "spec", "template", "spec", "initContainers")
 		if err != nil {
 			a.logger.Infof("replace image name meet error: %v", err)
 			return nil, errors.Wrap(err, "error getting item's spec.containers")
 		}
 	} else {
-		//handle containers
+		// handle containers
 		err = a.replaceImageName(obj, config, "spec", "template", "spec", "containers")
 		if err != nil {
 			a.logger.Infof("replace image name meet error: %v", err)
 			return nil, errors.Wrap(err, "error getting item's spec.containers")
 		}
 
-		//handle initContainers
+		// handle initContainers
 		err = a.replaceImageName(obj, config, "spec", "template", "spec", "initContainers")
 		if err != nil {
 			a.logger.Infof("replace image name meet error: %v", err)

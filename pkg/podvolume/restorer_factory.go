@@ -41,7 +41,8 @@ func NewRestorerFactory(repoLocker *repository.RepoLocker,
 	kubeClient kubernetes.Interface,
 	crClient ctrlclient.Client,
 	pvrInformer ctrlcache.Informer,
-	log logrus.FieldLogger) RestorerFactory {
+	log logrus.FieldLogger,
+) RestorerFactory {
 	return &restorerFactory{
 		repoLocker:  repoLocker,
 		repoEnsurer: repoEnsurer,

@@ -29,20 +29,18 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
-var (
-	backupColumns = []metav1.TableColumnDefinition{
-		// name needs Type and Format defined for the decorator to identify it:
-		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
-		{Name: "Name", Type: "string", Format: "name"},
-		{Name: "Status"},
-		{Name: "Errors"},
-		{Name: "Warnings"},
-		{Name: "Created"},
-		{Name: "Expires"},
-		{Name: "Storage Location"},
-		{Name: "Selector"},
-	}
-)
+var backupColumns = []metav1.TableColumnDefinition{
+	// name needs Type and Format defined for the decorator to identify it:
+	// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+	{Name: "Name", Type: "string", Format: "name"},
+	{Name: "Status"},
+	{Name: "Errors"},
+	{Name: "Warnings"},
+	{Name: "Created"},
+	{Name: "Expires"},
+	{Name: "Storage Location"},
+	{Name: "Selector"},
+}
 
 func printBackupList(list *velerov1api.BackupList) []metav1.TableRow {
 	sortBackupsByPrefixAndTimestamp(list)

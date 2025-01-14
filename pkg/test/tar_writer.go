@@ -87,7 +87,7 @@ func (tw *TarWriter) Add(name string, obj any) *TarWriter {
 		Name:     name,
 		Size:     int64(len(data)),
 		Typeflag: tar.TypeReg,
-		Mode:     0755,
+		Mode:     0o755,
 		ModTime:  time.Now(),
 	}))
 

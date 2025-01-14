@@ -72,7 +72,8 @@ type BackupRepoReconciler struct {
 
 func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client, repositoryManager repomanager.Manager,
 	maintenanceFrequency time.Duration, backupRepoConfig string, keepLatestMaintenanceJobs int, repoMaintenanceConfig string, maintenanceJobResources kube.PodResources,
-	logLevel logrus.Level, logFormat *logging.FormatFlag) *BackupRepoReconciler {
+	logLevel logrus.Level, logFormat *logging.FormatFlag,
+) *BackupRepoReconciler {
 	c := &BackupRepoReconciler{
 		client,
 		namespace,
@@ -414,8 +415,10 @@ func getLastMaintenanceTimeFromHistory(history []velerov1api.BackupRepositoryMai
 	return time
 }
 
-var funcStartMaintenanceJob = maintenance.StartNewJob
-var funcWaitMaintenanceJobComplete = maintenance.WaitJobComplete
+var (
+	funcStartMaintenanceJob        = maintenance.StartNewJob
+	funcWaitMaintenanceJobComplete = maintenance.WaitJobComplete
+)
 
 func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
 	startTime := r.clock.Now()

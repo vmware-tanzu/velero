@@ -61,6 +61,7 @@ func mockBackupFinalizerReconciler(fakeClient kbclient.Client, fakeGlobalClient 
 		10*time.Minute,
 	), backupper
 }
+
 func TestBackupFinalizerReconcile(t *testing.T) {
 	fakeClock := testclocks.NewFakeClock(time.Now())
 	metav1Now := metav1.NewTime(fakeClock.Now())

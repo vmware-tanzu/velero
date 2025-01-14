@@ -1095,7 +1095,8 @@ func TestGetVolumeSnapshotClassForStorageClass(t *testing.T) {
 
 	snapshotClasses := &snapshotv1api.VolumeSnapshotClassList{
 		Items: []snapshotv1api.VolumeSnapshotClass{
-			*hostpathClass, *fooClass, *barClass, *bazClass, *ambClass1, *ambClass2},
+			*hostpathClass, *fooClass, *barClass, *bazClass, *ambClass1, *ambClass2,
+		},
 	}
 
 	testCases := []struct {

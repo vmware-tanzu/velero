@@ -18,23 +18,19 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
+	"testing"
 	"time"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
-
-	"context"
-
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-
-	"strings"
-	"testing"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
@@ -176,19 +172,18 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		}
 		err := td.fakeClient.Create(context.TODO(), existing)
 		require.NoError(t, err)
-		existing2 :=
-			&velerov1api.DeleteBackupRequest{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: td.req.Namespace,
-					Name:      "bar-2",
-					Labels: map[string]string{
-						velerov1api.BackupNameLabel: "some-other-backup",
-					},
+		existing2 := &velerov1api.DeleteBackupRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: td.req.Namespace,
+				Name:      "bar-2",
+				Labels: map[string]string{
+					velerov1api.BackupNameLabel: "some-other-backup",
 				},
-				Spec: velerov1api.DeleteBackupRequestSpec{
-					BackupName: "some-other-backup",
-				},
-			}
+			},
+			Spec: velerov1api.DeleteBackupRequestSpec{
+				BackupName: "some-other-backup",
+			},
+		}
 		err = td.fakeClient.Create(context.TODO(), existing2)
 		require.NoError(t, err)
 		_, err = td.controller.Reconcile(context.TODO(), td.req)
@@ -956,7 +951,6 @@ func TestDeleteMovedSnapshots(t *testing.T) {
 			repoMgr:    repomocks.NewManager(t),
 			backupName: "backup-01",
 			snapshots: []*repotypes.SnapshotIdentifier{
-
 				{
 					SnapshotID:      "snapshot-1",
 					RepositoryType:  "repo-1",

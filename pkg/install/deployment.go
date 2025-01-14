@@ -208,6 +208,7 @@ func WithBackupRepoConfigMap(backupRepoConfigMap string) podTemplateOption {
 		c.backupRepoConfigMap = backupRepoConfigMap
 	}
 }
+
 func WithRepoMaintenanceJobConfigMap(repoMaintenanceJobConfigMap string) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.repoMaintenanceJobConfigMap = repoMaintenanceJobConfigMap

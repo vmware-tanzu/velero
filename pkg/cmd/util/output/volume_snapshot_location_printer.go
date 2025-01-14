@@ -23,14 +23,12 @@ import (
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
-var (
-	volumeSnapshotLocationColumns = []metav1.TableColumnDefinition{
-		// name needs Type and Format defined for the decorator to identify it:
-		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
-		{Name: "Name", Type: "string", Format: "name"},
-		{Name: "Provider"},
-	}
-)
+var volumeSnapshotLocationColumns = []metav1.TableColumnDefinition{
+	// name needs Type and Format defined for the decorator to identify it:
+	// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+	{Name: "Name", Type: "string", Format: "name"},
+	{Name: "Provider"},
+}
 
 func printVolumeSnapshotLocationList(list *v1.VolumeSnapshotLocationList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))

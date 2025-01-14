@@ -72,7 +72,7 @@ func dataDownloadBuilder() *builder.DataDownloadBuilder {
 }
 
 func initDataDownloadReconciler(objects []runtime.Object, needError ...bool) (*DataDownloadReconciler, error) {
-	var errs = make([]error, 6)
+	errs := make([]error, 6)
 	for k, isError := range needError {
 		if k == 0 && isError {
 			errs[0] = fmt.Errorf("Get error")
@@ -423,7 +423,8 @@ func TestDataDownloadReconcile(t *testing.T) {
 			}
 
 			datapath.MicroServiceBRWatcherCreator = func(kbclient.Client, kubernetes.Interface, manager.Manager, string, string,
-				string, string, string, string, datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
+				string, string, string, string, datapath.Callbacks, logrus.FieldLogger,
+			) datapath.AsyncBR {
 				asyncBR := datapathmockes.NewAsyncBR(t)
 				if test.mockInit {
 					asyncBR.On("Init", mock.Anything, mock.Anything).Return(test.mockInitErr)
@@ -721,7 +722,8 @@ func TestFindDataDownloadForPod(t *testing.T) {
 				assert.Equal(t, du.Namespace, requests[0].Namespace)
 				assert.Equal(t, du.Name, requests[0].Name)
 			},
-		}, {
+		},
+		{
 			name: "no selected label found for pod",
 			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Result(),
@@ -729,7 +731,8 @@ func TestFindDataDownloadForPod(t *testing.T) {
 				// Assert that the function returns a single request
 				assert.Empty(t, requests)
 			},
-		}, {
+		},
+		{
 			name: "no matched pod",
 			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: "non-existing-datadownload"}).Result(),
@@ -992,7 +995,8 @@ func (dt *ddResumeTestHelper) RebindVolume(context.Context, corev1.ObjectReferen
 func (dt *ddResumeTestHelper) CleanUp(context.Context, corev1.ObjectReference) {}
 
 func (dt *ddResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
-	datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
+	datapath.Callbacks, logrus.FieldLogger,
+) datapath.AsyncBR {
 	return dt.asyncBR
 }
 

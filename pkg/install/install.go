@@ -339,7 +339,7 @@ func CreateClient(r *unstructured.Unstructured, factory client.DynamicFactory, w
 func Install(dynamicFactory client.DynamicFactory, kbClient kbclient.Client, resources *unstructured.UnstructuredList, w io.Writer) error {
 	rg := GroupResources(resources)
 
-	//Install CRDs first
+	// Install CRDs first
 	for _, r := range rg.CRDResources {
 		if err := createResource(r, dynamicFactory, w); err != nil {
 			return err

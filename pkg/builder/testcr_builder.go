@@ -70,8 +70,6 @@ type TestCR struct {
 	Status TestCRStatus `json:"status,omitempty"`
 }
 
-type TestCRSpec struct {
-}
+type TestCRSpec struct{}
 
-type TestCRStatus struct {
-}
+type TestCRStatus struct{}

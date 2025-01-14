@@ -83,7 +83,8 @@ type microServiceBRWatcher struct {
 }
 
 func newMicroServiceBRWatcher(client client.Client, kubeClient kubernetes.Interface, mgr manager.Manager, taskType string, taskName string, namespace string,
-	podName string, containerName string, associatedObject string, callbacks Callbacks, log logrus.FieldLogger) AsyncBR {
+	podName string, containerName string, associatedObject string, callbacks Callbacks, log logrus.FieldLogger,
+) AsyncBR {
 	ms := &microServiceBRWatcher{
 		mgr:              mgr,
 		client:           client,
@@ -246,10 +247,12 @@ func (ms *microServiceBRWatcher) reEnsureThisPod(ctx context.Context) error {
 	return nil
 }
 
-var funcGetPodTerminationMessage = kube.GetPodContainerTerminateMessage
-var funcRedirectLog = redirectDataMoverLogs
-var funcGetResultFromMessage = getResultFromMessage
-var funcGetProgressFromMessage = getProgressFromMessage
+var (
+	funcGetPodTerminationMessage = kube.GetPodContainerTerminateMessage
+	funcRedirectLog              = redirectDataMoverLogs
+	funcGetResultFromMessage     = getResultFromMessage
+	funcGetProgressFromMessage   = getProgressFromMessage
+)
 
 var eventWaitTimeout = time.Minute
 
@@ -409,8 +412,10 @@ func (ms *microServiceBRWatcher) Cancel() {
 	ms.log.WithField("taskType", ms.taskType).WithField("taskName", ms.taskName).Info("MicroServiceBR is canceled")
 }
 
-var funcCreateTemp = os.CreateTemp
-var funcCollectPodLogs = kube.CollectPodLogs
+var (
+	funcCreateTemp     = os.CreateTemp
+	funcCollectPodLogs = kube.CollectPodLogs
+)
 
 func redirectDataMoverLogs(ctx context.Context, kubeClient kubernetes.Interface, namespace string, thisPod string, thisContainer string, logger logrus.FieldLogger) error {
 	logger.Infof("Starting to collect data mover pod log for %s", thisPod)

@@ -78,6 +78,7 @@ func TestGenerateJobName1(t *testing.T) {
 		})
 	}
 }
+
 func TestDeleteOldJobs(t *testing.T) {
 	// Set up test repo and keep value
 	repo := "test-repo"

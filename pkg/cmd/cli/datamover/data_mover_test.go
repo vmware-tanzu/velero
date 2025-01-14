@@ -45,7 +45,7 @@ func (em *exitWithMessageMock) CreateFile(name string) (*os.File, error) {
 	}
 
 	if em.writeFail {
-		return os.OpenFile(em.filePath, os.O_CREATE|os.O_RDONLY, 0500)
+		return os.OpenFile(em.filePath, os.O_CREATE|os.O_RDONLY, 0o500)
 	} else {
 		return os.Create(em.filePath)
 	}

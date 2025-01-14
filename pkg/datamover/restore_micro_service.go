@@ -65,7 +65,8 @@ type RestoreMicroService struct {
 
 func NewRestoreMicroService(ctx context.Context, client client.Client, kubeClient kubernetes.Interface, dataDownloadName string, namespace string, nodeName string,
 	sourceTargetPath datapath.AccessPoint, dataPathMgr *datapath.Manager, repoEnsurer *repository.Ensurer, cred *credentials.CredentialGetter,
-	ddInformer cache.Informer, log logrus.FieldLogger) *RestoreMicroService {
+	ddInformer cache.Informer, log logrus.FieldLogger,
+) *RestoreMicroService {
 	return &RestoreMicroService{
 		ctx:              ctx,
 		client:           client,
@@ -106,7 +107,6 @@ func (r *RestoreMicroService) Init() error {
 			},
 		},
 	)
-
 	if err != nil {
 		return errors.Wrap(err, "error adding dd handler")
 	}

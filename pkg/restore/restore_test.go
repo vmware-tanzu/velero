@@ -449,8 +449,12 @@ func TestRestoreResourceFiltering(t *testing.T) {
 		},
 		{
 			name: "OrLabelSelectors only restores matching resources",
-			restore: defaultRestore().OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}},
-				{MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).Result(),
+			restore: defaultRestore().OrLabelSelector([]*metav1.LabelSelector{
+				{MatchLabels: map[string]string{"a1": "b1"}},
+				{MatchLabels: map[string]string{"a2": "b2"}},
+				{MatchLabels: map[string]string{"a3": "b3"}},
+				{MatchLabels: map[string]string{"a4": "b4"}},
+			}).Result(),
 			backup: defaultBackup().Result(),
 			tarball: test.NewTarWriter(t).
 				AddItems("pods",
@@ -1925,7 +1929,8 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 						ResourceIdentifier: velero.ResourceIdentifier{
 							GroupResource: kuberesource.Pods,
 							Namespace:     "ns-1",
-							Name:          "pod-1"},
+							Name:          "pod-1",
+						},
 						OperationID: "pod-1-1",
 					},
 					Status: itemoperation.OperationStatus{
@@ -1950,7 +1955,8 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 						ResourceIdentifier: velero.ResourceIdentifier{
 							GroupResource: kuberesource.Pods,
 							Namespace:     "ns-1",
-							Name:          "pod-2"},
+							Name:          "pod-2",
+						},
 						OperationID: "pod-2-1",
 					},
 					Status: itemoperation.OperationStatus{
@@ -2852,7 +2858,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				AddItems(
 					"persistentvolumes",
 					builder.ForPersistentVolume("source-pv").
-						//ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						// ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
 						AWSEBSVolumeID("source-volume").
 						ClaimRef("source-ns", "pvc-1").
 						Result(),
@@ -2865,7 +2871,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(
 					builder.ForPersistentVolume("source-pv").
-						//ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						// ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
 						AWSEBSVolumeID("source-volume").
 						ClaimRef("source-ns", "pvc-1").
 						Result(),
@@ -2914,7 +2920,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			want: []*test.APIResource{
 				test.PVs(
 					builder.ForPersistentVolume("source-pv").
-						//ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						// ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
 						ObjectMeta(
 							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
 						).
@@ -3765,12 +3771,14 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 				"namespace":       "ns-1",
 				"name":            "pvc-1",
 				"uid":             "abc",
-				"resourceVersion": "1"}).Unstructured,
+				"resourceVersion": "1",
+			}).Unstructured,
 			expected: newTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").
 				WithAnnotations(kubeutil.KubeAnnDynamicallyProvisioned).
 				WithSpecField("claimRef", map[string]any{
-					"namespace": "ns-1", "name": "pvc-1"}).Unstructured,
+					"namespace": "ns-1", "name": "pvc-1",
+				}).Unstructured,
 		},
 		{
 			name: "PVCs that are bound have their binding annotations removed, but the volume name stays",

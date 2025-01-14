@@ -1,13 +1,13 @@
 package output
 
 import (
+	"testing"
+
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-
-	"testing"
 )
 
 func TestBindFlags(t *testing.T) {

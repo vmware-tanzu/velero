@@ -58,7 +58,8 @@ func TestInitContainerRestoreHookPodActionExecute(t *testing.T) {
 					builder.ForContainer("init-app-step2", "busy-box").
 						Command([]string{"init-step2"}).Result(),
 					builder.ForContainer("init-app-step3", "busy-box").
-						Command([]string{"init-step3"}).Result()}...).Result(),
+						Command([]string{"init-step3"}).Result(),
+				}...).Result(),
 			expectedRes: builder.ForPod("default", "app1").
 				ObjectMeta(builder.WithAnnotations(
 					"init.hook.restore.velero.io/container-image", "nginx",
@@ -75,7 +76,8 @@ func TestInitContainerRestoreHookPodActionExecute(t *testing.T) {
 					builder.ForContainer("init-app-step2", "busy-box").
 						Command([]string{"init-step2"}).Result(),
 					builder.ForContainer("init-app-step3", "busy-box").
-						Command([]string{"init-step3"}).Result()}...).Result(),
+						Command([]string{"init-step3"}).Result(),
+				}...).Result(),
 		},
 		{
 			name: "should run restore hook from restore spec",

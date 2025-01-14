@@ -32,8 +32,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
-const restoreProgressCheckInterval = 10 * time.Second
-const backupProgressCheckInterval = 10 * time.Second
+const (
+	restoreProgressCheckInterval = 10 * time.Second
+	backupProgressCheckInterval  = 10 * time.Second
+)
 
 var ErrorCanceled error = errors.New("uploader is canceled")
 

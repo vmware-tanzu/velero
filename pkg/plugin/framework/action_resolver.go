@@ -57,7 +57,8 @@ type resolvedAction struct {
 }
 
 func (recv resolvedAction) ShouldUse(groupResource schema.GroupResource, namespace string, metadata metav1.Object,
-	log logrus.FieldLogger) bool {
+	log logrus.FieldLogger,
+) bool {
 	if !recv.ResourceIncludesExcludes.ShouldInclude(groupResource.String()) {
 		log.Debug("Skipping action because it does not apply to this resource")
 		return false
@@ -82,7 +83,8 @@ func (recv resolvedAction) ShouldUse(groupResource schema.GroupResource, namespa
 
 // resolveAction resolves the resources, namespaces and selector into fully-qualified versions
 func resolveAction(helper discovery.Helper, action velero.Applicable) (resources *collections.IncludesExcludes,
-	namespaces *collections.IncludesExcludes, selector labels.Selector, err error) {
+	namespaces *collections.IncludesExcludes, selector labels.Selector, err error,
+) {
 	resourceSelector, err := action.AppliesTo()
 	if err != nil {
 		return nil, nil, nil, err

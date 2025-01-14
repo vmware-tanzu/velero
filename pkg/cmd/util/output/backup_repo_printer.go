@@ -23,15 +23,13 @@ import (
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
-var (
-	backupRepoColumns = []metav1.TableColumnDefinition{
-		// name needs Type and Format defined for the decorator to identify it:
-		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
-		{Name: "Name", Type: "string", Format: "name"},
-		{Name: "Status"},
-		{Name: "Last Maintenance"},
-	}
-)
+var backupRepoColumns = []metav1.TableColumnDefinition{
+	// name needs Type and Format defined for the decorator to identify it:
+	// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+	{Name: "Name", Type: "string", Format: "name"},
+	{Name: "Status"},
+	{Name: "Last Maintenance"},
+}
 
 func printBackupRepoList(list *v1.BackupRepositoryList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))

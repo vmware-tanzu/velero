@@ -76,7 +76,8 @@ func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Requ
 func (b *fakeBackupper) BackupWithResolvers(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
 	itemBlockActionResolver framework.ItemBlockActionResolver,
-	volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
+	volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter,
+) error {
 	args := b.Called(logger, backup, backupFile, backupItemActionResolver, volumeSnapshotterGetter)
 	return args.Error(0)
 }
@@ -129,9 +130,7 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			formatFlag := logging.FormatText
-			var (
-				logger = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
-			)
+			logger := logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 
 			c := &backupReconciler{
 				kbClient:   velerotest.NewFakeControllerRuntimeClient(t),
@@ -187,8 +186,12 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		},
 		{
 			name: "labelSelector as well as orLabelSelectors both are specified in backup request fails validation",
-			backup: defaultBackup().LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).OrLabelSelector([]*metav1.LabelSelector{{MatchLabels: map[string]string{"a1": "b1"}}, {MatchLabels: map[string]string{"a2": "b2"}},
-				{MatchLabels: map[string]string{"a3": "b3"}}, {MatchLabels: map[string]string{"a4": "b4"}}}).Result(),
+			backup: defaultBackup().LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).OrLabelSelector([]*metav1.LabelSelector{
+				{MatchLabels: map[string]string{"a1": "b1"}},
+				{MatchLabels: map[string]string{"a2": "b2"}},
+				{MatchLabels: map[string]string{"a3": "b3"}},
+				{MatchLabels: map[string]string{"a4": "b4"}},
+			}).Result(),
 			backupLocation: defaultBackupLocation,
 			expectedErrs:   []string{"encountered labelSelector as well as orLabelSelectors in backup spec, only one can be specified"},
 		},
@@ -203,9 +206,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			formatFlag := logging.FormatText
-			var (
-				logger = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
-			)
+			logger := logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 
 			apiServer := velerotest.NewAPIServer(t)
 			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
@@ -407,9 +408,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 }
 
 func TestDefaultBackupTTL(t *testing.T) {
-	var (
-		defaultBackupTTL = metav1.Duration{Duration: 24 * 30 * time.Hour}
-	)
+	defaultBackupTTL := metav1.Duration{Duration: 24 * 30 * time.Hour}
 
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
 	require.NoError(t, err)
@@ -1531,9 +1530,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			formatFlag := logging.FormatText
-			var (
-				logger = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
-			)
+			logger := logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 
 			c := &backupReconciler{
 				logger:                   logger,

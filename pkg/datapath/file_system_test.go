@@ -34,7 +34,7 @@ func TestAsyncBackup(t *testing.T) {
 	var asyncErr error
 	var asyncResult Result
 	finish := make(chan struct{})
-	var failErr = errors.New("fake-fail-error")
+	failErr := errors.New("fake-fail-error")
 	tests := []struct {
 		name         string
 		uploaderProv provider.Provider
@@ -119,7 +119,7 @@ func TestAsyncRestore(t *testing.T) {
 	var asyncErr error
 	var asyncResult Result
 	finish := make(chan struct{})
-	var failErr = errors.New("fake-fail-error")
+	failErr := errors.New("fake-fail-error")
 	tests := []struct {
 		name         string
 		uploaderProv provider.Provider

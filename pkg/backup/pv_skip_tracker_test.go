@@ -61,7 +61,7 @@ func TestSummary(t *testing.T) {
 
 func TestSerializeSkipReasons(t *testing.T) {
 	tracker := NewSkipPVTracker()
-	//tracker.Track("pv5", "", "skipped due to policy")
+	// tracker.Track("pv5", "", "skipped due to policy")
 	tracker.Track("pv3", podVolumeApproach, "it's set to opt-out")
 	tracker.Track("pv3", csiSnapshotApproach, "not applicable for CSI ")
 
