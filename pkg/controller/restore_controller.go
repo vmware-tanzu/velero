@@ -396,7 +396,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 		restore.Spec.ScheduleName = info.backup.GetLabels()[api.ScheduleNameLabel]
 	}
 
-	var resourceModifiers *resourcemodifiers.ResourceModifiers = nil
+	var resourceModifiers *resourcemodifiers.ResourceModifiers
 	if restore.Spec.ResourceModifier != nil && strings.EqualFold(restore.Spec.ResourceModifier.Kind, resourcemodifiers.ConfigmapRefType) {
 		ResourceModifierConfigMap := &corev1api.ConfigMap{}
 		err := r.kbClient.Get(context.Background(), client.ObjectKey{Namespace: restore.Namespace, Name: restore.Spec.ResourceModifier.Name}, ResourceModifierConfigMap)

@@ -386,7 +386,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
 	}
 
-	var gracePeriod int64 = 0
+	var gracePeriod int64
 	volumeMounts, volumeDevices, volumePath := kube.MakePodPVCAttachment(volumeName, targetPVC.Spec.VolumeMode, false)
 	volumeMounts = append(volumeMounts, podInfo.volumeMounts...)
 

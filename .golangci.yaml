@@ -240,7 +240,6 @@ linters-settings:
       - name: context-as-argument
         disabled: true
       - name: context-keys-type
-        disabled: false
       - name: dot-imports
         disabled: true
       - name: early-return
@@ -262,7 +261,6 @@ linters-settings:
       - name: indent-error-flow
         disabled: true
       - name: range
-        disabled: false
       - name: receiver-naming
         disabled: true
       - name: redefines-builtin-id
@@ -272,19 +270,16 @@ linters-settings:
         arguments:
           - "preserveScope"
       - name: time-naming
-        disabled: false
       - name: unexported-return
         disabled: true
       - name: unnecessary-stmt
         disabled: true
       - name: unreachable-code
-        disabled: false
       - name: unused-parameter
         disabled: true
       - name: use-any
         disabled: true
       - name: var-declaration
-        disabled: true
       - name: var-naming
         disabled: true
     
@@ -333,7 +328,7 @@ linters-settings:
     force-case-trailing-whitespace: 0
     # Force cuddling of err checks with err var assignment
     force-err-cuddling: false
-    # Allow leading comments to be separated with empty liens
+    # Allow leading comments to be separated with empty lines
     allow-separated-leading-comment: false
 
 linters:

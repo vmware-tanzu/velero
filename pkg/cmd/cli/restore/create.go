@@ -299,7 +299,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		}
 	}
 
-	var resModifiers *corev1.TypedLocalObjectReference = nil
+	var resModifiers *corev1.TypedLocalObjectReference
 
 	if o.ResourceModifierConfigMap != "" {
 		resModifiers = &corev1.TypedLocalObjectReference{
