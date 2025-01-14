@@ -92,7 +92,7 @@ func (o *OrderedResources) CreateResources() error {
 		"orderedresources": "true",
 	}
 	fmt.Printf("Creating resources in %s namespace ...\n", o.Namespace)
-	if err := k8sutil.CreateNamespace(o.Ctx, o.Client, o.Namespace); err != nil {
+	if err := k8sutil.CreateNamespace(o.Ctx, o.Client, o.Namespace, false); err != nil {
 		return errors.Wrapf(err, "failed to create namespace %s", o.Namespace)
 	}
 

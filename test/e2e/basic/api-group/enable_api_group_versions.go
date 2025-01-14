@@ -489,7 +489,7 @@ func installTestResources(ctx context.Context, client TestClient, group string, 
 
 		for version, cr := range tc.srcCRs {
 			ns := fmt.Sprintf("rockband%ds-src-%s-%d", i, version, i)
-			if err := CreateNamespace(ctx, client, ns); err != nil {
+			if err := CreateNamespace(ctx, client, ns, false); err != nil {
 				return "", "", errors.Wrapf(err, "create %s namespace", ns)
 			}
 

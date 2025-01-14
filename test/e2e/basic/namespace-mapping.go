@@ -88,7 +88,7 @@ func (n *NamespaceMapping) CreateResources() error {
 	for index, ns := range *n.NSIncluded {
 		n.kibishiiData.Levels = len(*n.NSIncluded) + index
 		By(fmt.Sprintf("Creating namespaces ...%s\n", ns), func() {
-			Expect(CreateNamespace(n.Ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
+			Expect(CreateNamespace(n.Ctx, n.Client, ns, false)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
 		})
 		By("Deploy sample workload of Kibishii", func() {
 			Expect(KibishiiPrepareBeforeBackup(n.Ctx, n.Client, n.VeleroCfg.CloudProvider,

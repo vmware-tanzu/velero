@@ -53,6 +53,7 @@ func (n *PeriodicalCase) CreateResources() error {
 					n.Ctx,
 					n.Client,
 					ns,
+					false,
 				),
 			).To(
 				Succeed(),

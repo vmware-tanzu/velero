@@ -54,7 +54,7 @@ func SSRTest() {
 		defer ctxCancel()
 		defer DeleteNamespace(context.TODO(), *veleroCfg.ClientToInstallVelero, testNS, false)
 		By(fmt.Sprintf("Create %s namespace", testNS))
-		Expect(CreateNamespace(ctx, *veleroCfg.ClientToInstallVelero, testNS)).To(Succeed(),
+		Expect(CreateNamespace(ctx, *veleroCfg.ClientToInstallVelero, testNS, false)).To(Succeed(),
 			fmt.Sprintf("Failed to create %s namespace", testNS))
 
 		By(fmt.Sprintf("Get version in %s namespace", testNS), func() {

@@ -65,7 +65,7 @@ func (p *PVBackupFiltering) Init() error {
 func (p *PVBackupFiltering) CreateResources() error {
 	for _, ns := range *p.NSIncluded {
 		By(fmt.Sprintf("Create namespaces %s for workload\n", ns), func() {
-			Expect(CreateNamespace(p.Ctx, p.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
+			Expect(CreateNamespace(p.Ctx, p.Client, ns, false)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
 		})
 		var pods []string
 		By(fmt.Sprintf("Deploy a few pods with several PVs in namespace %s", ns), func() {
