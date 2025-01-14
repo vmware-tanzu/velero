@@ -460,7 +460,8 @@ var _ = Describe("Backup Sync Reconciler", func() {
 					context.TODO(),
 					types.NamespacedName{
 						Namespace: cloudBackupData.backup.Namespace,
-						Name:      cloudBackupData.backup.Name},
+						Name:      cloudBackupData.backup.Name,
+					},
 					obj)
 				if cloudBackupData.backupShouldSkipSync &&
 					(cloudBackupData.backup.Status.Expiration == nil ||
@@ -725,11 +726,9 @@ var _ = Describe("Backup Sync Reconciler", func() {
 		locationList.Items = testObjList.(*velerov1api.BackupStorageLocationList).Items[1:]
 		testObjList = backupSyncSourceOrderFunc(locationList)
 		Expect(testObjList).To(BeEquivalentTo(locationList))
-
 	})
 
 	When("testing validateOwnerReferences", func() {
-
 		testCases := []struct {
 			name               string
 			backup             *velerov1api.Backup
@@ -886,7 +885,7 @@ var _ = Describe("Backup Sync Reconciler", func() {
 					client: ctrlfake.NewClientBuilder().Build(),
 				}
 
-				//create all required schedules as needed.
+				// create all required schedules as needed.
 				for _, creatable := range test.toCreate {
 					err := b.client.Create(context.Background(), creatable)
 					Expect(err).ShouldNot(HaveOccurred())

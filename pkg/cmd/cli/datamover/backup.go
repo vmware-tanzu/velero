@@ -213,8 +213,10 @@ func newdataMoverBackup(logger logrus.FieldLogger, factory client.Factory, confi
 	return s, nil
 }
 
-var funcExitWithMessage = exitWithMessage
-var funcCreateDataPathService = (*dataMoverBackup).createDataPathService
+var (
+	funcExitWithMessage       = exitWithMessage
+	funcCreateDataPathService = (*dataMoverBackup).createDataPathService
+)
 
 func (s *dataMoverBackup) run() {
 	signals.CancelOnShutdown(s.cancelFunc, s.logger)
@@ -268,8 +270,10 @@ func (s *dataMoverBackup) runDataPath() {
 	funcExitWithMessage(s.logger, true, result)
 }
 
-var funcNewCredentialFileStore = credentials.NewNamespacedFileStore
-var funcNewCredentialSecretStore = credentials.NewNamespacedSecretStore
+var (
+	funcNewCredentialFileStore   = credentials.NewNamespacedFileStore
+	funcNewCredentialSecretStore = credentials.NewNamespacedSecretStore
+)
 
 func (s *dataMoverBackup) createDataPathService() (dataPathService, error) {
 	credentialFileStore, err := funcNewCredentialFileStore(

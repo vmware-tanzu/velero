@@ -207,7 +207,8 @@ func (r *restoreOperationsReconciler) updateRestoreAndOperationsJSON(
 	backupStore persistence.BackupStore,
 	operations *itemoperationmap.OperationsForRestore,
 	changes bool,
-	completionChanges bool) error {
+	completionChanges bool,
+) error {
 	if len(operations.ErrsSinceUpdate) > 0 {
 		// FIXME: download/upload results
 		r.logger.WithField("restore", restore.Name).Infof("Restore has %d errors", len(operations.ErrsSinceUpdate))
@@ -254,7 +255,8 @@ func (r *restoreOperationsReconciler) updateRestoreAndOperationsJSON(
 func getRestoreItemOperationProgress(
 	restore *velerov1api.Restore,
 	pluginManager clientmgmt.Manager,
-	operationsList []*itemoperation.RestoreOperation) (bool, bool, int, int, []string) {
+	operationsList []*itemoperation.RestoreOperation,
+) (bool, bool, int, int, []string) {
 	inProgressOperations := false
 	changes := false
 	var errs []string

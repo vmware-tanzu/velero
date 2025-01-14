@@ -95,7 +95,6 @@ func TestNewDownloadCommand(t *testing.T) {
 	cmd := exec.Command(os.Args[0], []string{"-test.run=TestNewDownloadCommand"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
 	_, stderr, err := veleroexec.RunCommand(cmd)
-
 	if err != nil {
 		require.Contains(t, stderr, "download request download url timeout")
 		return

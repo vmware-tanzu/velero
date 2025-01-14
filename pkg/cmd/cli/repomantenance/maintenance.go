@@ -149,7 +149,6 @@ func (o *Options) runRepoPrune(f velerocli.Factory, namespace string, logger log
 			BackupLocation:  o.BackupStorageLocation,
 			RepositoryType:  o.RepoType,
 		}, true)
-
 	if err != nil {
 		return errors.Wrap(err, "failed to get backup repository")
 	}

@@ -224,27 +224,27 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--resource-policies-configmap", resPoliciesConfigmap})
 		flags.Parse([]string{"--data-mover", dataMover})
 		flags.Parse([]string{"--parallel-files-upload", strconv.Itoa(parallelFilesUpload)})
-		//flags.Parse([]string{"--wait"})
+		// flags.Parse([]string{"--wait"})
 
 		client := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
 		f.On("Namespace").Return(mock.Anything)
 		f.On("KubebuilderWatchClient").Return(client, nil)
 
-		//Complete
+		// Complete
 		e := o.Complete(args, f)
 		require.NoError(t, e)
 
-		//Validate
+		// Validate
 		e = o.Validate(cmd, args, f)
 		require.ErrorContains(t, e, "include-resources, exclude-resources and include-cluster-resources are old filter parameters")
 		require.ErrorContains(t, e, "include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\nThey cannot be used together")
 
-		//cmd
+		// cmd
 		e = o.Run(cmd, f)
 		require.NoError(t, e)
 
-		//Execute
+		// Execute
 		cmd.SetArgs([]string{"bk-name-exe"})
 		e = cmd.Execute()
 		require.NoError(t, e)
@@ -274,7 +274,7 @@ func TestCreateCommand(t *testing.T) {
 		require.Equal(t, resPoliciesConfigmap, o.ResPoliciesConfigmap)
 		require.Equal(t, dataMover, o.DataMover)
 		require.Equal(t, parallelFilesUpload, o.ParallelFilesUpload)
-		//assert.Equal(t, true, o.Wait)
+		// assert.Equal(t, true, o.Wait)
 
 		// verify oldAndNewFilterParametersUsedTogether
 		mix := o.oldAndNewFilterParametersUsedTogether()

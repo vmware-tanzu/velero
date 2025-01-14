@@ -141,7 +141,6 @@ func GetLatestMaintenanceJob(cli client.Client, ns string) (*batchv1.Job, error)
 	},
 		&client.HasLabels{RepositoryNameLabel},
 	)
-
 	if err != nil {
 		return nil, err
 	}

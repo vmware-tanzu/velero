@@ -136,7 +136,6 @@ func (ks *kopiaRepoService) Open(ctx context.Context, repoOption udmrepo.RepoOpt
 		Purpose:  repoOption.Description,
 		OnUpload: kr.updateProgress,
 	})
-
 	if err != nil {
 		if e := r.Close(repoCtx); e != nil {
 			ks.logger.WithError(e).Error("Failed to close raw repository on error")
@@ -199,7 +198,6 @@ func (ks *kopiaRepoService) Maintain(ctx context.Context, repoOption udmrepo.Rep
 	}, func(ctx context.Context, dw repo.DirectRepositoryWriter) error {
 		return km.runMaintenance(ctx, dw)
 	})
-
 	if err != nil {
 		return errors.Wrap(err, "error to maintain repo")
 	}
@@ -609,7 +607,6 @@ func writeInitParameters(ctx context.Context, repoOption udmrepo.RepoOptions, lo
 
 		return nil
 	})
-
 	if err != nil {
 		return errors.Wrap(err, "error to init write repo parameters")
 	}

@@ -35,8 +35,7 @@ type ClusterRoleBindingLister interface {
 }
 
 // noopClusterRoleBindingLister exists to handle clusters where RBAC is disabled.
-type NoopClusterRoleBindingLister struct {
-}
+type NoopClusterRoleBindingLister struct{}
 
 func (noop NoopClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
 	return []ClusterRoleBinding{}, nil

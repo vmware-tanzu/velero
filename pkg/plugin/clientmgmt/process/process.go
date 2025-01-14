@@ -28,8 +28,7 @@ type Factory interface {
 	newProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (Process, error)
 }
 
-type processFactory struct {
-}
+type processFactory struct{}
 
 func newProcessFactory() Factory {
 	return &processFactory{}

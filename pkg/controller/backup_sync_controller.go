@@ -67,7 +67,8 @@ func NewBackupSyncReconciler(
 	defaultBackupSyncPeriod time.Duration,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
-	logger logrus.FieldLogger) *backupSyncReconciler {
+	logger logrus.FieldLogger,
+) *backupSyncReconciler {
 	return &backupSyncReconciler{
 		client:                  client,
 		namespace:               namespace,
@@ -185,7 +186,7 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 		backup.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(backup.Spec.StorageLocation)
 
-		//check for the ownership references. If they do not exist, remove them.
+		// check for the ownership references. If they do not exist, remove them.
 		backup.ObjectMeta.OwnerReferences = b.filterBackupOwnerReferences(ctx, backup, log)
 
 		// attempt to create backup custom resource via API

@@ -53,7 +53,6 @@ func TestNewGetCommand(t *testing.T) {
 	cmd := exec.Command(os.Args[0], []string{"-test.run=TestNewGetCommand"}...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=1", cmdtest.CaptureFlag))
 	_, stderr, err := veleroexec.RunCommand(cmd)
-
 	if err != nil {
 		assert.Contains(t, stderr, fmt.Sprintf("backupstoragelocations.velero.io \"%s\" not found", bkList[0]))
 		return

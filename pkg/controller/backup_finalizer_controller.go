@@ -244,7 +244,8 @@ func (r *backupFinalizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // updateCSIVolumeSnapshotsCompleted calculate the completed VS number according to
 // the backup's async operation list.
 func updateCSIVolumeSnapshotsCompleted(
-	operations []*itemoperation.BackupOperation) int {
+	operations []*itemoperation.BackupOperation,
+) int {
 	completedNum := 0
 
 	for index := range operations {

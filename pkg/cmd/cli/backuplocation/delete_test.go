@@ -75,8 +75,9 @@ func TestNewDeleteCommand(t *testing.T) {
 	}
 	t.Fatalf("process ran with err %v, want backups by get()", err)
 }
+
 func TestDeleteFunctions(t *testing.T) {
-	//t.Run("create the other create command with fromSchedule option for Run() other branches", func(t *testing.T) {
+	// t.Run("create the other create command with fromSchedule option for Run() other branches", func(t *testing.T) {
 	// create a factory
 	f := &factorymocks.Factory{}
 	kbclient := velerotest.NewFakeControllerRuntimeClient(t)

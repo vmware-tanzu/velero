@@ -19,10 +19,9 @@ package repository
 import (
 	"context"
 	"fmt"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"testing"
 
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,7 +75,8 @@ func TestGetBackupRepository(t *testing.T) {
 			name: "found more than one repository",
 			backupRepositories: []velerov1api.BackupRepository{
 				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns", "fake-bsl", "fake-repository-type"}, velerov1api.BackupRepositoryPhaseReady, "01"),
-				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns", "fake-bsl", "fake-repository-type"}, velerov1api.BackupRepositoryPhaseReady, "02")},
+				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns", "fake-bsl", "fake-repository-type"}, velerov1api.BackupRepositoryPhaseReady, "02"),
+			},
 			backupRepositoryKey: BackupRepositoryKey{"fake-volume-ns", "fake-bsl", "fake-repository-type"},
 			expectedErr:         "more than one BackupRepository found for workload namespace \"fake-volume-ns\", backup storage location \"fake-bsl\", repository type \"fake-repository-type\"",
 		},
@@ -84,7 +84,8 @@ func TestGetBackupRepository(t *testing.T) {
 			name: "repository not ready, not expect ready",
 			backupRepositories: []velerov1api.BackupRepository{
 				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-01", "fake-bsl-01", "fake-repository-type-01"}, velerov1api.BackupRepositoryPhaseReady, "01"),
-				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseNotReady, "02")},
+				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseNotReady, "02"),
+			},
 			backupRepositoryKey: BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"},
 			expected:            buildBackupRepoPointer(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseNotReady, "02"),
 		},
@@ -92,7 +93,8 @@ func TestGetBackupRepository(t *testing.T) {
 			name: "repository is new, not expect ready",
 			backupRepositories: []velerov1api.BackupRepository{
 				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-01", "fake-bsl-01", "fake-repository-type-01"}, velerov1api.BackupRepositoryPhaseReady, "01"),
-				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseNew, "02")},
+				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseNew, "02"),
+			},
 			backupRepositoryKey: BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"},
 			expected:            buildBackupRepoPointer(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseNew, "02"),
 		},
@@ -100,7 +102,8 @@ func TestGetBackupRepository(t *testing.T) {
 			name: "repository state is empty, not expect ready",
 			backupRepositories: []velerov1api.BackupRepository{
 				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-01", "fake-bsl-01", "fake-repository-type-01"}, velerov1api.BackupRepositoryPhaseReady, "01"),
-				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, "", "02")},
+				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, "", "02"),
+			},
 			backupRepositoryKey: BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"},
 			expected:            buildBackupRepoPointer(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, "", "02"),
 		},
@@ -108,7 +111,8 @@ func TestGetBackupRepository(t *testing.T) {
 			name: "repository not ready, expect ready",
 			backupRepositories: []velerov1api.BackupRepository{
 				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-01", "fake-bsl-01", "fake-repository-type-01"}, velerov1api.BackupRepositoryPhaseReady, "01"),
-				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseNotReady, "02")},
+				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseNotReady, "02"),
+			},
 			backupRepositoryKey: BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"},
 			ensureReady:         true,
 			expectedErr:         "backup repository is not ready: ",
@@ -117,7 +121,8 @@ func TestGetBackupRepository(t *testing.T) {
 			name: "repository is new, expect ready",
 			backupRepositories: []velerov1api.BackupRepository{
 				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-01", "fake-bsl-01", "fake-repository-type-01"}, velerov1api.BackupRepositoryPhaseReady, "01"),
-				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseNew, "02")},
+				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseNew, "02"),
+			},
 			backupRepositoryKey: BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"},
 			ensureReady:         true,
 			expectedErr:         "backup repository not provisioned",
@@ -126,7 +131,8 @@ func TestGetBackupRepository(t *testing.T) {
 			name: "repository state is empty, expect ready",
 			backupRepositories: []velerov1api.BackupRepository{
 				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-01", "fake-bsl-01", "fake-repository-type-01"}, velerov1api.BackupRepositoryPhaseReady, "01"),
-				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, "", "02")},
+				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, "", "02"),
+			},
 			backupRepositoryKey: BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"},
 			ensureReady:         true,
 			expectedErr:         "backup repository not provisioned",
@@ -135,7 +141,8 @@ func TestGetBackupRepository(t *testing.T) {
 			name: "repository ready, expect ready",
 			backupRepositories: []velerov1api.BackupRepository{
 				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-01", "fake-bsl-01", "fake-repository-type-01"}, velerov1api.BackupRepositoryPhaseNotReady, "01"),
-				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseReady, "02")},
+				buildBackupRepo(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseReady, "02"),
+			},
 			backupRepositoryKey: BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"},
 			ensureReady:         true,
 			expected:            buildBackupRepoPointer(BackupRepositoryKey{"fake-volume-ns-02", "fake-bsl-02", "fake-repository-type-02"}, velerov1api.BackupRepositoryPhaseReady, "02"),

@@ -109,15 +109,15 @@ func TestCreateCommand(t *testing.T) {
 		f.On("Namespace").Return(mock.Anything)
 		f.On("KubebuilderWatchClient").Return(client, nil)
 
-		//Complete
+		// Complete
 		e := o.Complete(args, f)
 		require.NoError(t, e)
 
-		//Validate
+		// Validate
 		e = o.Validate(cmd, args, f)
 		require.ErrorContains(t, e, "either a backup or schedule must be specified, but not both")
 
-		//cmd
+		// cmd
 		e = o.Run(cmd, f)
 		require.NoError(t, e)
 

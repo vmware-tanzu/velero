@@ -23,21 +23,19 @@ import (
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
-var (
-	restoreColumns = []metav1.TableColumnDefinition{
-		// name needs Type and Format defined for the decorator to identify it:
-		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
-		{Name: "Name", Type: "string", Format: "name"},
-		{Name: "Backup"},
-		{Name: "Status"},
-		{Name: "Started"},
-		{Name: "Completed"},
-		{Name: "Errors"},
-		{Name: "Warnings"},
-		{Name: "Created"},
-		{Name: "Selector"},
-	}
-)
+var restoreColumns = []metav1.TableColumnDefinition{
+	// name needs Type and Format defined for the decorator to identify it:
+	// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+	{Name: "Name", Type: "string", Format: "name"},
+	{Name: "Backup"},
+	{Name: "Status"},
+	{Name: "Started"},
+	{Name: "Completed"},
+	{Name: "Errors"},
+	{Name: "Warnings"},
+	{Name: "Created"},
+	{Name: "Selector"},
+}
 
 func printRestoreList(list *v1.RestoreList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
