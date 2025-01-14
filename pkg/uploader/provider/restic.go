@@ -124,21 +124,21 @@ func (rp *resticProvider) RunBackup(
 	parentSnapshot string,
 	volMode uploader.PersistentVolumeMode,
 	uploaderCfg map[string]string,
-	updater uploader.ProgressUpdater) (string, bool, error) {
+	updater uploader.ProgressUpdater) (string, bool, int64, error) {
 	if updater == nil {
-		return "", false, errors.New("Need to initial backup progress updater first")
+		return "", false, 0, errors.New("Need to initial backup progress updater first")
 	}
 
 	if path == "" {
-		return "", false, errors.New("path is empty")
+		return "", false, 0, errors.New("path is empty")
 	}
 
 	if realSource != "" {
-		return "", false, errors.New("real source is not empty, this is not supported by restic uploader")
+		return "", false, 0, errors.New("real source is not empty, this is not supported by restic uploader")
 	}
 
 	if volMode == uploader.PersistentVolumeBlock {
-		return "", false, errors.New("unable to support block mode")
+		return "", false, 0, errors.New("unable to support block mode")
 	}
 
 	log := rp.log.WithFields(logrus.Fields{
@@ -149,7 +149,7 @@ func (rp *resticProvider) RunBackup(
 	if len(uploaderCfg) > 0 {
 		parallelFilesUpload, err := uploaderutil.GetParallelFilesUpload(uploaderCfg)
 		if err != nil {
-			return "", false, errors.Wrap(err, "failed to get uploader config")
+			return "", false, 0, errors.Wrap(err, "failed to get uploader config")
 		}
 		if parallelFilesUpload > 0 {
 			log.Warnf("ParallelFilesUpload is set to %d, but restic does not support parallel file uploads. Ignoring.", parallelFilesUpload)
@@ -171,9 +171,9 @@ func (rp *resticProvider) RunBackup(
 	if err != nil {
 		if strings.Contains(stderrBuf, "snapshot is empty") {
 			log.Debugf("Restic backup got empty dir with %s path", path)
-			return "", true, nil
+			return "", true, 0, nil
 		}
-		return "", false, errors.WithStack(fmt.Errorf("error running restic backup command %s with error: %v stderr: %v", backupCmd.String(), err, stderrBuf))
+		return "", false, 0, errors.WithStack(fmt.Errorf("error running restic backup command %s with error: %v stderr: %v", backupCmd.String(), err, stderrBuf))
 	}
 	// GetSnapshotID
 	snapshotIDCmd := resticGetSnapshotFunc(rp.repoIdentifier, rp.credentialsFile, tags)
@@ -184,10 +184,10 @@ func (rp *resticProvider) RunBackup(
 	}
 	snapshotID, err := resticGetSnapshotIDFunc(snapshotIDCmd)
 	if err != nil {
-		return "", false, errors.WithStack(fmt.Errorf("error getting snapshot id with error: %v", err))
+		return "", false, 0, errors.WithStack(fmt.Errorf("error getting snapshot id with error: %v", err))
 	}
 	log.Infof("Run command=%s, stdout=%s, stderr=%s", backupCmd.String(), summary, stderrBuf)
-	return snapshotID, false, nil
+	return snapshotID, false, 0, nil
 }
 
 // RunRestore runs a `restore` command and monitors the volume size to
@@ -198,9 +198,9 @@ func (rp *resticProvider) RunRestore(
 	volumePath string,
 	volMode uploader.PersistentVolumeMode,
 	uploaderCfg map[string]string,
-	updater uploader.ProgressUpdater) error {
+	updater uploader.ProgressUpdater) (int64, error) {
 	if updater == nil {
-		return errors.New("Need to initial backup progress updater first")
+		return 0, errors.New("Need to initial backup progress updater first")
 	}
 	log := rp.log.WithFields(logrus.Fields{
 		"snapshotID": snapshotID,
@@ -208,7 +208,7 @@ func (rp *resticProvider) RunRestore(
 	})
 
 	if volMode == uploader.PersistentVolumeBlock {
-		return errors.New("unable to support block mode")
+		return 0, errors.New("unable to support block mode")
 	}
 
 	restoreCmd := resticRestoreCMDFunc(rp.repoIdentifier, rp.credentialsFile, snapshotID, volumePath)
@@ -220,7 +220,7 @@ func (rp *resticProvider) RunRestore(
 
 	extraFlags, err := rp.parseRestoreExtraFlags(uploaderCfg)
 	if err != nil {
-		return errors.Wrap(err, "failed to parse uploader config")
+		return 0, errors.Wrap(err, "failed to parse uploader config")
 	} else if len(extraFlags) != 0 {
 		restoreCmd.ExtraFlags = append(restoreCmd.ExtraFlags, extraFlags...)
 	}
@@ -228,7 +228,7 @@ func (rp *resticProvider) RunRestore(
 	stdout, stderr, err := restic.RunRestore(restoreCmd, log, updater)
 
 	log.Infof("Run command=%v, stdout=%s, stderr=%s", restoreCmd, stdout, stderr)
-	return err
+	return 0, err
 }
 
 func (rp *resticProvider) parseRestoreExtraFlags(uploaderCfg map[string]string) ([]string, error) {
