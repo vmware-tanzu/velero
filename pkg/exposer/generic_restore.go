@@ -400,6 +400,11 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	}}
 	volumes = append(volumes, podInfo.volumes...)
 
+	if label == nil {
+		label = make(map[string]string)
+	}
+	label[podGroupLabel] = podGroupGenericRestore
+
 	volumeMode := corev1.PersistentVolumeFilesystem
 	if targetPVC.Spec.VolumeMode != nil {
 		volumeMode = *targetPVC.Spec.VolumeMode
@@ -462,6 +467,18 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 			Labels: label,
 		},
 		Spec: corev1.PodSpec{
+			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "kubernetes.io/hostname",
+					WhenUnsatisfiable: corev1.ScheduleAnyway,
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							podGroupLabel: podGroupGenericRestore,
+						},
+					},
+				},
+			},
 			NodeSelector: nodeSelector,
 			OS:           &podOS,
 			Containers: []corev1.Container{
