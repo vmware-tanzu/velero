@@ -95,6 +95,10 @@ func (urp *unifiedRepoProvider) InitRepo(ctx context.Context, param RepoParam) e
 
 	log.Debug("Start to init repo")
 
+	if param.BackupLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
+		return errors.Errorf("cannot create new backup repo for read-only backup storage location %s/%s", param.BackupLocation.Namespace, param.BackupLocation.Name)
+	}
+
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
 		udmrepo.WithConfigFile(urp.workPath, string(param.BackupRepo.UID)),
@@ -191,6 +195,10 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 	}
 	if !errors.Is(err, repo.ErrRepositoryNotInitialized) {
 		return errors.Wrap(err, "error to connect to backup repo")
+	}
+
+	if param.BackupLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
+		return errors.Errorf("cannot create new backup repo for read-only backup storage location %s/%s", param.BackupLocation.Namespace, param.BackupLocation.Name)
 	}
 
 	err = urp.repoService.Init(ctx, *repoOption, true)

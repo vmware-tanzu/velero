@@ -1,0 +1,1 @@
+Fix issue #8091, avoid to create new repo when BSL is readonly
