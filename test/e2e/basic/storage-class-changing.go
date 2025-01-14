@@ -48,8 +48,10 @@ func (s *StorageClasssChanging) Init() error {
 	}
 	s.srcStorageClass = StorageClassName
 	s.desStorageClass = StorageClassName2
-	s.labels = map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
-		"velero.io/plugin-config": ""}
+	s.labels = map[string]string{
+		"velero.io/change-storage-class": "RestoreItemAction",
+		"velero.io/plugin-config":        "",
+	}
 	s.data = map[string]string{s.srcStorageClass: s.desStorageClass}
 	s.cmName = "change-storage-class-config"
 	s.volume = "volume-1"
@@ -124,6 +126,7 @@ func (s *StorageClasssChanging) Restore() error {
 	})
 	return nil
 }
+
 func (s *StorageClasssChanging) Verify() error {
 	By(fmt.Sprintf("Expect storage class of PV %s to be %s ", s.volume, s.desStorageClass), func() {
 		Expect(WaitForReadyDeployment(s.Client.ClientGo, s.mappedNS, s.deploymentName)).To(Succeed())

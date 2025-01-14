@@ -52,9 +52,11 @@ import (
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
-const BackupObjectsPrefix = "backups"
-const RestoreObjectsPrefix = "restores"
-const PluginsObjectsPrefix = "plugins"
+const (
+	BackupObjectsPrefix  = "backups"
+	RestoreObjectsPrefix = "restores"
+	PluginsObjectsPrefix = "plugins"
+)
 
 var ImagesMatrix = map[string]map[string][]string{
 	"v1.10": {
@@ -211,7 +213,8 @@ func getPluginsByVersion(version string, cloudProvider string, needDataMoverPlug
 
 // getProviderVeleroInstallOptions returns Velero InstallOptions for the provider.
 func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
-	plugins []string) (*cliinstall.Options, error) {
+	plugins []string,
+) (*cliinstall.Options, error) {
 	if veleroCfg.CloudCredentialsFile == "" && veleroCfg.ServiceAccountNameToInstall == "" {
 		return nil, errors.Errorf("No credentials were supplied to use for E2E tests")
 	}
@@ -277,7 +280,8 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 
 // checkBackupPhase uses VeleroCLI to inspect the phase of a Velero backup.
 func checkBackupPhase(ctx context.Context, veleroCLI string, veleroNamespace string, backupName string,
-	expectedPhase velerov1api.BackupPhase) error {
+	expectedPhase velerov1api.BackupPhase,
+) error {
 	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "backup", "get", "-o", "json",
 		backupName)
 
@@ -305,7 +309,8 @@ func checkBackupPhase(ctx context.Context, veleroCLI string, veleroNamespace str
 
 // checkRestorePhase uses VeleroCLI to inspect the phase of a Velero restore.
 func checkRestorePhase(ctx context.Context, veleroCLI string, veleroNamespace string, restoreName string,
-	expectedPhase velerov1api.RestorePhase) error {
+	expectedPhase velerov1api.RestorePhase,
+) error {
 	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "restore", "get", "-o", "json",
 		restoreName)
 
@@ -369,6 +374,7 @@ func checkSchedulePause(ctx context.Context, veleroCLI, veleroNamespace, schedul
 	}
 	return nil
 }
+
 func CheckScheduleWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespace, scheduleName string, order map[string]string) error {
 	checkCMD := exec.CommandContext(ctx, veleroCLI, "--namespace", veleroNamespace, "schedule", "get", scheduleName, "-o", "json")
 	jsonBuf, err := common.CMDExecWithOutput(checkCMD)
@@ -1069,7 +1075,8 @@ func WaitBackupDeleted(ctx context.Context, backupName string, timeout time.Dura
 }
 
 func WaitForExpectedStateOfBackup(ctx context.Context, backupName string,
-	timeout time.Duration, existing bool, veleroCfg *VeleroConfig) error {
+	timeout time.Duration, existing bool, veleroCfg *VeleroConfig,
+) error {
 	return wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		if exist, err := IsBackupExist(ctx, backupName, veleroCfg); err != nil {
 			return false, err
@@ -1334,6 +1341,7 @@ func GetVersionList(veleroCli, veleroVersion string) []VeleroCLI2Version {
 	}
 	return veleroCLI2VersionList
 }
+
 func DeleteAllBackups(ctx context.Context, veleroCfg *VeleroConfig) error {
 	client := veleroCfg.ClientToInstallVelero
 	backupList := new(velerov1api.BackupList)
@@ -1668,6 +1676,7 @@ func GetPvName(ctx context.Context, client TestClient, pvcName, namespace string
 
 	return pvList[0], nil
 }
+
 func DeletePVs(ctx context.Context, client TestClient, pvList []string) error {
 	for _, pv := range pvList {
 		args := []string{"delete", "pv", pv, "--timeout=0s"}
@@ -1767,6 +1776,7 @@ func KubectlGetDeleteBackupRequestDetails(ctx context.Context, deleteBackupReque
 	}
 	return stdout, err
 }
+
 func KubectlGetDeleteBackupRequestStatus(ctx context.Context, deleteBackupRequest, veleroNamespace string) (string, error) {
 	args1 := []string{"get", "deletebackuprequests", "-n", veleroNamespace, deleteBackupRequest, "-o", "json"}
 

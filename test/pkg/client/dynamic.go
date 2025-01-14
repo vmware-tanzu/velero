@@ -77,14 +77,14 @@ type Getter interface {
 
 // Patcher patches an object.
 type Patcher interface {
-	//Patch patches the named object using the provided patch bytes, which are expected to be in JSON merge patch format. The patched object is returned.
+	// Patch patches the named object using the provided patch bytes, which are expected to be in JSON merge patch format. The patched object is returned.
 
 	Patch(name string, data []byte) (*unstructured.Unstructured, error)
 }
 
 // Deletor deletes an object.
 type Deletor interface {
-	//Patch patches the named object using the provided patch bytes, which are expected to be in JSON merge patch format. The patched object is returned.
+	// Patch patches the named object using the provided patch bytes, which are expected to be in JSON merge patch format. The patched object is returned.
 
 	Delete(name string, opts metav1.DeleteOptions) error
 }

@@ -265,7 +265,8 @@ func (t *TestCase) MonitorMetircs(ctx context.Context, collectors *metrics.Metri
 		BslPrefix:            VeleroCfg.BSLPrefix,
 		BslConfig:            VeleroCfg.BSLConfig,
 		Metrics:              make(map[string]string),
-		BslBucket:            VeleroCfg.BSLBucket}
+		BslBucket:            VeleroCfg.BSLBucket,
+	}
 	collectors.RegisterOneTimeMetric(minioMetrics)
 
 	timeMetrics := &metrics.TimeMetrics{

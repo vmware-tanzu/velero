@@ -33,7 +33,7 @@ func GenerateYamlReport() error {
 
 	// Open the file in append mode. If the file does not exist, it will be created.
 	filePath := "perf-report.yaml"
-	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return errors.Wrap(err, "error opening file")
 	}

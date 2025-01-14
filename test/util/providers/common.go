@@ -48,6 +48,7 @@ func ObjectsShouldBeInBucket(objectStoreProvider, cloudCredentialsFile, bslBucke
 	fmt.Printf("|| EXPECTED || - Backup %s exist in object storage bucket %s\n", backupName, bslBucket)
 	return nil
 }
+
 func ObjectsShouldNotBeInBucket(objectStoreProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string, retryTimes int) error {
 	var err error
 	var exist bool
@@ -89,15 +90,17 @@ func getProvider(cloudProvider string) (ObjectsInStorage, error) {
 	}
 	return s, nil
 }
+
 func getFullPrefix(bslPrefix, subPrefix string) string {
 	if bslPrefix == "" {
 		bslPrefix = subPrefix + "/"
 	} else {
-		//subPrefix must have surfix "/", so that objects under it can be listed
+		// subPrefix must have surfix "/", so that objects under it can be listed
 		bslPrefix = strings.Trim(bslPrefix, "/") + "/" + strings.Trim(subPrefix, "/") + "/"
 	}
 	return bslPrefix
 }
+
 func IsObjectsInBucket(objectStoreProvider, cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName, subPrefix string) (bool, error) {
 	bslPrefix = getFullPrefix(bslPrefix, subPrefix)
 	s, err := getProvider(objectStoreProvider)

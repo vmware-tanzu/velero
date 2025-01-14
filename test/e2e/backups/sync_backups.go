@@ -50,9 +50,7 @@ func (b *SyncBackups) Init() {
 
 func BackupsSyncTest() {
 	test := new(SyncBackups)
-	var (
-		err error
-	)
+	var err error
 	veleroCfg := VeleroCfg
 	BeforeEach(func() {
 		flag.Parse()

@@ -98,6 +98,7 @@ func TestIt(test VeleroBackupRestoreTest) error {
 	})
 	return nil
 }
+
 func (t *TestCase) Init() error {
 	t.UUIDgen = t.GenerateUUID()
 	t.VeleroCfg = VeleroCfg

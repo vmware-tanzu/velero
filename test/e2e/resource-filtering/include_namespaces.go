@@ -43,8 +43,10 @@ type IncludeNamespaces struct {
 	FilteringCase
 }
 
-var BackupWithIncludeNamespaces func() = TestFunc(&IncludeNamespaces{FilteringCase: testInBackup})
-var RestoreWithIncludeNamespaces func() = TestFunc(&IncludeNamespaces{FilteringCase: testInRestore})
+var (
+	BackupWithIncludeNamespaces  func() = TestFunc(&IncludeNamespaces{FilteringCase: testInBackup})
+	RestoreWithIncludeNamespaces func() = TestFunc(&IncludeNamespaces{FilteringCase: testInRestore})
+)
 
 func (i *IncludeNamespaces) Init() error {
 	i.FilteringCase.Init()

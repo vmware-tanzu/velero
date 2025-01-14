@@ -29,8 +29,10 @@ import (
 	"github.com/vmware-tanzu/velero/test/util/metrics"
 )
 
-const PodResourceDesc = "Resource consumption"
-const PodMetricsTimeout = 5 * time.Minute
+const (
+	PodResourceDesc   = "Resource consumption"
+	PodMetricsTimeout = 5 * time.Minute
+)
 
 type PodMetrics struct {
 	Client             *metricsclientset.Clientset

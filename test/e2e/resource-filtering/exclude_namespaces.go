@@ -42,8 +42,10 @@ type ExcludeNamespaces struct {
 	namespacesExcluded int
 }
 
-var BackupWithExcludeNamespaces func() = TestFunc(&ExcludeNamespaces{FilteringCase: testInBackup})
-var RestoreWithExcludeNamespaces func() = TestFunc(&ExcludeNamespaces{FilteringCase: testInRestore})
+var (
+	BackupWithExcludeNamespaces  func() = TestFunc(&ExcludeNamespaces{FilteringCase: testInBackup})
+	RestoreWithExcludeNamespaces func() = TestFunc(&ExcludeNamespaces{FilteringCase: testInRestore})
+)
 
 func (e *ExcludeNamespaces) Init() error {
 	e.FilteringCase.Init()

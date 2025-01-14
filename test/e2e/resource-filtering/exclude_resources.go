@@ -43,8 +43,10 @@ type ExcludeResources struct {
 	FilteringCase
 }
 
-var BackupWithExcludeResources func() = TestFunc(&ExcludeResources{testInBackup})
-var RestoreWithExcludeResources func() = TestFunc(&ExcludeResources{testInRestore})
+var (
+	BackupWithExcludeResources  func() = TestFunc(&ExcludeResources{testInBackup})
+	RestoreWithExcludeResources func() = TestFunc(&ExcludeResources{testInRestore})
+)
 
 func (e *ExcludeResources) Init() error {
 	e.FilteringCase.Init()
@@ -98,15 +100,15 @@ func (e *ExcludeResources) Verify() error {
 	for nsNum := 0; nsNum < e.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", e.CaseBaseName, nsNum)
 		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
-		//Check deployment
+		// Check deployment
 		_, err := GetDeployment(e.Client.ClientGo, namespace, e.CaseBaseName)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 		}
-		//Check secrets
+		// Check secrets
 		secretsList, err := e.Client.ClientGo.CoreV1().Secrets(namespace).List(e.Ctx, metav1.ListOptions{LabelSelector: e.labelSelector})
 		if err != nil {
-			if apierrors.IsNotFound(err) { //resource should be excluded
+			if apierrors.IsNotFound(err) { // resource should be excluded
 				return nil
 			}
 			return errors.Wrap(err, fmt.Sprintf("failed to list secrets in namespace: %q", namespace))
@@ -114,7 +116,7 @@ func (e *ExcludeResources) Verify() error {
 			return errors.Errorf(fmt.Sprintf("Should no secrets found  %s in namespace: %q", secretsList.Items[0].Name, namespace))
 		}
 
-		//Check configmap
+		// Check configmap
 		configmapList, err := e.Client.ClientGo.CoreV1().ConfigMaps(namespace).List(e.Ctx, metav1.ListOptions{LabelSelector: e.labelSelector})
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list configmap in namespace: %q", namespace))

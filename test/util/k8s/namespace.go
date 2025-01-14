@@ -128,7 +128,6 @@ func DeleteNamespace(ctx context.Context, client TestClient, namespace string, w
 
 func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, CaseBaseName string) error {
 	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")
 	}
@@ -146,7 +145,6 @@ func CleanupNamespacesWithPoll(ctx context.Context, client TestClient, CaseBaseN
 
 func CleanupNamespacesFiterdByExcludes(ctx context.Context, client TestClient, excludeNS []string) error {
 	namespaces, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve namespaces")
 	}

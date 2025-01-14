@@ -30,7 +30,8 @@ import (
 )
 
 func CreateService(ctx context.Context, client TestClient, namespace string,
-	service string, labels map[string]string, serviceSpec *corev1.ServiceSpec) error {
+	service string, labels map[string]string, serviceSpec *corev1.ServiceSpec,
+) error {
 	se := &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Service",

@@ -240,9 +240,9 @@ func generateVSpherePlugin(veleroCfg *test.VeleroConfig) error {
 }
 
 func cleanVSpherePluginConfig(c clientset.Interface, ns, secretName, configMapName string) error {
-	//clear secret
+	// clear secret
 	_, err := k8s.GetSecret(c, ns, secretName)
-	if err == nil { //exist
+	if err == nil { // exist
 		if err := k8s.WaitForSecretDelete(c, ns, secretName); err != nil {
 			return errors.WithMessagef(err, "Failed to clear up vsphere plugin secret in %s namespace", ns)
 		}
@@ -250,7 +250,7 @@ func cleanVSpherePluginConfig(c clientset.Interface, ns, secretName, configMapNa
 		return errors.WithMessagef(err, "Failed to retrieve vsphere plugin secret in %s namespace", ns)
 	}
 
-	//clear configmap
+	// clear configmap
 	_, err = k8s.GetConfigMap(c, ns, configMapName)
 	if err == nil {
 		if err := k8s.WaitForConfigmapDelete(c, ns, configMapName); err != nil {
@@ -293,7 +293,7 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 	if len(options.Prefix) > 0 {
 		args = append(args, "--prefix", options.Prefix)
 	}
-	//Treat ServiceAccountName priority higher than SecretFile
+	// Treat ServiceAccountName priority higher than SecretFile
 	if len(options.ServiceAccountName) > 0 {
 		args = append(args, "--service-account-name", options.ServiceAccountName)
 	} else {
