@@ -747,7 +747,7 @@ func (ctx *restoreContext) processSelectedResource(
 				// have to try to create them multiple times.
 				existingNamespaces.Insert(targetNS)
 			}
-			// For namespaces resources we don't need to following steps
+			// For namespaces resources we restore metadata when existing resource policy is update, else continue
 			if groupResource == kuberesource.Namespaces {
 				if existingNamespaces.Has(targetNS) {
 					// Check if the existing resource policy is set to 'update'
