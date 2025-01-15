@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
@@ -70,7 +71,13 @@ const (
 	ThrottleOptionListOps       = "listOPS"
 	ThrottleOptionUploadBytes   = "uploadBytes"
 	ThrottleOptionDownloadBytes = "downloadBytes"
+	FastGC FullMaintenanceIntervalOptions = "fastGC"
+	FastGCInterval time.Duration = 12 * time.Hour
+	EagerGC FullMaintenanceIntervalOptions = "eagerGC"
+	EagerGCInterval time.Duration = 6 * time.Hour
 )
+
+type FullMaintenanceIntervalOptions string
 
 const (
 	defaultUsername = "default"
@@ -88,6 +95,9 @@ type RepoOptions struct {
 	GeneralOptions map[string]string
 	// StorageOptions takes storage specific options
 	StorageOptions map[string]string
+	// FullMaintenanceInterval will overwrite kopia maintenance interval
+	// options are fastGC for 12 hours, eagerGC for 6 hours
+	FullMaintenanceInterval FullMaintenanceIntervalOptions
 
 	// Description is a description of the backup repository/backup repository operation.
 	// It is for logging/debugging purpose only and doesn't control any behavior of the backup repository.
@@ -152,6 +162,14 @@ func WithGenOptions(genOptions map[string]string) func(*RepoOptions) error {
 			options.GeneralOptions[k] = v
 		}
 
+		return nil
+	}
+}
+
+// WithFullMaintenanceInterval
+func WithFullMaintenanceInterval(interval FullMaintenanceIntervalOptions) func(*RepoOptions) error {
+	return func(options *RepoOptions) error {
+		options.FullMaintenanceInterval = interval
 		return nil
 	}
 }
