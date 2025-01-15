@@ -102,6 +102,7 @@ func loadCredentialsIntoEnv(credentialsFile string) error {
 	}
 	return nil
 }
+
 func parseCloudConfiguration(cloudName string) (cloud.Configuration, error) {
 	if cloudName == "" {
 		fmt.Println("cloudName is empty")
@@ -111,6 +112,7 @@ func parseCloudConfiguration(cloudName string) (cloud.Configuration, error) {
 	cloudConfiguration, err := cloudConfigurationFromName(cloudName)
 	return cloudConfiguration, errors.WithStack(err)
 }
+
 func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resourceGroupCfg string) (string, error) {
 	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
 		return "", err
@@ -187,6 +189,7 @@ func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resource
 
 	return storageKey, nil
 }
+
 func handleErrors(err error) {
 	if err != nil {
 		if bloberror.HasCode(err, bloberror.ContainerAlreadyExists) {
@@ -219,6 +222,7 @@ func deleteBlob(client *azblob.Client, containerName, blobName string) error {
 	_, err := client.DeleteBlob(context.Background(), containerName, blobName, nil)
 	return err
 }
+
 func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName string) (bool, error) {
 	ctx := context.Background()
 	accountName, accountKey, err := getStorageCredential(cloudCredentialsFile, bslConfig)

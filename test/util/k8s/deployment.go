@@ -125,6 +125,7 @@ func CreateDeploy(c clientset.Interface, ns string, deployment *apps.Deployment)
 	_, err := c.AppsV1().Deployments(ns).Create(context.TODO(), deployment, metav1.CreateOptions{})
 	return err
 }
+
 func CreateDeployment(c clientset.Interface, ns string, deployment *apps.Deployment) (*apps.Deployment, error) {
 	return c.AppsV1().Deployments(ns).Create(context.TODO(), deployment, metav1.CreateOptions{})
 }

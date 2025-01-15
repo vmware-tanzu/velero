@@ -50,7 +50,7 @@ func (s GCSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix
 	for {
 		obj, err := iter.Next()
 		if err == iterator.Done {
-			//return false, errors.Wrapf(err, fmt.Sprintf("Backup %s was not found under prefix %s \n", backupObject, bslPrefix))
+			// return false, errors.Wrapf(err, fmt.Sprintf("Backup %s was not found under prefix %s \n", backupObject, bslPrefix))
 			return false, nil
 		}
 		if err != nil {

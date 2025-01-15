@@ -76,7 +76,6 @@ func (n *NSAnnotationCase) Verify() error {
 		checkNSName := fmt.Sprintf("%s-%00000d", n.CaseBaseName, nsNum)
 		checkAnnoName := fmt.Sprintf("annotation-%s-%00000d", n.CaseBaseName, nsNum)
 		checkNS, err := GetNamespace(n.Ctx, n.Client, checkNSName)
-
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", checkNSName)
 		}

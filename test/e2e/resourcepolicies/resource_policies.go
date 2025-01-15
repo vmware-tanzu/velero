@@ -127,7 +127,7 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 			Expect(r.createDeploymentWithVolume(namespace, volList)).To(Succeed(), fmt.Sprintf("Failed to create deployment namespace %s", namespace))
 		})
 
-		//Write data into pods
+		// Write data into pods
 		By(fmt.Sprintf("Writing data into pod in namespaces ...%s\n", namespace), func() {
 			Expect(r.writeDataIntoPods(namespace, volName)).To(Succeed(), fmt.Sprintf("Failed to write data into pod in namespace %s", namespace))
 		})

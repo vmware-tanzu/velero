@@ -43,6 +43,7 @@ func BackupDeletionWithSnapshots() {
 func BackupDeletionWithRestic() {
 	backup_deletion_test(false)
 }
+
 func backup_deletion_test(useVolumeSnapshots bool) {
 	veleroCfg := VeleroCfg
 	veleroCfg.UseVolumeSnapshots = useVolumeSnapshots
@@ -81,7 +82,8 @@ func backup_deletion_test(useVolumeSnapshots bool) {
 
 // runUpgradeTests runs upgrade test on the provider by kibishii.
 func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupLocation string,
-	useVolumeSnapshots bool, kibishiiDirectory string) error {
+	useVolumeSnapshots bool, kibishiiDirectory string,
+) error {
 	var err error
 	var snapshotCheckPoint SnapshotCheckPoint
 	backupName := "backup-" + UUIDgen.String()

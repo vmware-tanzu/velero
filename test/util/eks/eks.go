@@ -29,8 +29,10 @@ import (
 )
 
 func KubectlDeleteIAMServiceAcount(ctx context.Context, name, namespace, cluster string) error {
-	args := []string{"delete", "iamserviceaccount", name,
-		"--namespace", namespace, "--cluster", cluster, "--wait"}
+	args := []string{
+		"delete", "iamserviceaccount", name,
+		"--namespace", namespace, "--cluster", cluster, "--wait",
+	}
 	fmt.Println(args)
 
 	cmd := exec.CommandContext(ctx, "eksctl", args...)
@@ -44,9 +46,11 @@ func KubectlDeleteIAMServiceAcount(ctx context.Context, name, namespace, cluster
 }
 
 func EksctlCreateIAMServiceAcount(ctx context.Context, name, namespace, policyARN, cluster string) error {
-	args := []string{"create", "iamserviceaccount", name,
+	args := []string{
+		"create", "iamserviceaccount", name,
 		"--namespace", namespace, "--cluster", cluster, "--attach-policy-arn", policyARN,
-		"--approve", "--override-existing-serviceaccounts"}
+		"--approve", "--override-existing-serviceaccounts",
+	}
 
 	PollInterval := 1 * time.Minute
 	PollTimeout := 10 * time.Minute

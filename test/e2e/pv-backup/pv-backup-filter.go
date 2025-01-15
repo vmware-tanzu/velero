@@ -23,12 +23,16 @@ type PVBackupFiltering struct {
 	id          string
 }
 
-const POD_COUNT, VOLUME_COUNT_PER_POD = 2, 3
-const OPT_IN_ANN, OPT_OUT_ANN = "backup.velero.io/backup-volumes", "backup.velero.io/backup-volumes-excludes"
-const FILE_NAME = "test-data.txt"
+const (
+	POD_COUNT, VOLUME_COUNT_PER_POD = 2, 3
+	OPT_IN_ANN, OPT_OUT_ANN         = "backup.velero.io/backup-volumes", "backup.velero.io/backup-volumes-excludes"
+	FILE_NAME                       = "test-data.txt"
+)
 
-var OptInPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_IN_ANN, id: "opt-in"})
-var OptOutPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_OUT_ANN, id: "opt-out"})
+var (
+	OptInPVBackupTest  func() = TestFunc(&PVBackupFiltering{annotation: OPT_IN_ANN, id: "opt-in"})
+	OptOutPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_OUT_ANN, id: "opt-out"})
+)
 
 func (p *PVBackupFiltering) Init() error {
 	p.TestCase.Init()
@@ -70,14 +74,14 @@ func (p *PVBackupFiltering) CreateResources() error {
 		var pods []string
 		By(fmt.Sprintf("Deploy a few pods with several PVs in namespace %s", ns), func() {
 			var volumesToAnnotation string
-			//Make sure PVC name is unique from other tests to avoid PVC creation error
+			// Make sure PVC name is unique from other tests to avoid PVC creation error
 			for i := 0; i <= POD_COUNT-1; i++ {
 				var volumeToAnnotationList []string
 				var volumes []string
 				for j := 0; j <= VOLUME_COUNT_PER_POD-1; j++ {
 					volume := fmt.Sprintf("volume-%s-%d-%d", p.id, i, j)
 					volumes = append(volumes, volume)
-					//Volumes cherry-pick policy for opt-in/out annotation to apply
+					// Volumes cherry-pick policy for opt-in/out annotation to apply
 					if j%2 == 0 {
 						volumeToAnnotationList = append(volumeToAnnotationList, volume)
 					}
@@ -182,6 +186,7 @@ func fileExist(ctx context.Context, namespace, podName, volume string) error {
 			FILE_NAME, volume, podName, namespace))
 	}
 }
+
 func fileNotExist(ctx context.Context, namespace, podName, volume string) error {
 	_, _, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME)
 	if err != nil {

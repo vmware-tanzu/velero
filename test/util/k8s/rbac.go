@@ -40,7 +40,7 @@ func CreateRBACWithBindingSA(ctx context.Context, client TestClient, namespace s
 		return err
 	}
 
-	//creating role binding and binding it to the test service account
+	// creating role binding and binding it to the test service account
 	rolebinding := &v1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterrolebinding,
