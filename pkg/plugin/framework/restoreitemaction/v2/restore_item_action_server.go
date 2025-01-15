@@ -150,7 +150,8 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *protoria
 }
 
 func (s *RestoreItemActionGRPCServer) Progress(ctx context.Context, req *protoriav2.RestoreItemActionProgressRequest) (
-	response *protoriav2.RestoreItemActionProgressResponse, err error) {
+	response *protoriav2.RestoreItemActionProgressResponse, err error,
+) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -189,7 +190,8 @@ func (s *RestoreItemActionGRPCServer) Progress(ctx context.Context, req *protori
 
 func (s *RestoreItemActionGRPCServer) Cancel(
 	ctx context.Context, req *protoriav2.RestoreItemActionCancelRequest) (
-	response *emptypb.Empty, err error) {
+	response *emptypb.Empty, err error,
+) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -215,7 +217,8 @@ func (s *RestoreItemActionGRPCServer) Cancel(
 }
 
 func (s *RestoreItemActionGRPCServer) AreAdditionalItemsReady(ctx context.Context, req *protoriav2.RestoreItemActionItemsReadyRequest) (
-	response *protoriav2.RestoreItemActionItemsReadyResponse, err error) {
+	response *protoriav2.RestoreItemActionItemsReadyResponse, err error,
+) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr

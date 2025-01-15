@@ -67,9 +67,7 @@ import (
 	cacheutil "k8s.io/client-go/tools/cache"
 )
 
-var (
-	scheme = runtime.NewScheme()
-)
+var scheme = runtime.NewScheme()
 
 const (
 	// the port where prometheus metrics are exposed

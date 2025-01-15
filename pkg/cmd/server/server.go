@@ -89,7 +89,7 @@ import (
 func NewCommand(f client.Factory) *cobra.Command {
 	config := config.GetDefaultConfig()
 
-	var command = &cobra.Command{
+	command := &cobra.Command{
 		Use:    "server",
 		Short:  "Run the velero server",
 		Long:   "Run the velero server",
@@ -1017,7 +1017,6 @@ func markDataUploadsCancel(ctx context.Context, client ctrlclient.Client, backup
 
 					return true
 				})
-
 			if err != nil {
 				log.WithError(errors.WithStack(err)).Errorf("failed to mark dataupload %q cancel", du.GetName())
 				continue
@@ -1058,7 +1057,6 @@ func markDataDownloadsCancel(ctx context.Context, client ctrlclient.Client, rest
 
 					return true
 				})
-
 			if err != nil {
 				log.WithError(errors.WithStack(err)).Errorf("failed to mark datadownload %q cancel", dd.GetName())
 				continue

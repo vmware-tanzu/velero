@@ -1159,9 +1159,7 @@ func TestIsPVCBound(t *testing.T) {
 	}
 }
 
-var (
-	csiStorageClass = "csi-hostpath-sc"
-)
+var csiStorageClass = "csi-hostpath-sc"
 
 func TestGetPVForPVC(t *testing.T) {
 	boundPVC := &corev1api.PersistentVolumeClaim{

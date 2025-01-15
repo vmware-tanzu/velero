@@ -45,8 +45,7 @@ type ServerStatusRequest struct {
 }
 
 // ServerStatusRequestSpec is the specification for a ServerStatusRequest.
-type ServerStatusRequestSpec struct {
-}
+type ServerStatusRequestSpec struct{}
 
 // ServerStatusRequestPhase represents the lifecycle phase of a ServerStatusRequest.
 // +kubebuilder:validation:Enum=New;Processed

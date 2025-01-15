@@ -639,7 +639,6 @@ func (r *DataUploadReconciler) findDataUploadForPod(ctx context.Context, podObj 
 
 				return true
 			})
-
 		if err != nil {
 			log.WithError(err).Warn("failed to cancel dataupload, and it will wait for prepare timeout")
 			return []reconcile.Request{}
@@ -712,7 +711,6 @@ func (r *DataUploadReconciler) acceptDataUpload(ctx context.Context, du *velerov
 	}
 
 	succeeded, err := r.exclusiveUpdateDataUpload(ctx, updated, updateFunc)
-
 	if err != nil {
 		return false, err
 	}
@@ -736,7 +734,6 @@ func (r *DataUploadReconciler) onPrepareTimeout(ctx context.Context, du *velerov
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseFailed
 		du.Status.Message = "timeout on preparing data upload"
 	})
-
 	if err != nil {
 		log.WithError(err).Warn("Failed to update dataupload")
 		return
@@ -771,7 +768,8 @@ func (r *DataUploadReconciler) onPrepareTimeout(ctx context.Context, du *velerov
 }
 
 func (r *DataUploadReconciler) exclusiveUpdateDataUpload(ctx context.Context, du *velerov2alpha1api.DataUpload,
-	updateFunc func(*velerov2alpha1api.DataUpload)) (bool, error) {
+	updateFunc func(*velerov2alpha1api.DataUpload),
+) (bool, error) {
 	updateFunc(du)
 
 	err := r.client.Update(ctx, du)
@@ -805,7 +803,6 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			Namespace: du.Spec.SourceNamespace,
 			Name:      du.Spec.SourcePVC,
 		}, pvc)
-
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get PVC %s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC)
 		}
@@ -881,7 +878,6 @@ func findDataUploadByPod(client client.Client, pod corev1.Pod) (*velerov2alpha1a
 			Namespace: pod.Namespace,
 			Name:      label,
 		}, du)
-
 		if err != nil {
 			return nil, errors.Wrapf(err, "error to find DataUpload by pod %s/%s", pod.Namespace, pod.Name)
 		}

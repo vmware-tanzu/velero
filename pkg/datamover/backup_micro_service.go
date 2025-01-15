@@ -76,7 +76,8 @@ type dataPathResult struct {
 
 func NewBackupMicroService(ctx context.Context, client client.Client, kubeClient kubernetes.Interface, dataUploadName string, namespace string, nodeName string,
 	sourceTargetPath datapath.AccessPoint, dataPathMgr *datapath.Manager, repoEnsurer *repository.Ensurer, cred *credentials.CredentialGetter,
-	duInformer cache.Informer, log logrus.FieldLogger) *BackupMicroService {
+	duInformer cache.Informer, log logrus.FieldLogger,
+) *BackupMicroService {
 	return &BackupMicroService{
 		ctx:              ctx,
 		client:           client,
@@ -117,7 +118,6 @@ func (r *BackupMicroService) Init() error {
 			},
 		},
 	)
-
 	if err != nil {
 		return errors.Wrap(err, "error adding du handler")
 	}
@@ -153,7 +153,6 @@ func (r *BackupMicroService) RunCancelableDataPath(ctx context.Context) (string,
 			return false, nil
 		}
 	})
-
 	if err != nil {
 		log.WithError(err).Error("Failed to wait du")
 		return "", errors.Wrap(err, "error waiting for du")

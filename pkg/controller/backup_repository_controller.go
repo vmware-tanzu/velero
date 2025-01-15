@@ -62,7 +62,8 @@ type BackupRepoReconciler struct {
 }
 
 func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client,
-	maintenanceFrequency time.Duration, backupRepoConfig string, repositoryManager repomanager.Manager) *BackupRepoReconciler {
+	maintenanceFrequency time.Duration, backupRepoConfig string, repositoryManager repomanager.Manager,
+) *BackupRepoReconciler {
 	c := &BackupRepoReconciler{
 		client,
 		namespace,

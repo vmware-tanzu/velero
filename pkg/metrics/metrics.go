@@ -30,7 +30,7 @@ type ServerMetrics struct {
 const (
 	metricNamespace           = "velero"
 	podVolumeMetricsNamespace = "podVolume"
-	//Velero metrics
+	// Velero metrics
 	backupTarballSizeBytesGauge   = "backup_tarball_size_bytes"
 	backupTotal                   = "backup_total"
 	backupAttemptTotal            = "backup_attempt_total"

@@ -38,8 +38,10 @@ import (
 
 // ErrNotFound is exported for external packages to check for when a file is
 // not found
-var ErrNotFound = errors.New("file not found")
-var ErrDownloadRequestDownloadURLTimeout = errors.New("download request download url timeout, check velero server logs for errors. backup storage location may not be available")
+var (
+	ErrNotFound                          = errors.New("file not found")
+	ErrDownloadRequestDownloadURLTimeout = errors.New("download request download url timeout, check velero server logs for errors. backup storage location may not be available")
+)
 
 func Stream(
 	ctx context.Context,

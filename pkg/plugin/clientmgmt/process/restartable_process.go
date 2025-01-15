@@ -27,8 +27,7 @@ type RestartableProcessFactory interface {
 	NewRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error)
 }
 
-type restartableProcessFactory struct {
-}
+type restartableProcessFactory struct{}
 
 func NewRestartableProcessFactory() RestartableProcessFactory {
 	return &restartableProcessFactory{}

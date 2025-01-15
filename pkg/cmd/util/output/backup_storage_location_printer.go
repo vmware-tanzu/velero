@@ -24,19 +24,17 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 )
 
-var (
-	backupStorageLocationColumns = []metav1.TableColumnDefinition{
-		// name needs Type and Format defined for the decorator to identify it:
-		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
-		{Name: "Name", Type: "string", Format: "name"},
-		{Name: "Provider"},
-		{Name: "Bucket/Prefix"},
-		{Name: "Phase"},
-		{Name: "Last Validated"},
-		{Name: "Access Mode"},
-		{Name: "Default"},
-	}
-)
+var backupStorageLocationColumns = []metav1.TableColumnDefinition{
+	// name needs Type and Format defined for the decorator to identify it:
+	// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+	{Name: "Name", Type: "string", Format: "name"},
+	{Name: "Provider"},
+	{Name: "Bucket/Prefix"},
+	{Name: "Phase"},
+	{Name: "Last Validated"},
+	{Name: "Access Mode"},
+	{Name: "Default"},
+}
 
 func printBackupStorageLocationList(list *velerov1api.BackupStorageLocationList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))

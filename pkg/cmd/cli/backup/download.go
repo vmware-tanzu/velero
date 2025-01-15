@@ -118,7 +118,7 @@ func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
 	kbClient, err := f.KubebuilderClient()
 	cmd.CheckError(err)
 
-	backupDest, err := os.OpenFile(o.Output, o.writeOptions, 0600)
+	backupDest, err := os.OpenFile(o.Output, o.writeOptions, 0o600)
 	if err != nil {
 		return err
 	}

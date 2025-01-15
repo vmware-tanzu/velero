@@ -31,8 +31,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
-const restoreProgressCheckInterval = 10 * time.Second
-const backupProgressCheckInterval = 10 * time.Second
+const (
+	restoreProgressCheckInterval = 10 * time.Second
+	backupProgressCheckInterval  = 10 * time.Second
+)
 
 var fileSystem = filesystem.NewFileSystem()
 

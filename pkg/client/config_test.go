@@ -47,6 +47,7 @@ func removeConfigfileName() error {
 	}
 	return nil
 }
+
 func TestConfigOperations(t *testing.T) {
 	preHomeEnv := ""
 	prevEnv := os.Environ()

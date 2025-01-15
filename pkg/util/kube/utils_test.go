@@ -42,7 +42,7 @@ import (
 )
 
 func TestNamespaceAndName(t *testing.T) {
-	//TODO
+	// TODO
 }
 
 func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
@@ -489,8 +489,8 @@ func TestIsCRDReady(t *testing.T) {
 
 func TestSinglePathMatch(t *testing.T) {
 	fakeFS := velerotest.NewFakeFileSystem()
-	fakeFS.MkdirAll("testDir1/subpath", 0755)
-	fakeFS.MkdirAll("testDir2/subpath", 0755)
+	fakeFS.MkdirAll("testDir1/subpath", 0o755)
+	fakeFS.MkdirAll("testDir2/subpath", 0o755)
 
 	_, err := SinglePathMatch("./*/subpath", fakeFS, logrus.StandardLogger())
 	assert.Error(t, err)

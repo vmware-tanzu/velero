@@ -52,7 +52,8 @@ func (s *BackupItemActionGRPCServer) getImpl(name string) (biav1.BackupItemActio
 
 func (s *BackupItemActionGRPCServer) AppliesTo(
 	ctx context.Context, req *proto.BackupItemActionAppliesToRequest) (
-	response *proto.BackupItemActionAppliesToResponse, err error) {
+	response *proto.BackupItemActionAppliesToResponse, err error,
+) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -81,7 +82,8 @@ func (s *BackupItemActionGRPCServer) AppliesTo(
 }
 
 func (s *BackupItemActionGRPCServer) Execute(
-	ctx context.Context, req *proto.ExecuteRequest) (response *proto.ExecuteResponse, err error) {
+	ctx context.Context, req *proto.ExecuteRequest,
+) (response *proto.ExecuteResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr

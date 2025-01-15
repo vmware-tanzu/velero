@@ -56,7 +56,8 @@ func (s *BackupItemActionGRPCServer) getImpl(name string) (biav2.BackupItemActio
 
 func (s *BackupItemActionGRPCServer) AppliesTo(
 	ctx context.Context, req *protobiav2.BackupItemActionAppliesToRequest) (
-	response *protobiav2.BackupItemActionAppliesToResponse, err error) {
+	response *protobiav2.BackupItemActionAppliesToResponse, err error,
+) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -85,7 +86,8 @@ func (s *BackupItemActionGRPCServer) AppliesTo(
 }
 
 func (s *BackupItemActionGRPCServer) Execute(
-	ctx context.Context, req *protobiav2.ExecuteRequest) (response *protobiav2.ExecuteResponse, err error) {
+	ctx context.Context, req *protobiav2.ExecuteRequest,
+) (response *protobiav2.ExecuteResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -141,7 +143,8 @@ func (s *BackupItemActionGRPCServer) Execute(
 
 func (s *BackupItemActionGRPCServer) Progress(
 	ctx context.Context, req *protobiav2.BackupItemActionProgressRequest) (
-	response *protobiav2.BackupItemActionProgressResponse, err error) {
+	response *protobiav2.BackupItemActionProgressResponse, err error,
+) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -180,7 +183,8 @@ func (s *BackupItemActionGRPCServer) Progress(
 
 func (s *BackupItemActionGRPCServer) Cancel(
 	ctx context.Context, req *protobiav2.BackupItemActionCancelRequest) (
-	response *emptypb.Empty, err error) {
+	response *emptypb.Empty, err error,
+) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
