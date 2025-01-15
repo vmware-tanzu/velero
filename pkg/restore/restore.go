@@ -750,7 +750,7 @@ func (ctx *restoreContext) processSelectedResource(
 			// For namespaces resources we restore metadata when existing resource policy is update, else continue
 			if groupResource == kuberesource.Namespaces {
 				if existingNamespaces.Has(targetNS) {
-					// Check if the existing resource policy is set to 'update'
+					// Skip updating namespace metadata if the existing resource policy is not set to 'update'
 					if len(ctx.restore.Spec.ExistingResourcePolicy) == 0 || ctx.restore.Spec.ExistingResourcePolicy != velerov1api.PolicyTypeUpdate {
 						ctx.log.Infof("Skipping update for existing namespace %s because existing resource policy is not 'update'", targetNS)
 						continue
