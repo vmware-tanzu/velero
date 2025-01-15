@@ -178,6 +178,12 @@ Additionally, you may want to update the the default File System Backup operatio
             - --fs-backup-timeout=240m
     ```
 
+### Ephemeral-storage Requests and Limits
+
+Velero does not set ephemeral-storage limits during installation. Limits and requests can be edited after install for clusters that monitor and restrict ephemeral-storage usage. 
+
+Plugins will use ephemeral-storage. There needs to be a sufficient requests and limit set to account for plugins and the additional ephemeral-storage used to maintain credentials and cache space for datamovers. Object storage plugins will fit comfortably into an allocation of 100MB of ephemeral-storage.
+
 ## Configure more than one storage location for backups or volume snapshots
 
 Velero supports any number of backup storage locations and volume snapshot locations. For more details, see [about locations](locations.md).
