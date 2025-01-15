@@ -250,11 +250,16 @@ func WaitJobComplete(cli client.Client, ctx context.Context, jobName, ns string,
 		return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.Wrap(err, "error to wait for maintenance job complete")
 	}
 
-	log.Info("Maintenance repo complete")
+	log.Infof("Maintenance repo complete, succeeded %v, failed %v", maintenanceJob.Status.Succeeded, maintenanceJob.Status.Failed)
 
-	result, err := getResultFromJob(cli, maintenanceJob)
-	if err != nil {
-		log.WithError(err).Warn("Failed to get maintenance job result")
+	result := ""
+	if maintenanceJob.Status.Failed > 0 {
+		if r, err := getResultFromJob(cli, maintenanceJob); err != nil {
+			log.WithError(err).Warn("Failed to get maintenance job result")
+			result = "Repo maintenance failed but result is not retrieveable"
+		} else {
+			result = r
+		}
 	}
 
 	return composeStatusFromJob(maintenanceJob, result), nil
@@ -303,9 +308,14 @@ func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1a
 			job = updated
 		}
 
-		message, err := getResultFromJob(cli, job)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error getting maintenance job[%s] result", job.Name)
+		message := ""
+		if job.Status.Failed > 0 {
+			if msg, err := getResultFromJob(cli, job); err != nil {
+				log.WithError(err).Warnf("Failed to get result of maintenance job %s", job.Name)
+				message = "Repo maintenance failed but result is not retrieveable"
+			} else {
+				message = msg
+			}
 		}
 
 		history = append(history, composeStatusFromJob(job, message))
