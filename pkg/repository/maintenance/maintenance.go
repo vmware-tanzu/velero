@@ -284,7 +284,7 @@ func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1a
 
 	history := []velerov1api.BackupRepositoryMaintenanceStatus{}
 
-	startPos := len(history) - limit
+	startPos := len(jobList.Items) - limit
 	if startPos < 0 {
 		startPos = 0
 	}

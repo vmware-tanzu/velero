@@ -65,13 +65,13 @@ type BackupRepoReconciler struct {
 	repositoryManager         repomanager.Manager
 	keepLatestMaintenanceJobs int
 	repoMaintenanceConfig     string
-	podResources              kube.PodResources
+	maintenanceJobResources   kube.PodResources
 	logLevel                  logrus.Level
 	logFormat                 *logging.FormatFlag
 }
 
 func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client, repositoryManager repomanager.Manager,
-	maintenanceFrequency time.Duration, backupRepoConfig string, keepLatestMaintenanceJobs int, repoMaintenanceConfig string, podResources kube.PodResources,
+	maintenanceFrequency time.Duration, backupRepoConfig string, keepLatestMaintenanceJobs int, repoMaintenanceConfig string, maintenanceJobResources kube.PodResources,
 	logLevel logrus.Level, logFormat *logging.FormatFlag) *BackupRepoReconciler {
 	c := &BackupRepoReconciler{
 		client,
@@ -83,7 +83,7 @@ func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client
 		repositoryManager,
 		keepLatestMaintenanceJobs,
 		repoMaintenanceConfig,
-		podResources,
+		maintenanceJobResources,
 		logLevel,
 		logFormat,
 	}
@@ -427,7 +427,7 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 
 	log.Info("Running maintenance on backup repository")
 
-	job, err := funcStartMaintenanceJob(r.Client, ctx, req, r.repoMaintenanceConfig, r.podResources, r.logLevel, r.logFormat, log)
+	job, err := funcStartMaintenanceJob(r.Client, ctx, req, r.repoMaintenanceConfig, r.maintenanceJobResources, r.logLevel, r.logFormat, log)
 	if err != nil {
 		log.WithError(err).Warn("Starting repo maintenance failed")
 		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {

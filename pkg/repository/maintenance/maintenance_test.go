@@ -444,7 +444,7 @@ func TestGetJobConfig(t *testing.T) {
 	}
 }
 
-func TestWaitAlJobsComplete(t *testing.T) {
+func TestWaitAllJobsComplete(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 
 	veleroNamespace := "velero"
@@ -680,11 +680,6 @@ func TestWaitAlJobsComplete(t *testing.T) {
 				jobPodSucceeded3,
 			},
 			expectedStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
-				{
-					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
-					StartTimestamp:    &metav1.Time{Time: now},
-					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
-				},
 				{
 					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
 					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
