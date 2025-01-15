@@ -34,6 +34,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/itemoperationmap"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
@@ -208,6 +209,8 @@ func (r *downloadRequestReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			log.Warnf("fail to get Backup metadata file's download URL %s, retry later: %s", downloadRequest.Spec.Target, err)
 			return ctrl.Result{}, errors.WithStack(err)
 		}
+
+		downloadRequest.Status.CaCert = location.Spec.Config[velero.CaCertKey]
 
 		downloadRequest.Status.Phase = velerov1api.DownloadRequestPhaseProcessed
 
