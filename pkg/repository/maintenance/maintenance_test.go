@@ -602,13 +602,35 @@ func TestWaitAllJobsComplete(t *testing.T) {
 			expectedError: "error waiting maintenance job[job1] complete: context deadline exceeded",
 		},
 		{
-			name:          "get result error",
+			name:          "get result error on succeeded job",
 			ctx:           context.TODO(),
 			runtimeScheme: scheme,
 			kubeClientObj: []runtime.Object{
 				jobSucceeded1,
 			},
-			expectedError: "error getting maintenance job[job1] result: no pod found for job job1",
+			expectedStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
+					StartTimestamp:    &metav1.Time{Time: now},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
+				},
+			},
+		},
+		{
+			name:          "get result error on failed job",
+			ctx:           context.TODO(),
+			runtimeScheme: scheme,
+			kubeClientObj: []runtime.Object{
+				jobFailed1,
+			},
+			expectedStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
+				{
+					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
+					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
+					Message:           "Repo maintenance failed but result is not retrieveable",
+				},
+			},
 		},
 		{
 			name:          "less than limit",
