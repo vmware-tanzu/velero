@@ -195,6 +195,25 @@ func TestListBackups(t *testing.T) {
 			},
 			expectedRes: []string{"backup-1", "backup-2"},
 		},
+		{
+			name: "minio normal case with minio folder still visible",
+			storageData: map[string][]byte{
+				"backups/backup-1/velero-backup.json": encodeToBytes(builder.ForBackup("", "backup-1").Result()),
+				"backups/backup-2/velero-backup.json": encodeToBytes(builder.ForBackup("", "backup-2").Result()),
+				"backups/backup-3/":                   encodeToBytes(builder.ForBackup("", "backup-2").Result()),
+			},
+			expectedRes: []string{"backup-1", "backup-2"},
+		},
+		{
+			name:   "minio normal case store prefix with minio folder still visible",
+			prefix: "velero-backups/",
+			storageData: map[string][]byte{
+				"velero-backups/backups/backup-1/velero-backup.json": encodeToBytes(builder.ForBackup("", "backup-1").Result()),
+				"velero-backups/backups/backup-2/velero-backup.json": encodeToBytes(builder.ForBackup("", "backup-2").Result()),
+				"velero-backups/backups/backup-3/":                   encodeToBytes(builder.ForBackup("", "backup-2").Result()),
+			},
+			expectedRes: []string{"backup-1", "backup-2"},
+		},
 	}
 
 	for _, tc := range tests {
