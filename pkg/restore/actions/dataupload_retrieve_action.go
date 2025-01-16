@@ -94,7 +94,7 @@ func (d *DataUploadRetrieveAction) Execute(input *velero.RestoreItemActionExecut
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: dataUpload.Name + "-",
-			Namespace:    dataUpload.Namespace,
+			Namespace:    input.Restore.Namespace,
 			Labels: map[string]string{
 				velerov1api.RestoreUIDLabel:       label.GetValidName(string(input.Restore.UID)),
 				velerov1api.PVCNamespaceNameLabel: label.GetValidName(dataUpload.Spec.SourceNamespace + "." + dataUpload.Spec.SourcePVC),
