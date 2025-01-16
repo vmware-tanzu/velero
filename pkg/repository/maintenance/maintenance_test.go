@@ -19,6 +19,7 @@ package maintenance
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -148,13 +150,30 @@ func TestWaitForJobComplete(t *testing.T) {
 	scheme := runtime.NewScheme()
 	batchv1.AddToScheme(scheme)
 
+	waitCompletionBackOff1 := wait.Backoff{
+		Duration: time.Second,
+		Steps:    math.MaxInt,
+		Factor:   2,
+		Cap:      time.Second * 12,
+	}
+
+	waitCompletionBackOff2 := wait.Backoff{
+		Duration: time.Second,
+		Steps:    math.MaxInt,
+		Factor:   2,
+		Cap:      time.Second * 2,
+	}
+
 	// Define test cases
 	tests := []struct {
 		description   string // Test case description
 		kubeClientObj []runtime.Object
 		runtimeScheme *runtime.Scheme
 		jobStatus     batchv1.JobStatus // Job status to set for the test
-		expectError   bool              // Whether an error is expected
+		logBackOff    wait.Backoff
+		updateAfter   time.Duration
+		expectedLogs  int
+		expectError   bool // Whether an error is expected
 	}{
 		{
 			description:   "wait error",
@@ -183,6 +202,26 @@ func TestWaitForJobComplete(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			description:   "Log backoff not to cap",
+			runtimeScheme: scheme,
+			kubeClientObj: []runtime.Object{
+				job,
+			},
+			logBackOff:   waitCompletionBackOff1,
+			updateAfter:  time.Second * 8,
+			expectedLogs: 3,
+		},
+		{
+			description:   "Log backoff to cap",
+			runtimeScheme: scheme,
+			kubeClientObj: []runtime.Object{
+				job,
+			},
+			logBackOff:   waitCompletionBackOff2,
+			updateAfter:  time.Second * 6,
+			expectedLogs: 3,
+		},
 	}
 
 	// Run tests
@@ -195,8 +234,24 @@ func TestWaitForJobComplete(t *testing.T) {
 			fakeClientBuilder = fakeClientBuilder.WithScheme(tc.runtimeScheme)
 			fakeClient := fakeClientBuilder.WithRuntimeObjects(tc.kubeClientObj...).Build()
 
+			buffer := []string{}
+			logger := velerotest.NewMultipleLogger(&buffer)
+
+			waitCompletionBackOff = tc.logBackOff
+
+			if tc.updateAfter != 0 {
+				go func() {
+					time.Sleep(tc.updateAfter)
+
+					original := job.DeepCopy()
+					job.Status.Succeeded = 1
+					err := fakeClient.Status().Patch(context.Background(), job, client.MergeFrom(original))
+					require.NoError(t, err)
+				}()
+			}
+
 			// Call the function
-			_, err := waitForJobComplete(context.Background(), fakeClient, job.Namespace, job.Name)
+			_, err := waitForJobComplete(context.Background(), fakeClient, job.Namespace, job.Name, logger)
 
 			// Check if the error matches the expectation
 			if tc.expectError {
@@ -204,6 +259,8 @@ func TestWaitForJobComplete(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+
+			assert.LessOrEqual(t, len(buffer), tc.expectedLogs)
 		})
 	}
 }

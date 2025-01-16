@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -92,9 +93,21 @@ func DeleteOldJobs(cli client.Client, repo string, keep int) error {
 	return nil
 }
 
+var waitCompletionBackOff = wait.Backoff{
+	Duration: time.Minute * 20,
+	Steps:    math.MaxInt,
+	Factor:   2,
+	Cap:      time.Hour * 12,
+}
+
 // waitForJobComplete wait for completion of the specified job and update the latest job object
-func waitForJobComplete(ctx context.Context, client client.Client, ns string, job string) (*batchv1.Job, error) {
+func waitForJobComplete(ctx context.Context, client client.Client, ns string, job string, logger logrus.FieldLogger) (*batchv1.Job, error) {
 	var ret *batchv1.Job
+
+	backOff := waitCompletionBackOff
+
+	startTime := time.Now()
+	nextCheckpoint := startTime.Add(backOff.Step())
 
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		updated := &batchv1.Job{}
@@ -111,6 +124,12 @@ func waitForJobComplete(ctx context.Context, client client.Client, ns string, jo
 
 		if updated.Status.Failed > 0 {
 			return true, nil
+		}
+
+		now := time.Now()
+		if now.After(nextCheckpoint) {
+			logger.Warnf("Repo maintenance job %s has lasted %v minutes", job, now.Sub(startTime).Minutes())
+			nextCheckpoint = now.Add(backOff.Step())
 		}
 
 		return false, nil
@@ -245,7 +264,7 @@ func getJobConfig(
 func WaitJobComplete(cli client.Client, ctx context.Context, jobName, ns string, logger logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
 	log := logger.WithField("job name", jobName)
 
-	maintenanceJob, err := waitForJobComplete(ctx, cli, ns, jobName)
+	maintenanceJob, err := waitForJobComplete(ctx, cli, ns, jobName, logger)
 	if err != nil {
 		return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.Wrap(err, "error to wait for maintenance job complete")
 	}
@@ -300,7 +319,7 @@ func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1a
 		if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
 			log.Infof("Waiting for maintenance job %s to complete", job.Name)
 
-			updated, err := waitForJobComplete(ctx, cli, job.Namespace, job.Name)
+			updated, err := waitForJobComplete(ctx, cli, job.Namespace, job.Name, log)
 			if err != nil {
 				return nil, errors.Wrapf(err, "error waiting maintenance job[%s] complete", job.Name)
 			}
