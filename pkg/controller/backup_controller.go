@@ -87,6 +87,7 @@ type backupReconciler struct {
 	defaultSnapshotMoveData     bool
 	globalCRClient              kbclient.Client
 	itemBlockWorkerCount        int
+	workerPool                  *pkgbackup.ItemBlockWorkerPool
 }
 
 func NewBackupReconciler(
@@ -139,6 +140,7 @@ func NewBackupReconciler(
 		defaultSnapshotMoveData:     defaultSnapshotMoveData,
 		itemBlockWorkerCount:        itemBlockWorkerCount,
 		globalCRClient:              globalCRClient,
+		workerPool:                  pkgbackup.StartItemBlockWorkerPool(ctx, itemBlockWorkerCount, logger),
 	}
 	b.updateTotalBackupMetric()
 	return b
@@ -329,6 +331,7 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 		Backup:           backup.DeepCopy(), // don't modify items in the cache
 		SkippedPVTracker: pkgbackup.NewSkipPVTracker(),
 		BackedUpItems:    pkgbackup.NewBackedUpItemsMap(),
+		ItemBlockChannel: b.workerPool.GetInputChannel(),
 	}
 	request.VolumesInformation.Init()
 

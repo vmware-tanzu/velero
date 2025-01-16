@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 
@@ -32,12 +33,14 @@ type BackupItemBlock struct {
 	itemblock.ItemBlock
 	// This is a reference to the  shared itemBackupper for the backup
 	itemBackupper *itemBackupper
+	pvbTimeoutCtx context.Context
 }
 
-func NewBackupItemBlock(log logrus.FieldLogger, itemBackupper *itemBackupper) *BackupItemBlock {
+func NewBackupItemBlock(log logrus.FieldLogger, itemBackupper *itemBackupper, pvbTimeoutCtx context.Context) *BackupItemBlock {
 	return &BackupItemBlock{
 		ItemBlock:     itemblock.ItemBlock{Log: log},
 		itemBackupper: itemBackupper,
+		pvbTimeoutCtx: pvbTimeoutCtx,
 	}
 }
 

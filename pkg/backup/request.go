@@ -51,6 +51,7 @@ type Request struct {
 	ResPolicies               *resourcepolicies.Policies
 	SkippedPVTracker          *skipPVTracker
 	VolumesInformation        volume.BackupVolumesInformation
+	ItemBlockChannel          chan ItemBlockInput
 }
 
 // BackupVolumesInformation contains the information needs by generating

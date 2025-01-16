@@ -71,6 +71,7 @@ type itemBackupper struct {
 	podVolumeBackupper       podvolume.Backupper
 	podVolumeSnapshotTracker *podvolume.Tracker
 	volumeSnapshotterGetter  VolumeSnapshotterGetter
+	kubernetesBackupper      *kubernetesBackupper
 
 	itemHookHandler                    hook.ItemHookHandler
 	snapshotLocationVolumeSnapshotters map[string]vsv1.VolumeSnapshotter
@@ -95,6 +96,8 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 	if !selectedForBackup || err != nil || len(files) == 0 || finalize {
 		return selectedForBackup, files, err
 	}
+	ib.tarWriter.Lock()
+	defer ib.tarWriter.Unlock()
 	for _, file := range files {
 		if err := ib.tarWriter.WriteHeader(file.Header); err != nil {
 			return false, []FileForArchive{}, errors.WithStack(err)

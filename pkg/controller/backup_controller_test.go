@@ -137,7 +137,9 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 				kbClient:   velerotest.NewFakeControllerRuntimeClient(t),
 				formatFlag: formatFlag,
 				logger:     logger,
+				workerPool: pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 			if test.backup != nil {
 				require.NoError(t, c.kbClient.Create(context.Background(), test.backup))
 			}
@@ -226,7 +228,9 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				clock:                 &clock.RealClock{},
 				formatFlag:            formatFlag,
 				metrics:               metrics.NewServerMetrics(),
+				workerPool:            pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			require.NotNil(t, test.backup)
 			require.NoError(t, c.kbClient.Create(context.Background(), test.backup))
@@ -289,7 +293,9 @@ func TestBackupLocationLabel(t *testing.T) {
 				defaultBackupLocation: test.backupLocation.Name,
 				clock:                 &clock.RealClock{},
 				formatFlag:            formatFlag,
+				workerPool:            pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			res := c.prepareBackupRequest(test.backup, logger)
 			assert.NotNil(t, res)
@@ -384,7 +390,9 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 				defaultBackupTTL:      defaultBackupTTL.Duration,
 				clock:                 testclocks.NewFakeClock(now),
 				formatFlag:            formatFlag,
+				workerPool:            pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			test.backup.Spec.StorageLocation = test.backupLocationNameInBackup
 
@@ -460,7 +468,9 @@ func TestDefaultBackupTTL(t *testing.T) {
 				defaultBackupTTL: defaultBackupTTL.Duration,
 				clock:            testclocks.NewFakeClock(now),
 				formatFlag:       formatFlag,
+				workerPool:       pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			res := c.prepareBackupRequest(test.backup, logger)
 			assert.NotNil(t, res)
@@ -560,7 +570,9 @@ func TestDefaultVolumesToResticDeprecation(t *testing.T) {
 				clock:                    &clock.RealClock{},
 				formatFlag:               formatFlag,
 				defaultVolumesToFsBackup: test.globalVal,
+				workerPool:               pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			res := c.prepareBackupRequest(test.backup, logger)
 			assert.NotNil(t, res)
@@ -1345,7 +1357,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				backupper:                backupper,
 				formatFlag:               formatFlag,
 				globalCRClient:           fakeGlobalClient,
+				workerPool:               pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			pluginManager.On("GetBackupItemActionsV2").Return(nil, nil)
 			pluginManager.On("GetItemBlockActions").Return(nil, nil)
@@ -1539,7 +1553,9 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 				logger:                   logger,
 				defaultSnapshotLocations: test.defaultLocations,
 				kbClient:                 velerotest.NewFakeControllerRuntimeClient(t),
+				workerPool:               pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			// set up a Backup object to represent what we expect to be passed to backupper.Backup()
 			backup := test.backup.DeepCopy()

@@ -18,6 +18,7 @@ package podvolume
 
 import (
 	"fmt"
+	"sync"
 
 	corev1api "k8s.io/api/core/v1"
 )
@@ -27,6 +28,7 @@ import (
 type Tracker struct {
 	pvcs   map[string]pvcSnapshotStatus
 	pvcPod map[string]string
+	*sync.RWMutex
 }
 
 type pvcSnapshotStatus int
@@ -42,7 +44,8 @@ func NewTracker() *Tracker {
 	return &Tracker{
 		pvcs: make(map[string]pvcSnapshotStatus),
 		// key: pvc ns/name, value: pod name
-		pvcPod: make(map[string]string),
+		pvcPod:  make(map[string]string),
+		RWMutex: &sync.RWMutex{},
 	}
 }
 
@@ -64,6 +67,8 @@ func (t *Tracker) Optout(pod *corev1api.Pod, volumeName string) {
 // OptedoutByPod returns true if the PVC with the specified namespace and name has been opted out by the pod.  The
 // second return value is the name of the pod which has the annotation that opted out the volume/pvc
 func (t *Tracker) OptedoutByPod(namespace, name string) (bool, string) {
+	t.RLock()
+	defer t.RUnlock()
 	status, found := t.pvcs[key(namespace, name)]
 
 	if !found || status != pvcSnapshotStatusOptedout {
@@ -74,6 +79,8 @@ func (t *Tracker) OptedoutByPod(namespace, name string) (bool, string) {
 
 // if the volume is a PVC, record the status and the related pod
 func (t *Tracker) recordStatus(pod *corev1api.Pod, volumeName string, status pvcSnapshotStatus, preReqStatus pvcSnapshotStatus) {
+	t.Lock()
+	defer t.Unlock()
 	for _, volume := range pod.Spec.Volumes {
 		if volume.Name == volumeName {
 			if volume.PersistentVolumeClaim != nil {
@@ -93,6 +100,8 @@ func (t *Tracker) recordStatus(pod *corev1api.Pod, volumeName string, status pvc
 
 // Has returns true if the PVC with the specified namespace and name has been tracked.
 func (t *Tracker) Has(namespace, name string) bool {
+	t.RLock()
+	defer t.RUnlock()
 	status, found := t.pvcs[key(namespace, name)]
 	return found && (status == pvcSnapshotStatusTracked || status == pvcSnapshotStatusTaken)
 }
@@ -100,6 +109,8 @@ func (t *Tracker) Has(namespace, name string) bool {
 // TakenForPodVolume returns true and the PVC's name if the pod volume with the specified name uses a
 // PVC and that PVC has been taken by pod volume backup.
 func (t *Tracker) TakenForPodVolume(pod *corev1api.Pod, volume string) (bool, string) {
+	t.RLock()
+	defer t.RUnlock()
 	for _, podVolume := range pod.Spec.Volumes {
 		if podVolume.Name != volume {
 			continue

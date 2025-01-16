@@ -191,25 +191,25 @@ type ItemBlockWorkerPool struct {
 }
 
 type ItemBlockInput struct {
-    itemBlock  ItemBlock
+    itemBlock  *BackupItemBlock
     returnChan chan ItemBlockReturn
 }
 
 type ItemBlockReturn struct {
-    itemBlock  ItemBlock
+    itemBlock *BackupItemBlock
     resources []schema.GroupResource
     err       error
 }
 
 func (*p ItemBlockWorkerPool) getInputChannel() chan ItemBlockInput
-func RunItemBlockWorkers(context context.Context, workers int)
-func processItemBlocksWorker(context context.Context, itemBlockChannel chan ItemBlockInput, logger logrus.FieldLogger, wg *sync.WaitGroup)
+func StartItemBlockWorkerPool(context context.Context, workers int, logger logrus.FieldLogger) ItemBlockWorkerPool
+func processItemBlockWorker(context context.Context, itemBlockChannel chan ItemBlockInput, logger logrus.FieldLogger, wg *sync.WaitGroup)
 ```
 
-The worker pool will be started by calling `RunItemBlockWorkers` in `backupReconciler.SetupWithManager`, passing in the worker count and reconciler context.
-`SetupWithManager` will also add the input channel to the `itemBackupper` so that it will be available during backup processing.
-The func `RunItemBlockWorkers` will create the `ItemBlockWorkerPool` with a shared buffered input channel (fixed buffer size) and start `workers` gororoutines which will each call `processItemBlocksWorker`.
-The `processItemBlocksWorker` func (run by the worker goroutines) will read from `itemBlockChannel`, call `BackupItemBlock` on the retrieved `ItemBlock`, and then send the return value to the retrieved `returnChan`, and then process the next block.
+The worker pool will be started by calling `StartItemBlockWorkerPool` in `NewBackupReconciler()`, passing in the worker count and reconciler context.
+`backupreconciler.prepareBackupRequest` will also add the input channel to the `backupRequest` so that it will be available during backup processing.
+The func `StartItemBlockWorkerPool` will create the `ItemBlockWorkerPool` with a shared buffered input channel (fixed buffer size) and start `workers` gororoutines which will each call `processItemBlockWorker`.
+The `processItemBlockWorker` func (run by the worker goroutines) will read from `itemBlockChannel`, call `BackupItemBlock` on the retrieved `ItemBlock`, and then send the return value to the retrieved `returnChan`, and then process the next block.
 
 #### Modify ItemBlock processing loop to send ItemBlocks to the worker pool rather than backing them up directly
 
