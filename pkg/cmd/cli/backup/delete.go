@@ -125,7 +125,7 @@ func Run(o *cli.DeleteOptions) error {
 			ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, label.GetValidName(b.Name),
 				velerov1api.BackupUIDLabel, string(b.UID)), builder.WithGenerateName(b.Name+"-")).Result()
 
-		if err := client.CreateRetryGenerateName(o.Client, context.TODO(), deleteRequest); err != nil {
+		if err := client.CreateRetryGenerateName(context.TODO(), o.Client, deleteRequest); err != nil {
 			errs = append(errs, err)
 			continue
 		}

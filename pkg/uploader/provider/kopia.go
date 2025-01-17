@@ -52,8 +52,8 @@ type kopiaProvider struct {
 
 // NewKopiaUploaderProvider initialized with open or create a repository
 func NewKopiaUploaderProvider(
-	requestorType string,
 	ctx context.Context,
+	requestorType string,
 	credGetter *credentials.CredentialGetter,
 	backupRepo *velerov1api.BackupRepository,
 	log logrus.FieldLogger,

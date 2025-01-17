@@ -189,7 +189,7 @@ func (c *gcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 	log.Info("Creating a new deletion request")
 	ndbr := pkgbackup.NewDeleteBackupRequest(backup.Name, string(backup.UID))
 	ndbr.SetNamespace(backup.Namespace)
-	if err := veleroclient.CreateRetryGenerateName(c, ctx, ndbr); err != nil {
+	if err := veleroclient.CreateRetryGenerateName(ctx, c, ndbr); err != nil {
 		log.WithError(err).Error("error creating DeleteBackupRequests")
 		return ctrl.Result{}, errors.Wrap(err, "error creating DeleteBackupRequest")
 	}

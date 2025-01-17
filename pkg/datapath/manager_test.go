@@ -26,13 +26,13 @@ import (
 func TestCreateFileSystemBR(t *testing.T) {
 	m := NewManager(2)
 
-	async_job_1, err := m.CreateFileSystemBR("job-1", "test", context.TODO(), nil, "velero", Callbacks{}, nil)
+	async_job_1, err := m.CreateFileSystemBR(context.TODO(), "job-1", "test", nil, "velero", Callbacks{}, nil)
 	assert.NoError(t, err)
 
-	_, err = m.CreateFileSystemBR("job-2", "test", context.TODO(), nil, "velero", Callbacks{}, nil)
+	_, err = m.CreateFileSystemBR(context.TODO(), "job-2", "test", nil, "velero", Callbacks{}, nil)
 	assert.NoError(t, err)
 
-	_, err = m.CreateFileSystemBR("job-3", "test", context.TODO(), nil, "velero", Callbacks{}, nil)
+	_, err = m.CreateFileSystemBR(context.TODO(), "job-3", "test", nil, "velero", Callbacks{}, nil)
 	assert.Equal(t, ConcurrentLimitExceed, err)
 
 	ret := m.GetAsyncBR("job-0")

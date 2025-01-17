@@ -180,7 +180,7 @@ func (r *restorer) RestorePodVolumes(data RestoreData, tracker *volume.RestoreVo
 		}
 
 		volumeRestore := newPodVolumeRestore(data.Restore, data.Pod, data.BackupLocation, volume, backupInfo.snapshotID, repoIdentifier, backupInfo.uploaderType, data.SourceNamespace, pvc)
-		if err := veleroclient.CreateRetryGenerateName(r.crClient, r.ctx, volumeRestore); err != nil {
+		if err := veleroclient.CreateRetryGenerateName(r.ctx, r.crClient, volumeRestore); err != nil {
 			errs = append(errs, errors.WithStack(err))
 			continue
 		}

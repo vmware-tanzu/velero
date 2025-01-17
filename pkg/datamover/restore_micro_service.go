@@ -157,7 +157,7 @@ func (r *RestoreMicroService) RunCancelableDataPath(ctx context.Context) (string
 		OnProgress:  r.OnDataDownloadProgress,
 	}
 
-	fsRestore, err := r.dataPathMgr.CreateFileSystemBR(dd.Name, dataUploadDownloadRequestor, ctx, r.client, dd.Namespace, callbacks, log)
+	fsRestore, err := r.dataPathMgr.CreateFileSystemBR(ctx, dd.Name, dataUploadDownloadRequestor, r.client, dd.Namespace, callbacks, log)
 	if err != nil {
 		return "", errors.Wrap(err, "error to create data path")
 	}

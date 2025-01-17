@@ -41,7 +41,7 @@ type DefaultServerStatusGetter struct {
 func (g *DefaultServerStatusGetter) GetServerStatus(kbClient kbclient.Client) (*velerov1api.ServerStatusRequest, error) {
 	created := builder.ForServerStatusRequest(g.Namespace, "", "0").ObjectMeta(builder.WithGenerateName("velero-cli-")).Result()
 
-	if err := veleroclient.CreateRetryGenerateName(kbClient, context.Background(), created); err != nil {
+	if err := veleroclient.CreateRetryGenerateName(context.Background(), kbClient, created); err != nil {
 		return nil, errors.WithStack(err)
 	}
 

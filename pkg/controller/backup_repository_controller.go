@@ -427,7 +427,7 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 
 	log.Info("Running maintenance on backup repository")
 
-	job, err := funcStartMaintenanceJob(r.Client, ctx, req, r.repoMaintenanceConfig, r.maintenanceJobResources, r.logLevel, r.logFormat, log)
+	job, err := funcStartMaintenanceJob(ctx, r.Client, req, r.repoMaintenanceConfig, r.maintenanceJobResources, r.logLevel, r.logFormat, log)
 	if err != nil {
 		log.WithError(err).Warn("Starting repo maintenance failed")
 		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
@@ -437,7 +437,7 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 
 	// when WaitMaintenanceJobComplete fails, the maintenance result will be left aside temporarily
 	// If the maintenenance still completes later, recallMaintenance recalls the left once and update LastMaintenanceTime and history
-	status, err := funcWaitMaintenanceJobComplete(r.Client, ctx, job, r.namespace, log)
+	status, err := funcWaitMaintenanceJobComplete(ctx, r.Client, job, r.namespace, log)
 	if err != nil {
 		return errors.Wrapf(err, "error waiting repo maintenance completion status")
 	}

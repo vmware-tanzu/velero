@@ -261,7 +261,7 @@ func getJobConfig(
 }
 
 // WaitJobComplete waits the completion of the specified maintenance job and return the BackupRepositoryMaintenanceStatus
-func WaitJobComplete(cli client.Client, ctx context.Context, jobName, ns string, logger logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
+func WaitJobComplete(ctx context.Context, cli client.Client, jobName, ns string, logger logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
 	log := logger.WithField("job name", jobName)
 
 	maintenanceJob, err := waitForJobComplete(ctx, cli, ns, jobName, logger)
@@ -344,7 +344,7 @@ func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1a
 }
 
 // StartNewJob creates a new maintenance job
-func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, repoMaintenanceJobConfig string,
+func StartNewJob(ctx context.Context, cli client.Client, repo *velerov1api.BackupRepository, repoMaintenanceJobConfig string,
 	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag, logger logrus.FieldLogger) (string, error) {
 	bsl := &velerov1api.BackupStorageLocation{}
 	if err := cli.Get(ctx, client.ObjectKey{Namespace: repo.Namespace, Name: repo.Spec.BackupStorageLocation}, bsl); err != nil {
@@ -375,7 +375,7 @@ func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.Backu
 
 	log.Info("Starting maintenance repo")
 
-	maintenanceJob, err := buildJob(cli, ctx, repo, bsl.Name, jobConfig, podResources, logLevel, logFormat)
+	maintenanceJob, err := buildJob(ctx, cli, repo, bsl.Name, jobConfig, podResources, logLevel, logFormat)
 	if err != nil {
 		return "", errors.Wrap(err, "error to build maintenance job")
 	}
@@ -391,7 +391,7 @@ func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.Backu
 	return maintenanceJob.Name, nil
 }
 
-func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, bslName string, config *JobConfigs,
+func buildJob(ctx context.Context, cli client.Client, repo *velerov1api.BackupRepository, bslName string, config *JobConfigs,
 	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag) (*batchv1.Job, error) {
 	// Get the Velero server deployment
 	deployment := &appsv1.Deployment{}

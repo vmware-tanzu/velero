@@ -106,7 +106,7 @@ func (d *DataUploadRetrieveAction) Execute(input *velero.RestoreItemActionExecut
 		},
 	}
 
-	err = veleroclient.CreateRetryGenerateName(d.client, context.Background(), &cm)
+	err = veleroclient.CreateRetryGenerateName(context.Background(), d.client, &cm)
 	if err != nil {
 		d.logger.Errorf("fail to create DataUploadResult ConfigMap %s/%s: %s", cm.Namespace, cm.Name, err.Error())
 		return nil, errors.Wrap(err, "fail to create DataUploadResult ConfigMap")

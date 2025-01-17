@@ -27,7 +27,7 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func CreateRetryGenerateName(client kbclient.Client, ctx context.Context, obj kbclient.Object) error {
+func CreateRetryGenerateName(ctx context.Context, client kbclient.Client, obj kbclient.Object) error {
 	retryCreateFn := func() error {
 		// needed to ensure that the name from the failed create isn't left on the object between retries
 		obj.SetName("")

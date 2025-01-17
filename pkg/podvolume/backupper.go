@@ -341,7 +341,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 
 		volumeBackup := newPodVolumeBackup(backup, pod, volume, repoIdentifier, b.uploaderType, pvc)
-		if err := veleroclient.CreateRetryGenerateName(b.crClient, b.ctx, volumeBackup); err != nil {
+		if err := veleroclient.CreateRetryGenerateName(b.ctx, b.crClient, volumeBackup); err != nil {
 			errs = append(errs, err)
 			continue
 		}

@@ -940,7 +940,7 @@ func (r *DataUploadReconciler) AttemptDataUploadResume(ctx context.Context, logg
 				continue
 			}
 
-			err := funcResumeCancellableDataBackup(r, ctx, du, logger)
+			err := funcResumeCancellableDataBackup(ctx, r, du, logger)
 			if err == nil {
 				logger.WithField("du", du.Name).WithField("current node", r.nodeName).Info("Completed to resume in progress DU")
 				continue

@@ -965,7 +965,7 @@ type ddResumeTestHelper struct {
 	asyncBR      datapath.AsyncBR
 }
 
-func (dt *ddResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler, _ context.Context, _ *velerov2alpha1api.DataUpload, _ logrus.FieldLogger) error {
+func (dt *ddResumeTestHelper) resumeCancellableDataPath(context.Context, *DataUploadReconciler, *velerov2alpha1api.DataUpload, logrus.FieldLogger) error {
 	return dt.resumeErr
 }
 

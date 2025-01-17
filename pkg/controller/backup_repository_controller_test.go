@@ -118,20 +118,20 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
 }
 
-func startMaintenanceJobFail(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
+func startMaintenanceJobFail(context.Context, client.Client, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
 	return "", errors.New("fake-start-error")
 }
 
-func startMaintenanceJobSucceed(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
+func startMaintenanceJobSucceed(context.Context, client.Client, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
 	return "fake-job-name", nil
 }
 
-func waitMaintenanceJobCompleteFail(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
+func waitMaintenanceJobCompleteFail(context.Context, client.Client, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
 	return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.New("fake-wait-error")
 }
 
-func waitMaintenanceJobCompleteFunc(now time.Time, result velerov1api.BackupRepositoryMaintenanceResult, message string) func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
-	return func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
+func waitMaintenanceJobCompleteFunc(now time.Time, result velerov1api.BackupRepositoryMaintenanceResult, message string) func(context.Context, client.Client, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
+	return func(context.Context, client.Client, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
 		return velerov1api.BackupRepositoryMaintenanceStatus{
 			StartTimestamp:    &metav1.Time{Time: now},
 			CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
@@ -180,8 +180,8 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 	tests := []struct {
 		name                    string
 		repo                    *velerov1api.BackupRepository
-		startJobFunc            func(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error)
-		waitJobFunc             func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error)
+		startJobFunc            func(context.Context, client.Client, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error)
+		waitJobFunc             func(context.Context, client.Client, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error)
 		expectedMaintenanceTime time.Time
 		expectedHistory         []velerov1api.BackupRepositoryMaintenanceStatus
 		expectedErr             string

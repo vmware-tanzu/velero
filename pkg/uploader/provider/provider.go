@@ -85,7 +85,7 @@ func NewUploaderProvider(
 		return nil, errors.New("uninitialized FileStore credential is not supported")
 	}
 	if uploaderType == uploader.KopiaType {
-		return NewKopiaUploaderProvider(requesterType, ctx, credGetter, backupRepo, log)
+		return NewKopiaUploaderProvider(ctx, requesterType, credGetter, backupRepo, log)
 	} else {
 		return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
 	}

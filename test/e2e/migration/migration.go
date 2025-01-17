@@ -398,9 +398,9 @@ func (m *migrationE2E) Restore() error {
 func (m *migrationE2E) Verify() error {
 	By(fmt.Sprintf("Verify workload %s after restore on standby cluster", m.CaseBaseName), func() {
 		Expect(kibishii.KibishiiVerifyAfterRestore(
+			m.Ctx,
 			*m.VeleroCfg.StandbyClient,
 			m.CaseBaseName,
-			m.Ctx,
 			&m.kibishiiData,
 			"",
 		)).To(Succeed(), "Fail to verify workload after restore")

@@ -255,7 +255,7 @@ func RunKibishiiTests(
 	}
 
 	fmt.Printf("KibishiiVerifyAfterRestore %s\n", time.Now().Format("2006-01-02 15:04:05"))
-	if err := KibishiiVerifyAfterRestore(client, kibishiiNamespace, oneHourTimeout, DefaultKibishiiData, fileName); err != nil {
+	if err := KibishiiVerifyAfterRestore(oneHourTimeout, client, kibishiiNamespace, DefaultKibishiiData, fileName); err != nil {
 		return errors.Wrapf(err, "Error verifying kibishii after restore")
 	}
 
@@ -415,7 +415,7 @@ func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClie
 	return nil
 }
 
-func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, oneHourTimeout context.Context,
+func KibishiiVerifyAfterRestore(oneHourTimeout context.Context, client TestClient, kibishiiNamespace string,
 	kibishiiData *KibishiiData, incrementalFileName string) error {
 	if kibishiiData == nil {
 		kibishiiData = DefaultKibishiiData

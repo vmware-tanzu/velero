@@ -238,7 +238,8 @@ linters-settings:
       - name: blank-imports
         disabled: true
       - name: context-as-argument
-        disabled: true
+        arguments:
+          - allowTypesBefore: "*testing.T"
       - name: context-keys-type
         disabled: false
       - name: dot-imports
