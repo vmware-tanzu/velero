@@ -502,15 +502,9 @@ func (s *server) initRepoManager() error {
 		s.namespace,
 		s.mgr.GetClient(),
 		s.repoLocker,
-		s.repoEnsurer,
 		s.credentialFileStore,
 		s.credentialSecretStore,
-		s.config.RepoMaintenanceJobConfig,
-		s.config.PodResources,
-		s.config.KeepLatestMaintenanceJobs,
 		s.logger,
-		s.logLevel,
-		s.config.LogFormat,
 	)
 
 	return nil
@@ -731,9 +725,14 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.namespace,
 			s.logger,
 			s.mgr.GetClient(),
+			s.repoManager,
 			s.config.RepoMaintenanceFrequency,
 			s.config.BackupRepoConfig,
-			s.repoManager,
+			s.config.KeepLatestMaintenanceJobs,
+			s.config.RepoMaintenanceJobConfig,
+			s.config.PodResources,
+			s.logLevel,
+			s.config.LogFormat,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupRepo)
 		}

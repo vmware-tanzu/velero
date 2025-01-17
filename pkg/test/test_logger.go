@@ -62,3 +62,19 @@ func NewSingleLoggerWithHooks(buffer *string, hooks []logrus.Hook) logrus.FieldL
 
 	return logrus.NewEntry(logger)
 }
+
+type multipleLogRecorder struct {
+	buffer *[]string
+}
+
+func (m *multipleLogRecorder) Write(p []byte) (n int, err error) {
+	*m.buffer = append(*m.buffer, string(p[:]))
+	return len(p), nil
+}
+
+func NewMultipleLogger(buffer *[]string) logrus.FieldLogger {
+	logger := logrus.New()
+	logger.Out = &multipleLogRecorder{buffer}
+	logger.Level = logrus.TraceLevel
+	return logrus.NewEntry(logger)
+}
