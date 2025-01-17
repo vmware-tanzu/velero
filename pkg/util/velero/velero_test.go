@@ -711,3 +711,51 @@ func TestGetVeleroServerAnnotations(t *testing.T) {
 		})
 	}
 }
+
+func TestGetVeleroServerLabelValue(t *testing.T) {
+	tests := []struct {
+		name       string
+		deployment *appsv1.Deployment
+		expected   string
+	}{
+		{
+			name:       "nil Labels",
+			deployment: &appsv1.Deployment{},
+			expected:   "",
+		},
+		{
+			name: "no label key",
+			deployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{},
+						},
+					},
+				},
+			},
+			expected: "",
+		},
+		{
+			name: "with label key",
+			deployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"fake-key": "fake-value"},
+						},
+					},
+				},
+			},
+			expected: "fake-value",
+		},
+	}
+
+	// Run tests
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GetVeleroServerLabelValue(tt.deployment, "fake-key")
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
