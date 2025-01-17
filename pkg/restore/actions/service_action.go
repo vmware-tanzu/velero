@@ -96,7 +96,7 @@ func deleteHealthCheckNodePort(service *corev1api.Service) error {
 	// annotation(HealthCheckNodePort is specified by `kubectl apply` command)
 	lastAppliedConfig, ok := service.Annotations[annotationLastAppliedConfig]
 	if ok {
-		appliedServiceUnstructured := new(map[string]interface{})
+		appliedServiceUnstructured := new(map[string]any)
 		if err := json.Unmarshal([]byte(lastAppliedConfig), appliedServiceUnstructured); err != nil {
 			return errors.WithStack(err)
 		}
@@ -119,7 +119,7 @@ func deleteHealthCheckNodePort(service *corev1api.Service) error {
 		if entry.FieldsV1 == nil {
 			continue
 		}
-		fields := new(map[string]interface{})
+		fields := new(map[string]any)
 		if err := json.Unmarshal(entry.FieldsV1.Raw, fields); err != nil {
 			return errors.WithStack(err)
 		}
@@ -157,7 +157,7 @@ func deleteNodePorts(service *corev1api.Service) error {
 	if ok {
 		explicitNodePorts := sets.NewString()
 		unnamedPortInts := sets.NewInt()
-		appliedServiceUnstructured := new(map[string]interface{})
+		appliedServiceUnstructured := new(map[string]any)
 		if err := json.Unmarshal([]byte(lastAppliedConfig), appliedServiceUnstructured); err != nil {
 			return errors.WithStack(err)
 		}
@@ -170,7 +170,7 @@ func deleteNodePorts(service *corev1api.Service) error {
 
 		if bool {
 			for _, port := range ports {
-				p, ok := port.(map[string]interface{})
+				p, ok := port.(map[string]any)
 				if !ok {
 					continue
 				}
@@ -224,7 +224,7 @@ func deleteNodePorts(service *corev1api.Service) error {
 		if entry.FieldsV1 == nil {
 			continue
 		}
-		fields := new(map[string]interface{})
+		fields := new(map[string]any)
 		if err := json.Unmarshal(entry.FieldsV1.Raw, fields); err != nil {
 			return errors.WithStack(err)
 		}
@@ -237,7 +237,7 @@ func deleteNodePorts(service *corev1api.Service) error {
 			continue
 		}
 		for key, port := range ports {
-			p, ok := port.(map[string]interface{})
+			p, ok := port.(map[string]any)
 			if !ok {
 				continue
 			}

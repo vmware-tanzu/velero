@@ -106,17 +106,17 @@ func TestDescriber_DescribeSlice(t *testing.T) {
 func TestStructuredDescriber_JSONEncode(t *testing.T) {
 	testcases := []struct {
 		name     string
-		inputMap map[string]interface{}
+		inputMap map[string]any
 		expect   string
 	}{
 		{
 			name:     "invalid json",
-			inputMap: map[string]interface{}{},
+			inputMap: map[string]any{},
 			expect:   "{}\n",
 		},
 		{
 			name:     "valid json",
-			inputMap: map[string]interface{}{"k1": "v1"},
+			inputMap: map[string]any{"k1": "v1"},
 			expect: `{
     "k1": "v1"
 }
@@ -148,8 +148,8 @@ func TestStructuredDescriber_DescribeMetadata(t *testing.T) {
 			"annotation-2": "v2",
 		},
 	}
-	expect := map[string]interface{}{
-		"metadata": map[string]interface{}{
+	expect := map[string]any{
+		"metadata": map[string]any{
 			"name":      "test",
 			"namespace": "test-ns",
 			"labels": map[string]string{

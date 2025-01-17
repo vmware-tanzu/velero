@@ -34,11 +34,11 @@ type Uploader struct {
 
 // Execute provides a mock function with given fields: ctx, source, policyTree, sourceInfo, previousManifests
 func (_m *Uploader) Upload(ctx context.Context, source fs.Entry, policyTree *policy.Tree, sourceInfo snapshot.SourceInfo, previousManifests ...*snapshot.Manifest) (*snapshot.Manifest, error) {
-	_va := make([]interface{}, len(previousManifests))
+	_va := make([]any, len(previousManifests))
 	for _i := range previousManifests {
 		_va[_i] = previousManifests[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, ctx, source, policyTree, sourceInfo)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)

@@ -33,9 +33,9 @@ const (
 	ConfigKeyColorized = "colorized"
 )
 
-// VeleroConfig is a map of strings to interface{} for deserializing Velero client config options.
+// VeleroConfig is a map of strings to any for deserializing Velero client config options.
 // The alias is a way to attach type-asserting convenience methods.
-type VeleroConfig map[string]interface{}
+type VeleroConfig map[string]any
 
 // LoadConfig loads the Velero client configuration file and returns it as a VeleroConfig. If the
 // file does not exist, an empty map is returned.

@@ -257,7 +257,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		backupInformer := cache.NewSharedInformer(&lw, &velerov1api.Backup{}, time.Second)
 		_, _ = backupInformer.AddEventHandler(
 			cache.FilteringResourceEventHandler{
-				FilterFunc: func(obj interface{}) bool {
+				FilterFunc: func(obj any) bool {
 					backup, ok := obj.(*velerov1api.Backup)
 
 					if !ok {
@@ -266,14 +266,14 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					return backup.Name == o.Name
 				},
 				Handler: cache.ResourceEventHandlerFuncs{
-					UpdateFunc: func(_, obj interface{}) {
+					UpdateFunc: func(_, obj any) {
 						backup, ok := obj.(*velerov1api.Backup)
 						if !ok {
 							return
 						}
 						updates <- backup
 					},
-					DeleteFunc: func(obj interface{}) {
+					DeleteFunc: func(obj any) {
 						backup, ok := obj.(*velerov1api.Backup)
 						if !ok {
 							return

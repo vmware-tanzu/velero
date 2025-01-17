@@ -145,7 +145,7 @@ func (a *ChangeImageNameAction) Execute(input *velero.RestoreItemActionExecuteIn
 }
 
 func (a *ChangeImageNameAction) replaceImageName(obj *unstructured.Unstructured, config *corev1.ConfigMap, filed ...string) error {
-	log := a.logger.WithFields(map[string]interface{}{
+	log := a.logger.WithFields(map[string]any{
 		"kind":      obj.GetKind(),
 		"namespace": obj.GetNamespace(),
 		"name":      obj.GetName(),
@@ -161,12 +161,12 @@ func (a *ChangeImageNameAction) replaceImageName(obj *unstructured.Unstructured,
 	}
 	for i, container := range containers {
 		log.Infoln("container:", container)
-		if image, ok := container.(map[string]interface{})["image"]; ok {
+		if image, ok := container.(map[string]any)["image"]; ok {
 			imageName := image.(string)
 			if exists, newImageName, err := a.isImageReplaceRuleExist(log, imageName, config); exists && err == nil {
 				needUpdateObj = true
 				log.Infof("Updating item's image from %s to %s", imageName, newImageName)
-				container.(map[string]interface{})["image"] = newImageName
+				container.(map[string]any)["image"] = newImageName
 				containers[i] = container
 			}
 		}

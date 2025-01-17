@@ -348,7 +348,7 @@ func (r *PodVolumeBackupReconciler) getParentSnapshot(ctx context.Context, log l
 		return ""
 	}
 
-	log.WithFields(map[string]interface{}{
+	log.WithFields(map[string]any{
 		"parentPodVolumeBackup": mostRecentPVB.Name,
 		"parentSnapshotID":      mostRecentPVB.Status.SnapshotID,
 	}).Info("Found most recent completed PodVolumeBackup for PVC")

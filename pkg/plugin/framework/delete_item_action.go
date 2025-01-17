@@ -34,7 +34,7 @@ type DeleteItemActionPlugin struct {
 }
 
 // GRPCClient returns a DeleteItemAction gRPC client.
-func (p *DeleteItemActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+func (p *DeleteItemActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (any, error) {
 	return common.NewClientDispenser(p.ClientLogger, clientConn, newDeleteItemActionGRPCClient), nil
 }
 

@@ -284,7 +284,7 @@ func createResource(r *unstructured.Unstructured, factory client.DynamicFactory,
 	id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
 
 	// Helper to reduce boilerplate message about the same object
-	log := func(f string, a ...interface{}) {
+	log := func(f string, a ...any) {
 		format := strings.Join([]string{id, ": ", f, "\n"}, "")
 		fmt.Fprintf(w, format, a...)
 	}
@@ -310,7 +310,7 @@ func CreateClient(r *unstructured.Unstructured, factory client.DynamicFactory, w
 	id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
 
 	// Helper to reduce boilerplate message about the same object
-	log := func(f string, a ...interface{}) {
+	log := func(f string, a ...any) {
 		format := strings.Join([]string{id, ": ", f, "\n"}, "")
 		fmt.Fprintf(w, format, a...)
 	}

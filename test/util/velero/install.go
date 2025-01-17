@@ -478,7 +478,7 @@ func patchResources(resources *unstructured.UnstructuredList, namespace string, 
 					".dockerconfigjson": credential,
 				},
 			}
-			resource.Object["imagePullSecrets"] = []map[string]interface{}{
+			resource.Object["imagePullSecrets"] = []map[string]any{
 				{
 					"name": "image-pull-secret",
 				},
@@ -559,7 +559,7 @@ func patchResources(resources *unstructured.UnstructuredList, namespace string, 
 	return nil
 }
 
-func toUnstructured(res interface{}) (unstructured.Unstructured, error) {
+func toUnstructured(res any) (unstructured.Unstructured, error) {
 	un := unstructured.Unstructured{}
 	data, err := json.Marshal(res)
 	if err != nil {

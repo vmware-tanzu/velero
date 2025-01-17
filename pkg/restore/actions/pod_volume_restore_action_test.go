@@ -299,7 +299,7 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 			require.NoError(t, err)
 
 			// Default to using the same pod for both Item and ItemFromBackup if podFromBackup not provided
-			var unstructuredPodFromBackup map[string]interface{}
+			var unstructuredPodFromBackup map[string]any
 			if tc.podFromBackup != nil {
 				unstructuredPodFromBackup, err = runtime.DefaultUnstructuredConverter.ToUnstructured(tc.podFromBackup)
 				require.NoError(t, err)
