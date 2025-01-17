@@ -46,7 +46,7 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 		Use:   "logs RESTORE",
 		Short: "Get restore logs",
 		Args:  cobra.ExactArgs(1),
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, args []string) {
 			restoreName := args[0]
 
 			kbClient, err := f.KubebuilderClient()

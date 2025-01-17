@@ -1266,7 +1266,7 @@ func newStringReadSeeker(s string) *stringReadSeeker {
 	}
 }
 
-func (srs *stringReadSeeker) Seek(offset int64, whence int) (int64, error) {
+func (srs *stringReadSeeker) Seek(_ int64, _ int) (int64, error) {
 	return 0, nil
 }
 

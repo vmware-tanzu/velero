@@ -149,7 +149,7 @@ type BackupItemActionResolver struct {
 	actions []biav1.BackupItemAction
 }
 
-func (recv BackupItemActionResolver) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]BackupItemResolvedAction, error) {
+func (recv BackupItemActionResolver) ResolveActions(helper discovery.Helper, _ logrus.FieldLogger) ([]BackupItemResolvedAction, error) {
 	var resolved []BackupItemResolvedAction
 	for _, action := range recv.actions {
 		resources, namespaces, selector, err := resolveAction(helper, action)
@@ -209,7 +209,7 @@ type RestoreItemActionResolver struct {
 	actions []riav1.RestoreItemAction
 }
 
-func (recv RestoreItemActionResolver) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]RestoreItemResolvedAction, error) {
+func (recv RestoreItemActionResolver) ResolveActions(helper discovery.Helper, _ logrus.FieldLogger) ([]RestoreItemResolvedAction, error) {
 	var resolved []RestoreItemResolvedAction
 	for _, action := range recv.actions {
 		resources, namespaces, selector, err := resolveAction(helper, action)
@@ -233,7 +233,7 @@ type RestoreItemActionResolverV2 struct {
 	actions []riav2.RestoreItemAction
 }
 
-func (recv RestoreItemActionResolverV2) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]RestoreItemResolvedActionV2, error) {
+func (recv RestoreItemActionResolverV2) ResolveActions(helper discovery.Helper, _ logrus.FieldLogger) ([]RestoreItemResolvedActionV2, error) {
 	var resolved []RestoreItemResolvedActionV2
 	for _, action := range recv.actions {
 		resources, namespaces, selector, err := resolveAction(helper, action)
@@ -262,7 +262,7 @@ type DeleteItemActionResolver struct {
 	actions []velero.DeleteItemAction
 }
 
-func (recv DeleteItemActionResolver) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]DeleteItemResolvedAction, error) {
+func (recv DeleteItemActionResolver) ResolveActions(helper discovery.Helper, _ logrus.FieldLogger) ([]DeleteItemResolvedAction, error) {
 	var resolved []DeleteItemResolvedAction
 	for _, action := range recv.actions {
 		resources, namespaces, selector, err := resolveAction(helper, action)
@@ -297,7 +297,7 @@ func NewItemBlockActionResolver(actions []ibav1.ItemBlockAction) ItemBlockAction
 	}
 }
 
-func (recv ItemBlockActionResolver) ResolveActions(helper discovery.Helper, log logrus.FieldLogger) ([]ItemBlockResolvedAction, error) {
+func (recv ItemBlockActionResolver) ResolveActions(helper discovery.Helper, _ logrus.FieldLogger) ([]ItemBlockResolvedAction, error) {
 	var resolved []ItemBlockResolvedAction
 	for _, action := range recv.actions {
 		resources, namespaces, selector, err := resolveAction(helper, action)

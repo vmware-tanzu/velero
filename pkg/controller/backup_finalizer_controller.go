@@ -67,7 +67,7 @@ func NewBackupFinalizerReconciler(
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	log logrus.FieldLogger,
 	metrics *metrics.ServerMetrics,
-	resourceTimeout time.Duration,
+	_ time.Duration,
 ) *backupFinalizerReconciler {
 	return &backupFinalizerReconciler{
 		client:            client,

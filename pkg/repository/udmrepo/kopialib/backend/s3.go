@@ -51,6 +51,6 @@ func (c *S3Backend) Setup(ctx context.Context, flags map[string]string) error {
 	return nil
 }
 
-func (c *S3Backend) Connect(ctx context.Context, isCreate bool) (blob.Storage, error) {
+func (c *S3Backend) Connect(ctx context.Context, _ bool) (blob.Storage, error) {
 	return s3.New(ctx, &c.options, false)
 }

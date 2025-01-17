@@ -46,11 +46,11 @@ type FakeVolumeSnapshotter struct {
 	Error error
 }
 
-func (bs *FakeVolumeSnapshotter) Init(config map[string]string) error {
+func (bs *FakeVolumeSnapshotter) Init(_ map[string]string) error {
 	return nil
 }
 
-func (bs *FakeVolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (bs *FakeVolumeSnapshotter) CreateSnapshot(volumeID, _ string, _ map[string]string) (string, error) {
 	if bs.Error != nil {
 		return "", bs.Error
 	}
@@ -96,7 +96,7 @@ func (bs *FakeVolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	return nil
 }
 
-func (bs *FakeVolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (bs *FakeVolumeSnapshotter) GetVolumeInfo(volumeID, _ string) (string, *int64, error) {
 	if bs.Error != nil {
 		return "", nil, bs.Error
 	}
@@ -108,7 +108,7 @@ func (bs *FakeVolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (strin
 	return volumeInfo.Type, volumeInfo.Iops, nil
 }
 
-func (bs *FakeVolumeSnapshotter) GetVolumeID(pv runtime.Unstructured) (string, error) {
+func (bs *FakeVolumeSnapshotter) GetVolumeID(_ runtime.Unstructured) (string, error) {
 	return bs.VolumeID, nil
 }
 

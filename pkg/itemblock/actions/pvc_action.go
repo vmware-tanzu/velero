@@ -61,7 +61,7 @@ func (a *PVCAction) AppliesTo() (velero.ResourceSelector, error) {
 	}, nil
 }
 
-func (a *PVCAction) GetRelatedItems(item runtime.Unstructured, backup *v1.Backup) ([]velero.ResourceIdentifier, error) {
+func (a *PVCAction) GetRelatedItems(item runtime.Unstructured, _ *v1.Backup) ([]velero.ResourceIdentifier, error) {
 	a.log.Info("Executing PVC ItemBlockAction")
 	defer a.log.Info("Done executing PVC ItemBlockAction")
 

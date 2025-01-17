@@ -76,7 +76,7 @@ type FakeClient struct {
 	listError      error
 }
 
-func (c *FakeClient) Get(ctx context.Context, key kbclient.ObjectKey, obj kbclient.Object, opts ...kbclient.GetOption) error {
+func (c *FakeClient) Get(ctx context.Context, key kbclient.ObjectKey, obj kbclient.Object, _ ...kbclient.GetOption) error {
 	if c.getError != nil {
 		return c.getError
 	}
@@ -272,7 +272,7 @@ type fakeSnapshotExposer struct {
 	peekErr         error
 }
 
-func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param any) error {
+func (f *fakeSnapshotExposer) Expose(ctx context.Context, _ corev1.ObjectReference, _ any) error {
 	du := velerov2alpha1api.DataUpload{}
 	err := f.kubeClient.Get(ctx, kbclient.ObjectKey{
 		Name:      dataUploadName,
@@ -289,7 +289,7 @@ func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obj
 	return nil
 }
 
-func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1.ObjectReference, tm time.Duration, para any) (*exposer.ExposeResult, error) {
+func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, _ corev1.ObjectReference, _ time.Duration, _ any) (*exposer.ExposeResult, error) {
 	pod := &corev1.Pod{}
 	err := f.kubeClient.Get(ctx, kbclient.ObjectKey{
 		Name:      dataUploadName,
@@ -307,7 +307,7 @@ func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1.ObjectRe
 	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, VolumeName: dataUploadName, NodeOS: pNodeOS}}, nil
 }
 
-func (f *fakeSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1.ObjectReference) error {
+func (f *fakeSnapshotExposer) PeekExposed(_ context.Context, _ corev1.ObjectReference) error {
 	return f.peekErr
 }
 
@@ -326,22 +326,22 @@ type fakeDataUploadFSBR struct {
 	startErr   error
 }
 
-func (f *fakeDataUploadFSBR) Init(ctx context.Context, param any) error {
+func (f *fakeDataUploadFSBR) Init(_ context.Context, _ any) error {
 	return f.initErr
 }
 
-func (f *fakeDataUploadFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param any) error {
+func (f *fakeDataUploadFSBR) StartBackup(_ datapath.AccessPoint, _ map[string]string, _ any) error {
 	return f.startErr
 }
 
-func (f *fakeDataUploadFSBR) StartRestore(snapshotID string, target datapath.AccessPoint, uploaderConfigs map[string]string) error {
+func (f *fakeDataUploadFSBR) StartRestore(_ string, _ datapath.AccessPoint, _ map[string]string) error {
 	return nil
 }
 
 func (b *fakeDataUploadFSBR) Cancel() {
 }
 
-func (b *fakeDataUploadFSBR) Close(ctx context.Context) {
+func (b *fakeDataUploadFSBR) Close(_ context.Context) {
 }
 
 func TestReconcile(t *testing.T) {
@@ -830,7 +830,7 @@ func TestFindDataUploadForPod(t *testing.T) {
 			name: "no selected label found for pod",
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Result(),
-			checkFunc: func(du *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
 				// Assert that the function returns a single request
 				assert.Empty(t, requests)
 			},
@@ -838,7 +838,7 @@ func TestFindDataUploadForPod(t *testing.T) {
 			name: "no matched pod",
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Labels(map[string]string{velerov1api.DataUploadLabel: "non-existing-dataupload"}).Result(),
-			checkFunc: func(du *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
 				assert.Empty(t, requests)
 			},
 		},
@@ -846,7 +846,7 @@ func TestFindDataUploadForPod(t *testing.T) {
 			name: "dataUpload not accepte",
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Labels(map[string]string{velerov1api.DataUploadLabel: dataUploadName}).Result(),
-			checkFunc: func(du *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
 				assert.Empty(t, requests)
 			},
 		},

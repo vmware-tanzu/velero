@@ -41,7 +41,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
-func TestNamespaceAndName(t *testing.T) {
+func TestNamespaceAndName(_ *testing.T) {
 	//TODO
 }
 

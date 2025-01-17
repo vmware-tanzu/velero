@@ -373,7 +373,7 @@ func TestDescribeNativeSnapshots(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		t.Run(tc.name, func(tt *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			d := &Describer{
 				Prefix: "",
 				out:    &tabwriter.Writer{},
@@ -541,7 +541,7 @@ func TestCSISnapshots(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		t.Run(tc.name, func(tt *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			d := &Describer{
 				Prefix: "",
 				out:    &tabwriter.Writer{},

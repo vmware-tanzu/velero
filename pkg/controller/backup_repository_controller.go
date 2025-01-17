@@ -106,7 +106,7 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *BackupRepoReconciler) invalidateBackupReposForBSL(ctx context.Context, bslObj client.Object) []reconcile.Request {
+func (r *BackupRepoReconciler) invalidateBackupReposForBSL(_ context.Context, bslObj client.Object) []reconcile.Request {
 	bsl := bslObj.(*velerov1api.BackupStorageLocation)
 
 	list := &velerov1api.BackupRepositoryList{}

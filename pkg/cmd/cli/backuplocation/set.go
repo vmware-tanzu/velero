@@ -76,7 +76,7 @@ func (o *SetOptions) BindFlags(flags *pflag.FlagSet) {
 	f.NoOptDefVal = cmd.TRUE
 }
 
-func (o *SetOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+func (o *SetOptions) Validate(_ *cobra.Command, _ []string, _ client.Factory) error {
 	if len(o.Credential.Data()) > 1 {
 		return errors.New("--credential can only contain 1 key/value pair")
 	}
@@ -84,12 +84,12 @@ func (o *SetOptions) Validate(c *cobra.Command, args []string, f client.Factory)
 	return nil
 }
 
-func (o *SetOptions) Complete(args []string, f client.Factory) error {
+func (o *SetOptions) Complete(args []string, _ client.Factory) error {
 	o.Name = args[0]
 	return nil
 }
 
-func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
+func (o *SetOptions) Run(_ *cobra.Command, f client.Factory) error {
 	kbClient, err := f.KubebuilderClient()
 	if err != nil {
 		return err

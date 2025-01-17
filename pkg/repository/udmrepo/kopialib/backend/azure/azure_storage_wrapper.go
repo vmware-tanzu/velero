@@ -53,7 +53,7 @@ func (s *Storage) ConnectionInfo() blob.ConnectionInfo {
 	}
 }
 
-func NewStorage(ctx context.Context, option *Option, isCreate bool) (blob.Storage, error) {
+func NewStorage(ctx context.Context, option *Option, _ bool) (blob.Storage, error) {
 	cfg := option.Config
 
 	client, _, err := azureutil.NewStorageClient(logrus.New(), cfg)

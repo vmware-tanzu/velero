@@ -470,7 +470,7 @@ func (kow *kopiaObjectWriter) Write(p []byte) (int, error) {
 	return kow.rawWriter.Write(p)
 }
 
-func (kow *kopiaObjectWriter) Seek(offset int64, whence int) (int64, error) {
+func (kow *kopiaObjectWriter) Seek(_ int64, _ int) (int64, error) {
 	return -1, errors.New("not supported")
 }
 

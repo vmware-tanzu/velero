@@ -36,7 +36,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   use,
 		Short: "Get information for all plugins on the velero server",
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(c *cobra.Command, _ []string) {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
 

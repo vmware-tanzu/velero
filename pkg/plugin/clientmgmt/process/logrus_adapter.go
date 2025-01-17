@@ -154,7 +154,7 @@ func (l *logrusAdapter) ResetNamed(name string) hclog.Logger {
 }
 
 // StandardLogger returns a value that conforms to the stdlib log.Logger interface
-func (l *logrusAdapter) StandardLogger(opts *hclog.StandardLoggerOptions) *log.Logger {
+func (l *logrusAdapter) StandardLogger(_ *hclog.StandardLoggerOptions) *log.Logger {
 	panic("not implemented")
 }
 
@@ -193,6 +193,6 @@ func (l *logrusAdapter) Name() string {
 }
 
 // Return a value that conforms to io.Writer, which can be passed into log.SetOutput()
-func (l *logrusAdapter) StandardWriter(opts *hclog.StandardLoggerOptions) io.Writer {
+func (l *logrusAdapter) StandardWriter(_ *hclog.StandardLoggerOptions) io.Writer {
 	panic("not implemented")
 }

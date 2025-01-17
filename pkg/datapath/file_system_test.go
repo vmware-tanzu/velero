@@ -48,7 +48,7 @@ func TestAsyncBackup(t *testing.T) {
 			callbacks: Callbacks{
 				OnCompleted: nil,
 				OnCancelled: nil,
-				OnFailed: func(ctx context.Context, namespace string, job string, err error) {
+				OnFailed: func(_ context.Context, _ string, _ string, _ error) {
 					asyncErr = failErr
 					asyncResult = Result{}
 					finish <- struct{}{}
@@ -61,7 +61,7 @@ func TestAsyncBackup(t *testing.T) {
 			callbacks: Callbacks{
 				OnCompleted: nil,
 				OnFailed:    nil,
-				OnCancelled: func(ctx context.Context, namespace string, job string) {
+				OnCancelled: func(_ context.Context, _ string, _ string) {
 					asyncErr = provider.ErrorCanceled
 					asyncResult = Result{}
 					finish <- struct{}{}
@@ -74,7 +74,7 @@ func TestAsyncBackup(t *testing.T) {
 			callbacks: Callbacks{
 				OnFailed:    nil,
 				OnCancelled: nil,
-				OnCompleted: func(ctx context.Context, namespace string, job string, result Result) {
+				OnCompleted: func(_ context.Context, _ string, _ string, result Result) {
 					asyncResult = result
 					asyncErr = nil
 					finish <- struct{}{}
@@ -134,7 +134,7 @@ func TestAsyncRestore(t *testing.T) {
 			callbacks: Callbacks{
 				OnCompleted: nil,
 				OnCancelled: nil,
-				OnFailed: func(ctx context.Context, namespace string, job string, err error) {
+				OnFailed: func(_ context.Context, _ string, _ string, _ error) {
 					asyncErr = failErr
 					asyncResult = Result{}
 					finish <- struct{}{}
@@ -147,7 +147,7 @@ func TestAsyncRestore(t *testing.T) {
 			callbacks: Callbacks{
 				OnCompleted: nil,
 				OnFailed:    nil,
-				OnCancelled: func(ctx context.Context, namespace string, job string) {
+				OnCancelled: func(_ context.Context, _ string, _ string) {
 					asyncErr = provider.ErrorCanceled
 					asyncResult = Result{}
 					finish <- struct{}{}
@@ -160,7 +160,7 @@ func TestAsyncRestore(t *testing.T) {
 			callbacks: Callbacks{
 				OnFailed:    nil,
 				OnCancelled: nil,
-				OnCompleted: func(ctx context.Context, namespace string, job string, result Result) {
+				OnCompleted: func(_ context.Context, _ string, _ string, result Result) {
 					asyncResult = result
 					asyncErr = nil
 					finish <- struct{}{}

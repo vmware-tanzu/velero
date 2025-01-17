@@ -80,7 +80,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		// PersistentPreRun will run before all subcommands EXCEPT in the following conditions:
 		//  - a subcommand defines its own PersistentPreRun function
 		//  - the command is run without arguments or with --help and only prints the usage info
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		PersistentPreRun: func(_ *cobra.Command, _ []string) {
 			features.Enable(config.Features()...)
 			features.Enable(cmdFeatures...)
 

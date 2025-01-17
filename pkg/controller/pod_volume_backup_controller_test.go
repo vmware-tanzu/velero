@@ -97,11 +97,11 @@ type fakeFSBR struct {
 	clock  clock.WithTickerAndDelayedExecution
 }
 
-func (b *fakeFSBR) Init(ctx context.Context, param any) error {
+func (b *fakeFSBR) Init(_ context.Context, _ any) error {
 	return nil
 }
 
-func (b *fakeFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param any) error {
+func (b *fakeFSBR) StartBackup(_ datapath.AccessPoint, _ map[string]string, _ any) error {
 	pvb := b.pvb
 
 	original := b.pvb.DeepCopy()
@@ -113,14 +113,14 @@ func (b *fakeFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[
 	return nil
 }
 
-func (b *fakeFSBR) StartRestore(snapshotID string, target datapath.AccessPoint, uploaderConfigs map[string]string) error {
+func (b *fakeFSBR) StartRestore(_ string, _ datapath.AccessPoint, _ map[string]string) error {
 	return nil
 }
 
 func (b *fakeFSBR) Cancel() {
 }
 
-func (b *fakeFSBR) Close(ctx context.Context) {
+func (b *fakeFSBR) Close(_ context.Context) {
 }
 
 var _ = Describe("PodVolumeBackup Reconciler", func() {

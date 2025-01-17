@@ -16,7 +16,7 @@ type OsCommandLine struct {
 	Args []string
 }
 
-func GetListByCmdPipes(ctx context.Context, cmdlines []*OsCommandLine) ([]string, error) {
+func GetListByCmdPipes(_ context.Context, cmdlines []*OsCommandLine) ([]string, error) {
 	var buf bytes.Buffer
 	var err error
 	var cmds []*exec.Cmd

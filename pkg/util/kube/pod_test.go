@@ -78,7 +78,7 @@ func TestEnsureDeletePod(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "pods",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(_ clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, nil
 					},
 				},
@@ -94,7 +94,7 @@ func TestEnsureDeletePod(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "pods",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(_ clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, nil
 					},
 				},
@@ -110,7 +110,7 @@ func TestEnsureDeletePod(t *testing.T) {
 				{
 					verb:     "get",
 					resource: "pods",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(_ clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-get-error")
 					},
 				},
@@ -350,7 +350,7 @@ func TestDeletePodIfAny(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "pods",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(_ clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-delete-error")
 					},
 				},
@@ -610,7 +610,7 @@ type fakePodLog struct {
 	readPos         int
 }
 
-func (fp *fakePodLog) GetPodLogReader(ctx context.Context, podGetter corev1client.CoreV1Interface, pod string, namespace string, logOptions *corev1api.PodLogOptions) (io.ReadCloser, error) {
+func (fp *fakePodLog) GetPodLogReader(_ context.Context, _ corev1client.CoreV1Interface, _ string, _ string, _ *corev1api.PodLogOptions) (io.ReadCloser, error) {
 	if fp.getError != nil {
 		return nil, fp.getError
 	}

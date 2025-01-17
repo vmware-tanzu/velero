@@ -46,7 +46,7 @@ func NewManager(cocurrentNum int) *Manager {
 }
 
 // CreateFileSystemBR creates a new file system backup/restore data path instance
-func (m *Manager) CreateFileSystemBR(jobName string, requestorType string, ctx context.Context, client client.Client, namespace string, callbacks Callbacks, log logrus.FieldLogger) (AsyncBR, error) {
+func (m *Manager) CreateFileSystemBR(jobName string, requestorType string, _ context.Context, client client.Client, namespace string, callbacks Callbacks, log logrus.FieldLogger) (AsyncBR, error) {
 	m.trackerLock.Lock()
 	defer m.trackerLock.Unlock()
 
@@ -60,7 +60,7 @@ func (m *Manager) CreateFileSystemBR(jobName string, requestorType string, ctx c
 }
 
 // CreateMicroServiceBRWatcher creates a new micro service watcher instance
-func (m *Manager) CreateMicroServiceBRWatcher(ctx context.Context, client client.Client, kubeClient kubernetes.Interface, mgr manager.Manager, taskType string,
+func (m *Manager) CreateMicroServiceBRWatcher(_ context.Context, client client.Client, kubeClient kubernetes.Interface, mgr manager.Manager, taskType string,
 	taskName string, namespace string, podName string, containerName string, associatedObject string, callbacks Callbacks, resume bool, log logrus.FieldLogger) (AsyncBR, error) {
 	m.trackerLock.Lock()
 	defer m.trackerLock.Unlock()

@@ -80,7 +80,7 @@ The '--namespace' flag can be used to specify the namespace where velero is inst
 Use '--force' to skip the prompt confirming if you want to uninstall Velero.
 		`,
 		Example: ` # velero uninstall --namespace staging`,
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			if o.wait {
 				fmt.Println("Warning: the \"--wait\" option is deprecated and will be removed in a future release. The uninstall command always waits for the uninstall to complete.")
 			}

@@ -45,7 +45,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Use:    "run-plugins",
 		Hidden: true,
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			config := pluginServer.GetConfig()
 			f.SetClientQPS(config.ClientQPS)
 			f.SetClientBurst(config.ClientBurst)

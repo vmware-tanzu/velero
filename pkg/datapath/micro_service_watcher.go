@@ -104,7 +104,7 @@ func newMicroServiceBRWatcher(client client.Client, kubeClient kubernetes.Interf
 	return ms
 }
 
-func (ms *microServiceBRWatcher) Init(ctx context.Context, param any) error {
+func (ms *microServiceBRWatcher) Init(ctx context.Context, _ any) error {
 	eventInformer, err := ms.mgr.GetCache().GetInformer(ctx, &v1.Event{})
 	if err != nil {
 		return errors.Wrap(err, "error getting event informer")
@@ -178,7 +178,7 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param any) error {
 	return nil
 }
 
-func (ms *microServiceBRWatcher) Close(ctx context.Context) {
+func (ms *microServiceBRWatcher) Close(_ context.Context) {
 	if ms.cancel != nil {
 		ms.cancel()
 	}
@@ -213,7 +213,7 @@ func (ms *microServiceBRWatcher) close() {
 	}
 }
 
-func (ms *microServiceBRWatcher) StartBackup(source AccessPoint, uploaderConfig map[string]string, param any) error {
+func (ms *microServiceBRWatcher) StartBackup(source AccessPoint, _ map[string]string, _ any) error {
 	ms.log.Infof("Start watching backup ms for source %v", source.ByPath)
 
 	ms.startWatch()
@@ -221,7 +221,7 @@ func (ms *microServiceBRWatcher) StartBackup(source AccessPoint, uploaderConfig 
 	return nil
 }
 
-func (ms *microServiceBRWatcher) StartRestore(snapshotID string, target AccessPoint, uploaderConfigs map[string]string) error {
+func (ms *microServiceBRWatcher) StartRestore(snapshotID string, target AccessPoint, _ map[string]string) error {
 	ms.log.Infof("Start watching restore ms to target %s, from snapshot %s", target.ByPath, snapshotID)
 
 	ms.startWatch()

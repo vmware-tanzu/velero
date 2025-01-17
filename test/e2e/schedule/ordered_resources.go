@@ -168,7 +168,7 @@ func (o *OrderedResources) Backup() error {
 			30*time.Second,
 			time.Minute*5,
 			true,
-			func(ctx context.Context) (bool, error) {
+			func(_ context.Context) (bool, error) {
 				backupList := new(velerov1api.BackupList)
 
 				if err := o.Client.Kubebuilder.List(

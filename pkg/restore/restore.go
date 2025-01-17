@@ -951,7 +951,7 @@ func (ctx *restoreContext) crdAvailable(name string, crdClient client.Dynamic) (
 
 	var available bool
 
-	err := wait.PollUntilContextTimeout(go_context.Background(), time.Second, ctx.resourceTimeout, true, func(ctx go_context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(go_context.Background(), time.Second, ctx.resourceTimeout, true, func(_ go_context.Context) (bool, error) {
 		unstructuredCRD, err := crdClient.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return true, err

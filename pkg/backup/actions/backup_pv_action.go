@@ -48,7 +48,7 @@ func (a *PVCAction) AppliesTo() (velero.ResourceSelector, error) {
 
 // Execute finds the PersistentVolume bound by the provided
 // PersistentVolumeClaim, if any, and backs it up
-func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+func (a *PVCAction) Execute(item runtime.Unstructured, _ *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	a.log.Info("Executing PVCAction")
 
 	pvc := new(corev1api.PersistentVolumeClaim)

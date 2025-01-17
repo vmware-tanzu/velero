@@ -107,7 +107,7 @@ func NewCommand() *cobra.Command {
 		Use:   "bug",
 		Short: "Report a Velero bug",
 		Long:  "Open a browser window to report a Velero bug",
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			kubectlVersion, err := getKubectlVersion()
 			if err != nil {
 				// we don't want to prevent the user from submitting a bug

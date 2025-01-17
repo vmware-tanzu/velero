@@ -48,11 +48,11 @@ func CreatePersistentVolume(client TestClient, name string) (*corev1.PersistentV
 	return client.ClientGo.CoreV1().PersistentVolumes().Create(context.TODO(), p, metav1.CreateOptions{})
 }
 
-func GetPersistentVolume(ctx context.Context, client TestClient, namespace string, persistentVolume string) (*corev1.PersistentVolume, error) {
+func GetPersistentVolume(ctx context.Context, client TestClient, _ string, persistentVolume string) (*corev1.PersistentVolume, error) {
 	return client.ClientGo.CoreV1().PersistentVolumes().Get(ctx, persistentVolume, metav1.GetOptions{})
 }
 
-func AddAnnotationToPersistentVolume(ctx context.Context, client TestClient, namespace string, persistentVolume, key string) (*corev1.PersistentVolume, error) {
+func AddAnnotationToPersistentVolume(ctx context.Context, client TestClient, _ string, persistentVolume, key string) (*corev1.PersistentVolume, error) {
 	newPV, err := GetPersistentVolume(ctx, client, "", persistentVolume)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Fail to ge PV %s", persistentVolume))

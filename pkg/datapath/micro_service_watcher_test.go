@@ -124,11 +124,11 @@ type startWatchFake struct {
 	progress           int
 }
 
-func (sw *startWatchFake) getPodContainerTerminateMessage(pod *v1.Pod, container string) string {
+func (sw *startWatchFake) getPodContainerTerminateMessage(_ *v1.Pod, _ string) string {
 	return sw.terminationMessage
 }
 
-func (sw *startWatchFake) redirectDataMoverLogs(ctx context.Context, kubeClient kubernetes.Interface, namespace string, thisPod string, thisContainer string, logger logrus.FieldLogger) error {
+func (sw *startWatchFake) redirectDataMoverLogs(_ context.Context, _ kubernetes.Interface, _ string, _ string, _ string, _ logrus.FieldLogger) error {
 	return sw.redirectErr
 }
 
@@ -136,19 +136,19 @@ func (sw *startWatchFake) getResultFromMessage(_ string, _ string, _ logrus.Fiel
 	return Result{}
 }
 
-func (sw *startWatchFake) OnCompleted(ctx context.Context, namespace string, task string, result Result) {
+func (sw *startWatchFake) OnCompleted(_ context.Context, _ string, _ string, _ Result) {
 	sw.complete = true
 }
 
-func (sw *startWatchFake) OnFailed(ctx context.Context, namespace string, task string, err error) {
+func (sw *startWatchFake) OnFailed(_ context.Context, _ string, _ string, _ error) {
 	sw.failed = true
 }
 
-func (sw *startWatchFake) OnCancelled(ctx context.Context, namespace string, task string) {
+func (sw *startWatchFake) OnCancelled(_ context.Context, _ string, _ string) {
 	sw.canceled = true
 }
 
-func (sw *startWatchFake) OnProgress(ctx context.Context, namespace string, task string, progress *uploader.Progress) {
+func (sw *startWatchFake) OnProgress(_ context.Context, _ string, _ string, _ *uploader.Progress) {
 	sw.progress++
 }
 

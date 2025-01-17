@@ -220,7 +220,7 @@ func (c *PodVolumeRestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(c)
 }
 
-func (c *PodVolumeRestoreReconciler) findVolumeRestoresForPod(ctx context.Context, pod client.Object) []reconcile.Request {
+func (c *PodVolumeRestoreReconciler) findVolumeRestoresForPod(_ context.Context, pod client.Object) []reconcile.Request {
 	list := &velerov1api.PodVolumeRestoreList{}
 	options := &client.ListOptions{
 		LabelSelector: labels.Set(map[string]string{

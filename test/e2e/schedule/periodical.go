@@ -104,7 +104,7 @@ func (n *PeriodicalCase) Backup() error {
 			30*time.Second,
 			5*time.Minute,
 			true,
-			func(ctx context.Context) (bool, error) {
+			func(_ context.Context) (bool, error) {
 				backups, err := veleroutil.GetBackupsForSchedule(
 					n.Ctx,
 					n.Client.Kubebuilder,
