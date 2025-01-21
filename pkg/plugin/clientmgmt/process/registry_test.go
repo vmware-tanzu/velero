@@ -66,34 +66,34 @@ func TestExecutable(t *testing.T) {
 	}{
 		{
 			name: "no perms",
-			mode: 0000,
+			mode: 0o000,
 		},
 		{
 			name: "r--r--r--",
-			mode: 0444,
+			mode: 0o444,
 		},
 		{
 			name: "rw-rw-rw-",
-			mode: 0666,
+			mode: 0o666,
 		},
 		{
 			name:             "--x------",
-			mode:             0100,
+			mode:             0o100,
 			expectExecutable: true,
 		},
 		{
 			name:             "-----x---",
-			mode:             0010,
+			mode:             0o010,
 			expectExecutable: true,
 		},
 		{
 			name:             "--------x",
-			mode:             0001,
+			mode:             0o001,
 			expectExecutable: true,
 		},
 		{
 			name:             "rwxrwxrwx",
-			mode:             0777,
+			mode:             0o777,
 			expectExecutable: true,
 		},
 		{
@@ -134,13 +134,13 @@ func TestReadPluginsDir(t *testing.T) {
 
 	r := NewRegistry(dir, logger, logLevel).(*registry)
 	r.fs = test.NewFakeFileSystem().
-		WithFileAndMode("/plugins/executable1", []byte("plugin1"), 0755).
-		WithFileAndMode("/plugins/nonexecutable2", []byte("plugin2"), 0644).
-		WithFileAndMode("/plugins/executable3", []byte("plugin3"), 0755).
-		WithFileAndMode("/plugins/nested/executable4", []byte("plugin4"), 0755).
-		WithFileAndMode("/plugins/nested/nonexecutable5", []byte("plugin4"), 0644).
-		WithFileAndMode("/plugins/nested/win-exe1.exe", []byte("plugin4"), 0600).
-		WithFileAndMode("/plugins/nested/WIN-EXE2.EXE", []byte("plugin4"), 0600)
+		WithFileAndMode("/plugins/executable1", []byte("plugin1"), 0o755).
+		WithFileAndMode("/plugins/nonexecutable2", []byte("plugin2"), 0o644).
+		WithFileAndMode("/plugins/executable3", []byte("plugin3"), 0o755).
+		WithFileAndMode("/plugins/nested/executable4", []byte("plugin4"), 0o755).
+		WithFileAndMode("/plugins/nested/nonexecutable5", []byte("plugin4"), 0o644).
+		WithFileAndMode("/plugins/nested/win-exe1.exe", []byte("plugin4"), 0o600).
+		WithFileAndMode("/plugins/nested/WIN-EXE2.EXE", []byte("plugin4"), 0o600)
 
 	plugins, err := r.readPluginsDir(dir)
 	require.NoError(t, err)

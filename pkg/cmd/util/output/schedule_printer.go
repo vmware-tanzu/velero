@@ -25,20 +25,18 @@ import (
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
-var (
-	scheduleColumns = []metav1.TableColumnDefinition{
-		// name needs Type and Format defined for the decorator to identify it:
-		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
-		{Name: "Name", Type: "string", Format: "name"},
-		{Name: "Status"},
-		{Name: "Created"},
-		{Name: "Schedule"},
-		{Name: "Backup TTL"},
-		{Name: "Last Backup"},
-		{Name: "Selector"},
-		{Name: "Paused"},
-	}
-)
+var scheduleColumns = []metav1.TableColumnDefinition{
+	// name needs Type and Format defined for the decorator to identify it:
+	// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+	{Name: "Name", Type: "string", Format: "name"},
+	{Name: "Status"},
+	{Name: "Created"},
+	{Name: "Schedule"},
+	{Name: "Backup TTL"},
+	{Name: "Last Backup"},
+	{Name: "Selector"},
+	{Name: "Paused"},
+}
 
 func printScheduleList(list *v1.ScheduleList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))

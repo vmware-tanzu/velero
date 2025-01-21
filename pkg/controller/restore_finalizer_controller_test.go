@@ -259,7 +259,8 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 			restore:          builder.ForRestore(velerov1api.DefaultNamespace, "restore").Result(),
 			restoredPVCNames: map[string]struct{}{"ns1/pvc1": {}},
 			restoredPV: []*corev1api.PersistentVolume{
-				builder.ForPersistentVolume("new-pv1").ObjectMeta(builder.WithLabels("label1", "label1-val")).ClaimRef("ns1", "pvc1").Phase(corev1api.VolumeBound).ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).Result()},
+				builder.ForPersistentVolume("new-pv1").ObjectMeta(builder.WithLabels("label1", "label1-val")).ClaimRef("ns1", "pvc1").Phase(corev1api.VolumeBound).ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).Result(),
+			},
 			restoredPVC: []*corev1api.PersistentVolumeClaim{
 				builder.ForPersistentVolumeClaim("ns1", "pvc1").VolumeName("new-pv1").Phase(corev1api.ClaimBound).Result(),
 			},
@@ -281,7 +282,8 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 			restore:          builder.ForRestore(velerov1api.DefaultNamespace, "restore").Result(),
 			restoredPVCNames: map[string]struct{}{"ns1/pvc1": {}},
 			restoredPV: []*corev1api.PersistentVolume{
-				builder.ForPersistentVolume("new-pv1").ClaimRef("ns1", "pvc1").Phase(corev1api.VolumeBound).ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result()},
+				builder.ForPersistentVolume("new-pv1").ClaimRef("ns1", "pvc1").Phase(corev1api.VolumeBound).ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+			},
 			restoredPVC: []*corev1api.PersistentVolumeClaim{
 				builder.ForPersistentVolumeClaim("ns1", "pvc1").VolumeName("new-pv1").Phase(corev1api.ClaimBound).Result(),
 			},
@@ -306,7 +308,8 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 			restore:          builder.ForRestore(velerov1api.DefaultNamespace, "restore").NamespaceMappings("ns2", "ns1").Result(),
 			restoredPVCNames: map[string]struct{}{"ns1/pvc1": {}},
 			restoredPV: []*corev1api.PersistentVolume{
-				builder.ForPersistentVolume("new-pv1").ClaimRef("ns1", "pvc1").Phase(corev1api.VolumeBound).ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result()},
+				builder.ForPersistentVolume("new-pv1").ClaimRef("ns1", "pvc1").Phase(corev1api.VolumeBound).ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+			},
 			restoredPVC: []*corev1api.PersistentVolumeClaim{
 				builder.ForPersistentVolumeClaim("ns1", "pvc1").VolumeName("new-pv1").Phase(corev1api.ClaimBound).Result(),
 			},
@@ -318,16 +321,17 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 		},
 		{
 			name: "two applicable pv patches",
-			volumeInfo: []*volume.BackupVolumeInfo{{
-				BackupMethod: "PodVolumeBackup",
-				PVCName:      "pvc1",
-				PVName:       "pv1",
-				PVCNamespace: "ns1",
-				PVInfo: &volume.PVInfo{
-					ReclaimPolicy: string(corev1api.PersistentVolumeReclaimDelete),
-					Labels:        map[string]string{"label1": "label1-val"},
+			volumeInfo: []*volume.BackupVolumeInfo{
+				{
+					BackupMethod: "PodVolumeBackup",
+					PVCName:      "pvc1",
+					PVName:       "pv1",
+					PVCNamespace: "ns1",
+					PVInfo: &volume.PVInfo{
+						ReclaimPolicy: string(corev1api.PersistentVolumeReclaimDelete),
+						Labels:        map[string]string{"label1": "label1-val"},
+					},
 				},
-			},
 				{
 					BackupMethod: "CSISnapshot",
 					PVCName:      "pvc2",
@@ -379,7 +383,8 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 			restore:          builder.ForRestore(velerov1api.DefaultNamespace, "restore").Result(),
 			restoredPVCNames: map[string]struct{}{"ns1/pvc1": {}},
 			restoredPV: []*corev1api.PersistentVolume{
-				builder.ForPersistentVolume("new-pv1").ClaimRef("ns2", "pvc2").Phase(corev1api.VolumeBound).ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result()},
+				builder.ForPersistentVolume("new-pv1").ClaimRef("ns2", "pvc2").Phase(corev1api.VolumeBound).ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result(),
+			},
 			restoredPVC: []*corev1api.PersistentVolumeClaim{
 				builder.ForPersistentVolumeClaim("ns1", "pvc1").VolumeName("new-pv1").Phase(corev1api.ClaimBound).Result(),
 			},
@@ -387,16 +392,17 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 		},
 		{
 			name: "two applicable pv patches with an error",
-			volumeInfo: []*volume.BackupVolumeInfo{{
-				BackupMethod: "PodVolumeBackup",
-				PVCName:      "pvc1",
-				PVName:       "pv1",
-				PVCNamespace: "ns1",
-				PVInfo: &volume.PVInfo{
-					ReclaimPolicy: string(corev1api.PersistentVolumeReclaimDelete),
-					Labels:        map[string]string{"label1": "label1-val"},
+			volumeInfo: []*volume.BackupVolumeInfo{
+				{
+					BackupMethod: "PodVolumeBackup",
+					PVCName:      "pvc1",
+					PVName:       "pv1",
+					PVCNamespace: "ns1",
+					PVInfo: &volume.PVInfo{
+						ReclaimPolicy: string(corev1api.PersistentVolumeReclaimDelete),
+						Labels:        map[string]string{"label1": "label1-val"},
+					},
 				},
-			},
 				{
 					BackupMethod: "CSISnapshot",
 					PVCName:      "pvc2",

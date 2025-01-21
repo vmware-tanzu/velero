@@ -579,7 +579,7 @@ func TestRestoreReconcile(t *testing.T) {
 				backupStore.On("DeleteRestore", test.restore.Name).Return(nil)
 			}
 
-			//err = r.processQueueItem(key)
+			// err = r.processQueueItem(key)
 			_, err = r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{
 				Namespace: test.restore.Namespace,
 				Name:      test.restore.Name,

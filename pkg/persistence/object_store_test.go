@@ -1145,6 +1145,7 @@ func TestGetBackupVolumeInfos(t *testing.T) {
 		})
 	}
 }
+
 func TestGetRestoreResults(t *testing.T) {
 	harness := newObjectBackupStoreTestHarness("test-bucket", "")
 

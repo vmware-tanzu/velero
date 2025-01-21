@@ -72,7 +72,8 @@ type BackupRepoReconciler struct {
 
 func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client, repositoryManager repomanager.Manager,
 	maintenanceFrequency time.Duration, backupRepoConfig string, keepLatestMaintenanceJobs int, repoMaintenanceConfig string, maintenanceJobResources kube.PodResources,
-	logLevel logrus.Level, logFormat *logging.FormatFlag) *BackupRepoReconciler {
+	logLevel logrus.Level, logFormat *logging.FormatFlag,
+) *BackupRepoReconciler {
 	c := &BackupRepoReconciler{
 		client,
 		namespace,

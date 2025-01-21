@@ -163,7 +163,6 @@ func deleteNodePorts(service *corev1api.Service) error {
 		}
 
 		ports, bool, err := unstructured.NestedSlice(*appliedServiceUnstructured, "spec", "ports")
-
 		if err != nil {
 			return errors.WithStack(err)
 		}

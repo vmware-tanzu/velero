@@ -312,7 +312,7 @@ func sortResourcesByOrder(
 			fullname = item.name
 		}
 		if _, ok := itemMap[fullname]; !ok {
-			//This item has been inserted in the result
+			// This item has been inserted in the result
 			continue
 		}
 		sortedItems = append(sortedItems, item)
@@ -672,7 +672,6 @@ func (r *itemCollector) processPagerClientCalls(
 	listPager.PageSize = int64(r.pageSize)
 	// Add each item to temporary slice
 	list, paginated, err := listPager.List(context.Background(), metav1.ListOptions{LabelSelector: label})
-
 	if err != nil {
 		r.log.WithError(errors.WithStack(err)).Error("Error listing resources")
 		return list, err

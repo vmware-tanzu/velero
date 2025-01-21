@@ -110,7 +110,6 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 		ready = true
 		return true, nil
 	})
-
 	// err will be set if we timed out or encountered issues retrieving the namespace,
 	if err != nil {
 		if terminatingNamespace {
@@ -180,9 +179,9 @@ func GetVolumeDirectory(ctx context.Context, log logrus.FieldLogger, pod *corev1
 
 // GetVolumeMode gets the uploader.PersistentVolumeMode of the volume.
 func GetVolumeMode(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, cli client.Client) (
-	uploader.PersistentVolumeMode, error) {
+	uploader.PersistentVolumeMode, error,
+) {
 	_, pv, _, err := GetPodPVCVolume(ctx, log, pod, volumeName, cli)
-
 	if err != nil {
 		if err == ErrorPodVolumeIsNotPVC {
 			return uploader.PersistentVolumeFilesystem, nil
@@ -199,7 +198,8 @@ func GetVolumeMode(ctx context.Context, log logrus.FieldLogger, pod *corev1api.P
 // GetPodPVCVolume gets the PVC, PV and volume for a pod volume name.
 // Returns pod volume in case of ErrorPodVolumeIsNotPVC error
 func GetPodPVCVolume(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, cli client.Client) (
-	*corev1api.PersistentVolumeClaim, *corev1api.PersistentVolume, *corev1api.Volume, error) {
+	*corev1api.PersistentVolumeClaim, *corev1api.PersistentVolume, *corev1api.Volume, error,
+) {
 	var volume *corev1api.Volume
 
 	for i := range pod.Spec.Volumes {

@@ -134,9 +134,13 @@ func TestGetVolumesByPod(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
 						// PVB Volumes
-						{Name: "pvbPV1"}, {Name: "pvbPV2"}, {Name: "pvbPV3"},
+						{Name: "pvbPV1"},
+						{Name: "pvbPV2"},
+						{Name: "pvbPV3"},
 						/// Excluded from PVB through annotation
-						{Name: "nonPvbPV1"}, {Name: "nonPvbPV2"}, {Name: "nonPvbPV3"},
+						{Name: "nonPvbPV1"},
+						{Name: "nonPvbPV2"},
+						{Name: "nonPvbPV3"},
 					},
 				},
 			},
@@ -155,7 +159,9 @@ func TestGetVolumesByPod(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
 						// PVB Volumes
-						{Name: "pvbPV1"}, {Name: "pvbPV2"}, {Name: "pvbPV3"},
+						{Name: "pvbPV1"},
+						{Name: "pvbPV2"},
+						{Name: "pvbPV3"},
 						/// Excluded from PVB because colume mounting default service account token
 						{Name: "default-token-5xq45"},
 					},
@@ -181,9 +187,13 @@ func TestGetVolumesByPod(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
 						// PVB Volumes
-						{Name: "pvbPV1"}, {Name: "pvbPV2"}, {Name: "pvbPV3"},
+						{Name: "pvbPV1"},
+						{Name: "pvbPV2"},
+						{Name: "pvbPV3"},
 						/// Excluded from pod volume backup through annotation
-						{Name: "nonPvbPV1"}, {Name: "nonPvbPV2"}, {Name: "nonPvbPV3"},
+						{Name: "nonPvbPV1"},
+						{Name: "nonPvbPV2"},
+						{Name: "nonPvbPV3"},
 						// Excluded from pod volume backup because hostpath
 						{Name: "hostPath1", VolumeSource: corev1api.VolumeSource{HostPath: &corev1api.HostPathVolumeSource{Path: "/hostpathVol"}}},
 					},
@@ -209,9 +219,13 @@ func TestGetVolumesByPod(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
 						// PVB Volumes
-						{Name: "pvbPV1"}, {Name: "pvbPV2"}, {Name: "pvbPV3"},
+						{Name: "pvbPV1"},
+						{Name: "pvbPV2"},
+						{Name: "pvbPV3"},
 						/// Excluded from pod volume backup through annotation
-						{Name: "nonPvbPV1"}, {Name: "nonPvbPV2"}, {Name: "nonPvbPV3"},
+						{Name: "nonPvbPV1"},
+						{Name: "nonPvbPV2"},
+						{Name: "nonPvbPV3"},
 						// Excluded from pod volume backup because hostpath
 						{Name: "superSecret", VolumeSource: corev1api.VolumeSource{Secret: &corev1api.SecretVolumeSource{SecretName: "super-secret"}}},
 					},
@@ -237,9 +251,13 @@ func TestGetVolumesByPod(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
 						// PVB Volumes
-						{Name: "pvbPV1"}, {Name: "pvbPV2"}, {Name: "pvbPV3"},
+						{Name: "pvbPV1"},
+						{Name: "pvbPV2"},
+						{Name: "pvbPV3"},
 						/// Excluded from pod volume backup through annotation
-						{Name: "nonPvbPV1"}, {Name: "nonPvbPV2"}, {Name: "nonPvbPV3"},
+						{Name: "nonPvbPV1"},
+						{Name: "nonPvbPV2"},
+						{Name: "nonPvbPV3"},
 						// Excluded from pod volume backup because hostpath
 						{Name: "appCOnfig", VolumeSource: corev1api.VolumeSource{ConfigMap: &corev1api.ConfigMapVolumeSource{LocalObjectReference: corev1api.LocalObjectReference{Name: "app-config"}}}},
 					},
@@ -264,7 +282,9 @@ func TestGetVolumesByPod(t *testing.T) {
 				},
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
-						{Name: "pvbPV1"}, {Name: "pvbPV2"}, {Name: "pvbPV3"},
+						{Name: "pvbPV1"},
+						{Name: "pvbPV2"},
+						{Name: "pvbPV3"},
 						{
 							Name: "projected",
 							VolumeSource: corev1api.VolumeSource{
@@ -305,7 +325,9 @@ func TestGetVolumesByPod(t *testing.T) {
 				},
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
-						{Name: "pvbPV1"}, {Name: "pvbPV2"}, {Name: "pvbPV3"},
+						{Name: "pvbPV1"},
+						{Name: "pvbPV2"},
+						{Name: "pvbPV3"},
 						{
 							Name: "downwardAPI",
 							VolumeSource: corev1api.VolumeSource{
@@ -345,7 +367,9 @@ func TestGetVolumesByPod(t *testing.T) {
 				},
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
-						{Name: "pvbPV1"}, {Name: "pvbPV2"}, {Name: "pvbPV3"},
+						{Name: "pvbPV1"},
+						{Name: "pvbPV2"},
+						{Name: "pvbPV3"},
 						{
 							Name: "downwardAPI",
 							VolumeSource: corev1api.VolumeSource{

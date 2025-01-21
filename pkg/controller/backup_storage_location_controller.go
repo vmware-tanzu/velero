@@ -64,7 +64,8 @@ func NewBackupStorageLocationReconciler(
 	defaultBackupLocationInfo storage.DefaultBackupLocationInfo,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
-	log logrus.FieldLogger) *backupStorageLocationReconciler {
+	log logrus.FieldLogger,
+) *backupStorageLocationReconciler {
 	return &backupStorageLocationReconciler{
 		ctx:                       ctx,
 		client:                    client,

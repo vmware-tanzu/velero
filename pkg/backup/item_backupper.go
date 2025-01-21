@@ -319,7 +319,7 @@ func getFileForArchive(namespace, name, groupResource, versionPath string, itemB
 		Name:     filePath,
 		Size:     int64(len(itemBytes)),
 		Typeflag: tar.TypeReg,
-		Mode:     0755,
+		Mode:     0o755,
 		ModTime:  time.Now(),
 	}
 	return FileForArchive{FilePath: filePath, Header: hdr, FileBytes: itemBytes}

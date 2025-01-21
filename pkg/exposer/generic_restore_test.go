@@ -184,7 +184,8 @@ func TestRestoreExpose(t *testing.T) {
 				TargetNamespace:  test.targetNamespace,
 				HostingPodLabels: map[string]string{},
 				Resources:        corev1api.ResourceRequirements{},
-				ExposeTimeout:    time.Millisecond})
+				ExposeTimeout:    time.Millisecond,
+			})
 			assert.EqualError(t, err, test.err)
 		})
 	}

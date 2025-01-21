@@ -63,7 +63,8 @@ func NewServerStatusRequestReconciler(
 	client client.Client,
 	pluginRegistry PluginLister,
 	clock clocks.WithTickerAndDelayedExecution,
-	log logrus.FieldLogger) *serverStatusRequestReconciler {
+	log logrus.FieldLogger,
+) *serverStatusRequestReconciler {
 	return &serverStatusRequestReconciler{
 		client:         client,
 		ctx:            ctx,

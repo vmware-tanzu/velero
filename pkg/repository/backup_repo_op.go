@@ -51,7 +51,7 @@ func repoLabelsFromKey(key BackupRepositoryKey) labels.Set {
 
 // GetBackupRepository gets a backup repository through BackupRepositoryKey and ensure ready if required.
 func GetBackupRepository(ctx context.Context, cli client.Client, namespace string, key BackupRepositoryKey, options ...bool) (*velerov1api.BackupRepository, error) {
-	var ensureReady = true
+	ensureReady := true
 	if len(options) > 0 {
 		ensureReady = options[0]
 	}
@@ -63,7 +63,6 @@ func GetBackupRepository(ctx context.Context, cli client.Client, namespace strin
 		Namespace:     namespace,
 		LabelSelector: selector,
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting backup repository list")
 	}

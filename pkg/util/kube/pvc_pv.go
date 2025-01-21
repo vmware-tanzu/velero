@@ -78,7 +78,8 @@ func DeletePVAndPVCIfAny(ctx context.Context, client corev1client.CoreV1Interfac
 
 // WaitPVCBound wait for binding of a PVC specified by name and returns the bound PV object
 func WaitPVCBound(ctx context.Context, pvcGetter corev1client.CoreV1Interface,
-	pvGetter corev1client.CoreV1Interface, pvc string, namespace string, timeout time.Duration) (*corev1api.PersistentVolume, error) {
+	pvGetter corev1client.CoreV1Interface, pvc string, namespace string, timeout time.Duration,
+) (*corev1api.PersistentVolume, error) {
 	var updated *corev1api.PersistentVolumeClaim
 	err := wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
 		tmpPVC, err := pvcGetter.PersistentVolumeClaims(namespace).Get(ctx, pvc, metav1.GetOptions{})
@@ -94,7 +95,6 @@ func WaitPVCBound(ctx context.Context, pvcGetter corev1client.CoreV1Interface,
 
 		return true, nil
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error to wait for rediness of PVC")
 	}
@@ -145,7 +145,6 @@ func EnsureDeletePVC(ctx context.Context, pvcGetter corev1client.CoreV1Interface
 		updated = pvc
 		return false, nil
 	})
-
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return errors.Errorf("timeout to assure pvc %s is deleted, finalizers in pvc %v", pvcName, updated.Finalizers)
@@ -159,7 +158,8 @@ func EnsureDeletePVC(ctx context.Context, pvcGetter corev1client.CoreV1Interface
 
 // RebindPVC rebinds a PVC by modifying its VolumeName to the specific PV
 func RebindPVC(ctx context.Context, pvcGetter corev1client.CoreV1Interface,
-	pvc *corev1api.PersistentVolumeClaim, pv string) (*corev1api.PersistentVolumeClaim, error) {
+	pvc *corev1api.PersistentVolumeClaim, pv string,
+) (*corev1api.PersistentVolumeClaim, error) {
 	origBytes, err := json.Marshal(pvc)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling original PVC")
@@ -190,7 +190,8 @@ func RebindPVC(ctx context.Context, pvcGetter corev1client.CoreV1Interface,
 
 // ResetPVBinding resets the binding info of a PV and adds the required labels so as to make it ready for binding
 func ResetPVBinding(ctx context.Context, pvGetter corev1client.CoreV1Interface, pv *corev1api.PersistentVolume,
-	labels map[string]string, pvc *corev1api.PersistentVolumeClaim) (*corev1api.PersistentVolume, error) {
+	labels map[string]string, pvc *corev1api.PersistentVolumeClaim,
+) (*corev1api.PersistentVolume, error) {
 	origBytes, err := json.Marshal(pv)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling original PV")
@@ -236,7 +237,8 @@ func ResetPVBinding(ctx context.Context, pvGetter corev1client.CoreV1Interface, 
 
 // SetPVReclaimPolicy sets the specified reclaim policy to a PV
 func SetPVReclaimPolicy(ctx context.Context, pvGetter corev1client.CoreV1Interface, pv *corev1api.PersistentVolume,
-	policy corev1api.PersistentVolumeReclaimPolicy) (*corev1api.PersistentVolume, error) {
+	policy corev1api.PersistentVolumeReclaimPolicy,
+) (*corev1api.PersistentVolume, error) {
 	if pv.Spec.PersistentVolumeReclaimPolicy == policy {
 		return nil, nil
 	}
@@ -271,7 +273,8 @@ func SetPVReclaimPolicy(ctx context.Context, pvGetter corev1client.CoreV1Interfa
 // nothing if the consuming doesn't affect the PV provision.
 // The latest PVC and the selected node will be returned.
 func WaitPVCConsumed(ctx context.Context, pvcGetter corev1client.CoreV1Interface, pvc string, namespace string,
-	storageClient storagev1.StorageV1Interface, timeout time.Duration, ignoreConsume bool) (string, *corev1api.PersistentVolumeClaim, error) {
+	storageClient storagev1.StorageV1Interface, timeout time.Duration, ignoreConsume bool,
+) (string, *corev1api.PersistentVolumeClaim, error) {
 	selectedNode := ""
 	var updated *corev1api.PersistentVolumeClaim
 	var storageClass *storagev1api.StorageClass
@@ -304,7 +307,6 @@ func WaitPVCConsumed(ctx context.Context, pvcGetter corev1client.CoreV1Interface
 
 		return true, nil
 	})
-
 	if err != nil {
 		return "", nil, errors.Wrap(err, "error to wait for PVC")
 	}
@@ -432,7 +434,8 @@ func DiagnosePV(pv *corev1api.PersistentVolume) string {
 }
 
 func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, nodeClient corev1client.CoreV1Interface,
-	storageClient storagev1.StorageV1Interface, log logrus.FieldLogger) (string, error) {
+	storageClient storagev1.StorageV1Interface, log logrus.FieldLogger,
+) (string, error) {
 	var nodeOS string
 	var scFsType string
 

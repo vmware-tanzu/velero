@@ -96,7 +96,7 @@ func (fs *FakeFileSystem) WithFileAndMode(path string, data []byte, mode os.File
 }
 
 func (fs *FakeFileSystem) WithDirectory(path string) *FakeFileSystem {
-	_ = fs.fs.MkdirAll(path, 0755)
+	_ = fs.fs.MkdirAll(path, 0o755)
 	return fs
 }
 

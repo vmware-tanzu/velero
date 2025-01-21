@@ -27,9 +27,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-var ConcurrentLimitExceed error = errors.New("Concurrent number exceeds")
-var FSBRCreator = newFileSystemBR
-var MicroServiceBRWatcherCreator = newMicroServiceBRWatcher
+var (
+	ConcurrentLimitExceed        error = errors.New("Concurrent number exceeds")
+	FSBRCreator                        = newFileSystemBR
+	MicroServiceBRWatcherCreator       = newMicroServiceBRWatcher
+)
 
 type Manager struct {
 	cocurrentNum int
@@ -61,7 +63,8 @@ func (m *Manager) CreateFileSystemBR(jobName string, requestorType string, ctx c
 
 // CreateMicroServiceBRWatcher creates a new micro service watcher instance
 func (m *Manager) CreateMicroServiceBRWatcher(ctx context.Context, client client.Client, kubeClient kubernetes.Interface, mgr manager.Manager, taskType string,
-	taskName string, namespace string, podName string, containerName string, associatedObject string, callbacks Callbacks, resume bool, log logrus.FieldLogger) (AsyncBR, error) {
+	taskName string, namespace string, podName string, containerName string, associatedObject string, callbacks Callbacks, resume bool, log logrus.FieldLogger,
+) (AsyncBR, error) {
 	m.trackerLock.Lock()
 	defer m.trackerLock.Unlock()
 
