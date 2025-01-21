@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -35,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -47,6 +49,7 @@ import (
 const (
 	RepositoryNameLabel              = "velero.io/repo-name"
 	GlobalKeyForRepoMaintenanceJobCM = "global"
+	TerminationLogIndicator          = "Repo maintenance error: "
 )
 
 type JobConfigs struct {
@@ -147,7 +150,7 @@ func getResultFromJob(cli client.Client, job *batchv1.Job) (string, error) {
 	}
 
 	if len(podList.Items) == 0 {
-		return "", fmt.Errorf("no pod found for job %s", job.Name)
+		return "", errors.Errorf("no pod found for job %s", job.Name)
 	}
 
 	// we only have one maintenance pod for the job
@@ -155,16 +158,29 @@ func getResultFromJob(cli client.Client, job *batchv1.Job) (string, error) {
 
 	statuses := pod.Status.ContainerStatuses
 	if len(statuses) == 0 {
-		return "", fmt.Errorf("no container statuses found for job %s", job.Name)
+		return "", errors.Errorf("no container statuses found for job %s", job.Name)
 	}
 
 	// we only have one maintenance container
 	terminated := statuses[0].State.Terminated
 	if terminated == nil {
-		return "", fmt.Errorf("container for job %s is not terminated", job.Name)
+		return "", errors.Errorf("container for job %s is not terminated", job.Name)
 	}
 
-	return terminated.Message, nil
+	if terminated.Message == "" {
+		return "", nil
+	}
+
+	idx := strings.Index(terminated.Message, TerminationLogIndicator)
+	if idx == -1 {
+		return "", errors.New("error to locate repo maintenance error indicator from termination message")
+	}
+
+	if idx+len(TerminationLogIndicator) >= len(terminated.Message) {
+		return "", errors.New("nothing after repo maintenance error indicator in termination message")
+	}
+
+	return terminated.Message[idx+len(TerminationLogIndicator):], nil
 }
 
 // getJobConfig is called to get the Maintenance Job Config for the
@@ -331,7 +347,7 @@ func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1a
 		if job.Status.Failed > 0 {
 			if msg, err := getResultFromJob(cli, job); err != nil {
 				log.WithError(err).Warnf("Failed to get result of maintenance job %s", job.Name)
-				message = "Repo maintenance failed but result is not retrieveable"
+				message = fmt.Sprintf("Repo maintenance failed but result is not retrieveable, err: %v", err)
 			} else {
 				message = msg
 			}
@@ -434,6 +450,16 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 		return nil, errors.Wrap(err, "failed to parse resource requirements for maintenance job")
 	}
 
+	podLabels := map[string]string{
+		RepositoryNameLabel: repo.Name,
+	}
+
+	for _, k := range util.ThirdPartyLabels {
+		if v := veleroutil.GetVeleroServerLabelValue(deployment, k); v != "" {
+			podLabels[k] = v
+		}
+	}
+
 	// Set arguments
 	args := []string{"repo-maintenance"}
 	args = append(args, fmt.Sprintf("--repo-name=%s", repo.Spec.VolumeNamespace))
@@ -455,10 +481,8 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 			BackoffLimit: new(int32), // Never retry
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "velero-repo-maintenance-pod",
-					Labels: map[string]string{
-						RepositoryNameLabel: repo.Name,
-					},
+					Name:   "velero-repo-maintenance-pod",
+					Labels: podLabels,
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -468,17 +492,26 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 							Command: []string{
 								"/velero",
 							},
-							Args:            args,
-							ImagePullPolicy: v1.PullIfNotPresent,
-							Env:             envVars,
-							EnvFrom:         envFromSources,
-							VolumeMounts:    volumeMounts,
-							Resources:       resources,
+							Args:                     args,
+							ImagePullPolicy:          v1.PullIfNotPresent,
+							Env:                      envVars,
+							EnvFrom:                  envFromSources,
+							VolumeMounts:             volumeMounts,
+							Resources:                resources,
+							TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 						},
 					},
 					RestartPolicy:      v1.RestartPolicyNever,
 					Volumes:            volumes,
 					ServiceAccountName: serviceAccount,
+					Tolerations: []v1.Toleration{
+						{
+							Key:      "os",
+							Operator: "Equal",
+							Effect:   "NoSchedule",
+							Value:    "windows",
+						},
+					},
 				},
 			},
 		},
@@ -487,22 +520,6 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 	if config != nil && len(config.LoadAffinities) > 0 {
 		affinity := kube.ToSystemAffinity(config.LoadAffinities)
 		job.Spec.Template.Spec.Affinity = affinity
-	}
-
-	if tolerations := veleroutil.GetTolerationsFromVeleroServer(deployment); tolerations != nil {
-		job.Spec.Template.Spec.Tolerations = tolerations
-	}
-
-	if nodeSelector := veleroutil.GetNodeSelectorFromVeleroServer(deployment); nodeSelector != nil {
-		job.Spec.Template.Spec.NodeSelector = nodeSelector
-	}
-
-	if labels := veleroutil.GetVeleroServerLables(deployment); len(labels) > 0 {
-		job.Spec.Template.Labels = labels
-	}
-
-	if annotations := veleroutil.GetVeleroServerAnnotations(deployment); len(annotations) > 0 {
-		job.Spec.Template.Annotations = annotations
 	}
 
 	return job, nil
@@ -516,8 +533,8 @@ func composeStatusFromJob(job *batchv1.Job, message string) velerov1api.BackupRe
 
 	return velerov1api.BackupRepositoryMaintenanceStatus{
 		Result:            result,
-		StartTimestamp:    &metav1.Time{Time: job.CreationTimestamp.Time},
-		CompleteTimestamp: &metav1.Time{Time: job.Status.CompletionTime.Time},
+		StartTimestamp:    &job.CreationTimestamp,
+		CompleteTimestamp: job.Status.CompletionTime,
 		Message:           message,
 	}
 }

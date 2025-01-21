@@ -87,3 +87,12 @@ func GetVeleroServerLables(deployment *appsv1.Deployment) map[string]string {
 func GetVeleroServerAnnotations(deployment *appsv1.Deployment) map[string]string {
 	return deployment.Spec.Template.Annotations
 }
+
+// GetVeleroServerLabelValue returns the value of specified label of Velero server deployment
+func GetVeleroServerLabelValue(deployment *appsv1.Deployment, key string) string {
+	if deployment.Spec.Template.Labels == nil {
+		return ""
+	}
+
+	return deployment.Spec.Template.Labels[key]
+}

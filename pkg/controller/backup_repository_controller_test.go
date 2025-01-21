@@ -131,10 +131,15 @@ func waitMaintenanceJobCompleteFail(client.Client, context.Context, string, stri
 }
 
 func waitMaintenanceJobCompleteFunc(now time.Time, result velerov1api.BackupRepositoryMaintenanceResult, message string) func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
+	completionTimeStamp := &metav1.Time{Time: now.Add(time.Hour)}
+	if result == velerov1api.BackupRepositoryMaintenanceFailed {
+		completionTimeStamp = nil
+	}
+
 	return func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
 		return velerov1api.BackupRepositoryMaintenanceStatus{
 			StartTimestamp:    &metav1.Time{Time: now},
-			CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
+			CompleteTimestamp: completionTimeStamp,
 			Result:            result,
 			Message:           message,
 		}, nil
@@ -316,10 +321,9 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
 				},
 				{
-					StartTimestamp:    &metav1.Time{Time: now},
-					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
-					Message:           "fake-maintenance-message",
+					StartTimestamp: &metav1.Time{Time: now},
+					Result:         velerov1api.BackupRepositoryMaintenanceFailed,
+					Message:        "fake-maintenance-message",
 				},
 			},
 		},
@@ -893,7 +897,7 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 		{
 			name:       "full history",
 			backupRepo: backupRepoWithFullHistory,
-			result:     velerov1api.BackupRepositoryMaintenanceFailed,
+			result:     velerov1api.BackupRepositoryMaintenanceSucceeded,
 			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
 				{
 					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 22)},
@@ -915,7 +919,7 @@ func TestUpdateRepoMaintenanceHistory(t *testing.T) {
 		{
 			name:       "over full history",
 			backupRepo: backupRepoWithOverFullHistory,
-			result:     velerov1api.BackupRepositoryMaintenanceFailed,
+			result:     velerov1api.BackupRepositoryMaintenanceSucceeded,
 			expectedHistory: []velerov1api.BackupRepositoryMaintenanceStatus{
 				{
 					StartTimestamp:    &metav1.Time{Time: standardTime.Add(-time.Hour * 20)},
@@ -1127,7 +1131,7 @@ func TestConsolidateHistory(t *testing.T) {
 				{
 					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
 					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
 					Message:           "fake-maintenance-message-2",
 				},
 			},
@@ -1149,7 +1153,7 @@ func TestConsolidateHistory(t *testing.T) {
 				{
 					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
 					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
 					Message:           "fake-maintenance-message-2",
 				},
 				{
@@ -1172,7 +1176,7 @@ func TestConsolidateHistory(t *testing.T) {
 				{
 					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
 					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
 					Message:           "fake-maintenance-message-2",
 				},
 			},
@@ -1194,7 +1198,7 @@ func TestConsolidateHistory(t *testing.T) {
 				{
 					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
 					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
 					Message:           "fake-maintenance-message-2",
 				},
 				{
@@ -1223,7 +1227,7 @@ func TestConsolidateHistory(t *testing.T) {
 				{
 					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
 					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
 					Message:           "fake-maintenance-message-2",
 				},
 				{
@@ -1237,7 +1241,7 @@ func TestConsolidateHistory(t *testing.T) {
 				{
 					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
 					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
 					Message:           "fake-maintenance-message-2",
 				},
 				{
@@ -1257,7 +1261,7 @@ func TestConsolidateHistory(t *testing.T) {
 				{
 					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
 					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
 					Message:           "fake-maintenance-message-2",
 				},
 				{
@@ -1339,13 +1343,13 @@ func TestGetLastMaintenanceTimeFromHistory(t *testing.T) {
 			history: []velerov1api.BackupRepositoryMaintenanceStatus{
 				{
 					StartTimestamp: &metav1.Time{Time: now},
-					Result:         velerov1api.BackupRepositoryMaintenanceSucceeded,
+					Result:         velerov1api.BackupRepositoryMaintenanceFailed,
 					Message:        "fake-maintenance-message",
 				},
 				{
 					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
 					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
+					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
 					Message:           "fake-maintenance-message-2",
 				},
 				{

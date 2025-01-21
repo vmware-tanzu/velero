@@ -26,6 +26,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
+	"github.com/vmware-tanzu/velero/pkg/repository/maintenance"
 	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
 )
 
@@ -78,17 +79,7 @@ func (o *Options) Run(f velerocli.Factory) {
 	}()
 
 	if pruneError != nil {
-		logger.WithError(pruneError).Error("An error occurred when running repo prune")
-		terminationLogFile, err := os.Create("/dev/termination-log")
-		if err != nil {
-			logger.WithError(err).Error("Failed to create termination log file")
-			return
-		}
-		defer terminationLogFile.Close()
-
-		if _, errWrite := terminationLogFile.WriteString(fmt.Sprintf("An error occurred: %v", err)); errWrite != nil {
-			logger.WithError(errWrite).Error("Failed to write error to termination log file")
-		}
+		os.Stdout.WriteString(fmt.Sprintf("%s%v", maintenance.TerminationLogIndicator, pruneError))
 	}
 }
 
@@ -163,20 +154,36 @@ func (o *Options) runRepoPrune(f velerocli.Factory, namespace string, logger log
 		return err
 	}
 
+	var repo *velerov1api.BackupRepository
+	retry := 10
+	for {
+		repo, err = repository.GetBackupRepository(context.Background(), cli, namespace,
+			repository.BackupRepositoryKey{
+				VolumeNamespace: o.RepoName,
+				BackupLocation:  o.BackupStorageLocation,
+				RepositoryType:  o.RepoType,
+			}, true)
+		if err == nil {
+			break
+		}
+
+		retry--
+		if retry == 0 {
+			break
+		}
+
+		logger.WithError(err).Warn("Failed to retrieve backup repo, need retry")
+
+		time.Sleep(time.Second)
+	}
+
+	if err != nil {
+		return errors.Wrap(err, "failed to get backup repository")
+	}
+
 	manager, err := initRepoManager(namespace, cli, kubeClient, logger)
 	if err != nil {
 		return err
-	}
-
-	// backupRepository
-	repo, err := repository.GetBackupRepository(context.Background(), cli, namespace,
-		repository.BackupRepositoryKey{
-			VolumeNamespace: o.RepoName,
-			BackupLocation:  o.BackupStorageLocation,
-			RepositoryType:  o.RepoType,
-		}, true)
-	if err != nil {
-		return errors.Wrap(err, "failed to get backup repository")
 	}
 
 	err = manager.PruneRepo(repo)

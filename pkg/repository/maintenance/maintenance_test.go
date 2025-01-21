@@ -284,11 +284,18 @@ func TestGetResultFromJob(t *testing.T) {
 	}
 
 	// Create a fake Kubernetes client
-	cli := fake.NewClientBuilder().WithObjects(job, pod).Build()
+	cli := fake.NewClientBuilder().Build()
 
 	// test an error should be returned
 	result, err := getResultFromJob(cli, job)
-	assert.Error(t, err)
+	assert.EqualError(t, err, "no pod found for job test-job")
+	assert.Equal(t, "", result)
+
+	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
+
+	// test an error should be returned
+	result, err = getResultFromJob(cli, job)
+	assert.EqualError(t, err, "no container statuses found for job test-job")
 	assert.Equal(t, "", result)
 
 	// Set a non-terminated container status to the pod
@@ -303,7 +310,7 @@ func TestGetResultFromJob(t *testing.T) {
 	// Test an error should be returned
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.Error(t, err)
+	assert.EqualError(t, err, "container for job test-job is not terminated")
 	assert.Equal(t, "", result)
 
 	// Set a terminated container status to the pod
@@ -311,9 +318,7 @@ func TestGetResultFromJob(t *testing.T) {
 		ContainerStatuses: []v1.ContainerStatus{
 			{
 				State: v1.ContainerState{
-					Terminated: &v1.ContainerStateTerminated{
-						Message: "test message",
-					},
+					Terminated: &v1.ContainerStateTerminated{},
 				},
 			},
 		},
@@ -323,7 +328,61 @@ func TestGetResultFromJob(t *testing.T) {
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
 	assert.NoError(t, err)
-	assert.Equal(t, "test message", result)
+	assert.Equal(t, "", result)
+
+	// Set a terminated container status with invalidate message to the pod
+	pod.Status = v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						Message: "fake-message",
+					},
+				},
+			},
+		},
+	}
+
+	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
+	result, err = getResultFromJob(cli, job)
+	assert.EqualError(t, err, "error to locate repo maintenance error indicator from termination message")
+	assert.Equal(t, "", result)
+
+	// Set a terminated container status with empty maintenance error to the pod
+	pod.Status = v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						Message: "Repo maintenance error: ",
+					},
+				},
+			},
+		},
+	}
+
+	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
+	result, err = getResultFromJob(cli, job)
+	assert.EqualError(t, err, "nothing after repo maintenance error indicator in termination message")
+	assert.Equal(t, "", result)
+
+	// Set a terminated container status with maintenance error to the pod
+	pod.Status = v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						Message: "Repo maintenance error: fake-error",
+					},
+				},
+			},
+		},
+	}
+
+	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
+	result, err = getResultFromJob(cli, job)
+	assert.NoError(t, err)
+	assert.Equal(t, "fake-error", result)
 }
 
 func TestGetJobConfig(t *testing.T) {
@@ -565,16 +624,15 @@ func TestWaitAllJobsComplete(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour)},
 		},
 		Status: batchv1.JobStatus{
-			StartTime:      &metav1.Time{Time: now.Add(time.Hour)},
-			CompletionTime: &metav1.Time{Time: now.Add(time.Hour * 2)},
-			Failed:         1,
+			StartTime: &metav1.Time{Time: now.Add(time.Hour)},
+			Failed:    1,
 		},
 	}
 
 	jobPodFailed1 := builder.ForPod(veleroNamespace, "job2").Labels(map[string]string{"job-name": "job2"}).ContainerStatuses(&v1.ContainerStatus{
 		State: v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{
-				Message: "fake-message-2",
+				Message: "Repo maintenance error: fake-message-2",
 			},
 		},
 	}).Result()
@@ -682,10 +740,9 @@ func TestWaitAllJobsComplete(t *testing.T) {
 			},
 			expectedStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
 				{
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
-					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
-					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
-					Message:           "Repo maintenance failed but result is not retrieveable",
+					Result:         velerov1api.BackupRepositoryMaintenanceFailed,
+					StartTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
+					Message:        "Repo maintenance failed but result is not retrieveable, err: no pod found for job job2",
 				},
 			},
 		},
@@ -706,10 +763,9 @@ func TestWaitAllJobsComplete(t *testing.T) {
 					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
 				},
 				{
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
-					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
-					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
-					Message:           "fake-message-2",
+					Result:         velerov1api.BackupRepositoryMaintenanceFailed,
+					StartTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
+					Message:        "fake-message-2",
 				},
 			},
 		},
@@ -732,10 +788,9 @@ func TestWaitAllJobsComplete(t *testing.T) {
 					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
 				},
 				{
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
-					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
-					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
-					Message:           "fake-message-2",
+					Result:         velerov1api.BackupRepositoryMaintenanceFailed,
+					StartTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
+					Message:        "fake-message-2",
 				},
 				{
 					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
@@ -760,10 +815,9 @@ func TestWaitAllJobsComplete(t *testing.T) {
 			},
 			expectedStatus: []velerov1api.BackupRepositoryMaintenanceStatus{
 				{
-					Result:            velerov1api.BackupRepositoryMaintenanceFailed,
-					StartTimestamp:    &metav1.Time{Time: now.Add(time.Hour)},
-					CompleteTimestamp: &metav1.Time{Time: now.Add(time.Hour * 2)},
-					Message:           "fake-message-2",
+					Result:         velerov1api.BackupRepositoryMaintenanceFailed,
+					StartTimestamp: &metav1.Time{Time: now.Add(time.Hour)},
+					Message:        "fake-message-2",
 				},
 				{
 					Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
@@ -799,7 +853,12 @@ func TestWaitAllJobsComplete(t *testing.T) {
 				assert.Equal(t, test.expectedStatus[i].Result, history[i].Result)
 				assert.Equal(t, test.expectedStatus[i].Message, history[i].Message)
 				assert.Equal(t, test.expectedStatus[i].StartTimestamp.Time, history[i].StartTimestamp.Time)
-				assert.Equal(t, test.expectedStatus[i].CompleteTimestamp.Time, history[i].CompleteTimestamp.Time)
+
+				if test.expectedStatus[i].CompleteTimestamp == nil {
+					assert.Nil(t, history[i].CompleteTimestamp)
+				} else {
+					assert.Equal(t, test.expectedStatus[i].CompleteTimestamp.Time, history[i].CompleteTimestamp.Time)
+				}
 			}
 		})
 	}
@@ -808,59 +867,36 @@ func TestWaitAllJobsComplete(t *testing.T) {
 }
 
 func TestBuildJob(t *testing.T) {
-	testCases := []struct {
-		name            string
-		m               *JobConfigs
-		deploy          *appsv1.Deployment
-		logLevel        logrus.Level
-		logFormat       *logging.FormatFlag
-		expectedJobName string
-		expectedError   bool
-		expectedEnv     []v1.EnvVar
-		expectedEnvFrom []v1.EnvFromSource
-	}{
-		{
-			name: "Valid maintenance job",
-			m: &JobConfigs{
-				PodResources: &kube.PodResources{
-					CPURequest:    "100m",
-					MemoryRequest: "128Mi",
-					CPULimit:      "200m",
-					MemoryLimit:   "256Mi",
-				},
-			},
-			deploy: &appsv1.Deployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "velero",
-					Namespace: "velero",
-				},
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+	deploy := appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "velero",
+			Namespace: "velero",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "velero-repo-maintenance-container",
+							Image: "velero-image",
+							Env: []v1.EnvVar{
 								{
-									Name:  "velero-repo-maintenance-container",
-									Image: "velero-image",
-									Env: []v1.EnvVar{
-										{
-											Name:  "test-name",
-											Value: "test-value",
+									Name:  "test-name",
+									Value: "test-value",
+								},
+							},
+							EnvFrom: []v1.EnvFromSource{
+								{
+									ConfigMapRef: &v1.ConfigMapEnvSource{
+										LocalObjectReference: v1.LocalObjectReference{
+											Name: "test-configmap",
 										},
 									},
-									EnvFrom: []v1.EnvFromSource{
-										{
-											ConfigMapRef: &v1.ConfigMapEnvSource{
-												LocalObjectReference: v1.LocalObjectReference{
-													Name: "test-configmap",
-												},
-											},
-										},
-										{
-											SecretRef: &v1.SecretEnvSource{
-												LocalObjectReference: v1.LocalObjectReference{
-													Name: "test-secret",
-												},
-											},
+								},
+								{
+									SecretRef: &v1.SecretEnvSource{
+										LocalObjectReference: v1.LocalObjectReference{
+											Name: "test-secret",
 										},
 									},
 								},
@@ -869,6 +905,36 @@ func TestBuildJob(t *testing.T) {
 					},
 				},
 			},
+		},
+	}
+
+	deploy2 := deploy
+	deploy2.Spec.Template.Labels = map[string]string{"azure.workload.identity/use": "fake-label-value"}
+
+	testCases := []struct {
+		name             string
+		m                *JobConfigs
+		deploy           *appsv1.Deployment
+		logLevel         logrus.Level
+		logFormat        *logging.FormatFlag
+		thirdPartyLabel  map[string]string
+		expectedJobName  string
+		expectedError    bool
+		expectedEnv      []v1.EnvVar
+		expectedEnvFrom  []v1.EnvFromSource
+		expectedPodLabel map[string]string
+	}{
+		{
+			name: "Valid maintenance job without third party labels",
+			m: &JobConfigs{
+				PodResources: &kube.PodResources{
+					CPURequest:    "100m",
+					MemoryRequest: "128Mi",
+					CPULimit:      "200m",
+					MemoryLimit:   "256Mi",
+				},
+			},
+			deploy:          &deploy,
 			logLevel:        logrus.InfoLevel,
 			logFormat:       logging.NewFormatFlag(),
 			expectedJobName: "test-123-maintain-job",
@@ -894,6 +960,51 @@ func TestBuildJob(t *testing.T) {
 						},
 					},
 				},
+			},
+			expectedPodLabel: map[string]string{
+				RepositoryNameLabel: "test-123",
+			},
+		},
+		{
+			name: "Valid maintenance job with third party labels",
+			m: &JobConfigs{
+				PodResources: &kube.PodResources{
+					CPURequest:    "100m",
+					MemoryRequest: "128Mi",
+					CPULimit:      "200m",
+					MemoryLimit:   "256Mi",
+				},
+			},
+			deploy:          &deploy2,
+			logLevel:        logrus.InfoLevel,
+			logFormat:       logging.NewFormatFlag(),
+			expectedJobName: "test-123-maintain-job",
+			expectedError:   false,
+			expectedEnv: []v1.EnvVar{
+				{
+					Name:  "test-name",
+					Value: "test-value",
+				},
+			},
+			expectedEnvFrom: []v1.EnvFromSource{
+				{
+					ConfigMapRef: &v1.ConfigMapEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "test-configmap",
+						},
+					},
+				},
+				{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "test-secret",
+						},
+					},
+				},
+			},
+			expectedPodLabel: map[string]string{
+				RepositoryNameLabel:           "test-123",
+				"azure.workload.identity/use": "fake-label-value",
 			},
 		},
 		{
@@ -996,14 +1107,7 @@ func TestBuildJob(t *testing.T) {
 				}
 				assert.Equal(t, expectedArgs, container.Args)
 
-				// Check affinity
-				assert.Nil(t, job.Spec.Template.Spec.Affinity)
-
-				// Check tolerations
-				assert.Nil(t, job.Spec.Template.Spec.Tolerations)
-
-				// Check node selector
-				assert.Nil(t, job.Spec.Template.Spec.NodeSelector)
+				assert.Equal(t, tc.expectedPodLabel, job.Spec.Template.Labels)
 			}
 		})
 	}
