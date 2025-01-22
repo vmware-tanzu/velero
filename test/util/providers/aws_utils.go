@@ -362,10 +362,9 @@ func (s AWSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObj
 	}
 	if actualCount != snapshotCheck.ExpectCount {
 		return errors.New(fmt.Sprintf("Snapshot count %d is not as expected %d", actualCount, snapshotCheck.ExpectCount))
-	} else {
-		fmt.Printf("Snapshot count %d is as expected %d\n", actualCount, snapshotCheck.ExpectCount)
-		return nil
 	}
+	fmt.Printf("Snapshot count %d is as expected %d\n", actualCount, snapshotCheck.ExpectCount)
+	return nil
 }
 
 func (s AWSStorage) GetMinioBucketSize(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig string) (int64, error) {

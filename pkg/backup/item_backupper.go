@@ -838,12 +838,11 @@ func zoneFromPVNodeAffinity(res *corev1api.PersistentVolume, topologyKeys ...str
 		}
 		for _, exp := range term.MatchExpressions {
 			if keySet.Has(exp.Key) && exp.Operator == "In" && len(exp.Values) > 0 {
-				if exp.Key == gkeCsiZoneKey {
-					providerGke = true
-					zones = append(zones, exp.Values[0])
-				} else {
+				if exp.Key != gkeCsiZoneKey {
 					return exp.Key, exp.Values[0]
 				}
+				providerGke = true
+				zones = append(zones, exp.Values[0])
 			}
 		}
 	}
