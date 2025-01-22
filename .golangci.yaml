@@ -231,7 +231,6 @@ linters-settings:
       - name: dot-imports
         disabled: true
       - name: early-return
-        disabled: true
         arguments:
           - "preserveScope"
       - name: empty-block
@@ -246,14 +245,14 @@ linters-settings:
         disabled: true
       - name: increment-decrement
       - name: indent-error-flow
-        disabled: true
+        arguments:
+          - "preserveScope"
       - name: range
       - name: receiver-naming
         disabled: true
       - name: redefines-builtin-id
         disabled: true
       - name: superfluous-else
-        disabled: true
         arguments:
           - "preserveScope"
       - name: time-naming
