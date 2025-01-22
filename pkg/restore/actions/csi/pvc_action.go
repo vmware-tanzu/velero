@@ -503,8 +503,8 @@ func restoreFromVolumeSnapshot(
 		vs,
 	); err != nil {
 		return errors.Wrapf(err,
-			fmt.Sprintf("Failed to get Volumesnapshot %s/%s to restore PVC %s/%s",
-				newNamespace, volumeSnapshotName, newNamespace, pvc.Name),
+			"Failed to get Volumesnapshot %s/%s to restore PVC %s/%s",
+			newNamespace, volumeSnapshotName, newNamespace, pvc.Name,
 		)
 	}
 
@@ -512,9 +512,10 @@ func restoreFromVolumeSnapshot(
 		restoreSize, err := resource.ParseQuantity(
 			vs.Annotations[velerov1api.VolumeSnapshotRestoreSize])
 		if err != nil {
-			return errors.Wrapf(err, fmt.Sprintf(
+			return errors.Wrapf(err,
 				"Failed to parse %s from annotation on Volumesnapshot %s/%s into restore size",
-				vs.Annotations[velerov1api.VolumeSnapshotRestoreSize], vs.Namespace, vs.Name))
+				vs.Annotations[velerov1api.VolumeSnapshotRestoreSize], vs.Namespace, vs.Name,
+			)
 		}
 		// It is possible that the volume provider allocated a larger
 		// capacity volume than what was requested in the backed up PVC.
