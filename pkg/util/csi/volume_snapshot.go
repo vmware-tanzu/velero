@@ -490,6 +490,8 @@ func SetVolumeSnapshotContentDeletionPolicy(
 	return crClient.Patch(context.TODO(), vsc, crclient.MergeFrom(originVSC))
 }
 
+// CleanupVolumeSnapshot deletes the VolumeSnapshot and the associated VolumeSnapshotContent.  It will make sure the
+// physical snapshot is also deleted.
 func CleanupVolumeSnapshot(
 	volSnap *snapshotv1api.VolumeSnapshot,
 	crClient crclient.Client,
@@ -528,7 +530,8 @@ func CleanupVolumeSnapshot(
 	}
 }
 
-// DeleteVolumeSnapshot handles the VolumeSnapshot instance deletion.
+// DeleteVolumeSnapshot handles the VolumeSnapshot instance deletion.  It will make sure the VolumeSnapshotContent is
+// recreated so that the physical snapshot is retained.
 func DeleteVolumeSnapshot(
 	vs snapshotv1api.VolumeSnapshot,
 	vsc snapshotv1api.VolumeSnapshotContent,
