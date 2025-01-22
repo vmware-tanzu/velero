@@ -58,7 +58,7 @@ func (c *CSIDataMoverVolumeInfo) Verify() error {
 	Expect(err).ShouldNot(HaveOccurred(), "Fail to get VolumeInfo metadata in the Backup Repository.")
 
 	fmt.Printf("The VolumeInfo metadata content: %+v\n", *volumeInfo[0])
-	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
+	Expect(volumeInfo).ToNot(BeEmpty())
 	Expect(volumeInfo[0].SnapshotDataMovementInfo).NotTo(BeNil())
 
 	return nil
