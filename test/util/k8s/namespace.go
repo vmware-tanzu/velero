@@ -115,10 +115,9 @@ func DeleteNamespace(ctx context.Context, client TestClient, namespace string, w
 			if err != nil {
 				fmt.Printf("Get namespace %s err: %v", namespace, err)
 				return false, err
-			} else {
-				if !slices.Contains(nsList, namespace) {
-					return true, nil
-				}
+			}
+			if !slices.Contains(nsList, namespace) {
+				return true, nil
 			}
 			fmt.Printf("namespace %q is still being deleted...\n", namespace)
 			logrus.Debugf("namespace %q is still being deleted...", namespace)
@@ -190,16 +189,16 @@ func CleanupNamespaces(ctx context.Context, client TestClient, CaseBaseName stri
 func WaitAllSelectedNSDeleted(ctx context.Context, client TestClient, label string) error {
 	return waitutil.PollImmediateInfinite(5*time.Second,
 		func() (bool, error) {
-			if ns, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: label}); err != nil {
+			ns, err := client.ClientGo.CoreV1().Namespaces().List(ctx, metav1.ListOptions{LabelSelector: label})
+			if err != nil {
 				return false, err
 			} else if ns == nil {
 				return true, nil
 			} else if len(ns.Items) == 0 {
 				return true, nil
-			} else {
-				logrus.Debugf("%d namespaces is still being deleted...\n", len(ns.Items))
-				return false, nil
 			}
+			logrus.Debugf("%d namespaces is still being deleted...\n", len(ns.Items))
+			return false, nil
 		})
 }
 
