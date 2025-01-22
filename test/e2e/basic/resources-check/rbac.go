@@ -177,11 +177,10 @@ func (r *RBACCase) Destroy() error {
 }
 
 func (r *RBACCase) Clean() error {
-	if CurrentSpecReport().Failed() && r.VeleroCfg.FailFast {
-		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
-	} else {
+	if !(CurrentSpecReport().Failed() && r.VeleroCfg.FailFast) {
 		return r.Destroy()
 	}
+	fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
 
 	return nil
 }
