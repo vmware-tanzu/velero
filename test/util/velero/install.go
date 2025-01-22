@@ -192,15 +192,14 @@ func generateVSpherePlugin(veleroCfg *test.VeleroConfig) error {
 
 	if err := createVCCredentialSecret(cli.ClientGo, veleroCfg.VeleroNamespace); err != nil {
 		// For TKGs/uTKG the VC secret is not supposed to exist.
-		if apierrors.IsNotFound(err) {
-			clusterFlavor = "GUEST"
-		} else {
+		if !apierrors.IsNotFound(err) {
 			return errors.WithMessagef(
 				err,
 				"Failed to create virtual center credential secret in %s namespace",
 				veleroCfg.VeleroNamespace,
 			)
 		}
+		clusterFlavor = "GUEST"
 	}
 
 	_, err := k8s.CreateConfigMap(
