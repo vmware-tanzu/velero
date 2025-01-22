@@ -879,7 +879,6 @@ var _ = Describe("Backup Sync Reconciler", func() {
 			},
 		}
 		for _, test := range testCases {
-			test := test
 			It(test.name, func() {
 				logger := velerotest.NewLogger()
 				b := backupSyncReconciler{

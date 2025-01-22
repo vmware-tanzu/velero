@@ -158,7 +158,7 @@ func (di *FakeServerResourcesInterface) ServerPreferredResources() ([]*metav1.AP
 	if di.ReturnError != nil {
 		return di.ResourceList, di.ReturnError
 	}
-	if di.FailedGroups == nil || len(di.FailedGroups) == 0 {
+	if len(di.FailedGroups) == 0 {
 		return di.ResourceList, nil
 	}
 	return di.ResourceList, &discovery.ErrGroupDiscoveryFailed{Groups: di.FailedGroups}
@@ -168,7 +168,7 @@ func (di *FakeServerResourcesInterface) ServerGroupsAndResources() ([]*metav1.AP
 	if di.ReturnError != nil {
 		return di.APIGroup, di.ResourceList, di.ReturnError
 	}
-	if di.FailedGroups == nil || len(di.FailedGroups) == 0 {
+	if len(di.FailedGroups) == 0 {
 		return di.APIGroup, di.ResourceList, nil
 	}
 	return di.APIGroup, di.ResourceList, &discovery.ErrGroupDiscoveryFailed{Groups: di.FailedGroups}

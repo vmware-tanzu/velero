@@ -89,14 +89,13 @@ func TestResetVolumeSnapshotSpecForRestore(t *testing.T) {
 			before := tc.vs.DeepCopy()
 			resetVolumeSnapshotSpecForRestore(&tc.vs, &tc.vscName)
 
-			assert.Equalf(t, tc.vs.Name, before.Name, "unexpected change to Object.Name, Want: %s; Got %s", tc.name, before.Name, tc.vs.Name)
-			assert.Equal(t, tc.vs.Namespace, before.Namespace, "unexpected change to Object.Namespace, Want: %s; Got %s", tc.name, before.Namespace, tc.vs.Namespace)
+			assert.Equal(t, tc.vs.Name, before.Name, "unexpected change to Object.Name")
+			assert.Equal(t, tc.vs.Namespace, before.Namespace, "unexpected change to Object.Namespace")
 			assert.NotNil(t, tc.vs.Spec.Source)
 			assert.Nil(t, tc.vs.Spec.Source.PersistentVolumeClaimName)
 			assert.NotNil(t, tc.vs.Spec.Source.VolumeSnapshotContentName)
 			assert.Equal(t, *tc.vs.Spec.Source.VolumeSnapshotContentName, tc.vscName)
-			assert.Equal(t, *tc.vs.Spec.VolumeSnapshotClassName, *before.Spec.VolumeSnapshotClassName, "unexpected value for Spec.VolumeSnapshotClassName, Want: %s, Got: %s",
-				*tc.vs.Spec.VolumeSnapshotClassName, *before.Spec.VolumeSnapshotClassName)
+			assert.Equal(t, *tc.vs.Spec.VolumeSnapshotClassName, *before.Spec.VolumeSnapshotClassName, "unexpected value for Spec.VolumeSnapshotClassName")
 			assert.Nil(t, tc.vs.Status)
 		})
 	}
