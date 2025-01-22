@@ -369,11 +369,10 @@ func describePodVolumeRestores(d *Describer, restores []velerov1api.PodVolumeRes
 	// Get the type of pod volume uploader. Since the uploader only comes from a single source, we can
 	// take the uploader type from the first element of the array.
 	var uploaderType string
-	if len(restores) > 0 {
-		uploaderType = restores[0].Spec.UploaderType
-	} else {
+	if len(restores) == 0 {
 		return
 	}
+	uploaderType = restores[0].Spec.UploaderType
 
 	if details {
 		d.Printf("%s Restores:\n", uploaderType)

@@ -956,9 +956,8 @@ func (em *exitWithMessageMock) CreateFile(name string) (*os.File, error) {
 
 	if em.writeFail {
 		return os.OpenFile(em.filePath, os.O_CREATE|os.O_RDONLY, 0500)
-	} else {
-		return os.Create(em.filePath)
 	}
+	return os.Create(em.filePath)
 }
 
 func TestExitPodWithMessage(t *testing.T) {

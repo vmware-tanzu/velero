@@ -139,9 +139,8 @@ func (r *RestoreMicroService) RunCancelableDataPath(ctx context.Context) (string
 
 		if pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseInProgress {
 			return true, nil
-		} else {
-			return false, nil
 		}
+		return false, nil
 	})
 	if err != nil {
 		log.WithError(err).Error("Failed to wait PVR")

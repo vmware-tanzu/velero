@@ -100,13 +100,12 @@ func (p *volumeSnapshotContentRestoreItemAction) Execute(
 	// Set the DeletionPolicy to Retain to avoid VS deletion will not trigger snapshot deletion
 	vsc.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
 
-	if vscFromBackup.Status != nil && vscFromBackup.Status.SnapshotHandle != nil {
-		vsc.Spec.Source.VolumeHandle = nil
-		vsc.Spec.Source.SnapshotHandle = vscFromBackup.Status.SnapshotHandle
-	} else {
+	if vscFromBackup.Status == nil || vscFromBackup.Status.SnapshotHandle == nil {
 		p.log.Errorf("fail to get snapshot handle from VSC %s status", vsc.Name)
 		return nil, errors.Errorf("fail to get snapshot handle from VSC %s status", vsc.Name)
 	}
+	vsc.Spec.Source.VolumeHandle = nil
+	vsc.Spec.Source.SnapshotHandle = vscFromBackup.Status.SnapshotHandle
 
 	additionalItems := []velero.ResourceIdentifier{}
 	if csi.IsVolumeSnapshotContentHasDeleteSecret(&vsc) {

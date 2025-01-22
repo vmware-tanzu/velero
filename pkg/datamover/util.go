@@ -21,9 +21,8 @@ import "fmt"
 func GetUploaderType(dataMover string) string {
 	if dataMover == "" || dataMover == "velero" {
 		return "kopia"
-	} else {
-		return dataMover
 	}
+	return dataMover
 }
 
 func IsBuiltInUploader(dataMover string) bool {

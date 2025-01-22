@@ -127,9 +127,8 @@ func EnsureDeletePod(ctx context.Context, podGetter corev1client.CoreV1Interface
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return errors.Errorf("timeout to assure pod %s is deleted, finalizers in pod %v", pod, updated.Finalizers)
-		} else {
-			return errors.Wrapf(err, "error to assure pod is deleted, %s", pod)
 		}
+		return errors.Wrapf(err, "error to assure pod is deleted, %s", pod)
 	}
 
 	return nil

@@ -389,9 +389,8 @@ func CheckScheduleWithResourceOrder(ctx context.Context, veleroCLI, veleroNamesp
 	}
 	if reflect.DeepEqual(schedule.Spec.Template.OrderedResources, order) {
 		return nil
-	} else {
-		return fmt.Errorf("resource order %v set in schedule command is not equal with order %v stored in schedule cr", order, schedule.Spec.Template.OrderedResources)
 	}
+	return fmt.Errorf("resource order %v set in schedule command is not equal with order %v stored in schedule cr", order, schedule.Spec.Template.OrderedResources)
 }
 
 func CheckBackupWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespace, backupName string, orderResources map[string]string) error {
@@ -410,9 +409,8 @@ func CheckBackupWithResourceOrder(ctx context.Context, veleroCLI, veleroNamespac
 	}
 	if reflect.DeepEqual(backup.Spec.OrderedResources, orderResources) {
 		return nil
-	} else {
-		return fmt.Errorf("resource order %v set in backup command is not equal with order %v stored in backup cr", orderResources, backup.Spec.OrderedResources)
 	}
+	return fmt.Errorf("resource order %v set in backup command is not equal with order %v stored in backup cr", orderResources, backup.Spec.OrderedResources)
 }
 
 // VeleroBackupNamespace uses the veleroCLI to backup a namespace.
@@ -660,10 +658,7 @@ func VeleroVersion(ctx context.Context, veleroCLI, veleroNamespace string) error
 	args := []string{
 		"version", "--namespace", veleroNamespace,
 	}
-	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
-		return err
-	}
-	return nil
+	return VeleroCmdExec(ctx, veleroCLI, args)
 }
 
 // GetPlugins will collect all kinds plugins for VeleroInstall, such as provider
@@ -1048,37 +1043,35 @@ func IsBackupExist(ctx context.Context, backupName string, veleroCfg *VeleroConf
 
 func WaitBackupDeleted(ctx context.Context, backupName string, timeout time.Duration, veleroCfg *VeleroConfig) error {
 	return wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
-		if exist, err := IsBackupExist(ctx, backupName, veleroCfg); err != nil {
+		exist, err := IsBackupExist(ctx, backupName, veleroCfg)
+		if err != nil {
 			return false, err
-		} else {
-			if exist {
-				return false, nil
-			} else {
-				fmt.Printf("Backup %s does not exist\n", backupName)
-				return true, nil
-			}
 		}
+		if exist {
+			return false, nil
+		}
+		fmt.Printf("Backup %s does not exist\n", backupName)
+		return true, nil
 	})
 }
 
 func WaitForExpectedStateOfBackup(ctx context.Context, backupName string,
 	timeout time.Duration, existing bool, veleroCfg *VeleroConfig) error {
 	return wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
-		if exist, err := IsBackupExist(ctx, backupName, veleroCfg); err != nil {
+		exist, err := IsBackupExist(ctx, backupName, veleroCfg)
+		if err != nil {
 			return false, err
-		} else {
-			msg := "does not exist as expect"
-			if exist {
-				msg = "was found as expect"
-			}
-			if exist == existing {
-				fmt.Println("Backup <" + backupName + "> " + msg)
-				return true, nil
-			} else {
-				fmt.Println("Backup <" + backupName + "> " + msg)
-				return false, nil
-			}
 		}
+		msg := "does not exist as expect"
+		if exist {
+			msg = "was found as expect"
+		}
+		if exist == existing {
+			fmt.Println("Backup <" + backupName + "> " + msg)
+			return true, nil
+		}
+		fmt.Println("Backup <" + backupName + "> " + msg)
+		return false, nil
 	})
 }
 
@@ -1239,9 +1232,8 @@ func SnapshotCRsCountShouldBe(ctx context.Context, namespace, backupName string,
 	}
 	if count == expectedCount {
 		return nil
-	} else {
-		return errors.New(fmt.Sprintf("SnapshotCR count %d of backup %s in namespace %s is not as expected %d", count, backupName, namespace, expectedCount))
 	}
+	return errors.New(fmt.Sprintf("SnapshotCR count %d of backup %s in namespace %s is not as expected %d", count, backupName, namespace, expectedCount))
 }
 
 func BackupRepositoriesCountShouldBe(ctx context.Context, veleroNamespace, targetNamespace string, expectedCount int) error {
@@ -1251,9 +1243,8 @@ func BackupRepositoriesCountShouldBe(ctx context.Context, veleroNamespace, targe
 	}
 	if len(resticArr) == expectedCount {
 		return nil
-	} else {
-		return errors.New(fmt.Sprintf("BackupRepositories count %d in namespace %s is not as expected %d", len(resticArr), targetNamespace, expectedCount))
 	}
+	return errors.New(fmt.Sprintf("BackupRepositories count %d in namespace %s is not as expected %d", len(resticArr), targetNamespace, expectedCount))
 }
 
 func GetRepositories(ctx context.Context, veleroNamespace, targetNamespace string) ([]string, error) {
@@ -1568,9 +1559,8 @@ func IsSupportUploaderType(version string) (bool, error) {
 	}
 	if v.AtLeast(verSupportUploaderType) {
 		return true, nil
-	} else {
-		return false, nil
 	}
+	return false, nil
 }
 
 func GetVeleroPodName(ctx context.Context) ([]string, error) {

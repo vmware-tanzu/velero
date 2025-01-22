@@ -268,9 +268,8 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1a
 		if apierrors.IsNotFound(err) {
 			curLog.WithField("backup pod", backupPodName).Debugf("Backup pod is not running in the current node %s", exposeWaitParam.NodeName)
 			return nil, nil
-		} else {
-			return nil, errors.Wrapf(err, "error to get backup pod %s", backupPodName)
 		}
+		return nil, errors.Wrapf(err, "error to get backup pod %s", backupPodName)
 	}
 
 	curLog.WithField("pod", pod.Name).Infof("Backup pod is in running state in node %s", pod.Spec.NodeName)

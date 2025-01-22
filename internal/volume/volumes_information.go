@@ -338,24 +338,24 @@ func (v *BackupVolumesInformation) generateVolumeInfoForSkippedPV() {
 	tmpVolumeInfos := make([]*BackupVolumeInfo, 0)
 
 	for pvName, skippedReason := range v.SkippedPVs {
-		if pvcPVInfo := v.pvMap.retrieve(pvName, "", ""); pvcPVInfo != nil {
-			volumeInfo := &BackupVolumeInfo{
-				PVCName:           pvcPVInfo.PVCName,
-				PVCNamespace:      pvcPVInfo.PVCNamespace,
-				PVName:            pvName,
-				SnapshotDataMoved: false,
-				Skipped:           true,
-				SkippedReason:     skippedReason,
-				PVInfo: &PVInfo{
-					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
-					Labels:        pvcPVInfo.PV.Labels,
-				},
-			}
-			tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
-		} else {
+		pvcPVInfo := v.pvMap.retrieve(pvName, "", "")
+		if pvcPVInfo == nil {
 			v.logger.Warnf("Cannot find info for PV %s", pvName)
 			continue
 		}
+		volumeInfo := &BackupVolumeInfo{
+			PVCName:           pvcPVInfo.PVCName,
+			PVCNamespace:      pvcPVInfo.PVCNamespace,
+			PVName:            pvName,
+			SnapshotDataMoved: false,
+			Skipped:           true,
+			SkippedReason:     skippedReason,
+			PVInfo: &PVInfo{
+				ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
+				Labels:        pvcPVInfo.PV.Labels,
+			},
+		}
+		tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
 	}
 
 	v.volumeInfos = append(v.volumeInfos, tmpVolumeInfos...)
@@ -366,32 +366,32 @@ func (v *BackupVolumesInformation) generateVolumeInfoForVeleroNativeSnapshot() {
 	tmpVolumeInfos := make([]*BackupVolumeInfo, 0)
 
 	for _, nativeSnapshot := range v.NativeSnapshots {
-		if pvcPVInfo := v.pvMap.retrieve(nativeSnapshot.Spec.PersistentVolumeName, "", ""); pvcPVInfo != nil {
-			volumeResult := VolumeResultFailed
-			if nativeSnapshot.Status.Phase == SnapshotPhaseCompleted {
-				volumeResult = VolumeResultSucceeded
-			}
-			volumeInfo := &BackupVolumeInfo{
-				BackupMethod:      NativeSnapshot,
-				PVCName:           pvcPVInfo.PVCName,
-				PVCNamespace:      pvcPVInfo.PVCNamespace,
-				PVName:            pvcPVInfo.PV.Name,
-				SnapshotDataMoved: false,
-				Skipped:           false,
-				// Only set Succeeded to true when the NativeSnapshot's phase is Completed,
-				// although NativeSnapshot doesn't check whether the snapshot creation result.
-				Result:             volumeResult,
-				NativeSnapshotInfo: newNativeSnapshotInfo(nativeSnapshot),
-				PVInfo: &PVInfo{
-					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
-					Labels:        pvcPVInfo.PV.Labels,
-				},
-			}
-			tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
-		} else {
+		pvcPVInfo := v.pvMap.retrieve(nativeSnapshot.Spec.PersistentVolumeName, "", "")
+		if pvcPVInfo == nil {
 			v.logger.Warnf("cannot find info for PV %s", nativeSnapshot.Spec.PersistentVolumeName)
 			continue
 		}
+		volumeResult := VolumeResultFailed
+		if nativeSnapshot.Status.Phase == SnapshotPhaseCompleted {
+			volumeResult = VolumeResultSucceeded
+		}
+		volumeInfo := &BackupVolumeInfo{
+			BackupMethod:      NativeSnapshot,
+			PVCName:           pvcPVInfo.PVCName,
+			PVCNamespace:      pvcPVInfo.PVCNamespace,
+			PVName:            pvcPVInfo.PV.Name,
+			SnapshotDataMoved: false,
+			Skipped:           false,
+			// Only set Succeeded to true when the NativeSnapshot's phase is Completed,
+			// although NativeSnapshot doesn't check whether the snapshot creation result.
+			Result:             volumeResult,
+			NativeSnapshotInfo: newNativeSnapshotInfo(nativeSnapshot),
+			PVInfo: &PVInfo{
+				ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
+				Labels:        pvcPVInfo.PV.Labels,
+			},
+		}
+		tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
 	}
 
 	v.volumeInfos = append(v.volumeInfos, tmpVolumeInfos...)
@@ -449,38 +449,38 @@ func (v *BackupVolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 		if volumeSnapshotContent.Status.SnapshotHandle != nil {
 			snapshotHandle = *volumeSnapshotContent.Status.SnapshotHandle
 		}
-		if pvcPVInfo := v.pvMap.retrieve("", *volumeSnapshot.Spec.Source.PersistentVolumeClaimName, volumeSnapshot.Namespace); pvcPVInfo != nil {
-			volumeInfo := &BackupVolumeInfo{
-				BackupMethod:          CSISnapshot,
-				PVCName:               pvcPVInfo.PVCName,
-				PVCNamespace:          pvcPVInfo.PVCNamespace,
-				PVName:                pvcPVInfo.PV.Name,
-				Skipped:               false,
-				SnapshotDataMoved:     false,
-				PreserveLocalSnapshot: true,
-				CSISnapshotInfo: &CSISnapshotInfo{
-					VSCName:        *volumeSnapshot.Status.BoundVolumeSnapshotContentName,
-					Size:           size,
-					Driver:         volumeSnapshotContent.Spec.Driver,
-					SnapshotHandle: snapshotHandle,
-					OperationID:    operation.Spec.OperationID,
-					ReadyToUse:     volumeSnapshot.Status.ReadyToUse,
-				},
-				PVInfo: &PVInfo{
-					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
-					Labels:        pvcPVInfo.PV.Labels,
-				},
-			}
-
-			if volumeSnapshot.Status.CreationTime != nil {
-				volumeInfo.StartTimestamp = volumeSnapshot.Status.CreationTime
-			}
-
-			tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
-		} else {
+		pvcPVInfo := v.pvMap.retrieve("", *volumeSnapshot.Spec.Source.PersistentVolumeClaimName, volumeSnapshot.Namespace)
+		if pvcPVInfo == nil {
 			v.logger.Warnf("cannot find info for PVC %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Spec.Source.PersistentVolumeClaimName)
 			continue
 		}
+		volumeInfo := &BackupVolumeInfo{
+			BackupMethod:          CSISnapshot,
+			PVCName:               pvcPVInfo.PVCName,
+			PVCNamespace:          pvcPVInfo.PVCNamespace,
+			PVName:                pvcPVInfo.PV.Name,
+			Skipped:               false,
+			SnapshotDataMoved:     false,
+			PreserveLocalSnapshot: true,
+			CSISnapshotInfo: &CSISnapshotInfo{
+				VSCName:        *volumeSnapshot.Status.BoundVolumeSnapshotContentName,
+				Size:           size,
+				Driver:         volumeSnapshotContent.Spec.Driver,
+				SnapshotHandle: snapshotHandle,
+				OperationID:    operation.Spec.OperationID,
+				ReadyToUse:     volumeSnapshot.Status.ReadyToUse,
+			},
+			PVInfo: &PVInfo{
+				ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
+				Labels:        pvcPVInfo.PV.Labels,
+			},
+		}
+
+		if volumeSnapshot.Status.CreationTime != nil {
+			volumeInfo.StartTimestamp = volumeSnapshot.Status.CreationTime
+		}
+
+		tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
 	}
 
 	v.volumeInfos = append(v.volumeInfos, tmpVolumeInfos...)
@@ -512,17 +512,17 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromPVB() {
 			continue
 		}
 		if pvcName != "" {
-			if pvcPVInfo := v.pvMap.retrieve("", pvcName, pvb.Spec.Pod.Namespace); pvcPVInfo != nil {
-				volumeInfo.PVCName = pvcPVInfo.PVCName
-				volumeInfo.PVCNamespace = pvcPVInfo.PVCNamespace
-				volumeInfo.PVName = pvcPVInfo.PV.Name
-				volumeInfo.PVInfo = &PVInfo{
-					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
-					Labels:        pvcPVInfo.PV.Labels,
-				}
-			} else {
+			pvcPVInfo := v.pvMap.retrieve("", pvcName, pvb.Spec.Pod.Namespace)
+			if pvcPVInfo == nil {
 				v.logger.Warnf("Cannot find info for PVC %s/%s", pvb.Spec.Pod.Namespace, pvcName)
 				continue
+			}
+			volumeInfo.PVCName = pvcPVInfo.PVCName
+			volumeInfo.PVCNamespace = pvcPVInfo.PVCNamespace
+			volumeInfo.PVName = pvcPVInfo.PV.Name
+			volumeInfo.PVInfo = &PVInfo{
+				ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
+				Labels:        pvcPVInfo.PV.Labels,
 			}
 		} else {
 			v.logger.Debug("The PVB %s doesn't have a corresponding PVC", pvb.Name)
@@ -589,51 +589,50 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 			)
 			continue
 		}
-
-		if pvcPVInfo := v.pvMap.retrieve(
+		pvcPVInfo := v.pvMap.retrieve(
 			"",
 			operation.Spec.ResourceIdentifier.Name,
 			operation.Spec.ResourceIdentifier.Namespace,
-		); pvcPVInfo != nil {
-			dataMover := veleroDatamover
-			if dataUpload.Spec.DataMover != "" {
-				dataMover = dataUpload.Spec.DataMover
-			}
-
-			volumeInfo := &BackupVolumeInfo{
-				BackupMethod:      CSISnapshot,
-				PVCName:           pvcPVInfo.PVCName,
-				PVCNamespace:      pvcPVInfo.PVCNamespace,
-				PVName:            pvcPVInfo.PV.Name,
-				SnapshotDataMoved: true,
-				Skipped:           false,
-				CSISnapshotInfo: &CSISnapshotInfo{
-					SnapshotHandle: FieldValueIsUnknown,
-					VSCName:        FieldValueIsUnknown,
-					OperationID:    FieldValueIsUnknown,
-					Driver:         dataUpload.Spec.CSISnapshot.Driver,
-				},
-				SnapshotDataMovementInfo: &SnapshotDataMovementInfo{
-					DataMover:    dataMover,
-					UploaderType: velerov1api.BackupRepositoryTypeKopia,
-					OperationID:  operation.Spec.OperationID,
-					Phase:        dataUpload.Status.Phase,
-				},
-				PVInfo: &PVInfo{
-					ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
-					Labels:        pvcPVInfo.PV.Labels,
-				},
-			}
-
-			if dataUpload.Status.StartTimestamp != nil {
-				volumeInfo.StartTimestamp = dataUpload.Status.StartTimestamp
-			}
-
-			tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
-		} else {
+		)
+		if pvcPVInfo == nil {
 			v.logger.Warnf("Cannot find info for PVC %s/%s", operation.Spec.ResourceIdentifier.Namespace, operation.Spec.ResourceIdentifier.Name)
 			continue
 		}
+		dataMover := veleroDatamover
+		if dataUpload.Spec.DataMover != "" {
+			dataMover = dataUpload.Spec.DataMover
+		}
+
+		volumeInfo := &BackupVolumeInfo{
+			BackupMethod:      CSISnapshot,
+			PVCName:           pvcPVInfo.PVCName,
+			PVCNamespace:      pvcPVInfo.PVCNamespace,
+			PVName:            pvcPVInfo.PV.Name,
+			SnapshotDataMoved: true,
+			Skipped:           false,
+			CSISnapshotInfo: &CSISnapshotInfo{
+				SnapshotHandle: FieldValueIsUnknown,
+				VSCName:        FieldValueIsUnknown,
+				OperationID:    FieldValueIsUnknown,
+				Driver:         dataUpload.Spec.CSISnapshot.Driver,
+			},
+			SnapshotDataMovementInfo: &SnapshotDataMovementInfo{
+				DataMover:    dataMover,
+				UploaderType: velerov1api.BackupRepositoryTypeKopia,
+				OperationID:  operation.Spec.OperationID,
+				Phase:        dataUpload.Status.Phase,
+			},
+			PVInfo: &PVInfo{
+				ReclaimPolicy: string(pvcPVInfo.PV.Spec.PersistentVolumeReclaimPolicy),
+				Labels:        pvcPVInfo.PV.Labels,
+			},
+		}
+
+		if dataUpload.Status.StartTimestamp != nil {
+			volumeInfo.StartTimestamp = dataUpload.Status.StartTimestamp
+		}
+
+		tmpVolumeInfos = append(tmpVolumeInfos, volumeInfo)
 	}
 
 	v.volumeInfos = append(v.volumeInfos, tmpVolumeInfos...)
@@ -728,16 +727,15 @@ func (t *RestoreVolumeInfoTracker) Populate(ctx context.Context, restoredResourc
 				t.pvcCSISnapshotMap[pvc.Namespace+"/"+pvcName] = *vs
 			}
 		}
-		if pvc.Status.Phase == corev1api.ClaimBound && pvc.Spec.VolumeName != "" {
-			pv := &corev1api.PersistentVolume{}
-			if err := t.client.Get(ctx, kbclient.ObjectKey{Name: pvc.Spec.VolumeName}, pv); err != nil {
-				log.WithError(err).Error("Failed to get PV")
-			} else {
-				t.pvPvc.insert(*pv, pvcName, pvcNS)
-			}
-		} else {
+		if pvc.Status.Phase != corev1api.ClaimBound || pvc.Spec.VolumeName == "" {
 			log.Warn("PVC is not bound or has no volume name")
 			continue
+		}
+		pv := &corev1api.PersistentVolume{}
+		if err := t.client.Get(ctx, kbclient.ObjectKey{Name: pvc.Spec.VolumeName}, pv); err != nil {
+			log.WithError(err).Error("Failed to get PV")
+		} else {
+			t.pvPvc.insert(*pv, pvcName, pvcNS)
 		}
 	}
 	if err := t.client.List(ctx, t.datadownloadList, &kbclient.ListOptions{
@@ -765,18 +763,17 @@ func (t *RestoreVolumeInfoTracker) Result() []*RestoreVolumeInfo {
 			t.log.WithError(err).Warn("Fail to get PVC from PodVolumeRestore: ", pvr.Name)
 			continue
 		}
-		if pvcName != "" {
-			volumeInfo.PVCName = pvcName
-			volumeInfo.PVCNamespace = pvr.Spec.Pod.Namespace
-			if pvcPVInfo := t.pvPvc.retrieve("", pvcName, pvr.Spec.Pod.Namespace); pvcPVInfo != nil {
-				volumeInfo.PVName = pvcPVInfo.PV.Name
-			}
-		} else {
+		if pvcName == "" {
 			// In this case, the volume is not bound to a PVC and
 			// the PVR will not be able to populate into the volume, so we'll skip it
 			t.log.Warnf("unable to get PVC for PodVolumeRestore %s/%s, pod: %s/%s, volume: %s",
 				pvr.Namespace, pvr.Name, pvr.Spec.Pod.Namespace, pvr.Spec.Pod.Name, pvr.Spec.Volume)
 			continue
+		}
+		volumeInfo.PVCName = pvcName
+		volumeInfo.PVCNamespace = pvr.Spec.Pod.Namespace
+		if pvcPVInfo := t.pvPvc.retrieve("", pvcName, pvr.Spec.Pod.Namespace); pvcPVInfo != nil {
+			volumeInfo.PVName = pvcPVInfo.PV.Name
 		}
 		volumeInfos = append(volumeInfos, volumeInfo)
 	}

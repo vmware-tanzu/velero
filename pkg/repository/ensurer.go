@@ -89,9 +89,8 @@ func (r *Ensurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, ba
 
 		// no repo found: create one and wait for it to be ready
 		return r.createBackupRepositoryAndWait(ctx, namespace, backupRepoKey)
-	} else {
-		return nil, errors.WithStack(err)
 	}
+	return nil, errors.WithStack(err)
 }
 
 func (r *Ensurer) repoLock(key BackupRepositoryKey) *sync.Mutex {
@@ -126,9 +125,8 @@ func (r *Ensurer) waitBackupRepository(ctx context.Context, namespace string, ba
 		} else if isBackupRepositoryNotFoundError(err) || isBackupRepositoryNotProvisionedError(err) {
 			checkErr = err
 			return false, nil
-		} else {
-			return false, err
 		}
+		return false, err
 	}
 
 	err := wait.PollUntilContextTimeout(ctx, time.Millisecond*500, r.resourceTimeout, true, checkFunc)

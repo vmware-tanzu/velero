@@ -216,15 +216,14 @@ func generateVSpherePlugin(veleroCfg *test.VeleroConfig) error {
 
 	if err := createVCCredentialSecret(cli.ClientGo, veleroCfg.VeleroNamespace); err != nil {
 		// For TKGs/uTKG the VC secret is not supposed to exist.
-		if apierrors.IsNotFound(err) {
-			clusterFlavor = "GUEST"
-		} else {
+		if !apierrors.IsNotFound(err) {
 			return errors.WithMessagef(
 				err,
 				"Failed to create virtual center credential secret in %s namespace",
 				veleroCfg.VeleroNamespace,
 			)
 		}
+		clusterFlavor = "GUEST"
 	}
 
 	_, err := k8s.CreateConfigMap(
@@ -729,14 +728,13 @@ func IsVeleroReady(ctx context.Context, veleroCfg *test.VeleroConfig) (bool, err
 			"-o", "json", "-n", namespace))
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to get the node-agent daemonset, stdout=%s, stderr=%s", stdout, stderr)
-		} else {
-			daemonset := &appsv1api.DaemonSet{}
-			if err = json.Unmarshal([]byte(stdout), daemonset); err != nil {
-				return false, errors.Wrapf(err, "failed to unmarshal the node-agent daemonset")
-			}
-			if daemonset.Status.DesiredNumberScheduled != daemonset.Status.NumberAvailable {
-				return false, fmt.Errorf("the available number pod %d in node-agent daemonset not equal to scheduled number %d", daemonset.Status.NumberAvailable, daemonset.Status.DesiredNumberScheduled)
-			}
+		}
+		daemonset := &appsv1api.DaemonSet{}
+		if err = json.Unmarshal([]byte(stdout), daemonset); err != nil {
+			return false, errors.Wrapf(err, "failed to unmarshal the node-agent daemonset")
+		}
+		if daemonset.Status.DesiredNumberScheduled != daemonset.Status.NumberAvailable {
+			return false, fmt.Errorf("the available number pod %d in node-agent daemonset not equal to scheduled number %d", daemonset.Status.NumberAvailable, daemonset.Status.DesiredNumberScheduled)
 		}
 	}
 

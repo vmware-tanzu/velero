@@ -201,10 +201,9 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{}, nil
-		} else {
-			log.Error("DeletionTimestamp is marked but can't find the expected finalizer")
-			return ctrl.Result{}, nil
 		}
+		log.Error("DeletionTimestamp is marked but can't find the expected finalizer")
+		return ctrl.Result{}, nil
 	}
 
 	// add finalizer
@@ -380,12 +379,12 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "No backups found for schedule")
 		}
 
-		if backup := mostRecentCompletedBackup(backupList.Items); backup.Name != "" {
-			restore.Spec.BackupName = backup.Name
-		} else {
+		backup := mostRecentCompletedBackup(backupList.Items)
+		if backup.Name == "" {
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "No completed backups found for schedule")
 			return backupInfo{}, nil
 		}
+		restore.Spec.BackupName = backup.Name
 	}
 
 	info, err := r.fetchBackupInfo(restore.Spec.BackupName)
@@ -553,10 +552,9 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 	if err != nil {
 		restoreLog.WithError(err).Errorf("fail to get VolumeInfos metadata file for backup %s", restore.Spec.BackupName)
 		return errors.WithStack(err)
-	} else {
-		for _, volumeInfo := range volumeInfos {
-			backupVolumeInfoMap[volumeInfo.PVName] = *volumeInfo
-		}
+	}
+	for _, volumeInfo := range volumeInfos {
+		backupVolumeInfoMap[volumeInfo.PVName] = *volumeInfo
 	}
 
 	restoreLog.Info("starting restore")
@@ -767,11 +765,7 @@ func putResults(restore *api.Restore, results map[string]results.Result, backupS
 		return errors.Wrap(err, "error closing gzip writer")
 	}
 
-	if err := backupStore.PutRestoreResults(restore.Spec.BackupName, restore.Name, buf); err != nil {
-		return err
-	}
-
-	return nil
+	return backupStore.PutRestoreResults(restore.Spec.BackupName, restore.Name, buf)
 }
 
 func putRestoredResourceList(restore *api.Restore, list map[string][]string, backupStore persistence.BackupStore) error {
@@ -787,11 +781,7 @@ func putRestoredResourceList(restore *api.Restore, list map[string][]string, bac
 		return errors.Wrap(err, "error closing gzip writer")
 	}
 
-	if err := backupStore.PutRestoredResourceList(restore.Name, buf); err != nil {
-		return err
-	}
-
-	return nil
+	return backupStore.PutRestoredResourceList(restore.Name, buf)
 }
 
 func putOperationsForRestore(restore *api.Restore, operations []*itemoperation.RestoreOperation, backupStore persistence.BackupStore) error {
@@ -807,11 +797,7 @@ func putOperationsForRestore(restore *api.Restore, operations []*itemoperation.R
 		return errors.Wrap(err, "error closing gzip writer")
 	}
 
-	if err := backupStore.PutRestoreItemOperations(restore.Name, buf); err != nil {
-		return err
-	}
-
-	return nil
+	return backupStore.PutRestoreItemOperations(restore.Name, buf)
 }
 
 func putRestoreVolumeInfoList(restore *api.Restore, volInfoList []*volume.RestoreVolumeInfo, store persistence.BackupStore) error {

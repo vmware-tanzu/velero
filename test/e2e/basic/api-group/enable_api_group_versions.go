@@ -389,9 +389,8 @@ func rerenderTestYaml(index int, group, path string) (string, error) {
 			return fmt.Sprintf("RockBand%dList", index)
 		} else if s == "rockbands" {
 			return fmt.Sprintf("rockband%ds", index)
-		} else {
-			return fmt.Sprintf("rockband%d", index)
 		}
+		return fmt.Sprintf("rockband%d", index)
 	})
 
 	// replace group name to new value

@@ -199,9 +199,8 @@ func (e *podVolumeExposer) GetExposed(ctx context.Context, ownerObject corev1api
 		if apierrors.IsNotFound(err) {
 			curLog.WithField("hosting pod", hostingPodName).Debug("Hosting pod is not running in the current node")
 			return nil, nil
-		} else {
-			return nil, errors.Wrapf(err, "error to wait for rediness of pod %s", hostingPodName)
 		}
+		return nil, errors.Wrapf(err, "error to wait for rediness of pod %s", hostingPodName)
 	}
 
 	curLog.WithField("pod", updated.Name).Infof("Hosting pod is in running state in node %s", updated.Spec.NodeName)

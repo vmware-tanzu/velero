@@ -677,14 +677,13 @@ func GetKubeConfigContext() error {
 		if err != nil {
 			return err
 		}
-		if test.VeleroCfg.StandbyClusterContext != "" {
-			tcStandby, err = k8s.NewTestClient(test.VeleroCfg.StandbyClusterContext)
-			test.VeleroCfg.StandbyClient = &tcStandby
-			if err != nil {
-				return err
-			}
-		} else {
+		if test.VeleroCfg.StandbyClusterContext == "" {
 			return errors.New("migration test needs 2 clusters to run")
+		}
+		tcStandby, err = k8s.NewTestClient(test.VeleroCfg.StandbyClusterContext)
+		test.VeleroCfg.StandbyClient = &tcStandby
+		if err != nil {
+			return err
 		}
 	}
 

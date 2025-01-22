@@ -107,10 +107,7 @@ func (m *RestoreItemOperationsMap) UpdateForRestore(backupStore persistence.Back
 	if !ok || (!operations.ChangesSinceUpdate && len(operations.ErrsSinceUpdate) == 0) {
 		return nil
 	}
-	if err := operations.uploadProgress(backupStore, restoreName); err != nil {
-		return err
-	}
-	return nil
+	return operations.uploadProgress(backupStore, restoreName)
 }
 
 type OperationsForRestore struct {

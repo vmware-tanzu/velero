@@ -398,9 +398,8 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 			if cnt > 0 {
 				return false, nil
-			} else {
-				return true, nil
 			}
+			return true, nil
 		})
 		if err != nil {
 			log.WithError(err).Error("Error polling for deletion of restores")

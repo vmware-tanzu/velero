@@ -140,10 +140,9 @@ func getInnermostTrace(err error) stackTracer {
 		}
 
 		c, isCauser := err.(causer)
-		if isCauser {
-			err = c.Cause()
-		} else {
+		if !isCauser {
 			return tracer
 		}
+		err = c.Cause()
 	}
 }

@@ -35,9 +35,8 @@ func CreateRetryGenerateName(client kbclient.Client, ctx context.Context, obj kb
 	}
 	if obj.GetGenerateName() != "" && obj.GetName() == "" {
 		return retry.OnError(retry.DefaultRetry, apierrors.IsAlreadyExists, retryCreateFn)
-	} else {
-		return client.Create(ctx, obj, &kbclient.CreateOptions{})
 	}
+	return client.Create(ctx, obj, &kbclient.CreateOptions{})
 }
 
 // CapBackoff provides a backoff with a set backoff cap

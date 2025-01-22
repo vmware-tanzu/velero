@@ -21,7 +21,6 @@ const NilString = "<nil>"
 func GetString(str *string) string {
 	if str == nil {
 		return NilString
-	} else {
-		return *str
 	}
+	return *str
 }

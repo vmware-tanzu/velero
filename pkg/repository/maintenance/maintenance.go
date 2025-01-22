@@ -227,11 +227,10 @@ func getJobConfig(
 	); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
-		} else {
-			return nil, errors.Wrapf(
-				err,
-				"fail to get repo maintenance job configs %s", repoMaintenanceJobConfig)
 		}
+		return nil, errors.Wrapf(
+			err,
+			"fail to get repo maintenance job configs %s", repoMaintenanceJobConfig)
 	}
 
 	if cm.Data == nil {

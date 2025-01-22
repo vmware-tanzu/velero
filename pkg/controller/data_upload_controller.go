@@ -346,9 +346,8 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			if err == datapath.ConcurrentLimitExceed {
 				log.Debug("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
-			} else {
-				return r.errorOut(ctx, du, err, "error to create data path", log)
 			}
+			return r.errorOut(ctx, du, err, "error to create data path", log)
 		}
 
 		if err := r.initCancelableDataPath(ctx, asyncBR, res, log); err != nil {
@@ -887,9 +886,8 @@ func exclusiveUpdateDataUpload(ctx context.Context, cli client.Client, du *veler
 	// warn we won't rollback du values in memory when error
 	if apierrors.IsConflict(err) {
 		return false, nil
-	} else {
-		return false, err
 	}
+	return false, err
 }
 
 func (r *DataUploadReconciler) closeDataPath(ctx context.Context, duName string) {
@@ -1036,9 +1034,8 @@ func UpdateDataUploadWithRetry(ctx context.Context, client client.Client, namesp
 				if apierrors.IsConflict(err) {
 					log.Debugf("failed to update dataupload for %s/%s and will retry it", du.Namespace, du.Name)
 					return false, nil
-				} else {
-					return false, errors.Wrapf(err, "error updating dataupload with error %s/%s", du.Namespace, du.Name)
 				}
+				return false, errors.Wrapf(err, "error updating dataupload with error %s/%s", du.Namespace, du.Name)
 			}
 		}
 

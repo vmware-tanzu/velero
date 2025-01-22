@@ -336,24 +336,23 @@ func (p *pvcBackupItemAction) Execute(
 			// Return without modification to not fail the backup,
 			// and the above error log makes the backup partially fail.
 			return item, nil, "", nil, nil
-		} else {
-			itemToUpdate = []velero.ResourceIdentifier{
-				{
-					GroupResource: schema.GroupResource{
-						Group:    "velero.io",
-						Resource: "datauploads",
-					},
-					Namespace: dataUpload.Namespace,
-					Name:      dataUpload.Name,
-				},
-			}
-			// Set the DataUploadNameLabel, which is used for restore to
-			// let CSI plugin check whether it should handle the volume.
-			// If volume is CSI migration, PVC doesn't have the annotation.
-			annotations[velerov1api.DataUploadNameAnnotation] = dataUpload.Namespace + "/" + dataUpload.Name
-
-			dataUploadLog.Info("DataUpload is submitted successfully.")
 		}
+		itemToUpdate = []velero.ResourceIdentifier{
+			{
+				GroupResource: schema.GroupResource{
+					Group:    "velero.io",
+					Resource: "datauploads",
+				},
+				Namespace: dataUpload.Namespace,
+				Name:      dataUpload.Name,
+			},
+		}
+		// Set the DataUploadNameLabel, which is used for restore to
+		// let CSI plugin check whether it should handle the volume.
+		// If volume is CSI migration, PVC doesn't have the annotation.
+		annotations[velerov1api.DataUploadNameAnnotation] = dataUpload.Namespace + "/" + dataUpload.Name
+
+		dataUploadLog.Info("DataUpload is submitted successfully.")
 	} else {
 		setPVCRequestSizeToVSRestoreSize(&pvc, vsc, p.log)
 
@@ -608,9 +607,8 @@ func (p *pvcBackupItemAction) getVolumeSnapshotReference(
 			if existingVS.Status != nil && existingVS.Status.VolumeGroupSnapshotName != nil {
 				p.log.Infof("Reusing existing VolumeSnapshot %s for PVC %s", existingVS.Name, pvc.Name)
 				return existingVS, nil
-			} else {
-				return nil, errors.Errorf("found VolumeSnapshot %s for PVC %s, but it was not created via VolumeGroupSnapshot (missing volumeGroupSnapshotName)", existingVS.Name, pvc.Name)
 			}
+			return nil, errors.Errorf("found VolumeSnapshot %s for PVC %s, but it was not created via VolumeGroupSnapshot (missing volumeGroupSnapshotName)", existingVS.Name, pvc.Name)
 		}
 
 		p.log.Infof("No existing VS found for PVC %s; creating new VGS", pvc.Name)
@@ -792,11 +790,12 @@ func (p *pvcBackupItemAction) determineVGSClass(
 		}
 	}
 
-	if len(matched) == 1 {
+	switch len(matched) {
+	case 1:
 		return matched[0], nil
-	} else if len(matched) == 0 {
+	case 0:
 		return "", errors.Errorf("no VolumeGroupSnapshotClass found for driver %q for PVC %s", driver, pvc.Name)
-	} else {
+	default:
 		return "", errors.Errorf("multiple VolumeGroupSnapshotClasses found for driver %q with label velero.io/csi-volumegroupsnapshot-class=true", driver)
 	}
 }

@@ -103,9 +103,8 @@ func GetBackendType(provider string, config map[string]string) BackendType {
 		return bt
 	} else if config != nil && config["s3Url"] != "" {
 		return AWSBackend
-	} else {
-		return bt
 	}
+	return bt
 }
 
 func IsBackendTypeValid(backendType BackendType) bool {

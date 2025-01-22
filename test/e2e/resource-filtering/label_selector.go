@@ -118,19 +118,18 @@ func (l *LabelSelector) Verify() error {
 		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
 		//Check deployment
 		_, err := GetDeployment(l.Client.ClientGo, namespace, l.CaseBaseName)
-		if nsNum%2 == 1 { //include
-			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
-			}
-		} else { //exclude
+		if nsNum%2 != 1 { //exclude
 			if err == nil {
 				return fmt.Errorf("failed to exclude deployment in namespaces %q", namespace)
-			} else {
-				if apierrors.IsNotFound(err) { //resource should be excluded
-					return nil
-				}
-				return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 			}
+			if apierrors.IsNotFound(err) { //resource should be excluded
+				return nil
+			}
+			return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
+		}
+		//include
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 		}
 
 		//Check secrets
@@ -138,21 +137,20 @@ func (l *LabelSelector) Verify() error {
 			LabelSelector: l.labelSelector,
 		})
 
-		if nsNum%2 == 0 { //include
-			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("failed to list secrets in namespace: %q", namespace))
-			} else if len(secretsList.Items) == 0 {
-				return errors.Errorf("no secrets found in namespace: %q", namespace)
-			}
-		} else { //exclude
+		if nsNum%2 != 0 { //exclude
 			if err == nil {
 				return fmt.Errorf("failed to exclude secrets in namespaces %q", namespace)
-			} else {
-				if apierrors.IsNotFound(err) { //resource should be excluded
-					return nil
-				}
-				return errors.Wrap(err, fmt.Sprintf("failed to list secrets in namespace: %q", namespace))
 			}
+			if apierrors.IsNotFound(err) { //resource should be excluded
+				return nil
+			}
+			return errors.Wrap(err, fmt.Sprintf("failed to list secrets in namespace: %q", namespace))
+		}
+		//include
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to list secrets in namespace: %q", namespace))
+		} else if len(secretsList.Items) == 0 {
+			return errors.Errorf("no secrets found in namespace: %q", namespace)
 		}
 	}
 	return nil

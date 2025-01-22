@@ -293,9 +293,8 @@ func (r *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			if err == datapath.ConcurrentLimitExceed {
 				log.Debug("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
-			} else {
-				return r.errorOut(ctx, pvr, err, "error to create data path", log)
 			}
+			return r.errorOut(ctx, pvr, err, "error to create data path", log)
 		}
 
 		if err := r.initCancelableDataPath(ctx, asyncBR, res, log); err != nil {
@@ -438,9 +437,8 @@ func exclusiveUpdatePodVolumeRestore(ctx context.Context, cli client.Client, pvr
 	// warn we won't rollback pvr values in memory when error
 	if apierrors.IsConflict(err) {
 		return false, nil
-	} else {
-		return false, err
 	}
+	return false, err
 }
 
 func (r *PodVolumeRestoreReconciler) onPrepareTimeout(ctx context.Context, pvr *velerov1api.PodVolumeRestore) {
@@ -944,9 +942,8 @@ func UpdatePVRWithRetry(ctx context.Context, client client.Client, namespacedNam
 				if apierrors.IsConflict(err) {
 					log.Debugf("failed to update PVR for %s/%s and will retry it", pvr.Namespace, pvr.Name)
 					return false, nil
-				} else {
-					return false, errors.Wrapf(err, "error updating PVR %s/%s", pvr.Namespace, pvr.Name)
 				}
+				return false, errors.Wrapf(err, "error updating PVR %s/%s", pvr.Namespace, pvr.Name)
 			}
 		}
 

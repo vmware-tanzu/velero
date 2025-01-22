@@ -51,10 +51,9 @@ func DeletePVAndPVCIfAny(ctx context.Context, client corev1client.CoreV1Interfac
 		if apierrors.IsNotFound(err) {
 			log.WithError(err).Debugf("Abort deleting PV and PVC, for related PVC doesn't exist, %s/%s", pvcNamespace, pvcName)
 			return
-		} else {
-			log.Warnf("failed to get pvc %s/%s with err %v", pvcNamespace, pvcName, err)
-			return
 		}
+		log.Warnf("failed to get pvc %s/%s with err %v", pvcNamespace, pvcName, err)
+		return
 	}
 
 	if pvcObj.Spec.VolumeName == "" {
@@ -153,9 +152,8 @@ func EnsureDeletePVC(ctx context.Context, pvcGetter corev1client.CoreV1Interface
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return errors.Errorf("timeout to assure pvc %s is deleted, finalizers in pvc %v", pvcName, updated.Finalizers)
-		} else {
-			return errors.Wrapf(err, "error to ensure pvc deleted for %s", pvcName)
 		}
+		return errors.Wrapf(err, "error to ensure pvc deleted for %s", pvcName)
 	}
 
 	return nil
@@ -184,9 +182,8 @@ func EnsurePVDeleted(ctx context.Context, pvGetter corev1client.CoreV1Interface,
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return errors.Errorf("timeout to assure pv %s is deleted", pvName)
-		} else {
-			return errors.Wrapf(err, "error to ensure pv is deleted for %s", pvName)
 		}
+		return errors.Wrapf(err, "error to ensure pv is deleted for %s", pvName)
 	}
 
 	return nil
@@ -385,9 +382,8 @@ func WaitPVBound(ctx context.Context, pvGetter corev1client.CoreV1Interface, pvN
 
 	if err != nil {
 		return nil, errors.Wrap(err, "error to wait for bound of PV")
-	} else {
-		return updated, nil
 	}
+	return updated, nil
 }
 
 // IsPVCBound returns true if the specified PVC has been bound

@@ -372,23 +372,13 @@ func FileExistInPV(
 	if strings.Contains(output, fmt.Sprintf("/%s/%s: No such file or directory", volume, filename)) {
 		return false, nil
 	}
-
 	if err == nil {
 		return true, nil
-	} else {
-		return false, errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s",
-			filename, volume, podName, namespace))
 	}
+	return false, errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s",
+		filename, volume, podName, namespace))
 }
-func ReadFileFromPodVolume(
-	ctx context.Context,
-	namespace string,
-	podName string,
-	containerName string,
-	volume string,
-	filename string,
-	workerOS string,
-) (string, string, error) {
+func ReadFileFromPodVolume(ctx context.Context, namespace, podName, containerName, volume, filename, workerOS string) (string, string, error) {
 	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", "cat", fmt.Sprintf("/%s/%s", volume, filename)}
 	if workerOS == common.WorkerOSWindows {

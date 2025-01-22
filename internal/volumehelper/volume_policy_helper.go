@@ -95,10 +95,9 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 			if action.Type == resourcepolicies.Snapshot {
 				v.logger.Infof(fmt.Sprintf("performing snapshot action for pv %s", pv.Name))
 				return true, nil
-			} else {
-				v.logger.Infof("Skip snapshot action for pv %s as the action type is %s", pv.Name, action.Type)
-				return false, nil
 			}
+			v.logger.Infof("Skip snapshot action for pv %s as the action type is %s", pv.Name, action.Type)
+			return false, nil
 		}
 	}
 
@@ -178,11 +177,10 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 				v.logger.Infof("Perform fs-backup action for volume %s of pod %s due to volume policy match",
 					volume.Name, pod.Namespace+"/"+pod.Name)
 				return true, nil
-			} else {
-				v.logger.Infof("Skip fs-backup action for volume %s for pod %s because the action type is %s",
-					volume.Name, pod.Namespace+"/"+pod.Name, action.Type)
-				return false, nil
 			}
+			v.logger.Infof("Skip fs-backup action for volume %s for pod %s because the action type is %s",
+				volume.Name, pod.Namespace+"/"+pod.Name, action.Type)
+			return false, nil
 		}
 	}
 
@@ -190,11 +188,10 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 		v.logger.Infof("Perform fs-backup action for volume %s of pod %s due to opt-in/out way",
 			volume.Name, pod.Namespace+"/"+pod.Name)
 		return true, nil
-	} else {
-		v.logger.Infof("Skip fs-backup action for volume %s of pod %s due to opt-in/out way",
-			volume.Name, pod.Namespace+"/"+pod.Name)
-		return false, nil
 	}
+	v.logger.Infof("Skip fs-backup action for volume %s of pod %s due to opt-in/out way",
+		volume.Name, pod.Namespace+"/"+pod.Name)
+	return false, nil
 }
 
 func (v volumeHelperImpl) shouldPerformFSBackupLegacy(
@@ -211,17 +208,16 @@ func (v volumeHelperImpl) shouldPerformFSBackupLegacy(
 		}
 
 		return false
-	} else {
-		// Check volume in opt-out way
-		optOutVolumeNames := podvolumeutil.GetVolumesToExclude(&pod)
-		for _, volumeName := range optOutVolumeNames {
-			if volume.Name == volumeName {
-				return false
-			}
-		}
-
-		return true
 	}
+	// Check volume in opt-out way
+	optOutVolumeNames := podvolumeutil.GetVolumesToExclude(&pod)
+	for _, volumeName := range optOutVolumeNames {
+		if volume.Name == volumeName {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (v *volumeHelperImpl) shouldIncludeVolumeInBackup(vol corev1api.Volume) bool {

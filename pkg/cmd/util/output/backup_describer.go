@@ -794,12 +794,11 @@ func describePodVolumeBackups(d *Describer, details bool, podVolumeBackups []vel
 	// Get the type of pod volume uploader. Since the uploader only comes from a single source, we can
 	// take the uploader type from the first element of the array.
 	var uploaderType string
-	if len(podVolumeBackups) > 0 {
-		uploaderType = podVolumeBackups[0].Spec.UploaderType
-	} else {
+	if len(podVolumeBackups) == 0 {
 		d.Printf("\tPod Volume Backups: <none included>\n")
 		return
 	}
+	uploaderType = podVolumeBackups[0].Spec.UploaderType
 
 	if details {
 		d.Printf("\tPod Volume Backups - %s:\n", uploaderType)

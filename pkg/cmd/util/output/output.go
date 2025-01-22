@@ -88,10 +88,7 @@ func GetShowLabelsValue(cmd *cobra.Command) bool {
 // ValidateFlags returns an error if any of the output-related flags
 // were specified with invalid values, or nil otherwise.
 func ValidateFlags(cmd *cobra.Command) error {
-	if err := validateOutputFlag(cmd); err != nil {
-		return err
-	}
-	return nil
+	return validateOutputFlag(cmd)
 }
 
 func validateOutputFlag(cmd *cobra.Command) error {

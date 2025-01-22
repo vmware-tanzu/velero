@@ -89,7 +89,6 @@ func ExtractPodVolumeHostPath(ctx context.Context, path string, kubeClient kuber
 
 	if osType == kube.NodeOSWindows {
 		return strings.Replace(path, nodeagent.HostPodVolumeMountPathWin(), podPath, 1), nil
-	} else {
-		return strings.Replace(path, nodeagent.HostPodVolumeMountPath(), podPath, 1), nil
 	}
+	return strings.Replace(path, nodeagent.HostPodVolumeMountPath(), podPath, 1), nil
 }

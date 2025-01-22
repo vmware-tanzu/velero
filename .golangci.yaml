@@ -206,10 +206,12 @@ linters:
         - name: context-keys-type
         - name: dot-imports
           disabled: true
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#early-return
+        # In Go it is idiomatic to minimize nesting statements, a typical example is to avoid if-then-else constructions. 
         - name: early-return
           disabled: true
           arguments:
-            - "preserveScope"
+            - preserve-scope # do not suggest refactorings that would increase variable scope
         - name: empty-block
           disabled: true
         - name: error-naming
@@ -220,18 +222,27 @@ linters:
           disabled: true
         - name: errorf
           disabled: true
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#if-return
+        # Checking if an error is nil to just after return the error or nil is redundant.
+        - name: if-return
         - name: increment-decrement
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#indent-error-flow
+        # To improve the readability of code, it is recommended to reduce the indentation as much as possible.
+        # This rule highlights redundant else-blocks that can be eliminated from the code.
         - name: indent-error-flow
-          disabled: true
+          arguments:
+            - preserve-scope # do not suggest refactorings that would increase variable scope.
         - name: range
         - name: receiver-naming
           disabled: true
         - name: redefines-builtin-id
           disabled: true
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#superfluous-else
+        # To improve the readability of code, it is recommended to reduce the indentation as much as possible.
+        # This rule highlights redundant else-blocks that can be eliminated from the code.
         - name: superfluous-else
-          disabled: true
           arguments:
-            - "preserveScope"
+            - preserve-scope # do not suggest refactorings that would increase variable scope.
         - name: time-naming
         - name: unexported-return
           disabled: true

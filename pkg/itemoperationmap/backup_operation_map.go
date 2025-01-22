@@ -107,10 +107,7 @@ func (m *BackupItemOperationsMap) UpdateForBackup(backupStore persistence.Backup
 	if !ok || (!operations.ChangesSinceUpdate && len(operations.ErrsSinceUpdate) == 0) {
 		return nil
 	}
-	if err := operations.uploadProgress(backupStore, backupName); err != nil {
-		return err
-	}
-	return nil
+	return operations.uploadProgress(backupStore, backupName)
 }
 
 type OperationsForBackup struct {

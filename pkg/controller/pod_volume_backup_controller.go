@@ -289,9 +289,8 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			if err == datapath.ConcurrentLimitExceed {
 				log.Debug("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
-			} else {
-				return r.errorOut(ctx, pvb, err, "error to create data path", log)
 			}
+			return r.errorOut(ctx, pvb, err, "error to create data path", log)
 		}
 
 		r.metrics.RegisterPodVolumeBackupEnqueue(r.nodeName)
@@ -433,9 +432,8 @@ func exclusiveUpdatePodVolumeBackup(ctx context.Context, cli client.Client, pvb 
 
 	if apierrors.IsConflict(err) {
 		return false, nil
-	} else {
-		return false, err
 	}
+	return false, err
 }
 
 func (r *PodVolumeBackupReconciler) onPrepareTimeout(ctx context.Context, pvb *velerov1api.PodVolumeBackup) {
@@ -885,9 +883,8 @@ func UpdatePVBWithRetry(ctx context.Context, client client.Client, namespacedNam
 				if apierrors.IsConflict(err) {
 					log.Debugf("failed to update PVB for %s/%s and will retry it", pvb.Namespace, pvb.Name)
 					return false, nil
-				} else {
-					return false, errors.Wrapf(err, "error updating PVB with error %s/%s", pvb.Namespace, pvb.Name)
 				}
+				return false, errors.Wrapf(err, "error updating PVB with error %s/%s", pvb.Namespace, pvb.Name)
 			}
 		}
 

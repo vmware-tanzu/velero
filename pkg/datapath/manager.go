@@ -91,7 +91,6 @@ func (m *Manager) GetAsyncBR(jobName string) AsyncBR {
 
 	if async, exist := m.tracker[jobName]; exist {
 		return async
-	} else {
-		return nil
 	}
+	return nil
 }

@@ -149,9 +149,8 @@ func (r *BackupMicroService) RunCancelableDataPath(ctx context.Context) (string,
 
 		if du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
 			return true, nil
-		} else {
-			return false, nil
 		}
+		return false, nil
 	})
 
 	if err != nil {
