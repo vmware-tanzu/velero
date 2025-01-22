@@ -16,6 +16,6 @@ limitations under the License.
 
 package util
 
-var ThirdPartyLabels []string = []string{
+var ThirdPartyLabels = []string{
 	"azure.workload.identity/use",
 }

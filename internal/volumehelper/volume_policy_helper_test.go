@@ -314,7 +314,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 				fakeClient.Create(context.Background(), tc.pod)
 			}
 
-			var p *resourcepolicies.Policies = nil
+			var p *resourcepolicies.Policies
 			if tc.resourcePolicies != nil {
 				p = &resourcepolicies.Policies{}
 				err := p.BuildPolicy(tc.resourcePolicies)
@@ -679,7 +679,7 @@ func TestVolumeHelperImpl_ShouldPerformFSBackup(t *testing.T) {
 				fakeClient.Create(context.Background(), tc.pod)
 			}
 
-			var p *resourcepolicies.Policies = nil
+			var p *resourcepolicies.Policies
 			if tc.resourcePolicies != nil {
 				p = &resourcepolicies.Policies{}
 				err := p.BuildPolicy(tc.resourcePolicies)

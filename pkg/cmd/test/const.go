@@ -1,4 +1,4 @@
 package test
 
-var VeleroNameSpace string = "velero-test"
-var CaptureFlag string = "CAPTRUE-OUTPUT"
+var VeleroNameSpace = "velero-test"
+var CaptureFlag = "CAPTRUE-OUTPUT"

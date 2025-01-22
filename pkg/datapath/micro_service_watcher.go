@@ -251,7 +251,7 @@ var funcRedirectLog = redirectDataMoverLogs
 var funcGetResultFromMessage = getResultFromMessage
 var funcGetProgressFromMessage = getProgressFromMessage
 
-var eventWaitTimeout time.Duration = time.Minute
+var eventWaitTimeout = time.Minute
 
 func (ms *microServiceBRWatcher) startWatch() {
 	ms.wgWatcher.Add(1)

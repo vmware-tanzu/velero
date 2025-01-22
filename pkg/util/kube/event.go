@@ -128,7 +128,7 @@ func (er *eventRecorder) EndingEvent(object runtime.Object, warning bool, reason
 	}
 }
 
-var shutdownTimeout time.Duration = time.Minute
+var shutdownTimeout = time.Minute
 
 func (er *eventRecorder) Shutdown() {
 	var wait chan struct{}

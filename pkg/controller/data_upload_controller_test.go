@@ -121,7 +121,7 @@ func (c *FakeClient) List(ctx context.Context, list kbclient.ObjectList, opts ..
 }
 
 func initDataUploaderReconciler(needError ...bool) (*DataUploadReconciler, error) {
-	var errs []error = make([]error, 6)
+	var errs = make([]error, 6)
 	for k, isError := range needError {
 		if k == 0 && isError {
 			errs[0] = fmt.Errorf("Get error")

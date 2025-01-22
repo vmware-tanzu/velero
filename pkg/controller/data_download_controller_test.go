@@ -72,7 +72,7 @@ func dataDownloadBuilder() *builder.DataDownloadBuilder {
 }
 
 func initDataDownloadReconciler(objects []runtime.Object, needError ...bool) (*DataDownloadReconciler, error) {
-	var errs []error = make([]error, 6)
+	var errs = make([]error, 6)
 	for k, isError := range needError {
 		if k == 0 && isError {
 			errs[0] = fmt.Errorf("Get error")

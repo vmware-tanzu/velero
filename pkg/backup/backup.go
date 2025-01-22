@@ -352,7 +352,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(items)}
 
-	var resourcePolicy *resourcepolicies.Policies = nil
+	var resourcePolicy *resourcepolicies.Policies
 	if backupRequest.ResPolicies != nil {
 		resourcePolicy = backupRequest.ResPolicies
 	}
