@@ -302,9 +302,8 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			if err == datapath.ConcurrentLimitExceed {
 				log.Info("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
-			} else {
-				return r.errorOut(ctx, dd, err, "error to create data path", log)
 			}
+			return r.errorOut(ctx, dd, err, "error to create data path", log)
 		}
 
 		if err := r.initCancelableDataPath(ctx, asyncBR, result, log); err != nil {
@@ -775,9 +774,8 @@ func exclusiveUpdateDataDownload(ctx context.Context, cli client.Client, dd *vel
 	// it won't rollback dd in memory when error
 	if apierrors.IsConflict(err) {
 		return false, nil
-	} else {
-		return false, err
 	}
+	return false, err
 }
 
 func (r *DataDownloadReconciler) getTargetPVC(ctx context.Context, dd *velerov2alpha1api.DataDownload) (*corev1api.PersistentVolumeClaim, error) {
@@ -887,9 +885,8 @@ func UpdateDataDownloadWithRetry(ctx context.Context, client client.Client, name
 				if apierrors.IsConflict(err) {
 					log.Warnf("failed to update datadownload for %s/%s and will retry it", dd.Namespace, dd.Name)
 					return false, nil
-				} else {
-					return false, errors.Wrapf(err, "error updating datadownload %s/%s", dd.Namespace, dd.Name)
 				}
+				return false, errors.Wrapf(err, "error updating datadownload %s/%s", dd.Namespace, dd.Name)
 			}
 		}
 
