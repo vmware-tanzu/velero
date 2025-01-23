@@ -1,7 +1,7 @@
 kind: VolumeSnapshotClass
 apiVersion: snapshot.storage.k8s.io/v1
 metadata:
-  name: zfspv-snapclass
+  name: e2e-volume-snapshot-class
   annotations:
     snapshot.storage.kubernetes.io/is-default-class: "true"
   labels:

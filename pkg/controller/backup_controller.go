@@ -86,6 +86,7 @@ type backupReconciler struct {
 	maxConcurrentK8SConnections int
 	defaultSnapshotMoveData     bool
 	globalCRClient              kbclient.Client
+	itemBlockWorkerCount        int
 }
 
 func NewBackupReconciler(
@@ -110,6 +111,7 @@ func NewBackupReconciler(
 	credentialStore credentials.FileStore,
 	maxConcurrentK8SConnections int,
 	defaultSnapshotMoveData bool,
+	itemBlockWorkerCount int,
 	globalCRClient kbclient.Client,
 ) *backupReconciler {
 	b := &backupReconciler{
@@ -135,6 +137,7 @@ func NewBackupReconciler(
 		credentialFileStore:         credentialStore,
 		maxConcurrentK8SConnections: maxConcurrentK8SConnections,
 		defaultSnapshotMoveData:     defaultSnapshotMoveData,
+		itemBlockWorkerCount:        itemBlockWorkerCount,
 		globalCRClient:              globalCRClient,
 	}
 	b.updateTotalBackupMetric()
@@ -325,6 +328,7 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	request := &pkgbackup.Request{
 		Backup:           backup.DeepCopy(), // don't modify items in the cache
 		SkippedPVTracker: pkgbackup.NewSkipPVTracker(),
+		BackedUpItems:    pkgbackup.NewBackedUpItemsMap(),
 	}
 	request.VolumesInformation.Init()
 

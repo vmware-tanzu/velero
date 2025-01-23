@@ -57,6 +57,8 @@ type podTemplateConfig struct {
 	backupRepoConfigMap             string
 	repoMaintenanceJobConfigMap     string
 	nodeAgentConfigMap              string
+	itemBlockWorkerCount            int
+	forWindows                      bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -212,6 +214,18 @@ func WithRepoMaintenanceJobConfigMap(repoMaintenanceJobConfigMap string) podTemp
 	}
 }
 
+func WithItemBlockWorkerCount(itemBlockWorkerCount int) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.itemBlockWorkerCount = itemBlockWorkerCount
+	}
+}
+
+func WithForWindows() podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.forWindows = true
+	}
+}
+
 func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment {
 	// TODO: Add support for server args
 	c := &podTemplateConfig{
@@ -297,6 +311,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 		args = append(args, fmt.Sprintf("--repo-maintenance-job-configmap=%s", c.repoMaintenanceJobConfigMap))
 	}
 
+	if c.itemBlockWorkerCount > 0 {
+		args = append(args, fmt.Sprintf("--item-block-worker-count=%d", c.itemBlockWorkerCount))
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: objectMeta(namespace, "velero"),
 		TypeMeta: metav1.TypeMeta{
@@ -313,6 +331,12 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyAlways,
 					ServiceAccountName: c.serviceAccountName,
+					NodeSelector: map[string]string{
+						"kubernetes.io/os": "linux",
+					},
+					OS: &corev1.PodOS{
+						Name: "linux",
+					},
 					Containers: []corev1.Container{
 						{
 							Name:            "velero",

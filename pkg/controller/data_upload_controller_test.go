@@ -59,6 +59,7 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const dataUploadName = "dataupload-1"
@@ -120,7 +121,7 @@ func (c *FakeClient) List(ctx context.Context, list kbclient.ObjectList, opts ..
 }
 
 func initDataUploaderReconciler(needError ...bool) (*DataUploadReconciler, error) {
-	var errs []error = make([]error, 6)
+	var errs = make([]error, 6)
 	for k, isError := range needError {
 		if k == 0 && isError {
 			errs[0] = fmt.Errorf("Get error")
@@ -165,6 +166,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 			RestoreSize: &restoreSize,
 		},
 	}
+
 	daemonSet := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "velero",
@@ -186,6 +188,8 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 			},
 		},
 	}
+
+	node := builder.ForNode("fake-node").Labels(map[string]string{kube.NodeOSLabel: kube.NodeOSLinux}).Result()
 
 	dataPathMgr := datapath.NewManager(1)
 
@@ -229,7 +233,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 	}
 
 	fakeSnapshotClient := snapshotFake.NewSimpleClientset(vsObject, vscObj)
-	fakeKubeClient := clientgofake.NewSimpleClientset(daemonSet)
+	fakeKubeClient := clientgofake.NewSimpleClientset(daemonSet, node)
 
 	return NewDataUploadReconciler(
 		fakeClient,
@@ -262,9 +266,10 @@ func dataUploadBuilder() *builder.DataUploadBuilder {
 }
 
 type fakeSnapshotExposer struct {
-	kubeClient kbclient.Client
-	clock      clock.WithTickerAndDelayedExecution
-	peekErr    error
+	kubeClient      kbclient.Client
+	clock           clock.WithTickerAndDelayedExecution
+	ambiguousNodeOS bool
+	peekErr         error
 }
 
 func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param interface{}) error {
@@ -293,11 +298,21 @@ func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1.ObjectRe
 	if err != nil {
 		return nil, err
 	}
-	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, VolumeName: dataUploadName}}, nil
+
+	nodeOS := "linux"
+	pNodeOS := &nodeOS
+	if f.ambiguousNodeOS {
+		pNodeOS = nil
+	}
+	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, VolumeName: dataUploadName, NodeOS: pNodeOS}}, nil
 }
 
 func (f *fakeSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1.ObjectReference) error {
 	return f.peekErr
+}
+
+func (f *fakeSnapshotExposer) DiagnoseExpose(context.Context, corev1.ObjectReference) string {
+	return ""
 }
 
 func (f *fakeSnapshotExposer) CleanUp(context.Context, corev1.ObjectReference, string, string) {
@@ -343,6 +358,8 @@ func TestReconcile(t *testing.T) {
 		expectedRequeue     ctrl.Result
 		expectedErrMsg      string
 		needErrs            []bool
+		removeNode          bool
+		ambiguousNodeOS     bool
 		peekErr             error
 		notCreateFSBR       bool
 		fsBRInitErr         error
@@ -352,25 +369,29 @@ func TestReconcile(t *testing.T) {
 			name:            "Dataupload is not initialized",
 			du:              builder.ForDataUpload("unknown-ns", "unknown-name").Result(),
 			expectedRequeue: ctrl.Result{},
-		}, {
+		},
+		{
 			name:            "Error get Dataupload",
 			du:              builder.ForDataUpload(velerov1api.DefaultNamespace, "unknown-name").Result(),
 			expectedRequeue: ctrl.Result{},
 			expectedErrMsg:  "getting DataUpload: Get error",
 			needErrs:        []bool{true, false, false, false},
-		}, {
+		},
+		{
 			name:            "Unsupported data mover type",
 			du:              dataUploadBuilder().DataMover("unknown type").Result(),
 			expected:        dataUploadBuilder().Phase("").Result(),
 			expectedRequeue: ctrl.Result{},
-		}, {
+		},
+		{
 			name:              "Unknown type of snapshot exposer is not initialized",
 			du:                dataUploadBuilder().SnapshotType("unknown type").Result(),
 			expectedProcessed: true,
 			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
 			expectedRequeue:   ctrl.Result{},
 			expectedErrMsg:    "unknown type type of snapshot exposer is not exist",
-		}, {
+		},
+		{
 			name:            "Dataupload should be accepted",
 			du:              dataUploadBuilder().Result(),
 			pod:             builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1.Volume{Name: "test-pvc"}).Result(),
@@ -388,6 +409,27 @@ func TestReconcile(t *testing.T) {
 			expectedErrMsg:    "failed to get PVC",
 		},
 		{
+			name:              "Dataupload should fail to get PVC attaching node",
+			du:                dataUploadBuilder().Result(),
+			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1.Volume{Name: "test-pvc"}).Result(),
+			pvc:               builder.ForPersistentVolumeClaim("fake-ns", "test-pvc").StorageClass("fake-sc").Result(),
+			expectedProcessed: true,
+			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
+			expectedRequeue:   ctrl.Result{},
+			expectedErrMsg:    "error to get storage class",
+		},
+		{
+			name:              "Dataupload should fail because expected node doesn't exist",
+			du:                dataUploadBuilder().Result(),
+			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1.Volume{Name: "test-pvc"}).Result(),
+			pvc:               builder.ForPersistentVolumeClaim("fake-ns", "test-pvc").Result(),
+			removeNode:        true,
+			expectedProcessed: true,
+			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
+			expectedRequeue:   ctrl.Result{},
+			expectedErrMsg:    "no appropriate node to run data upload",
+		},
+		{
 			name:            "Dataupload should be prepared",
 			du:              dataUploadBuilder().SnapshotType(fakeSnapshotType).Result(),
 			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).Result(),
@@ -399,6 +441,15 @@ func TestReconcile(t *testing.T) {
 			du:              dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
 			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
 			expectedRequeue: ctrl.Result{},
+		},
+		{
+			name:              "Dataupload should fail if expose returns ambiguous nodeOS",
+			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
+			ambiguousNodeOS:   true,
+			expectedProcessed: true,
+			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
+			expectedErrMsg:    "unsupported ambiguous node OS",
 		},
 		{
 			name:            "Dataupload with not enabled cancel",
@@ -475,7 +526,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:     "prepare timeout",
-			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).StartTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 5)}).Result(),
+			du:       dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).AcceptedTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 5)}).Result(),
 			expected: dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
 		},
 		{
@@ -550,6 +601,11 @@ func TestReconcile(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			if test.removeNode {
+				err = r.kubeClient.CoreV1().Nodes().Delete(ctx, "fake-node", metav1.DeleteOptions{})
+				require.NoError(t, err)
+			}
+
 			if test.dataMgr != nil {
 				r.dataPathMgr = test.dataMgr
 			} else {
@@ -557,7 +613,7 @@ func TestReconcile(t *testing.T) {
 			}
 
 			if test.du.Spec.SnapshotType == fakeSnapshotType {
-				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{fakeSnapshotType: &fakeSnapshotExposer{r.client, r.Clock, test.peekErr}}
+				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{fakeSnapshotType: &fakeSnapshotExposer{r.client, r.Clock, test.ambiguousNodeOS, test.peekErr}}
 			} else if test.du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
 				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
 			}
@@ -607,7 +663,7 @@ func TestReconcile(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, du.Status.Phase, test.expected.Status.Phase)
+				assert.Equal(t, test.expected.Status.Phase, du.Status.Phase)
 			}
 
 			if test.expectedProcessed {
@@ -1043,6 +1099,10 @@ func (dt *duResumeTestHelper) PeekExposed(context.Context, corev1.ObjectReferenc
 	return nil
 }
 
+func (dt *duResumeTestHelper) DiagnoseExpose(context.Context, corev1.ObjectReference) string {
+	return ""
+}
+
 func (dt *duResumeTestHelper) CleanUp(context.Context, corev1.ObjectReference, string, string) {}
 
 func (dt *duResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
@@ -1071,19 +1131,19 @@ func TestAttemptDataUploadResume(t *testing.T) {
 		},
 		{
 			name:                 "accepted DataUpload in the current node",
-			du:                   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Labels(map[string]string{acceptNodeLabelKey: "node-1"}).Result(),
+			du:                   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).AcceptedByNode("node-1").Result(),
 			cancelledDataUploads: []string{dataUploadName},
 			acceptedDataUploads:  []string{dataUploadName},
 		},
 		{
 			name:                 "accepted DataUpload in the current node but canceled",
-			du:                   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Labels(map[string]string{acceptNodeLabelKey: "node-1"}).Cancel(true).Result(),
+			du:                   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).AcceptedByNode("node-1").Cancel(true).Result(),
 			cancelledDataUploads: []string{dataUploadName},
 			acceptedDataUploads:  []string{dataUploadName},
 		},
 		{
 			name:                "accepted DataUpload in the current node but update error",
-			du:                  dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Labels(map[string]string{acceptNodeLabelKey: "node-1"}).Result(),
+			du:                  dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).AcceptedByNode("node-1").Result(),
 			needErrs:            []bool{false, false, true, false, false, false},
 			acceptedDataUploads: []string{dataUploadName},
 		},

@@ -42,10 +42,16 @@ COPY go.mod go.sum /go/src/github.com/vmware-tanzu/velero/
 # velero-builder and restic-builder uses a different go.mod from each other. id helps to avoid sharing cache with velero-builder.
 RUN --mount=type=cache,target=/go/pkg/mod,id=vbb go mod download
 COPY . /go/src/github.com/vmware-tanzu/velero
-RUN --mount=type=cache,target=/go/pkg/mod,id=vbb GOARM=$( echo "${GOARM}" | cut -c2-) go build -o /output/${BIN} \
-    -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
-RUN --mount=type=cache,target=/go/pkg/mod,id=vbb GOARM=$( echo "${GOARM}" | cut -c2-) go build -o /output/velero-helper \
-    -ldflags "${LDFLAGS}" ${PKG}/cmd/velero-helper
+
+RUN --mount=type=cache,target=/go/pkg/mod,id=vbb mkdir -p /output/usr/bin && \
+    export GOARM=$( echo "${GOARM}" | cut -c2-) && \
+    go build -o /output/${BIN} \
+    -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN} && \
+    go build -o /output/velero-restore-helper \
+    -ldflags "${LDFLAGS}" ${PKG}/cmd/velero-restore-helper && \
+    go build -o /output/velero-helper \
+    -ldflags "${LDFLAGS}" ${PKG}/cmd/velero-helper && \
+    go clean -modcache -cache
 
 # Restic binary build section
 FROM --platform=$BUILDPLATFORM golang:1.22-bookworm AS restic-builder

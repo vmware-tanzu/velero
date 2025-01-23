@@ -129,7 +129,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 		_, err = k8s.GetNamespace(ctx, *veleroCfg.ClientToInstallVelero, veleroCfg.VeleroNamespace)
 		// We should uninstall Velero for a new service account creation.
 		if !apierrors.IsNotFound(err) {
-			if err := VeleroUninstall(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace); err != nil {
+			if err := VeleroUninstall(context.Background(), *veleroCfg); err != nil {
 				return errors.Wrapf(err, "Failed to uninstall velero %s", veleroCfg.VeleroNamespace)
 			}
 		}
@@ -150,15 +150,19 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 			return errors.Wrapf(err, "Failed to create service account %s to %s namespace", veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace)
 		}
 	}
-	err = installVeleroServer(ctx, veleroCfg.VeleroCLI, veleroCfg.CloudProvider, &installOptions{
-		Options:                          veleroInstallOptions,
-		RegistryCredentialFile:           veleroCfg.RegistryCredentialFile,
-		RestoreHelperImage:               veleroCfg.RestoreHelperImage,
-		VeleroServerDebugMode:            veleroCfg.VeleroServerDebugMode,
-		WithoutDisableInformerCacheParam: veleroCfg.WithoutDisableInformerCacheParam,
-	})
 
-	if err != nil {
+	if err := installVeleroServer(
+		ctx,
+		veleroCfg.VeleroCLI,
+		veleroCfg.CloudProvider,
+		&installOptions{
+			Options:                          veleroInstallOptions,
+			RegistryCredentialFile:           veleroCfg.RegistryCredentialFile,
+			RestoreHelperImage:               veleroCfg.RestoreHelperImage,
+			VeleroServerDebugMode:            veleroCfg.VeleroServerDebugMode,
+			WithoutDisableInformerCacheParam: veleroCfg.WithoutDisableInformerCacheParam,
+		},
+	); err != nil {
 		time.Sleep(9 * time.Hour)
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
@@ -247,7 +251,7 @@ func cleanVSpherePluginConfig(c clientset.Interface, ns, secretName, configMapNa
 	}
 
 	//clear configmap
-	_, err = k8s.GetConfigmap(c, ns, configMapName)
+	_, err = k8s.GetConfigMap(c, ns, configMapName)
 	if err == nil {
 		if err := k8s.WaitForConfigmapDelete(c, ns, configMapName); err != nil {
 			return errors.WithMessagef(err, "Failed to clear up vsphere plugin configmap in %s namespace", ns)
@@ -267,9 +271,6 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 	}
 	if len(options.Image) > 0 {
 		args = append(args, "--image", options.Image)
-	}
-	if options.UseRestic {
-		args = append(args, "--use-restic")
 	}
 	if options.UseNodeAgent {
 		args = append(args, "--use-node-agent")
@@ -320,14 +321,6 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 
 	if len(options.Features) > 0 {
 		args = append(args, "--features", options.Features)
-		if !strings.EqualFold(cloudProvider, test.Vsphere) && strings.EqualFold(options.Features, test.FeatureCSI) && options.UseVolumeSnapshots {
-			// https://github.com/openebs/zfs-localpv/blob/develop/docs/snapshot.md
-			fmt.Printf("Start to install %s VolumeSnapshotClass ... \n", cloudProvider)
-			if err := k8s.KubectlApplyByFile(ctx, fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", cloudProvider)); err != nil {
-				fmt.Println("Fail to install VolumeSnapshotClass when CSI feature is enabled: ", err)
-				return err
-			}
-		}
 	}
 
 	if options.GarbageCollectionFrequency > 0 {
@@ -374,14 +367,14 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 		args = append(args, fmt.Sprintf("--uploader-type=%v", options.UploaderType))
 	}
 
-	if err := createVelereResources(ctx, cli, namespace, args, options); err != nil {
+	if err := createVeleroResources(ctx, cli, namespace, args, options); err != nil {
 		return err
 	}
 
 	return waitVeleroReady(ctx, namespace, options.UseNodeAgent)
 }
 
-func createVelereResources(ctx context.Context, cli, namespace string, args []string, options *installOptions) error {
+func createVeleroResources(ctx context.Context, cli, namespace string, args []string, options *installOptions) error {
 	args = append(args, "--dry-run", "--output", "json", "--crds-only")
 
 	// get the CRD definitions
@@ -419,6 +412,15 @@ func createVelereResources(ctx context.Context, cli, namespace string, args []st
 	stdout, stderr, err = velerexec.RunCommand(cmd)
 	if err != nil {
 		return errors.Wrapf(err, "failed to run velero install dry run command, stdout=%s, stderr=%s", stdout, stderr)
+	}
+
+	// From v1.15, the Restic uploader is deprecated,
+	// and a warning message is printed for the install CLI.
+	// Need to skip the deprecation of Restic message before the generated JSON.
+	// Redirect to the stdout to the first curly bracket to skip the warning.
+	if stdout[0] != '{' {
+		newIndex := strings.Index(stdout, "{")
+		stdout = stdout[newIndex:]
 	}
 
 	resources := &unstructured.UnstructuredList{}
@@ -670,7 +672,7 @@ func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroCo
 		fmt.Printf("error in checking velero status with %v", err)
 		ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 		defer ctxCancel()
-		VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)
+		VeleroUninstall(ctx, veleroCfg)
 		ready = false
 	}
 	if ready {
@@ -681,9 +683,15 @@ func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroCo
 	return VeleroInstall(context.Background(), &veleroCfg, false)
 }
 
-func VeleroUninstall(ctx context.Context, cli, namespace string) error {
-	stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, cli, "uninstall", "--force", "-n", namespace))
-	if err != nil {
+func VeleroUninstall(ctx context.Context, veleroCfg test.VeleroConfig) error {
+	if stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(
+		ctx,
+		veleroCfg.VeleroCLI,
+		"uninstall",
+		"--force",
+		"-n",
+		veleroCfg.VeleroNamespace,
+	)); err != nil {
 		return errors.Wrapf(err, "failed to uninstall velero, stdout=%s, stderr=%s", stdout, stderr)
 	}
 	fmt.Println("Velero uninstalled ⛵")

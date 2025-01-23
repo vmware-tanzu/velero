@@ -33,6 +33,7 @@ import (
 
 	clientTesting "k8s.io/client-go/testing"
 
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -188,14 +189,15 @@ func TestWaitPVCConsumed(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		pvcName       string
-		pvcNamespace  string
-		kubeClientObj []runtime.Object
-		kubeReactors  []reactor
-		expectedPVC   *corev1api.PersistentVolumeClaim
-		selectedNode  string
-		err           string
+		name                       string
+		pvcName                    string
+		pvcNamespace               string
+		kubeClientObj              []runtime.Object
+		kubeReactors               []reactor
+		expectedPVC                *corev1api.PersistentVolumeClaim
+		selectedNode               string
+		ignoreWaitForFirstConsumer bool
+		err                        string
 	}{
 		{
 			name:         "get pvc error",
@@ -211,6 +213,16 @@ func TestWaitPVCConsumed(t *testing.T) {
 				pvcObject,
 			},
 			expectedPVC: pvcObject,
+		},
+		{
+			name:                       "success when ignore wait for first consumer",
+			pvcName:                    "fake-pvc-2",
+			pvcNamespace:               "fake-namespace",
+			ignoreWaitForFirstConsumer: true,
+			kubeClientObj: []runtime.Object{
+				pvcObjectWithSC,
+			},
+			expectedPVC: pvcObjectWithSC,
 		},
 		{
 			name:         "get sc fail",
@@ -274,7 +286,7 @@ func TestWaitPVCConsumed(t *testing.T) {
 
 			var kubeClient kubernetes.Interface = fakeKubeClient
 
-			selectedNode, pvc, err := WaitPVCConsumed(context.Background(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, kubeClient.StorageV1(), time.Millisecond)
+			selectedNode, pvc, err := WaitPVCConsumed(context.Background(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, kubeClient.StorageV1(), time.Millisecond, test.ignoreWaitForFirstConsumer)
 
 			if err != nil {
 				assert.EqualError(t, err, test.err)
@@ -462,7 +474,7 @@ func TestDeletePVCIfAny(t *testing.T) {
 				},
 			},
 			ensureTimeout: time.Second,
-			logMessage:    "failed to delete pvc fake-namespace/fake-pvc with err error to ensure pvc deleted for fake-pvc: context deadline exceeded",
+			logMessage:    "failed to delete pvc fake-namespace/fake-pvc with err timeout to assure pvc fake-pvc is deleted, finalizers in pvc []",
 			logLevel:      "level=warning",
 		},
 		{
@@ -584,6 +596,14 @@ func TestEnsureDeletePVC(t *testing.T) {
 		},
 	}
 
+	pvcObjectWithFinalizer := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "fake-ns",
+			Name:       "fake-pvc",
+			Finalizers: []string{"fake-finalizer-1", "fake-finalizer-2"},
+		},
+	}
+
 	tests := []struct {
 		name      string
 		clientObj []runtime.Object
@@ -635,6 +655,23 @@ func TestEnsureDeletePVC(t *testing.T) {
 			name:      "wait timeout",
 			pvcName:   "fake-pvc",
 			namespace: "fake-ns",
+			clientObj: []runtime.Object{pvcObjectWithFinalizer},
+			timeout:   time.Millisecond,
+			reactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvcObject, nil
+					},
+				},
+			},
+			err: "timeout to assure pvc fake-pvc is deleted, finalizers in pvc [fake-finalizer-1 fake-finalizer-2]",
+		},
+		{
+			name:      "wait timeout, no finalizer",
+			pvcName:   "fake-pvc",
+			namespace: "fake-ns",
 			clientObj: []runtime.Object{pvcObject},
 			timeout:   time.Millisecond,
 			reactors: []reactor{
@@ -646,7 +683,7 @@ func TestEnsureDeletePVC(t *testing.T) {
 					},
 				},
 			},
-			err: "error to ensure pvc deleted for fake-pvc: context deadline exceeded",
+			err: "timeout to assure pvc fake-pvc is deleted, finalizers in pvc []",
 		},
 	}
 
@@ -1460,6 +1497,214 @@ func TestMakePodPVCAttachment(t *testing.T) {
 			if tc.expectedVolumeMount != nil {
 				assert.Equal(t, tc.expectedVolumeMount[0].ReadOnly, tc.readOnly)
 			}
+		})
+	}
+}
+
+func TestDiagnosePVC(t *testing.T) {
+	testCases := []struct {
+		name     string
+		pvc      *corev1api.PersistentVolumeClaim
+		expected string
+	}{
+		{
+			name: "pvc with all info",
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-pvc",
+					Namespace: "fake-ns",
+				},
+				Spec: corev1api.PersistentVolumeClaimSpec{
+					VolumeName: "fake-pv",
+				},
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimPending,
+				},
+			},
+			expected: "PVC fake-ns/fake-pvc, phase Pending, binding to fake-pv\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			diag := DiagnosePVC(tc.pvc)
+			assert.Equal(t, tc.expected, diag)
+		})
+	}
+}
+
+func TestDiagnosePV(t *testing.T) {
+	testCases := []struct {
+		name     string
+		pv       *corev1api.PersistentVolume
+		expected string
+	}{
+		{
+			name: "pv with all info",
+			pv: &corev1api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-pv",
+				},
+				Status: corev1api.PersistentVolumeStatus{
+					Phase:   corev1api.VolumePending,
+					Message: "fake-message",
+					Reason:  "fake-reason",
+				},
+			},
+			expected: "PV fake-pv, phase Pending, reason fake-reason, message fake-message\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			diag := DiagnosePV(tc.pv)
+			assert.Equal(t, tc.expected, diag)
+		})
+	}
+}
+
+func TestGetPVCAttachingNodeOS(t *testing.T) {
+	storageClass := "fake-storage-class"
+	nodeNoOSLabel := builder.ForNode("fake-node").Result()
+	nodeWindows := builder.ForNode("fake-node").Labels(map[string]string{"kubernetes.io/os": "windows"}).Result()
+
+	pvcObj := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc",
+		},
+	}
+
+	blockMode := corev1api.PersistentVolumeBlock
+	pvcObjBlockMode := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeMode: &blockMode,
+		},
+	}
+
+	pvcObjWithNode := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "fake-namespace",
+			Name:        "fake-pvc",
+			Annotations: map[string]string{KubeAnnSelectedNode: "fake-node"},
+		},
+	}
+
+	pvcObjWithStorageClass := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+		},
+	}
+
+	pvcObjWithBoth := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "fake-namespace",
+			Name:        "fake-pvc",
+			Annotations: map[string]string{KubeAnnSelectedNode: "fake-node"},
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+		},
+	}
+
+	scObjWithoutFSType := &storagev1api.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-storage-class",
+		},
+	}
+
+	scObjWithFSType := &storagev1api.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-storage-class",
+		},
+		Parameters: map[string]string{"csi.storage.k8s.io/fstype": "ntfs"},
+	}
+
+	tests := []struct {
+		name           string
+		pvc            *corev1api.PersistentVolumeClaim
+		kubeClientObj  []runtime.Object
+		expectedNodeOS string
+		err            string
+	}{
+		{
+			name:           "no selected node and storage class",
+			pvc:            pvcObj,
+			expectedNodeOS: NodeOSLinux,
+		},
+		{
+			name: "node doesn't exist",
+			pvc:  pvcObjWithNode,
+			err:  "error to get os from node fake-node for PVC fake-namespace/fake-pvc: error getting node fake-node: nodes \"fake-node\" not found",
+		},
+		{
+			name: "node without os label",
+			pvc:  pvcObjWithNode,
+			kubeClientObj: []runtime.Object{
+				nodeNoOSLabel,
+			},
+			expectedNodeOS: NodeOSLinux,
+		},
+		{
+			name: "sc doesn't exist",
+			pvc:  pvcObjWithStorageClass,
+			err:  "error to get storage class fake-storage-class: storageclasses.storage.k8s.io \"fake-storage-class\" not found",
+		},
+		{
+			name: "sc without fsType",
+			pvc:  pvcObjWithStorageClass,
+			kubeClientObj: []runtime.Object{
+				scObjWithoutFSType,
+			},
+			expectedNodeOS: NodeOSLinux,
+		},
+		{
+			name: "deduce from node os",
+			pvc:  pvcObjWithBoth,
+			kubeClientObj: []runtime.Object{
+				nodeWindows,
+				scObjWithFSType,
+			},
+			expectedNodeOS: NodeOSWindows,
+		},
+		{
+			name: "deduce from sc",
+			pvc:  pvcObjWithBoth,
+			kubeClientObj: []runtime.Object{
+				nodeNoOSLabel,
+				scObjWithFSType,
+			},
+			expectedNodeOS: NodeOSWindows,
+		},
+		{
+			name:           "block access",
+			pvc:            pvcObjBlockMode,
+			expectedNodeOS: NodeOSLinux,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			nodeOS, err := GetPVCAttachingNodeOS(test.pvc, kubeClient.CoreV1(), kubeClient.StorageV1(), velerotest.NewLogger())
+
+			if err != nil {
+				assert.EqualError(t, err, test.err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, test.expectedNodeOS, nodeOS)
 		})
 	}
 }

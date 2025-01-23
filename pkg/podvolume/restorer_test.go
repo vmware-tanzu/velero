@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
-	ctrlfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -315,12 +314,37 @@ func TestRestorePodVolumes(t *testing.T) {
 			},
 		},
 		{
+			name: "pod is not running on linux nodes",
+			pvbs: []*velerov1api.PodVolumeBackup{
+				createPVBObj(true, true, 1, "kopia"),
+			},
+			kubeClientObj: []runtime.Object{
+				createNodeAgentDaemonset(),
+				createWindowsNodeObj(),
+				createPVCObj(1),
+				createPodObj(true, true, true, 1),
+			},
+			ctlClientObj: []runtime.Object{
+				createBackupRepoObj(),
+			},
+			restoredPod:     createPodObj(true, true, true, 1),
+			sourceNamespace: "fake-ns",
+			bsl:             "fake-bsl",
+			runtimeScheme:   scheme,
+			errs: []expectError{
+				{
+					err: "restored pod fake-ns/fake-pod is not running in linux node(fake-node-name): os type windows for node fake-node-name is not linux",
+				},
+			},
+		},
+		{
 			name: "node-agent pod is not running",
 			pvbs: []*velerov1api.PodVolumeBackup{
 				createPVBObj(true, true, 1, "kopia"),
 			},
 			kubeClientObj: []runtime.Object{
 				createNodeAgentDaemonset(),
+				createNodeObj(),
 				createPVCObj(1),
 				createPodObj(true, true, true, 1),
 			},
@@ -344,6 +368,7 @@ func TestRestorePodVolumes(t *testing.T) {
 			},
 			kubeClientObj: []runtime.Object{
 				createNodeAgentDaemonset(),
+				createNodeObj(),
 				createPVCObj(1),
 				createPodObj(true, true, true, 1),
 				createNodeAgentPodObj(true),
@@ -366,11 +391,6 @@ func TestRestorePodVolumes(t *testing.T) {
 			ctx := context.Background()
 			if test.ctx != nil {
 				ctx = test.ctx
-			}
-
-			fakeClientBuilder := ctrlfake.NewClientBuilder()
-			if test.runtimeScheme != nil {
-				fakeClientBuilder = fakeClientBuilder.WithScheme(test.runtimeScheme)
 			}
 
 			objClient := append(test.ctlClientObj, test.kubeClientObj...)
@@ -438,7 +458,8 @@ func TestRestorePodVolumes(t *testing.T) {
 						for i := 0; i < len(errs); i++ {
 							j := 0
 							for ; j < len(test.errs); j++ {
-								if errs[i].Error() == test.errs[j].err {
+								err := errs[i].Error()
+								if err == test.errs[j].err {
 									break
 								}
 							}

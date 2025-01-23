@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
@@ -50,12 +51,12 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
 	dataUploadDownloadRequestor = "snapshot-data-upload-download"
-	acceptNodeLabelKey          = "velero.io/accepted-by"
 	DataUploadDownloadFinalizer = "velero.io/data-upload-download-finalizer"
 	preparingMonitorFrequency   = time.Minute
 )
@@ -255,8 +256,8 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		} else if peekErr := ep.PeekExposed(ctx, getOwnerObject(du)); peekErr != nil {
 			r.tryCancelAcceptedDataUpload(ctx, du, fmt.Sprintf("found a dataupload %s/%s with expose error: %s. mark it as cancel", du.Namespace, du.Name, peekErr))
 			log.Errorf("Cancel du %s/%s because of expose error %s", du.Namespace, du.Name, peekErr)
-		} else if du.Status.StartTimestamp != nil {
-			if time.Since(du.Status.StartTimestamp.Time) >= r.preparingTimeout {
+		} else if du.Status.AcceptedTimestamp != nil {
+			if time.Since(du.Status.AcceptedTimestamp.Time) >= r.preparingTimeout {
 				r.onPrepareTimeout(ctx, du)
 			}
 		}
@@ -282,6 +283,10 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		} else if res == nil {
 			log.Debug("Get empty exposer")
 			return ctrl.Result{}, nil
+		}
+
+		if res.ByPod.NodeOS == nil {
+			return r.errorOut(ctx, du, errors.New("unsupported ambiguous node OS"), "invalid expose result", log)
 		}
 
 		log.Info("Exposed snapshot is ready and creating data path routine")
@@ -316,6 +321,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		original := du.DeepCopy()
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseInProgress
 		du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
+		du.Status.NodeOS = velerov2alpha1api.NodeOS(*res.ByPod.NodeOS)
 		if err := r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
 			log.WithError(err).Warnf("Failed to update dataupload %s to InProgress, will data path close and retry", du.Name)
 
@@ -701,12 +707,8 @@ func (r *DataUploadReconciler) acceptDataUpload(ctx context.Context, du *velerov
 
 	updateFunc := func(dataUpload *velerov2alpha1api.DataUpload) {
 		dataUpload.Status.Phase = velerov2alpha1api.DataUploadPhaseAccepted
-		labels := dataUpload.GetLabels()
-		if labels == nil {
-			labels = make(map[string]string)
-		}
-		labels[acceptNodeLabelKey] = r.nodeName
-		dataUpload.SetLabels(labels)
+		dataUpload.Status.AcceptedByNode = r.nodeName
+		dataUpload.Status.AcceptedTimestamp = &metav1.Time{Time: r.Clock.Now()}
 	}
 
 	succeeded, err := r.exclusiveUpdateDataUpload(ctx, updated, updateFunc)
@@ -755,6 +757,11 @@ func (r *DataUploadReconciler) onPrepareTimeout(ctx context.Context, du *velerov
 			volumeSnapshotName = du.Spec.CSISnapshot.VolumeSnapshot
 		}
 
+		diags := strings.Split(ep.DiagnoseExpose(ctx, getOwnerObject(du)), "\n")
+		for _, diag := range diags {
+			log.Warnf("[Diagnose DU expose]%s", diag)
+		}
+
 		ep.CleanUp(ctx, getOwnerObject(du), volumeSnapshotName, du.Spec.SourceNamespace)
 
 		log.Info("Dataupload has been cleaned up")
@@ -790,6 +797,8 @@ func (r *DataUploadReconciler) closeDataPath(ctx context.Context, duName string)
 }
 
 func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload) (interface{}, error) {
+	log := r.logger.WithField("dataupload", du.Name)
+
 	if du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
 		pvc := &corev1.PersistentVolumeClaim{}
 		err := r.client.Get(context.Background(), types.NamespacedName{
@@ -801,16 +810,36 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			return nil, errors.Wrapf(err, "failed to get PVC %s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC)
 		}
 
+		nodeOS, err := kube.GetPVCAttachingNodeOS(pvc, r.kubeClient.CoreV1(), r.kubeClient.StorageV1(), log)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get attaching node OS for PVC %s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC)
+		}
+
+		if err := kube.HasNodeWithOS(context.Background(), nodeOS, r.kubeClient.CoreV1()); err != nil {
+			return nil, errors.Wrapf(err, "no appropriate node to run data upload for PVC %s/%s", du.Spec.SourceNamespace, du.Spec.SourcePVC)
+		}
+
 		accessMode := exposer.AccessModeFileSystem
 		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == corev1.PersistentVolumeBlock {
 			accessMode = exposer.AccessModeBlock
+		}
+
+		hostingPodLabels := map[string]string{velerov1api.DataUploadLabel: du.Name}
+		for _, k := range util.ThirdPartyLabels {
+			if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, du.Namespace, k, nodeOS); err != nil {
+				if err != nodeagent.ErrNodeAgentLabelNotFound {
+					log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
+				}
+			} else {
+				hostingPodLabels[k] = v
+			}
 		}
 
 		return &exposer.CSISnapshotExposeParam{
 			SnapshotName:     du.Spec.CSISnapshot.VolumeSnapshot,
 			SourceNamespace:  du.Spec.SourceNamespace,
 			StorageClass:     du.Spec.CSISnapshot.StorageClass,
-			HostingPodLabels: map[string]string{velerov1api.DataUploadLabel: du.Name},
+			HostingPodLabels: hostingPodLabels,
 			AccessMode:       accessMode,
 			OperationTimeout: du.Spec.OperationTimeout.Duration,
 			ExposeTimeout:    r.preparingTimeout,
@@ -818,8 +847,10 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			Affinity:         r.loadAffinity,
 			BackupPVCConfig:  r.backupPVCConfig,
 			Resources:        r.podResources,
+			NodeOS:           nodeOS,
 		}, nil
 	}
+
 	return nil, nil
 }
 

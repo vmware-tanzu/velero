@@ -201,21 +201,45 @@ func TestCSIConditionMatch(t *testing.T) {
 		expectedMatch bool
 	}{
 		{
-			name:          "match csi condition",
+			name:          "match csi driver condition",
 			condition:     &csiCondition{&csiVolumeSource{Driver: "test"}},
 			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}),
 			expectedMatch: true,
 		},
 		{
-			name:          "empty csi condition",
+			name:          "empty csi driver condition",
 			condition:     &csiCondition{nil},
 			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}),
 			expectedMatch: true,
 		},
 		{
-			name:          "empty csi volume",
+			name:          "empty csi driver volume",
 			condition:     &csiCondition{&csiVolumeSource{Driver: "test"}},
 			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{}),
+			expectedMatch: false,
+		},
+		{
+			name:          "match csi volumeAttributes condition",
+			condition:     &csiCondition{&csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}),
+			expectedMatch: true,
+		},
+		{
+			name:          "empty csi volumeAttributes condition",
+			condition:     &csiCondition{&csiVolumeSource{Driver: "test"}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}),
+			expectedMatch: true,
+		},
+		{
+			name:          "empty csi volumeAttributes volume",
+			condition:     &csiCondition{&csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": ""}}),
+			expectedMatch: false,
+		},
+		{
+			name:          "empty csi volumeAttributes volume",
+			condition:     &csiCondition{&csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}},
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}),
 			expectedMatch: false,
 		},
 	}
@@ -302,7 +326,8 @@ func TestParsePodVolume(t *testing.T) {
 	}
 	csiVolume := corev1api.Volume{}
 	csiVolume.CSI = &corev1api.CSIVolumeSource{
-		Driver: "csi.example.com",
+		Driver:           "csi.example.com",
+		VolumeAttributes: map[string]string{"protocol": "nfs"},
 	}
 	emptyVolume := corev1api.Volume{}
 
@@ -321,7 +346,7 @@ func TestParsePodVolume(t *testing.T) {
 		{
 			name:        "CSI volume",
 			inputVolume: &csiVolume,
-			expectedCSI: &csiVolumeSource{Driver: "csi.example.com"},
+			expectedCSI: &csiVolumeSource{Driver: "csi.example.com", VolumeAttributes: map[string]string{"protocol": "nfs"}},
 		},
 		{
 			name:        "Empty volume",
@@ -348,8 +373,18 @@ func TestParsePodVolume(t *testing.T) {
 			if tc.expectedCSI != nil {
 				if structuredVolume.csi == nil {
 					t.Errorf("Expected a non-nil CSI volume source")
-				} else if *tc.expectedCSI != *structuredVolume.csi {
+				} else if tc.expectedCSI.Driver != structuredVolume.csi.Driver {
 					t.Errorf("CSI volume source does not match expected value")
+				}
+				// Check volumeAttributes
+				if len(tc.expectedCSI.VolumeAttributes) != len(structuredVolume.csi.VolumeAttributes) {
+					t.Errorf("CSI volume attributes does not match expected value")
+				} else {
+					for k, v := range tc.expectedCSI.VolumeAttributes {
+						if structuredVolume.csi.VolumeAttributes[k] != v {
+							t.Errorf("CSI volume attributes does not match expected value")
+						}
+					}
 				}
 			}
 		})
@@ -363,7 +398,7 @@ func TestParsePV(t *testing.T) {
 	nfsVolume.Spec.NFS = &corev1api.NFSVolumeSource{Server: "nfs.example.com", Path: "/exports/data"}
 	csiVolume := corev1api.PersistentVolume{}
 	csiVolume.Spec.Capacity = corev1api.ResourceList{corev1api.ResourceStorage: resource.MustParse("2Gi")}
-	csiVolume.Spec.CSI = &corev1api.CSIPersistentVolumeSource{Driver: "csi.example.com"}
+	csiVolume.Spec.CSI = &corev1api.CSIPersistentVolumeSource{Driver: "csi.example.com", VolumeAttributes: map[string]string{"protocol": "nfs"}}
 	emptyVolume := corev1api.PersistentVolume{}
 
 	// Test cases
@@ -383,7 +418,7 @@ func TestParsePV(t *testing.T) {
 			name:        "CSI volume",
 			inputVolume: &csiVolume,
 			expectedNFS: nil,
-			expectedCSI: &csiVolumeSource{Driver: "csi.example.com"},
+			expectedCSI: &csiVolumeSource{Driver: "csi.example.com", VolumeAttributes: map[string]string{"protocol": "nfs"}},
 		},
 		{
 			name:        "Empty volume",
@@ -415,8 +450,18 @@ func TestParsePV(t *testing.T) {
 			if tc.expectedCSI != nil {
 				if structuredVolume.csi == nil {
 					t.Errorf("Expected a non-nil CSI volume source")
-				} else if *tc.expectedCSI != *structuredVolume.csi {
+				} else if tc.expectedCSI.Driver != structuredVolume.csi.Driver {
 					t.Errorf("CSI volume source does not match expected value")
+				}
+				// Check volumeAttributes
+				if len(tc.expectedCSI.VolumeAttributes) != len(structuredVolume.csi.VolumeAttributes) {
+					t.Errorf("CSI volume attributes does not match expected value")
+				} else {
+					for k, v := range tc.expectedCSI.VolumeAttributes {
+						if structuredVolume.csi.VolumeAttributes[k] != v {
+							t.Errorf("CSI volume attributes does not match expected value")
+						}
+					}
 				}
 			}
 		})

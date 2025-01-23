@@ -144,7 +144,7 @@ func (e *ExcludeFromBackup) Verify() error {
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 
 		//Check configmap: should be included
-		_, err = GetConfigmap(e.Client.ClientGo, namespace, e.CaseBaseName)
+		_, err = GetConfigMap(e.Client.ClientGo, namespace, e.CaseBaseName)
 		Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("failed to list configmap in namespace: %q", namespace))
 	})
 	return nil

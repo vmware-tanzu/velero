@@ -47,6 +47,14 @@ func TestEnsureDeletePod(t *testing.T) {
 		},
 	}
 
+	podObjectWithFinalizer := &corev1api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "fake-ns",
+			Name:       "fake-pod",
+			Finalizers: []string{"fake-finalizer-1", "fake-finalizer-2"},
+		},
+	}
+
 	tests := []struct {
 		name      string
 		clientObj []runtime.Object
@@ -60,6 +68,38 @@ func TestEnsureDeletePod(t *testing.T) {
 			podName:   "fake-pod",
 			namespace: "fake-ns",
 			err:       "error to delete pod fake-pod: pods \"fake-pod\" not found",
+		},
+		{
+			name:      "wait timeout",
+			podName:   "fake-pod",
+			namespace: "fake-ns",
+			clientObj: []runtime.Object{podObjectWithFinalizer},
+			reactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "pods",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, nil
+					},
+				},
+			},
+			err: "timeout to assure pod fake-pod is deleted, finalizers in pod [fake-finalizer-1 fake-finalizer-2]",
+		},
+		{
+			name:      "wait timeout, no finalizer",
+			podName:   "fake-pod",
+			namespace: "fake-ns",
+			clientObj: []runtime.Object{podObject},
+			reactors: []reactor{
+				{
+					verb:     "delete",
+					resource: "pods",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, nil
+					},
+				},
+			},
+			err: "timeout to assure pod fake-pod is deleted, finalizers in pod []",
 		},
 		{
 			name:      "wait fail",
@@ -843,6 +883,52 @@ func TestToSystemAffinity(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			affinity := ToSystemAffinity(test.loadAffinities)
 			assert.True(t, reflect.DeepEqual(affinity, test.expected))
+		})
+	}
+}
+
+func TestDiagnosePod(t *testing.T) {
+	testCases := []struct {
+		name     string
+		pod      *corev1api.Pod
+		expected string
+	}{
+		{
+			name: "pod with all info",
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-pod",
+					Namespace: "fake-ns",
+				},
+				Spec: corev1api.PodSpec{
+					NodeName: "fake-node",
+				},
+				Status: corev1api.PodStatus{
+					Phase: corev1api.PodPending,
+					Conditions: []corev1api.PodCondition{
+						{
+							Type:    corev1api.PodInitialized,
+							Status:  corev1api.ConditionTrue,
+							Reason:  "fake-reason-1",
+							Message: "fake-message-1",
+						},
+						{
+							Type:    corev1api.PodScheduled,
+							Status:  corev1api.ConditionFalse,
+							Reason:  "fake-reason-2",
+							Message: "fake-message-2",
+						},
+					},
+				},
+			},
+			expected: "Pod fake-ns/fake-pod, phase Pending, node name fake-node\nPod condition Initialized, status True, reason fake-reason-1, message fake-message-1\nPod condition PodScheduled, status False, reason fake-reason-2, message fake-message-2\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			diag := DiagnosePod(tc.pod)
+			assert.Equal(t, tc.expected, diag)
 		})
 	}
 }

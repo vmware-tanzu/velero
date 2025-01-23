@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
@@ -120,31 +121,37 @@ func DeletePVIfAny(ctx context.Context, pvGetter corev1client.CoreV1Interface, p
 
 // EnsureDeletePVC asserts the existence of a PVC by name, deletes it and waits for its disappearance and returns errors on any failure
 // If timeout is 0, it doesn't wait and return nil
-func EnsureDeletePVC(ctx context.Context, pvcGetter corev1client.CoreV1Interface, pvc string, namespace string, timeout time.Duration) error {
-	err := pvcGetter.PersistentVolumeClaims(namespace).Delete(ctx, pvc, metav1.DeleteOptions{})
+func EnsureDeletePVC(ctx context.Context, pvcGetter corev1client.CoreV1Interface, pvcName string, namespace string, timeout time.Duration) error {
+	err := pvcGetter.PersistentVolumeClaims(namespace).Delete(ctx, pvcName, metav1.DeleteOptions{})
 	if err != nil {
-		return errors.Wrapf(err, "error to delete pvc %s", pvc)
+		return errors.Wrapf(err, "error to delete pvc %s", pvcName)
 	}
 
 	if timeout == 0 {
 		return nil
 	}
 
+	var updated *corev1api.PersistentVolumeClaim
 	err = wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
-		_, err := pvcGetter.PersistentVolumeClaims(namespace).Get(ctx, pvc, metav1.GetOptions{})
+		pvc, err := pvcGetter.PersistentVolumeClaims(namespace).Get(ctx, pvcName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 
-			return false, errors.Wrapf(err, "error to get pvc %s", pvc)
+			return false, errors.Wrapf(err, "error to get pvc %s", pvcName)
 		}
 
+		updated = pvc
 		return false, nil
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, "error to ensure pvc deleted for %s", pvc)
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.Errorf("timeout to assure pvc %s is deleted, finalizers in pvc %v", pvcName, updated.Finalizers)
+		} else {
+			return errors.Wrapf(err, "error to ensure pvc deleted for %s", pvcName)
+		}
 	}
 
 	return nil
@@ -264,7 +271,7 @@ func SetPVReclaimPolicy(ctx context.Context, pvGetter corev1client.CoreV1Interfa
 // nothing if the consuming doesn't affect the PV provision.
 // The latest PVC and the selected node will be returned.
 func WaitPVCConsumed(ctx context.Context, pvcGetter corev1client.CoreV1Interface, pvc string, namespace string,
-	storageClient storagev1.StorageV1Interface, timeout time.Duration) (string, *corev1api.PersistentVolumeClaim, error) {
+	storageClient storagev1.StorageV1Interface, timeout time.Duration, ignoreConsume bool) (string, *corev1api.PersistentVolumeClaim, error) {
 	selectedNode := ""
 	var updated *corev1api.PersistentVolumeClaim
 	var storageClass *storagev1api.StorageClass
@@ -275,18 +282,20 @@ func WaitPVCConsumed(ctx context.Context, pvcGetter corev1client.CoreV1Interface
 			return false, errors.Wrapf(err, "error to get pvc %s/%s", namespace, pvc)
 		}
 
-		if tmpPVC.Spec.StorageClassName != nil && storageClass == nil {
-			storageClass, err = storageClient.StorageClasses().Get(ctx, *tmpPVC.Spec.StorageClassName, metav1.GetOptions{})
-			if err != nil {
-				return false, errors.Wrapf(err, "error to get storage class %s", *tmpPVC.Spec.StorageClassName)
+		if !ignoreConsume {
+			if tmpPVC.Spec.StorageClassName != nil && storageClass == nil {
+				storageClass, err = storageClient.StorageClasses().Get(ctx, *tmpPVC.Spec.StorageClassName, metav1.GetOptions{})
+				if err != nil {
+					return false, errors.Wrapf(err, "error to get storage class %s", *tmpPVC.Spec.StorageClassName)
+				}
 			}
-		}
 
-		if storageClass != nil {
-			if storageClass.VolumeBindingMode != nil && *storageClass.VolumeBindingMode == storagev1api.VolumeBindingWaitForFirstConsumer {
-				selectedNode = tmpPVC.Annotations[KubeAnnSelectedNode]
-				if selectedNode == "" {
-					return false, nil
+			if storageClass != nil {
+				if storageClass.VolumeBindingMode != nil && *storageClass.VolumeBindingMode == storagev1api.VolumeBindingWaitForFirstConsumer {
+					selectedNode = tmpPVC.Annotations[KubeAnnSelectedNode]
+					if selectedNode == "" {
+						return false, nil
+					}
 				}
 			}
 		}
@@ -347,8 +356,8 @@ func IsPVCBound(pvc *corev1api.PersistentVolumeClaim) bool {
 
 // MakePodPVCAttachment returns the volume mounts and devices for a pod needed to attach a PVC
 func MakePodPVCAttachment(volumeName string, volumeMode *corev1api.PersistentVolumeMode, readOnly bool) ([]corev1api.VolumeMount, []corev1api.VolumeDevice, string) {
-	var volumeMounts []corev1api.VolumeMount = nil
-	var volumeDevices []corev1api.VolumeDevice = nil
+	var volumeMounts []corev1api.VolumeMount
+	var volumeDevices []corev1api.VolumeDevice
 	volumePath := "/" + volumeName
 
 	if volumeMode != nil && *volumeMode == corev1api.PersistentVolumeBlock {
@@ -411,4 +420,57 @@ func GetPVCForPodVolume(vol *corev1api.Volume, pod *corev1api.Pod, crClient crcl
 	}
 
 	return pvc, nil
+}
+
+func DiagnosePVC(pvc *corev1api.PersistentVolumeClaim) string {
+	return fmt.Sprintf("PVC %s/%s, phase %s, binding to %s\n", pvc.Namespace, pvc.Name, pvc.Status.Phase, pvc.Spec.VolumeName)
+}
+
+func DiagnosePV(pv *corev1api.PersistentVolume) string {
+	diag := fmt.Sprintf("PV %s, phase %s, reason %s, message %s\n", pv.Name, pv.Status.Phase, pv.Status.Reason, pv.Status.Message)
+	return diag
+}
+
+func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, nodeClient corev1client.CoreV1Interface,
+	storageClient storagev1.StorageV1Interface, log logrus.FieldLogger) (string, error) {
+	var nodeOS string
+	var scFsType string
+
+	if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == corev1api.PersistentVolumeBlock {
+		log.Infof("Use linux node for block mode PVC %s/%s", pvc.Namespace, pvc.Name)
+		return NodeOSLinux, nil
+	}
+
+	if value := pvc.Annotations[KubeAnnSelectedNode]; value != "" {
+		os, err := GetNodeOS(context.Background(), value, nodeClient)
+		if err != nil {
+			return "", errors.Wrapf(err, "error to get os from node %s for PVC %s/%s", value, pvc.Namespace, pvc.Name)
+		}
+
+		nodeOS = os
+	}
+
+	if pvc.Spec.StorageClassName != nil {
+		sc, err := storageClient.StorageClasses().Get(context.Background(), *pvc.Spec.StorageClassName, metav1.GetOptions{})
+		if err != nil {
+			return "", errors.Wrapf(err, "error to get storage class %s", *pvc.Spec.StorageClassName)
+		}
+
+		if sc.Parameters != nil {
+			scFsType = strings.ToLower(sc.Parameters["csi.storage.k8s.io/fstype"])
+		}
+	}
+
+	if nodeOS != "" {
+		log.Infof("Deduced node os %s from selected node for PVC %s/%s (fsType %s)", nodeOS, pvc.Namespace, pvc.Name, scFsType)
+		return nodeOS, nil
+	}
+
+	if scFsType == "ntfs" {
+		log.Infof("Deduced Windows node os from fsType for PVC %s/%s", pvc.Namespace, pvc.Name)
+		return NodeOSWindows, nil
+	}
+
+	log.Warnf("Cannot deduce node os for PVC %s/%s, default to linux", pvc.Namespace, pvc.Name)
+	return NodeOSLinux, nil
 }

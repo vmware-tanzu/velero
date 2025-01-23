@@ -118,6 +118,12 @@ func (d *DataDownloadBuilder) Labels(labels map[string]string) *DataDownloadBuil
 	return d
 }
 
+// Annotations sets the DataDownload's Annotations.
+func (d *DataDownloadBuilder) Annotations(annotations map[string]string) *DataDownloadBuilder {
+	d.object.Annotations = annotations
+	return d
+}
+
 // StartTimestamp sets the DataDownload's StartTimestamp.
 func (d *DataDownloadBuilder) StartTimestamp(startTime *metav1.Time) *DataDownloadBuilder {
 	d.object.Status.StartTimestamp = startTime
@@ -139,5 +145,23 @@ func (d *DataDownloadBuilder) Progress(progress shared.DataMoveOperationProgress
 // Node sets the DataDownload's Node.
 func (d *DataDownloadBuilder) Node(node string) *DataDownloadBuilder {
 	d.object.Status.Node = node
+	return d
+}
+
+// NodeOS sets the DataDownload's Node OS.
+func (d *DataDownloadBuilder) NodeOS(nodeOS velerov2alpha1api.NodeOS) *DataDownloadBuilder {
+	d.object.Spec.NodeOS = nodeOS
+	return d
+}
+
+// AcceptedByNode sets the DataDownload's AcceptedByNode.
+func (d *DataDownloadBuilder) AcceptedByNode(node string) *DataDownloadBuilder {
+	d.object.Status.AcceptedByNode = node
+	return d
+}
+
+// AcceptedTimestamp sets the DataDownload's AcceptedTimestamp.
+func (d *DataDownloadBuilder) AcceptedTimestamp(acceptedTimestamp *metav1.Time) *DataDownloadBuilder {
+	d.object.Status.AcceptedTimestamp = acceptedTimestamp
 	return d
 }

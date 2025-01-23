@@ -227,9 +227,60 @@ linters-settings:
     require-explanation: true
     # Enable to require nolint directives to mention the specific linter being suppressed. Default is false.
     require-specific: true
+  perfsprint:
+    strconcat: false
+    sprintf1: false
+    errorf: false
+    int-conversion: true
+    fiximports: true
   revive:
     rules:
+      - name: blank-imports
+        disabled: true
+      - name: context-as-argument
+        disabled: true
+      - name: context-keys-type
+      - name: dot-imports
+        disabled: true
+      - name: early-return
+        disabled: true
+        arguments:
+          - "preserveScope"
+      - name: empty-block
+        disabled: true
+      - name: error-naming
+        disabled: true
+      - name: error-return
+        disabled: true
+      - name: error-strings
+        disabled: true
+      - name: errorf
+        disabled: true
+      - name: increment-decrement
+        disabled: true
+      - name: indent-error-flow
+        disabled: true
+      - name: range
+      - name: receiver-naming
+        disabled: true
+      - name: redefines-builtin-id
+        disabled: true
+      - name: superfluous-else
+        disabled: true
+        arguments:
+          - "preserveScope"
+      - name: time-naming
       - name: unexported-return
+        disabled: true
+      - name: unnecessary-stmt
+        disabled: true
+      - name: unreachable-code
+      - name: unused-parameter
+        disabled: true
+      - name: use-any
+        disabled: true
+      - name: var-declaration
+      - name: var-naming
         disabled: true
     
   rowserrcheck:
@@ -277,7 +328,7 @@ linters-settings:
     force-case-trailing-whitespace: 0
     # Force cuddling of err checks with err var assignment
     force-err-cuddling: false
-    # Allow leading comments to be separated with empty liens
+    # Allow leading comments to be separated with empty lines
     allow-separated-leading-comment: false
 
 linters:
@@ -310,6 +361,7 @@ linters:
     - nilerr
     - noctx
     - nolintlint
+    - perfsprint
     - revive
     - staticcheck
     - stylecheck
@@ -331,7 +383,6 @@ issues:
       text: "DefaultVolumesToRestic" # No need to report deprecate for DefaultVolumesToRestic.
     - path: ".*_test.go$"
       linters:
-        - dupword
         - errcheck
         - goconst
         - gosec
@@ -342,7 +393,6 @@ issues:
         - unused
     - path: test/
       linters:
-        - dupword
         - errcheck
         - goconst
         - gosec
@@ -351,6 +401,14 @@ issues:
         - stylecheck
         - unparam
         - unused
+    - path: ".*data_upload_controller_test.go$"
+      linters:
+        - dupword
+      text: "type"
+    - path: ".*config_test.go$"
+      linters:
+        - dupword
+      text: "bucket"
 
   # The list of ids of default excludes to include or disable. By default it's empty.
   include:

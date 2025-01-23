@@ -200,13 +200,31 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 			},
 		},
 	}
-	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
-		Scheme: scheme,
-		Cache:  cacheOption,
-	})
+
+	var mgr manager.Manager
+	retry := 10
+	for {
+		mgr, err = ctrl.NewManager(clientConfig, ctrl.Options{
+			Scheme: scheme,
+			Cache:  cacheOption,
+		})
+		if err == nil {
+			break
+		}
+
+		retry--
+		if retry == 0 {
+			break
+		}
+
+		logger.WithError(err).Warn("Failed to create controller manager, need retry")
+
+		time.Sleep(time.Second)
+	}
+
 	if err != nil {
 		cancelFunc()
-		return nil, err
+		return nil, errors.Wrap(err, "error creating controller manager")
 	}
 
 	s := &nodeAgentServer{
@@ -335,7 +353,13 @@ func (s *nodeAgentServer) run() {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	var restorePVCConfig nodeagent.RestorePVC
+	if s.dataPathConfigs != nil && s.dataPathConfigs.RestorePVCConfig != nil {
+		restorePVCConfig = *s.dataPathConfigs.RestorePVCConfig
+		s.logger.Infof("Using customized restorePVC config %v", restorePVCConfig)
+	}
+
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, restorePVCConfig, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}

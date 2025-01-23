@@ -27,6 +27,7 @@ Contact: [#Velero Slack](https://kubernetes.slack.com/messages/velero), [GitHub 
 | [AlibabaCloud](https://www.alibabacloud.com/)        | Alibaba Cloud OSS            | Alibaba Cloud                      | [AlibabaCloud](https://github.com/AliyunContainerService/velero-plugin)     | [GitHub Issue](https://github.com/AliyunContainerService/velero-plugin/issues)              |
 | [DigitalOcean](https://www.digitalocean.com/)        | DigitalOcean Object Storage  | DigitalOcean Volumes Block Storage | [StackPointCloud](https://github.com/StackPointCloud/ark-plugin-digitalocean)  |                                 |
 | [Hewlett Packard](https://www.hpe.com/us/en/storage.html)     | 🚫                           | HPE Storage                        | [Hewlett Packard](https://github.com/hpe-storage/velero-plugin)  | [Slack](https://slack.hpedev.io/), [GitHub Issue](https://github.com/hpe-storage/velero-plugin/issues) |
+| [HuaweiCloud](https://www.huaweicloud.com)     | HuaweiCloud OBS                           | 🚫                        | [HuaweiCloud](https://github.com/setoru/velero-plugin-for-huaweicloud)  | [GitHub Issue](https://github.com/setoru/velero-plugin-for-huaweicloud/issues) |
 | [OpenEBS](https://openebs.io/)             | 🚫                           | OpenEBS CStor Volume               | [OpenEBS](https://github.com/openebs/velero-plugin)          | [Slack](https://openebs-community.slack.com/), [GitHub Issue](https://github.com/openebs/velero-plugin/issues) |
 | [OpenStack](https://www.openstack.org/) | Swift | Cinder | [OpenStack](https://github.com/Lirt/velero-plugin-for-openstack) | [GitHub Issue](https://github.com/Lirt/velero-plugin-for-openstack/issues) |
 | [Portworx](https://portworx.com/)            | 🚫                           | Portworx Volume                    | [Portworx](https://docs.portworx.com/scheduler/kubernetes/ark.html)         | [Slack](https://portworx.slack.com/messages/px-k8s), [GitHub Issue](https://github.com/portworx/ark-plugin/issues) |
@@ -55,7 +56,7 @@ _Some storage providers, like Quobyte, may need a different [signature algorithm
 
 In the case you want to take volume snapshots but didn't find a plugin for your provider, Velero has support for snapshotting using File System Backup. Please see the [File System Backup][30] documentation.
 
-[0]: https://github.com/aws/aws-sdk-go/aws
+[0]: https://github.com/aws/aws-sdk-go-v2
 [1]: contributions/ibm-config.md
 [2]: contributions/oracle-config.md
 [3]: contributions/minio.md

@@ -60,6 +60,5 @@ func (f *FilesystemUploadVolumeInfo) Verify() error {
 	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
 	Expect(volumeInfo[0].PVBInfo).NotTo(BeNil())
 
-	// Clean SC and VSC
-	return f.cleanResource()
+	return nil
 }

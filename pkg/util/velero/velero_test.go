@@ -312,6 +312,105 @@ func TestGetEnvVarsFromVeleroServer(t *testing.T) {
 	}
 }
 
+func TestGetEnvFromSourcesFromVeleroServer(t *testing.T) {
+	tests := []struct {
+		name     string
+		deploy   *appsv1.Deployment
+		expected []v1.EnvFromSource
+	}{
+		{
+			name: "no env vars",
+			deploy: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									EnvFrom: []v1.EnvFromSource{},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []v1.EnvFromSource{},
+		},
+		{
+			name: "configmap",
+			deploy: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									EnvFrom: []v1.EnvFromSource{
+										{
+											ConfigMapRef: &v1.ConfigMapEnvSource{
+												LocalObjectReference: v1.LocalObjectReference{
+													Name: "foo",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []v1.EnvFromSource{
+				{
+					ConfigMapRef: &v1.ConfigMapEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "foo",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "secret",
+			deploy: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									EnvFrom: []v1.EnvFromSource{
+										{
+											SecretRef: &v1.SecretEnvSource{
+												LocalObjectReference: v1.LocalObjectReference{
+													Name: "foo",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []v1.EnvFromSource{
+				{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "foo",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := GetEnvFromSourcesFromVeleroServer(test.deploy)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
 func TestGetVolumeMountsFromVeleroServer(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -608,6 +707,54 @@ func TestGetVeleroServerAnnotations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := GetVeleroServerAnnotations(tt.deployment)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGetVeleroServerLabelValue(t *testing.T) {
+	tests := []struct {
+		name       string
+		deployment *appsv1.Deployment
+		expected   string
+	}{
+		{
+			name:       "nil Labels",
+			deployment: &appsv1.Deployment{},
+			expected:   "",
+		},
+		{
+			name: "no label key",
+			deployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{},
+						},
+					},
+				},
+			},
+			expected: "",
+		},
+		{
+			name: "with label key",
+			deployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"fake-key": "fake-value"},
+						},
+					},
+				},
+			},
+			expected: "fake-value",
+		},
+	}
+
+	// Run tests
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GetVeleroServerLabelValue(tt.deployment, "fake-key")
 			assert.Equal(t, tt.expected, result)
 		})
 	}

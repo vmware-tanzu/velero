@@ -24,10 +24,23 @@ import (
 )
 
 func TestDaemonSet(t *testing.T) {
+	userID := int64(0)
+	boolFalse := false
+	boolTrue := true
+
 	ds := DaemonSet("velero")
 
 	assert.Equal(t, "node-agent", ds.Spec.Template.Spec.Containers[0].Name)
 	assert.Equal(t, "velero", ds.ObjectMeta.Namespace)
+	assert.Equal(t, "node-agent", ds.Spec.Template.ObjectMeta.Labels["name"])
+	assert.Equal(t, "node-agent", ds.Spec.Template.ObjectMeta.Labels["role"])
+	assert.Equal(t, "linux", ds.Spec.Template.Spec.NodeSelector["kubernetes.io/os"])
+	assert.Equal(t, "linux", string(ds.Spec.Template.Spec.OS.Name))
+	assert.Equal(t, corev1.PodSecurityContext{RunAsUser: &userID}, *ds.Spec.Template.Spec.SecurityContext)
+	assert.Equal(t, corev1.SecurityContext{Privileged: &boolFalse}, *ds.Spec.Template.Spec.Containers[0].SecurityContext)
+
+	ds = DaemonSet("velero", WithPrivilegedNodeAgent(true))
+	assert.Equal(t, corev1.SecurityContext{Privileged: &boolTrue}, *ds.Spec.Template.Spec.Containers[0].SecurityContext)
 
 	ds = DaemonSet("velero", WithImage("velero/velero:v0.11"))
 	assert.Equal(t, "velero/velero:v0.11", ds.Spec.Template.Spec.Containers[0].Image)
@@ -47,4 +60,14 @@ func TestDaemonSet(t *testing.T) {
 
 	ds = DaemonSet("velero", WithServiceAccountName("test-sa"))
 	assert.Equal(t, "test-sa", ds.Spec.Template.Spec.ServiceAccountName)
+
+	ds = DaemonSet("velero", WithForWindows())
+	assert.Equal(t, "node-agent-windows", ds.Spec.Template.Spec.Containers[0].Name)
+	assert.Equal(t, "velero", ds.ObjectMeta.Namespace)
+	assert.Equal(t, "node-agent-windows", ds.Spec.Template.ObjectMeta.Labels["name"])
+	assert.Equal(t, "node-agent", ds.Spec.Template.ObjectMeta.Labels["role"])
+	assert.Equal(t, "windows", ds.Spec.Template.Spec.NodeSelector["kubernetes.io/os"])
+	assert.Equal(t, "windows", string(ds.Spec.Template.Spec.OS.Name))
+	assert.Equal(t, (*corev1.PodSecurityContext)(nil), ds.Spec.Template.Spec.SecurityContext)
+	assert.Equal(t, (*corev1.SecurityContext)(nil), ds.Spec.Template.Spec.Containers[0].SecurityContext)
 }

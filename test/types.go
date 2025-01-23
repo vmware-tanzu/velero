@@ -25,9 +25,12 @@ import (
 	"github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
+// e2e-storage-class is the default StorageClass for E2E.
 const StorageClassName = "e2e-storage-class"
+
+// e2e-storage-class-2 is used for the StorageClass mapping test case.
 const StorageClassName2 = "e2e-storage-class-2"
-const CSIStorageClassName = "e2e-csi-storage-class"
+
 const FeatureCSI = "EnableCSI"
 const VanillaZFS = "vanilla-zfs"
 const Kind = "kind"
@@ -38,6 +41,8 @@ const AWS = "aws"
 const GCP = "gcp"
 const Vsphere = "vsphere"
 const CSI = "csi"
+const Velero = "velero"
+const VeleroRestoreHelper = "velero-restore-helper"
 
 const UploaderTypeRestic = "restic"
 
@@ -118,6 +123,7 @@ type VeleroConfig struct {
 	ServiceAccountNameToInstall       string
 	EKSPolicyARN                      string
 	FailFast                          bool
+	HasVspherePlugin                  bool
 }
 
 type VeleroCfgInPerf struct {

@@ -770,7 +770,7 @@ func TestConcatenateObjects(t *testing.T) {
 
 			if tc.rawWriter != nil {
 				require.NotNil(t, tc.rawWriter)
-				tc.rawWriter.On("ConcatenateObjects", mock.Anything, mock.Anything).Return(object.ID{}, tc.rawWriterRetErr)
+				tc.rawWriter.On("ConcatenateObjects", mock.Anything, mock.Anything, mock.Anything).Return(object.ID{}, tc.rawWriterRetErr)
 			}
 
 			if tc.setWriter {

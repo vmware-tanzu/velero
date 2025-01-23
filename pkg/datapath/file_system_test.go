@@ -85,6 +85,7 @@ func TestAsyncBackup(t *testing.T) {
 					SnapshotID:    "fake-snapshot",
 					EmptySnapshot: false,
 					Source:        AccessPoint{ByPath: "fake-path"},
+					TotalBytes:    1000,
 				},
 			},
 			path: "fake-path",
@@ -95,7 +96,7 @@ func TestAsyncBackup(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fs := newFileSystemBR("job-1", "test", nil, "velero", Callbacks{}, velerotest.NewLogger()).(*fileSystemBR)
 			mockProvider := providerMock.NewProvider(t)
-			mockProvider.On("RunBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.result.Backup.SnapshotID, test.result.Backup.EmptySnapshot, test.err)
+			mockProvider.On("RunBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.result.Backup.SnapshotID, test.result.Backup.EmptySnapshot, test.result.Backup.TotalBytes, test.err)
 			mockProvider.On("Close", mock.Anything).Return(nil)
 			fs.uploaderProv = mockProvider
 			fs.initialized = true
@@ -167,7 +168,8 @@ func TestAsyncRestore(t *testing.T) {
 			},
 			result: Result{
 				Restore: RestoreResult{
-					Target: AccessPoint{ByPath: "fake-path"},
+					Target:     AccessPoint{ByPath: "fake-path"},
+					TotalBytes: 1000,
 				},
 			},
 			path:     "fake-path",
@@ -179,7 +181,7 @@ func TestAsyncRestore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fs := newFileSystemBR("job-1", "test", nil, "velero", Callbacks{}, velerotest.NewLogger()).(*fileSystemBR)
 			mockProvider := providerMock.NewProvider(t)
-			mockProvider.On("RunRestore", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.err)
+			mockProvider.On("RunRestore", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.result.Restore.TotalBytes, test.err)
 			mockProvider.On("Close", mock.Anything).Return(nil)
 			fs.uploaderProv = mockProvider
 			fs.initialized = true

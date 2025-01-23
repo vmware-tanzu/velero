@@ -72,7 +72,7 @@ func BackupsSyncTest() {
 			if InstallVelero {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
-				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
+				Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 			}
 		}
 	})
@@ -108,7 +108,7 @@ func BackupsSyncTest() {
 		})
 
 		By("Uninstall velero", func() {
-			Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
+			Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 		})
 
 		By("Install velero", func() {

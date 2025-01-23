@@ -19,6 +19,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -222,7 +223,7 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--default-volumes-to-fs-backup", defaultVolumesToFsBackup})
 		flags.Parse([]string{"--resource-policies-configmap", resPoliciesConfigmap})
 		flags.Parse([]string{"--data-mover", dataMover})
-		flags.Parse([]string{"--parallel-files-upload", fmt.Sprintf("%d", parallelFilesUpload)})
+		flags.Parse([]string{"--parallel-files-upload", strconv.Itoa(parallelFilesUpload)})
 		//flags.Parse([]string{"--wait"})
 
 		client := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)

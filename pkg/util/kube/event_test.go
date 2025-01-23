@@ -43,9 +43,12 @@ func TestEvent(t *testing.T) {
 	}
 
 	cases := []struct {
-		name     string
-		events   []testEvent
-		expected int
+		name           string
+		events         []testEvent
+		generateDiff   int
+		generateSame   int
+		generateEnding bool
+		expected       int
 	}{
 		{
 			name: "update events, different message",
@@ -116,6 +119,18 @@ func TestEvent(t *testing.T) {
 			},
 			expected: -1,
 		},
+		{
+			name:           "auto generate 200",
+			generateDiff:   200,
+			generateEnding: true,
+			expected:       201,
+		},
+		{
+			name:           "auto generate 200, update",
+			generateSame:   200,
+			generateEnding: true,
+			expected:       2,
+		},
 	}
 
 	shutdownTimeout = time.Second * 5
@@ -142,6 +157,28 @@ func TestEvent(t *testing.T) {
 
 			_, err = client.CoreV1().Pods("fake-ns").Create(context.Background(), pod, metav1.CreateOptions{})
 			require.NoError(t, err)
+
+			for i := 0; i < tc.generateDiff; i++ {
+				tc.events = append(tc.events, testEvent{
+					reason:  fmt.Sprintf("fake-reason-%v", i),
+					message: fmt.Sprintf("fake-message-%v", i),
+				})
+			}
+
+			for i := 0; i < tc.generateSame; i++ {
+				tc.events = append(tc.events, testEvent{
+					reason:  "fake-reason",
+					message: fmt.Sprintf("fake-message-%v", i),
+				})
+			}
+
+			if tc.generateEnding {
+				tc.events = append(tc.events, testEvent{
+					reason:  "fake-ending-reason",
+					message: "fake-ending-message",
+					ending:  true,
+				})
+			}
 
 			for _, e := range tc.events {
 				if e.ending {

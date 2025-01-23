@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1api "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerocredentials "github.com/vmware-tanzu/velero/internal/credentials"
 	credmock "github.com/vmware-tanzu/velero/internal/credentials/mocks"
@@ -222,7 +223,7 @@ func TestGetStorageVariables(t *testing.T) {
 		repoName          string
 		repoBackend       string
 		repoConfig        map[string]string
-		getS3BucketRegion func(string) (string, error)
+		getS3BucketRegion func(bucket string, config map[string]string) (string, error)
 		expected          map[string]string
 		expectedErr       string
 	}{
@@ -291,7 +292,7 @@ func TestGetStorageVariables(t *testing.T) {
 					},
 				},
 			},
-			getS3BucketRegion: func(bucket string) (string, error) {
+			getS3BucketRegion: func(bucket string, config map[string]string) (string, error) {
 				return "region from bucket: " + bucket, nil
 			},
 			repoBackend: "fake-repo-type",
@@ -313,7 +314,7 @@ func TestGetStorageVariables(t *testing.T) {
 					Config:   map[string]string{},
 				},
 			},
-			getS3BucketRegion: func(bucket string) (string, error) {
+			getS3BucketRegion: func(bucket string, config map[string]string) (string, error) {
 				return "", errors.New("fake error")
 			},
 			expected:    map[string]string{},
@@ -339,7 +340,7 @@ func TestGetStorageVariables(t *testing.T) {
 					},
 				},
 			},
-			getS3BucketRegion: func(bucket string) (string, error) {
+			getS3BucketRegion: func(bucket string, config map[string]string) (string, error) {
 				return "region from bucket: " + bucket, nil
 			},
 			repoBackend: "fake-repo-type",
@@ -374,7 +375,7 @@ func TestGetStorageVariables(t *testing.T) {
 					},
 				},
 			},
-			getS3BucketRegion: func(bucket string) (string, error) {
+			getS3BucketRegion: func(bucket string, config map[string]string) (string, error) {
 				return "region from bucket: " + bucket, nil
 			},
 			repoBackend: "fake-repo-type",
@@ -600,6 +601,13 @@ func TestGetStoreOptions(t *testing.T) {
 }
 
 func TestPrepareRepo(t *testing.T) {
+	bsl := velerov1api.BackupStorageLocation{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "fake-bsl",
+			Namespace: velerov1api.DefaultNamespace,
+		},
+	}
+
 	testCases := []struct {
 		name            string
 		funcTable       localFuncTable
@@ -608,6 +616,7 @@ func TestPrepareRepo(t *testing.T) {
 		retFuncInit     func(context.Context, udmrepo.RepoOptions, bool) error
 		credStoreReturn string
 		credStoreError  error
+		readOnlyBSL     bool
 		expectedErr     string
 	}{
 		{
@@ -655,7 +664,29 @@ func TestPrepareRepo(t *testing.T) {
 			},
 		},
 		{
-			name:            "initialize fail",
+			name:            "bsl is readonly",
+			readOnlyBSL:     true,
+			getter:          new(credmock.SecretStore),
+			credStoreReturn: "fake-password",
+			funcTable: localFuncTable{
+				getStorageVariables: func(*velerov1api.BackupStorageLocation, string, string, map[string]string) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+				getStorageCredentials: func(*velerov1api.BackupStorageLocation, velerocredentials.FileStore) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+			},
+			repoService: new(reposervicenmocks.BackupRepoService),
+			retFuncInit: func(ctx context.Context, repoOption udmrepo.RepoOptions, createNew bool) error {
+				if !createNew {
+					return repo.ErrRepositoryNotInitialized
+				}
+				return errors.New("fake-error-2")
+			},
+			expectedErr: "cannot create new backup repo for read-only backup storage location velero/fake-bsl",
+		},
+		{
+			name:            "connect fail",
 			getter:          new(credmock.SecretStore),
 			credStoreReturn: "fake-password",
 			funcTable: localFuncTable{
@@ -676,7 +707,7 @@ func TestPrepareRepo(t *testing.T) {
 			expectedErr: "error to connect to backup repo: fake-error-1",
 		},
 		{
-			name:            "not initialize",
+			name:            "initialize error",
 			getter:          new(credmock.SecretStore),
 			credStoreReturn: "fake-password",
 			funcTable: localFuncTable{
@@ -695,6 +726,26 @@ func TestPrepareRepo(t *testing.T) {
 				return errors.New("fake-error-2")
 			},
 			expectedErr: "error to create backup repo: fake-error-2",
+		},
+		{
+			name:            "initialize succeed",
+			getter:          new(credmock.SecretStore),
+			credStoreReturn: "fake-password",
+			funcTable: localFuncTable{
+				getStorageVariables: func(*velerov1api.BackupStorageLocation, string, string, map[string]string) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+				getStorageCredentials: func(*velerov1api.BackupStorageLocation, velerocredentials.FileStore) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+			},
+			repoService: new(reposervicenmocks.BackupRepoService),
+			retFuncInit: func(ctx context.Context, repoOption udmrepo.RepoOptions, createNew bool) error {
+				if !createNew {
+					return repo.ErrRepositoryNotInitialized
+				}
+				return nil
+			},
 		},
 	}
 
@@ -718,8 +769,14 @@ func TestPrepareRepo(t *testing.T) {
 
 			tc.repoService.On("Init", mock.Anything, mock.Anything, mock.Anything).Return(tc.retFuncInit)
 
+			if tc.readOnlyBSL {
+				bsl.Spec.AccessMode = velerov1api.BackupStorageLocationAccessModeReadOnly
+			} else {
+				bsl.Spec.AccessMode = velerov1api.BackupStorageLocationAccessModeReadWrite
+			}
+
 			err := urp.PrepareRepo(context.Background(), RepoParam{
-				BackupLocation: &velerov1api.BackupStorageLocation{},
+				BackupLocation: &bsl,
 				BackupRepo:     &velerov1api.BackupRepository{},
 			})
 
@@ -1037,6 +1094,13 @@ func TestBatchForget(t *testing.T) {
 }
 
 func TestInitRepo(t *testing.T) {
+	bsl := velerov1api.BackupStorageLocation{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "fake-bsl",
+			Namespace: velerov1api.DefaultNamespace,
+		},
+	}
+
 	testCases := []struct {
 		name            string
 		funcTable       localFuncTable
@@ -1045,8 +1109,14 @@ func TestInitRepo(t *testing.T) {
 		retFuncInit     interface{}
 		credStoreReturn string
 		credStoreError  error
+		readOnlyBSL     bool
 		expectedErr     string
 	}{
+		{
+			name:        "bsl is readonly",
+			readOnlyBSL: true,
+			expectedErr: "cannot create new backup repo for read-only backup storage location velero/fake-bsl",
+		},
 		{
 			name:        "get repo option fail",
 			expectedErr: "error to get repo options: error to get repo password: invalid credentials interface",
@@ -1110,8 +1180,14 @@ func TestInitRepo(t *testing.T) {
 				tc.repoService.On("Init", mock.Anything, mock.Anything, mock.Anything).Return(tc.retFuncInit)
 			}
 
+			if tc.readOnlyBSL {
+				bsl.Spec.AccessMode = velerov1api.BackupStorageLocationAccessModeReadOnly
+			} else {
+				bsl.Spec.AccessMode = velerov1api.BackupStorageLocationAccessModeReadWrite
+			}
+
 			err := urp.InitRepo(context.Background(), RepoParam{
-				BackupLocation: &velerov1api.BackupStorageLocation{},
+				BackupLocation: &bsl,
 				BackupRepo:     &velerov1api.BackupRepository{},
 			})
 

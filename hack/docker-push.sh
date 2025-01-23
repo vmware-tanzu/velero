@@ -63,7 +63,7 @@ fi
 if [[ -z $BRANCH && -z $TAG ]]; then
     echo "Test Velero container build without pushing, when Dockerfile is changed by PR."
     BRANCH="${GITHUB_BASE_REF}-container"
-    OUTPUT_TYPE="local,dest=."
+    OUTPUT_TYPE="tar"
 else
     OUTPUT_TYPE="registry"
 fi
@@ -88,8 +88,12 @@ else
     fi
 fi
 
-if [[ -z "$BUILDX_PLATFORMS" ]]; then
-    BUILDX_PLATFORMS="linux/amd64,linux/arm64"
+if [[ -z "$BUILD_OS" ]]; then
+    BUILD_OS="linux,windows"
+fi
+
+if [[ -z "$BUILD_ARCH" ]]; then
+    BUILD_ARCH="amd64,arm64"
 fi
 
 # Debugging info
@@ -98,13 +102,16 @@ echo "BRANCH: $BRANCH"
 echo "TAG: $TAG"
 echo "TAG_LATEST: $TAG_LATEST"
 echo "VERSION: $VERSION"
-echo "BUILDX_PLATFORMS: $BUILDX_PLATFORMS"
+echo "BUILD_OS: $BUILD_OS"
+echo "BUILD_ARCH: $BUILD_ARCH"
 
 echo "Building and pushing container images."
 
 
 VERSION="$VERSION" \
 TAG_LATEST="$TAG_LATEST" \
-BUILDX_PLATFORMS="$BUILDX_PLATFORMS" \
-BUILDX_OUTPUT_TYPE=$OUTPUT_TYPE \
+BUILD_OS="$BUILD_OS" \
+BUILD_ARCH="$BUILD_ARCH" \
+BUILD_OUTPUT_TYPE=$OUTPUT_TYPE \
+BUILD_TAG_GCR=true \
 make all-containers

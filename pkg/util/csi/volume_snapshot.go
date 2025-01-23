@@ -167,8 +167,9 @@ func EnsureDeleteVS(ctx context.Context, snapshotClient snapshotter.SnapshotV1In
 		return errors.Wrap(err, "error to delete volume snapshot")
 	}
 
+	var updated *snapshotv1api.VolumeSnapshot
 	err = wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
-		_, err := snapshotClient.VolumeSnapshots(vsNamespace).Get(ctx, vsName, metav1.GetOptions{})
+		vs, err := snapshotClient.VolumeSnapshots(vsNamespace).Get(ctx, vsName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -177,11 +178,16 @@ func EnsureDeleteVS(ctx context.Context, snapshotClient snapshotter.SnapshotV1In
 			return false, errors.Wrapf(err, fmt.Sprintf("error to get VolumeSnapshot %s", vsName))
 		}
 
+		updated = vs
 		return false, nil
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, "error to assure VolumeSnapshot is deleted, %s", vsName)
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.Errorf("timeout to assure VolumeSnapshot %s is deleted, finalizers in VS %v", vsName, updated.Finalizers)
+		} else {
+			return errors.Wrapf(err, "error to assure VolumeSnapshot is deleted, %s", vsName)
+		}
 	}
 
 	return nil
@@ -219,8 +225,10 @@ func EnsureDeleteVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1I
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrap(err, "error to delete volume snapshot content")
 	}
+
+	var updated *snapshotv1api.VolumeSnapshotContent
 	err = wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
-		_, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vscName, metav1.GetOptions{})
+		vsc, err := snapshotClient.VolumeSnapshotContents().Get(ctx, vscName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -229,11 +237,16 @@ func EnsureDeleteVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1I
 			return false, errors.Wrapf(err, fmt.Sprintf("error to get VolumeSnapshotContent %s", vscName))
 		}
 
+		updated = vsc
 		return false, nil
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, "error to assure VolumeSnapshotContent is deleted, %s", vscName)
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.Errorf("timeout to assure VolumeSnapshotContent %s is deleted, finalizers in VSC %v", vscName, updated.Finalizers)
+		} else {
+			return errors.Wrapf(err, "error to assure VolumeSnapshotContent is deleted, %s", vscName)
+		}
 	}
 
 	return nil
@@ -477,6 +490,8 @@ func SetVolumeSnapshotContentDeletionPolicy(
 	return crClient.Patch(context.TODO(), vsc, crclient.MergeFrom(originVSC))
 }
 
+// CleanupVolumeSnapshot deletes the VolumeSnapshot and the associated VolumeSnapshotContent.  It will make sure the
+// physical snapshot is also deleted.
 func CleanupVolumeSnapshot(
 	volSnap *snapshotv1api.VolumeSnapshot,
 	crClient crclient.Client,
@@ -515,7 +530,8 @@ func CleanupVolumeSnapshot(
 	}
 }
 
-// DeleteVolumeSnapshot handles the VolumeSnapshot instance deletion.
+// DeleteVolumeSnapshot handles the VolumeSnapshot instance deletion.  It will make sure the VolumeSnapshotContent is
+// recreated so that the physical snapshot is retained.
 func DeleteVolumeSnapshot(
 	vs snapshotv1api.VolumeSnapshot,
 	vsc snapshotv1api.VolumeSnapshotContent,
@@ -772,4 +788,52 @@ func WaitUntilVSCHandleIsReady(
 	}
 
 	return vsc, nil
+}
+
+func DiagnoseVS(vs *snapshotv1api.VolumeSnapshot) string {
+	vscName := ""
+	readyToUse := false
+	errMessage := ""
+
+	if vs.Status != nil {
+		if vs.Status.BoundVolumeSnapshotContentName != nil {
+			vscName = *vs.Status.BoundVolumeSnapshotContentName
+		}
+
+		if vs.Status.ReadyToUse != nil {
+			readyToUse = *vs.Status.ReadyToUse
+		}
+
+		if vs.Status.Error != nil && vs.Status.Error.Message != nil {
+			errMessage = *vs.Status.Error.Message
+		}
+	}
+
+	diag := fmt.Sprintf("VS %s/%s, bind to %s, readyToUse %v, errMessage %s\n", vs.Namespace, vs.Name, vscName, readyToUse, errMessage)
+
+	return diag
+}
+
+func DiagnoseVSC(vsc *snapshotv1api.VolumeSnapshotContent) string {
+	handle := ""
+	readyToUse := false
+	errMessage := ""
+
+	if vsc.Status != nil {
+		if vsc.Status.SnapshotHandle != nil {
+			handle = *vsc.Status.SnapshotHandle
+		}
+
+		if vsc.Status.ReadyToUse != nil {
+			readyToUse = *vsc.Status.ReadyToUse
+		}
+
+		if vsc.Status.Error != nil && vsc.Status.Error.Message != nil {
+			errMessage = *vsc.Status.Error.Message
+		}
+	}
+
+	diag := fmt.Sprintf("VSC %s, readyToUse %v, errMessage %s, handle %s\n", vsc.Name, readyToUse, errMessage, handle)
+
+	return diag
 }

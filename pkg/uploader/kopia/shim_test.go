@@ -338,7 +338,7 @@ func TestConcatenateObjects(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			_, err := NewShimRepo(tc.backupRepo).ConcatenateObjects(ctx, tc.objectIDs)
+			_, err := NewShimRepo(tc.backupRepo).ConcatenateObjects(ctx, tc.objectIDs, repo.ConcatenateOptions{})
 
 			if tc.expectedError != "" {
 				assert.EqualError(t, err, tc.expectedError)

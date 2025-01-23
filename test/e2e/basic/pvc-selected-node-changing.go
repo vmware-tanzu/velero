@@ -68,14 +68,6 @@ func (p *PVCSelectedNodeChanging) CreateResources() error {
 			fmt.Sprintf("Failed to create namespace %s", p.namespace))
 	})
 
-	By(fmt.Sprintf("Create a storage class %s.", StorageClassName), func() {
-		Expect(InstallStorageClass(context.Background(), fmt.Sprintf("../testdata/storage-class/%s.yaml", p.VeleroCfg.CloudProvider))).To(Succeed())
-	})
-
-	By(fmt.Sprintf("Create a storage class %s.", StorageClassName), func() {
-		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", p.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
-	})
-
 	By(fmt.Sprintf("Create pod %s in namespace %s", p.podName, p.namespace), func() {
 		nodeNameList, err := GetWorkerNodes(p.Ctx)
 		Expect(err).To(Succeed())

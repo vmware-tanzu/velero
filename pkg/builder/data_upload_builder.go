@@ -133,6 +133,12 @@ func (d *DataUploadBuilder) Labels(labels map[string]string) *DataUploadBuilder 
 	return d
 }
 
+// Annotations sets the DataUpload's Annotations.
+func (d *DataUploadBuilder) Annotations(annotations map[string]string) *DataUploadBuilder {
+	d.object.Annotations = annotations
+	return d
+}
+
 // Progress sets the DataUpload's Progress.
 func (d *DataUploadBuilder) Progress(progress shared.DataMoveOperationProgress) *DataUploadBuilder {
 	d.object.Status.Progress = progress
@@ -142,5 +148,23 @@ func (d *DataUploadBuilder) Progress(progress shared.DataMoveOperationProgress) 
 // Node sets the DataUpload's Node.
 func (d *DataUploadBuilder) Node(node string) *DataUploadBuilder {
 	d.object.Status.Node = node
+	return d
+}
+
+// NodeOS sets the DataUpload's Node OS.
+func (d *DataUploadBuilder) NodeOS(nodeOS velerov2alpha1api.NodeOS) *DataUploadBuilder {
+	d.object.Status.NodeOS = nodeOS
+	return d
+}
+
+// AcceptedByNode sets the DataUpload's AcceptedByNode.
+func (d *DataUploadBuilder) AcceptedByNode(node string) *DataUploadBuilder {
+	d.object.Status.AcceptedByNode = node
+	return d
+}
+
+// AcceptedTimestamp sets the DataUpload's AcceptedTimestamp.
+func (d *DataUploadBuilder) AcceptedTimestamp(acceptedTimestamp *metav1.Time) *DataUploadBuilder {
+	d.object.Status.AcceptedTimestamp = acceptedTimestamp
 	return d
 }

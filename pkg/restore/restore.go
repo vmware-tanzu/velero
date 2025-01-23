@@ -48,6 +48,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
@@ -102,22 +103,23 @@ type Restorer interface {
 
 // kubernetesRestorer implements Restorer for restoring into a Kubernetes cluster.
 type kubernetesRestorer struct {
-	discoveryHelper            discovery.Helper
-	dynamicFactory             client.DynamicFactory
-	namespaceClient            corev1.NamespaceInterface
-	podVolumeRestorerFactory   podvolume.RestorerFactory
-	podVolumeTimeout           time.Duration
-	resourceTerminatingTimeout time.Duration
-	resourceTimeout            time.Duration
-	resourcePriorities         types.Priorities
-	fileSystem                 filesystem.Interface
-	pvRenamer                  func(string) (string, error)
-	logger                     logrus.FieldLogger
-	podCommandExecutor         podexec.PodCommandExecutor
-	podGetter                  cache.Getter
-	credentialFileStore        credentials.FileStore
-	kbClient                   crclient.Client
-	multiHookTracker           *hook.MultiHookTracker
+	discoveryHelper               discovery.Helper
+	dynamicFactory                client.DynamicFactory
+	namespaceClient               corev1.NamespaceInterface
+	podVolumeRestorerFactory      podvolume.RestorerFactory
+	podVolumeTimeout              time.Duration
+	resourceTerminatingTimeout    time.Duration
+	resourceTimeout               time.Duration
+	resourcePriorities            types.Priorities
+	fileSystem                    filesystem.Interface
+	pvRenamer                     func(string) (string, error)
+	logger                        logrus.FieldLogger
+	podCommandExecutor            podexec.PodCommandExecutor
+	podGetter                     cache.Getter
+	credentialFileStore           credentials.FileStore
+	kbClient                      crclient.Client
+	multiHookTracker              *hook.MultiHookTracker
+	resourceDeletionStatusTracker kube.ResourceDeletionStatusTracker
 }
 
 // NewKubernetesRestorer creates a new kubernetesRestorer.
@@ -323,6 +325,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		backupVolumeInfoMap:            req.BackupVolumeInfoMap,
 		restoreVolumeInfoTracker:       req.RestoreVolumeInfoTracker,
 		hooksWaitExecutor:              hooksWaitExecutor,
+		resourceDeletionStatusTracker:  req.ResourceDeletionStatusTracker,
 	}
 
 	return restoreCtx.execute()
@@ -371,6 +374,7 @@ type restoreContext struct {
 	backupVolumeInfoMap            map[string]volume.BackupVolumeInfo
 	restoreVolumeInfoTracker       *volume.RestoreVolumeInfoTracker
 	hooksWaitExecutor              *hooksWaitExecutor
+	resourceDeletionStatusTracker  kube.ResourceDeletionStatusTracker
 }
 
 type resourceClientKey struct {
@@ -718,6 +722,7 @@ func (ctx *restoreContext) processSelectedResource(
 					ns,
 					ctx.namespaceClient,
 					ctx.resourceTerminatingTimeout,
+					ctx.resourceDeletionStatusTracker,
 				)
 				if err != nil {
 					errs.AddVeleroError(err)
@@ -1119,7 +1124,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		// namespace into which the resource is being restored into exists.
 		// This is the *remapped* namespace that we are ensuring exists.
 		nsToEnsure := getNamespace(ctx.log, archive.GetItemFilePath(ctx.restoreDir, "namespaces", "", obj.GetNamespace()), namespace)
-		_, nsCreated, err := kube.EnsureNamespaceExistsAndIsReady(nsToEnsure, ctx.namespaceClient, ctx.resourceTerminatingTimeout)
+		_, nsCreated, err := kube.EnsureNamespaceExistsAndIsReady(nsToEnsure, ctx.namespaceClient, ctx.resourceTerminatingTimeout, ctx.resourceDeletionStatusTracker)
 		if err != nil {
 			errs.AddVeleroError(err)
 			return warnings, errs, itemExists
@@ -1665,13 +1670,26 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			errs.Add(namespace, err)
 			return warnings, errs, itemExists
 		}
-		obj.SetResourceVersion(createdObj.GetResourceVersion())
-		updated, err := resourceClient.UpdateStatus(obj, metav1.UpdateOptions{})
-		if err != nil {
+
+		resourceVersion := createdObj.GetResourceVersion()
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			obj.SetResourceVersion(resourceVersion)
+			updated, err := resourceClient.UpdateStatus(obj, metav1.UpdateOptions{})
+			if err != nil {
+				if apierrors.IsConflict(err) {
+					res, err := resourceClient.Get(name, metav1.GetOptions{})
+					if err == nil {
+						resourceVersion = res.GetResourceVersion()
+					}
+				}
+				return err
+			}
+
+			createdObj = updated
+			return nil
+		}); err != nil {
 			ctx.log.Infof("status field update failed %s: %v", kube.NamespaceAndName(obj), err)
 			warnings.Add(namespace, err)
-		} else {
-			createdObj = updated
 		}
 	}
 

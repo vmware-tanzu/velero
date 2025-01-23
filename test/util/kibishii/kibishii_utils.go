@@ -65,8 +65,15 @@ func GetKibishiiPVCNameList(workerCount int) []string {
 }
 
 // RunKibishiiTests runs kibishii tests on the provider.
-func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
-	useVolumeSnapshots, defaultVolumesToFsBackup bool) error {
+func RunKibishiiTests(
+	veleroCfg VeleroConfig,
+	backupName string,
+	restoreName string,
+	backupLocation string,
+	kibishiiNamespace string,
+	useVolumeSnapshots bool,
+	defaultVolumesToFsBackup bool,
+) error {
 	pvCount := len(KibishiiPVCNameList)
 	client := *veleroCfg.ClientToInstallVelero
 	oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
@@ -120,9 +127,8 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 
 	// Checkpoint for a successful backup
 	if useVolumeSnapshots {
-		if providerName == Vsphere {
+		if veleroCfg.HasVspherePlugin {
 			// Wait for uploads started by the Velero Plugin for vSphere to complete
-			// TODO - remove after upload progress monitoring is implemented
 			fmt.Println("Waiting for vSphere uploads to complete")
 			if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace, 2); err != nil {
 				return errors.Wrapf(err, "Error waiting for uploads to complete")
@@ -132,9 +138,12 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		if err != nil {
 			return errors.Wrap(err, "Fail to get snapshot checkpoint")
 		}
-		err = SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,
-			veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLConfig,
-			backupName, snapshotCheckPoint)
+		err = CheckSnapshotsInProvider(
+			veleroCfg,
+			backupName,
+			snapshotCheckPoint,
+			false,
+		)
 		if err != nil {
 			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
@@ -167,9 +176,12 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 					return errors.Wrap(err, "failed to get snapshot checkPoint")
 				}
 			} else {
-				err = SnapshotsShouldNotExistInCloud(veleroCfg.CloudProvider,
-					veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLConfig,
-					backupName, SnapshotCheckPoint{})
+				err = CheckSnapshotsInProvider(
+					veleroCfg,
+					backupName,
+					SnapshotCheckPoint{},
+					false,
+				)
 				if err != nil {
 					return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 				}

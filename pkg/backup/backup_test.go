@@ -76,6 +76,7 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 	req := &Request{
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
+		BackedUpItems:    NewBackedUpItemsMap(),
 	}
 
 	backupFile := bytes.NewBuffer([]byte{})
@@ -103,7 +104,7 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 	// go through BackedUpItems after the backup to assemble the list of files we
 	// expect to see in the tarball and compare to see if they match
 	var expectedFiles []string
-	for item := range req.BackedUpItems {
+	for item := range req.BackedUpItems.CopyItemMap() {
 		file := "resources/" + gvkToResource[item.resource]
 		if item.namespace != "" {
 			file = file + "/namespaces/" + item.namespace
@@ -135,6 +136,7 @@ func TestBackupProgressIsUpdated(t *testing.T) {
 	req := &Request{
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
+		BackedUpItems:    NewBackedUpItemsMap(),
 	}
 	backupFile := bytes.NewBuffer([]byte{})
 
@@ -159,8 +161,8 @@ func TestBackupProgressIsUpdated(t *testing.T) {
 	h.backupper.Backup(h.log, req, backupFile, nil, nil, nil)
 
 	require.NotNil(t, req.Status.Progress)
-	assert.Len(t, req.BackedUpItems, req.Status.Progress.TotalItems)
-	assert.Len(t, req.BackedUpItems, req.Status.Progress.ItemsBackedUp)
+	assert.Equal(t, req.BackedUpItems.Len(), req.Status.Progress.TotalItems)
+	assert.Equal(t, req.BackedUpItems.Len(), req.Status.Progress.ItemsBackedUp)
 }
 
 // TestBackupOldResourceFiltering runs backups with different combinations
@@ -871,6 +873,7 @@ func TestBackupOldResourceFiltering(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1048,6 +1051,7 @@ func TestCRDInclusion(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1143,6 +1147,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1169,6 +1174,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 	backup1 := &Request{
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
+		BackedUpItems:    NewBackedUpItemsMap(),
 	}
 	backup1File := bytes.NewBuffer([]byte{})
 
@@ -1183,6 +1189,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 	backup2 := &Request{
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
+		BackedUpItems:    NewBackedUpItemsMap(),
 	}
 	backup2File := bytes.NewBuffer([]byte{})
 
@@ -1233,6 +1240,7 @@ func TestBackupResourceOrdering(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1349,6 +1357,7 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 			backupReq: &Request{
 				Backup:           defaultBackup().SnapshotVolumes(false).Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			resPolicies: &resourcepolicies.ResourcePolicies{
 				Version: "v1",
@@ -1395,6 +1404,7 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 					},
 					includedPVs: map[string]struct{}{},
 				},
+				BackedUpItems: NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVCs(
@@ -1641,6 +1651,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1722,6 +1733,7 @@ func TestBackupWithInvalidActions(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1872,6 +1884,7 @@ func TestBackupActionModifications(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2128,6 +2141,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2385,6 +2399,7 @@ func TestItemBlockActionsRunForCorrectItems(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2466,6 +2481,7 @@ func TestBackupWithInvalidItemBlockActions(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2718,6 +2734,7 @@ func TestItemBlockActionRelatedItems(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2882,6 +2899,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -2916,6 +2934,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -2951,6 +2970,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -2986,6 +3006,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3021,6 +3042,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3054,6 +3076,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3070,6 +3093,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			req: &Request{
 				Backup:           defaultBackup().Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3089,6 +3113,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3106,6 +3131,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3126,6 +3152,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "another", "another"),
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3256,6 +3283,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 			req: &Request{
 				Backup:           defaultBackup().Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -3286,6 +3314,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 			req: &Request{
 				Backup:           defaultBackup().Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -3316,6 +3345,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 			req: &Request{
 				Backup:           defaultBackup().Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
+				BackedUpItems:    NewBackedUpItemsMap(),
 			},
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -3398,6 +3428,7 @@ func TestBackupWithInvalidHooks(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -3868,6 +3899,7 @@ func TestBackupWithHooks(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile         = bytes.NewBuffer([]byte{})
 				podCommandExecutor = new(test.MockPodCommandExecutor)
@@ -3894,7 +3926,17 @@ func TestBackupWithHooks(t *testing.T) {
 			require.NoError(t, h.backupper.Backup(h.log, req, backupFile, nil, tc.actions, nil))
 
 			if tc.wantHookExecutionLog != nil {
-				assert.Equal(t, tc.wantHookExecutionLog, podCommandExecutor.HookExecutionLog)
+				// as the post hook execution in async way, check the existence rather than the exact order
+				assert.Equal(t, len(tc.wantHookExecutionLog), len(podCommandExecutor.HookExecutionLog))
+				m := map[string]struct{}{}
+				for _, entry := range podCommandExecutor.HookExecutionLog {
+					m[entry.String()] = struct{}{}
+				}
+
+				for _, entry := range tc.wantHookExecutionLog {
+					_, exist := m[entry.String()]
+					assert.True(t, exist)
+				}
 			}
 			assertTarballContents(t, backupFile, append(tc.wantBackedUp, "metadata/version")...)
 		})
@@ -3903,7 +3945,7 @@ func TestBackupWithHooks(t *testing.T) {
 
 type fakePodVolumeBackupperFactory struct{}
 
-func (f *fakePodVolumeBackupperFactory) NewBackupper(context.Context, *velerov1.Backup, string) (podvolume.Backupper, error) {
+func (f *fakePodVolumeBackupperFactory) NewBackupper(context.Context, logrus.FieldLogger, *velerov1.Backup, string) (podvolume.Backupper, error) {
 	return &fakePodVolumeBackupper{}, nil
 }
 
@@ -3934,6 +3976,24 @@ func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *
 
 func (b *fakePodVolumeBackupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velerov1.PodVolumeBackup {
 	return b.pvbs
+}
+
+func (b *fakePodVolumeBackupper) GetPodVolumeBackup(namespace, name string) (*velerov1.PodVolumeBackup, error) {
+	for _, pvb := range b.pvbs {
+		if pvb.Namespace == namespace && pvb.Name == name {
+			return pvb, nil
+		}
+	}
+	return nil, nil
+}
+func (b *fakePodVolumeBackupper) ListPodVolumeBackupsByPod(podNamespace, podName string) ([]*velerov1.PodVolumeBackup, error) {
+	var pvbs []*velerov1.PodVolumeBackup
+	for _, pvb := range b.pvbs {
+		if pvb.Spec.Pod.Namespace == podNamespace && pvb.Spec.Pod.Name == podName {
+			pvbs = append(pvbs, pvb)
+		}
+	}
+	return pvbs, nil
 }
 
 // TestBackupWithPodVolume runs backups of pods that are annotated for PodVolume backup,
@@ -4071,6 +4131,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 					Backup:            tc.backup,
 					SnapshotLocations: []*velerov1.VolumeSnapshotLocation{tc.vsl},
 					SkippedPVTracker:  NewSkipPVTracker(),
+					BackedUpItems:     NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -4199,7 +4260,7 @@ func newHarness(t *testing.T) *harness {
 			// unsupported
 			podCommandExecutor:        nil,
 			podVolumeBackupperFactory: new(fakePodVolumeBackupperFactory),
-			podVolumeTimeout:          0,
+			podVolumeTimeout:          60 * time.Second,
 		},
 		log: log,
 	}
@@ -5181,6 +5242,7 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -5342,6 +5404,7 @@ func TestBackupNamespaces(t *testing.T) {
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
+					BackedUpItems:    NewBackedUpItemsMap(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -5510,6 +5573,36 @@ func TestUpdateVolumeInfos(t *testing.T) {
 				},
 			},
 		},
+		{
+			// This is an error case. No crash happen here is good enough.
+			name:       "VolumeInfo doesn't have SnapshotDataMovementInfo when there is a matching DataUpload",
+			operations: []*itemoperation.BackupOperation{},
+			dataUpload: builder.ForDataUpload("velero", "du-1").
+				CompletionTimestamp(&now).
+				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{VolumeSnapshot: "vs-1"}).
+				SnapshotID("snapshot-id").
+				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000}).
+				Phase(velerov2alpha1.DataUploadPhaseCompleted).
+				SourceNamespace("ns-1").
+				SourcePVC("pvc-1").
+				Result(),
+			volumeInfos: []*volume.BackupVolumeInfo{
+				{
+					PVCName:                  "pvc-1",
+					PVCNamespace:             "ns-1",
+					CompletionTimestamp:      &metav1.Time{},
+					SnapshotDataMovementInfo: nil,
+				},
+			},
+			expectedVolumeInfos: []*volume.BackupVolumeInfo{
+				{
+					PVCName:                  "pvc-1",
+					PVCNamespace:             "ns-1",
+					CompletionTimestamp:      &metav1.Time{},
+					SnapshotDataMovementInfo: nil,
+				},
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -5526,8 +5619,10 @@ func TestUpdateVolumeInfos(t *testing.T) {
 			}
 
 			require.NoError(t, updateVolumeInfos(tc.volumeInfos, unstructures, tc.operations, logger))
-			require.Equal(t, tc.expectedVolumeInfos[0].CompletionTimestamp, tc.volumeInfos[0].CompletionTimestamp)
-			require.Equal(t, tc.expectedVolumeInfos[0].SnapshotDataMovementInfo, tc.volumeInfos[0].SnapshotDataMovementInfo)
+			if len(tc.expectedVolumeInfos) > 0 {
+				require.Equal(t, tc.expectedVolumeInfos[0].CompletionTimestamp, tc.volumeInfos[0].CompletionTimestamp)
+				require.Equal(t, tc.expectedVolumeInfos[0].SnapshotDataMovementInfo, tc.volumeInfos[0].SnapshotDataMovementInfo)
+			}
 		})
 	}
 }

@@ -45,6 +45,15 @@ func GetEnvVarsFromVeleroServer(deployment *appsv1.Deployment) []v1.EnvVar {
 	return nil
 }
 
+// GetEnvFromSourcesFromVeleroServer get the environment sources from the Velero server deployment
+func GetEnvFromSourcesFromVeleroServer(deployment *appsv1.Deployment) []v1.EnvFromSource {
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		// We only have one container in the Velero server deployment
+		return container.EnvFrom
+	}
+	return nil
+}
+
 // GetVolumeMountsFromVeleroServer get the volume mounts from the Velero server deployment
 func GetVolumeMountsFromVeleroServer(deployment *appsv1.Deployment) []v1.VolumeMount {
 	for _, container := range deployment.Spec.Template.Spec.Containers {
@@ -77,4 +86,13 @@ func GetVeleroServerLables(deployment *appsv1.Deployment) map[string]string {
 // GetVeleroServerAnnotations get the annotations of the Velero server deployment
 func GetVeleroServerAnnotations(deployment *appsv1.Deployment) map[string]string {
 	return deployment.Spec.Template.Annotations
+}
+
+// GetVeleroServerLabelValue returns the value of specified label of Velero server deployment
+func GetVeleroServerLabelValue(deployment *appsv1.Deployment, key string) string {
+	if deployment.Spec.Template.Labels == nil {
+		return ""
+	}
+
+	return deployment.Spec.Template.Labels[key]
 }

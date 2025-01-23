@@ -50,8 +50,10 @@ import (
 	datapathmockes "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
 	exposermockes "github.com/vmware-tanzu/velero/pkg/exposer/mocks"
 )
@@ -66,11 +68,11 @@ func dataDownloadBuilder() *builder.DataDownloadBuilder {
 		PV:        "test-pv",
 		PVC:       "test-pvc",
 		Namespace: "test-ns",
-	})
+	}).NodeOS(velerov2alpha1api.NodeOS("linux"))
 }
 
 func initDataDownloadReconciler(objects []runtime.Object, needError ...bool) (*DataDownloadReconciler, error) {
-	var errs []error = make([]error, 6)
+	var errs = make([]error, 6)
 	for k, isError := range needError {
 		if k == 0 && isError {
 			errs[0] = fmt.Errorf("Get error")
@@ -140,7 +142,7 @@ func initDataDownloadReconcilerWithError(objects []runtime.Object, needError ...
 
 	dataPathMgr := datapath.NewManager(1)
 
-	return NewDataDownloadReconciler(fakeClient, nil, fakeKubeClient, dataPathMgr, corev1.ResourceRequirements{}, "test-node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
+	return NewDataDownloadReconciler(fakeClient, nil, fakeKubeClient, dataPathMgr, nodeagent.RestorePVC{}, corev1.ResourceRequirements{}, "test-node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
 }
 
 func TestDataDownloadReconcile(t *testing.T) {
@@ -165,6 +167,8 @@ func TestDataDownloadReconcile(t *testing.T) {
 			},
 		},
 	}
+
+	node := builder.ForNode("fake-node").Labels(map[string]string{kube.NodeOSLabel: kube.NodeOSLinux}).Result()
 
 	tests := []struct {
 		name              string
@@ -325,8 +329,14 @@ func TestDataDownloadReconcile(t *testing.T) {
 		},
 		{
 			name:      "Restore is exposed",
-			dd:        dataDownloadBuilder().Result(),
+			dd:        dataDownloadBuilder().NodeOS(velerov2alpha1api.NodeOSLinux).Result(),
 			targetPVC: builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+		},
+		{
+			name:              "Expected node doesn't exist",
+			dd:                dataDownloadBuilder().NodeOS(velerov2alpha1api.NodeOSWindows).Result(),
+			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			expectedStatusMsg: "no appropriate node to run datadownload",
 		},
 		{
 			name:      "Get empty restore exposer",
@@ -349,7 +359,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 		},
 		{
 			name:     "prepare timeout",
-			dd:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).StartTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 5)}).Result(),
+			dd:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).AcceptedTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 5)}).Result(),
 			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Result(),
 		},
 		{
@@ -387,9 +397,9 @@ func TestDataDownloadReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var objs []runtime.Object
+			objs := []runtime.Object{daemonSet, node}
 			if test.targetPVC != nil {
-				objs = []runtime.Object{test.targetPVC, daemonSet}
+				objs = append(objs, test.targetPVC)
 			}
 			r, err := initDataDownloadReconciler(objs, test.needErrs...)
 			require.NoError(t, err)
@@ -496,7 +506,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 
 			if test.expected != nil {
 				require.NoError(t, err)
-				assert.Equal(t, dd.Status.Phase, test.expected.Status.Phase)
+				assert.Equal(t, test.expected.Status.Phase, dd.Status.Phase)
 			}
 
 			if test.isGetExposeErr {
@@ -959,7 +969,7 @@ func (dt *ddResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler,
 	return dt.resumeErr
 }
 
-func (dt *ddResumeTestHelper) Expose(context.Context, corev1.ObjectReference, string, string, map[string]string, corev1.ResourceRequirements, time.Duration) error {
+func (dt *ddResumeTestHelper) Expose(context.Context, corev1.ObjectReference, exposer.GenericRestoreExposeParam) error {
 	return nil
 }
 
@@ -969,6 +979,10 @@ func (dt *ddResumeTestHelper) GetExposed(context.Context, corev1.ObjectReference
 
 func (dt *ddResumeTestHelper) PeekExposed(context.Context, corev1.ObjectReference) error {
 	return nil
+}
+
+func (dt *ddResumeTestHelper) DiagnoseExpose(context.Context, corev1.ObjectReference) string {
+	return ""
 }
 
 func (dt *ddResumeTestHelper) RebindVolume(context.Context, corev1.ObjectReference, string, string, time.Duration) error {
@@ -1003,23 +1017,19 @@ func TestAttemptDataDownloadResume(t *testing.T) {
 		},
 		{
 			name:                   "accepted DataDownload in the current node",
-			dd:                     dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Labels(map[string]string{acceptNodeLabelKey: "node-1"}).Result(),
+			dd:                     dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).AcceptedByNode("node-1").Result(),
 			cancelledDataDownloads: []string{dataDownloadName},
 			acceptedDataDownloads:  []string{dataDownloadName},
 		},
 		{
-			name: "accepted DataDownload with dd label but is canceled",
-			dd: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Cancel(true).Labels(map[string]string{
-				acceptNodeLabelKey: "node-1",
-			}).Result(),
+			name:                   "accepted DataDownload with dd label but is canceled",
+			dd:                     dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Cancel(true).AcceptedByNode("node-1").Result(),
 			acceptedDataDownloads:  []string{dataDownloadName},
 			cancelledDataDownloads: []string{dataDownloadName},
 		},
 		{
-			name: "accepted DataDownload with dd label but cancel fail",
-			dd: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Labels(map[string]string{
-				acceptNodeLabelKey: "node-1",
-			}).Result(),
+			name:                  "accepted DataDownload with dd label but cancel fail",
+			dd:                    dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).AcceptedByNode("node-1").Result(),
 			needErrs:              []bool{false, false, true, false, false, false},
 			acceptedDataDownloads: []string{dataDownloadName},
 		},

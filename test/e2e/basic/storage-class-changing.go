@@ -18,7 +18,7 @@ type StorageClasssChanging struct {
 	TestCase
 	labels          map[string]string
 	data            map[string]string
-	configmaptName  string
+	cmName          string
 	namespace       string
 	srcStorageClass string
 	desStorageClass string
@@ -51,7 +51,7 @@ func (s *StorageClasssChanging) Init() error {
 	s.labels = map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
 		"velero.io/plugin-config": ""}
 	s.data = map[string]string{s.srcStorageClass: s.desStorageClass}
-	s.configmaptName = "change-storage-class-config"
+	s.cmName = "change-storage-class-config"
 	s.volume = "volume-1"
 	s.pvcName = fmt.Sprintf("pvc-%s", s.volume)
 	s.podName = "pod-1"
@@ -72,10 +72,6 @@ func (s *StorageClasssChanging) CreateResources() error {
 		"app": "test",
 	}
 
-	By(("Installing storage class..."), func() {
-		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", s.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
-	})
-
 	By(fmt.Sprintf("Create namespace %s", s.namespace), func() {
 		Expect(CreateNamespace(s.Ctx, s.Client, s.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", s.namespace))
@@ -94,8 +90,8 @@ func (s *StorageClasssChanging) CreateResources() error {
 		Expect(err).To(Succeed())
 	})
 
-	By(fmt.Sprintf("Create ConfigMap %s in namespace %s", s.configmaptName, s.VeleroCfg.VeleroNamespace), func() {
-		_, err := CreateConfigMap(s.Client.ClientGo, s.VeleroCfg.VeleroNamespace, s.configmaptName, s.labels, s.data)
+	By(fmt.Sprintf("Create ConfigMap %s in namespace %s", s.cmName, s.VeleroCfg.VeleroNamespace), func() {
+		_, err := CreateConfigMap(s.Client.ClientGo, s.VeleroCfg.VeleroNamespace, s.cmName, s.labels, s.data)
 		Expect(err).To(Succeed(), fmt.Sprintf("failed to create configmap in the namespace %q", s.VeleroCfg.VeleroNamespace))
 	})
 	return nil
@@ -149,8 +145,7 @@ func (s *StorageClasssChanging) Clean() error {
 			Expect(CleanupNamespacesWithPoll(s.Ctx, s.Client, s.CaseBaseName)).To(Succeed(),
 				fmt.Sprintf("Failed to delete namespace %s", s.CaseBaseName))
 		})
-		DeleteConfigmap(s.Client.ClientGo, s.VeleroCfg.VeleroNamespace, s.configmaptName)
-		DeleteStorageClass(s.Ctx, s.Client, s.desStorageClass)
+		DeleteConfigMap(s.Client.ClientGo, s.VeleroCfg.VeleroNamespace, s.cmName)
 		s.TestCase.Clean()
 	}
 

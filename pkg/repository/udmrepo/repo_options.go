@@ -200,7 +200,12 @@ func GetRepoDomain() string {
 
 func getRepoConfigFile(workPath string, repoID string) string {
 	if workPath == "" {
-		workPath = filepath.Join(os.Getenv("HOME"), "udmrepo")
+		home := os.Getenv("HOME")
+		if home != "" {
+			workPath = filepath.Join(home, "udmrepo")
+		} else {
+			workPath = filepath.Join(os.TempDir(), "udmrepo")
+		}
 	}
 
 	name := "repo-" + strings.ToLower(repoID) + ".conf"

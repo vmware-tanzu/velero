@@ -396,7 +396,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 		restore.Spec.ScheduleName = info.backup.GetLabels()[api.ScheduleNameLabel]
 	}
 
-	var resourceModifiers *resourcemodifiers.ResourceModifiers = nil
+	var resourceModifiers *resourcemodifiers.ResourceModifiers
 	if restore.Spec.ResourceModifier != nil && strings.EqualFold(restore.Spec.ResourceModifier.Kind, resourcemodifiers.ConfigmapRefType) {
 		ResourceModifierConfigMap := &corev1api.ConfigMap{}
 		err := r.kbClient.Get(context.Background(), client.ObjectKey{Namespace: restore.Namespace, Name: restore.Spec.ResourceModifier.Name}, ResourceModifierConfigMap)
@@ -559,17 +559,18 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 	}
 
 	restoreReq := &pkgrestore.Request{
-		Log:                      restoreLog,
-		Restore:                  restore,
-		Backup:                   info.backup,
-		PodVolumeBackups:         podVolumeBackups,
-		VolumeSnapshots:          volumeSnapshots,
-		BackupReader:             backupFile,
-		ResourceModifiers:        resourceModifiers,
-		DisableInformerCache:     r.disableInformerCache,
-		CSIVolumeSnapshots:       csiVolumeSnapshots,
-		BackupVolumeInfoMap:      backupVolumeInfoMap,
-		RestoreVolumeInfoTracker: volume.NewRestoreVolInfoTracker(restore, restoreLog, r.globalCrClient),
+		Log:                           restoreLog,
+		Restore:                       restore,
+		Backup:                        info.backup,
+		PodVolumeBackups:              podVolumeBackups,
+		VolumeSnapshots:               volumeSnapshots,
+		BackupReader:                  backupFile,
+		ResourceModifiers:             resourceModifiers,
+		DisableInformerCache:          r.disableInformerCache,
+		CSIVolumeSnapshots:            csiVolumeSnapshots,
+		BackupVolumeInfoMap:           backupVolumeInfoMap,
+		RestoreVolumeInfoTracker:      volume.NewRestoreVolInfoTracker(restore, restoreLog, r.globalCrClient),
+		ResourceDeletionStatusTracker: kubeutil.NewResourceDeletionStatusTracker(),
 	}
 	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, pluginManager)
 
