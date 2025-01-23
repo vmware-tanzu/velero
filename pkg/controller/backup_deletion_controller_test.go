@@ -25,6 +25,8 @@ import (
 	"reflect"
 	"time"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+
 	"context"
 
 	"github.com/sirupsen/logrus"
@@ -609,7 +611,13 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 				Provider: "provider-1",
 			},
 		}
-		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), backup, location, snapshotLocation)
+
+		csiSnapshot := builder.ForVolumeSnapshot("user-ns", "vs-1").ObjectMeta(
+			builder.WithLabelsMap(map[string]string{
+				"velero.io/backup-name": "foo",
+			})).SourcePVC("some-pvc").Result()
+
+		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), backup, location, snapshotLocation, csiSnapshot)
 		td.volumeSnapshotter.SnapshotsTaken.Insert("snap-1")
 
 		snapshots := []*volume.Snapshot{
@@ -653,6 +661,13 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Name:      backup.Name,
 		}, &velerov1api.Backup{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
+
+		// leaked CSI snapshot should be deleted
+		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+			Namespace: "user-ns",
+			Name:      "vs-1",
+		}, &snapshotv1api.VolumeSnapshot{})
+		assert.True(t, apierrors.IsNotFound(err), "Expected not found error for the leaked CSI snapshot, but actual value of error: %v", err)
 
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())

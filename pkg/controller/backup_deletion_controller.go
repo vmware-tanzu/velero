@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/util/csi"
+
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -34,6 +36,8 @@ import (
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/delete"
@@ -251,12 +255,18 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	// don't defer CleanupClients here, since it was already called above.
 
+	var errs []string
+
 	if len(actions) > 0 {
 		// Download the tarball
 		backupFile, err := downloadToTempFile(backup.Name, backupStore, log)
 
 		if err != nil {
 			log.WithError(err).Errorf("Unable to download tarball for backup %s, skipping associated DeleteItemAction plugins", backup.Name)
+			log.Info("Cleaning up CSI volumesnapshots")
+			if err := r.deleteCSIVolumeSnapshots(ctx, backup, log); err != nil {
+				errs = append(errs, err.Error())
+			}
 		} else {
 			defer closeAndRemoveFile(backupFile, r.logger)
 			deleteCtx := &delete.Context{
@@ -278,8 +288,6 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			}
 		}
 	}
-
-	var errs []string
 
 	if backupStore != nil {
 		log.Info("Removing PV snapshots")
@@ -493,6 +501,24 @@ func (r *backupDeletionReconciler) deleteExistingDeletionRequests(ctx context.Co
 		}
 	}
 	return errs
+}
+
+// deleteCSIVolumeSnapshots clean up the CSI snapshots created by the backup, this should be called when the backup is failed
+// when it's running, e.g. due to velero pod restart, and the backup.tar is failed to be downloaded from storage.
+func (r *backupDeletionReconciler) deleteCSIVolumeSnapshots(ctx context.Context, backup *velerov1api.Backup, log logrus.FieldLogger) error {
+	vsList := snapshotv1api.VolumeSnapshotList{}
+	if err := r.Client.List(ctx, &vsList, &client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
+		}),
+	}); err != nil {
+		return errors.Wrap(err, "error listing volume snapshots")
+	}
+	for _, item := range vsList.Items {
+		vs := item
+		csi.CleanupVolumeSnapshot(&vs, r.Client, log)
+	}
+	return nil
 }
 
 func (r *backupDeletionReconciler) deletePodVolumeSnapshots(ctx context.Context, backup *velerov1api.Backup) []error {
