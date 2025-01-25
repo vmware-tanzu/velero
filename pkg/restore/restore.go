@@ -1302,15 +1302,6 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 	}
 
-	objStatus, statusFieldExists, statusFieldErr := unstructured.NestedFieldCopy(obj.Object, "status")
-	// Clear out non-core metadata fields and status.
-	if obj, err = resetMetadataAndStatus(obj); err != nil {
-		errs.Add(namespace, err)
-		return warnings, errs, itemExists
-	}
-
-	ctx.log.Infof("restore status includes excludes: %+v", ctx.resourceStatusIncludesExcludes)
-
 	for _, action := range ctx.getApplicableActions(groupResource, namespace) {
 		if !action.Selector.Matches(labels.Set(obj.GetLabels())) {
 			continue
@@ -1458,6 +1449,15 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			}
 		}
 	}
+
+	// Status is removed after the ResourceModifiers are applied as some resource modifiers may rely on status fields to modify the object.
+	objStatus, statusFieldExists, statusFieldErr := unstructured.NestedFieldCopy(obj.Object, "status")
+	// Clear out non-core metadata fields and status.
+	if obj, err = resetMetadataAndStatus(obj); err != nil {
+		errs.Add(namespace, err)
+		return warnings, errs, itemExists
+	}
+	ctx.log.Infof("restore status includes excludes: %+v", ctx.resourceStatusIncludesExcludes)
 
 	// Necessary because we may have remapped the namespace if the namespace is
 	// blank, don't create the key.
