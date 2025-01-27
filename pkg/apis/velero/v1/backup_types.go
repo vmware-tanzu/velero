@@ -87,7 +87,9 @@ type BackupSpec struct {
 
 	// LabelSelector is a metav1.LabelSelector to filter with
 	// when adding individual objects to the backup. If empty
-	// or nil, all objects are included. Optional.
+	// or nil, all objects are included.
+	// If matched object is Namespace, the namespace will act as IncludedNamespaces,
+	// and all resources in the namespace are included in the backup. Optional.
 	// +optional
 	// +nullable
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
