@@ -35,7 +35,7 @@ import (
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 )
 
-func CreateNamespace(ctx context.Context, client TestClient, namespace string) error {
+func CreateNamespace(_ context.Context, client TestClient, namespace string) error {
 	ns := builder.ForNamespace(namespace).Result()
 	// Add label to avoid PSA check.
 	ns.Labels = map[string]string{
@@ -62,7 +62,7 @@ func CreateNamespaceWithLabel(ctx context.Context, client TestClient, namespace 
 	return err
 }
 
-func CreateNamespaceWithAnnotation(ctx context.Context, client TestClient, namespace string, annotation map[string]string) error {
+func CreateNamespaceWithAnnotation(_ context.Context, client TestClient, namespace string, annotation map[string]string) error {
 	ns := builder.ForNamespace(namespace).Result()
 	// Add label to avoid PSA check.
 	ns.Labels = map[string]string{
@@ -95,7 +95,7 @@ func KubectlDeleteNamespace(ctx context.Context, namespace string) error {
 	return err
 }
 
-func DeleteNamespace(ctx context.Context, client TestClient, namespace string, wait bool) error {
+func DeleteNamespace(_ context.Context, _ TestClient, namespace string, wait bool) error {
 	tenMinuteTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*10)
 	defer ctxCancel()
 

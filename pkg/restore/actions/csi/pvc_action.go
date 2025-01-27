@@ -341,8 +341,8 @@ func (p *pvcRestoreItemAction) Cancel(
 }
 
 func (p *pvcRestoreItemAction) AreAdditionalItemsReady(
-	additionalItems []velero.ResourceIdentifier,
-	restore *velerov1api.Restore,
+	_ []velero.ResourceIdentifier,
+	_ *velerov1api.Restore,
 ) (bool, error) {
 	return true, nil
 }

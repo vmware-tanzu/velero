@@ -67,7 +67,7 @@ func NewBackupCommand(f client.Factory) *cobra.Command {
 		Short:  "Run the velero data-mover backup",
 		Long:   "Run the velero data-mover backup",
 		Hidden: true,
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(c *cobra.Command, _ []string) {
 			logLevel := logLevelFlag.Parse()
 			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))
 

@@ -1456,15 +1456,15 @@ func (a *recordResourcesAction) Execute(input *velero.RestoreItemActionExecuteIn
 	}, nil
 }
 
-func (a *recordResourcesAction) Progress(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
+func (a *recordResourcesAction) Progress(_ string, _ *velerov1api.Restore) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, nil
 }
 
-func (a *recordResourcesAction) Cancel(operationID string, restore *velerov1api.Restore) error {
+func (a *recordResourcesAction) Cancel(_ string, _ *velerov1api.Restore) error {
 	return nil
 }
 
-func (a *recordResourcesAction) AreAdditionalItemsReady(additionalItems []velero.ResourceIdentifier, restore *velerov1api.Restore) (bool, error) {
+func (a *recordResourcesAction) AreAdditionalItemsReady(_ []velero.ResourceIdentifier, _ *velerov1api.Restore) (bool, error) {
 	return true, nil
 }
 
@@ -1691,11 +1691,11 @@ func (a *pluggableAction) AppliesTo() (velero.ResourceSelector, error) {
 	return a.selector, nil
 }
 
-func (a *pluggableAction) Progress(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
+func (a *pluggableAction) Progress(_ string, _ *velerov1api.Restore) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, nil
 }
 
-func (a *pluggableAction) Cancel(operationID string, restore *velerov1api.Restore) error {
+func (a *pluggableAction) Cancel(_ string, _ *velerov1api.Restore) error {
 	return nil
 }
 
@@ -1704,7 +1704,7 @@ func (a *pluggableAction) addSelector(selector velero.ResourceSelector) *pluggab
 	return a
 }
 
-func (a *pluggableAction) AreAdditionalItemsReady(additionalItems []velero.ResourceIdentifier, restore *velerov1api.Restore) (bool, error) {
+func (a *pluggableAction) AreAdditionalItemsReady(_ []velero.ResourceIdentifier, _ *velerov1api.Restore) (bool, error) {
 	return true, nil
 }
 
@@ -1857,7 +1857,7 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 				OperationID: obj.GetName() + "-1",
 			}, nil
 		},
-		progressFunc: func(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
+		progressFunc: func(_ string, _ *velerov1api.Restore) (velero.OperationProgress, error) {
 			return velero.OperationProgress{
 				Completed:   true,
 				Description: "Done!",
@@ -1878,7 +1878,7 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 				OperationID: obj.GetName() + "-1",
 			}, nil
 		},
-		progressFunc: func(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
+		progressFunc: func(_ string, _ *velerov1api.Restore) (velero.OperationProgress, error) {
 			return velero.OperationProgress{
 				Completed:   false,
 				Description: "Working...",
@@ -2394,13 +2394,13 @@ type volumeSnapshotter struct {
 }
 
 // Init is a no-op.
-func (vs *volumeSnapshotter) Init(config map[string]string) error {
+func (vs *volumeSnapshotter) Init(_ map[string]string) error {
 	return nil
 }
 
 // CreateVolumeFromSnapshot looks up the specified snapshotID in the snapshotVolumes
 // map and returns the corresponding volumeID if it exists, or an error otherwise.
-func (vs *volumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+func (vs *volumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, _, _ string, _ *int64) (volumeID string, err error) {
 	volumeID, ok := vs.snapshotVolumes[snapshotID]
 	if !ok {
 		return "", errors.New("snapshot not found")
@@ -2424,22 +2424,22 @@ func (vs *volumeSnapshotter) SetVolumeID(pv runtime.Unstructured, volumeID strin
 }
 
 // GetVolumeID panics because it's not expected to be used for restores.
-func (*volumeSnapshotter) GetVolumeID(pv runtime.Unstructured) (string, error) {
+func (*volumeSnapshotter) GetVolumeID(_ runtime.Unstructured) (string, error) {
 	panic("GetVolumeID should not be used for restores")
 }
 
 // CreateSnapshot panics because it's not expected to be used for restores.
-func (*volumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (snapshotID string, err error) {
+func (*volumeSnapshotter) CreateSnapshot(_, _ string, _ map[string]string) (snapshotID string, err error) {
 	panic("CreateSnapshot should not be used for restores")
 }
 
 // GetVolumeInfo panics because it's not expected to be used for restores.
-func (*volumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (*volumeSnapshotter) GetVolumeInfo(_, _ string) (string, *int64, error) {
 	panic("GetVolumeInfo should not be used for restores")
 }
 
 // DeleteSnapshot panics because it's not expected to be used for restores.
-func (*volumeSnapshotter) DeleteSnapshot(snapshotID string) error {
+func (*volumeSnapshotter) DeleteSnapshot(_ string) error {
 	panic("DeleteSnapshot should not be used for backups")
 }
 

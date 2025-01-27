@@ -36,7 +36,7 @@ func TestNewClientDispenser(t *testing.T) {
 	clientConn := new(grpc.ClientConn)
 
 	c := 3
-	initFunc := func(base *ClientBase, clientConn *grpc.ClientConn) interface{} {
+	initFunc := func(_ *ClientBase, _ *grpc.ClientConn) interface{} {
 		return c
 	}
 

@@ -56,7 +56,7 @@ func CreateSecretFromFiles(ctx context.Context, client TestClient, namespace str
 }
 
 // WaitForPods waits until all of the pods have gone to PodRunning state
-func WaitForPods(ctx context.Context, client TestClient, namespace string, pods []string) error {
+func WaitForPods(_ context.Context, client TestClient, namespace string, pods []string) error {
 	timeout := 5 * time.Minute
 	interval := 5 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
@@ -322,7 +322,7 @@ func WriteRandomDataToFileInPod(ctx context.Context, namespace, podName, contain
 	return cmd.Run()
 }
 
-func CreateFileToPod(ctx context.Context, namespace, podName, containerName, volume, filename, content string) error {
+func CreateFileToPod(ctx context.Context, namespace, podName, containerName, volume, filename, _ string) error {
 	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("echo ns-%s pod-%s volume-%s  > /%s/%s", namespace, podName, volume, volume, filename)}
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
@@ -401,7 +401,7 @@ func WaitForCRDEstablished(crdName string) error {
 	return nil
 }
 
-func GetAllService(ctx context.Context) (string, error) {
+func GetAllService(_ context.Context) (string, error) {
 	args := []string{"get", "service", "-A"}
 	cmd := exec.CommandContext(context.Background(), "kubectl", args...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)

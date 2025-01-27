@@ -36,7 +36,7 @@ func TestGetS3ResticEnvVars(t *testing.T) {
 			name:     "when config is empty, no env vars are returned",
 			config:   map[string]string{},
 			expected: map[string]string{},
-			getS3Credentials: func(config map[string]string) (*aws.Credentials, error) {
+			getS3Credentials: func(_ map[string]string) (*aws.Credentials, error) {
 				return nil, nil
 			},
 		},
@@ -57,7 +57,7 @@ func TestGetS3ResticEnvVars(t *testing.T) {
 			expected: map[string]string{
 				"AWS_SHARED_CREDENTIALS_FILE": "/tmp/credentials/path/to/secret",
 			},
-			getS3Credentials: func(config map[string]string) (*aws.Credentials, error) {
+			getS3Credentials: func(_ map[string]string) (*aws.Credentials, error) {
 				return nil, nil
 			},
 		},

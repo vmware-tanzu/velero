@@ -185,22 +185,22 @@ func (p *volumeSnapshotRestoreItemAction) Name() string {
 }
 
 func (p *volumeSnapshotRestoreItemAction) Progress(
-	operationID string,
-	restore *velerov1api.Restore,
+	_ string,
+	_ *velerov1api.Restore,
 ) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, nil
 }
 
 func (p *volumeSnapshotRestoreItemAction) Cancel(
-	operationID string,
-	restore *velerov1api.Restore,
+	_ string,
+	_ *velerov1api.Restore,
 ) error {
 	return nil
 }
 
 func (p *volumeSnapshotRestoreItemAction) AreAdditionalItemsReady(
-	additionalItems []velero.ResourceIdentifier,
-	restore *velerov1api.Restore,
+	_ []velero.ResourceIdentifier,
+	_ *velerov1api.Restore,
 ) (bool, error) {
 	return true, nil
 }

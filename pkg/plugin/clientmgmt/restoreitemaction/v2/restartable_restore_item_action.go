@@ -179,16 +179,16 @@ func (r *AdaptedV1RestartableRestoreItemAction) Execute(input *velero.RestoreIte
 
 // Progress returns with an error since v1 plugins will never return an operationID, which means that
 // any operationID passed in here will be invalid.
-func (r *AdaptedV1RestartableRestoreItemAction) Progress(operationID string, restore *api.Restore) (velero.OperationProgress, error) {
+func (r *AdaptedV1RestartableRestoreItemAction) Progress(_ string, _ *api.Restore) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, riav2.AsyncOperationsNotSupportedError()
 }
 
 // Cancel just returns without error since v1 plugins don't implement it.
-func (r *AdaptedV1RestartableRestoreItemAction) Cancel(operationID string, restore *api.Restore) error {
+func (r *AdaptedV1RestartableRestoreItemAction) Cancel(_ string, _ *api.Restore) error {
 	return nil
 }
 
 // AreAdditionalItemsReady just returns true since v1 plugins don't wait for items.
-func (r *AdaptedV1RestartableRestoreItemAction) AreAdditionalItemsReady(additionalItems []velero.ResourceIdentifier, restore *api.Restore) (bool, error) {
+func (r *AdaptedV1RestartableRestoreItemAction) AreAdditionalItemsReady(_ []velero.ResourceIdentifier, _ *api.Restore) (bool, error) {
 	return true, nil
 }

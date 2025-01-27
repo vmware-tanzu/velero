@@ -220,7 +220,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 		UpdateFunc: func(_, newObj interface{}) {
 			handler(newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(_ interface{}) {
 			err := fmt.Errorf("pod %s deleted before all hooks were executed", kube.NamespaceAndName(pod))
 			log.Error(err)
 			cancel()

@@ -608,7 +608,7 @@ func VeleroBackupLogs(ctx context.Context, veleroCLI string, veleroNamespace str
 	return VeleroCmdExec(ctx, veleroCLI, args)
 }
 
-func RunDebug(ctx context.Context, veleroCLI, veleroNamespace, backup, restore string) {
+func RunDebug(ctx context.Context, veleroCLI, veleroNamespace, backup, _ string) {
 	output := fmt.Sprintf("debug-bundle-%d.tar.gz", time.Now().UnixNano())
 	args := []string{"debug", "--namespace", veleroNamespace, "--output", output, "--verbose"}
 	if len(backup) > 0 {
@@ -824,7 +824,7 @@ func WaitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, 
 	return err
 }
 
-func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace string, pvcNameList []string) ([]string, error) {
+func GetVsphereSnapshotIDs(ctx context.Context, _ time.Duration, namespace string, pvcNameList []string) ([]string, error) {
 	checkSnapshotCmd := exec.CommandContext(ctx, "kubectl",
 		"get", "-n", namespace, "snapshots.backupdriver.cnsdp.vmware.com", "-o=jsonpath='{range .items[*]}{.spec.resourceHandle.name}{\"=\"}{.status.snapshotID}{\"\\n\"}{end}'")
 	fmt.Printf("checkSnapshotCmd cmd =%v\n", checkSnapshotCmd)
@@ -1648,7 +1648,7 @@ func InstallStorageClasses(provider string) error {
 	return InstallStorageClass(ctx, tmpFile.Name())
 }
 
-func GetPvName(ctx context.Context, client TestClient, pvcName, namespace string) (string, error) {
+func GetPvName(_ context.Context, _ TestClient, pvcName, namespace string) (string, error) {
 	pvcList, err := GetPvcByPVCName(context.Background(), namespace, pvcName)
 	if err != nil {
 		return "", err
@@ -1668,7 +1668,7 @@ func GetPvName(ctx context.Context, client TestClient, pvcName, namespace string
 
 	return pvList[0], nil
 }
-func DeletePVs(ctx context.Context, client TestClient, pvList []string) error {
+func DeletePVs(ctx context.Context, _ TestClient, pvList []string) error {
 	for _, pv := range pvList {
 		args := []string{"delete", "pv", pv, "--timeout=0s"}
 		fmt.Println(args)

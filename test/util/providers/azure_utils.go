@@ -219,7 +219,7 @@ func deleteBlob(client *azblob.Client, containerName, blobName string) error {
 	_, err := client.DeleteBlob(context.Background(), containerName, blobName, nil)
 	return err
 }
-func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName string) (bool, error) {
+func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, _, bslConfig, backupName string) (bool, error) {
 	ctx := context.Background()
 	accountName, accountKey, err := getStorageCredential(cloudCredentialsFile, bslConfig)
 	if err != nil {
@@ -302,7 +302,7 @@ func (s AzureStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bsl
 	return nil
 }
 
-func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupName string, snapshotCheck SnapshotCheckPoint) error {
+func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, _, backupName string, snapshotCheck SnapshotCheckPoint) error {
 	ctx := context.Background()
 
 	if err := loadCredentialsIntoEnv(cloudCredentialsFile); err != nil {

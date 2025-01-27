@@ -308,12 +308,12 @@ func (h *DefaultItemHookHandler) HandleHooks(
 type NoOpItemHookHandler struct{}
 
 func (h *NoOpItemHookHandler) HandleHooks(
-	log logrus.FieldLogger,
-	groupResource schema.GroupResource,
-	obj runtime.Unstructured,
-	resourceHooks []ResourceHook,
-	phase HookPhase,
-	hookTracker *HookTracker,
+	_ logrus.FieldLogger,
+	_ schema.GroupResource,
+	_ runtime.Unstructured,
+	_ []ResourceHook,
+	_ HookPhase,
+	_ *HookTracker,
 ) error {
 	return nil
 }

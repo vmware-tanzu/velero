@@ -262,7 +262,7 @@ func cleanVSpherePluginConfig(c clientset.Interface, ns, secretName, configMapNa
 	return nil
 }
 
-func installVeleroServer(ctx context.Context, cli, cloudProvider string, options *installOptions) error {
+func installVeleroServer(ctx context.Context, cli, _ string, options *installOptions) error {
 	args := []string{"install"}
 	namespace := "velero"
 	if len(options.Namespace) > 0 {
@@ -666,7 +666,7 @@ func checkBSL(ctx context.Context, veleroCfg *test.VeleroConfig) error {
 	return nil
 }
 
-func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroConfig) error {
+func PrepareVelero(_ context.Context, caseName string, veleroCfg test.VeleroConfig) error {
 	ready, err := IsVeleroReady(context.Background(), &veleroCfg)
 	if err != nil {
 		fmt.Printf("error in checking velero status with %v", err)

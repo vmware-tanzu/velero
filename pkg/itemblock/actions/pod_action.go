@@ -47,7 +47,7 @@ func (a *PodAction) AppliesTo() (velero.ResourceSelector, error) {
 // GetRelatedItems scans the pod's spec.volumes for persistentVolumeClaim volumes and returns a
 // ResourceIdentifier list containing references to all of the persistentVolumeClaim volumes used by
 // the pod. This ensures that when a pod is backed up, all referenced PVCs are backed up along with the pod.
-func (a *PodAction) GetRelatedItems(item runtime.Unstructured, backup *v1.Backup) ([]velero.ResourceIdentifier, error) {
+func (a *PodAction) GetRelatedItems(item runtime.Unstructured, _ *v1.Backup) ([]velero.ResourceIdentifier, error) {
 	a.log.Info("Executing pod ItemBlockAction")
 	defer a.log.Info("Done executing pod ItemBlockAction")
 

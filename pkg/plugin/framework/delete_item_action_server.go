@@ -49,7 +49,7 @@ func (s *DeleteItemActionGRPCServer) getImpl(name string) (velero.DeleteItemActi
 	return itemAction, nil
 }
 
-func (s *DeleteItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.DeleteItemActionAppliesToRequest) (response *proto.DeleteItemActionAppliesToResponse, err error) {
+func (s *DeleteItemActionGRPCServer) AppliesTo(_ context.Context, req *proto.DeleteItemActionAppliesToRequest) (response *proto.DeleteItemActionAppliesToResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -77,7 +77,7 @@ func (s *DeleteItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.D
 	}, nil
 }
 
-func (s *DeleteItemActionGRPCServer) Execute(ctx context.Context, req *proto.DeleteItemActionExecuteRequest) (_ *proto.Empty, err error) {
+func (s *DeleteItemActionGRPCServer) Execute(_ context.Context, req *proto.DeleteItemActionExecuteRequest) (_ *proto.Empty, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr

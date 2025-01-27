@@ -67,7 +67,7 @@ func (o *SetOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.Credential, "credential", "Sets the credential to be used by this location as a key-value pair, where the key is the Kubernetes Secret name, and the value is the data key name within the Secret. Optional, one value only.")
 }
 
-func (o *SetOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+func (o *SetOptions) Validate(c *cobra.Command, _ []string, _ client.Factory) error {
 	if err := output.ValidateFlags(c); err != nil {
 		return err
 	}
@@ -79,12 +79,12 @@ func (o *SetOptions) Validate(c *cobra.Command, args []string, f client.Factory)
 	return nil
 }
 
-func (o *SetOptions) Complete(args []string, f client.Factory) error {
+func (o *SetOptions) Complete(args []string, _ client.Factory) error {
 	o.Name = args[0]
 	return nil
 }
 
-func (o *SetOptions) Run(c *cobra.Command, f client.Factory) error {
+func (o *SetOptions) Run(_ *cobra.Command, f client.Factory) error {
 	kbClient, err := f.KubebuilderClient()
 	if err != nil {
 		return err

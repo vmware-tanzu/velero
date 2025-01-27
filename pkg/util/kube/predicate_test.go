@@ -180,7 +180,7 @@ func TestSpecChangePredicate(t *testing.T) {
 }
 
 func TestNewGenericEventPredicate(t *testing.T) {
-	predicate := NewGenericEventPredicate(func(object client.Object) bool {
+	predicate := NewGenericEventPredicate(func(_ client.Object) bool {
 		return false
 	})
 
@@ -188,7 +188,7 @@ func TestNewGenericEventPredicate(t *testing.T) {
 }
 
 func TestNewAllEventPredicate(t *testing.T) {
-	predicate := NewAllEventPredicate(func(object client.Object) bool {
+	predicate := NewAllEventPredicate(func(_ client.Object) bool {
 		return false
 	})
 

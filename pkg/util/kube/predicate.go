@@ -81,13 +81,13 @@ func NewUpdateEventPredicate(f func(client.Object, client.Object) bool) predicat
 		UpdateFunc: func(event event.UpdateEvent) bool {
 			return f(event.ObjectOld, event.ObjectNew)
 		},
-		CreateFunc: func(event event.CreateEvent) bool {
+		CreateFunc: func(_ event.CreateEvent) bool {
 			return false
 		},
-		DeleteFunc: func(event event.DeleteEvent) bool {
+		DeleteFunc: func(_ event.DeleteEvent) bool {
 			return false
 		},
-		GenericFunc: func(event event.GenericEvent) bool {
+		GenericFunc: func(_ event.GenericEvent) bool {
 			return false
 		},
 	}
@@ -121,13 +121,13 @@ func NewCreateEventPredicate(f func(client.Object) bool) predicate.Predicate {
 		CreateFunc: func(event event.CreateEvent) bool {
 			return f(event.Object)
 		},
-		DeleteFunc: func(event event.DeleteEvent) bool {
+		DeleteFunc: func(_ event.DeleteEvent) bool {
 			return false
 		},
-		GenericFunc: func(event event.GenericEvent) bool {
+		GenericFunc: func(_ event.GenericEvent) bool {
 			return false
 		},
-		UpdateFunc: func(event event.UpdateEvent) bool {
+		UpdateFunc: func(_ event.UpdateEvent) bool {
 			return false
 		},
 	}

@@ -119,7 +119,7 @@ func (p *Progress) UpdateProgress() {
 func (p *Progress) UploadStarted() {}
 
 // CachedFile statistic the total bytes been cached currently
-func (p *Progress) CachedFile(fname string, numBytes int64) {
+func (p *Progress) CachedFile(_ string, numBytes int64) {
 	atomic.AddInt64(&p.cachedBytes, numBytes)
 	p.UpdateProgress()
 }
@@ -132,10 +132,10 @@ func (p *Progress) HashedBytes(numBytes int64) {
 }
 
 // HashingFile statistic the file been hashed currently
-func (p *Progress) HashingFile(fname string) {}
+func (p *Progress) HashingFile(_ string) {}
 
 // ExcludedFile statistic the file been excluded currently
-func (p *Progress) ExcludedFile(fname string, numBytes int64) {}
+func (p *Progress) ExcludedFile(_ string, _ int64) {}
 
 // ExcludedDir statistic the dir been excluded currently
 func (p *Progress) ExcludedDir(dirname string) {
@@ -143,15 +143,15 @@ func (p *Progress) ExcludedDir(dirname string) {
 }
 
 // FinishedHashingFile which will called when specific file finished hash
-func (p *Progress) FinishedHashingFile(fname string, numBytes int64) {
+func (p *Progress) FinishedHashingFile(_ string, _ int64) {
 	p.UpdateProgress()
 }
 
 // StartedDirectory called when begin to upload one directory
-func (p *Progress) StartedDirectory(dirname string) {}
+func (p *Progress) StartedDirectory(_ string) {}
 
 // FinishedDirectory called when finish to upload one directory
-func (p *Progress) FinishedDirectory(dirname string) {
+func (p *Progress) FinishedDirectory(_ string) {
 	p.UpdateProgress()
 }
 
@@ -167,7 +167,7 @@ func (p *Progress) ProgressBytes(processedBytes int64, totalBytes int64) {
 	p.UpdateProgress()
 }
 
-func (p *Progress) FinishedFile(fname string, err error) {}
+func (p *Progress) FinishedFile(_ string, _ error) {}
 
 func (p *Progress) EstimationParameters() snapshotfs.EstimationParameters {
 	return p.estimationParam

@@ -39,7 +39,7 @@ func (em *exitWithMessageMock) Exit(code int) {
 	em.exitCode = code
 }
 
-func (em *exitWithMessageMock) CreateFile(name string) (*os.File, error) {
+func (em *exitWithMessageMock) CreateFile(_ string) (*os.File, error) {
 	if em.createErr != nil {
 		return nil, em.createErr
 	}

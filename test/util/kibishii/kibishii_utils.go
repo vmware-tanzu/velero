@@ -264,7 +264,7 @@ func RunKibishiiTests(
 }
 
 func installKibishii(ctx context.Context, namespace string, cloudPlatform, veleroFeatures,
-	kibishiiDirectory string, useVolumeSnapshots bool, workerReplicas int) error {
+	kibishiiDirectory string, _ bool, workerReplicas int) error {
 	if strings.EqualFold(cloudPlatform, Azure) &&
 		strings.EqualFold(veleroFeatures, FeatureCSI) {
 		cloudPlatform = AzureCSI
@@ -312,7 +312,7 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 	return err
 }
 
-func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiData) error {
+func generateData(_ context.Context, namespace string, kibishiiData *KibishiiData) error {
 	timeout := 30 * time.Minute
 	interval := 1 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
@@ -338,7 +338,7 @@ func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiD
 	return nil
 }
 
-func verifyData(ctx context.Context, namespace string, kibishiiData *KibishiiData) error {
+func verifyData(_ context.Context, namespace string, kibishiiData *KibishiiData) error {
 	timeout := 10 * time.Minute
 	interval := 5 * time.Second
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {

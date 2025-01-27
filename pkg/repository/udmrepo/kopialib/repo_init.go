@@ -148,7 +148,7 @@ func connectWithStorage(ctx context.Context, st blob.Storage, repoOption udmrepo
 func ensureEmpty(ctx context.Context, s blob.Storage) error {
 	hasDataError := errors.Errorf("has data")
 
-	err := s.ListBlobs(ctx, "", func(cb blob.Metadata) error {
+	err := s.ListBlobs(ctx, "", func(_ blob.Metadata) error {
 		return hasDataError
 	})
 

@@ -79,13 +79,13 @@ func (c *gcReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	s := kube.NewPeriodicalEnqueueSource(c.logger.WithField("controller", constant.ControllerGarbageCollection), mgr.GetClient(), &velerov1api.BackupList{}, c.frequency, kube.PeriodicalEnqueueSourceOption{})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Backup{}, builder.WithPredicates(predicate.Funcs{
-			UpdateFunc: func(ue event.UpdateEvent) bool {
+			UpdateFunc: func(_ event.UpdateEvent) bool {
 				return false
 			},
-			DeleteFunc: func(de event.DeleteEvent) bool {
+			DeleteFunc: func(_ event.DeleteEvent) bool {
 				return false
 			},
-			GenericFunc: func(ge event.GenericEvent) bool {
+			GenericFunc: func(_ event.GenericEvent) bool {
 				return false
 			},
 		})).

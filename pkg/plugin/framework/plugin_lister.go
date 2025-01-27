@@ -119,7 +119,7 @@ type PluginListerGRPCServer struct {
 }
 
 // ListPlugins returns a list of registered plugins, delegating to s.impl to perform the listing.
-func (s *PluginListerGRPCServer) ListPlugins(ctx context.Context, req *proto.Empty) (*proto.ListPluginsResponse, error) {
+func (s *PluginListerGRPCServer) ListPlugins(_ context.Context, _ *proto.Empty) (*proto.ListPluginsResponse, error) {
 	list, err := s.impl.ListPlugins()
 	if err != nil {
 		return nil, err

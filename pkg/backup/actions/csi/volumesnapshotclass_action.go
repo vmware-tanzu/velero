@@ -53,7 +53,7 @@ func (p *volumeSnapshotClassBackupItemAction) AppliesTo() (
 // items any snapshot lister secret that may be referenced in its annotations.
 func (p *volumeSnapshotClassBackupItemAction) Execute(
 	item runtime.Unstructured,
-	backup *velerov1api.Backup,
+	_ *velerov1api.Backup,
 ) (
 	runtime.Unstructured,
 	[]velero.ResourceIdentifier,
@@ -103,16 +103,16 @@ func (p *volumeSnapshotClassBackupItemAction) Name() string {
 
 // Progress is not implemented for VolumeSnapshotClassBackupItemAction
 func (p *volumeSnapshotClassBackupItemAction) Progress(
-	operationID string,
-	backup *velerov1api.Backup,
+	_ string,
+	_ *velerov1api.Backup,
 ) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, nil
 }
 
 // Cancel is not implemented for VolumeSnapshotClassBackupItemAction
 func (p *volumeSnapshotClassBackupItemAction) Cancel(
-	operationID string,
-	backup *velerov1api.Backup,
+	_ string,
+	_ *velerov1api.Backup,
 ) error {
 	return nil
 }

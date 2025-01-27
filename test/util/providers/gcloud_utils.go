@@ -36,7 +36,7 @@ import (
 
 type GCSStorage string
 
-func (s GCSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) (bool, error) {
+func (s GCSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, _, backupObject string) (bool, error) {
 	q := &storage.Query{
 		Prefix: bslPrefix,
 	}
@@ -67,7 +67,7 @@ func (s GCSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix
 	}
 }
 
-func (s GCSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) error {
+func (s GCSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, _, backupObject string) error {
 	q := &storage.Query{
 		Prefix: bslPrefix,
 	}
@@ -103,7 +103,7 @@ func (s GCSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPr
 	}
 }
 
-func (s GCSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObject string, snapshotCheck test.SnapshotCheckPoint) error {
+func (s GCSStorage) IsSnapshotExisted(cloudCredentialsFile, _, backupObject string, snapshotCheck test.SnapshotCheckPoint) error {
 	ctx := context.Background()
 	data, err := os.ReadFile(cloudCredentialsFile)
 	if err != nil {
@@ -144,7 +144,7 @@ func (s GCSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObj
 	}
 }
 
-func (s GCSStorage) GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, objectKey string) (io.ReadCloser, error) {
+func (s GCSStorage) GetObject(cloudCredentialsFile, bslBucket, bslPrefix, _, objectKey string) (io.ReadCloser, error) {
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx, option.WithCredentialsFile(cloudCredentialsFile))
 	if err != nil {

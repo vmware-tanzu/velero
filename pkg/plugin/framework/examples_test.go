@@ -39,7 +39,7 @@ type VolumeSnapshotter struct {
 }
 
 // Implement all methods for the VolumeSnapshotter interface...
-func (b *VolumeSnapshotter) Init(config map[string]string) error {
+func (b *VolumeSnapshotter) Init(_ map[string]string) error {
 	b.FieldLogger.Infof("VolumeSnapshotter.Init called")
 
 	// ...
@@ -47,7 +47,7 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	return nil
 }
 
-func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(_, _, _ string, _ *int64) (volumeID string, err error) {
 	b.FieldLogger.Infof("CreateVolumeFromSnapshot called")
 
 	// ...
@@ -55,7 +55,7 @@ func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vol
 	return "volumeID", nil
 }
 
-func (b *VolumeSnapshotter) GetVolumeID(pv runtime.Unstructured) (string, error) {
+func (b *VolumeSnapshotter) GetVolumeID(_ runtime.Unstructured) (string, error) {
 	b.FieldLogger.Infof("GetVolumeID called")
 
 	// ...
@@ -63,7 +63,7 @@ func (b *VolumeSnapshotter) GetVolumeID(pv runtime.Unstructured) (string, error)
 	return "volumeID", nil
 }
 
-func (b *VolumeSnapshotter) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+func (b *VolumeSnapshotter) SetVolumeID(_ runtime.Unstructured, _ string) (runtime.Unstructured, error) {
 	b.FieldLogger.Infof("SetVolumeID called")
 
 	// ...
@@ -71,7 +71,7 @@ func (b *VolumeSnapshotter) SetVolumeID(pv runtime.Unstructured, volumeID string
 	return nil, nil
 }
 
-func (b *VolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (b *VolumeSnapshotter) GetVolumeInfo(_, _ string) (string, *int64, error) {
 	b.FieldLogger.Infof("GetVolumeInfo called")
 
 	// ...
@@ -79,7 +79,7 @@ func (b *VolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *i
 	return "volumeFilesystemType", nil, nil
 }
 
-func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (snapshotID string, err error) {
+func (b *VolumeSnapshotter) CreateSnapshot(_, _ string, _ map[string]string) (snapshotID string, err error) {
 	b.FieldLogger.Infof("CreateSnapshot called")
 
 	// ...
@@ -87,7 +87,7 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 	return "snapshotID", nil
 }
 
-func (b *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
+func (b *VolumeSnapshotter) DeleteSnapshot(_ string) error {
 	b.FieldLogger.Infof("DeleteSnapshot called")
 
 	// ...
@@ -113,7 +113,7 @@ func (d *DeleteItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{}, nil
 }
 
-func (d *DeleteItemAction) Execute(input *velero.DeleteItemActionExecuteInput) error {
+func (d *DeleteItemAction) Execute(_ *velero.DeleteItemActionExecuteInput) error {
 	d.FieldLogger.Infof("Execute called")
 
 	// ...

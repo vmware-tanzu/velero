@@ -38,11 +38,11 @@ type resticRepositoryProvider struct {
 	svc *restic.RepositoryService
 }
 
-func (r *resticRepositoryProvider) InitRepo(ctx context.Context, param RepoParam) error {
+func (r *resticRepositoryProvider) InitRepo(_ context.Context, param RepoParam) error {
 	return r.svc.InitRepo(param.BackupLocation, param.BackupRepo)
 }
 
-func (r *resticRepositoryProvider) ConnectToRepo(ctx context.Context, param RepoParam) error {
+func (r *resticRepositoryProvider) ConnectToRepo(_ context.Context, param RepoParam) error {
 	return r.svc.ConnectToRepo(param.BackupLocation, param.BackupRepo)
 }
 
@@ -62,19 +62,19 @@ func (r *resticRepositoryProvider) PrepareRepo(ctx context.Context, param RepoPa
 	return nil
 }
 
-func (r *resticRepositoryProvider) BoostRepoConnect(ctx context.Context, param RepoParam) error {
+func (r *resticRepositoryProvider) BoostRepoConnect(_ context.Context, _ RepoParam) error {
 	return nil
 }
 
-func (r *resticRepositoryProvider) PruneRepo(ctx context.Context, param RepoParam) error {
+func (r *resticRepositoryProvider) PruneRepo(_ context.Context, param RepoParam) error {
 	return r.svc.PruneRepo(param.BackupLocation, param.BackupRepo)
 }
 
-func (r *resticRepositoryProvider) EnsureUnlockRepo(ctx context.Context, param RepoParam) error {
+func (r *resticRepositoryProvider) EnsureUnlockRepo(_ context.Context, param RepoParam) error {
 	return r.svc.UnlockRepo(param.BackupLocation, param.BackupRepo)
 }
 
-func (r *resticRepositoryProvider) Forget(ctx context.Context, snapshotID string, param RepoParam) error {
+func (r *resticRepositoryProvider) Forget(_ context.Context, snapshotID string, param RepoParam) error {
 	return r.svc.Forget(param.BackupLocation, param.BackupRepo, snapshotID)
 }
 
@@ -90,6 +90,6 @@ func (r *resticRepositoryProvider) BatchForget(ctx context.Context, snapshotIDs 
 	return errs
 }
 
-func (r *resticRepositoryProvider) DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration {
+func (r *resticRepositoryProvider) DefaultMaintenanceFrequency(_ context.Context, _ RepoParam) time.Duration {
 	return r.svc.DefaultMaintenanceFrequency()
 }

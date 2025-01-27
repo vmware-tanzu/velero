@@ -57,7 +57,7 @@ func TestResticRunBackup(t *testing.T) {
 			name:       "nil uploader",
 			rp:         &resticProvider{log: logrus.New()},
 			nilUpdater: true,
-			hookBackupFunc: func(repoIdentifier string, passwordFile string, path string, tags map[string]string) *restic.Command {
+			hookBackupFunc: func(_ string, _ string, _ string, _ map[string]string) *restic.Command {
 				return &restic.Command{Command: "date"}
 			},
 			errorHandleFunc: func(err error) bool {
@@ -67,7 +67,7 @@ func TestResticRunBackup(t *testing.T) {
 		{
 			name: "wrong restic execute command",
 			rp:   &resticProvider{log: logrus.New()},
-			hookBackupFunc: func(repoIdentifier string, passwordFile string, path string, tags map[string]string) *restic.Command {
+			hookBackupFunc: func(_ string, _ string, _ string, _ map[string]string) *restic.Command {
 				return &restic.Command{Command: "date"}
 			},
 			errorHandleFunc: func(err error) bool {
@@ -77,7 +77,7 @@ func TestResticRunBackup(t *testing.T) {
 			name:           "has parent snapshot",
 			rp:             &resticProvider{log: logrus.New()},
 			parentSnapshot: "parentSnapshot",
-			hookBackupFunc: func(repoIdentifier string, passwordFile string, path string, tags map[string]string) *restic.Command {
+			hookBackupFunc: func(_ string, _ string, _ string, _ map[string]string) *restic.Command {
 				return &restic.Command{Command: "date"}
 			},
 			hookResticBackupFunc: func(*restic.Command, logrus.FieldLogger, uploader.ProgressUpdater) (string, string, error) {
@@ -162,7 +162,7 @@ func TestResticRunBackup(t *testing.T) {
 }
 
 func TestResticRunRestore(t *testing.T) {
-	resticRestoreCMDFunc = func(repoIdentifier, passwordFile, snapshotID, target string) *restic.Command {
+	resticRestoreCMDFunc = func(_, _, _, _ string) *restic.Command {
 		return &restic.Command{Args: []string{""}}
 	}
 	testCases := []struct {
@@ -184,7 +184,7 @@ func TestResticRunRestore(t *testing.T) {
 		{
 			name: "has extral flags",
 			rp:   &resticProvider{log: logrus.New(), extraFlags: []string{"test-extra-flags"}},
-			hookResticRestoreFunc: func(repoIdentifier, passwordFile, snapshotID, target string) *restic.Command {
+			hookResticRestoreFunc: func(_, _, _, _ string) *restic.Command {
 				return &restic.Command{Args: []string{"date"}}
 			},
 			errorHandleFunc: func(err error) bool {
@@ -194,7 +194,7 @@ func TestResticRunRestore(t *testing.T) {
 		{
 			name: "wrong restic execute command",
 			rp:   &resticProvider{log: logrus.New()},
-			hookResticRestoreFunc: func(repoIdentifier, passwordFile, snapshotID, target string) *restic.Command {
+			hookResticRestoreFunc: func(_, _, _, _ string) *restic.Command {
 				return &restic.Command{Args: []string{"date"}}
 			},
 			errorHandleFunc: func(err error) bool {
@@ -329,7 +329,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
-			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
+			resticTempCACertFileFunc: func(_ []byte, _ string, _ filesystem.Interface) (string, error) {
 				return "", errors.New("error writing CACert file")
 			},
 			checkFunc: func(provider Provider, err error) {
@@ -341,10 +341,10 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
-			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
+			resticTempCACertFileFunc: func(_ []byte, _ string, _ filesystem.Interface) (string, error) {
 				return "test-ca", nil
 			},
-			resticCmdEnvFunc: func(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error) {
+			resticCmdEnvFunc: func(_ *velerov1api.BackupStorageLocation, _ credentials.FileStore) ([]string, error) {
 				return nil, errors.New("error generating repository cmnd env")
 			},
 			checkFunc: func(provider Provider, err error) {
@@ -356,10 +356,10 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
-			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
+			resticTempCACertFileFunc: func(_ []byte, _ string, _ filesystem.Interface) (string, error) {
 				return "test-ca", nil
 			},
-			resticCmdEnvFunc: func(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error) {
+			resticCmdEnvFunc: func(_ *velerov1api.BackupStorageLocation, _ credentials.FileStore) ([]string, error) {
 				return nil, nil
 			},
 			checkFunc: func(provider Provider, err error) {
@@ -373,10 +373,10 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
-			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
+			resticTempCACertFileFunc: func(_ []byte, _ string, _ filesystem.Interface) (string, error) {
 				return "test-ca", nil
 			},
-			resticCmdEnvFunc: func(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error) {
+			resticCmdEnvFunc: func(_ *velerov1api.BackupStorageLocation, _ credentials.FileStore) ([]string, error) {
 				return nil, nil
 			},
 			checkFunc: func(provider Provider, err error) {
@@ -386,7 +386,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(_ *testing.T) {
 			repoIdentifier := "my-repo"
 			bsl := &velerov1api.BackupStorageLocation{}
 			if !tc.emptyBSL {

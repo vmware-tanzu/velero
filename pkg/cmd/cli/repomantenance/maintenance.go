@@ -56,7 +56,7 @@ func NewCommand(f velerocli.Factory) *cobra.Command {
 		Use:    "repo-maintenance",
 		Hidden: true,
 		Short:  "VELERO INTERNAL COMMAND ONLY - not intended to be run directly by users",
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			o.Run(f)
 		},
 	}

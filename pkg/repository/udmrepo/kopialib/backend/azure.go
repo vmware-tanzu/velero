@@ -40,6 +40,6 @@ func (c *AzureBackend) Setup(ctx context.Context, flags map[string]string) error
 	return nil
 }
 
-func (c *AzureBackend) Connect(ctx context.Context, isCreate bool) (blob.Storage, error) {
+func (c *AzureBackend) Connect(ctx context.Context, _ bool) (blob.Storage, error) {
 	return azure.NewStorage(ctx, &c.option, false)
 }

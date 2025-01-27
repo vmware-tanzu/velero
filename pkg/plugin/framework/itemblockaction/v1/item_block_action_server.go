@@ -52,7 +52,7 @@ func (s *ItemBlockActionGRPCServer) getImpl(name string) (ibav1.ItemBlockAction,
 }
 
 func (s *ItemBlockActionGRPCServer) AppliesTo(
-	ctx context.Context, req *protoibav1.ItemBlockActionAppliesToRequest) (
+	_ context.Context, req *protoibav1.ItemBlockActionAppliesToRequest) (
 	response *protoibav1.ItemBlockActionAppliesToResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
@@ -82,7 +82,7 @@ func (s *ItemBlockActionGRPCServer) AppliesTo(
 }
 
 func (s *ItemBlockActionGRPCServer) GetRelatedItems(
-	ctx context.Context, req *protoibav1.ItemBlockActionGetRelatedItemsRequest) (response *protoibav1.ItemBlockActionGetRelatedItemsResponse, err error) {
+	_ context.Context, req *protoibav1.ItemBlockActionGetRelatedItemsRequest) (response *protoibav1.ItemBlockActionGetRelatedItemsResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
