@@ -18,7 +18,6 @@ package csi
 
 import (
 	"context"
-	"fmt"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
@@ -93,9 +92,9 @@ func (p *volumeSnapshotContentDeleteItemAction) Execute(
 				snapCont.Name, input.Backup.Name, *snapCont.Status.SnapshotHandle)
 			return nil
 		}
-		return errors.Wrapf(err, fmt.Sprintf(
+		return errors.Wrapf(err,
 			"failed to set DeletionPolicy on volumesnapshotcontent %s. Skipping deletion",
-			snapCont.Name))
+			snapCont.Name)
 	}
 
 	if err := p.crClient.Delete(

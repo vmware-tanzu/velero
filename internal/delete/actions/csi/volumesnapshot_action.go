@@ -18,7 +18,6 @@ package csi
 
 import (
 	"context"
-	"fmt"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
@@ -89,8 +88,8 @@ func (p *volumeSnapshotDeleteItemAction) Execute(
 		if err != nil && !apierrors.IsNotFound(err) {
 			return errors.Wrapf(
 				err,
-				fmt.Sprintf("failed to patch DeletionPolicy of volume snapshot %s/%s",
-					vs.Namespace, vs.Name),
+				"failed to patch DeletionPolicy of volume snapshot %s/%s",
+				vs.Namespace, vs.Name,
 			)
 		}
 
