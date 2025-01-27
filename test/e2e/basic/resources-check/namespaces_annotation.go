@@ -22,16 +22,16 @@ import (
 
 	"github.com/pkg/errors"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 type NSAnnotationCase struct {
-	TestCase
+	BRCase
 }
 
 func (n *NSAnnotationCase) Init() error {
-	n.TestCase.Init()
+	n.BRCase.Init()
 	n.CaseBaseName = "namespace-annotations-" + n.UUIDgen
 	n.BackupName = "backup-" + n.CaseBaseName
 	n.RestoreName = "restore-" + n.CaseBaseName

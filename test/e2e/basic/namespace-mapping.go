@@ -8,26 +8,26 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/kibishii"
 )
 
 type NamespaceMapping struct {
-	TestCase
+	BRCase
 	MappedNamespaceList []string
 	kibishiiData        *KibishiiData
 }
 
 const NamespaceBaseName string = "ns-mp-"
 
-var OneNamespaceMappingResticTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NamespacesTotal: 1, UseVolumeSnapshots: false}})
-var MultiNamespacesMappingResticTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NamespacesTotal: 2, UseVolumeSnapshots: false}})
-var OneNamespaceMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NamespacesTotal: 1, UseVolumeSnapshots: true}})
-var MultiNamespacesMappingSnapshotTest func() = TestFunc(&NamespaceMapping{TestCase: TestCase{NamespacesTotal: 2, UseVolumeSnapshots: true}})
+var OneNamespaceMappingResticTest func() = TestFunc(&NamespaceMapping{BRCase: BRCase{NamespacesTotal: 1, UseVolumeSnapshots: false}})
+var MultiNamespacesMappingResticTest func() = TestFunc(&NamespaceMapping{BRCase: BRCase{NamespacesTotal: 2, UseVolumeSnapshots: false}})
+var OneNamespaceMappingSnapshotTest func() = TestFunc(&NamespaceMapping{BRCase: BRCase{NamespacesTotal: 1, UseVolumeSnapshots: true}})
+var MultiNamespacesMappingSnapshotTest func() = TestFunc(&NamespaceMapping{BRCase: BRCase{NamespacesTotal: 2, UseVolumeSnapshots: true}})
 
 func (n *NamespaceMapping) Init() error {
-	n.TestCase.Init()
+	n.BRCase.Init()
 	n.CaseBaseName = "ns-mp-" + n.UUIDgen
 	n.BackupName = "backup-" + n.CaseBaseName
 	n.RestoreName = "restore-" + n.CaseBaseName
@@ -128,7 +128,7 @@ func (n *NamespaceMapping) Clean() error {
 			}
 		}
 
-		return n.GetTestCase().Clean()
+		return n.BRCase.Clean()
 	}
 
 	return nil

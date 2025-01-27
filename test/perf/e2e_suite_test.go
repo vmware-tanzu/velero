@@ -68,7 +68,7 @@ func init() {
 	flag.DurationVar(&VeleroCfg.PodVolumeOperationTimeout, "pod-volume-operation-timeout", 360*time.Minute, "Timeout for pod volume operations. Optional.")
 	//vmware-tanzu-experiments
 	flag.StringVar(&VeleroCfg.Features, "features", "", "Comma-separated list of features to enable for this Velero process.")
-	flag.StringVar(&VeleroCfg.DefaultClusterContext, "default-cluster-context", "", "Default cluster context for migration test.")
+	flag.StringVar(&VeleroCfg.ActiveClusterContext, "default-cluster-context", "", "Default cluster context for migration test.")
 	flag.StringVar(&VeleroCfg.UploaderType, "uploader-type", "kopia", "Identify persistent volume backup uploader.")
 	flag.BoolVar(&VeleroCfg.VeleroServerDebugMode, "velero-server-debug-mode", false, "Identify persistent volume backup uploader.")
 	flag.StringVar(&VeleroCfg.NFSServerPath, "nfs-server-path", "", "the path of nfs server")
@@ -84,7 +84,7 @@ func initConfig() error {
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	VeleroCfg.DefaultClient = &cli
+	VeleroCfg.ActiveClient = &cli
 
 	ReportData = &E2EReport{
 		TestDescription: VeleroCfg.TestCaseDescribe,
