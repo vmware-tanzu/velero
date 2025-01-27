@@ -57,7 +57,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2-csi"},
 						},
 						Action: resourcepolicies.Action{
@@ -78,7 +78,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2-csi"},
 						},
 						Action: resourcepolicies.Action{
@@ -99,7 +99,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2-csi"},
 						},
 						Action: resourcepolicies.Action{
@@ -121,7 +121,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2-csi"},
 						},
 						Action: resourcepolicies.Action{
@@ -152,7 +152,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2-csi"},
 						},
 						Action: resourcepolicies.Action{
@@ -186,7 +186,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2-csi"},
 						},
 						Action: resourcepolicies.Action{
@@ -220,7 +220,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2-csi"},
 						},
 						Action: resourcepolicies.Action{
@@ -253,7 +253,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2-csi"},
 						},
 						Action: resourcepolicies.Action{
@@ -465,7 +465,7 @@ func TestVolumeHelperImpl_ShouldIncludeVolumeInBackup(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2-csi"},
 						},
 						Action: resourcepolicies.Action{
@@ -540,7 +540,7 @@ func TestVolumeHelperImpl_ShouldPerformFSBackup(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2-csi"},
 						},
 						Action: resourcepolicies.Action{
@@ -566,7 +566,7 @@ func TestVolumeHelperImpl_ShouldPerformFSBackup(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"volumeTypes": []string{"emptyDir"},
 						},
 						Action: resourcepolicies.Action{
@@ -600,7 +600,7 @@ func TestVolumeHelperImpl_ShouldPerformFSBackup(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2-csi"},
 						},
 						Action: resourcepolicies.Action{
@@ -635,7 +635,7 @@ func TestVolumeHelperImpl_ShouldPerformFSBackup(t *testing.T) {
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp3-csi"},
 						},
 						Action: resourcepolicies.Action{

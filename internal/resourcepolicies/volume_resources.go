@@ -226,9 +226,9 @@ func (c *capacity) isInRange(y resource.Quantity) bool {
 	return false
 }
 
-// unmarshalVolConditions parse map[string]interface{} into volumeConditions format
+// unmarshalVolConditions parse map[string]any into volumeConditions format
 // and validate key fields of the map.
-func unmarshalVolConditions(con map[string]interface{}) (*volumeConditions, error) {
+func unmarshalVolConditions(con map[string]any) (*volumeConditions, error) {
 	volConditons := &volumeConditions{}
 	buffer := new(bytes.Buffer)
 	err := yaml.NewEncoder(buffer).Encode(con)

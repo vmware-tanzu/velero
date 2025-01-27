@@ -369,7 +369,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 		_, _ = restoreInformer.AddEventHandler(
 			cache.FilteringResourceEventHandler{
-				FilterFunc: func(obj interface{}) bool {
+				FilterFunc: func(obj any) bool {
 					restore, ok := obj.(*api.Restore)
 					if !ok {
 						return false
@@ -377,14 +377,14 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					return restore.Name == o.RestoreName
 				},
 				Handler: cache.ResourceEventHandlerFuncs{
-					UpdateFunc: func(_, obj interface{}) {
+					UpdateFunc: func(_, obj any) {
 						restore, ok := obj.(*api.Restore)
 						if !ok {
 							return
 						}
 						updates <- restore
 					},
-					DeleteFunc: func(obj interface{}) {
+					DeleteFunc: func(obj any) {
 						restore, ok := obj.(*api.Restore)
 						if !ok {
 							return

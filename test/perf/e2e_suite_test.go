@@ -88,7 +88,7 @@ func initConfig() error {
 
 	ReportData = &E2EReport{
 		TestDescription: VeleroCfg.TestCaseDescribe,
-		OtherFields:     make(map[string]interface{}),
+		OtherFields:     make(map[string]any),
 	}
 
 	return nil

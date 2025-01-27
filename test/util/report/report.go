@@ -47,6 +47,6 @@ func GenerateYamlReport() error {
 	return nil
 }
 
-func AddTestSuitData(dataMap map[string]interface{}, testSuitDesc string) {
+func AddTestSuitData(dataMap map[string]any, testSuitDesc string) {
 	test.ReportData.OtherFields[testSuitDesc] = dataMap
 }

@@ -108,7 +108,7 @@ func (pbs *PVCBackupSummary) addSkipped(volumeName string, reason string) {
 
 const indexNamePod = "POD"
 
-func podIndexFunc(obj interface{}) ([]string, error) {
+func podIndexFunc(obj any) ([]string, error) {
 	pvb, ok := obj.(*velerov1api.PodVolumeBackup)
 	if !ok {
 		return nil, errors.Errorf("expected PodVolumeBackup, but got %T", obj)
@@ -144,7 +144,7 @@ func newBackupper(
 
 	b.handlerRegistration, _ = pvbInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: func(_, obj interface{}) {
+			UpdateFunc: func(_, obj any) {
 				pvb, ok := obj.(*velerov1api.PodVolumeBackup)
 				if !ok {
 					log.Errorf("expected PodVolumeBackup, but got %T", obj)

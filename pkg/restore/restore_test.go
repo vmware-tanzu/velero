@@ -2354,7 +2354,7 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 
 			t.Logf("%v", string(itemJSON))
 
-			u := make(map[string]interface{})
+			u := make(map[string]any)
 			if !assert.NoError(t, json.Unmarshal(itemJSON, &u)) {
 				continue
 			}
@@ -3761,7 +3761,7 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 				kubeutil.KubeAnnBindCompleted,
 				kubeutil.KubeAnnBoundByController,
 				kubeutil.KubeAnnDynamicallyProvisioned,
-			).WithSpecField("claimRef", map[string]interface{}{
+			).WithSpecField("claimRef", map[string]any{
 				"namespace":       "ns-1",
 				"name":            "pvc-1",
 				"uid":             "abc",
@@ -3769,7 +3769,7 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 			expected: newTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").
 				WithAnnotations(kubeutil.KubeAnnDynamicallyProvisioned).
-				WithSpecField("claimRef", map[string]interface{}{
+				WithSpecField("claimRef", map[string]any{
 					"namespace": "ns-1", "name": "pvc-1"}).Unstructured,
 		},
 		{
@@ -3809,7 +3809,7 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		{
 			name: "The input obj isn't service",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Pod",
 				},
 			},
@@ -3818,7 +3818,7 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		{
 			name: "The StatusError contains no causes",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Service",
 				},
 			},
@@ -3832,7 +3832,7 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		{
 			name: "The causes contains not only port already allocated error",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Service",
 				},
 			},
@@ -3852,9 +3852,9 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		{
 			name: "Get already allocated error but the service doesn't exist",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Service",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
@@ -3878,9 +3878,9 @@ func TestIsAlreadyExistsError(t *testing.T) {
 				builder.ForService("default", "test").Result(),
 			),
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Service",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
@@ -3939,7 +3939,7 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		{
 			name: "Invalid PV, expect false.",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": 1,
 				},
 			},
@@ -3948,10 +3948,10 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		{
 			name: "Cannot find VS, expect false",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
@@ -3962,15 +3962,15 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		{
 			name: "VS's source PVC is nil, expect false",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
-					"spec": map[string]interface{}{
-						"claimRef": map[string]interface{}{
+					"spec": map[string]any{
+						"claimRef": map[string]any{
 							"namespace": "velero",
 							"name":      "test",
 						},
@@ -3983,10 +3983,10 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		{
 			name: "PVs claimref is nil, expect false.",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "velero",
 						"name":      "test",
 					},
@@ -3999,15 +3999,15 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		{
 			name: "Find VS, expect true.",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "velero",
 						"name":      "test",
 					},
-					"spec": map[string]interface{}{
-						"claimRef": map[string]interface{}{
+					"spec": map[string]any{
+						"claimRef": map[string]any{
 							"namespace": "velero",
 							"name":      "test",
 						},
@@ -4048,7 +4048,7 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		{
 			name: "Invalid PV, expect false.",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": 1,
 				},
 			},
@@ -4057,10 +4057,10 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		{
 			name: "PV without ClaimRef, expect false",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
@@ -4073,15 +4073,15 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		{
 			name: "Cannot find DataUploadResult CM, expect false",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
-					"spec": map[string]interface{}{
-						"claimRef": map[string]interface{}{
+					"spec": map[string]any{
+						"claimRef": map[string]any{
 							"namespace": "velero",
 							"name":      "testPVC",
 						},
@@ -4095,15 +4095,15 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		{
 			name: "Find DataUploadResult CM, expect true",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
-					"spec": map[string]interface{}{
-						"claimRef": map[string]interface{}{
+					"spec": map[string]any{
+						"claimRef": map[string]any{
 							"namespace": "velero",
 							"name":      "testPVC",
 						},

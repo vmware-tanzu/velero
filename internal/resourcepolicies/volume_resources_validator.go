@@ -78,7 +78,7 @@ func (c *csiCondition) validate() error {
 }
 
 // decodeStruct restric validate the keys in decoded mappings to exist as fields in the struct being decoded into
-func decodeStruct(r io.Reader, s interface{}) error {
+func decodeStruct(r io.Reader, s any) error {
 	dec := yaml.NewDecoder(r)
 	dec.KnownFields(true)
 	return dec.Decode(s)

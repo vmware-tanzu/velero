@@ -34,7 +34,7 @@ type RestoreItemActionPlugin struct {
 }
 
 // GRPCClient returns a RestoreItemAction gRPC client.
-func (p *RestoreItemActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+func (p *RestoreItemActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (any, error) {
 	return common.NewClientDispenser(p.ClientLogger, clientConn, newRestoreItemActionGRPCClient), nil
 }
 

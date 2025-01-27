@@ -34,7 +34,7 @@ type BackupItemActionPlugin struct {
 }
 
 // GRPCClient returns a clientDispenser for BackupItemAction gRPC clients.
-func (p *BackupItemActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+func (p *BackupItemActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (any, error) {
 	return common.NewClientDispenser(p.ClientLogger, clientConn, newBackupItemActionGRPCClient), nil
 }
 

@@ -84,7 +84,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 		return nil, errors.Errorf("object was of unexpected type %T", input.Item)
 	}
 
-	log := a.logger.WithFields(map[string]interface{}{
+	log := a.logger.WithFields(map[string]any{
 		"kind":      obj.GetKind(),
 		"namespace": obj.GetNamespace(),
 		"name":      obj.GetName(),

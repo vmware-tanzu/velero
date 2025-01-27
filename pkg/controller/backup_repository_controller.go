@@ -548,7 +548,7 @@ func getBackupRepositoryConfig(ctx context.Context, ctrlClient client.Client, co
 		return nil, nil
 	}
 
-	var unmarshalled map[string]interface{}
+	var unmarshalled map[string]any
 	if err := json.Unmarshal([]byte(jsonData), &unmarshalled); err != nil {
 		return nil, errors.Wrapf(err, "error unmarshalling config data from %s for repo %s, repo type %s", configName, repoName, repoType)
 	}

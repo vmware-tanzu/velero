@@ -372,7 +372,7 @@ func (p *volumeSnapshotBackupItemAction) Cancel(
 func NewVolumeSnapshotBackupItemAction(
 	f client.Factory,
 ) plugincommon.HandlerInitializer {
-	return func(logger logrus.FieldLogger) (interface{}, error) {
+	return func(logger logrus.FieldLogger) (any, error) {
 		crClient, err := f.KubebuilderClient()
 		if err != nil {
 			return nil, errors.WithStack(err)

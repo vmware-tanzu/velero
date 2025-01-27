@@ -46,14 +46,14 @@ type Action struct {
 	// Type defined specific type of action, currently only support 'skip'
 	Type VolumeActionType `yaml:"type"`
 	// Parameters defined map of parameters when executing a specific action
-	Parameters map[string]interface{} `yaml:"parameters,omitempty"`
+	Parameters map[string]any `yaml:"parameters,omitempty"`
 }
 
 // volumePolicy defined policy to conditions to match Volumes and related action to handle matched Volumes
 type VolumePolicy struct {
 	// Conditions defined list of conditions to match Volumes
-	Conditions map[string]interface{} `yaml:"conditions"`
-	Action     Action                 `yaml:"action"`
+	Conditions map[string]any `yaml:"conditions"`
+	Action     Action         `yaml:"action"`
 }
 
 // resourcePolicies currently defined slice of volume policies to handle backup
@@ -122,7 +122,7 @@ func (p *Policies) match(res *structuredVolume) *Action {
 	return nil
 }
 
-func (p *Policies) GetMatchAction(res interface{}) (*Action, error) {
+func (p *Policies) GetMatchAction(res any) (*Action, error) {
 	volume := &structuredVolume{}
 	switch obj := res.(type) {
 	case *v1.PersistentVolume:

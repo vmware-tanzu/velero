@@ -778,7 +778,7 @@ func (ctx *restoreContext) processSelectedResource(
 					itemsRestored: len(ctx.restoredItems),
 				}
 			}
-			ctx.log.WithFields(map[string]interface{}{
+			ctx.log.WithFields(map[string]any{
 				"progress":  "",
 				"resource":  groupResource.String(),
 				"namespace": selectedItem.targetNamespace,
@@ -2053,7 +2053,7 @@ func hasPodVolumeBackup(unstructuredPV *unstructured.Unstructured, ctx *restoreC
 	return found
 }
 
-func hasDeleteReclaimPolicy(obj map[string]interface{}) bool {
+func hasDeleteReclaimPolicy(obj map[string]any) bool {
 	policy, _, _ := unstructured.NestedString(obj, "spec", "persistentVolumeReclaimPolicy")
 	return policy == string(v1.PersistentVolumeReclaimDelete)
 }
@@ -2089,9 +2089,9 @@ func resetMetadata(obj *unstructured.Unstructured) (*unstructured.Unstructured, 
 	if !ok {
 		return nil, errors.New("metadata not found")
 	}
-	metadata, ok := res.(map[string]interface{})
+	metadata, ok := res.(map[string]any)
 	if !ok {
-		return nil, errors.Errorf("metadata was of type %T, expected map[string]interface{}", res)
+		return nil, errors.Errorf("metadata was of type %T, expected map[string]any", res)
 	}
 
 	for k := range metadata {

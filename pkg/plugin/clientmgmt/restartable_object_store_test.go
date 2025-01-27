@@ -35,7 +35,7 @@ import (
 func TestRestartableGetObjectStore(t *testing.T) {
 	tests := []struct {
 		name          string
-		plugin        interface{}
+		plugin        any
 		getError      error
 		expectedError string
 	}{
@@ -189,7 +189,7 @@ func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 	restartabletest.RunRestartableDelegateTests(
 		t,
 		common.PluginKindObjectStore,
-		func(key process.KindAndName, p process.RestartableProcess) interface{} {
+		func(key process.KindAndName, p process.RestartableProcess) any {
 			return &restartableObjectStore{
 				key:                 key,
 				sharedPluginProcess: p,
@@ -200,39 +200,39 @@ func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "PutObject",
-			Inputs:                  []interface{}{"bucket", "key", strings.NewReader("body")},
-			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+			Inputs:                  []any{"bucket", "key", strings.NewReader("body")},
+			ExpectedErrorOutputs:    []any{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "GetObject",
-			Inputs:                  []interface{}{"bucket", "key"},
-			ExpectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{io.NopCloser(strings.NewReader("object")), errors.Errorf("delegate error")},
+			Inputs:                  []any{"bucket", "key"},
+			ExpectedErrorOutputs:    []any{nil, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{io.NopCloser(strings.NewReader("object")), errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "ListCommonPrefixes",
-			Inputs:                  []interface{}{"bucket", "prefix", "delimiter"},
-			ExpectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
+			Inputs:                  []any{"bucket", "prefix", "delimiter"},
+			ExpectedErrorOutputs:    []any{([]string)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{[]string{"a", "b"}, errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "ListObjects",
-			Inputs:                  []interface{}{"bucket", "prefix"},
-			ExpectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
+			Inputs:                  []any{"bucket", "prefix"},
+			ExpectedErrorOutputs:    []any{([]string)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{[]string{"a", "b"}, errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "DeleteObject",
-			Inputs:                  []interface{}{"bucket", "key"},
-			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+			Inputs:                  []any{"bucket", "key"},
+			ExpectedErrorOutputs:    []any{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "CreateSignedURL",
-			Inputs:                  []interface{}{"bucket", "key", 30 * time.Minute},
-			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{"signedURL", errors.Errorf("delegate error")},
+			Inputs:                  []any{"bucket", "key", 30 * time.Minute},
+			ExpectedErrorOutputs:    []any{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{"signedURL", errors.Errorf("delegate error")},
 		},
 	)
 }

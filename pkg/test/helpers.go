@@ -29,8 +29,8 @@ func UnstructuredOrDie(data string) *unstructured.Unstructured {
 	return o.(*unstructured.Unstructured)
 }
 
-func GetAsMap(j string) (map[string]interface{}, error) {
-	m := make(map[string]interface{})
+func GetAsMap(j string) (map[string]any, error) {
+	m := make(map[string]any)
 	err := json.Unmarshal([]byte(j), &m)
 	return m, err
 }

@@ -53,7 +53,7 @@ func (p *StrategicMergePatcher) Patch(u *unstructured.Unstructured, _ logrus.Fie
 
 // strategicPatchObject applies a strategic merge patch of `patchBytes` to
 // `originalObject` and stores the result in `objToUpdate`.
-// It additionally returns the map[string]interface{} representation of the
+// It additionally returns the map[string]any representation of the
 // `originalObject` and `patchBytes`.
 // NOTE: Both `originalObject` and `objToUpdate` are supposed to be versioned.
 func strategicPatchObject(
@@ -67,7 +67,7 @@ func strategicPatchObject(
 		return err
 	}
 
-	patchMap := make(map[string]interface{})
+	patchMap := make(map[string]any)
 	var strictErrs []error
 	strictErrs, err = kubejson.UnmarshalStrict(patchBytes, &patchMap)
 	if err != nil {
@@ -84,8 +84,8 @@ func strategicPatchObject(
 // <originalMap> and stores the result in <objToUpdate>.
 // NOTE: <objToUpdate> must be a versioned object.
 func applyPatchToObject(
-	originalMap map[string]interface{},
-	patchMap map[string]interface{},
+	originalMap map[string]any,
+	patchMap map[string]any,
 	objToUpdate runtime.Object,
 	schemaReferenceObj runtime.Object,
 	strictErrs []error,

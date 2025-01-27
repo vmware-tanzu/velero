@@ -46,7 +46,7 @@ type BackupItemActionGRPCClient struct {
 	grpcClient protobiav2.BackupItemActionClient
 }
 
-func newBackupItemActionGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) interface{} {
+func newBackupItemActionGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) any {
 	return &BackupItemActionGRPCClient{
 		ClientBase: base,
 		grpcClient: protobiav2.NewBackupItemActionClient(clientConn),

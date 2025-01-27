@@ -100,7 +100,7 @@ type csiSnapshotExposer struct {
 	log               logrus.FieldLogger
 }
 
-func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param interface{}) error {
+func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param any) error {
 	csiExposeParam := param.(*CSISnapshotExposeParam)
 
 	curLog := e.log.WithFields(logrus.Fields{
@@ -232,7 +232,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 	return nil
 }
 
-func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.ObjectReference, timeout time.Duration, param interface{}) (*ExposeResult, error) {
+func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.ObjectReference, timeout time.Duration, param any) (*ExposeResult, error) {
 	exposeWaitParam := param.(*CSISnapshotExposeWaitParam)
 
 	backupPodName := ownerObject.Name
