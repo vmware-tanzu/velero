@@ -79,6 +79,9 @@ type DownloadRequestStatus struct {
 	// +optional
 	DownloadURL string `json:"downloadURL,omitempty"`
 
+	// CaCert contains cacert value to use
+	CaCert string `json:"caCert,omitempty"`
+
 	// Expiration is when this DownloadRequest expires and can be deleted by the system.
 	// +optional
 	// +nullable
