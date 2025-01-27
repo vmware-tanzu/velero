@@ -60,9 +60,10 @@ jobs:
         # grep -E "v[1-9]\.(2[5-9]|[3-9][0-9])" filters for v1.25 to v9.99
         # and removes older patches of the same minor version
         # awk -F. '{if(!a[$1"."$2]++)print $1"."$2"."$NF}'
+        # TODO: replace "alpha|beta|1\.3[2-9]\.[1-9]" with "alpha|beta" when containerdv2 works https://github.com/vmware-tanzu/velero/issues/8648
         run: |
           echo "matrix={\
-            \"k8s\":$(wget -q -O - "https://hub.docker.com/v2/namespaces/kindest/repositories/node/tags?page_size=50" | grep -o '"name": *"[^"]*' | grep -o '[^"]*$' | grep -v -E "alpha|beta" | grep -E "v[1-9]\.(2[5-9]|[3-9][0-9])" | awk -F. '{if(!a[$1"."$2]++)print $1"."$2"."$NF}' | sort -r | sed s/v//g | jq -R -c -s 'split("\n")[:-1]'),\
+            \"k8s\":$(wget -q -O - "https://hub.docker.com/v2/namespaces/kindest/repositories/node/tags?page_size=50" | grep -o '"name": *"[^"]*' | grep -o '[^"]*$' | grep -v -E "alpha|beta|1\.3[2-9]\.[1-9]" | grep -E "v[1-9]\.(2[5-9]|[3-9][0-9])" | awk -F. '{if(!a[$1"."$2]++)print $1"."$2"."$NF}' | sort -r | sed s/v//g | jq -R -c -s 'split("\n")[:-1]'),\
             \"labels\":[\
               \"Basic && (ClusterResource || NodePort || StorageClass)\", \
               \"ResourceFiltering && !Restic\", \
