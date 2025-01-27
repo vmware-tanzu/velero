@@ -954,12 +954,27 @@ func TestGetVolumeSnapshotClass(t *testing.T) {
 		Driver: "bar.csi.k8s.io",
 	}
 
+	sctestClass := &snapshotv1api.VolumeSnapshotClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "sctest",
+		},
+		Driver: "foo.csi.k8s.io",
+	}
+
 	// storageclasses
 	fooStorageClass := &storagev1api.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
+			Name:   "foo",
+			Labels: map[string]string{},
+		},
+		Provisioner: "foo.csi.k8s.io",
+	}
+
+	foolabelStorageClass := &storagev1api.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 			Labels: map[string]string{
-				"velero.io/csi-volumesnapshot-class": "foo",
+				"velero.io/csi-volumesnapshot-class": "sctest",
 			},
 		},
 		Provisioner: "foo.csi.k8s.io",
@@ -967,30 +982,24 @@ func TestGetVolumeSnapshotClass(t *testing.T) {
 
 	barStorageClass := &storagev1api.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "bar",
-			Labels: map[string]string{
-				"velero.io/csi-volumesnapshot-class": "foo",
-			},
+			Name:   "bar",
+			Labels: map[string]string{},
 		},
 		Provisioner: "bar.csi.k8s.io",
 	}
 
 	hostpathStorageClass := &storagev1api.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "hostpath",
-			Labels: map[string]string{
-				"velero.io/csi-volumesnapshot-class": "foo",
-			},
+			Name:   "hostpath",
+			Labels: map[string]string{},
 		},
 		Provisioner: "hostpath.csi.k8s.io",
 	}
 
 	blahStorageClass := &storagev1api.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "blah",
-			Labels: map[string]string{
-				"velero.io/csi-volumesnapshot-class": "foo",
-			},
+			Name:   "blah",
+			Labels: map[string]string{},
 		},
 		Provisioner: "blah.csi.k8s.io",
 	}
@@ -1021,6 +1030,13 @@ func TestGetVolumeSnapshotClass(t *testing.T) {
 			backup:       backupNone,
 			expectedVSC:  fooClassWithoutLabel,
 			expectError:  false,
+		},
+		{
+			name:         "footwithoutlabel VSC annotations on StorageClass",
+			storageClass: foolabelStorageClass,
+			pvc:          pvcNone,
+			backup:       backupNone,
+			expectedVSC:  sctestClass,
 		},
 		{
 			name:         "foowithoutlabel VSC annotations on pvc, but csi driver does not match, no annotation on backup so fallback to default behavior of labels",
