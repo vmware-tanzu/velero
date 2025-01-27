@@ -243,7 +243,6 @@ linters-settings:
       - name: dot-imports
         disabled: true
       - name: early-return
-        disabled: true
         arguments:
           - "preserveScope"
       - name: empty-block
@@ -266,7 +265,6 @@ linters-settings:
       - name: redefines-builtin-id
         disabled: true
       - name: superfluous-else
-        disabled: true
         arguments:
           - "preserveScope"
       - name: time-naming
