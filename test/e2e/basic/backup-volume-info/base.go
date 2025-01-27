@@ -96,6 +96,7 @@ func (v *BackupVolumeInfo) Start() error {
 	v.TestCase.Start()
 	return nil
 }
+
 func (v *BackupVolumeInfo) CreateResources() error {
 	labels := map[string]string{
 		"volume-info": "true",

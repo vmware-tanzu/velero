@@ -50,6 +50,7 @@ func BslDeletionWithSnapshots() {
 func BslDeletionWithRestic() {
 	BslDeletionTest(false)
 }
+
 func BslDeletionTest(useVolumeSnapshots bool) {
 	var (
 		err       error
@@ -143,7 +144,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 
 			label1 := "for=1"
 			// TODO remove when issue https://github.com/vmware-tanzu/velero/issues/4724 is fixed
-			//label2 := "for!=1"
+			// label2 := "for!=1"
 			label2 := "for=2"
 			By("Create namespace for sample workload", func() {
 				Expect(CreateNamespace(oneHourTimeout, *veleroCfg.ClientToInstallVelero, bslDeletionTestNs)).To(Succeed())

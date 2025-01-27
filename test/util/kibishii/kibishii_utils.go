@@ -49,12 +49,16 @@ type KibishiiData struct {
 	ExpectedNodes int
 }
 
-var DefaultKibishiiWorkerCounts = 2
-var DefaultKibishiiData = &KibishiiData{2, 10, 10, 1024, 1024, 0, DefaultKibishiiWorkerCounts}
+var (
+	DefaultKibishiiWorkerCounts = 2
+	DefaultKibishiiData         = &KibishiiData{2, 10, 10, 1024, 1024, 0, DefaultKibishiiWorkerCounts}
+)
 
-var KibishiiPodNameList = []string{"kibishii-deployment-0", "kibishii-deployment-1"}
-var KibishiiPVCNameList = []string{"kibishii-data-kibishii-deployment-0", "kibishii-data-kibishii-deployment-1"}
-var KibishiiStorageClassName = "kibishii-storage-class"
+var (
+	KibishiiPodNameList      = []string{"kibishii-deployment-0", "kibishii-deployment-1"}
+	KibishiiPVCNameList      = []string{"kibishii-data-kibishii-deployment-0", "kibishii-data-kibishii-deployment-1"}
+	KibishiiStorageClassName = "kibishii-storage-class"
+)
 
 func GetKibishiiPVCNameList(workerCount int) []string {
 	var kibishiiPVCNameList []string
@@ -264,7 +268,8 @@ func RunKibishiiTests(
 }
 
 func installKibishii(ctx context.Context, namespace string, cloudPlatform, veleroFeatures,
-	kibishiiDirectory string, useVolumeSnapshots bool, workerReplicas int) error {
+	kibishiiDirectory string, useVolumeSnapshots bool, workerReplicas int,
+) error {
 	if strings.EqualFold(cloudPlatform, Azure) &&
 		strings.EqualFold(veleroFeatures, FeatureCSI) {
 		cloudPlatform = AzureCSI
@@ -331,7 +336,6 @@ func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiD
 		}
 		return true, nil
 	})
-
 	if err != nil {
 		return errors.Wrapf(err, fmt.Sprintf("Failed to wait generate data in namespace %s", namespace))
 	}
@@ -361,7 +365,6 @@ func verifyData(ctx context.Context, namespace string, kibishiiData *KibishiiDat
 		}
 		return true, nil
 	})
-
 	if err != nil {
 		return errors.Wrapf(err, fmt.Sprintf("Failed to verify kibishii data in namespace %s\n", namespace))
 	}
@@ -384,7 +387,8 @@ func KibishiiGenerateData(oneHourTimeout context.Context, kibishiiNamespace stri
 
 func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClient,
 	providerName, kibishiiNamespace, registryCredentialFile, veleroFeatures,
-	kibishiiDirectory string, useVolumeSnapshots bool, kibishiiData *KibishiiData) error {
+	kibishiiDirectory string, useVolumeSnapshots bool, kibishiiData *KibishiiData,
+) error {
 	fmt.Printf("installKibishii %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	serviceAccountName := "default"
 
@@ -416,7 +420,8 @@ func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClie
 }
 
 func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, oneHourTimeout context.Context,
-	kibishiiData *KibishiiData, incrementalFileName string) error {
+	kibishiiData *KibishiiData, incrementalFileName string,
+) error {
 	if kibishiiData == nil {
 		kibishiiData = DefaultKibishiiData
 	}
@@ -448,8 +453,10 @@ func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, one
 }
 
 func ClearKibishiiData(ctx context.Context, namespace, podName, containerName, dir string) error {
-	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
-		"--", "/bin/sh", "-c", "rm -rf /" + dir + "/*"}
+	arg := []string{
+		"exec", "-n", namespace, "-c", containerName, podName,
+		"--", "/bin/sh", "-c", "rm -rf /" + dir + "/*",
+	}
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	return cmd.Run()

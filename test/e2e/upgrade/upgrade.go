@@ -33,8 +33,10 @@ import (
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
-var upgradeNamespace string
-var veleroCfg VeleroConfig
+var (
+	upgradeNamespace string
+	veleroCfg        VeleroConfig
+)
 
 func BackupUpgradeRestoreWithSnapshots() {
 	veleroCfg = VeleroCfg
@@ -111,8 +113,8 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			supportUploaderType, err := IsSupportUploaderType(veleroCLI2Version.VeleroVersion)
 			Expect(err).To(Succeed())
 			if veleroCLI2Version.VeleroCLI == "" {
-				//Assume tag of velero server image is identical to velero CLI version
-				//Download velero CLI if it's empty according to velero CLI version
+				// Assume tag of velero server image is identical to velero CLI version
+				// Download velero CLI if it's empty according to velero CLI version
 				By(fmt.Sprintf("Install the expected old version Velero CLI (%s) for installing Velero",
 					veleroCLI2Version.VeleroVersion), func() {
 					veleroCLI2Version.VeleroCLI, err = InstallVeleroCLI(veleroCLI2Version.VeleroVersion)
@@ -170,7 +172,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				BackupCfg.UseVolumeSnapshots = useVolumeSnapshots
 				BackupCfg.DefaultVolumesToFsBackup = !useVolumeSnapshots
 				BackupCfg.Selector = ""
-				//TODO: pay attention to this param, remove it when restic is not the default backup tool any more.
+				// TODO: pay attention to this param, remove it when restic is not the default backup tool any more.
 				BackupCfg.UseResticIfFSBackup = !supportUploaderType
 				Expect(VeleroBackupNamespace(oneHourTimeout, tmpCfg.UpgradeFromVeleroCLI,
 					tmpCfg.VeleroNamespace, BackupCfg)).To(Succeed(), func() string {

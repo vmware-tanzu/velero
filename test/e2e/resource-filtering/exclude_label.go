@@ -86,7 +86,7 @@ func (e *ExcludeFromBackup) CreateResources() error {
 	if err := CreateNamespace(e.Ctx, e.Client, namespace); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 	}
-	//Create deployment: to be included
+	// Create deployment: to be included
 	fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
 	deployment := NewDeployment(e.CaseBaseName, namespace, e.replica, label2, nil).Result()
 	deployment, err := CreateDeployment(e.Client.ClientGo, namespace, deployment)
@@ -97,7 +97,7 @@ func (e *ExcludeFromBackup) CreateResources() error {
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", namespace))
 	}
-	//Create Secret
+	// Create Secret
 	secretName := e.CaseBaseName
 	fmt.Printf("Creating secret %s in namespaces ...%s\n", secretName, namespace)
 	_, err = CreateSecret(e.Client.ClientGo, namespace, secretName, e.labels)
@@ -112,7 +112,7 @@ func (e *ExcludeFromBackup) CreateResources() error {
 		_, err = GetSecret(e.Client.ClientGo, namespace, e.CaseBaseName)
 		Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 	})
-	//Create Configmap: to be included
+	// Create Configmap: to be included
 	configmaptName := e.CaseBaseName
 	fmt.Printf("Creating configmap %s in namespaces ...%s\n", configmaptName, namespace)
 	_, err = CreateConfigMap(e.Client.ClientGo, namespace, configmaptName, label1, nil)
@@ -129,21 +129,21 @@ func (e *ExcludeFromBackup) CreateResources() error {
 func (e *ExcludeFromBackup) Verify() error {
 	namespace := e.CaseBaseName
 	By(fmt.Sprintf("Checking resources in namespaces ...%s\n", namespace), func() {
-		//Check namespace
+		// Check namespace
 		checkNS, err := GetNamespace(e.Ctx, e.Client, namespace)
 		Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("Could not retrieve test namespace %s", namespace))
 		Expect(checkNS.Name).To(Equal(namespace), fmt.Sprintf("Retrieved namespace for %s has name %s instead", namespace, checkNS.Name))
 
-		//Check deployment: should be included
+		// Check deployment: should be included
 		_, err = GetDeployment(e.Client.ClientGo, namespace, e.CaseBaseName)
 		Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 
-		//Check secrets: secrets should not be included
+		// Check secrets: secrets should not be included
 		_, err = GetSecret(e.Client.ClientGo, namespace, e.CaseBaseName)
 		Expect(err).Should(HaveOccurred(), fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 
-		//Check configmap: should be included
+		// Check configmap: should be included
 		_, err = GetConfigMap(e.Client.ClientGo, namespace, e.CaseBaseName)
 		Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("failed to list configmap in namespace: %q", namespace))
 	})

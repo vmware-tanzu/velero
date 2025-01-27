@@ -35,8 +35,10 @@ type FilteringCase struct {
 	labelSelector  string
 }
 
-var testInBackup = FilteringCase{IsTestInBackup: true}
-var testInRestore = FilteringCase{IsTestInBackup: false}
+var (
+	testInBackup  = FilteringCase{IsTestInBackup: true}
+	testInRestore = FilteringCase{IsTestInBackup: false}
+)
 
 func (f *FilteringCase) Init() error {
 	f.TestCase.Init()
@@ -66,7 +68,7 @@ func (f *FilteringCase) CreateResources() error {
 		if err := CreateNamespace(f.Ctx, f.Client, namespace); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
-		//Create deployment
+		// Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
 		deployment := NewDeployment(f.CaseBaseName, namespace, f.replica, f.labels, nil).Result()
 		deployment, err := CreateDeployment(f.Client.ClientGo, namespace, deployment)
@@ -77,7 +79,7 @@ func (f *FilteringCase) CreateResources() error {
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", namespace))
 		}
-		//Create Secret
+		// Create Secret
 		secretName := f.CaseBaseName
 		fmt.Printf("Creating secret %s in namespaces ...%s\n", secretName, namespace)
 		_, err = CreateSecret(f.Client.ClientGo, namespace, secretName, f.labels)
@@ -88,7 +90,7 @@ func (f *FilteringCase) CreateResources() error {
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to ensure secret completion in namespace: %q", namespace))
 		}
-		//Create Configmap
+		// Create Configmap
 		configmaptName := f.CaseBaseName
 		fmt.Printf("Creating configmap %s in namespaces ...%s\n", configmaptName, namespace)
 		_, err = CreateConfigMap(f.Client.ClientGo, namespace, configmaptName, f.labels, nil)
@@ -107,7 +109,7 @@ func (f *FilteringCase) Verify() error {
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", f.CaseBaseName, nsNum)
 		fmt.Printf("Checking resources in namespaces ...%s\n", namespace)
-		//Check namespace
+		// Check namespace
 		checkNS, err := GetNamespace(f.Ctx, f.Client, namespace)
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test namespace %s", namespace)
@@ -115,24 +117,26 @@ func (f *FilteringCase) Verify() error {
 		if checkNS.Name != namespace {
 			return errors.Errorf("Retrieved namespace for %s has name %s instead", namespace, checkNS.Name)
 		}
-		//Check deployment
+		// Check deployment
 		_, err = GetDeployment(f.Client.ClientGo, namespace, f.CaseBaseName)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list deployment in namespace: %q", namespace))
 		}
 
-		//Check secrets
+		// Check secrets
 		secretsList, err := f.Client.ClientGo.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: f.labelSelector})
+			LabelSelector: f.labelSelector,
+		})
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list secrets in namespace: %q", namespace))
 		} else if len(secretsList.Items) == 0 {
 			return errors.Wrap(err, fmt.Sprintf("no secrets found in namespace: %q", namespace))
 		}
 
-		//Check configmap
+		// Check configmap
 		configmapList, err := f.Client.ClientGo.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: f.labelSelector})
+			LabelSelector: f.labelSelector,
+		})
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to list configmap in namespace: %q", namespace))
 		} else if len(configmapList.Items) == 0 {

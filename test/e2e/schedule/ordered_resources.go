@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//the ordered resources test related to https://github.com/vmware-tanzu/velero/issues/4561
+// the ordered resources test related to https://github.com/vmware-tanzu/velero/issues/4561
 import (
 	"context"
 	"fmt"
@@ -96,7 +96,7 @@ func (o *OrderedResources) CreateResources() error {
 		return errors.Wrapf(err, "failed to create namespace %s", o.Namespace)
 	}
 
-	//Create deployment
+	// Create deployment
 	deploymentName := fmt.Sprintf("deploy-%s", o.CaseBaseName)
 	fmt.Printf("Creating deployment %s in %s namespaces ...\n", deploymentName, o.Namespace)
 	deployment := k8sutil.NewDeployment(deploymentName, o.Namespace, 1, label, nil).Result()
@@ -109,7 +109,7 @@ func (o *OrderedResources) CreateResources() error {
 		return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", o.Namespace))
 	}
 
-	//Create Secret
+	// Create Secret
 	secretName := fmt.Sprintf("secret-%s", o.CaseBaseName)
 	fmt.Printf("Creating secret %s in %s namespaces ...\n", secretName, o.Namespace)
 	_, err = k8sutil.CreateSecret(o.Client.ClientGo, o.Namespace, secretName, label)
@@ -117,7 +117,7 @@ func (o *OrderedResources) CreateResources() error {
 		return errors.Wrap(err, fmt.Sprintf("failed to create secret in the namespace %q", o.Namespace))
 	}
 
-	//Create ConfigMap
+	// Create ConfigMap
 	cmName := fmt.Sprintf("configmap-%s", o.CaseBaseName)
 	fmt.Printf("Creating ConfigMap %s in %s namespaces ...\n", cmName, o.Namespace)
 	if _, err := k8sutil.CreateConfigMap(

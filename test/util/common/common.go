@@ -90,7 +90,7 @@ func CMDExecWithOutput(checkCMD *exec.Cmd) (*[]byte, error) {
 }
 
 func WriteToFile(content, fileName string) error {
-	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0666)
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0o666)
 	if err != nil {
 		fmt.Println("fail to open file", err)
 		return err
@@ -110,6 +110,7 @@ func WriteToFile(content, fileName string) error {
 	}
 	return nil
 }
+
 func CreateFileContent(namespace, podName, volume string) string {
 	return fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, podName, volume)
 }

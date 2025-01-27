@@ -66,7 +66,7 @@ func init() {
 	flag.StringVar(&VeleroCfg.VeleroPodCPURequest, "velero-pod-cpu-request", "2", "CPU request for velero pod. Optional.")
 	flag.StringVar(&VeleroCfg.VeleroPodMemRequest, "velero-pod-mem-request", "2Gi", "Memory request for velero pod. Optional.")
 	flag.DurationVar(&VeleroCfg.PodVolumeOperationTimeout, "pod-volume-operation-timeout", 360*time.Minute, "Timeout for pod volume operations. Optional.")
-	//vmware-tanzu-experiments
+	// vmware-tanzu-experiments
 	flag.StringVar(&VeleroCfg.Features, "features", "", "Comma-separated list of features to enable for this Velero process.")
 	flag.StringVar(&VeleroCfg.DefaultClusterContext, "default-cluster-context", "", "Default cluster context for migration test.")
 	flag.StringVar(&VeleroCfg.UploaderType, "uploader-type", "kopia", "Identify persistent volume backup uploader.")

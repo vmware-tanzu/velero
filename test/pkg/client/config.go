@@ -72,11 +72,11 @@ func SaveConfig(config VeleroConfig) error {
 
 	// Try to make the directory in case it doesn't exist
 	dir := filepath.Dir(fileName)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return errors.WithStack(err)
 	}
 
-	configFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	configFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return errors.WithStack(err)
 	}

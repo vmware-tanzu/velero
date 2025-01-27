@@ -112,9 +112,8 @@ func (r *RBACCase) Verify() error {
 			return errors.Errorf("Retrieved namespace for %s has name %s instead", checkNSName, checkNS.Name)
 		}
 
-		//getting service account from the restore
+		// getting service account from the restore
 		checkSA, err := GetServiceAccount(r.Ctx, r.Client, checkNSName, checkServiceAccountName)
-
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test service account %s", checkSA)
 		}
@@ -123,9 +122,8 @@ func (r *RBACCase) Verify() error {
 			return errors.Errorf("Retrieved service account for %s has name %s instead", checkServiceAccountName, checkSA.Name)
 		}
 
-		//getting cluster role from the restore
+		// getting cluster role from the restore
 		checkClusterRole, err := GetClusterRole(r.Ctx, r.Client, checkClusterRoleName)
-
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test cluster role %s", checkClusterRole)
 		}
@@ -134,9 +132,8 @@ func (r *RBACCase) Verify() error {
 			return errors.Errorf("Retrieved cluster role for %s has name %s instead", checkClusterRoleName, checkClusterRole.Name)
 		}
 
-		//getting cluster role binding from the restore
+		// getting cluster role binding from the restore
 		checkClusterRoleBinding, err := GetClusterRoleBinding(r.Ctx, r.Client, checkClusterRoleBindingName)
-
 		if err != nil {
 			return errors.Wrapf(err, "Could not retrieve test cluster role binding %s", checkClusterRoleBinding)
 		}
@@ -145,7 +142,7 @@ func (r *RBACCase) Verify() error {
 			return errors.Errorf("Retrieved cluster role binding for %s has name %s instead", checkClusterRoleBindingName, checkClusterRoleBinding.Name)
 		}
 
-		//check if the role binding maps to service account
+		// check if the role binding maps to service account
 		checkSubjects := checkClusterRoleBinding.Subjects[0].Name
 
 		if checkSubjects != checkServiceAccountName {
@@ -156,13 +153,13 @@ func (r *RBACCase) Verify() error {
 }
 
 func (r *RBACCase) Destroy() error {
-	//cleanup clusterrole
+	// cleanup clusterrole
 	err := CleanupClusterRole(r.Ctx, r.Client, r.CaseBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could not cleanup clusterroles")
 	}
 
-	//cleanup cluster rolebinding
+	// cleanup cluster rolebinding
 	err = CleanupClusterRoleBinding(r.Ctx, r.Client, r.CaseBaseName)
 	if err != nil {
 		return errors.Wrap(err, "Could not cleanup clusterrolebindings")

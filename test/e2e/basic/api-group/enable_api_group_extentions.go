@@ -30,9 +30,7 @@ import (
 )
 
 func APIExtensionsVersionsTest() {
-	var (
-		backupName, restoreName string
-	)
+	var backupName, restoreName string
 
 	resourceName := "apiextensions.k8s.io"
 	crdName := "rocknrollbands.music.example.io"

@@ -31,18 +31,20 @@ const StorageClassName = "e2e-storage-class"
 // e2e-storage-class-2 is used for the StorageClass mapping test case.
 const StorageClassName2 = "e2e-storage-class-2"
 
-const FeatureCSI = "EnableCSI"
-const VanillaZFS = "vanilla-zfs"
-const Kind = "kind"
-const Azure = "azure"
-const AzureCSI = "azure-csi"
-const AwsCSI = "aws-csi"
-const AWS = "aws"
-const GCP = "gcp"
-const Vsphere = "vsphere"
-const CSI = "csi"
-const Velero = "velero"
-const VeleroRestoreHelper = "velero-restore-helper"
+const (
+	FeatureCSI          = "EnableCSI"
+	VanillaZFS          = "vanilla-zfs"
+	Kind                = "kind"
+	Azure               = "azure"
+	AzureCSI            = "azure-csi"
+	AwsCSI              = "aws-csi"
+	AWS                 = "aws"
+	GCP                 = "gcp"
+	Vsphere             = "vsphere"
+	CSI                 = "csi"
+	Velero              = "velero"
+	VeleroRestoreHelper = "velero-restore-helper"
+)
 
 const UploaderTypeRestic = "restic"
 
@@ -53,12 +55,16 @@ const (
 	VeleroVSphereConfigMapName    = "velero-vsphere-plugin-config"
 )
 
-var PublicCloudProviders = []string{AWS, Azure, GCP, Vsphere}
-var LocalCloudProviders = []string{Kind, VanillaZFS}
-var CloudProviders = append(PublicCloudProviders, LocalCloudProviders...)
+var (
+	PublicCloudProviders = []string{AWS, Azure, GCP, Vsphere}
+	LocalCloudProviders  = []string{Kind, VanillaZFS}
+	CloudProviders       = append(PublicCloudProviders, LocalCloudProviders...)
+)
 
-var InstallVelero bool
-var UUIDgen uuid.UUID
+var (
+	InstallVelero bool
+	UUIDgen       uuid.UUID
+)
 
 var VeleroCfg VeleroConfig
 

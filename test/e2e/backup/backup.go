@@ -120,7 +120,7 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 		It("should be successfully backed up and restored to the default BackupStorageLocation", func() {
 			if InstallVelero {
 				if useVolumeSnapshots {
-					//Install node agent also
+					// Install node agent also
 					veleroCfg.UseNodeAgent = useVolumeSnapshots
 					// DefaultVolumesToFsBackup should be mutually exclusive with useVolumeSnapshots in installation CLI,
 					// otherwise DefaultVolumesToFsBackup need to be set to false in backup CLI when taking volume snapshot
@@ -162,7 +162,7 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 			if InstallVelero {
 				if useVolumeSnapshots {
 					veleroCfg.DefaultVolumesToFsBackup = !useVolumeSnapshots
-				} else { //FS volume backup
+				} else { // FS volume backup
 					// Install VolumeSnapshots also
 					veleroCfg.UseVolumeSnapshots = !useVolumeSnapshots
 					// DefaultVolumesToFsBackup is false in installation CLI here,

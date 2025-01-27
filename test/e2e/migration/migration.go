@@ -120,8 +120,8 @@ func (m *migrationE2E) Backup() error {
 	var err error
 
 	if m.veleroCLI2Version.VeleroCLI == "" {
-		//Assume tag of velero server image is identical to velero CLI version
-		//Download velero CLI if it's empty according to velero CLI version
+		// Assume tag of velero server image is identical to velero CLI version
+		// Download velero CLI if it's empty according to velero CLI version
 		By(
 			fmt.Sprintf("Install the expected version Velero CLI %s",
 				m.veleroCLI2Version.VeleroVersion),
@@ -256,7 +256,7 @@ func (m *migrationE2E) Backup() error {
 		snapshotCheckPoint.NamespaceBackedUp = m.CaseBaseName
 
 		if OriginVeleroCfg.SnapshotMoveData {
-			//VolumeSnapshotContent should be deleted after data movement
+			// VolumeSnapshotContent should be deleted after data movement
 			_, err := util.CheckVolumeSnapshotCR(
 				*m.VeleroCfg.DefaultClient,
 				map[string]string{"namespace": m.CaseBaseName},
@@ -358,8 +358,10 @@ func (m *migrationE2E) Restore() error {
 	By(fmt.Sprintf("Restore %s", m.CaseBaseName), func() {
 		if m.VeleroCfg.SnapshotMoveData {
 			cmName := "datamover-storage-class-config"
-			labels := map[string]string{"velero.io/change-storage-class": "RestoreItemAction",
-				"velero.io/plugin-config": ""}
+			labels := map[string]string{
+				"velero.io/change-storage-class": "RestoreItemAction",
+				"velero.io/plugin-config":        "",
+			}
 			data := map[string]string{kibishii.KibishiiStorageClassName: test.StorageClassName}
 
 			By(fmt.Sprintf("Create ConfigMap %s in namespace %s",

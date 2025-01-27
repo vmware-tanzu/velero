@@ -166,7 +166,8 @@ func (n *NodePort) Restore() error {
 }
 
 func createServiceWithNodeport(ctx context.Context, client TestClient, namespace string,
-	service string, labels map[string]string, nodePort int32) error {
+	service string, labels map[string]string, nodePort int32,
+) error {
 	serviceSpec := &v1.ServiceSpec{
 		Ports: []v1.ServicePort{
 			{

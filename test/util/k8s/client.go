@@ -48,9 +48,7 @@ type TestClient struct {
 	MetricsClient *metricsclientset.Clientset
 }
 
-var (
-	err error
-)
+var err error
 
 // NewTestClient returns a set of ready-to-use API clients.
 func NewTestClient(kubecontext string) (TestClient, error) {
@@ -66,7 +64,6 @@ func InitTestClient(kubecontext string) (TestClient, error) {
 	f := client.NewFactory("e2e", kubecontext, config)
 
 	clientGo, err := f.KubeClient()
-
 	if err != nil {
 		return TestClient{}, err
 	}

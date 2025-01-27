@@ -63,7 +63,7 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 		for _, podName := range pods {
 			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 			if err != nil {
-				//Should ignore "etcdserver: request timed out" kind of errors, try to get pod status again before timeout.
+				// Should ignore "etcdserver: request timed out" kind of errors, try to get pod status again before timeout.
 				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...\n", namespace, podName, corev1.PodRunning)))
 				return false, nil
 			}
@@ -300,8 +300,10 @@ func PrepareVolumeList(volumeNameList []string) (vols []*corev1.Volume) {
 }
 
 func CalFileHashInPod(ctx context.Context, namespace, podName, containerName, filePath string) (string, error) {
-	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
-		"--", "/bin/sh", "-c", fmt.Sprintf("sha256sum %s | awk '{ print $1 }'", filePath)}
+	arg := []string{
+		"exec", "-n", namespace, "-c", containerName, podName,
+		"--", "/bin/sh", "-c", fmt.Sprintf("sha256sum %s | awk '{ print $1 }'", filePath),
+	}
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	output, err := cmd.Output()
 	if err != nil {
@@ -315,16 +317,20 @@ func CalFileHashInPod(ctx context.Context, namespace, podName, containerName, fi
 }
 
 func WriteRandomDataToFileInPod(ctx context.Context, namespace, podName, containerName, volume, filename string, fileSize int64) error {
-	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
-		"--", "/bin/sh", "-c", fmt.Sprintf("dd if=/dev/urandom of=/%s/%s bs=%d count=1", volume, filename, fileSize)}
+	arg := []string{
+		"exec", "-n", namespace, "-c", containerName, podName,
+		"--", "/bin/sh", "-c", fmt.Sprintf("dd if=/dev/urandom of=/%s/%s bs=%d count=1", volume, filename, fileSize),
+	}
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	return cmd.Run()
 }
 
 func CreateFileToPod(ctx context.Context, namespace, podName, containerName, volume, filename, content string) error {
-	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
-		"--", "/bin/sh", "-c", fmt.Sprintf("echo ns-%s pod-%s volume-%s  > /%s/%s", namespace, podName, volume, volume, filename)}
+	arg := []string{
+		"exec", "-n", namespace, "-c", containerName, podName,
+		"--", "/bin/sh", "-c", fmt.Sprintf("echo ns-%s pod-%s volume-%s  > /%s/%s", namespace, podName, volume, volume, filename),
+	}
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	return cmd.Run()
@@ -345,9 +351,12 @@ func FileExistInPV(ctx context.Context, namespace, podName, containerName, volum
 		}
 	}
 }
+
 func ReadFileFromPodVolume(ctx context.Context, namespace, podName, containerName, volume, filename string) (string, string, error) {
-	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
-		"--", "cat", fmt.Sprintf("/%s/%s", volume, filename)}
+	arg := []string{
+		"exec", "-n", namespace, "-c", containerName, podName,
+		"--", "cat", fmt.Sprintf("/%s/%s", volume, filename),
+	}
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	stdout, stderr, err := veleroexec.RunCommand(cmd)

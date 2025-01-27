@@ -37,9 +37,7 @@ import (
 
 func SSRTest() {
 	testNS := "ssr-test"
-	var (
-		err error
-	)
+	var err error
 	veleroCfg := VeleroCfg
 	BeforeEach(func() {
 		flag.Parse()
