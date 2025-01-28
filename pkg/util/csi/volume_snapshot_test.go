@@ -1032,11 +1032,12 @@ func TestGetVolumeSnapshotClass(t *testing.T) {
 			expectError:  false,
 		},
 		{
-			name:         "footwithoutlabel VSC annotations on StorageClass",
+			name:         "sctest VSC annotations on StorageClass",
 			storageClass: foolabelStorageClass,
 			pvc:          pvcNone,
 			backup:       backupNone,
 			expectedVSC:  sctestClass,
+			expectError:  false,
 		},
 		{
 			name:         "foowithoutlabel VSC annotations on pvc, but csi driver does not match, no annotation on backup so fallback to default behavior of labels",
