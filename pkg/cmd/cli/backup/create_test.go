@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -84,6 +85,42 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 		"pods":                   "p1,p2",
 		"persistentvolumeclaims": "pvc1,pvc2",
 	}, backup.Spec.OrderedResources)
+}
+
+func TestCreateOptions_ValidateFromScheduleFlag(t *testing.T) {
+	o := &CreateOptions{}
+	cmd := &cobra.Command{}
+
+	cmd.Flags().String("from-schedule", "", "Test from-schedule flag")
+
+	t.Run("from-schedule with empty or no value", func(t *testing.T) {
+		cmd.Flags().Set("from-schedule", "")
+		err := o.validateFromScheduleFlag(cmd)
+		require.True(t, cmd.Flags().Changed("from-schedule"))
+		require.Error(t, err)
+		require.Equal(t, "flag must have a non-empty value: --from-schedule", err.Error())
+	})
+
+	t.Run("from-schedule with spaces only", func(t *testing.T) {
+		cmd.Flags().Set("from-schedule", " ")
+		err := o.validateFromScheduleFlag(cmd)
+		require.Error(t, err)
+		require.Equal(t, "flag must have a non-empty value: --from-schedule", err.Error())
+	})
+
+	t.Run("from-schedule with valid value", func(t *testing.T) {
+		cmd.Flags().Set("from-schedule", "daily")
+		err := o.validateFromScheduleFlag(cmd)
+		require.NoError(t, err)
+		require.Equal(t, "daily", o.FromSchedule)
+	})
+
+	t.Run("from-schedule with leading and trailing spaces", func(t *testing.T) {
+		cmd.Flags().Set("from-schedule", " daily ")
+		err := o.validateFromScheduleFlag(cmd)
+		require.NoError(t, err)
+		require.Equal(t, "daily", o.FromSchedule)
+	})
 }
 
 func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
