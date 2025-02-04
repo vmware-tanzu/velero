@@ -600,6 +600,19 @@ func writeInitParameters(ctx context.Context, repoOption udmrepo.RepoOptions, lo
 			logger.Infof("Quick maintenance interval change from %v to %v", p.QuickCycle.Interval, overwriteQuickMaintainInterval)
 			p.QuickCycle.Interval = overwriteQuickMaintainInterval
 		}
+		fullMaintIntervalOption := udmrepo.FullMaintenanceIntervalOptions(repoOption.StorageOptions[udmrepo.StoreOptionKeyFullMaintenanceInterval])
+		if fullMaintIntervalOption == udmrepo.FastGC {
+			logger.Infof("Full maintenance interval change from %v to %v", p.FullCycle.Interval, udmrepo.FastGCInterval)
+			p.FullCycle.Interval = udmrepo.FastGCInterval
+		}
+		if fullMaintIntervalOption == udmrepo.EagerGC {
+			logger.Infof("Full maintenance interval change from %v to %v", p.FullCycle.Interval, udmrepo.EagerGCInterval)
+			p.FullCycle.Interval = udmrepo.EagerGCInterval
+		}
+		if fullMaintIntervalOption == udmrepo.NormalGC {
+			logger.Infof("Full maintenance interval change from %v to %v", p.FullCycle.Interval, udmrepo.NormalGCInterval)
+			p.FullCycle.Interval = udmrepo.NormalGCInterval
+		}
 
 		p.Owner = r.ClientOptions().UsernameAtHost()
 
