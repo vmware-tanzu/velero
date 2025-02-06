@@ -309,9 +309,9 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		}
 	}
 
-	var cancelFunc context.CancelFunc
-	kb.podVolumeContext, cancelFunc = context.WithTimeout(context.Background(), podVolumeTimeout)
-	defer cancelFunc()
+	var podVolumeCancelFunc context.CancelFunc
+	kb.podVolumeContext, podVolumeCancelFunc = context.WithTimeout(context.Background(), podVolumeTimeout)
+	defer podVolumeCancelFunc()
 
 	var podVolumeBackupper podvolume.Backupper
 	if kb.podVolumeBackupperFactory != nil {
