@@ -88,10 +88,9 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 }
 
 func TestCreateOptions_ValidateFromScheduleFlag(t *testing.T) {
-	o := &CreateOptions{}
 	cmd := &cobra.Command{}
-
-	cmd.Flags().String("from-schedule", "", "Test from-schedule flag")
+	o := NewCreateOptions()
+	o.BindFromSchedule(cmd.Flags())
 
 	t.Run("from-schedule with empty or no value", func(t *testing.T) {
 		cmd.Flags().Set("from-schedule", "")
@@ -104,6 +103,7 @@ func TestCreateOptions_ValidateFromScheduleFlag(t *testing.T) {
 	t.Run("from-schedule with spaces only", func(t *testing.T) {
 		cmd.Flags().Set("from-schedule", " ")
 		err := o.validateFromScheduleFlag(cmd)
+		require.True(t, cmd.Flags().Changed("from-schedule"))
 		require.Error(t, err)
 		require.Equal(t, "flag must have a non-empty value: --from-schedule", err.Error())
 	})

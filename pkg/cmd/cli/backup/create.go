@@ -221,19 +221,13 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 }
 
 func (o *CreateOptions) validateFromScheduleFlag(c *cobra.Command) error {
-	fromSchedule, err := c.Flags().GetString("from-schedule")
-	if err != nil {
-		return err
-	}
-
-	trimmed := strings.TrimSpace(fromSchedule)
+	trimmed := strings.TrimSpace(o.FromSchedule)
 	if c.Flags().Changed("from-schedule") && trimmed == "" {
 		return fmt.Errorf("flag must have a non-empty value: --from-schedule")
 	}
 
 	// Assign the trimmed value back
 	o.FromSchedule = trimmed
-
 	return nil
 }
 
