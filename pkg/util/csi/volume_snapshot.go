@@ -425,7 +425,7 @@ func GetVolumeSnapshotClassForStorageClass(
 	for _, sc := range snapshotClasses.Items {
 		_, hasLabelSelector := sc.Labels[velerov1api.VolumeSnapshotClassSelectorLabel]
 		if sc.Driver == provisioner {
-			n += 1
+			n++
 			vsClass = sc
 			if hasLabelSelector {
 				return &sc, nil

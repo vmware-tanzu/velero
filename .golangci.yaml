@@ -257,7 +257,6 @@ linters-settings:
       - name: errorf
         disabled: true
       - name: increment-decrement
-        disabled: true
       - name: indent-error-flow
         disabled: true
       - name: range
