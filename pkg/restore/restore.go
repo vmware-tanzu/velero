@@ -108,6 +108,7 @@ type kubernetesRestorer struct {
 	namespaceClient               corev1.NamespaceInterface
 	podVolumeRestorerFactory      podvolume.RestorerFactory
 	podVolumeTimeout              time.Duration
+	podVolumeContext              go_context.Context
 	resourceTerminatingTimeout    time.Duration
 	resourceTimeout               time.Duration
 	resourcePriorities            types.Priorities
@@ -249,12 +250,13 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 		}
 	}
 
-	ctx, cancelFunc := go_context.WithTimeout(go_context.Background(), podVolumeTimeout)
-	defer cancelFunc()
+	var podVolumeCancelFunc go_context.CancelFunc
+	kr.podVolumeContext, podVolumeCancelFunc = go_context.WithTimeout(go_context.Background(), podVolumeTimeout)
+	defer podVolumeCancelFunc()
 
 	var podVolumeRestorer podvolume.Restorer
 	if kr.podVolumeRestorerFactory != nil {
-		podVolumeRestorer, err = kr.podVolumeRestorerFactory.NewRestorer(ctx, req.Restore)
+		podVolumeRestorer, err = kr.podVolumeRestorerFactory.NewRestorer(kr.podVolumeContext, req.Restore)
 		if err != nil {
 			return results.Result{}, results.Result{Velero: []string{err.Error()}}
 		}
