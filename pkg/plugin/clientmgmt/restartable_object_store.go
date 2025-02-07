@@ -54,7 +54,7 @@ func NewRestartableObjectStore(name string, sharedPluginProcess process.Restarta
 }
 
 // reinitialize reinitializes a re-dispensed plugin using the initial data passed to Init().
-func (r *restartableObjectStore) Reinitialize(dispensed interface{}) error {
+func (r *restartableObjectStore) Reinitialize(dispensed any) error {
 	objectStore, ok := dispensed.(velero.ObjectStore)
 	if !ok {
 		return errors.Errorf("plugin %T is not a ObjectStore", dispensed)

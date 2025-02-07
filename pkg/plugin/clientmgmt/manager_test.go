@@ -159,10 +159,10 @@ func TestGetObjectStore(t *testing.T) {
 	getPluginTest(t,
 		common.PluginKindObjectStore,
 		"velero.io/aws",
-		func(m Manager, name string) (interface{}, error) {
+		func(m Manager, name string) (any, error) {
 			return m.GetObjectStore(name)
 		},
-		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+		func(name string, sharedPluginProcess process.RestartableProcess) any {
 			return &restartableObjectStore{
 				key:                 process.KindAndName{Kind: common.PluginKindObjectStore, Name: name},
 				sharedPluginProcess: sharedPluginProcess,
@@ -176,10 +176,10 @@ func TestGetVolumeSnapshotter(t *testing.T) {
 	getPluginTest(t,
 		common.PluginKindVolumeSnapshotter,
 		"velero.io/aws",
-		func(m Manager, name string) (interface{}, error) {
+		func(m Manager, name string) (any, error) {
 			return m.GetVolumeSnapshotter(name)
 		},
-		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+		func(name string, sharedPluginProcess process.RestartableProcess) any {
 			return &vsv1cli.RestartableVolumeSnapshotter{
 				Key:                 process.KindAndName{Kind: common.PluginKindVolumeSnapshotter, Name: name},
 				SharedPluginProcess: sharedPluginProcess,
@@ -193,10 +193,10 @@ func TestGetBackupItemAction(t *testing.T) {
 	getPluginTest(t,
 		common.PluginKindBackupItemAction,
 		"velero.io/pod",
-		func(m Manager, name string) (interface{}, error) {
+		func(m Manager, name string) (any, error) {
 			return m.GetBackupItemAction(name)
 		},
-		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+		func(name string, sharedPluginProcess process.RestartableProcess) any {
 			return &biav1cli.RestartableBackupItemAction{
 				Key:                 process.KindAndName{Kind: common.PluginKindBackupItemAction, Name: name},
 				SharedPluginProcess: sharedPluginProcess,
@@ -210,10 +210,10 @@ func TestGetBackupItemActionV2(t *testing.T) {
 	getPluginTest(t,
 		common.PluginKindBackupItemActionV2,
 		"velero.io/pod",
-		func(m Manager, name string) (interface{}, error) {
+		func(m Manager, name string) (any, error) {
 			return m.GetBackupItemActionV2(name)
 		},
-		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+		func(name string, sharedPluginProcess process.RestartableProcess) any {
 			return &biav2cli.RestartableBackupItemAction{
 				Key:                 process.KindAndName{Kind: common.PluginKindBackupItemActionV2, Name: name},
 				SharedPluginProcess: sharedPluginProcess,
@@ -227,10 +227,10 @@ func TestGetRestoreItemAction(t *testing.T) {
 	getPluginTest(t,
 		common.PluginKindRestoreItemAction,
 		"velero.io/pod",
-		func(m Manager, name string) (interface{}, error) {
+		func(m Manager, name string) (any, error) {
 			return m.GetRestoreItemAction(name)
 		},
-		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+		func(name string, sharedPluginProcess process.RestartableProcess) any {
 			return &riav1cli.RestartableRestoreItemAction{
 				Key:                 process.KindAndName{Kind: common.PluginKindRestoreItemAction, Name: name},
 				SharedPluginProcess: sharedPluginProcess,
@@ -244,10 +244,10 @@ func TestGetRestoreItemActionV2(t *testing.T) {
 	getPluginTest(t,
 		common.PluginKindRestoreItemActionV2,
 		"velero.io/pod",
-		func(m Manager, name string) (interface{}, error) {
+		func(m Manager, name string) (any, error) {
 			return m.GetRestoreItemActionV2(name)
 		},
-		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+		func(name string, sharedPluginProcess process.RestartableProcess) any {
 			return &riav2cli.RestartableRestoreItemAction{
 				Key:                 process.KindAndName{Kind: common.PluginKindRestoreItemActionV2, Name: name},
 				SharedPluginProcess: sharedPluginProcess,
@@ -261,10 +261,10 @@ func TestGetItemBlockAction(t *testing.T) {
 	getPluginTest(t,
 		common.PluginKindItemBlockAction,
 		"velero.io/pod",
-		func(m Manager, name string) (interface{}, error) {
+		func(m Manager, name string) (any, error) {
 			return m.GetItemBlockAction(name)
 		},
-		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+		func(name string, sharedPluginProcess process.RestartableProcess) any {
 			return &ibav1cli.RestartableItemBlockAction{
 				Key:                 process.KindAndName{Kind: common.PluginKindItemBlockAction, Name: name},
 				SharedPluginProcess: sharedPluginProcess,
@@ -278,8 +278,8 @@ func getPluginTest(
 	t *testing.T,
 	kind common.PluginKind,
 	name string,
-	getPluginFunc func(m Manager, name string) (interface{}, error),
-	expectedResultFunc func(name string, sharedPluginProcess process.RestartableProcess) interface{},
+	getPluginFunc func(m Manager, name string) (any, error),
+	expectedResultFunc func(name string, sharedPluginProcess process.RestartableProcess) any,
 	reinitializable bool,
 ) {
 	t.Helper()
@@ -373,7 +373,7 @@ func TestGetBackupItemActions(t *testing.T) {
 			}
 			registry.On("List", pluginKind).Return(pluginIDs)
 
-			var expectedActions []interface{}
+			var expectedActions []any
 			for i := range pluginIDs {
 				pluginID := pluginIDs[i]
 				pluginName := pluginID.Name
@@ -408,7 +408,7 @@ func TestGetBackupItemActions(t *testing.T) {
 				assert.EqualError(t, err, "NewRestartableProcess")
 			} else {
 				require.NoError(t, err)
-				var actual []interface{}
+				var actual []any
 				for i := range backupItemActions {
 					actual = append(actual, backupItemActions[i])
 				}
@@ -465,7 +465,7 @@ func TestGetBackupItemActionsV2(t *testing.T) {
 			}
 			registry.On("List", pluginKind).Return(pluginIDs)
 
-			var expectedActions []interface{}
+			var expectedActions []any
 			for i := range pluginIDs {
 				pluginID := pluginIDs[i]
 				pluginName := pluginID.Name
@@ -500,7 +500,7 @@ func TestGetBackupItemActionsV2(t *testing.T) {
 				assert.EqualError(t, err, "NewRestartableProcess")
 			} else {
 				require.NoError(t, err)
-				var actual []interface{}
+				var actual []any
 				for i := range backupItemActions {
 					actual = append(actual, backupItemActions[i])
 				}
@@ -557,7 +557,7 @@ func TestGetRestoreItemActions(t *testing.T) {
 			}
 			registry.On("List", pluginKind).Return(pluginIDs)
 
-			var expectedActions []interface{}
+			var expectedActions []any
 			for i := range pluginIDs {
 				pluginID := pluginIDs[i]
 				pluginName := pluginID.Name
@@ -592,7 +592,7 @@ func TestGetRestoreItemActions(t *testing.T) {
 				assert.EqualError(t, err, "NewRestartableProcess")
 			} else {
 				require.NoError(t, err)
-				var actual []interface{}
+				var actual []any
 				for i := range restoreItemActions {
 					actual = append(actual, restoreItemActions[i])
 				}
@@ -649,7 +649,7 @@ func TestGetRestoreItemActionsV2(t *testing.T) {
 			}
 			registry.On("List", pluginKind).Return(pluginIDs)
 
-			var expectedActions []interface{}
+			var expectedActions []any
 			for i := range pluginIDs {
 				pluginID := pluginIDs[i]
 				pluginName := pluginID.Name
@@ -684,7 +684,7 @@ func TestGetRestoreItemActionsV2(t *testing.T) {
 				assert.EqualError(t, err, "NewRestartableProcess")
 			} else {
 				require.NoError(t, err)
-				var actual []interface{}
+				var actual []any
 				for i := range restoreItemActions {
 					actual = append(actual, restoreItemActions[i])
 				}
@@ -698,10 +698,10 @@ func TestGetDeleteItemAction(t *testing.T) {
 	getPluginTest(t,
 		common.PluginKindDeleteItemAction,
 		"velero.io/deleter",
-		func(m Manager, name string) (interface{}, error) {
+		func(m Manager, name string) (any, error) {
 			return m.GetDeleteItemAction(name)
 		},
-		func(name string, sharedPluginProcess process.RestartableProcess) interface{} {
+		func(name string, sharedPluginProcess process.RestartableProcess) any {
 			return &restartableDeleteItemAction{
 				key:                 process.KindAndName{Kind: common.PluginKindDeleteItemAction, Name: name},
 				sharedPluginProcess: sharedPluginProcess,
@@ -758,7 +758,7 @@ func TestGetDeleteItemActions(t *testing.T) {
 			}
 			registry.On("List", pluginKind).Return(pluginIDs)
 
-			var expectedActions []interface{}
+			var expectedActions []any
 			for i := range pluginIDs {
 				pluginID := pluginIDs[i]
 				pluginName := pluginID.Name
@@ -793,7 +793,7 @@ func TestGetDeleteItemActions(t *testing.T) {
 				assert.EqualError(t, err, "NewRestartableProcess")
 			} else {
 				require.NoError(t, err)
-				var actual []interface{}
+				var actual []any
 				for i := range deleteItemActions {
 					actual = append(actual, deleteItemActions[i])
 				}
@@ -850,7 +850,7 @@ func TestGetItemBlockActions(t *testing.T) {
 			}
 			registry.On("List", pluginKind).Return(pluginIDs)
 
-			var expectedActions []interface{}
+			var expectedActions []any
 			for i := range pluginIDs {
 				pluginID := pluginIDs[i]
 				pluginName := pluginID.Name
@@ -885,7 +885,7 @@ func TestGetItemBlockActions(t *testing.T) {
 				assert.EqualError(t, err, "NewRestartableProcess")
 			} else {
 				require.NoError(t, err)
-				var actual []interface{}
+				var actual []any
 				for i := range itemBlockActions {
 					actual = append(actual, itemBlockActions[i])
 				}

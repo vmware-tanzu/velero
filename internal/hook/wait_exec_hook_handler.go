@@ -116,7 +116,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	// not yet been observed to be running. It relies on the Informer not to be called concurrently.
 	// When a container is observed running and its hooks are executed, the container is deleted
 	// from the byContainer map. When the map is empty the watch is ended.
-	handler := func(newObj interface{}) {
+	handler := func(newObj any) {
 		newPod, ok := newObj.(*v1.Pod)
 		if !ok {
 			return
@@ -217,10 +217,10 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 
 	_, podWatcher := cache.NewInformer(lw, pod, 0, cache.ResourceEventHandlerFuncs{
 		AddFunc: handler,
-		UpdateFunc: func(_, newObj interface{}) {
+		UpdateFunc: func(_, newObj any) {
 			handler(newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			err := fmt.Errorf("pod %s deleted before all hooks were executed", kube.NamespaceAndName(pod))
 			log.Error(err)
 			cancel()

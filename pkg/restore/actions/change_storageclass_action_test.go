@@ -42,11 +42,11 @@ import (
 func TestChangeStorageClassActionExecute(t *testing.T) {
 	tests := []struct {
 		name              string
-		pvOrPvcOrSTS      interface{}
+		pvOrPvcOrSTS      any
 		configMap         *corev1api.ConfigMap
 		storageClass      *storagev1api.StorageClass
 		storageClassSlice []*storagev1api.StorageClass
-		want              interface{}
+		want              any
 		wantErr           error
 	}{
 		{

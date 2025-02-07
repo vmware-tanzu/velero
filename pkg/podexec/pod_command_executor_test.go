@@ -52,7 +52,7 @@ func TestNewPodCommandExecutor(t *testing.T) {
 func TestExecutePodCommandMissingInputs(t *testing.T) {
 	tests := []struct {
 		name         string
-		item         map[string]interface{}
+		item         map[string]any
 		podNamespace string
 		podName      string
 		hookName     string
@@ -63,22 +63,22 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 		},
 		{
 			name: "missing pod namespace",
-			item: map[string]interface{}{},
+			item: map[string]any{},
 		},
 		{
 			name:         "missing pod name",
-			item:         map[string]interface{}{},
+			item:         map[string]any{},
 			podNamespace: "ns",
 		},
 		{
 			name:         "missing hookName",
-			item:         map[string]interface{}{},
+			item:         map[string]any{},
 			podNamespace: "ns",
 			podName:      "pod",
 		},
 		{
 			name:         "missing hook",
-			item:         map[string]interface{}{},
+			item:         map[string]any{},
 			podNamespace: "ns",
 			podName:      "pod",
 			hookName:     "hook",

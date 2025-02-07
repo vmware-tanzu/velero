@@ -63,8 +63,8 @@ var UUIDgen uuid.UUID
 var VeleroCfg VeleroConfig
 
 type E2EReport struct {
-	TestDescription string                 `yaml:"Test Description"`
-	OtherFields     map[string]interface{} `yaml:",inline"`
+	TestDescription string         `yaml:"Test Description"`
+	OtherFields     map[string]any `yaml:",inline"`
 }
 
 var ReportData *E2EReport

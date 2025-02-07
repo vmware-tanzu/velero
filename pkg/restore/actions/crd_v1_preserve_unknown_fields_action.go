@@ -107,7 +107,7 @@ func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *velero.RestoreItemActi
 	}, nil
 }
 
-func fromUnstructured(unstructured map[string]interface{}) (*apiextv1.CustomResourceDefinition, error) {
+func fromUnstructured(unstructured map[string]any) (*apiextv1.CustomResourceDefinition, error) {
 	var crd apiextv1.CustomResourceDefinition
 
 	js, err := json.Marshal(unstructured)

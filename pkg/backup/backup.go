@@ -448,7 +448,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	var itemBlock *BackupItemBlock
 
 	for i := range items {
-		log.WithFields(map[string]interface{}{
+		log.WithFields(map[string]any{
 			"progress":  "",
 			"resource":  items[i].groupResource.String(),
 			"namespace": items[i].namespace,
@@ -509,7 +509,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 			itemsBackedUp: backedUpItems,
 		}
 
-		log.WithFields(map[string]interface{}{
+		log.WithFields(map[string]any{
 			"progress":  "",
 			"resource":  items[i].groupResource.String(),
 			"namespace": items[i].namespace,
@@ -975,7 +975,7 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 	unstructuredDataUploads := make([]unstructured.Unstructured, 0)
 
 	for i, item := range items {
-		log.WithFields(map[string]interface{}{
+		log.WithFields(map[string]any{
 			"progress":  "",
 			"resource":  item.groupResource.String(),
 			"namespace": item.namespace,
@@ -1018,7 +1018,7 @@ func (kb *kubernetesBackupper) FinalizeBackup(
 		backedUpItems := backupRequest.BackedUpItems.Len()
 		totalItems := backedUpItems + (len(items) - (i + 1))
 
-		log.WithFields(map[string]interface{}{
+		log.WithFields(map[string]any{
 			"progress":  "",
 			"resource":  item.groupResource.String(),
 			"namespace": item.namespace,

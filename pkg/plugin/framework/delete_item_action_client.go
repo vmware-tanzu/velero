@@ -44,7 +44,7 @@ type DeleteItemActionGRPCClient struct {
 	grpcClient proto.DeleteItemActionClient
 }
 
-func newDeleteItemActionGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) interface{} {
+func newDeleteItemActionGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) any {
 	return &DeleteItemActionGRPCClient{
 		ClientBase: base,
 		grpcClient: proto.NewDeleteItemActionClient(clientConn),

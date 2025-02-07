@@ -42,7 +42,7 @@ type RestartableProcess interface {
 	AddReinitializer(key KindAndName, r Reinitializer)
 	Reset() error
 	ResetIfNeeded() error
-	GetByKindAndName(key KindAndName) (interface{}, error)
+	GetByKindAndName(key KindAndName) (any, error)
 	Stop()
 }
 
@@ -57,7 +57,7 @@ type restartableProcess struct {
 	// lock guards all of the fields below
 	lock           sync.RWMutex
 	process        Process
-	plugins        map[KindAndName]interface{}
+	plugins        map[KindAndName]any
 	reinitializers map[KindAndName]Reinitializer
 	resetFailures  int
 }
@@ -65,7 +65,7 @@ type restartableProcess struct {
 // reinitializer is capable of reinitializing a restartable plugin instance using the newly dispensed plugin.
 type Reinitializer interface {
 	// reinitialize reinitializes a restartable plugin instance using the newly dispensed plugin.
-	Reinitialize(dispensed interface{}) error
+	Reinitialize(dispensed any) error
 }
 
 // newRestartableProcess creates a new restartableProcess for the given command and options.
@@ -74,7 +74,7 @@ func newRestartableProcess(command string, logger logrus.FieldLogger, logLevel l
 		command:        command,
 		logger:         logger,
 		logLevel:       logLevel,
-		plugins:        make(map[KindAndName]interface{}),
+		plugins:        make(map[KindAndName]any),
 		reinitializers: make(map[KindAndName]Reinitializer),
 	}
 
@@ -118,7 +118,7 @@ func (p *restartableProcess) resetLH() error {
 
 	// Redispense any previously dispensed plugins, reinitializing if necessary.
 	// Start by creating a new map to hold the newly dispensed plugins.
-	newPlugins := make(map[KindAndName]interface{})
+	newPlugins := make(map[KindAndName]any)
 	for key := range p.plugins {
 		// Re-dispense
 		dispensed, err := p.process.dispense(key)
@@ -160,7 +160,7 @@ func (p *restartableProcess) ResetIfNeeded() error {
 }
 
 // GetByKindAndName acquires the lock and calls getByKindAndNameLH.
-func (p *restartableProcess) GetByKindAndName(key KindAndName) (interface{}, error) {
+func (p *restartableProcess) GetByKindAndName(key KindAndName) (any, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -169,7 +169,7 @@ func (p *restartableProcess) GetByKindAndName(key KindAndName) (interface{}, err
 
 // getByKindAndNameLH returns the dispensed plugin for key. If the plugin hasn't been dispensed before, it dispenses a
 // new one.
-func (p *restartableProcess) getByKindAndNameLH(key KindAndName) (interface{}, error) {
+func (p *restartableProcess) getByKindAndNameLH(key KindAndName) (any, error) {
 	dispensed, found := p.plugins[key]
 	if found {
 		return dispensed, nil

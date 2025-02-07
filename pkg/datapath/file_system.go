@@ -85,7 +85,7 @@ func newFileSystemBR(jobName string, requestorType string, client client.Client,
 	return fs
 }
 
-func (fs *fileSystemBR) Init(ctx context.Context, param interface{}) error {
+func (fs *fileSystemBR) Init(ctx context.Context, param any) error {
 	initParam := param.(*FSBRInitParam)
 
 	var err error
@@ -164,7 +164,7 @@ func (fs *fileSystemBR) close(ctx context.Context) {
 	}
 }
 
-func (fs *fileSystemBR) StartBackup(source AccessPoint, uploaderConfig map[string]string, param interface{}) error {
+func (fs *fileSystemBR) StartBackup(source AccessPoint, uploaderConfig map[string]string, param any) error {
 	if !fs.initialized {
 		return errors.New("file system data path is not initialized")
 	}
