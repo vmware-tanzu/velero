@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
@@ -30,10 +30,10 @@ import (
 type inheritedPodInfo struct {
 	image          string
 	serviceAccount string
-	env            []v1.EnvVar
-	envFrom        []v1.EnvFromSource
-	volumeMounts   []v1.VolumeMount
-	volumes        []v1.Volume
+	env            []corev1api.EnvVar
+	envFrom        []corev1api.EnvFromSource
+	volumeMounts   []corev1api.VolumeMount
+	volumes        []corev1api.Volume
 	logLevelArgs   []string
 	logFormatArgs  []string
 }
