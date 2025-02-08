@@ -30,7 +30,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/vmware-tanzu/crash-diagnostics/exec"
-	appsv1 "k8s.io/api/apps/v1"
+	appsv1api "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/clientcmd"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -117,7 +117,7 @@ func (o *option) validate(f client.Factory) error {
 	if err != nil {
 		return err
 	}
-	deploymentList := new(appsv1.DeploymentList)
+	deploymentList := new(appsv1api.DeploymentList)
 	selector, err := labels.Parse("component=velero")
 	cmd.CheckError(err)
 	err = crClient.List(context.TODO(), deploymentList, &ctrlclient.ListOptions{
