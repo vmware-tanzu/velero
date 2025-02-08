@@ -22,7 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/datapath"
@@ -36,7 +36,7 @@ var getVolumeMode = kube.GetVolumeMode
 var singlePathMatch = kube.SinglePathMatch
 
 // GetPodVolumeHostPath returns a path that can be accessed from the host for a given volume of a pod
-func GetPodVolumeHostPath(ctx context.Context, pod *corev1.Pod, volumeName string,
+func GetPodVolumeHostPath(ctx context.Context, pod *corev1api.Pod, volumeName string,
 	cli ctrlclient.Client, fs filesystem.Interface, log logrus.FieldLogger) (datapath.AccessPoint, error) {
 	logger := log.WithField("pod name", pod.Name).WithField("pod UID", pod.GetUID()).WithField("volume", volumeName)
 

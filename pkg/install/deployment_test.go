@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -42,7 +42,7 @@ func TestDeployment(t *testing.T) {
 
 	deploy = Deployment("velero", WithImage("velero/velero:v0.11"))
 	assert.Equal(t, "velero/velero:v0.11", deploy.Spec.Template.Spec.Containers[0].Image)
-	assert.Equal(t, corev1.PullIfNotPresent, deploy.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	assert.Equal(t, corev1api.PullIfNotPresent, deploy.Spec.Template.Spec.Containers[0].ImagePullPolicy)
 
 	deploy = Deployment("velero", WithSecret(true))
 	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Env, 7)

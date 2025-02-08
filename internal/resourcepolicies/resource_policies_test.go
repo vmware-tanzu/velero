@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -260,7 +260,7 @@ func TestGetResourceMatchedAction(t *testing.T) {
 
 func TestGetResourcePoliciesFromConfig(t *testing.T) {
 	// Create a test ConfigMap
-	cm := &v1.ConfigMap{
+	cm := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -316,7 +316,7 @@ func TestGetMatchAction(t *testing.T) {
 	testCases := []struct {
 		name     string
 		yamlData string
-		vol      *v1.PersistentVolume
+		vol      *corev1api.PersistentVolume
 		skip     bool
 	}{
 		{
@@ -327,10 +327,10 @@ volumePolicies:
    csi: {}
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "ebs.csi.aws.com"},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "ebs.csi.aws.com"},
 					}},
 			},
 			skip: true,
@@ -343,10 +343,10 @@ volumePolicies:
    csi: {}
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
 					}},
 			},
 			skip: false,
@@ -360,10 +360,10 @@ volumePolicies:
         driver: files.csi.driver
     action:
       type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "disks.csi.driver"},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "disks.csi.driver"},
 					}},
 			},
 			skip: false,
@@ -377,10 +377,10 @@ volumePolicies:
         driver: files.csi.driver
     action:
       type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver"},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "files.csi.driver"},
 					}},
 			},
 			skip: true,
@@ -397,10 +397,10 @@ volumePolicies:
     action:
       type: skip
 `,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "disks.csi.driver"},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "disks.csi.driver"},
 					}},
 			},
 			skip: false,
@@ -417,10 +417,10 @@ volumePolicies:
     action:
       type: skip
 `,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
 					}},
 			},
 			skip: false,
@@ -437,10 +437,10 @@ volumePolicies:
     action:
       type: skip
 `,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"protocol": "nfs"}},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"protocol": "nfs"}},
 					}},
 			},
 			skip: true,
@@ -461,10 +461,10 @@ volumePolicies:
           protocol: nfs
     action:
       type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "disks.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "disks.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
 					}},
 			},
 			skip: true,
@@ -485,10 +485,10 @@ volumePolicies:
           protocol: nfs
     action:
       type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
 					}},
 			},
 			skip: false,
@@ -509,10 +509,10 @@ volumePolicies:
           protocol: nfs
     action:
       type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1", "protocol": "nfs"}},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1", "protocol": "nfs"}},
 					}},
 			},
 			skip: true,
@@ -525,13 +525,13 @@ volumePolicies:
     capacity: "0,100Gi"
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
 					},
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "ebs.csi.aws.com"},
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "ebs.csi.aws.com"},
 					}},
 			},
 			skip: true,
@@ -544,10 +544,10 @@ volumePolicies:
     nfs: {}
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						NFS: &v1.NFSVolumeSource{Server: "192.168.1.20"},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						NFS: &corev1api.NFSVolumeSource{Server: "192.168.1.20"},
 					}},
 			},
 			skip: true,
@@ -560,13 +560,13 @@ volumePolicies:
     capacity: "0,100Gi"
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
 					},
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						NFS: &v1.NFSVolumeSource{Server: "192.168.1.20"},
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						NFS: &corev1api.NFSVolumeSource{Server: "192.168.1.20"},
 					},
 				},
 			},
@@ -581,10 +581,10 @@ volumePolicies:
     nfs: {}
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
 					},
 				},
 			},
@@ -601,13 +601,13 @@ volumePolicies:
       - hostPath
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
 					},
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						HostPath: &v1.HostPathVolumeSource{Path: "/mnt/data"},
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						HostPath: &corev1api.HostPathVolumeSource{Path: "/mnt/data"},
 					},
 				},
 			},
@@ -623,13 +623,13 @@ volumePolicies:
       - local
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
 					},
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						HostPath: &v1.HostPathVolumeSource{Path: "/mnt/data"},
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						HostPath: &corev1api.HostPathVolumeSource{Path: "/mnt/data"},
 					},
 				},
 			},

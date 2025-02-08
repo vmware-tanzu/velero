@@ -22,7 +22,7 @@ import (
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	core_v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -129,7 +129,7 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 			Spec: snapshotv1api.VolumeSnapshotContentSpec{
 				DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
 				Driver:         csiDriverName,
-				VolumeSnapshotRef: core_v1.ObjectReference{
+				VolumeSnapshotRef: corev1api.ObjectReference{
 					APIVersion: "snapshot.storage.k8s.io/v1",
 					Kind:       "VolumeSnapshot",
 					Namespace:  newNamespace,

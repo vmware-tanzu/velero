@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -30,7 +30,7 @@ func PluginConfigLabelSelector(kind PluginKind, name string) string {
 	return fmt.Sprintf("velero.io/plugin-config,%s=%s", name, kind)
 }
 
-func GetPluginConfig(kind PluginKind, name string, client corev1client.ConfigMapInterface) (*corev1.ConfigMap, error) {
+func GetPluginConfig(kind PluginKind, name string, client corev1client.ConfigMapInterface) (*corev1api.ConfigMap, error) {
 	opts := metav1.ListOptions{
 		// velero.io/plugin-config: true
 		// velero.io/pod-volume-restore: RestoreItemAction
