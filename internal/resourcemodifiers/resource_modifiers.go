@@ -23,7 +23,7 @@ import (
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -63,7 +63,7 @@ type ResourceModifiers struct {
 	ResourceModifierRules []ResourceModifierRule `json:"resourceModifierRules"`
 }
 
-func GetResourceModifiersFromConfig(cm *v1.ConfigMap) (*ResourceModifiers, error) {
+func GetResourceModifiersFromConfig(cm *corev1api.ConfigMap) (*ResourceModifiers, error) {
 	if cm == nil {
 		return nil, fmt.Errorf("could not parse config from nil configmap")
 	}

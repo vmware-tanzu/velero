@@ -25,7 +25,7 @@ import (
 	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,7 +75,7 @@ type CSISnapshotExposeParam struct {
 	BackupPVCConfig map[string]nodeagent.BackupPVC
 
 	// Resources defines the resource requirements of the hosting pod
-	Resources corev1.ResourceRequirements
+	Resources corev1api.ResourceRequirements
 
 	// NodeOS specifies the OS of node that the source volume is attaching
 	NodeOS string
@@ -103,7 +103,7 @@ type csiSnapshotExposer struct {
 	log               logrus.FieldLogger
 }
 
-func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param any) error {
+func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.ObjectReference, param any) error {
 	csiExposeParam := param.(*CSISnapshotExposeParam)
 
 	curLog := e.log.WithFields(logrus.Fields{
@@ -236,7 +236,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 	return nil
 }
 
-func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.ObjectReference, timeout time.Duration, param any) (*ExposeResult, error) {
+func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1api.ObjectReference, timeout time.Duration, param any) (*ExposeResult, error) {
 	exposeWaitParam := param.(*CSISnapshotExposeWaitParam)
 
 	backupPodName := ownerObject.Name
@@ -249,7 +249,7 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.
 		"owner": ownerObject.Name,
 	})
 
-	pod := &corev1.Pod{}
+	pod := &corev1api.Pod{}
 	err := exposeWaitParam.NodeClient.Get(ctx, types.NamespacedName{
 		Namespace: ownerObject.Namespace,
 		Name:      backupPodName,
@@ -298,7 +298,7 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.
 	}}, nil
 }
 
-func (e *csiSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1.ObjectReference) error {
+func (e *csiSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1api.ObjectReference) error {
 	backupPodName := ownerObject.Name
 
 	curLog := e.log.WithFields(logrus.Fields{
@@ -322,7 +322,7 @@ func (e *csiSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1
 	return nil
 }
 
-func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject corev1.ObjectReference) string {
+func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject corev1api.ObjectReference) string {
 	backupPodName := ownerObject.Name
 	backupPVCName := ownerObject.Name
 	backupVSName := ownerObject.Name
@@ -388,7 +388,7 @@ func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject cor
 
 const cleanUpTimeout = time.Minute
 
-func (e *csiSnapshotExposer) CleanUp(ctx context.Context, ownerObject corev1.ObjectReference, vsName string, sourceNamespace string) {
+func (e *csiSnapshotExposer) CleanUp(ctx context.Context, ownerObject corev1api.ObjectReference, vsName string, sourceNamespace string) {
 	backupPodName := ownerObject.Name
 	backupPVCName := ownerObject.Name
 	backupVSName := ownerObject.Name
@@ -400,18 +400,18 @@ func (e *csiSnapshotExposer) CleanUp(ctx context.Context, ownerObject corev1.Obj
 	csi.DeleteVolumeSnapshotIfAny(ctx, e.csiSnapshotClient, vsName, sourceNamespace, e.log)
 }
 
-func getVolumeModeByAccessMode(accessMode string) (corev1.PersistentVolumeMode, error) {
+func getVolumeModeByAccessMode(accessMode string) (corev1api.PersistentVolumeMode, error) {
 	switch accessMode {
 	case AccessModeFileSystem:
-		return corev1.PersistentVolumeFilesystem, nil
+		return corev1api.PersistentVolumeFilesystem, nil
 	case AccessModeBlock:
-		return corev1.PersistentVolumeBlock, nil
+		return corev1api.PersistentVolumeBlock, nil
 	default:
 		return "", errors.Errorf("unsupported access mode %s", accessMode)
 	}
 }
 
-func (e *csiSnapshotExposer) createBackupVS(ctx context.Context, ownerObject corev1.ObjectReference, snapshotVS *snapshotv1api.VolumeSnapshot) (*snapshotv1api.VolumeSnapshot, error) {
+func (e *csiSnapshotExposer) createBackupVS(ctx context.Context, ownerObject corev1api.ObjectReference, snapshotVS *snapshotv1api.VolumeSnapshot) (*snapshotv1api.VolumeSnapshot, error) {
 	backupVSName := ownerObject.Name
 	backupVSCName := ownerObject.Name
 
@@ -435,7 +435,7 @@ func (e *csiSnapshotExposer) createBackupVS(ctx context.Context, ownerObject cor
 	return e.csiSnapshotClient.VolumeSnapshots(vs.Namespace).Create(ctx, vs, metav1.CreateOptions{})
 }
 
-func (e *csiSnapshotExposer) createBackupVSC(ctx context.Context, ownerObject corev1.ObjectReference, snapshotVSC *snapshotv1api.VolumeSnapshotContent, vs *snapshotv1api.VolumeSnapshot) (*snapshotv1api.VolumeSnapshotContent, error) {
+func (e *csiSnapshotExposer) createBackupVSC(ctx context.Context, ownerObject corev1api.ObjectReference, snapshotVSC *snapshotv1api.VolumeSnapshotContent, vs *snapshotv1api.VolumeSnapshot) (*snapshotv1api.VolumeSnapshotContent, error) {
 	backupVSCName := ownerObject.Name
 
 	vsc := &snapshotv1api.VolumeSnapshotContent{
@@ -444,7 +444,7 @@ func (e *csiSnapshotExposer) createBackupVSC(ctx context.Context, ownerObject co
 			Annotations: snapshotVSC.Annotations,
 		},
 		Spec: snapshotv1api.VolumeSnapshotContentSpec{
-			VolumeSnapshotRef: corev1.ObjectReference{
+			VolumeSnapshotRef: corev1api.ObjectReference{
 				Name:            vs.Name,
 				Namespace:       vs.Namespace,
 				UID:             vs.UID,
@@ -462,7 +462,7 @@ func (e *csiSnapshotExposer) createBackupVSC(ctx context.Context, ownerObject co
 	return e.csiSnapshotClient.VolumeSnapshotContents().Create(ctx, vsc, metav1.CreateOptions{})
 }
 
-func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject corev1.ObjectReference, backupVS, storageClass, accessMode string, resource resource.Quantity, readOnly bool) (*corev1.PersistentVolumeClaim, error) {
+func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject corev1api.ObjectReference, backupVS, storageClass, accessMode string, resource resource.Quantity, readOnly bool) (*corev1api.PersistentVolumeClaim, error) {
 	backupPVCName := ownerObject.Name
 
 	volumeMode, err := getVolumeModeByAccessMode(accessMode)
@@ -470,19 +470,19 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 		return nil, err
 	}
 
-	pvcAccessMode := corev1.ReadWriteOnce
+	pvcAccessMode := corev1api.ReadWriteOnce
 
 	if readOnly {
-		pvcAccessMode = corev1.ReadOnlyMany
+		pvcAccessMode = corev1api.ReadOnlyMany
 	}
 
-	dataSource := &corev1.TypedLocalObjectReference{
+	dataSource := &corev1api.TypedLocalObjectReference{
 		APIGroup: &snapshotv1api.SchemeGroupVersion.Group,
 		Kind:     "VolumeSnapshot",
 		Name:     backupVS,
 	}
 
-	pvc := &corev1.PersistentVolumeClaim{
+	pvc := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ownerObject.Namespace,
 			Name:      backupPVCName,
@@ -496,8 +496,8 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 				},
 			},
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			AccessModes: []corev1api.PersistentVolumeAccessMode{
 				pvcAccessMode,
 			},
 			StorageClassName: &storageClass,
@@ -505,9 +505,9 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 			DataSource:       dataSource,
 			DataSourceRef:    nil,
 
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource,
+			Resources: corev1api.VolumeResourceRequirements{
+				Requests: corev1api.ResourceList{
+					corev1api.ResourceStorage: resource,
 				},
 			},
 		},
@@ -523,17 +523,17 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 
 func (e *csiSnapshotExposer) createBackupPod(
 	ctx context.Context,
-	ownerObject corev1.ObjectReference,
-	backupPVC *corev1.PersistentVolumeClaim,
+	ownerObject corev1api.ObjectReference,
+	backupPVC *corev1api.PersistentVolumeClaim,
 	operationTimeout time.Duration,
 	label map[string]string,
 	annotation map[string]string,
 	affinity *kube.LoadAffinity,
-	resources corev1.ResourceRequirements,
+	resources corev1api.ResourceRequirements,
 	backupPVCReadOnly bool,
 	spcNoRelabeling bool,
 	nodeOS string,
-) (*corev1.Pod, error) {
+) (*corev1api.Pod, error) {
 	podName := ownerObject.Name
 
 	containerName := string(ownerObject.UID)
@@ -548,10 +548,10 @@ func (e *csiSnapshotExposer) createBackupPod(
 	volumeMounts, volumeDevices, volumePath := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode, backupPVCReadOnly)
 	volumeMounts = append(volumeMounts, podInfo.volumeMounts...)
 
-	volumes := []corev1.Volume{{
+	volumes := []corev1api.Volume{{
 		Name: volumeName,
-		VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+		VolumeSource: corev1api.VolumeSource{
+			PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 				ClaimName: backupPVC.Name,
 			},
 		},
@@ -568,7 +568,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	}
 	label[podGroupLabel] = podGroupSnapshot
 
-	volumeMode := corev1.PersistentVolumeFilesystem
+	volumeMode := corev1api.PersistentVolumeFilesystem
 	if backupPVC.Spec.VolumeMode != nil {
 		volumeMode = *backupPVC.Spec.VolumeMode
 	}
@@ -588,14 +588,14 @@ func (e *csiSnapshotExposer) createBackupPod(
 		affinityList = append(affinityList, affinity)
 	}
 
-	var securityCtx *corev1.PodSecurityContext
+	var securityCtx *corev1api.PodSecurityContext
 	nodeSelector := map[string]string{}
-	podOS := corev1.PodOS{}
-	toleration := []corev1.Toleration{}
+	podOS := corev1api.PodOS{}
+	toleration := []corev1api.Toleration{}
 	if nodeOS == kube.NodeOSWindows {
 		userID := "ContainerAdministrator"
-		securityCtx = &corev1.PodSecurityContext{
-			WindowsOptions: &corev1.WindowsSecurityContextOptions{
+		securityCtx = &corev1api.PodSecurityContext{
+			WindowsOptions: &corev1api.WindowsSecurityContextOptions{
 				RunAsUserName: &userID,
 			},
 		}
@@ -603,7 +603,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 		nodeSelector[kube.NodeOSLabel] = kube.NodeOSWindows
 		podOS.Name = kube.NodeOSWindows
 
-		toleration = append(toleration, corev1.Toleration{
+		toleration = append(toleration, corev1api.Toleration{
 			Key:      "os",
 			Operator: "Equal",
 			Effect:   "NoSchedule",
@@ -611,12 +611,12 @@ func (e *csiSnapshotExposer) createBackupPod(
 		})
 	} else {
 		userID := int64(0)
-		securityCtx = &corev1.PodSecurityContext{
+		securityCtx = &corev1api.PodSecurityContext{
 			RunAsUser: &userID,
 		}
 
 		if spcNoRelabeling {
-			securityCtx.SELinuxOptions = &corev1.SELinuxOptions{
+			securityCtx.SELinuxOptions = &corev1api.SELinuxOptions{
 				Type: "spc_t",
 			}
 		}
@@ -625,7 +625,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 		podOS.Name = kube.NodeOSLinux
 	}
 
-	pod := &corev1.Pod{
+	pod := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Namespace: ownerObject.Namespace,
@@ -641,12 +641,12 @@ func (e *csiSnapshotExposer) createBackupPod(
 			Labels:      label,
 			Annotations: annotation,
 		},
-		Spec: corev1.PodSpec{
-			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+		Spec: corev1api.PodSpec{
+			TopologySpreadConstraints: []corev1api.TopologySpreadConstraint{
 				{
 					MaxSkew:           1,
 					TopologyKey:       "kubernetes.io/hostname",
-					WhenUnsatisfiable: corev1.ScheduleAnyway,
+					WhenUnsatisfiable: corev1api.ScheduleAnyway,
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							podGroupLabel: podGroupSnapshot,
@@ -657,11 +657,11 @@ func (e *csiSnapshotExposer) createBackupPod(
 			NodeSelector: nodeSelector,
 			OS:           &podOS,
 			Affinity:     kube.ToSystemAffinity(affinityList),
-			Containers: []corev1.Container{
+			Containers: []corev1api.Container{
 				{
 					Name:            containerName,
 					Image:           podInfo.image,
-					ImagePullPolicy: corev1.PullNever,
+					ImagePullPolicy: corev1api.PullNever,
 					Command: []string{
 						"/velero",
 						"data-mover",
@@ -678,7 +678,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes:                       volumes,
-			RestartPolicy:                 corev1.RestartPolicyNever,
+			RestartPolicy:                 corev1api.RestartPolicyNever,
 			SecurityContext:               securityCtx,
 			Tolerations:                   toleration,
 		},

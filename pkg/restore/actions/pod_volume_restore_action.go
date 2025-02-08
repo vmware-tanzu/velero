@@ -25,8 +25,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -60,7 +60,7 @@ type PodVolumeRestoreAction struct {
 }
 
 func NewPodVolumeRestoreAction(logger logrus.FieldLogger, client corev1client.ConfigMapInterface, crClient ctrlclient.Client, namespace string) (*PodVolumeRestoreAction, error) {
-	deployment := &appsv1.Deployment{}
+	deployment := &appsv1api.Deployment{}
 	if err := crClient.Get(context.TODO(), types.NamespacedName{Name: "velero", Namespace: namespace}, deployment); err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 	a.logger.Info("Executing PodVolumeRestoreAction")
 	defer a.logger.Info("Done executing PodVolumeRestoreAction")
 
-	var pod corev1.Pod
+	var pod corev1api.Pod
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), &pod); err != nil {
 		return nil, errors.Wrap(err, "unable to convert pod from runtime.Unstructured")
 	}
@@ -92,7 +92,7 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 	// has not yet been applied to `input.Item` so we can't perform a reverse-lookup in
 	// the namespace mapping in the restore spec. Instead, use the pod from the backup
 	// so that if the mapping is applied earlier, we still use the correct namespace.
-	var podFromBackup corev1.Pod
+	var podFromBackup corev1api.Pod
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.ItemFromBackup.UnstructuredContent(), &podFromBackup); err != nil {
 		return nil, errors.Wrap(err, "unable to convert source pod from runtime.Unstructured")
 	}
@@ -156,7 +156,7 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 
 	runAsUser, runAsGroup, allowPrivilegeEscalation, secCtx := getSecurityContext(log, config)
 
-	var securityContext corev1.SecurityContext
+	var securityContext corev1api.SecurityContext
 	securityContextSet := false
 	// Use securityContext settings from configmap if available
 	if runAsUser != "" || runAsGroup != "" || allowPrivilegeEscalation != "" || secCtx != "" {
@@ -181,7 +181,7 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 	initContainerBuilder.SecurityContext(&securityContext)
 
 	for volumeName := range volumeSnapshots {
-		mount := &corev1.VolumeMount{
+		mount := &corev1api.VolumeMount{
 			Name:      volumeName,
 			MountPath: "/restores/" + volumeName,
 		}
@@ -191,7 +191,7 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 
 	initContainer := *initContainerBuilder.Result()
 	if len(pod.Spec.InitContainers) == 0 || (pod.Spec.InitContainers[0].Name != restorehelper.WaitInitContainer && pod.Spec.InitContainers[0].Name != restorehelper.WaitInitContainerLegacy) {
-		pod.Spec.InitContainers = append([]corev1.Container{initContainer}, pod.Spec.InitContainers...)
+		pod.Spec.InitContainers = append([]corev1api.Container{initContainer}, pod.Spec.InitContainers...)
 	} else {
 		pod.Spec.InitContainers[0] = initContainer
 	}
@@ -204,7 +204,7 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }
 
-func getCommand(log logrus.FieldLogger, config *corev1.ConfigMap) []string {
+func getCommand(log logrus.FieldLogger, config *corev1api.ConfigMap) []string {
 	if config == nil {
 		log.Debug("No config found for plugin")
 		return []string{defaultCommand}
@@ -219,7 +219,7 @@ func getCommand(log logrus.FieldLogger, config *corev1.ConfigMap) []string {
 	return []string{config.Data["command"]}
 }
 
-func getImage(log logrus.FieldLogger, config *corev1.ConfigMap, defaultImage string) string {
+func getImage(log logrus.FieldLogger, config *corev1api.ConfigMap, defaultImage string) string {
 	if config == nil {
 		log.Debug("No config found for plugin")
 		return defaultImage
@@ -254,7 +254,7 @@ func getImage(log logrus.FieldLogger, config *corev1.ConfigMap, defaultImage str
 
 // getResourceRequests extracts the CPU and memory requests from a ConfigMap.
 // The 0 values are valid if the keys are not present
-func getResourceRequests(log logrus.FieldLogger, config *corev1.ConfigMap) (string, string) {
+func getResourceRequests(log logrus.FieldLogger, config *corev1api.ConfigMap) (string, string) {
 	if config == nil {
 		log.Debug("No config found for plugin")
 		return "", ""
@@ -265,7 +265,7 @@ func getResourceRequests(log logrus.FieldLogger, config *corev1.ConfigMap) (stri
 
 // getResourceLimits extracts the CPU and memory limits from a ConfigMap.
 // The 0 values are valid if the keys are not present
-func getResourceLimits(log logrus.FieldLogger, config *corev1.ConfigMap) (string, string) {
+func getResourceLimits(log logrus.FieldLogger, config *corev1api.ConfigMap) (string, string) {
 	if config == nil {
 		log.Debug("No config found for plugin")
 		return "", ""
@@ -275,7 +275,7 @@ func getResourceLimits(log logrus.FieldLogger, config *corev1.ConfigMap) (string
 }
 
 // getSecurityContext extracts securityContext runAsUser, runAsGroup, allowPrivilegeEscalation, and securityContext from a ConfigMap.
-func getSecurityContext(log logrus.FieldLogger, config *corev1.ConfigMap) (string, string, string, string) {
+func getSecurityContext(log logrus.FieldLogger, config *corev1api.ConfigMap) (string, string, string, string) {
 	if config == nil {
 		log.Debug("No config found for plugin")
 		return "", "", "", ""
@@ -290,19 +290,19 @@ func getSecurityContext(log logrus.FieldLogger, config *corev1.ConfigMap) (strin
 func newRestoreInitContainerBuilder(image, restoreUID string) *builder.ContainerBuilder {
 	return builder.ForContainer(restorehelper.WaitInitContainer, image).
 		Args(restoreUID).
-		Env([]*corev1.EnvVar{
+		Env([]*corev1api.EnvVar{
 			{
 				Name: "POD_NAMESPACE",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
+				ValueFrom: &corev1api.EnvVarSource{
+					FieldRef: &corev1api.ObjectFieldSelector{
 						FieldPath: "metadata.namespace",
 					},
 				},
 			},
 			{
 				Name: "POD_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
+				ValueFrom: &corev1api.EnvVarSource{
+					FieldRef: &corev1api.ObjectFieldSelector{
 						FieldPath: "metadata.name",
 					},
 				},
@@ -312,15 +312,15 @@ func newRestoreInitContainerBuilder(image, restoreUID string) *builder.Container
 
 // defaultSecurityCtx returns a default security context for the init container, which has the level "restricted" per
 // Pod Security Standards.
-func defaultSecurityCtx() corev1.SecurityContext {
+func defaultSecurityCtx() corev1api.SecurityContext {
 	uid := int64(restoreHelperUID)
-	return corev1.SecurityContext{
+	return corev1api.SecurityContext{
 		AllowPrivilegeEscalation: boolptr.False(),
-		Capabilities: &corev1.Capabilities{
-			Drop: []corev1.Capability{"ALL"},
+		Capabilities: &corev1api.Capabilities{
+			Drop: []corev1api.Capability{"ALL"},
 		},
-		SeccompProfile: &corev1.SeccompProfile{
-			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		SeccompProfile: &corev1api.SeccompProfile{
+			Type: corev1api.SeccompProfileTypeRuntimeDefault,
 		},
 		RunAsUser:    &uid,
 		RunAsNonRoot: boolptr.True(),
