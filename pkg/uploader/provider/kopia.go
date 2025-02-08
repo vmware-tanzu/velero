@@ -51,6 +51,8 @@ type kopiaProvider struct {
 }
 
 // NewKopiaUploaderProvider initialized with open or create a repository
+//
+//nolint:revive //FIXME
 func NewKopiaUploaderProvider(
 	requestorType string,
 	ctx context.Context,

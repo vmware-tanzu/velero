@@ -118,14 +118,17 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
 }
 
+//nolint:revive //FIXME
 func startMaintenanceJobFail(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
 	return "", errors.New("fake-start-error")
 }
 
+//nolint:revive //FIXME
 func startMaintenanceJobSucceed(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
 	return "fake-job-name", nil
 }
 
+//nolint:revive //FIXME
 func waitMaintenanceJobCompleteFail(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error) {
 	return velerov1api.BackupRepositoryMaintenanceStatus{}, errors.New("fake-wait-error")
 }

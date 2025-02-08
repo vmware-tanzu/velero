@@ -1083,6 +1083,7 @@ type duResumeTestHelper struct {
 	asyncBR      datapath.AsyncBR
 }
 
+//nolint:revive //FIXME
 func (dt *duResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler, _ context.Context, _ *velerov2alpha1api.DataUpload, _ logrus.FieldLogger) error {
 	return dt.resumeErr
 }

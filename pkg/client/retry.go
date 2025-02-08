@@ -27,6 +27,7 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+//nolint:revive //FIXME
 func CreateRetryGenerateName(client kbclient.Client, ctx context.Context, obj kbclient.Object) error {
 	retryCreateFn := func() error {
 		// needed to ensure that the name from the failed create isn't left on the object between retries

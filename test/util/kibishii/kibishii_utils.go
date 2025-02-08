@@ -415,6 +415,7 @@ func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClie
 	return nil
 }
 
+//nolint:revive //FIXME
 func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, oneHourTimeout context.Context,
 	kibishiiData *KibishiiData, incrementalFileName string) error {
 	if kibishiiData == nil {
