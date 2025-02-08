@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/vmware-tanzu/velero/internal/velero"
@@ -34,11 +34,11 @@ type podTemplateOption func(*podTemplateConfig)
 
 type podTemplateConfig struct {
 	image                           string
-	envVars                         []corev1.EnvVar
+	envVars                         []corev1api.EnvVar
 	restoreOnly                     bool
 	annotations                     map[string]string
 	labels                          map[string]string
-	resources                       corev1.ResourceRequirements
+	resources                       corev1api.ResourceRequirements
 	withSecret                      bool
 	defaultRepoMaintenanceFrequency time.Duration
 	garbageCollectionFrequency      time.Duration
@@ -81,11 +81,11 @@ func WithLabels(labels map[string]string) podTemplateOption {
 
 func WithEnvFromSecretKey(varName, secret, key string) podTemplateOption {
 	return func(c *podTemplateConfig) {
-		c.envVars = append(c.envVars, corev1.EnvVar{
+		c.envVars = append(c.envVars, corev1api.EnvVar{
 			Name: varName,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
+			ValueFrom: &corev1api.EnvVarSource{
+				SecretKeyRef: &corev1api.SecretKeySelector{
+					LocalObjectReference: corev1api.LocalObjectReference{
 						Name: secret,
 					},
 					Key: key,
@@ -107,7 +107,7 @@ func WithRestoreOnly(b bool) podTemplateOption {
 	}
 }
 
-func WithResources(resources corev1.ResourceRequirements) podTemplateOption {
+func WithResources(resources corev1api.ResourceRequirements) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.resources = resources
 	}
@@ -226,7 +226,7 @@ func WithForWindows() podTemplateOption {
 	}
 }
 
-func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment {
+func Deployment(namespace string, opts ...podTemplateOption) *appsv1api.Deployment {
 	// TODO: Add support for server args
 	c := &podTemplateConfig{
 		image: velero.DefaultVeleroImage(),
@@ -236,10 +236,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 		opt(c)
 	}
 
-	pullPolicy := corev1.PullAlways
+	pullPolicy := corev1api.PullAlways
 	imageParts := strings.Split(c.image, ":")
 	if len(imageParts) == 2 && imageParts[1] != "latest" {
-		pullPolicy = corev1.PullIfNotPresent
+		pullPolicy = corev1api.PullIfNotPresent
 	}
 
 	args := []string{"server"}
@@ -315,29 +315,29 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 		args = append(args, fmt.Sprintf("--item-block-worker-count=%d", c.itemBlockWorkerCount))
 	}
 
-	deployment := &appsv1.Deployment{
+	deployment := &appsv1api.Deployment{
 		ObjectMeta: objectMeta(namespace, "velero"),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
-			APIVersion: appsv1.SchemeGroupVersion.String(),
+			APIVersion: appsv1api.SchemeGroupVersion.String(),
 		},
-		Spec: appsv1.DeploymentSpec{
+		Spec: appsv1api.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"deploy": "velero"}},
-			Template: corev1.PodTemplateSpec{
+			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      podLabels(c.labels, map[string]string{"deploy": "velero"}),
 					Annotations: podAnnotations(c.annotations),
 				},
-				Spec: corev1.PodSpec{
-					RestartPolicy:      corev1.RestartPolicyAlways,
+				Spec: corev1api.PodSpec{
+					RestartPolicy:      corev1api.RestartPolicyAlways,
 					ServiceAccountName: c.serviceAccountName,
 					NodeSelector: map[string]string{
 						"kubernetes.io/os": "linux",
 					},
-					OS: &corev1.PodOS{
+					OS: &corev1api.PodOS{
 						Name: "linux",
 					},
-					Containers: []corev1.Container{
+					Containers: []corev1api.Container{
 						{
 							Name:            "velero",
 							Image:           c.image,
@@ -347,7 +347,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 								"/velero",
 							},
 							Args: args,
-							VolumeMounts: []corev1.VolumeMount{
+							VolumeMounts: []corev1api.VolumeMount{
 								{
 									Name:      "plugins",
 									MountPath: "/plugins",
@@ -357,15 +357,15 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 									MountPath: "/scratch",
 								},
 							},
-							Env: []corev1.EnvVar{
+							Env: []corev1api.EnvVar{
 								{
 									Name:  "VELERO_SCRATCH_DIR",
 									Value: "/scratch",
 								},
 								{
 									Name: "VELERO_NAMESPACE",
-									ValueFrom: &corev1.EnvVarSource{
-										FieldRef: &corev1.ObjectFieldSelector{
+									ValueFrom: &corev1api.EnvVarSource{
+										FieldRef: &corev1api.ObjectFieldSelector{
 											FieldPath: "metadata.namespace",
 										},
 									},
@@ -378,17 +378,17 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 							Resources: c.resources,
 						},
 					},
-					Volumes: []corev1.Volume{
+					Volumes: []corev1api.Volume{
 						{
 							Name: "plugins",
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							VolumeSource: corev1api.VolumeSource{
+								EmptyDir: &corev1api.EmptyDirVolumeSource{},
 							},
 						},
 						{
 							Name: "scratch",
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: new(corev1.EmptyDirVolumeSource),
+							VolumeSource: corev1api.VolumeSource{
+								EmptyDir: new(corev1api.EmptyDirVolumeSource),
 							},
 						},
 					},
@@ -400,10 +400,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 	if c.withSecret {
 		deployment.Spec.Template.Spec.Volumes = append(
 			deployment.Spec.Template.Spec.Volumes,
-			corev1.Volume{
+			corev1api.Volume{
 				Name: "cloud-credentials",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
+				VolumeSource: corev1api.VolumeSource{
+					Secret: &corev1api.SecretVolumeSource{
 						SecretName: "cloud-credentials",
 					},
 				},
@@ -412,13 +412,13 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 
 		deployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(
 			deployment.Spec.Template.Spec.Containers[0].VolumeMounts,
-			corev1.VolumeMount{
+			corev1api.VolumeMount{
 				Name:      "cloud-credentials",
 				MountPath: "/credentials",
 			},
 		)
 
-		deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, []corev1.EnvVar{
+		deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, []corev1api.EnvVar{
 			{
 				Name:  "GOOGLE_APPLICATION_CREDENTIALS",
 				Value: "/credentials/cloud",

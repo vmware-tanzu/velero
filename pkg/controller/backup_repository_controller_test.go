@@ -22,7 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -675,14 +675,14 @@ func TestNeedInvalidBackupRepo(t *testing.T) {
 }
 
 func TestGetBackupRepositoryConfig(t *testing.T) {
-	configWithNoData := &corev1.ConfigMap{
+	configWithNoData := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "config-1",
 			Namespace: velerov1api.DefaultNamespace,
 		},
 	}
 
-	configWithWrongData := &corev1.ConfigMap{
+	configWithWrongData := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "config-1",
 			Namespace: velerov1api.DefaultNamespace,
@@ -692,7 +692,7 @@ func TestGetBackupRepositoryConfig(t *testing.T) {
 		},
 	}
 
-	configWithData := &corev1.ConfigMap{
+	configWithData := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "config-1",
 			Namespace: velerov1api.DefaultNamespace,
@@ -755,7 +755,7 @@ func TestGetBackupRepositoryConfig(t *testing.T) {
 	}
 
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -961,7 +961,7 @@ func TestRecallMaintenance(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	batchv1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 	velerov1api.AddToScheme(scheme)
 
 	jobSucceeded := &batchv1.Job{
@@ -978,9 +978,9 @@ func TestRecallMaintenance(t *testing.T) {
 		},
 	}
 
-	jobPodSucceeded := builder.ForPod(velerov1api.DefaultNamespace, "job1").Labels(map[string]string{"job-name": "job1"}).ContainerStatuses(&corev1.ContainerStatus{
-		State: corev1.ContainerState{
-			Terminated: &corev1.ContainerStateTerminated{},
+	jobPodSucceeded := builder.ForPod(velerov1api.DefaultNamespace, "job1").Labels(map[string]string{"job-name": "job1"}).ContainerStatuses(&corev1api.ContainerStatus{
+		State: corev1api.ContainerState{
+			Terminated: &corev1api.ContainerStateTerminated{},
 		},
 	}).Result()
 

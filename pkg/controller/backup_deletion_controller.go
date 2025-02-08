@@ -27,7 +27,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -540,7 +540,7 @@ func (r *backupDeletionReconciler) deleteMovedSnapshots(ctx context.Context, bac
 	if r.repoMgr == nil {
 		return nil
 	}
-	list := &corev1.ConfigMapList{}
+	list := &corev1api.ConfigMapList{}
 	if err := r.Client.List(ctx, list, &client.ListOptions{
 		Namespace: backup.Namespace,
 		LabelSelector: labels.SelectorFromSet(

@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -571,7 +571,7 @@ func DescribeBackupResultsInSF(ctx context.Context, kbClient kbclient.Client, d 
 }
 
 // DescribeResourcePoliciesInSF describes resource policies in structured format.
-func DescribeResourcePoliciesInSF(d *StructuredDescriber, resPolicies *v1.TypedLocalObjectReference) {
+func DescribeResourcePoliciesInSF(d *StructuredDescriber, resPolicies *corev1api.TypedLocalObjectReference) {
 	policiesInfo := make(map[string]any)
 	policiesInfo["type"] = resPolicies.Kind
 	policiesInfo["name"] = resPolicies.Name
