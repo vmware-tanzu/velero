@@ -23,15 +23,15 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	waitutil "k8s.io/apimachinery/pkg/util/wait"
 )
 
 func CreateService(ctx context.Context, client TestClient, namespace string,
-	service string, labels map[string]string, serviceSpec *corev1.ServiceSpec) error {
-	se := &corev1.Service{
+	service string, labels map[string]string, serviceSpec *corev1api.ServiceSpec) error {
+	se := &corev1api.Service{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Service",
 			APIVersion: "apps/v1",
@@ -51,7 +51,7 @@ func CreateService(ctx context.Context, client TestClient, namespace string,
 	return nil
 }
 
-func GetService(ctx context.Context, client TestClient, namespace string, service string) (*corev1.Service, error) {
+func GetService(ctx context.Context, client TestClient, namespace string, service string) (*corev1api.Service, error) {
 	return client.ClientGo.CoreV1().Services(namespace).Get(ctx, service, metav1.GetOptions{})
 }
 

@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1api "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerocredentials "github.com/vmware-tanzu/velero/internal/credentials"
 	credmock "github.com/vmware-tanzu/velero/internal/credentials/mocks"
@@ -602,7 +602,7 @@ func TestGetStoreOptions(t *testing.T) {
 
 func TestPrepareRepo(t *testing.T) {
 	bsl := velerov1api.BackupStorageLocation{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "fake-bsl",
 			Namespace: velerov1api.DefaultNamespace,
 		},
@@ -1095,7 +1095,7 @@ func TestBatchForget(t *testing.T) {
 
 func TestInitRepo(t *testing.T) {
 	bsl := velerov1api.BackupStorageLocation{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "fake-bsl",
 			Namespace: velerov1api.DefaultNamespace,
 		},
