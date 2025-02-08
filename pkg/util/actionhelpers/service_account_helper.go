@@ -18,7 +18,7 @@ package actionhelpers
 
 import (
 	"github.com/sirupsen/logrus"
-	rbac "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -31,7 +31,7 @@ func ClusterRoleBindingsForAction(clusterRoleBindingListers map[string]ClusterRo
 	// Look up the supported RBAC version
 	var supportedAPI metav1.GroupVersionForDiscovery
 	for _, ag := range discoveryHelper.APIGroups() {
-		if ag.Name == rbac.GroupName {
+		if ag.Name == rbacv1.GroupName {
 			supportedAPI = ag.PreferredVersion
 			break
 		}

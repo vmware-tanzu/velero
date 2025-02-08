@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	rbac "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	rbacbeta "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -81,7 +81,7 @@ func (v1beta1 V1beta1ClusterRoleBindingLister) List() ([]ClusterRoleBinding, err
 // Necessary so that callers to the ClusterRoleBindingLister interfaces don't need the kubernetes.Interface.
 func NewClusterRoleBindingListerMap(clientset kubernetes.Interface) map[string]ClusterRoleBindingLister {
 	return map[string]ClusterRoleBindingLister{
-		rbac.SchemeGroupVersion.Version:     V1ClusterRoleBindingLister{client: clientset.RbacV1().ClusterRoleBindings()},
+		rbacv1.SchemeGroupVersion.Version:   V1ClusterRoleBindingLister{client: clientset.RbacV1().ClusterRoleBindings()},
 		rbacbeta.SchemeGroupVersion.Version: V1beta1ClusterRoleBindingLister{client: clientset.RbacV1beta1().ClusterRoleBindings()},
 		"":                                  NoopClusterRoleBindingLister{},
 	}
@@ -98,7 +98,7 @@ type ClusterRoleBinding interface {
 }
 
 type V1ClusterRoleBinding struct {
-	Crb rbac.ClusterRoleBinding
+	Crb rbacv1.ClusterRoleBinding
 }
 
 func (c V1ClusterRoleBinding) Name() string {
@@ -112,7 +112,7 @@ func (c V1ClusterRoleBinding) RoleRefName() string {
 func (c V1ClusterRoleBinding) ServiceAccountSubjects(namespace string) []string {
 	var saSubjects []string
 	for _, s := range c.Crb.Subjects {
-		if s.Kind == rbac.ServiceAccountKind && s.Namespace == namespace {
+		if s.Kind == rbacv1.ServiceAccountKind && s.Namespace == namespace {
 			saSubjects = append(saSubjects, s.Name)
 		}
 	}
@@ -134,7 +134,7 @@ func (c V1beta1ClusterRoleBinding) RoleRefName() string {
 func (c V1beta1ClusterRoleBinding) ServiceAccountSubjects(namespace string) []string {
 	var saSubjects []string
 	for _, s := range c.Crb.Subjects {
-		if s.Kind == rbac.ServiceAccountKind && s.Namespace == namespace {
+		if s.Kind == rbacv1.ServiceAccountKind && s.Namespace == namespace {
 			saSubjects = append(saSubjects, s.Name)
 		}
 	}

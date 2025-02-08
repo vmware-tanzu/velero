@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	. "github.com/vmware-tanzu/velero/test"
@@ -186,7 +186,7 @@ func (r *ResourcePoliciesCase) Clean() error {
 	return nil
 }
 
-func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []*v1.Volume) error {
+func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []*corev1api.Volume) error {
 	var err error
 	for i := range volList {
 		pvcName := fmt.Sprintf("pvc-%d", i)
@@ -208,7 +208,7 @@ func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []
 	return nil
 }
 
-func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volList []*v1.Volume) error {
+func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volList []*corev1api.Volume) error {
 	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"resource-policies": "resource-policies"}, nil).WithVolume(volList).Result()
 	deployment, err := CreateDeployment(r.Client.ClientGo, namespace, deployment)
 	if err != nil {

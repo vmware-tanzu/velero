@@ -31,8 +31,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -167,19 +167,19 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		},
 	}
 
-	daemonSet := &appsv1.DaemonSet{
+	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "velero",
 			Name:      "node-agent",
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
-			APIVersion: appsv1.SchemeGroupVersion.String(),
+			APIVersion: appsv1api.SchemeGroupVersion.String(),
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
 						{
 							Image: "fake-image",
 						},
@@ -207,7 +207,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 	if err != nil {
 		return nil, err
 	}
-	err = corev1.AddToScheme(scheme)
+	err = corev1api.AddToScheme(scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +243,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		dataPathMgr,
 		nil,
 		map[string]nodeagent.BackupPVC{},
-		corev1.ResourceRequirements{},
+		corev1api.ResourceRequirements{},
 		testclocks.NewFakeClock(now),
 		"test-node",
 		time.Minute*5,
@@ -272,7 +272,7 @@ type fakeSnapshotExposer struct {
 	peekErr         error
 }
 
-func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param any) error {
+func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.ObjectReference, param any) error {
 	du := velerov2alpha1api.DataUpload{}
 	err := f.kubeClient.Get(ctx, kbclient.ObjectKey{
 		Name:      dataUploadName,
@@ -289,8 +289,8 @@ func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obj
 	return nil
 }
 
-func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1.ObjectReference, tm time.Duration, para any) (*exposer.ExposeResult, error) {
-	pod := &corev1.Pod{}
+func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1api.ObjectReference, tm time.Duration, para any) (*exposer.ExposeResult, error) {
+	pod := &corev1api.Pod{}
 	err := f.kubeClient.Get(ctx, kbclient.ObjectKey{
 		Name:      dataUploadName,
 		Namespace: velerov1api.DefaultNamespace,
@@ -307,15 +307,15 @@ func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1.ObjectRe
 	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, VolumeName: dataUploadName, NodeOS: pNodeOS}}, nil
 }
 
-func (f *fakeSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1.ObjectReference) error {
+func (f *fakeSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1api.ObjectReference) error {
 	return f.peekErr
 }
 
-func (f *fakeSnapshotExposer) DiagnoseExpose(context.Context, corev1.ObjectReference) string {
+func (f *fakeSnapshotExposer) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (f *fakeSnapshotExposer) CleanUp(context.Context, corev1.ObjectReference, string, string) {
+func (f *fakeSnapshotExposer) CleanUp(context.Context, corev1api.ObjectReference, string, string) {
 }
 
 type fakeDataUploadFSBR struct {
@@ -348,8 +348,8 @@ func TestReconcile(t *testing.T) {
 	tests := []struct {
 		name                string
 		du                  *velerov2alpha1api.DataUpload
-		pod                 *corev1.Pod
-		pvc                 *corev1.PersistentVolumeClaim
+		pod                 *corev1api.Pod
+		pvc                 *corev1api.PersistentVolumeClaim
 		snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
 		dataMgr             *datapath.Manager
 		expectedProcessed   bool
@@ -394,7 +394,7 @@ func TestReconcile(t *testing.T) {
 		{
 			name:            "Dataupload should be accepted",
 			du:              dataUploadBuilder().Result(),
-			pod:             builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1.Volume{Name: "test-pvc"}).Result(),
+			pod:             builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1api.Volume{Name: "test-pvc"}).Result(),
 			pvc:             builder.ForPersistentVolumeClaim("fake-ns", "test-pvc").Result(),
 			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
 			expectedRequeue: ctrl.Result{},
@@ -402,7 +402,7 @@ func TestReconcile(t *testing.T) {
 		{
 			name:              "Dataupload should fail to get PVC information",
 			du:                dataUploadBuilder().Result(),
-			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1.Volume{Name: "wrong-pvc"}).Result(),
+			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1api.Volume{Name: "wrong-pvc"}).Result(),
 			expectedProcessed: true,
 			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
 			expectedRequeue:   ctrl.Result{},
@@ -411,7 +411,7 @@ func TestReconcile(t *testing.T) {
 		{
 			name:              "Dataupload should fail to get PVC attaching node",
 			du:                dataUploadBuilder().Result(),
-			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1.Volume{Name: "test-pvc"}).Result(),
+			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1api.Volume{Name: "test-pvc"}).Result(),
 			pvc:               builder.ForPersistentVolumeClaim("fake-ns", "test-pvc").StorageClass("fake-sc").Result(),
 			expectedProcessed: true,
 			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
@@ -421,7 +421,7 @@ func TestReconcile(t *testing.T) {
 		{
 			name:              "Dataupload should fail because expected node doesn't exist",
 			du:                dataUploadBuilder().Result(),
-			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1.Volume{Name: "test-pvc"}).Result(),
+			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1api.Volume{Name: "test-pvc"}).Result(),
 			pvc:               builder.ForPersistentVolumeClaim("fake-ns", "test-pvc").Result(),
 			removeNode:        true,
 			expectedProcessed: true,
@@ -437,14 +437,14 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:            "Dataupload prepared should be completed",
-			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1api.Volume{Name: "dataupload-1"}).Result(),
 			du:              dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
 			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
 			expectedRequeue: ctrl.Result{},
 		},
 		{
 			name:              "Dataupload should fail if expose returns ambiguous nodeOS",
-			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1api.Volume{Name: "dataupload-1"}).Result(),
 			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
 			ambiguousNodeOS:   true,
 			expectedProcessed: true,
@@ -453,21 +453,21 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:            "Dataupload with not enabled cancel",
-			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1api.Volume{Name: "dataupload-1"}).Result(),
 			du:              dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).SnapshotType(fakeSnapshotType).Cancel(false).Result(),
 			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
 			expectedRequeue: ctrl.Result{},
 		},
 		{
 			name:            "Dataupload should be cancel",
-			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1api.Volume{Name: "dataupload-1"}).Result(),
 			du:              dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).SnapshotType(fakeSnapshotType).Cancel(true).Result(),
 			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseCanceling).Result(),
 			expectedRequeue: ctrl.Result{},
 		},
 		{
 			name: "Dataupload should be cancel with match node",
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1api.Volume{Name: "dataupload-1"}).Result(),
 			du: func() *velerov2alpha1api.DataUpload {
 				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).SnapshotType(fakeSnapshotType).Cancel(true).Result()
 				du.Status.Node = "test-node"
@@ -480,7 +480,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "Dataupload should not be cancel with mismatch node",
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1api.Volume{Name: "dataupload-1"}).Result(),
 			du: func() *velerov2alpha1api.DataUpload {
 				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).SnapshotType(fakeSnapshotType).Cancel(true).Result()
 				du.Status.Node = "different_node"
@@ -493,14 +493,14 @@ func TestReconcile(t *testing.T) {
 		{
 			name:            "runCancelableDataUpload is concurrent limited",
 			dataMgr:         datapath.NewManager(0),
-			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1api.Volume{Name: "dataupload-1"}).Result(),
 			du:              dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
 			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).Result(),
 			expectedRequeue: ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
 		},
 		{
 			name:              "data path init error",
-			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1api.Volume{Name: "dataupload-1"}).Result(),
 			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
 			fsBRInitErr:       errors.New("fake-data-path-init-error"),
 			expectedProcessed: true,
@@ -509,7 +509,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:            "Unable to update status to in progress for data download",
-			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			pod:             builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1api.Volume{Name: "dataupload-1"}).Result(),
 			du:              dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
 			needErrs:        []bool{false, false, false, true},
 			expected:        dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
@@ -517,7 +517,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name:              "data path start error",
-			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			pod:               builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1api.Volume{Name: "dataupload-1"}).Result(),
 			du:                dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhasePrepared).SnapshotType(fakeSnapshotType).Result(),
 			fsBRStartErr:      errors.New("fake-data-path-start-error"),
 			expectedProcessed: true,
@@ -538,7 +538,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "Dataupload with enabled cancel",
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1api.Volume{Name: "dataupload-1"}).Result(),
 			du: func() *velerov2alpha1api.DataUpload {
 				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).SnapshotType(fakeSnapshotType).Result()
 				controllerutil.AddFinalizer(du, DataUploadDownloadFinalizer)
@@ -553,7 +553,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "Dataupload with remove finalizer and should not be retrieved",
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1.Volume{Name: "dataupload-1"}).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Volumes(&corev1api.Volume{Name: "dataupload-1"}).Result(),
 			du: func() *velerov2alpha1api.DataUpload {
 				du := dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).SnapshotType(fakeSnapshotType).Cancel(true).Result()
 				controllerutil.AddFinalizer(du, DataUploadDownloadFinalizer)
@@ -812,13 +812,13 @@ func TestFindDataUploadForPod(t *testing.T) {
 	tests := []struct {
 		name      string
 		du        *velerov2alpha1api.DataUpload
-		pod       *corev1.Pod
+		pod       *corev1api.Pod
 		checkFunc func(*velerov2alpha1api.DataUpload, []reconcile.Request)
 	}{
 		{
 			name: "find dataUpload for pod",
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Labels(map[string]string{velerov1api.DataUploadLabel: dataUploadName}).Status(corev1.PodStatus{Phase: corev1.PodRunning}).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Labels(map[string]string{velerov1api.DataUploadLabel: dataUploadName}).Status(corev1api.PodStatus{Phase: corev1api.PodRunning}).Result(),
 			checkFunc: func(du *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
 				// Assert that the function returns a single request
 				assert.Len(t, requests, 1)
@@ -1087,23 +1087,23 @@ func (dt *duResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler,
 	return dt.resumeErr
 }
 
-func (dt *duResumeTestHelper) Expose(context.Context, corev1.ObjectReference, any) error {
+func (dt *duResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, any) error {
 	return nil
 }
 
-func (dt *duResumeTestHelper) GetExposed(context.Context, corev1.ObjectReference, time.Duration, any) (*exposer.ExposeResult, error) {
+func (dt *duResumeTestHelper) GetExposed(context.Context, corev1api.ObjectReference, time.Duration, any) (*exposer.ExposeResult, error) {
 	return dt.exposeResult, dt.getExposeErr
 }
 
-func (dt *duResumeTestHelper) PeekExposed(context.Context, corev1.ObjectReference) error {
+func (dt *duResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
 	return nil
 }
 
-func (dt *duResumeTestHelper) DiagnoseExpose(context.Context, corev1.ObjectReference) string {
+func (dt *duResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (dt *duResumeTestHelper) CleanUp(context.Context, corev1.ObjectReference, string, string) {}
+func (dt *duResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference, string, string) {}
 
 func (dt *duResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
 	datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
@@ -1276,7 +1276,7 @@ func TestResumeCancellableBackup(t *testing.T) {
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Node("node-1").Result(),
 			exposeResult: &exposer.ExposeResult{
 				ByPod: exposer.ExposeByPod{
-					HostingPod: &corev1.Pod{},
+					HostingPod: &corev1api.Pod{},
 				},
 			},
 			mockInit:       true,
@@ -1289,7 +1289,7 @@ func TestResumeCancellableBackup(t *testing.T) {
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Node("node-1").Result(),
 			exposeResult: &exposer.ExposeResult{
 				ByPod: exposer.ExposeByPod{
-					HostingPod: &corev1.Pod{},
+					HostingPod: &corev1api.Pod{},
 				},
 			},
 			mockInit:        true,
@@ -1303,7 +1303,7 @@ func TestResumeCancellableBackup(t *testing.T) {
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Node("node-1").Result(),
 			exposeResult: &exposer.ExposeResult{
 				ByPod: exposer.ExposeByPod{
-					HostingPod: &corev1.Pod{},
+					HostingPod: &corev1api.Pod{},
 				},
 			},
 			mockInit:  true,

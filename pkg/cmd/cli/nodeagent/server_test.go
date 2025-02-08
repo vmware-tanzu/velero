@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -38,14 +38,14 @@ import (
 func Test_validatePodVolumesHostPath(t *testing.T) {
 	tests := []struct {
 		name      string
-		pods      []*corev1.Pod
+		pods      []*corev1api.Pod
 		dirs      []string
 		createDir bool
 		wantErr   bool
 	}{
 		{
 			name: "no error when pod volumes are present",
-			pods: []*corev1.Pod{
+			pods: []*corev1api.Pod{
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
 				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo")).Result(),
 			},
@@ -55,9 +55,9 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 		},
 		{
 			name: "no error when pod volumes are present and there are mirror pods",
-			pods: []*corev1.Pod{
+			pods: []*corev1api.Pod{
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
-				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo"), builder.WithAnnotations(corev1.MirrorPodAnnotationKey, "baz")).Result(),
+				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo"), builder.WithAnnotations(corev1api.MirrorPodAnnotationKey, "baz")).Result(),
 			},
 			dirs:      []string{"foo", "baz"},
 			createDir: true,
@@ -65,7 +65,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 		},
 		{
 			name: "error when all pod volumes missing",
-			pods: []*corev1.Pod{
+			pods: []*corev1api.Pod{
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
 				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo")).Result(),
 			},
@@ -75,7 +75,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 		},
 		{
 			name: "error when some pod volumes missing",
-			pods: []*corev1.Pod{
+			pods: []*corev1api.Pod{
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
 				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo")).Result(),
 			},
@@ -85,7 +85,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 		},
 		{
 			name: "no error when pod volumes are not present",
-			pods: []*corev1.Pod{
+			pods: []*corev1api.Pod{
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
 			},
 			dirs:      []string{"foo"},

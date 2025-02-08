@@ -24,7 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -65,13 +65,13 @@ type DataDownloadReconciler struct {
 	nodeName         string
 	dataPathMgr      *datapath.Manager
 	restorePVCConfig nodeagent.RestorePVC
-	podResources     v1.ResourceRequirements
+	podResources     corev1api.ResourceRequirements
 	preparingTimeout time.Duration
 	metrics          *metrics.ServerMetrics
 }
 
 func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
-	restorePVCConfig nodeagent.RestorePVC, podResources v1.ResourceRequirements, nodeName string, preparingTimeout time.Duration,
+	restorePVCConfig nodeagent.RestorePVC, podResources corev1api.ResourceRequirements, nodeName string, preparingTimeout time.Duration,
 	logger logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:           client,
@@ -518,10 +518,10 @@ func (r *DataDownloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov2alpha1api.DataDownload{}).
 		WatchesRawSource(s).
-		Watches(&v1.Pod{}, kube.EnqueueRequestsFromMapUpdateFunc(r.findSnapshotRestoreForPod),
+		Watches(&corev1api.Pod{}, kube.EnqueueRequestsFromMapUpdateFunc(r.findSnapshotRestoreForPod),
 			builder.WithPredicates(predicate.Funcs{
 				UpdateFunc: func(ue event.UpdateEvent) bool {
-					newObj := ue.ObjectNew.(*v1.Pod)
+					newObj := ue.ObjectNew.(*corev1api.Pod)
 
 					if _, ok := newObj.Labels[velerov1api.DataDownloadLabel]; !ok {
 						return false
@@ -547,7 +547,7 @@ func (r *DataDownloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *DataDownloadReconciler) findSnapshotRestoreForPod(ctx context.Context, podObj client.Object) []reconcile.Request {
-	pod := podObj.(*v1.Pod)
+	pod := podObj.(*corev1api.Pod)
 	dd, err := findDataDownloadByPod(r.client, *pod)
 
 	log := r.logger.WithField("pod", pod.Name)
@@ -566,7 +566,7 @@ func (r *DataDownloadReconciler) findSnapshotRestoreForPod(ctx context.Context, 
 		return []reconcile.Request{}
 	}
 
-	if pod.Status.Phase == v1.PodRunning {
+	if pod.Status.Phase == corev1api.PodRunning {
 		log.Info("Preparing data download")
 		// we don't expect anyone else update the CR during the Prepare process
 		updated, err := r.exclusiveUpdateDataDownload(context.Background(), dd, r.prepareDataDownload)
@@ -711,7 +711,7 @@ func (r *DataDownloadReconciler) exclusiveUpdateDataDownload(ctx context.Context
 	}
 }
 
-func (r *DataDownloadReconciler) getTargetPVC(ctx context.Context, dd *velerov2alpha1api.DataDownload) (*v1.PersistentVolumeClaim, error) {
+func (r *DataDownloadReconciler) getTargetPVC(ctx context.Context, dd *velerov2alpha1api.DataDownload) (*corev1api.PersistentVolumeClaim, error) {
 	return r.kubeClient.CoreV1().PersistentVolumeClaims(dd.Spec.TargetVolume.Namespace).Get(ctx, dd.Spec.TargetVolume.PVC, metav1.GetOptions{})
 }
 
@@ -772,8 +772,8 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 	}, nil
 }
 
-func getDataDownloadOwnerObject(dd *velerov2alpha1api.DataDownload) v1.ObjectReference {
-	return v1.ObjectReference{
+func getDataDownloadOwnerObject(dd *velerov2alpha1api.DataDownload) corev1api.ObjectReference {
+	return corev1api.ObjectReference{
 		Kind:       dd.Kind,
 		Namespace:  dd.Namespace,
 		Name:       dd.Name,
@@ -782,7 +782,7 @@ func getDataDownloadOwnerObject(dd *velerov2alpha1api.DataDownload) v1.ObjectRef
 	}
 }
 
-func findDataDownloadByPod(client client.Client, pod v1.Pod) (*velerov2alpha1api.DataDownload, error) {
+func findDataDownloadByPod(client client.Client, pod corev1api.Pod) (*velerov2alpha1api.DataDownload, error) {
 	if label, exist := pod.Labels[velerov1api.DataDownloadLabel]; exist {
 		dd := &velerov2alpha1api.DataDownload{}
 		err := client.Get(context.Background(), types.NamespacedName{

@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,7 +43,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
-	appsv1 "k8s.io/api/apps/v1"
+	appsv1api "k8s.io/api/apps/v1"
 )
 
 func TestGenerateJobName1(t *testing.T) {
@@ -275,7 +275,7 @@ func TestGetResultFromJob(t *testing.T) {
 	}
 
 	// Set up test pod with no status
-	pod := &v1.Pod{
+	pod := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pod",
 			Namespace: "default",
@@ -299,10 +299,10 @@ func TestGetResultFromJob(t *testing.T) {
 	assert.Equal(t, "", result)
 
 	// Set a non-terminated container status to the pod
-	pod.Status = v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
+	pod.Status = corev1api.PodStatus{
+		ContainerStatuses: []corev1api.ContainerStatus{
 			{
-				State: v1.ContainerState{},
+				State: corev1api.ContainerState{},
 			},
 		},
 	}
@@ -314,11 +314,11 @@ func TestGetResultFromJob(t *testing.T) {
 	assert.Equal(t, "", result)
 
 	// Set a terminated container status to the pod
-	pod.Status = v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
+	pod.Status = corev1api.PodStatus{
+		ContainerStatuses: []corev1api.ContainerStatus{
 			{
-				State: v1.ContainerState{
-					Terminated: &v1.ContainerStateTerminated{},
+				State: corev1api.ContainerState{
+					Terminated: &corev1api.ContainerStateTerminated{},
 				},
 			},
 		},
@@ -331,11 +331,11 @@ func TestGetResultFromJob(t *testing.T) {
 	assert.Equal(t, "", result)
 
 	// Set a terminated container status with invalidate message to the pod
-	pod.Status = v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
+	pod.Status = corev1api.PodStatus{
+		ContainerStatuses: []corev1api.ContainerStatus{
 			{
-				State: v1.ContainerState{
-					Terminated: &v1.ContainerStateTerminated{
+				State: corev1api.ContainerState{
+					Terminated: &corev1api.ContainerStateTerminated{
 						Message: "fake-message",
 					},
 				},
@@ -349,11 +349,11 @@ func TestGetResultFromJob(t *testing.T) {
 	assert.Equal(t, "", result)
 
 	// Set a terminated container status with empty maintenance error to the pod
-	pod.Status = v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
+	pod.Status = corev1api.PodStatus{
+		ContainerStatuses: []corev1api.ContainerStatus{
 			{
-				State: v1.ContainerState{
-					Terminated: &v1.ContainerStateTerminated{
+				State: corev1api.ContainerState{
+					Terminated: &corev1api.ContainerStateTerminated{
 						Message: "Repo maintenance error: ",
 					},
 				},
@@ -367,11 +367,11 @@ func TestGetResultFromJob(t *testing.T) {
 	assert.Equal(t, "", result)
 
 	// Set a terminated container status with maintenance error to the pod
-	pod.Status = v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
+	pod.Status = corev1api.PodStatus{
+		ContainerStatuses: []corev1api.ContainerStatus{
 			{
-				State: v1.ContainerState{
-					Terminated: &v1.ContainerStateTerminated{
+				State: corev1api.ContainerState{
+					Terminated: &corev1api.ContainerStateTerminated{
 						Message: "Repo maintenance error: fake-error",
 					},
 				},
@@ -404,7 +404,7 @@ func TestGetJobConfig(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		repoJobConfig  *v1.ConfigMap
+		repoJobConfig  *corev1api.ConfigMap
 		expectedConfig *JobConfigs
 		expectedError  error
 	}{
@@ -415,7 +415,7 @@ func TestGetJobConfig(t *testing.T) {
 		},
 		{
 			name: "Invalid JSON",
-			repoJobConfig: &v1.ConfigMap{
+			repoJobConfig: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: veleroNamespace,
 					Name:      repoMaintenanceJobConfig,
@@ -429,7 +429,7 @@ func TestGetJobConfig(t *testing.T) {
 		},
 		{
 			name: "Find config specific for BackupRepository",
-			repoJobConfig: &v1.ConfigMap{
+			repoJobConfig: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: veleroNamespace,
 					Name:      repoMaintenanceJobConfig,
@@ -463,7 +463,7 @@ func TestGetJobConfig(t *testing.T) {
 		},
 		{
 			name: "Find config specific for global",
-			repoJobConfig: &v1.ConfigMap{
+			repoJobConfig: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: veleroNamespace,
 					Name:      repoMaintenanceJobConfig,
@@ -497,7 +497,7 @@ func TestGetJobConfig(t *testing.T) {
 		},
 		{
 			name: "Specific config supersede global config",
-			repoJobConfig: &v1.ConfigMap{
+			repoJobConfig: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: veleroNamespace,
 					Name:      repoMaintenanceJobConfig,
@@ -610,9 +610,9 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 	}
 
-	jobPodSucceeded1 := builder.ForPod(veleroNamespace, "job1").Labels(map[string]string{"job-name": "job1"}).ContainerStatuses(&v1.ContainerStatus{
-		State: v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{},
+	jobPodSucceeded1 := builder.ForPod(veleroNamespace, "job1").Labels(map[string]string{"job-name": "job1"}).ContainerStatuses(&corev1api.ContainerStatus{
+		State: corev1api.ContainerState{
+			Terminated: &corev1api.ContainerStateTerminated{},
 		},
 	}).Result()
 
@@ -629,9 +629,9 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 	}
 
-	jobPodFailed1 := builder.ForPod(veleroNamespace, "job2").Labels(map[string]string{"job-name": "job2"}).ContainerStatuses(&v1.ContainerStatus{
-		State: v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{
+	jobPodFailed1 := builder.ForPod(veleroNamespace, "job2").Labels(map[string]string{"job-name": "job2"}).ContainerStatuses(&corev1api.ContainerStatus{
+		State: corev1api.ContainerState{
+			Terminated: &corev1api.ContainerStateTerminated{
 				Message: "Repo maintenance error: fake-message-2",
 			},
 		},
@@ -651,9 +651,9 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 	}
 
-	jobPodSucceeded2 := builder.ForPod(veleroNamespace, "job3").Labels(map[string]string{"job-name": "job3"}).ContainerStatuses(&v1.ContainerStatus{
-		State: v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{},
+	jobPodSucceeded2 := builder.ForPod(veleroNamespace, "job3").Labels(map[string]string{"job-name": "job3"}).ContainerStatuses(&corev1api.ContainerStatus{
+		State: corev1api.ContainerState{
+			Terminated: &corev1api.ContainerStateTerminated{},
 		},
 	}).Result()
 
@@ -671,9 +671,9 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 	}
 
-	jobPodSucceeded3 := builder.ForPod(veleroNamespace, "job4").Labels(map[string]string{"job-name": "job4"}).ContainerStatuses(&v1.ContainerStatus{
-		State: v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{},
+	jobPodSucceeded3 := builder.ForPod(veleroNamespace, "job4").Labels(map[string]string{"job-name": "job4"}).ContainerStatuses(&corev1api.ContainerStatus{
+		State: corev1api.ContainerState{
+			Terminated: &corev1api.ContainerStateTerminated{},
 		},
 	}).Result()
 
@@ -681,7 +681,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	batchv1.AddToScheme(scheme)
-	v1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	testCases := []struct {
 		name           string
@@ -867,35 +867,35 @@ func TestWaitAllJobsComplete(t *testing.T) {
 }
 
 func TestBuildJob(t *testing.T) {
-	deploy := appsv1.Deployment{
+	deploy := appsv1api.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "velero",
 			Namespace: "velero",
 		},
-		Spec: appsv1.DeploymentSpec{
-			Template: v1.PodTemplateSpec{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
+		Spec: appsv1api.DeploymentSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
 						{
 							Name:  "velero-repo-maintenance-container",
 							Image: "velero-image",
-							Env: []v1.EnvVar{
+							Env: []corev1api.EnvVar{
 								{
 									Name:  "test-name",
 									Value: "test-value",
 								},
 							},
-							EnvFrom: []v1.EnvFromSource{
+							EnvFrom: []corev1api.EnvFromSource{
 								{
-									ConfigMapRef: &v1.ConfigMapEnvSource{
-										LocalObjectReference: v1.LocalObjectReference{
+									ConfigMapRef: &corev1api.ConfigMapEnvSource{
+										LocalObjectReference: corev1api.LocalObjectReference{
 											Name: "test-configmap",
 										},
 									},
 								},
 								{
-									SecretRef: &v1.SecretEnvSource{
-										LocalObjectReference: v1.LocalObjectReference{
+									SecretRef: &corev1api.SecretEnvSource{
+										LocalObjectReference: corev1api.LocalObjectReference{
 											Name: "test-secret",
 										},
 									},
@@ -914,14 +914,14 @@ func TestBuildJob(t *testing.T) {
 	testCases := []struct {
 		name             string
 		m                *JobConfigs
-		deploy           *appsv1.Deployment
+		deploy           *appsv1api.Deployment
 		logLevel         logrus.Level
 		logFormat        *logging.FormatFlag
 		thirdPartyLabel  map[string]string
 		expectedJobName  string
 		expectedError    bool
-		expectedEnv      []v1.EnvVar
-		expectedEnvFrom  []v1.EnvFromSource
+		expectedEnv      []corev1api.EnvVar
+		expectedEnvFrom  []corev1api.EnvFromSource
 		expectedPodLabel map[string]string
 	}{
 		{
@@ -939,23 +939,23 @@ func TestBuildJob(t *testing.T) {
 			logFormat:       logging.NewFormatFlag(),
 			expectedJobName: "test-123-maintain-job",
 			expectedError:   false,
-			expectedEnv: []v1.EnvVar{
+			expectedEnv: []corev1api.EnvVar{
 				{
 					Name:  "test-name",
 					Value: "test-value",
 				},
 			},
-			expectedEnvFrom: []v1.EnvFromSource{
+			expectedEnvFrom: []corev1api.EnvFromSource{
 				{
-					ConfigMapRef: &v1.ConfigMapEnvSource{
-						LocalObjectReference: v1.LocalObjectReference{
+					ConfigMapRef: &corev1api.ConfigMapEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
 							Name: "test-configmap",
 						},
 					},
 				},
 				{
-					SecretRef: &v1.SecretEnvSource{
-						LocalObjectReference: v1.LocalObjectReference{
+					SecretRef: &corev1api.SecretEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
 							Name: "test-secret",
 						},
 					},
@@ -980,23 +980,23 @@ func TestBuildJob(t *testing.T) {
 			logFormat:       logging.NewFormatFlag(),
 			expectedJobName: "test-123-maintain-job",
 			expectedError:   false,
-			expectedEnv: []v1.EnvVar{
+			expectedEnv: []corev1api.EnvVar{
 				{
 					Name:  "test-name",
 					Value: "test-value",
 				},
 			},
-			expectedEnvFrom: []v1.EnvFromSource{
+			expectedEnvFrom: []corev1api.EnvFromSource{
 				{
-					ConfigMapRef: &v1.ConfigMapEnvSource{
-						LocalObjectReference: v1.LocalObjectReference{
+					ConfigMapRef: &corev1api.ConfigMapEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
 							Name: "test-configmap",
 						},
 					},
 				},
 				{
-					SecretRef: &v1.SecretEnvSource{
-						LocalObjectReference: v1.LocalObjectReference{
+					SecretRef: &corev1api.SecretEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
 							Name: "test-secret",
 						},
 					},
@@ -1052,7 +1052,7 @@ func TestBuildJob(t *testing.T) {
 				objs = append(objs, tc.deploy)
 			}
 			scheme := runtime.NewScheme()
-			_ = appsv1.AddToScheme(scheme)
+			_ = appsv1api.AddToScheme(scheme)
 			_ = velerov1api.AddToScheme(scheme)
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 
@@ -1077,21 +1077,21 @@ func TestBuildJob(t *testing.T) {
 				container := job.Spec.Template.Spec.Containers[0]
 				assert.Equal(t, "velero-repo-maintenance-container", container.Name)
 				assert.Equal(t, "velero-image", container.Image)
-				assert.Equal(t, v1.PullIfNotPresent, container.ImagePullPolicy)
+				assert.Equal(t, corev1api.PullIfNotPresent, container.ImagePullPolicy)
 
 				// Check container env
 				assert.Equal(t, tc.expectedEnv, container.Env)
 				assert.Equal(t, tc.expectedEnvFrom, container.EnvFrom)
 
 				// Check resources
-				expectedResources := v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse(tc.m.PodResources.CPURequest),
-						v1.ResourceMemory: resource.MustParse(tc.m.PodResources.MemoryRequest),
+				expectedResources := corev1api.ResourceRequirements{
+					Requests: corev1api.ResourceList{
+						corev1api.ResourceCPU:    resource.MustParse(tc.m.PodResources.CPURequest),
+						corev1api.ResourceMemory: resource.MustParse(tc.m.PodResources.MemoryRequest),
 					},
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse(tc.m.PodResources.CPULimit),
-						v1.ResourceMemory: resource.MustParse(tc.m.PodResources.MemoryLimit),
+					Limits: corev1api.ResourceList{
+						corev1api.ResourceCPU:    resource.MustParse(tc.m.PodResources.CPULimit),
+						corev1api.ResourceMemory: resource.MustParse(tc.m.PodResources.MemoryLimit),
 					},
 				}
 				assert.Equal(t, expectedResources, container.Resources)

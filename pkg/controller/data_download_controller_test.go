@@ -27,8 +27,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -101,7 +101,7 @@ func initDataDownloadReconcilerWithError(objects []runtime.Object, needError ...
 	if err != nil {
 		return nil, err
 	}
-	err = corev1.AddToScheme(scheme)
+	err = corev1api.AddToScheme(scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -142,23 +142,23 @@ func initDataDownloadReconcilerWithError(objects []runtime.Object, needError ...
 
 	dataPathMgr := datapath.NewManager(1)
 
-	return NewDataDownloadReconciler(fakeClient, nil, fakeKubeClient, dataPathMgr, nodeagent.RestorePVC{}, corev1.ResourceRequirements{}, "test-node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
+	return NewDataDownloadReconciler(fakeClient, nil, fakeKubeClient, dataPathMgr, nodeagent.RestorePVC{}, corev1api.ResourceRequirements{}, "test-node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
 }
 
 func TestDataDownloadReconcile(t *testing.T) {
-	daemonSet := &appsv1.DaemonSet{
+	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "velero",
 			Name:      "node-agent",
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
-			APIVersion: appsv1.SchemeGroupVersion.String(),
+			APIVersion: appsv1api.SchemeGroupVersion.String(),
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
 						{
 							Image: "fake-image",
 						},
@@ -173,7 +173,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 	tests := []struct {
 		name              string
 		dd                *velerov2alpha1api.DataDownload
-		targetPVC         *corev1.PersistentVolumeClaim
+		targetPVC         *corev1api.PersistentVolumeClaim
 		dataMgr           *datapath.Manager
 		needErrs          []bool
 		needCreateFSBR    bool
@@ -453,7 +453,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 						if test.isExposeErr {
 							ep.On("Expose", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("Error to expose restore exposer"))
 						} else if test.notNilExpose {
-							hostingPod := builder.ForPod("test-ns", "test-name").Volumes(&corev1.Volume{Name: "test-pvc"}).Result()
+							hostingPod := builder.ForPod("test-ns", "test-name").Volumes(&corev1api.Volume{Name: "test-pvc"}).Result()
 							hostingPod.ObjectMeta.SetUID("test-uid")
 							ep.On("GetExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: hostingPod, VolumeName: "test-pvc"}}, nil)
 						} else if test.isGetExposeErr {
@@ -707,13 +707,13 @@ func TestFindDataDownloadForPod(t *testing.T) {
 	tests := []struct {
 		name      string
 		du        *velerov2alpha1api.DataDownload
-		pod       *corev1.Pod
+		pod       *corev1api.Pod
 		checkFunc func(*velerov2alpha1api.DataDownload, []reconcile.Request)
 	}{
 		{
 			name: "find dataDownload for pod",
 			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: dataDownloadName}).Status(corev1.PodStatus{Phase: corev1.PodRunning}).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: dataDownloadName}).Status(corev1api.PodStatus{Phase: corev1api.PodRunning}).Result(),
 			checkFunc: func(du *velerov2alpha1api.DataDownload, requests []reconcile.Request) {
 				// Assert that the function returns a single request
 				assert.Len(t, requests, 1)
@@ -969,27 +969,27 @@ func (dt *ddResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler,
 	return dt.resumeErr
 }
 
-func (dt *ddResumeTestHelper) Expose(context.Context, corev1.ObjectReference, exposer.GenericRestoreExposeParam) error {
+func (dt *ddResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, exposer.GenericRestoreExposeParam) error {
 	return nil
 }
 
-func (dt *ddResumeTestHelper) GetExposed(context.Context, corev1.ObjectReference, kbclient.Client, string, time.Duration) (*exposer.ExposeResult, error) {
+func (dt *ddResumeTestHelper) GetExposed(context.Context, corev1api.ObjectReference, kbclient.Client, string, time.Duration) (*exposer.ExposeResult, error) {
 	return dt.exposeResult, dt.getExposeErr
 }
 
-func (dt *ddResumeTestHelper) PeekExposed(context.Context, corev1.ObjectReference) error {
+func (dt *ddResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
 	return nil
 }
 
-func (dt *ddResumeTestHelper) DiagnoseExpose(context.Context, corev1.ObjectReference) string {
+func (dt *ddResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (dt *ddResumeTestHelper) RebindVolume(context.Context, corev1.ObjectReference, string, string, time.Duration) error {
+func (dt *ddResumeTestHelper) RebindVolume(context.Context, corev1api.ObjectReference, string, string, time.Duration) error {
 	return nil
 }
 
-func (dt *ddResumeTestHelper) CleanUp(context.Context, corev1.ObjectReference) {}
+func (dt *ddResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference) {}
 
 func (dt *ddResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
 	datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
@@ -1153,7 +1153,7 @@ func TestResumeCancellableRestore(t *testing.T) {
 			dd:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Node("node-1").Result(),
 			exposeResult: &exposer.ExposeResult{
 				ByPod: exposer.ExposeByPod{
-					HostingPod: &corev1.Pod{},
+					HostingPod: &corev1api.Pod{},
 				},
 			},
 			mockInit:       true,
@@ -1166,7 +1166,7 @@ func TestResumeCancellableRestore(t *testing.T) {
 			dd:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Node("node-1").Result(),
 			exposeResult: &exposer.ExposeResult{
 				ByPod: exposer.ExposeByPod{
-					HostingPod: &corev1.Pod{},
+					HostingPod: &corev1api.Pod{},
 				},
 			},
 			mockInit:        true,
@@ -1180,7 +1180,7 @@ func TestResumeCancellableRestore(t *testing.T) {
 			dd:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Node("node-1").Result(),
 			exposeResult: &exposer.ExposeResult{
 				ByPod: exposer.ExposeByPod{
-					HostingPod: &corev1.Pod{},
+					HostingPod: &corev1api.Pod{},
 				},
 			},
 			mockInit:  true,

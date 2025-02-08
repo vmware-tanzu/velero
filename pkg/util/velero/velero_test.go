@@ -21,23 +21,23 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestGetNodeSelectorFromVeleroServer(t *testing.T) {
 	tests := []struct {
 		name   string
-		deploy *appsv1.Deployment
+		deploy *appsv1api.Deployment
 		want   map[string]string
 	}{
 		{
 			name: "no node selector",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
 							NodeSelector: map[string]string{},
 						},
 					},
@@ -47,10 +47,10 @@ func TestGetNodeSelectorFromVeleroServer(t *testing.T) {
 		},
 		{
 			name: "node selector",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
 							NodeSelector: map[string]string{
 								"foo": "bar",
 							},
@@ -82,29 +82,29 @@ func TestGetNodeSelectorFromVeleroServer(t *testing.T) {
 func TestGetTolerationsFromVeleroServer(t *testing.T) {
 	tests := []struct {
 		name   string
-		deploy *appsv1.Deployment
-		want   []v1.Toleration
+		deploy *appsv1api.Deployment
+		want   []corev1api.Toleration
 	}{
 		{
 			name: "no tolerations",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Tolerations: []v1.Toleration{},
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Tolerations: []corev1api.Toleration{},
 						},
 					},
 				},
 			},
-			want: []v1.Toleration{},
+			want: []corev1api.Toleration{},
 		},
 		{
 			name: "tolerations",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Tolerations: []v1.Toleration{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Tolerations: []corev1api.Toleration{
 								{
 									Key:      "foo",
 									Operator: "Exists",
@@ -114,7 +114,7 @@ func TestGetTolerationsFromVeleroServer(t *testing.T) {
 					},
 				},
 			},
-			want: []v1.Toleration{
+			want: []corev1api.Toleration{
 				{
 					Key:      "foo",
 					Operator: "Exists",
@@ -141,15 +141,15 @@ func TestGetTolerationsFromVeleroServer(t *testing.T) {
 func TestGetAffinityFromVeleroServer(t *testing.T) {
 	tests := []struct {
 		name   string
-		deploy *appsv1.Deployment
-		want   *v1.Affinity
+		deploy *appsv1api.Deployment
+		want   *corev1api.Affinity
 	}{
 		{
 			name: "no affinity",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
 							Affinity: nil,
 						},
 					},
@@ -159,16 +159,16 @@ func TestGetAffinityFromVeleroServer(t *testing.T) {
 		},
 		{
 			name: "affinity",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Affinity: &v1.Affinity{
-								NodeAffinity: &v1.NodeAffinity{
-									RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-										NodeSelectorTerms: []v1.NodeSelectorTerm{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Affinity: &corev1api.Affinity{
+								NodeAffinity: &corev1api.NodeAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+										NodeSelectorTerms: []corev1api.NodeSelectorTerm{
 											{
-												MatchExpressions: []v1.NodeSelectorRequirement{
+												MatchExpressions: []corev1api.NodeSelectorRequirement{
 													{
 														Key:      "foo",
 														Operator: "In",
@@ -184,12 +184,12 @@ func TestGetAffinityFromVeleroServer(t *testing.T) {
 					},
 				},
 			},
-			want: &v1.Affinity{
-				NodeAffinity: &v1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{
+			want: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
 							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
 									{
 										Key:      "foo",
 										Operator: "In",
@@ -248,35 +248,35 @@ func TestGetAffinityFromVeleroServer(t *testing.T) {
 func TestGetEnvVarsFromVeleroServer(t *testing.T) {
 	tests := []struct {
 		name   string
-		deploy *appsv1.Deployment
-		want   []v1.EnvVar
+		deploy *appsv1api.Deployment
+		want   []corev1api.EnvVar
 	}{
 		{
 			name: "no env vars",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
 								{
-									Env: []v1.EnvVar{},
+									Env: []corev1api.EnvVar{},
 								},
 							},
 						},
 					},
 				},
 			},
-			want: []v1.EnvVar{},
+			want: []corev1api.EnvVar{},
 		},
 		{
 			name: "env vars",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
 								{
-									Env: []v1.EnvVar{
+									Env: []corev1api.EnvVar{
 										{
 											Name:  "foo",
 											Value: "bar",
@@ -288,7 +288,7 @@ func TestGetEnvVarsFromVeleroServer(t *testing.T) {
 					},
 				},
 			},
-			want: []v1.EnvVar{
+			want: []corev1api.EnvVar{
 				{
 					Name:  "foo",
 					Value: "bar",
@@ -315,38 +315,38 @@ func TestGetEnvVarsFromVeleroServer(t *testing.T) {
 func TestGetEnvFromSourcesFromVeleroServer(t *testing.T) {
 	tests := []struct {
 		name     string
-		deploy   *appsv1.Deployment
-		expected []v1.EnvFromSource
+		deploy   *appsv1api.Deployment
+		expected []corev1api.EnvFromSource
 	}{
 		{
 			name: "no env vars",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
 								{
-									EnvFrom: []v1.EnvFromSource{},
+									EnvFrom: []corev1api.EnvFromSource{},
 								},
 							},
 						},
 					},
 				},
 			},
-			expected: []v1.EnvFromSource{},
+			expected: []corev1api.EnvFromSource{},
 		},
 		{
 			name: "configmap",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
 								{
-									EnvFrom: []v1.EnvFromSource{
+									EnvFrom: []corev1api.EnvFromSource{
 										{
-											ConfigMapRef: &v1.ConfigMapEnvSource{
-												LocalObjectReference: v1.LocalObjectReference{
+											ConfigMapRef: &corev1api.ConfigMapEnvSource{
+												LocalObjectReference: corev1api.LocalObjectReference{
 													Name: "foo",
 												},
 											},
@@ -358,10 +358,10 @@ func TestGetEnvFromSourcesFromVeleroServer(t *testing.T) {
 					},
 				},
 			},
-			expected: []v1.EnvFromSource{
+			expected: []corev1api.EnvFromSource{
 				{
-					ConfigMapRef: &v1.ConfigMapEnvSource{
-						LocalObjectReference: v1.LocalObjectReference{
+					ConfigMapRef: &corev1api.ConfigMapEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
 							Name: "foo",
 						},
 					},
@@ -370,16 +370,16 @@ func TestGetEnvFromSourcesFromVeleroServer(t *testing.T) {
 		},
 		{
 			name: "secret",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
 								{
-									EnvFrom: []v1.EnvFromSource{
+									EnvFrom: []corev1api.EnvFromSource{
 										{
-											SecretRef: &v1.SecretEnvSource{
-												LocalObjectReference: v1.LocalObjectReference{
+											SecretRef: &corev1api.SecretEnvSource{
+												LocalObjectReference: corev1api.LocalObjectReference{
 													Name: "foo",
 												},
 											},
@@ -391,10 +391,10 @@ func TestGetEnvFromSourcesFromVeleroServer(t *testing.T) {
 					},
 				},
 			},
-			expected: []v1.EnvFromSource{
+			expected: []corev1api.EnvFromSource{
 				{
-					SecretRef: &v1.SecretEnvSource{
-						LocalObjectReference: v1.LocalObjectReference{
+					SecretRef: &corev1api.SecretEnvSource{
+						LocalObjectReference: corev1api.LocalObjectReference{
 							Name: "foo",
 						},
 					},
@@ -414,35 +414,35 @@ func TestGetEnvFromSourcesFromVeleroServer(t *testing.T) {
 func TestGetVolumeMountsFromVeleroServer(t *testing.T) {
 	tests := []struct {
 		name   string
-		deploy *appsv1.Deployment
-		want   []v1.VolumeMount
+		deploy *appsv1api.Deployment
+		want   []corev1api.VolumeMount
 	}{
 		{
 			name: "no volume mounts",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
 								{
-									VolumeMounts: []v1.VolumeMount{},
+									VolumeMounts: []corev1api.VolumeMount{},
 								},
 							},
 						},
 					},
 				},
 			},
-			want: []v1.VolumeMount{},
+			want: []corev1api.VolumeMount{},
 		},
 		{
 			name: "volume mounts",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
 								{
-									VolumeMounts: []v1.VolumeMount{
+									VolumeMounts: []corev1api.VolumeMount{
 										{
 											Name:      "foo",
 											MountPath: "/bar",
@@ -454,7 +454,7 @@ func TestGetVolumeMountsFromVeleroServer(t *testing.T) {
 					},
 				},
 			},
-			want: []v1.VolumeMount{
+			want: []corev1api.VolumeMount{
 				{
 					Name:      "foo",
 					MountPath: "/bar",
@@ -481,29 +481,29 @@ func TestGetVolumeMountsFromVeleroServer(t *testing.T) {
 func TestGetVolumesFromVeleroServer(t *testing.T) {
 	tests := []struct {
 		name   string
-		deploy *appsv1.Deployment
-		want   []v1.Volume
+		deploy *appsv1api.Deployment
+		want   []corev1api.Volume
 	}{
 		{
 			name: "no volumes",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Volumes: []v1.Volume{},
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Volumes: []corev1api.Volume{},
 						},
 					},
 				},
 			},
-			want: []v1.Volume{},
+			want: []corev1api.Volume{},
 		},
 		{
 			name: "volumes",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Volumes: []v1.Volume{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Volumes: []corev1api.Volume{
 								{
 									Name: "foo",
 								},
@@ -512,7 +512,7 @@ func TestGetVolumesFromVeleroServer(t *testing.T) {
 					},
 				},
 			},
-			want: []v1.Volume{
+			want: []corev1api.Volume{
 				{
 					Name: "foo",
 				},
@@ -538,15 +538,15 @@ func TestGetVolumesFromVeleroServer(t *testing.T) {
 func TestGetServiceAccountFromVeleroServer(t *testing.T) {
 	tests := []struct {
 		name   string
-		deploy *appsv1.Deployment
+		deploy *appsv1api.Deployment
 		want   string
 	}{
 		{
 			name: "no service account",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
 							ServiceAccountName: "",
 						},
 					},
@@ -556,10 +556,10 @@ func TestGetServiceAccountFromVeleroServer(t *testing.T) {
 		},
 		{
 			name: "service account",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
 							ServiceAccountName: "foo",
 						},
 					},
@@ -582,16 +582,16 @@ func TestGetServiceAccountFromVeleroServer(t *testing.T) {
 func TestGetVeleroServerImage(t *testing.T) {
 	tests := []struct {
 		name   string
-		deploy *appsv1.Deployment
+		deploy *appsv1api.Deployment
 		want   string
 	}{
 		{
 			name: "velero server image",
-			deploy: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
 								{
 									Image: "velero/velero:latest",
 								},
@@ -617,14 +617,14 @@ func TestGetVeleroServerImage(t *testing.T) {
 func TestGetVeleroServerLables(t *testing.T) {
 	tests := []struct {
 		name       string
-		deployment *appsv1.Deployment
+		deployment *appsv1api.Deployment
 		expected   map[string]string
 	}{
 		{
 			name: "Empty Labels",
-			deployment: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
+			deployment: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{},
 						},
@@ -635,9 +635,9 @@ func TestGetVeleroServerLables(t *testing.T) {
 		},
 		{
 			name: "Non-empty Labels",
-			deployment: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
+			deployment: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"app":       "velero",
@@ -666,14 +666,14 @@ func TestGetVeleroServerLables(t *testing.T) {
 func TestGetVeleroServerAnnotations(t *testing.T) {
 	tests := []struct {
 		name       string
-		deployment *appsv1.Deployment
+		deployment *appsv1api.Deployment
 		expected   map[string]string
 	}{
 		{
 			name: "Empty Labels",
-			deployment: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
+			deployment: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{},
 						},
@@ -684,9 +684,9 @@ func TestGetVeleroServerAnnotations(t *testing.T) {
 		},
 		{
 			name: "Non-empty Labels",
-			deployment: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
+			deployment: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"app":       "velero",
@@ -715,19 +715,19 @@ func TestGetVeleroServerAnnotations(t *testing.T) {
 func TestGetVeleroServerLabelValue(t *testing.T) {
 	tests := []struct {
 		name       string
-		deployment *appsv1.Deployment
+		deployment *appsv1api.Deployment
 		expected   string
 	}{
 		{
 			name:       "nil Labels",
-			deployment: &appsv1.Deployment{},
+			deployment: &appsv1api.Deployment{},
 			expected:   "",
 		},
 		{
 			name: "no label key",
-			deployment: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
+			deployment: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{},
 						},
@@ -738,9 +738,9 @@ func TestGetVeleroServerLabelValue(t *testing.T) {
 		},
 		{
 			name: "with label key",
-			deployment: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
+			deployment: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"fake-key": "fake-value"},
 						},

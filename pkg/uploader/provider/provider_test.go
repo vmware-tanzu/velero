@@ -23,7 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
@@ -48,7 +48,7 @@ func TestNewUploaderProvider(t *testing.T) {
 	bsl := &velerov1api.BackupStorageLocation{}
 	backupRepo := &velerov1api.BackupRepository{}
 	credGetter := &credentials.CredentialGetter{}
-	repoKeySelector := &v1.SecretKeySelector{}
+	repoKeySelector := &corev1api.SecretKeySelector{}
 	log := logrus.New()
 
 	testCases := []NewUploaderProviderTestCase{
@@ -84,7 +84,7 @@ func TestNewUploaderProvider(t *testing.T) {
 		t.Run(testCase.Description, func(t *testing.T) {
 			if testCase.needFromFile {
 				mockFileGetter := &mocks.FileStore{}
-				mockFileGetter.On("Path", &v1.SecretKeySelector{}).Return("", nil)
+				mockFileGetter.On("Path", &corev1api.SecretKeySelector{}).Return("", nil)
 				credGetter.FromFile = mockFileGetter
 			}
 			_, err := NewUploaderProvider(ctx, client, testCase.UploaderType, testCase.RequestorType, repoIdentifier, bsl, backupRepo, credGetter, repoKeySelector, log)

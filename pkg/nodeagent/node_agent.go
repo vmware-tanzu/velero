@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -137,7 +137,7 @@ func isRunningInNode(ctx context.Context, namespace string, nodeName string, crC
 		return errors.New("node name is empty")
 	}
 
-	pods := new(v1.PodList)
+	pods := new(corev1api.PodList)
 	parsedSelector, err := labels.Parse(fmt.Sprintf("role=%s", nodeAgentRole))
 	if err != nil {
 		return errors.Wrap(err, "fail to parse selector")
@@ -166,7 +166,7 @@ func isRunningInNode(ctx context.Context, namespace string, nodeName string, crC
 	return errors.Errorf("daemonset pod not found in running state in node %s", nodeName)
 }
 
-func GetPodSpec(ctx context.Context, kubeClient kubernetes.Interface, namespace string, osType string) (*v1.PodSpec, error) {
+func GetPodSpec(ctx context.Context, kubeClient kubernetes.Interface, namespace string, osType string) (*corev1api.PodSpec, error) {
 	dsName := daemonSet
 	if osType == kube.NodeOSWindows {
 		dsName = daemonsetWindows

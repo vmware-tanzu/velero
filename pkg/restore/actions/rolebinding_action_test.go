@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	rbac "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -73,15 +73,15 @@ func TestRoleBindingActionExecute(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			subjects := []rbac.Subject{}
+			subjects := []rbacv1.Subject{}
 
 			for _, ns := range tc.namespaces {
-				subjects = append(subjects, rbac.Subject{
+				subjects = append(subjects, rbacv1.Subject{
 					Namespace: ns,
 				})
 			}
 
-			roleBinding := rbac.RoleBinding{
+			roleBinding := rbacv1.RoleBinding{
 				Subjects: subjects,
 			}
 
@@ -100,7 +100,7 @@ func TestRoleBindingActionExecute(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			var resRoleBinding *rbac.RoleBinding
+			var resRoleBinding *rbacv1.RoleBinding
 			err = runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), &resRoleBinding)
 			require.NoError(t, err)
 

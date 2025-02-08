@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clocktesting "k8s.io/utils/clock/testing"
@@ -790,7 +790,7 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		},
 		Spec: velerov1api.RestoreSpec{
 			BackupName: "backup-1",
-			ResourceModifier: &corev1.TypedLocalObjectReference{
+			ResourceModifier: &corev1api.TypedLocalObjectReference{
 				Kind: resourcemodifiers.ConfigmapRefType,
 				Name: "test-configmap",
 			},
@@ -820,14 +820,14 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		},
 		Spec: velerov1api.RestoreSpec{
 			BackupName: "backup-1",
-			ResourceModifier: &corev1.TypedLocalObjectReference{
+			ResourceModifier: &corev1api.TypedLocalObjectReference{
 				Kind: resourcemodifiers.ConfigmapRefType,
 				Name: "test-configmap",
 			},
 		},
 	}
 
-	cm1 := &corev1.ConfigMap{
+	cm1 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: velerov1api.DefaultNamespace,
@@ -848,7 +848,7 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		},
 		Spec: velerov1api.RestoreSpec{
 			BackupName: "backup-1",
-			ResourceModifier: &corev1.TypedLocalObjectReference{
+			ResourceModifier: &corev1api.TypedLocalObjectReference{
 				// intentional to ensure case insensitivity works as expected
 				Kind: "confIGMaP",
 				Name: "test-configmap-invalid",
@@ -856,7 +856,7 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		},
 	}
 
-	invalidVersionCm := &corev1.ConfigMap{
+	invalidVersionCm := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap-invalid",
 			Namespace: velerov1api.DefaultNamespace,
@@ -877,14 +877,14 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		},
 		Spec: velerov1api.RestoreSpec{
 			BackupName: "backup-1",
-			ResourceModifier: &corev1.TypedLocalObjectReference{
+			ResourceModifier: &corev1api.TypedLocalObjectReference{
 				Kind: resourcemodifiers.ConfigmapRefType,
 				Name: "test-configmap-invalid-operator",
 			},
 		},
 	}
 
-	invalidOperatorCm := &corev1.ConfigMap{
+	invalidOperatorCm := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap-invalid-operator",
 			Namespace: velerov1api.DefaultNamespace,

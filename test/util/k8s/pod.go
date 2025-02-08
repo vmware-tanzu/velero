@@ -21,18 +21,17 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
-func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList []string, pvcAnn, ann map[string]string) (*corev1.Pod, error) {
+func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList []string, pvcAnn, ann map[string]string) (*corev1api.Pod, error) {
 	if pvcName != "" && len(volumeNameList) != 1 {
 		return nil, errors.New("Volume name list should contain only 1 since PVC name is not empty")
 	}
-	volumes := []corev1.Volume{}
+	volumes := []corev1api.Volume{}
 	for _, volume := range volumeNameList {
 		var _pvcName string
 		if pvcName == "" {
@@ -45,10 +44,10 @@ func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList [
 			return nil, err
 		}
 
-		volumes = append(volumes, corev1.Volume{
+		volumes = append(volumes, corev1api.Volume{
 			Name: volume,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+			VolumeSource: corev1api.VolumeSource{
+				PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 					ClaimName: pvc.Name,
 					ReadOnly:  false,
 				},
@@ -56,41 +55,41 @@ func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList [
 		})
 	}
 
-	vmList := []corev1.VolumeMount{}
+	vmList := []corev1api.VolumeMount{}
 	for _, v := range volumes {
-		vmList = append(vmList, corev1.VolumeMount{
+		vmList = append(vmList, corev1api.VolumeMount{
 			Name:      v.Name,
 			MountPath: "/" + v.Name,
 		})
 	}
 
-	p := &corev1.Pod{
+	p := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: ann,
 		},
-		Spec: corev1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{
+		Spec: corev1api.PodSpec{
+			SecurityContext: &corev1api.PodSecurityContext{
 				FSGroup:             func(i int64) *int64 { return &i }(65534),
-				FSGroupChangePolicy: func(policy v1.PodFSGroupChangePolicy) *v1.PodFSGroupChangePolicy { return &policy }(v1.FSGroupChangeAlways),
+				FSGroupChangePolicy: func(policy corev1api.PodFSGroupChangePolicy) *corev1api.PodFSGroupChangePolicy { return &policy }(corev1api.FSGroupChangeAlways),
 			},
-			Containers: []corev1.Container{
+			Containers: []corev1api.Container{
 				{
 					Name:         name,
 					Image:        "gcr.io/velero-gcp/busybox",
 					Command:      []string{"sleep", "3600"},
 					VolumeMounts: vmList,
 					// Make pod obeys the restricted pod security standards.
-					SecurityContext: &v1.SecurityContext{
+					SecurityContext: &corev1api.SecurityContext{
 						AllowPrivilegeEscalation: boolptr.False(),
-						Capabilities: &v1.Capabilities{
-							Drop: []v1.Capability{"ALL"},
+						Capabilities: &corev1api.Capabilities{
+							Drop: []corev1api.Capability{"ALL"},
 						},
 						RunAsNonRoot: boolptr.True(),
 						RunAsUser:    func(i int64) *int64 { return &i }(65534),
 						RunAsGroup:   func(i int64) *int64 { return &i }(65534),
-						SeccompProfile: &v1.SeccompProfile{
-							Type: v1.SeccompProfileTypeRuntimeDefault,
+						SeccompProfile: &corev1api.SeccompProfile{
+							Type: corev1api.SeccompProfileTypeRuntimeDefault,
 						},
 					},
 				},
@@ -102,11 +101,11 @@ func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList [
 	return client.ClientGo.CoreV1().Pods(ns).Create(context.TODO(), p, metav1.CreateOptions{})
 }
 
-func GetPod(ctx context.Context, client TestClient, namespace string, pod string) (*corev1.Pod, error) {
+func GetPod(ctx context.Context, client TestClient, namespace string, pod string) (*corev1api.Pod, error) {
 	return client.ClientGo.CoreV1().Pods(namespace).Get(ctx, pod, metav1.GetOptions{})
 }
 
-func AddAnnotationToPod(ctx context.Context, client TestClient, namespace, podName string, ann map[string]string) (*corev1.Pod, error) {
+func AddAnnotationToPod(ctx context.Context, client TestClient, namespace, podName string, ann map[string]string) (*corev1api.Pod, error) {
 	newPod, err := GetPod(ctx, client, namespace, podName)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Fail to ge pod %s in namespace %s", podName, namespace))
@@ -125,6 +124,6 @@ func AddAnnotationToPod(ctx context.Context, client TestClient, namespace, podNa
 	return client.ClientGo.CoreV1().Pods(namespace).Update(ctx, newPod, metav1.UpdateOptions{})
 }
 
-func ListPods(ctx context.Context, client TestClient, namespace string) (*corev1.PodList, error) {
+func ListPods(ctx context.Context, client TestClient, namespace string) (*corev1api.PodList, error) {
 	return client.ClientGo.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 }

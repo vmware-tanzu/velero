@@ -23,7 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,7 +41,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 	tests := []struct {
 		name             string
 		podOrObj         any
-		configMap        *corev1.ConfigMap
+		configMap        *corev1api.ConfigMap
 		freshedImageName string
 		imageNameSlice   []string
 		want             any
@@ -50,7 +50,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 		{
 			name: "a valid mapping with spaces for a new image repository is applied correctly",
 			podOrObj: builder.ForPod("default", "pod1").ObjectMeta().
-				Containers(&corev1.Container{
+				Containers(&corev1api.Container{
 					Name:  "container1",
 					Image: "1.1.1.1:5000/abc:test",
 				}).Result(),
@@ -65,7 +65,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 		{
 			name: "a valid mapping for a new image repository is applied correctly",
 			podOrObj: builder.ForPod("default", "pod1").ObjectMeta().
-				Containers(&corev1.Container{
+				Containers(&corev1api.Container{
 					Name:  "container2",
 					Image: "1.1.1.1:5000/abc:test",
 				}).Result(),
@@ -80,7 +80,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 		{
 			name: "a valid mapping for a new image name is applied correctly",
 			podOrObj: builder.ForPod("default", "pod1").ObjectMeta().
-				Containers(&corev1.Container{
+				Containers(&corev1api.Container{
 					Name:  "container3",
 					Image: "1.1.1.1:5000/abc:test",
 				}).Result(),
@@ -95,7 +95,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 		{
 			name: "a valid mapping for a new image repository port is applied correctly",
 			podOrObj: builder.ForPod("default", "pod1").ObjectMeta().
-				Containers(&corev1.Container{
+				Containers(&corev1api.Container{
 					Name:  "container4",
 					Image: "1.1.1.1:5000/abc:test",
 				}).Result(),
@@ -110,7 +110,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 		{
 			name: "a valid mapping for a new image tag is applied correctly",
 			podOrObj: builder.ForPod("default", "pod1").ObjectMeta().
-				Containers(&corev1.Container{
+				Containers(&corev1api.Container{
 					Name:  "container5",
 					Image: "1.1.1.1:5000/abc:test",
 				}).Result(),
@@ -125,7 +125,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 		{
 			name: "image name contains more than one part that matching the replacing words.",
 			podOrObj: builder.ForPod("default", "pod1").ObjectMeta().
-				Containers(&corev1.Container{
+				Containers(&corev1api.Container{
 					Name:  "container6",
 					Image: "dev/image1:dev",
 				}).Result(),
@@ -170,7 +170,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 				assert.EqualError(t, err, tc.wantErr.Error())
 			default:
 				assert.NoError(t, err)
-				pod := new(corev1.Pod)
+				pod := new(corev1api.Pod)
 				err = runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), pod)
 				require.NoError(t, err)
 				assert.Equal(t, tc.want, pod.Spec.Containers[0].Image)

@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -236,13 +236,13 @@ func TestGetPassword(t *testing.T) {
 	testCases := []struct {
 		name           string
 		empytSecret    bool
-		credGetterFunc func(*mocks.SecretStore, *v1.SecretKeySelector)
+		credGetterFunc func(*mocks.SecretStore, *corev1api.SecretKeySelector)
 		expectError    bool
 		expectedPass   string
 	}{
 		{
 			name: "valid credentials interface",
-			credGetterFunc: func(ss *mocks.SecretStore, selector *v1.SecretKeySelector) {
+			credGetterFunc: func(ss *mocks.SecretStore, selector *corev1api.SecretKeySelector) {
 				ss.On("Get", selector).Return("test", nil)
 			},
 			expectError:  false,
@@ -256,7 +256,7 @@ func TestGetPassword(t *testing.T) {
 		},
 		{
 			name: "ErrorGettingPassword",
-			credGetterFunc: func(ss *mocks.SecretStore, selector *v1.SecretKeySelector) {
+			credGetterFunc: func(ss *mocks.SecretStore, selector *corev1api.SecretKeySelector) {
 				ss.On("Get", selector).Return("", errors.New("error getting password"))
 			},
 			expectError:  true,
@@ -272,7 +272,7 @@ func TestGetPassword(t *testing.T) {
 			if !tc.empytSecret {
 				credGetter.FromSecret = mockCredGetter
 			}
-			repoKeySelector := &v1.SecretKeySelector{LocalObjectReference: v1.LocalObjectReference{Name: "velero-repo-credentials"}, Key: "repository-password"}
+			repoKeySelector := &corev1api.SecretKeySelector{LocalObjectReference: corev1api.LocalObjectReference{Name: "velero-repo-credentials"}, Key: "repository-password"}
 
 			if tc.credGetterFunc != nil {
 				tc.credGetterFunc(mockCredGetter, repoKeySelector)

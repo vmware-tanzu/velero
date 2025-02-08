@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -36,16 +36,16 @@ import (
 func TestGetPodVolumeHostPath(t *testing.T) {
 	tests := []struct {
 		name              string
-		getVolumeDirFunc  func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (string, error)
-		getVolumeModeFunc func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (uploader.PersistentVolumeMode, error)
+		getVolumeDirFunc  func(context.Context, logrus.FieldLogger, *corev1api.Pod, string, ctrlclient.Client) (string, error)
+		getVolumeModeFunc func(context.Context, logrus.FieldLogger, *corev1api.Pod, string, ctrlclient.Client) (uploader.PersistentVolumeMode, error)
 		pathMatchFunc     func(string, filesystem.Interface, logrus.FieldLogger) (string, error)
-		pod               *corev1.Pod
+		pod               *corev1api.Pod
 		pvc               string
 		err               string
 	}{
 		{
 			name: "get volume dir fail",
-			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (string, error) {
+			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1api.Pod, string, ctrlclient.Client) (string, error) {
 				return "", errors.New("fake-error-1")
 			},
 			pod: builder.ForPod(velerov1api.DefaultNamespace, "fake-pod-1").Result(),
@@ -54,10 +54,10 @@ func TestGetPodVolumeHostPath(t *testing.T) {
 		},
 		{
 			name: "single path match fail",
-			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (string, error) {
+			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1api.Pod, string, ctrlclient.Client) (string, error) {
 				return "", nil
 			},
-			getVolumeModeFunc: func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (uploader.PersistentVolumeMode, error) {
+			getVolumeModeFunc: func(context.Context, logrus.FieldLogger, *corev1api.Pod, string, ctrlclient.Client) (uploader.PersistentVolumeMode, error) {
 				return uploader.PersistentVolumeFilesystem, nil
 			},
 			pathMatchFunc: func(string, filesystem.Interface, logrus.FieldLogger) (string, error) {
@@ -69,7 +69,7 @@ func TestGetPodVolumeHostPath(t *testing.T) {
 		},
 		{
 			name: "get block volume dir success",
-			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (
+			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1api.Pod, string, ctrlclient.Client) (
 				string, error) {
 				return "fake-pvc-1", nil
 			},

@@ -30,7 +30,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	storagev1api "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -170,7 +170,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		cancelFunc()
 		return nil, err
 	}
-	if err := v1.AddToScheme(scheme); err != nil {
+	if err := corev1api.AddToScheme(scheme); err != nil {
 		cancelFunc()
 		return nil, err
 	}
@@ -184,7 +184,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 	// use a field selector to filter to only pods scheduled on this node.
 	cacheOption := cache.Options{
 		ByObject: map[ctrlclient.Object]cache.ByObject{
-			&v1.Pod{}: {
+			&corev1api.Pod{}: {
 				Field: fields.Set{"spec.nodeName": nodeName}.AsSelector(),
 			},
 			&velerov1api.PodVolumeBackup{}: {
@@ -199,7 +199,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 			&velerov2alpha1api.DataDownload{}: {
 				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
 			},
-			&v1.Event{}: {
+			&corev1api.Event{}: {
 				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
 			},
 		},
@@ -328,7 +328,7 @@ func (s *nodeAgentServer) run() {
 		s.logger.Infof("Using customized backupPVC config %v", backupPVCConfig)
 	}
 
-	podResources := v1.ResourceRequirements{}
+	podResources := corev1api.ResourceRequirements{}
 	if s.dataPathConfigs != nil && s.dataPathConfigs.PodResources != nil {
 		if res, err := kube.ParseResourceRequirements(s.dataPathConfigs.PodResources.CPURequest, s.dataPathConfigs.PodResources.MemoryRequest, s.dataPathConfigs.PodResources.CPULimit, s.dataPathConfigs.PodResources.MemoryLimit); err != nil {
 			s.logger.WithError(err).Warn("Pod resource requirements are invalid, ignore")
@@ -391,7 +391,7 @@ func (s *nodeAgentServer) run() {
 }
 
 func (s *nodeAgentServer) waitCacheForResume() error {
-	podInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &v1.Pod{})
+	podInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &corev1api.Pod{})
 	if err != nil {
 		return errors.Wrap(err, "error getting pod informer")
 	}
@@ -444,7 +444,7 @@ func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface
 
 		// if the pod is a mirror pod, the directory name is the hash value of the
 		// mirror pod annotation
-		if hash, ok := pod.GetAnnotations()[v1.MirrorPodAnnotationKey]; ok {
+		if hash, ok := pod.GetAnnotations()[corev1api.MirrorPodAnnotationKey]; ok {
 			dirName = hash
 		}
 
@@ -517,7 +517,7 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 			continue
 		}
 
-		pod := &v1.Pod{}
+		pod := &corev1api.Pod{}
 		if err := client.Get(s.ctx, types.NamespacedName{
 			Namespace: pvr.Spec.Pod.Namespace,
 			Name:      pvr.Spec.Pod.Name,

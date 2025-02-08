@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
@@ -292,7 +292,7 @@ type MockCredentialGetter struct {
 	mock.Mock
 }
 
-func (m *MockCredentialGetter) Path(selector *v1.SecretKeySelector) (string, error) {
+func (m *MockCredentialGetter) Path(selector *corev1api.SecretKeySelector) (string, error) {
 	args := m.Called(selector)
 	return args.Get(0).(string), args.Error(1)
 }
@@ -301,14 +301,14 @@ func TestNewResticUploaderProvider(t *testing.T) {
 	testCases := []struct {
 		name                     string
 		emptyBSL                 bool
-		mockCredFunc             func(*MockCredentialGetter, *v1.SecretKeySelector)
+		mockCredFunc             func(*MockCredentialGetter, *corev1api.SecretKeySelector)
 		resticCmdEnvFunc         func(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error)
 		resticTempCACertFileFunc func(caCert []byte, bsl string, fs filesystem.Interface) (string, error)
 		checkFunc                func(provider Provider, err error)
 	}{
 		{
 			name: "No error in creating temp credentials file",
-			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
+			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
 			checkFunc: func(provider Provider, err error) {
@@ -317,7 +317,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			},
 		}, {
 			name: "Error in creating temp credentials file",
-			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
+			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("", errors.New("error creating temp credentials file"))
 			},
 			checkFunc: func(provider Provider, err error) {
@@ -326,7 +326,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			},
 		}, {
 			name: "ObjectStorage with CACert present and creating CACert file failed",
-			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
+			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
 			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
@@ -338,7 +338,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			},
 		}, {
 			name: "Generating repository cmd failed",
-			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
+			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
 			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
@@ -353,7 +353,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			},
 		}, {
 			name: "New provider with not nil bsl",
-			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
+			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
 			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
@@ -370,7 +370,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 		{
 			name:     "New provider with nil bsl",
 			emptyBSL: true,
-			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
+			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
 			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
@@ -393,7 +393,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 				bsl = builder.ForBackupStorageLocation("test-ns", "test-name").CACert([]byte("my-cert")).Result()
 			}
 			credGetter := &credentials.CredentialGetter{}
-			repoKeySelector := &v1.SecretKeySelector{}
+			repoKeySelector := &corev1api.SecretKeySelector{}
 			log := logrus.New()
 
 			// Mock CredentialGetter
