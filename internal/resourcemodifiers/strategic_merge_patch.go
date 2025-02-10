@@ -117,14 +117,9 @@ func applyPatchToObject(
 			})
 		}
 	} else if len(strictErrs) > 0 {
-		switch {
-		//case validationDirective == metav1.FieldValidationWarn:
-		//	addStrictDecodingWarnings(requestContext, strictErrs)
-		default:
-			return apierrors.NewInvalid(schema.GroupKind{}, "", field.ErrorList{
-				field.Invalid(field.NewPath("patch"), fmt.Sprintf("%+v", patchMap), runtime.NewStrictDecodingError(strictErrs).Error()),
-			})
-		}
+		return apierrors.NewInvalid(schema.GroupKind{}, "", field.ErrorList{
+			field.Invalid(field.NewPath("patch"), fmt.Sprintf("%+v", patchMap), runtime.NewStrictDecodingError(strictErrs).Error()),
+		})
 	}
 
 	return nil

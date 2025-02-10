@@ -272,7 +272,6 @@ linters-settings:
       - name: unexported-return
         disabled: true
       - name: unnecessary-stmt
-        disabled: true
       - name: unreachable-code
       - name: unused-parameter
         disabled: true
