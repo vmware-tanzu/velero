@@ -967,10 +967,10 @@ func TestGetVolumeSnapshotClass(t *testing.T) {
 		Provisioner: "foo.csi.k8s.io",
 	}
 
-	foolabelStorageClass := &storagev1api.StorageClass{
+	fooannotationStorageClass := &storagev1api.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
-			Labels: map[string]string{
+			Annotations: map[string]string{
 				"velero.io/csi-volumesnapshot-class": "sctest",
 			},
 		},
@@ -1001,7 +1001,7 @@ func TestGetVolumeSnapshotClass(t *testing.T) {
 		Provisioner: "blah.csi.k8s.io",
 	}
 
-	objs := []runtime.Object{hostpathClass, fooClass, barClass, fooClassWithoutLabel, barClass2}
+	objs := []runtime.Object{hostpathClass, sctestClass, fooClass, barClass, fooClassWithoutLabel, barClass2}
 	fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
 
 	testCases := []struct {
@@ -1030,7 +1030,7 @@ func TestGetVolumeSnapshotClass(t *testing.T) {
 		},
 		{
 			name:         "sctest VSC annotations on StorageClass",
-			storageClass: foolabelStorageClass,
+			storageClass: fooannotationStorageClass,
 			pvc:          pvcNone,
 			backup:       backupNone,
 			expectedVSC:  sctestClass,
