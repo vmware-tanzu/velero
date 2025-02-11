@@ -593,9 +593,9 @@ func TestExecute(t *testing.T) {
 			name:        "Restore from VolumeSnapshot without volume-snapshot-name annotation",
 			backup:      builder.ForBackup("velero", "testBackup").Result(),
 			restore:     builder.ForRestore("velero", "testRestore").Backup("testBackup").Result(),
-			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations(AnnSelectedNode, "node1")).Result(),
+			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations(AnnSelectedNode, "node1")).VolumeName("test-volume").Result(),
 			vs:          builder.ForVolumeSnapshot("velero", "testVS").ObjectMeta(builder.WithAnnotations(velerov1api.VolumeSnapshotRestoreSize, "10Gi")).Result(),
-			expectedPVC: builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations(AnnSelectedNode, "node1")).Result(),
+			expectedPVC: builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations(AnnSelectedNode, "node1")).VolumeName("").Result(),
 		},
 		{
 			name:        "DataUploadResult cannot be found",
