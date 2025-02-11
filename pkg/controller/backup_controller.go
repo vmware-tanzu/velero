@@ -910,6 +910,7 @@ func closeAndRemoveFile(file *os.File, log logrus.FieldLogger) {
 	if err := file.Close(); err != nil {
 		log.WithError(err).WithField("file", file.Name()).Error("error closing file")
 	}
+
 	if err := os.Remove(file.Name()); err != nil {
 		log.WithError(err).WithField("file", file.Name()).Error("error removing file")
 	}
