@@ -43,12 +43,17 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
+const (
+	indexNamePod  = "POD"
+	pvbKeyPattern = "%s+%s+%s"
+)
+
 // Backupper can execute pod volume backups of volumes in a pod.
 type Backupper interface {
 	// BackupPodVolumes backs up all specified volumes in a pod.
 	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, resPolicies *resourcepolicies.Policies, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, *PVCBackupSummary, []error)
 	WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velerov1api.PodVolumeBackup
-	GetPodVolumeBackup(namespace, name string) (*velerov1api.PodVolumeBackup, error)
+	GetPodVolumeBackupByPodAndVolume(podNamespace, podName, volume string) (*velerov1api.PodVolumeBackup, error)
 	ListPodVolumeBackupsByPod(podNamespace, podName string) ([]*velerov1api.PodVolumeBackup, error)
 }
 
@@ -106,8 +111,6 @@ func (pbs *PVCBackupSummary) addSkipped(volumeName string, reason string) {
 	}
 }
 
-const indexNamePod = "POD"
-
 func podIndexFunc(obj any) ([]string, error) {
 	pvb, ok := obj.(*velerov1api.PodVolumeBackup)
 	if !ok {
@@ -117,6 +120,16 @@ func podIndexFunc(obj any) ([]string, error) {
 		return nil, errors.New("PodVolumeBackup is nil")
 	}
 	return []string{cache.NewObjectName(pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name).String()}, nil
+}
+
+// the PVB's name is auto-generated when creating the PVB, we cannot get the name or uid before creating it.
+// So we cannot use namespace&name or uid as the key because we need to insert PVB into the indexer before creating it in API server
+func podVolumeBackupKey(obj any) (string, error) {
+	pvb, ok := obj.(*velerov1api.PodVolumeBackup)
+	if !ok {
+		return "", fmt.Errorf("expected PodVolumeBackup, but got %T", obj)
+	}
+	return fmt.Sprintf(pvbKeyPattern, pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name, pvb.Spec.Volume), nil
 }
 
 func newBackupper(
@@ -137,7 +150,7 @@ func newBackupper(
 		uploaderType: uploaderType,
 		pvbInformer:  pvbInformer,
 		wg:           sync.WaitGroup{},
-		pvbIndexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		pvbIndexer: cache.NewIndexer(podVolumeBackupKey, cache.Indexers{
 			indexNamePod: podIndexFunc,
 		}),
 	}
@@ -341,14 +354,20 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 
 		volumeBackup := newPodVolumeBackup(backup, pod, volume, repoIdentifier, b.uploaderType, pvc)
-		if err := veleroclient.CreateRetryGenerateName(b.crClient, b.ctx, volumeBackup); err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		b.wg.Add(1)
-
+		// the PVB must be added into the indexer before creating it in API server otherwise unexpected behavior may happen:
+		// the PVB may be handled very quickly by the controller and the informer handler will insert the PVB before "b.pvbIndexer.Add(volumeBackup)" runs,
+		// this causes the PVB inserted by "b.pvbIndexer.Add(volumeBackup)" overrides the PVB in the indexer while the PVB inserted by "b.pvbIndexer.Add(volumeBackup)"
+		// contains empty "Status"
 		if err := b.pvbIndexer.Add(volumeBackup); err != nil {
 			errs = append(errs, errors.Wrapf(err, "failed to add PodVolumeBackup %s/%s to indexer", volumeBackup.Namespace, volumeBackup.Name))
+			continue
+		}
+		// similar with above: the PVB may be handled very quickly by the controller and the informer handler will call "b.wg.Done()" before "b.wg.Add(1)" runs which causes panic
+		// see https://github.com/vmware-tanzu/velero/issues/8657
+		b.wg.Add(1)
+		if err := veleroclient.CreateRetryGenerateName(b.crClient, b.ctx, volumeBackup); err != nil {
+			b.wg.Done()
+			errs = append(errs, err)
 			continue
 		}
 
@@ -392,8 +411,8 @@ func (b *backupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velero
 	return podVolumeBackups
 }
 
-func (b *backupper) GetPodVolumeBackup(namespace, name string) (*velerov1api.PodVolumeBackup, error) {
-	obj, exist, err := b.pvbIndexer.GetByKey(cache.NewObjectName(namespace, name).String())
+func (b *backupper) GetPodVolumeBackupByPodAndVolume(podNamespace, podName, volume string) (*velerov1api.PodVolumeBackup, error) {
+	obj, exist, err := b.pvbIndexer.GetByKey(fmt.Sprintf(pvbKeyPattern, podNamespace, podName, volume))
 	if err != nil {
 		return nil, err
 	}
