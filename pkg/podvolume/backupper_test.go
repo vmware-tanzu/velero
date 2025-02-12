@@ -582,37 +582,44 @@ func TestBackupPodVolumes(t *testing.T) {
 	}
 }
 
-func TestGetPodVolumeBackup(t *testing.T) {
+func TestGetPodVolumeBackupByPodAndVolume(t *testing.T) {
 	backupper := &backupper{
-		pvbIndexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		pvbIndexer: cache.NewIndexer(podVolumeBackupKey, cache.Indexers{
 			indexNamePod: podIndexFunc,
 		}),
 	}
 
 	obj := &velerov1api.PodVolumeBackup{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "velero",
-			Name:      "pvb",
-		},
 		Spec: velerov1api.PodVolumeBackupSpec{
 			Pod: corev1api.ObjectReference{
 				Kind:      "Pod",
 				Namespace: "default",
 				Name:      "pod",
 			},
+			Volume: "volume",
 		},
 	}
 
 	err := backupper.pvbIndexer.Add(obj)
 	require.NoError(t, err)
 
-	// not exist PVB
-	pvb, err := backupper.GetPodVolumeBackup("invalid-namespace", "invalid-name")
+	// incorrect pod namespace
+	pvb, err := backupper.GetPodVolumeBackupByPodAndVolume("invalid-namespace", "pod", "volume")
 	require.NoError(t, err)
 	assert.Nil(t, pvb)
 
-	// exist PVB
-	pvb, err = backupper.GetPodVolumeBackup("velero", "pvb")
+	// incorrect pod name
+	pvb, err = backupper.GetPodVolumeBackupByPodAndVolume("default", "invalid-pod", "volume")
+	require.NoError(t, err)
+	assert.Nil(t, pvb)
+
+	// incorrect volume
+	pvb, err = backupper.GetPodVolumeBackupByPodAndVolume("default", "pod", "invalid-volume")
+	require.NoError(t, err)
+	assert.Nil(t, pvb)
+
+	// correct pod namespace, name and volume
+	pvb, err = backupper.GetPodVolumeBackupByPodAndVolume("default", "pod", "volume")
 	require.NoError(t, err)
 	assert.NotNil(t, pvb)
 }
