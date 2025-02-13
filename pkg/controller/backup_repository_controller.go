@@ -92,17 +92,27 @@ func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client
 }
 
 func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	s := kube.NewPeriodicalEnqueueSource(r.logger.WithField("controller", constant.ControllerBackupRepo), mgr.GetClient(), &velerov1api.BackupRepositoryList{}, repoSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
+	s := kube.NewPeriodicalEnqueueSource(
+		r.logger.WithField("controller", constant.ControllerBackupRepo),
+		mgr.GetClient(),
+		&velerov1api.BackupRepositoryList{},
+		repoSyncPeriod,
+		kube.PeriodicalEnqueueSourceOption{},
+	)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.BackupRepository{}, builder.WithPredicates(kube.SpecChangePredicate{})).
 		WatchesRawSource(s).
-		Watches(&velerov1api.BackupStorageLocation{}, kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
+		Watches(
+			&velerov1api.BackupStorageLocation{},
+			kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
 			builder.WithPredicates(
 				// When BSL updates, check if the backup repositories need to be invalidated
 				kube.NewUpdateEventPredicate(r.needInvalidBackupRepo),
 				// When BSL is created, invalidate any backup repositories that reference it
-				kube.NewCreateEventPredicate(func(client.Object) bool { return true }))).
+				kube.NewCreateEventPredicate(func(client.Object) bool { return true }),
+			),
+		).
 		Complete(r)
 }
 
@@ -194,8 +204,14 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
+	bsl, bslErr := r.getBSL(ctx, backupRepo)
+	if bslErr != nil {
+		log.WithError(bslErr).Error("Fail to get BSL for BackupRepository. Skip reconciling.")
+		return ctrl.Result{}, nil
+	}
+
 	if backupRepo.Status.Phase == "" || backupRepo.Status.Phase == velerov1api.BackupRepositoryPhaseNew {
-		if err := r.initializeRepo(ctx, backupRepo, log); err != nil {
+		if err := r.initializeRepo(ctx, backupRepo, bsl, log); err != nil {
 			log.WithError(err).Error("error initialize repository")
 			return ctrl.Result{}, errors.WithStack(err)
 		}
@@ -213,7 +229,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	switch backupRepo.Status.Phase {
 	case velerov1api.BackupRepositoryPhaseNotReady:
-		ready, err := r.checkNotReadyRepo(ctx, backupRepo, log)
+		ready, err := r.checkNotReadyRepo(ctx, backupRepo, bsl, log)
 		if err != nil {
 			return ctrl.Result{}, err
 		} else if !ready {
@@ -221,6 +237,11 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 		fallthrough
 	case velerov1api.BackupRepositoryPhaseReady:
+		if bsl.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
+			log.Debugf("Skip running maintenance for BackupRepository, because its BSL is in the ReadOnly mode.")
+			return ctrl.Result{}, nil
+		}
+
 		if err := r.recallMaintenance(ctx, backupRepo, log); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "error handling incomplete repo maintenance jobs")
 		}
@@ -237,17 +258,21 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func (r *BackupRepoReconciler) getIdentiferByBSL(ctx context.Context, req *velerov1api.BackupRepository) (string, error) {
-	loc := &velerov1api.BackupStorageLocation{}
+func (r *BackupRepoReconciler) getBSL(ctx context.Context, req *velerov1api.BackupRepository) (*velerov1api.BackupStorageLocation, error) {
+	loc := new(velerov1api.BackupStorageLocation)
 
 	if err := r.Get(ctx, client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Spec.BackupStorageLocation,
 	}, loc); err != nil {
-		return "", errors.Wrapf(err, "error to get BSL %s", req.Spec.BackupStorageLocation)
+		return nil, err
 	}
 
-	repoIdentifier, err := repoconfig.GetRepoIdentifier(loc, req.Spec.VolumeNamespace)
+	return loc, nil
+}
+
+func (r *BackupRepoReconciler) getIdentifierByBSL(bsl *velerov1api.BackupStorageLocation, req *velerov1api.BackupRepository) (string, error) {
+	repoIdentifier, err := repoconfig.GetRepoIdentifier(bsl, req.Spec.VolumeNamespace)
 	if err != nil {
 		return "", errors.Wrapf(err, "error to get identifier for repo %s", req.Name)
 	}
@@ -255,11 +280,11 @@ func (r *BackupRepoReconciler) getIdentiferByBSL(ctx context.Context, req *veler
 	return repoIdentifier, nil
 }
 
-func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) error {
+func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1api.BackupRepository, bsl *velerov1api.BackupStorageLocation, log logrus.FieldLogger) error {
 	log.WithField("repoConfig", r.backupRepoConfig).Info("Initializing backup repository")
 
 	// confirm the repo's BackupStorageLocation is valid
-	repoIdentifier, err := r.getIdentiferByBSL(ctx, req)
+	repoIdentifier, err := r.getIdentifierByBSL(bsl, req)
 	if err != nil {
 		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
 			rr.Status.Message = err.Error()
@@ -475,10 +500,10 @@ func dueForMaintenance(req *velerov1api.BackupRepository, now time.Time) bool {
 	return req.Status.LastMaintenanceTime == nil || req.Status.LastMaintenanceTime.Add(req.Spec.MaintenanceFrequency.Duration).Before(now)
 }
 
-func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *velerov1api.BackupRepository, log logrus.FieldLogger) (bool, error) {
+func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *velerov1api.BackupRepository, bsl *velerov1api.BackupStorageLocation, log logrus.FieldLogger) (bool, error) {
 	log.Info("Checking backup repository for readiness")
 
-	repoIdentifier, err := r.getIdentiferByBSL(ctx, req)
+	repoIdentifier, err := r.getIdentifierByBSL(bsl, req)
 	if err != nil {
 		return false, r.patchBackupRepository(ctx, req, repoNotReady(err.Error()))
 	}
