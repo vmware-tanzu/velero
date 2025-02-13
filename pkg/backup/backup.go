@@ -762,7 +762,7 @@ func (kb *kubernetesBackupper) waitUntilPVBsProcessed(ctx context.Context, log l
 			if processed {
 				continue
 			}
-			updatedPVB, err := itemBlock.itemBackupper.podVolumeBackupper.GetPodVolumeBackup(pvb.Namespace, pvb.Name)
+			updatedPVB, err := itemBlock.itemBackupper.podVolumeBackupper.GetPodVolumeBackupByPodAndVolume(pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name, pvb.Spec.Volume)
 			if err != nil {
 				allProcessed = false
 				log.Infof("failed to get PVB: %v", err)
