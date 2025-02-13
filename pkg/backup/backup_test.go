@@ -3978,9 +3978,9 @@ func (b *fakePodVolumeBackupper) WaitAllPodVolumesProcessed(log logrus.FieldLogg
 	return b.pvbs
 }
 
-func (b *fakePodVolumeBackupper) GetPodVolumeBackup(namespace, name string) (*velerov1.PodVolumeBackup, error) {
+func (b *fakePodVolumeBackupper) GetPodVolumeBackupByPodAndVolume(podNamespace, podName, volume string) (*velerov1.PodVolumeBackup, error) {
 	for _, pvb := range b.pvbs {
-		if pvb.Namespace == namespace && pvb.Name == name {
+		if pvb.Spec.Pod.Namespace == podNamespace && pvb.Spec.Pod.Name == podName && pvb.Spec.Volume == volume {
 			return pvb, nil
 		}
 	}
