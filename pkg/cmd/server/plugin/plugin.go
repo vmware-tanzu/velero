@@ -139,10 +139,6 @@ func NewCommand(f client.Factory) *cobra.Command {
 					newDateUploadDeleteItemAction(f),
 				).
 				RegisterDeleteItemAction(
-					"velero.io/csi-volumesnapshot-delete",
-					newVolumeSnapshotDeleteItemAction(f),
-				).
-				RegisterDeleteItemAction(
 					"velero.io/csi-volumesnapshotcontent-delete",
 					newVolumeSnapshotContentDeleteItemAction(f),
 				).
@@ -431,10 +427,6 @@ func newVolumeSnapshotClassBackupItemAction(logger logrus.FieldLogger) (any, err
 }
 
 // DeleteItemAction plugins
-
-func newVolumeSnapshotDeleteItemAction(f client.Factory) plugincommon.HandlerInitializer {
-	return dia.NewVolumeSnapshotDeleteItemAction(f)
-}
 
 func newVolumeSnapshotContentDeleteItemAction(f client.Factory) plugincommon.HandlerInitializer {
 	return dia.NewVolumeSnapshotContentDeleteItemAction(f)
