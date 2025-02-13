@@ -79,6 +79,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
+const ObjectStatusRestoreAnnotationKey = "velero.io/restore-status"
+
 var resourceMustHave = []string{
 	"datauploads.velero.io",
 }
@@ -1657,15 +1659,16 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 
 	// determine whether to restore status according to original GR
-	shouldRestoreStatus := ctx.resourceStatusIncludesExcludes != nil && ctx.resourceStatusIncludesExcludes.ShouldInclude(groupResource.String())
+	shouldRestoreStatus := determineRestoreStatus(obj, ctx.resourceStatusIncludesExcludes, groupResource.String(), ctx.log)
+
 	if shouldRestoreStatus && statusFieldErr != nil {
 		err := fmt.Errorf("could not get status to be restored %s: %v", kube.NamespaceAndName(obj), statusFieldErr)
 		ctx.log.Errorf(err.Error())
 		errs.Add(namespace, err)
 		return warnings, errs, itemExists
 	}
-	ctx.log.Debugf("status field for %s: exists: %v, should restore: %v", newGR, statusFieldExists, shouldRestoreStatus)
-	// if it should restore status, run a UpdateStatus
+
+	// Proceed with status restoration if decided
 	if statusFieldExists && shouldRestoreStatus {
 		if err := unstructured.SetNestedField(obj.Object, objStatus, "status"); err != nil {
 			ctx.log.Errorf("could not set status field %s: %v", kube.NamespaceAndName(obj), err)
@@ -2542,4 +2545,52 @@ func (ctx *restoreContext) handleSkippedPVHasRetainPolicy(
 
 	obj = resetVolumeBindingInfo(obj)
 	return obj, nil
+}
+
+func determineRestoreStatus(
+	obj *unstructured.Unstructured,
+	resourceIncludesExcludes *collections.IncludesExcludes,
+	groupResource string,
+	log logrus.FieldLogger,
+) bool {
+	var shouldRestoreStatus bool
+
+	// Determine restore spec behavior
+	if resourceIncludesExcludes != nil {
+		shouldRestoreStatus = resourceIncludesExcludes.ShouldInclude(groupResource)
+	}
+
+	// Retrieve annotations
+	annotations := obj.GetAnnotations()
+
+	if annotations == nil {
+		log.Warnf("No annotations found for %s, using restore spec setting: %v",
+			kube.NamespaceAndName(obj), shouldRestoreStatus)
+		return shouldRestoreStatus
+	}
+
+	// Check for object-level annotation
+	objectAnnotation, annotationExists := annotations[ObjectStatusRestoreAnnotationKey]
+
+	if !annotationExists {
+		log.Debugf("No restore status-specific annotation found for %s, using restore spec setting: %v",
+			kube.NamespaceAndName(obj), shouldRestoreStatus)
+		return shouldRestoreStatus
+	}
+
+	normalizedValue := strings.ToLower(strings.TrimSpace(objectAnnotation))
+	switch normalizedValue {
+	case "true":
+		shouldRestoreStatus = true
+	case "false":
+		shouldRestoreStatus = false
+	default:
+		log.Warnf("Invalid annotation value '%s' on %s, using restore spec setting: %v",
+			objectAnnotation, kube.NamespaceAndName(obj), shouldRestoreStatus)
+	}
+
+	log.Infof("Final status restore decision for %s: %v (annotation: %v, restore spec: %v)",
+		kube.NamespaceAndName(obj), shouldRestoreStatus, annotationExists, shouldRestoreStatus)
+
+	return shouldRestoreStatus
 }

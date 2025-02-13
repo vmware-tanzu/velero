@@ -25,6 +25,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/collections"
+
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -4136,6 +4139,104 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			require.Equal(t, tc.expectedResult, hasSnapshotDataUpload(ctx, tc.obj))
+		})
+	}
+}
+
+func TestDetermineRestoreStatus(t *testing.T) {
+	tests := []struct {
+		name                string
+		annotations         map[string]string
+		restoreSpecIncludes *bool
+		expectedDecision    bool
+	}{
+		{
+			name:                "No annotation, fallback to restore spec",
+			annotations:         nil,
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    true,
+		},
+		{
+			name:                "No annotation, restore spec excludes",
+			annotations:         nil,
+			restoreSpecIncludes: boolptr.False(),
+			expectedDecision:    false,
+		},
+		{
+			name:                "Annotation explicitly set to true, restore spec is false",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "true"},
+			restoreSpecIncludes: boolptr.False(),
+			expectedDecision:    true,
+		},
+		{
+			name:                "Annotation explicitly set to false, restore spec is true",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "false"},
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    false,
+		},
+		{
+			name:                "Invalid annotation value, fallback to restore spec",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "foo"},
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    true,
+		},
+		{
+			name:                "Empty annotation value, fallback to restore spec",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: ""},
+			restoreSpecIncludes: boolptr.False(),
+			expectedDecision:    false,
+		},
+		{
+			name:                "Mixed-case annotation value 'True' should be treated as true",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "True"},
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    true,
+		},
+		{
+			name:                "Mixed-case annotation value 'FALSE' should be treated as false",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "FALSE"},
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    false,
+		},
+		{
+			name:                "Nil IncludesExcludes, but annotation is 'true'",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "true"},
+			restoreSpecIncludes: nil,
+			expectedDecision:    true,
+		},
+		{
+			name:                "Nil IncludesExcludes, but annotation is 'false'",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "false"},
+			restoreSpecIncludes: nil,
+			expectedDecision:    false,
+		},
+		{
+			name:                "Nil IncludesExcludes, no annotation (default to false)",
+			annotations:         nil,
+			restoreSpecIncludes: nil,
+			expectedDecision:    false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			obj := &unstructured.Unstructured{}
+			obj.SetAnnotations(test.annotations)
+
+			var includesExcludes *collections.IncludesExcludes
+			if test.restoreSpecIncludes != nil {
+				includesExcludes = collections.NewIncludesExcludes()
+				if *test.restoreSpecIncludes {
+					includesExcludes.Includes("*")
+				} else {
+					includesExcludes.Excludes("*")
+				}
+			}
+
+			log := logrus.New()
+			result := determineRestoreStatus(obj, includesExcludes, "testGroupResource", log)
+
+			assert.Equal(t, test.expectedDecision, result)
 		})
 	}
 }
