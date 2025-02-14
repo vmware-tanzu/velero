@@ -26,12 +26,14 @@ import (
 type backedUpItemsMap struct {
 	*sync.RWMutex
 	backedUpItems map[itemKey]struct{}
+	totalItems    map[itemKey]struct{}
 }
 
 func NewBackedUpItemsMap() *backedUpItemsMap {
 	return &backedUpItemsMap{
 		RWMutex:       &sync.RWMutex{},
 		backedUpItems: make(map[itemKey]struct{}),
+		totalItems:    make(map[itemKey]struct{}),
 	}
 }
 
@@ -75,6 +77,12 @@ func (m *backedUpItemsMap) Len() int {
 	return len(m.backedUpItems)
 }
 
+func (m *backedUpItemsMap) BackedUpAndTotalLen() (int, int) {
+	m.RLock()
+	defer m.RUnlock()
+	return len(m.backedUpItems), len(m.totalItems)
+}
+
 func (m *backedUpItemsMap) Has(key itemKey) bool {
 	m.RLock()
 	defer m.RUnlock()
@@ -87,4 +95,11 @@ func (m *backedUpItemsMap) AddItem(key itemKey) {
 	m.Lock()
 	defer m.Unlock()
 	m.backedUpItems[key] = struct{}{}
+	m.totalItems[key] = struct{}{}
+}
+
+func (m *backedUpItemsMap) AddItemToTotal(key itemKey) {
+	m.Lock()
+	defer m.Unlock()
+	m.totalItems[key] = struct{}{}
 }
