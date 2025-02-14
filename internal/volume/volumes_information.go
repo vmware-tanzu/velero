@@ -838,6 +838,7 @@ func (t *RestoreVolumeInfoTracker) Result() []*RestoreVolumeInfo {
 		if csiSnapshot.Spec.Source.VolumeSnapshotContentName != nil {
 			vscName = *csiSnapshot.Spec.Source.VolumeSnapshotContentName
 		}
+
 		volumeInfo := &RestoreVolumeInfo{
 			PVCNamespace:      pvcNS,
 			PVCName:           pvcName,

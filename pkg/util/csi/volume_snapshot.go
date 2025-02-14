@@ -532,8 +532,7 @@ func CleanupVolumeSnapshot(
 	}
 }
 
-// DeleteVolumeSnapshot handles the VolumeSnapshot and VolumeSnapshotContent instance deletion.
-func DeleteVolumeSnapshot(
+func DeleteReadyVolumeSnapshot(
 	vs snapshotv1api.VolumeSnapshot,
 	vsc snapshotv1api.VolumeSnapshotContent,
 	client crclient.Client,

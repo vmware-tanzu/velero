@@ -19,34 +19,32 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"github.com/vmware-tanzu/velero/pkg/constant"
-	"github.com/vmware-tanzu/velero/pkg/itemoperation"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-
-	storagev1api "k8s.io/api/storage/v1"
-
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
+	storagev1api "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/clock"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
@@ -304,7 +302,58 @@ func (ctx *finalizerContext) execute() (results.Result, results.Result) { //noli
 	rehErrs := ctx.WaitRestoreExecHook()
 	errs.Merge(&rehErrs)
 
+	vsErrs := ctx.deleteVolumeSnapshotAndVolumeSnapshotContent()
+	errs.Merge(&vsErrs)
+
 	return warnings, errs
+}
+
+func (ctx *finalizerContext) deleteVolumeSnapshotAndVolumeSnapshotContent() (errs results.Result) {
+	for _, operation := range ctx.restoreItemOperationList.items {
+		if operation.Spec.RestoreItemAction == constant.PluginCsiVolumeSnapshotRestoreRIA &&
+			operation.Status.Phase == itemoperation.OperationPhaseCompleted {
+			if operation.Spec.OperationID == "" || !strings.Contains(operation.Spec.OperationID, "/") {
+				ctx.logger.Errorf("invalid OperationID: %s", operation.Spec.OperationID)
+				errs.Add("", errors.Errorf("invalid OperationID: %s", operation.Spec.OperationID))
+				continue
+			}
+
+			operationIDParts := strings.Split(operation.Spec.OperationID, "/")
+
+			vs := new(snapshotv1api.VolumeSnapshot)
+			vsc := new(snapshotv1api.VolumeSnapshotContent)
+
+			if err := ctx.crClient.Get(
+				context.TODO(),
+				client.ObjectKey{Namespace: operationIDParts[0], Name: operationIDParts[1]},
+				vs,
+			); err != nil {
+				ctx.logger.Errorf("Fail to get the VolumeSnapshot %s: %s", operation.Spec.OperationID, err.Error())
+				errs.Add(operationIDParts[0], errors.Errorf("Fail to get the VolumeSnapshot %s: %s", operation.Spec.OperationID, err.Error()))
+				continue
+			}
+
+			if err := ctx.crClient.Delete(context.TODO(), vs); err != nil {
+				ctx.logger.Errorf("Fail to delete VolumeSnapshot %s: %s", operation.Spec.OperationID, err.Error())
+				errs.Add(vs.Namespace, err)
+			}
+
+			if vs.Status != nil && vs.Status.BoundVolumeSnapshotContentName != nil {
+				vsc.Name = *vs.Status.BoundVolumeSnapshotContentName
+			} else {
+				ctx.logger.Errorf("VolumeSnapshotContent %s is not ready.", vsc.Name)
+				errs.Add("", errors.Errorf("VolumeSnapshotContent %s is not ready.", vsc.Name))
+				continue
+			}
+
+			if err := ctx.crClient.Delete(context.TODO(), vsc); err != nil {
+				ctx.logger.Errorf("Fail to delete VolumeSnapshotContent %s: %s", vsc.Name, err.Error())
+				errs.Add("", errors.Errorf("Fail to delete the VolumeSnapshotContent %s", err))
+			}
+		}
+	}
+
+	return errs
 }
 
 // patchDynamicPV patches newly dynamically provisioned PV using volume info

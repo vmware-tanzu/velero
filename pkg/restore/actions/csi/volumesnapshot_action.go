@@ -18,23 +18,21 @@ package csi
 
 import (
 	"context"
+	"strings"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	core_v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/label"
 	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/restoreitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/util/csi"
 )
 
 // volumeSnapshotRestoreItemAction is a Velero restore item
@@ -90,6 +88,13 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 			errors.Wrapf(err, "failed to convert input.Item from unstructured")
 	}
 
+	var vsFromBackup snapshotv1api.VolumeSnapshot
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(
+		input.ItemFromBackup.UnstructuredContent(), &vsFromBackup); err != nil {
+		return &velero.RestoreItemActionExecuteOutput{},
+			errors.Errorf(err.Error(), "failed to convert input.ItemFromBackup from unstructured")
+	}
+
 	// If cross-namespace restore is configured, change the namespace
 	// for VolumeSnapshot object to be restored
 	newNamespace, ok := input.Restore.Spec.NamespaceMapping[vs.GetNamespace()]
@@ -98,76 +103,25 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 		newNamespace = vs.Namespace
 	}
 
-	if !csi.IsVolumeSnapshotExists(newNamespace, vs.Name, p.crClient) {
-		snapHandle, exists := vs.Annotations[velerov1api.VolumeSnapshotHandleAnnotation]
-		if !exists {
-			return nil, errors.Errorf(
-				"VolumeSnapshot %s/%s does not have a %s annotation",
-				vs.Namespace,
-				vs.Name,
-				velerov1api.VolumeSnapshotHandleAnnotation,
-			)
-		}
+	// operationID format is "vsNamespace/vsNamespace".
+	operationID := newNamespace + "/" + vs.Name
 
-		csiDriverName, exists := vs.Annotations[velerov1api.DriverNameAnnotation]
-		if !exists {
-			return nil, errors.Errorf(
-				"VolumeSnapshot %s/%s does not have a %s annotation",
-				vs.Namespace, vs.Name, velerov1api.DriverNameAnnotation)
-		}
-
-		p.log.Debugf("Set VolumeSnapshotContent %s/%s DeletionPolicy to Retain to make sure VS deletion in namespace will not delete Snapshot on cloud provider.",
-			newNamespace, vs.Name)
-
-		vsc := snapshotv1api.VolumeSnapshotContent{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: vs.Name + "-",
-				Labels: map[string]string{
-					velerov1api.RestoreNameLabel: label.GetValidName(input.Restore.Name),
-				},
-			},
-			Spec: snapshotv1api.VolumeSnapshotContentSpec{
-				DeletionPolicy: snapshotv1api.VolumeSnapshotContentRetain,
-				Driver:         csiDriverName,
-				VolumeSnapshotRef: core_v1.ObjectReference{
-					APIVersion: "snapshot.storage.k8s.io/v1",
-					Kind:       "VolumeSnapshot",
-					Namespace:  newNamespace,
-					Name:       vs.Name,
-				},
-				Source: snapshotv1api.VolumeSnapshotContentSource{
-					SnapshotHandle: &snapHandle,
-				},
-			},
-		}
-
-		// we create the VolumeSnapshotContent here instead of relying on the
-		// restore flow because we want to statically bind this VolumeSnapshot
-		// with a VolumeSnapshotContent that will be used as its source for pre-populating
-		// the volume that will be created as a result of the restore. To perform
-		// this static binding, a bi-directional link between the VolumeSnapshotContent
-		// and VolumeSnapshot objects have to be setup. Further, it is disallowed
-		// to convert a dynamically created VolumeSnapshotContent for static binding.
-		// See: https://github.com/kubernetes-csi/external-snapshotter/issues/274
-		if err := p.crClient.Create(context.TODO(), &vsc); err != nil {
-			return nil, errors.Wrapf(err,
-				"failed to create VolumeSnapshotContents %s",
-				vsc.GenerateName)
-		}
-		p.log.Infof("Created VolumesnapshotContents %s with static binding to volumesnapshot %s/%s",
-			vsc, newNamespace, vs.Name)
-
-		// Reset Spec to convert the VolumeSnapshot from using
-		// the dynamic VolumeSnapshotContent to the static one.
-		resetVolumeSnapshotSpecForRestore(&vs, &vsc.Name)
-
-		// Reset VolumeSnapshot annotation. By now, only change
-		// DeletionPolicy to Retain.
-		resetVolumeSnapshotAnnotation(&vs)
+	// Reset Spec to convert the VolumeSnapshot from using
+	// the dynamic VolumeSnapshotContent to the static one.
+	if vsFromBackup.Status != nil && vsFromBackup.Status.BoundVolumeSnapshotContentName != nil {
+		resetVolumeSnapshotSpecForRestore(&vs, vsFromBackup.Status.BoundVolumeSnapshotContentName)
+	} else {
+		p.log.Errorf("Fail to get VSC name from the VS %s status", operationID)
+		return nil, errors.Errorf("fail to get VSC name from the VS %s status", operationID)
 	}
+
+	// Reset VolumeSnapshot annotation. By now, only change
+	// DeletionPolicy to Retain.
+	resetVolumeSnapshotAnnotation(&vs)
 
 	vsMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&vs)
 	if err != nil {
+		p.log.Errorf("Fail to convert VS %s to unstructured", operationID)
 		return nil, errors.WithStack(err)
 	}
 
@@ -177,6 +131,7 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem:     &unstructured.Unstructured{Object: vsMap},
 		AdditionalItems: []velero.ResourceIdentifier{},
+		OperationID:     operationID,
 	}, nil
 }
 
@@ -188,13 +143,85 @@ func (p *volumeSnapshotRestoreItemAction) Progress(
 	operationID string,
 	restore *velerov1api.Restore,
 ) (velero.OperationProgress, error) {
-	return velero.OperationProgress{}, nil
+	progress := velero.OperationProgress{}
+
+	// The operationID format should be "vsNamespace/vsName".
+	if operationID == "" || !strings.Contains(operationID, "/") {
+		return progress, riav2.InvalidOperationIDError(operationID)
+	}
+
+	logger := p.log.WithFields(logrus.Fields{
+		"Action":      "VolumeSnapshotRestoreItemAction",
+		"OperationID": operationID,
+		"Namespace":   restore.Namespace,
+	})
+
+	vsc := new(snapshotv1api.VolumeSnapshotContent)
+	vs := new(snapshotv1api.VolumeSnapshot)
+
+	operationIDParts := strings.Split(operationID, "/")
+
+	if err := p.crClient.Get(
+		context.TODO(),
+		crclient.ObjectKey{Namespace: operationIDParts[0], Name: operationIDParts[1]},
+		vs,
+	); err != nil {
+		logger.Errorf("Fail to get the VolumeSnapshot %s", operationID)
+		return progress, err
+	}
+
+	if vs.Spec.Source.VolumeSnapshotContentName == nil {
+		logger.Errorf("VolumeSnapshot %s referenced VSC is nil", operationID)
+		return progress, errors.Errorf("VolumeSnapshot %s referenced VSC is nil", operationID)
+	}
+
+	if err := p.crClient.Get(
+		context.TODO(),
+		crclient.ObjectKey{
+			Name: *vs.Spec.Source.VolumeSnapshotContentName,
+		},
+		vsc,
+	); err != nil {
+		logger.Errorf("Fail to get the VolumeSnapshotContent %s",
+			*vs.Spec.Source.VolumeSnapshotContentName,
+		)
+		return progress, err
+	}
+
+	if (vsc.Status != nil && boolptr.IsSetToTrue(vsc.Status.ReadyToUse)) &&
+		(vs.Status != nil && boolptr.IsSetToTrue(vs.Status.ReadyToUse)) {
+		// VS and VSC are ready. Delete them to make sure they will not cause conflict for the next restore.
+		if err := p.crClient.Delete(context.TODO(), vs); err != nil {
+			logger.Warnf("Fail to delete VS %s after VS turns ready %s.", vs.Namespace+vs.Name, err.Error())
+		}
+		if err := p.crClient.Delete(context.TODO(), vsc); err != nil {
+			logger.Warnf("Fail to delete VSC %s after VSC turns ready %s.", vsc.Name, err.Error())
+		}
+	} else {
+		logger.Debugf("VolumeSnapshot or VolumeSnapshotContent are not ready yet.")
+		progress.Description = "VolumeSnapshot or VolumeSnapshotContent creation are still in progress."
+		return progress, nil
+	}
+
+	progress.Description = "VolumeSnapshot and VolumeSnapshotContent are ready"
+	progress.OperationUnits = "Bytes"
+	progress.Completed = true
+	if vsc.Status.RestoreSize != nil {
+		progress.NCompleted = *vsc.Status.RestoreSize
+		progress.NTotal = *vsc.Status.RestoreSize
+	}
+
+	logger.Infof("VolumeSnapshot %s/%s and VolumeSnapshotContent %s are ready.",
+		vs.Namespace, vs.Name, vsc.Name)
+
+	return progress, nil
 }
 
 func (p *volumeSnapshotRestoreItemAction) Cancel(
 	operationID string,
 	restore *velerov1api.Restore,
 ) error {
+	// CSI Specification doesn't support canceling a snapshot creation.
 	return nil
 }
 
@@ -206,7 +233,8 @@ func (p *volumeSnapshotRestoreItemAction) AreAdditionalItemsReady(
 }
 
 func NewVolumeSnapshotRestoreItemAction(
-	f client.Factory) plugincommon.HandlerInitializer {
+	f client.Factory,
+) plugincommon.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (any, error) {
 		crClient, err := f.KubebuilderClient()
 		if err != nil {

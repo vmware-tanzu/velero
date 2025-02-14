@@ -163,12 +163,12 @@ func NewCommand(f client.Factory) *cobra.Command {
 					newPvcRestoreItemAction(f),
 				).
 				RegisterRestoreItemActionV2(
-					"velero.io/csi-volumesnapshot-restorer",
+					constant.PluginCsiVolumeSnapshotRestoreRIA,
 					newVolumeSnapshotRestoreItemAction(f),
 				).
 				RegisterRestoreItemActionV2(
 					"velero.io/csi-volumesnapshotcontent-restorer",
-					newVolumeSnapshotContentRestoreItemAction,
+					newVolumeSnapshotContentRestoreItemAction(f),
 				).
 				RegisterRestoreItemActionV2(
 					"velero.io/csi-volumesnapshotclass-restorer",
@@ -442,8 +442,8 @@ func newVolumeSnapshotRestoreItemAction(f client.Factory) plugincommon.HandlerIn
 	return csiria.NewVolumeSnapshotRestoreItemAction(f)
 }
 
-func newVolumeSnapshotContentRestoreItemAction(logger logrus.FieldLogger) (any, error) {
-	return csiria.NewVolumeSnapshotContentRestoreItemAction(logger)
+func newVolumeSnapshotContentRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return csiria.NewVolumeSnapshotContentRestoreItemAction(f)
 }
 
 func newVolumeSnapshotClassRestoreItemAction(logger logrus.FieldLogger) (any, error) {
