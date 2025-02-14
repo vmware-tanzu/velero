@@ -16,6 +16,11 @@ limitations under the License.
 
 package util
 
+import (
+	"crypto/sha256"
+	"encoding/hex"
+)
+
 func Contains(slice []string, key string) bool {
 	for _, i := range slice {
 		if i == key {
@@ -23,4 +28,11 @@ func Contains(slice []string, key string) bool {
 		}
 	}
 	return false
+}
+
+// GenerateSha256FromRestoreUIDAndVsName Use the restore UID and the VS Name to generate
+// the new VSC and VS name. By this way, VS and VSC RIA action can get the same VSC name.
+func GenerateSha256FromRestoreUIDAndVsName(restoreUID string, vsName string) string {
+	sha256Bytes := sha256.Sum256([]byte(restoreUID + "/" + vsName))
+	return hex.EncodeToString(sha256Bytes[:])
 }

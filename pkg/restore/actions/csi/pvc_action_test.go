@@ -45,6 +45,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
@@ -546,6 +547,7 @@ func TestCancel(t *testing.T) {
 }
 
 func TestExecute(t *testing.T) {
+	vsName := util.GenerateSha256FromRestoreUIDAndVsName("restoreUID", "vsName")
 	tests := []struct {
 		name                 string
 		backup               *velerov1api.Backup
@@ -573,20 +575,22 @@ func TestExecute(t *testing.T) {
 		{
 			name:        "VolumeSnapshot cannot be found",
 			backup:      builder.ForBackup("velero", "testBackup").Result(),
-			restore:     builder.ForRestore("velero", "testRestore").Backup("testBackup").Result(),
-			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations(velerov1api.VolumeSnapshotLabel, "testVS")).Result(),
-			expectedErr: "Failed to get Volumesnapshot velero/testVS to restore PVC velero/testPVC: volumesnapshots.snapshot.storage.k8s.io \"testVS\" not found",
+			restore:     builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("restoreUID")).Backup("testBackup").Result(),
+			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations(velerov1api.VolumeSnapshotLabel, "vsName")).Result(),
+			expectedErr: fmt.Sprintf("Failed to get Volumesnapshot velero/%s to restore PVC velero/testPVC: volumesnapshots.snapshot.storage.k8s.io \"%s\" not found", vsName, vsName),
 		},
 		{
 			name:    "Restore from VolumeSnapshot",
 			backup:  builder.ForBackup("velero", "testBackup").Result(),
-			restore: builder.ForRestore("velero", "testRestore").Backup("testBackup").Result(),
-			pvc: builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations(velerov1api.VolumeSnapshotLabel, "testVS")).
+			restore: builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("restoreUID")).Backup("testBackup").Result(),
+			pvc: builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations(velerov1api.VolumeSnapshotLabel, "vsName")).
 				RequestResource(map[corev1api.ResourceName]resource.Quantity{corev1api.ResourceStorage: resource.MustParse("10Gi")}).
 				DataSource(&corev1api.TypedLocalObjectReference{APIGroup: &snapshotv1api.SchemeGroupVersion.Group, Kind: "VolumeSnapshot", Name: "testVS"}).
 				DataSourceRef(&corev1api.TypedObjectReference{APIGroup: &snapshotv1api.SchemeGroupVersion.Group, Kind: "VolumeSnapshot", Name: "testVS"}).
 				Result(),
-			vs:          builder.ForVolumeSnapshot("velero", "testVS").ObjectMeta(builder.WithAnnotations(velerov1api.VolumeSnapshotRestoreSize, "10Gi")).Result(),
+			vs: builder.ForVolumeSnapshot("velero", vsName).ObjectMeta(
+				builder.WithAnnotations(velerov1api.VolumeSnapshotRestoreSize, "10Gi"),
+			).Result(),
 			expectedPVC: builder.ForPersistentVolumeClaim("velero", "testPVC").Result(),
 		},
 		{
