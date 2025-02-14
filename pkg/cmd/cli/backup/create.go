@@ -179,6 +179,11 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return fmt.Errorf("either a 'selector' or an 'or-selector' can be specified, but not both")
 	}
 
+	// Ensure if FromSchedule is set, it has a non-empty value
+	if err := o.validateFromScheduleFlag(c); err != nil {
+		return err
+	}
+
 	// Ensure that unless FromSchedule is set, args contains a backup name
 	if o.FromSchedule == "" && len(args) != 1 {
 		return fmt.Errorf("a backup name is required, unless you are creating based on a schedule")
@@ -212,6 +217,17 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		}
 	}
 
+	return nil
+}
+
+func (o *CreateOptions) validateFromScheduleFlag(c *cobra.Command) error {
+	trimmed := strings.TrimSpace(o.FromSchedule)
+	if c.Flags().Changed("from-schedule") && trimmed == "" {
+		return fmt.Errorf("flag must have a non-empty value: --from-schedule")
+	}
+
+	// Assign the trimmed value back
+	o.FromSchedule = trimmed
 	return nil
 }
 

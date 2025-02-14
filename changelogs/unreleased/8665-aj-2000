@@ -1,0 +1,1 @@
+Fixes issue #8214, validate `--from-schedule` flag in create backup command to prevent empty or whitespace-only values.
