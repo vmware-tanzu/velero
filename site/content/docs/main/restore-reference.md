@@ -281,6 +281,62 @@ By default, Velero will remove the `status` field of an object before it's resto
 
 You can use `--status-include-resources` and `--status-exclude-resources` flags to select the resources whose `status` field will be restored by Velero.  If there are resources selected via these flags, velero will trigger another API call to update the restored object to restore `status` field after it's created.
 
+## Object-Level Resource Status Restoration
+
+Starting from Velero 1.16, Velero now supports object-level control over status restoration during restores. Previously, status restoration could only be configured at the resource type level using the `restoreStatus` field in the Restore CR. With this enhancement, users and controllers can now specify status restoration at the individual resource instance level using the annotation:
+```yaml
+metadata:
+  annotations:
+    velero.io/restore-status: "true"
+```
+This feature provides fine-grained control over status restoration, allowing users and controllers to mark specific objects for status restore while keeping others unaffected.
+
+Velero determines whether to restore the status of an object based on the following precedence:
+1.	Object-Level Annotation (`velero.io/restore-status`)
+- If the annotation is present with a valid value ("true" or "false"), it overrides the global `restoreStatus` setting.
+- "true" → Status will be restored for this object, even if the resource type is not included in `restoreStatus.includedResources`.
+- "false" → Status will not be restored for this object, even if the resource type is included in `restoreStatus.includedResources`.
+2.	Restore CR (`restoreStatus` Field)
+•	If the annotation is missing or invalid, Velero falls back to the `restoreStatus` configuration in the Restore CR.
+•	Objects of resource types listed in `restoreStatus.includedResources` will have their status restored.
+•	Objects of resource types excluded from `restoreStatus.excludedResources` will not have their status restored.
+3.	Default Behavior
+•	If an object has no annotation and its resource type is not included in `restoreStatus.includedResources`, status restoration is skipped.
+
+Let's go over some examples:
+
+1. Restore Status for a Specific Object: If you want Velero to restore the status for a specific resource instance regardless of global restore settings, add the annotation:
+```yaml
+metadata:
+  annotations:
+    velero.io/restore-status: "true"
+```
+Even if the resource type is not listed in `restoreStatus.includedResources`, this object’s status will be restored.
+
+2. Prevent Status Restore for a Specific Object: If you want to exclude a specific object from status restoration, even if its resource type is included in `restoreStatus.includedResources`, use:
+```yaml
+metadata:
+  annotations:
+    velero.io/restore-status: "false"
+```
+This ensures that this specific object will not have its status restored.
+
+3. Restore Status Based on Resource Type: If you want to restore the status for all objects of a resource type, use the `restoreStatus` field in the Restore CR:
+```yaml
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: restore-with-status
+  namespace: velero
+spec:
+  restoreStatus:
+    includedResources:
+      - foo.bar.io
+```
+All `foo.bar.io` objects will have their status restored, except those that have `velero.io/restore-status`: "false" annotation.
+
+4.  Default Behavior (No Annotations & No Restore Spec): If no `velero.io/restore-status` annotation is set and the resource type is not listed in `restoreStatus.includedResources`, Velero skips restoring status for that object. This maintains the existing default behavior.
+
 ## Write Sparse files
 If using fs-restore or CSI snapshot data movements, it's supported to write sparse files during restore by the below command:
 ```bash
