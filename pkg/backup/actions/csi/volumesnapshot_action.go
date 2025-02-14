@@ -137,7 +137,7 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 			vsc = &snapshotv1api.VolumeSnapshotContent{}
 		}
 
-		csi.DeleteVolumeSnapshot(*vs, *vsc, backup, p.crClient, p.log)
+		csi.DeleteVolumeSnapshot(*vs, *vsc, p.crClient, p.log)
 		return item, nil, "", nil, nil
 	}
 
