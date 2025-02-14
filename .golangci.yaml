@@ -52,6 +52,14 @@ output:
 
 # all available settings of specific linters
 linters-settings:
+  depguard:
+    list-type: blacklist # Velero.io word list : ignore
+    include-go-root: false
+    packages:
+      - github.com/sirupsen/logrus
+    packages-with-error-message:
+      # specify an error message to output when a denylisted package is used
+      - github.com/sirupsen/logrus: "logging is allowed only by logutils.Log"
   dogsled:
     # checks assignments with too many blank identifiers; default is 2
     max-blank-identifiers: 2
@@ -86,9 +94,6 @@ linters-settings:
   gocognit:
     # minimal code complexity to report, 30 by default (but we recommend 10-20)
     min-complexity: 10
-  nestif:
-    # minimal complexity of if statements to report, 5 by default
-    min-complexity: 4
   goconst:
     # minimal length of string constant, 3 by default
     min-len: 3
@@ -180,14 +185,22 @@ linters-settings:
     disable:
       - shadow
     disable-all: false
-  depguard:
-    list-type: blacklist # Velero.io word list : ignore
-    include-go-root: false
-    packages:
-      - github.com/sirupsen/logrus
-    packages-with-error-message:
-      # specify an error message to output when a denylisted package is used
-      - github.com/sirupsen/logrus: "logging is allowed only by logutils.Log"
+  importas:
+    alias:
+      - alias: appsv1api
+        pkg: k8s.io/api/apps/v1
+      - alias: corev1api
+        pkg: k8s.io/api/core/v1
+      - alias: rbacv1
+        pkg: k8s.io/api/rbac/v1
+      - alias: apierrors
+        pkg: k8s.io/apimachinery/pkg/api/errors
+      - alias: apiextv1
+        pkg: k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
+      - alias: metav1
+        pkg: k8s.io/apimachinery/pkg/apis/meta/v1
+      - alias: storagev1api
+        pkg: k8s.io/api/storage/v1
   lll:
     # max line length, lines longer will be reported. Default is 120.
     # '\t' is counted as 1 character by default, and can be changed with the tab-width option
@@ -207,15 +220,9 @@ linters-settings:
   nakedret:
     # make an issue if func has more lines of code than this setting and it has naked returns; default is 30
     max-func-lines: 30
-  prealloc:
-    # XXX: we don't recommend using this linter before doing performance profiling.
-    # For most programs usage of prealloc will be a premature optimization.
-
-    # Report preallocation suggestions only on simple loops that have no returns/breaks/continues/gotos in them.
-    # True by default.
-    simple: true
-    range-loops: true # Report preallocation suggestions on range loops, true by default
-    for-loops: false # Report preallocation suggestions on for loops, false by default
+  nestif:
+    # minimal complexity of if statements to report, 5 by default
+    min-complexity: 4
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
     allow-unused: false
@@ -233,6 +240,15 @@ linters-settings:
     errorf: false
     int-conversion: true
     fiximports: true
+  prealloc:
+    # XXX: we don't recommend using this linter before doing performance profiling.
+    # For most programs usage of prealloc will be a premature optimization.
+
+    # Report preallocation suggestions only on simple loops that have no returns/breaks/continues/gotos in them.
+    # True by default.
+    simple: true
+    range-loops: true # Report preallocation suggestions on range loops, true by default
+    for-loops: false # Report preallocation suggestions on for loops, false by default
   revive:
     rules:
       - name: blank-imports
@@ -279,7 +295,6 @@ linters-settings:
       - name: var-declaration
       - name: var-naming
         disabled: true
-    
   rowserrcheck:
     packages:
       - github.com/jmoiron/sqlx

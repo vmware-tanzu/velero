@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -33,17 +33,17 @@ import (
 func TestAddPVFromPVCActionExecute(t *testing.T) {
 	tests := []struct {
 		name           string
-		itemFromBackup *v1.PersistentVolumeClaim
+		itemFromBackup *corev1api.PersistentVolumeClaim
 		want           []velero.ResourceIdentifier
 	}{
 		{
 			name: "bound PVC with volume name returns associated PV",
-			itemFromBackup: &v1.PersistentVolumeClaim{
-				Spec: v1.PersistentVolumeClaimSpec{
+			itemFromBackup: &corev1api.PersistentVolumeClaim{
+				Spec: corev1api.PersistentVolumeClaimSpec{
 					VolumeName: "bound-pv",
 				},
-				Status: v1.PersistentVolumeClaimStatus{
-					Phase: v1.ClaimBound,
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimBound,
 				},
 			},
 			want: []velero.ResourceIdentifier{
@@ -55,22 +55,22 @@ func TestAddPVFromPVCActionExecute(t *testing.T) {
 		},
 		{
 			name: "unbound PVC with volume name does not return any additional items",
-			itemFromBackup: &v1.PersistentVolumeClaim{
-				Spec: v1.PersistentVolumeClaimSpec{
+			itemFromBackup: &corev1api.PersistentVolumeClaim{
+				Spec: corev1api.PersistentVolumeClaimSpec{
 					VolumeName: "pending-pv",
 				},
-				Status: v1.PersistentVolumeClaimStatus{
-					Phase: v1.ClaimPending,
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimPending,
 				},
 			},
 			want: nil,
 		},
 		{
 			name: "bound PVC without volume name does not return any additional items",
-			itemFromBackup: &v1.PersistentVolumeClaim{
-				Spec: v1.PersistentVolumeClaimSpec{},
-				Status: v1.PersistentVolumeClaimStatus{
-					Phase: v1.ClaimBound,
+			itemFromBackup: &corev1api.PersistentVolumeClaim{
+				Spec: corev1api.PersistentVolumeClaimSpec{},
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimBound,
 				},
 			},
 			want: nil,
