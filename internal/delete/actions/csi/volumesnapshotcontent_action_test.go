@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -155,4 +156,55 @@ func TestNewVolumeSnapshotContentDeleteItemAction(t *testing.T) {
 	plugin1 := NewVolumeSnapshotContentDeleteItemAction(f1)
 	_, err1 := plugin1(logger)
 	require.NoError(t, err1)
+}
+
+func TestCheckVSCReadiness(t *testing.T) {
+	tests := []struct {
+		name      string
+		vsc       *snapshotv1api.VolumeSnapshotContent
+		createVSC bool
+		expectErr bool
+		ready     bool
+	}{
+		{
+			name: "VSC not exist",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "vsc-1",
+					Namespace: "velero",
+				},
+			},
+			createVSC: false,
+			expectErr: true,
+			ready:     false,
+		},
+		{
+			name: "VSC not ready",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "vsc-1",
+					Namespace: "velero",
+				},
+			},
+			createVSC: true,
+			expectErr: false,
+			ready:     false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.TODO()
+			crClient := velerotest.NewFakeControllerRuntimeClient(t)
+			if test.createVSC {
+				require.NoError(t, crClient.Create(ctx, test.vsc))
+			}
+
+			ready, err := checkVSCReadiness(ctx, test.vsc, crClient)
+			require.Equal(t, test.ready, ready)
+			if test.expectErr {
+				require.Error(t, err)
+			}
+		})
+	}
 }

@@ -475,6 +475,17 @@ func IsVolumeSnapshotExists(
 	return err == nil
 }
 
+func IsVolumeSnapshotContentExists(name string, client crclient.Client) bool {
+	vsc := new(snapshotv1api.VolumeSnapshotContent)
+	err := client.Get(
+		context.TODO(),
+		crclient.ObjectKey{Name: name},
+		vsc,
+	)
+
+	return err == nil
+}
+
 func SetVolumeSnapshotContentDeletionPolicy(
 	vscName string,
 	crClient crclient.Client,
@@ -532,8 +543,7 @@ func CleanupVolumeSnapshot(
 	}
 }
 
-// DeleteVolumeSnapshot handles the VolumeSnapshot and VolumeSnapshotContent instance deletion.
-func DeleteVolumeSnapshot(
+func DeleteReadyVolumeSnapshot(
 	vs snapshotv1api.VolumeSnapshot,
 	vsc snapshotv1api.VolumeSnapshotContent,
 	client crclient.Client,

@@ -1497,7 +1497,7 @@ func TestDeleteVolumeSnapshots(t *testing.T) {
 			)
 			logger := logging.DefaultLogger(logrus.DebugLevel, logging.FormatText)
 
-			DeleteVolumeSnapshot(tc.vs, tc.vsc, client, logger)
+			DeleteReadyVolumeSnapshot(tc.vs, tc.vsc, client, logger)
 
 			vsList := new(snapshotv1api.VolumeSnapshotList)
 			err := client.List(

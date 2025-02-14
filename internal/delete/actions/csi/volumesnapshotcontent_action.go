@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -79,6 +80,13 @@ func (p *volumeSnapshotContentDeleteItemAction) Execute(
 	}
 
 	p.log.Infof("Deleting VolumeSnapshotContent %s", snapCont.Name)
+
+	uuid, err := uuid.NewRandom()
+	if err != nil {
+		p.log.WithError(err).Errorf("Fail to generate the UUID to create VSC %s", snapCont.Name)
+		return errors.Wrapf(err, "Fail to generate the UUID to create VSC %s", snapCont.Name)
+	}
+	snapCont.Name = "vsc-" + uuid.String()
 
 	snapCont.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentDelete
 
