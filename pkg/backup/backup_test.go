@@ -275,6 +275,41 @@ func TestBackupOldResourceFiltering(t *testing.T) {
 			},
 		},
 		{
+			name: "included namespaces via label filter backs up all resources in those namespaces and other includedNamespaces resources containing label",
+			backup: defaultBackup().
+				IncludedNamespaces("moo").
+				LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"backup-ns": "true"}}).
+				Result(),
+			apiResources: []*test.APIResource{
+				test.Namespaces(
+					builder.ForNamespace("foo").ObjectMeta(builder.WithLabels("backup-ns", "true")).Result(),
+					builder.ForNamespace("moo").Result(),
+				),
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("moo", "mar").ObjectMeta(builder.WithLabels("backup-ns", "true")).Result(),
+					builder.ForPod("moo", "unlabeled-not-included").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+			},
+			want: []string{
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/moo/mar.json",
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/namespaces/moo/mar.json",
+				"resources/namespaces/cluster/foo.json",
+				"resources/namespaces/cluster/moo.json",
+				"resources/namespaces/v1-preferredversion/cluster/foo.json",
+				"resources/namespaces/v1-preferredversion/cluster/moo.json",
+			},
+		},
+		{
 			name: "excluded namespaces filter only backs up resources not in those namespaces",
 			backup: defaultBackup().
 				ExcludedNamespaces("zoo").
