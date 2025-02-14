@@ -600,6 +600,29 @@ func writeInitParameters(ctx context.Context, repoOption udmrepo.RepoOptions, lo
 			logger.Infof("Quick maintenance interval change from %v to %v", p.QuickCycle.Interval, overwriteQuickMaintainInterval)
 			p.QuickCycle.Interval = overwriteQuickMaintainInterval
 		}
+		// the repoOption.StorageOptions are set via
+		// udmrepo.WithStoreOptions -> udmrepo.GetStoreOptions (interface)
+		// -> pkg/repository/provider.GetStoreOptions(param interface{}) -> pkg/repository/provider.getStorageVariables(..., backupRepoConfig)
+		// where backupRepoConfig comes from param.(RepoParam).BackupRepo.Spec.RepositoryConfig map[string]string
+		// where RepositoryConfig comes from pkg/controller/getBackupRepositoryConfig(...)
+		// where it gets a configMap name from pkg/cmd/server/config/Config.BackupRepoConfig
+		// which gets set via velero server flag `backup-repository-configmap` "The name of ConfigMap containing backup repository configurations."
+		// and data stored as json under ConfigMap.Data[repoType] where repoType is BackupRepository.Spec.RepositoryType: either kopia or restic
+		// repoOption.StorageOptions[udmrepo.StoreOptionKeyFullMaintenanceInterval] would for example look like
+		// configMapName.data.kopia: {"fullMaintenanceInterval": "eagerGC"}
+		fullMaintIntervalOption := udmrepo.FullMaintenanceIntervalOptions(repoOption.StorageOptions[udmrepo.StoreOptionKeyFullMaintenanceInterval])
+		if fullMaintIntervalOption == udmrepo.FastGC {
+			logger.Infof("Full maintenance interval change from %v to %v", p.FullCycle.Interval, udmrepo.FastGCInterval)
+			p.FullCycle.Interval = udmrepo.FastGCInterval
+		}
+		if fullMaintIntervalOption == udmrepo.EagerGC {
+			logger.Infof("Full maintenance interval change from %v to %v", p.FullCycle.Interval, udmrepo.EagerGCInterval)
+			p.FullCycle.Interval = udmrepo.EagerGCInterval
+		}
+		if fullMaintIntervalOption == udmrepo.NormalGC {
+			logger.Infof("Full maintenance interval change from %v to %v", p.FullCycle.Interval, udmrepo.NormalGCInterval)
+			p.FullCycle.Interval = udmrepo.NormalGCInterval
+		}
 
 		p.Owner = r.ClientOptions().UsernameAtHost()
 

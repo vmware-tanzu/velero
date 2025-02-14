@@ -576,9 +576,13 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 	result[udmrepo.StoreOptionOssRegion] = strings.Trim(region, "/")
 	result[udmrepo.StoreOptionFsPath] = config["fspath"]
 
-	if backupRepoConfig != nil {
-		if v, found := backupRepoConfig[udmrepo.StoreOptionCacheLimit]; found {
-			result[udmrepo.StoreOptionCacheLimit] = v
+	// Write all backupRepoConfig to results if not exists, otherwise error on conflict
+	for k, v := range backupRepoConfig { // if nil, this would be skipped
+		if _, ok := result[k]; !ok {
+			// TODO: validation of allowed values for each key?
+			result[k] = v
+		} else {
+			return result, errors.Errorf("backupRepoConfig contains key %s that would override storage variables", k)
 		}
 	}
 
