@@ -1,0 +1,1 @@
+Fix issue #8493, setting PVC volume handle to null if CSI volume snapshot is not found

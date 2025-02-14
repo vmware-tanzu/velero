@@ -224,7 +224,9 @@ func (p *pvcRestoreItemAction) Execute(
 			if !ok {
 				logger.Info("Skipping PVCRestoreItemAction for PVC,",
 					"PVC does not have a CSI VolumeSnapshot.")
-				// Make no change in the input PVC.
+				// In case CSI volume snapshot is not found, we will remove the existing volume handle from the PVC
+				// This will simply allow the to  provision new PVC
+				pvc.Spec.VolumeName = ""
 				return &velero.RestoreItemActionExecuteOutput{
 					UpdatedItem: input.Item,
 				}, nil
