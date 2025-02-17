@@ -759,8 +759,7 @@ func (kb *kubernetesBackupper) backupItemBlock(itemBlock *BackupItemBlock) []sch
 
 	if len(postHookPods) > 0 {
 		itemBlock.Log.Debug("Executing post hooks")
-		itemBlock.itemBackupper.hookTracker.AsyncItemBlocks.Add(1)
-		go kb.handleItemBlockPostHooks(itemBlock, postHookPods)
+		kb.handleItemBlockPostHooks(itemBlock, postHookPods)
 	}
 
 	return grList
@@ -798,7 +797,6 @@ func (kb *kubernetesBackupper) handleItemBlockPreHooks(itemBlock *BackupItemBloc
 // The hooks cannot execute until the PVBs to be processed
 func (kb *kubernetesBackupper) handleItemBlockPostHooks(itemBlock *BackupItemBlock, hookPods []itemblock.ItemBlockItem) {
 	log := itemBlock.Log
-	defer itemBlock.itemBackupper.hookTracker.AsyncItemBlocks.Done()
 
 	// the post hooks will not execute until all PVBs of the item block pods are processed
 	if err := kb.waitUntilPVBsProcessed(kb.podVolumeContext, log, itemBlock, hookPods); err != nil {

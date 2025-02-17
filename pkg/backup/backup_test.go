@@ -3995,17 +3995,7 @@ func TestBackupWithHooks(t *testing.T) {
 			require.NoError(t, h.backupper.Backup(h.log, req, backupFile, nil, tc.actions, nil))
 
 			if tc.wantHookExecutionLog != nil {
-				// as the post hook execution in async way, check the existence rather than the exact order
-				assert.Equal(t, len(tc.wantHookExecutionLog), len(podCommandExecutor.HookExecutionLog))
-				m := map[string]struct{}{}
-				for _, entry := range podCommandExecutor.HookExecutionLog {
-					m[entry.String()] = struct{}{}
-				}
-
-				for _, entry := range tc.wantHookExecutionLog {
-					_, exist := m[entry.String()]
-					assert.True(t, exist)
-				}
+				assert.Equal(t, tc.wantHookExecutionLog, podCommandExecutor.HookExecutionLog)
 			}
 			assertTarballContents(t, backupFile, append(tc.wantBackedUp, "metadata/version")...)
 		})

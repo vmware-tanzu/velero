@@ -69,16 +69,14 @@ type HookTracker struct {
 	// HookExecutedCnt indicates the number of executed hooks.
 	hookExecutedCnt int
 	// hookErrs records hook execution errors if any.
-	hookErrs        []HookErrInfo
-	AsyncItemBlocks *sync.WaitGroup
+	hookErrs []HookErrInfo
 }
 
 // NewHookTracker creates a hookTracker instance.
 func NewHookTracker() *HookTracker {
 	return &HookTracker{
-		lock:            &sync.RWMutex{},
-		tracker:         make(map[hookKey]hookStatus),
-		AsyncItemBlocks: &sync.WaitGroup{},
+		lock:    &sync.RWMutex{},
+		tracker: make(map[hookKey]hookStatus),
 	}
 }
 
@@ -143,8 +141,6 @@ func (ht *HookTracker) Record(podNamespace, podName, container, source, hookName
 
 // Stat returns the number of attempted hooks and failed hooks
 func (ht *HookTracker) Stat() (hookAttemptedCnt int, hookFailedCnt int) {
-	ht.AsyncItemBlocks.Wait()
-
 	ht.lock.RLock()
 	defer ht.lock.RUnlock()
 
