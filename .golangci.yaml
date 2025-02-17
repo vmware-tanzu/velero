@@ -12,11 +12,6 @@ run:
   # exit code when at least one issue was found, default is 1
   issues-exit-code: 1
 
-
-  # default is true. Enables skipping of directories:
-  #   vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
-  skip-dirs-use-default: true
-
   # by default isn't set. If set we pass it to "go list -mod={option}". From "go help modules":
   # If invoked with -mod=readonly, the go command is disallowed from the implicit
   # automatic updating of go.mod described above. Instead, it fails when any changes
@@ -138,28 +133,6 @@ linters-settings:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
     local-prefixes: github.com/org/project
-  golint:
-    # minimal confidence for issues, default is 0.8
-    min-confidence: 0.8
-  gomnd:
-    # the list of enabled checks, see https://github.com/tommy-muehle/go-mnd/#checks for description.
-    checks: argument,case,condition,operation,return,assign
-  gomodguard:
-    allowed:
-      modules:                                                        # List of allowed modules
-        # - gopkg.in/yaml.v2
-      domains:                                                        # List of allowed module domains
-        # - golang.org
-    blocked:
-      modules:                                                        # List of blocked modules
-        # - github.com/uudashr/go-module:                             # Blocked module
-        #     recommendations:                                        # Recommended modules that should be used instead (Optional)
-        #       - golang.org/x/mod
-        #     reason: "`mod` is the official go.mod parser library."  # Reason why the recommended module should be used (Optional)
-      versions:                                                       # List of blocked module version constraints
-        # - github.com/mitchellh/go-homedir:                          # Blocked module with version constraint
-        #     version: "< 1.1.0"                                      # Version constraint, see https://github.com/Masterminds/semver#basic-comparisons
-        #     reason: "testing if blocked version constraint works."  # Reason why the version constraint exists. (Optional)
   govet:
     # report about shadowed variables
     # check-shadowing: true
@@ -180,23 +153,12 @@ linters-settings:
     disable:
       - shadow
     disable-all: false
-  depguard:
-    list-type: blacklist # Velero.io word list : ignore
-    include-go-root: false
-    packages:
-      - github.com/sirupsen/logrus
-    packages-with-error-message:
-      # specify an error message to output when a denylisted package is used
-      - github.com/sirupsen/logrus: "logging is allowed only by logutils.Log"
   lll:
     # max line length, lines longer will be reported. Default is 120.
     # '\t' is counted as 1 character by default, and can be changed with the tab-width option
     line-length: 120
     # tab width in spaces. Default to 1.
     tab-width: 1
-  maligned:
-    # print struct with more effective memory layout or not, false by default
-    suggest-new: true
   misspell:
     # Correct spellings using locale preferences for US or UK.
     # Default is to use a neutral variety of English.
@@ -219,8 +181,6 @@ linters-settings:
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
     allow-unused: false
-    # Disable to ensure that nolint directives don't have a leading space. Default is true.
-    allow-leading-space: true
     # Exclude following linters from requiring an explanation.  Default is [].
     allow-no-explanation: []
     # Enable to require an explanation of nonzero length after each nolint directive. Default is false.
@@ -232,7 +192,6 @@ linters-settings:
     sprintf1: false
     errorf: false
     int-conversion: true
-    fiximports: true
   revive:
     rules:
       - name: blank-imports
@@ -297,12 +256,6 @@ linters-settings:
     # Inspect exported functions, default is false. Set to true if no external program/library imports your code.
     # XXX: if you enable this setting, unparam will report a lot of false-positives in text editors:
     # if it's called for subdir of a project it can't find external interfaces. All text editor integrations
-    # with golangci-lint call it on a directory with the changed file.
-    check-exported: false
-  unused:
-    # treat code as a program (not a library) and report unused exported identifiers; default is false.
-    # XXX: if you enable this setting, unused will report a lot of false-positives in text editors:
-    # if it's called for subdir of a project it can't find funcs usages. All text editor integrations
     # with golangci-lint call it on a directory with the changed file.
     check-exported: false
   whitespace:
