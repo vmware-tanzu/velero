@@ -191,7 +191,7 @@ func runCrashd(o *option) error {
 	if o.verbose {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
-	return exec.Execute("velero-debug-collector", bytes.NewReader(scriptBytes), o.asCrashdArgMap())
+	return exec.Execute("velero-debug-collector", bytes.NewReader(scriptBytes), o.asCrashdArgMap(), false)
 }
 
 func kubeconfigAndContext(fs *pflag.FlagSet) (string, string) {
