@@ -214,18 +214,23 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 
 	selector := fields.OneTermEqualSelector("metadata.name", pod.Name)
 	lw := e.ListWatchFactory.NewListWatch(pod.Namespace, selector)
-
-	_, podWatcher := cache.NewInformer(lw, pod, 0, cache.ResourceEventHandlerFuncs{
-		AddFunc: handler,
-		UpdateFunc: func(_, newObj any) {
-			handler(newObj)
+	_, podWatcher := cache.NewInformerWithOptions(cache.InformerOptions{
+		ListerWatcher: lw,
+		ObjectType:    pod,
+		ResyncPeriod:  0,
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: handler,
+			UpdateFunc: func(_, newObj any) {
+				handler(newObj)
+			},
+			DeleteFunc: func(obj any) {
+				err := fmt.Errorf("pod %s deleted before all hooks were executed", kube.NamespaceAndName(pod))
+				log.Error(err)
+				cancel()
+			},
 		},
-		DeleteFunc: func(obj any) {
-			err := fmt.Errorf("pod %s deleted before all hooks were executed", kube.NamespaceAndName(pod))
-			log.Error(err)
-			cancel()
-		},
-	})
+	},
+	)
 
 	podWatcher.Run(ctx.Done())
 
