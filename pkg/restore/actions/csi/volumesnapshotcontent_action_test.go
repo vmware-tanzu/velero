@@ -29,9 +29,11 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestVSCExecute(t *testing.T) {
+	var snapshotHandleName = "testHandle"
 	tests := []struct {
 		name          string
 		item          runtime.Unstructured
@@ -52,7 +54,7 @@ func TestVSCExecute(t *testing.T) {
 					velerov1api.PrefixedSecretNameAnnotation:      "name",
 					velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
 				},
-			)).Result(),
+			)).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).Result(),
 			restore:   builder.ForRestore("velero", "restore").Result(),
 			expectErr: false,
 			expectedItems: []velero.ResourceIdentifier{
@@ -67,10 +69,10 @@ func TestVSCExecute(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p, err := NewVolumeSnapshotContentRestoreItemAction(logrus.StandardLogger())
-			require.NoError(t, err)
-
-			action := p.(*volumeSnapshotContentRestoreItemAction)
+			action := volumeSnapshotContentRestoreItemAction{
+				log:    logrus.StandardLogger(),
+				client: velerotest.NewFakeControllerRuntimeClient(t),
+			}
 
 			if test.vsc != nil {
 				vsMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(test.vsc)
@@ -80,8 +82,9 @@ func TestVSCExecute(t *testing.T) {
 
 			output, err := action.Execute(
 				&velero.RestoreItemActionExecuteInput{
-					Item:    test.item,
-					Restore: test.restore,
+					Item:           test.item,
+					ItemFromBackup: test.item,
+					Restore:        test.restore,
 				},
 			)
 
