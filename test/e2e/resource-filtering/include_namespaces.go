@@ -104,7 +104,7 @@ func (i *IncludeNamespaces) CreateResources() error {
 	for nsNum := 0; nsNum < i.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", i.CaseBaseName, nsNum)
 		fmt.Printf("Creating namespaces ...%s\n", createNSName)
-		if err := CreateNamespace(i.Ctx, i.Client, createNSName); err != nil {
+		if err := CreateNamespace(i.Ctx, i.Client, createNSName, false); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 	}
