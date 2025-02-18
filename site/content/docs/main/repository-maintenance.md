@@ -51,7 +51,7 @@ For example, the following BackupRepository's key should be `test-default-kopia`
 
 You can still customize the maintenance job resource requests and limit when using the [velero install][1] CLI command.
 
-The `LoadAffinity` structure is reused from design [node-agent affinity configuration](2).
+The `LoadAffinity` structure is reused from design [node-agent affinity configuration][2].
 
 ### Affinity Example
 It's possible that the users want to choose nodes that match condition A or condition B to run the job.
@@ -131,33 +131,11 @@ velero install --default-repo-maintain-frequency <DURATION>
 For Kopia the default maintenance frequency is 1 hour, and Restic is 7 * 24 hours.
 
 ### Full Maintenance Interval customization
-The full maintenance interval defaults to kopia defaults of 24 hours. Velero provide three override options under `fullMaintenanceInterval` configuration using `backup-repository-configmap` ConfigMap provided to velero install commands allowing for faster removal of deleted velero backups from kopia repo.
-- normalGC: 24 hours
-- fastGC: 12 hours
-- eagerGC: 6 hours
-
-Example of the `backup-repository-configmap` ConfigMap for the above scenario is as below:
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: <config-name>
-  namespace: velero
-data:
-  <repository-type-1>: |
-    {
-      "fullMaintenanceInterval": fastGC
-    }
-  <repository-type-2>: |
-    {
-      "fullMaintenanceInterval": normalGC
-    }        
-```
-
-Per kopia [Maintenance Safety](https://kopia.io/docs/advanced/maintenance/#maintenance-safety), it is expected that velero backup deletion will not result in immediate kopia repository data removal. Reducing full maintenance interval using above options should help reduce time taken to remove blobs not in use.
+See [backup repository configuration][3]
 
 ### Others
 Maintenance jobs will inherit the labels, annotations, toleration, nodeSelector, service account, image, environment variables, cloud-credentials etc. from Velero deployment.
 
 [1]: velero-install.md#usage
 [2]: node-agent-concurrency.md
+[3]: backup-repository-configuration.md#full-maintenance-interval-customization
