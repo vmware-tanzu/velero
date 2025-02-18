@@ -611,18 +611,18 @@ func writeInitParameters(ctx context.Context, repoOption udmrepo.RepoOptions, lo
 		// repoOption.StorageOptions[udmrepo.StoreOptionKeyFullMaintenanceInterval] would for example look like
 		// configMapName.data.kopia: {"fullMaintenanceInterval": "eagerGC"}
 		fullMaintIntervalOption := udmrepo.FullMaintenanceIntervalOptions(repoOption.StorageOptions[udmrepo.StoreOptionKeyFullMaintenanceInterval])
-		if fullMaintIntervalOption == udmrepo.FastGC {
-			logger.Infof("Full maintenance interval change from %v to %v", p.FullCycle.Interval, udmrepo.FastGCInterval)
+		priorMaintInterval := p.FullCycle.Interval
+		switch fullMaintIntervalOption {
+		case udmrepo.FastGC:
 			p.FullCycle.Interval = udmrepo.FastGCInterval
-		}
-		if fullMaintIntervalOption == udmrepo.EagerGC {
-			logger.Infof("Full maintenance interval change from %v to %v", p.FullCycle.Interval, udmrepo.EagerGCInterval)
+		case udmrepo.EagerGC:
 			p.FullCycle.Interval = udmrepo.EagerGCInterval
-		}
-		if fullMaintIntervalOption == udmrepo.NormalGC {
-			logger.Infof("Full maintenance interval change from %v to %v", p.FullCycle.Interval, udmrepo.NormalGCInterval)
+		case udmrepo.NormalGC:
 			p.FullCycle.Interval = udmrepo.NormalGCInterval
+		default:
+			return errors.Errorf("invalid full maintenance interval option %s", fullMaintIntervalOption)
 		}
+		logger.Infof("Full maintenance interval change from %v to %v", priorMaintInterval, p.FullCycle.Interval)
 
 		p.Owner = r.ClientOptions().UsernameAtHost()
 
