@@ -592,7 +592,6 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 				result[param] = v
 			}
 		}
-
 	}
 
 	return result, nil
