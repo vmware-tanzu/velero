@@ -694,7 +694,7 @@ func TestGetBackupRepositoryConfig(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 		},
 		Data: map[string]string{
-			"fake-repo-type":   "{\"cacheLimitMB\": 1000, \"enableCompression\": true}",
+			"fake-repo-type":   "{\"cacheLimitMB\": 1000, \"enableCompression\": true, \"fullMaintenanceInterval\": \"fastGC\"}",
 			"fake-repo-type-1": "{\"cacheLimitMB\": 1, \"enableCompression\": false}",
 		},
 	}
@@ -744,8 +744,9 @@ func TestGetBackupRepositoryConfig(t *testing.T) {
 				configWithData,
 			},
 			expectedResult: map[string]string{
-				"cacheLimitMB":      "1000",
-				"enableCompression": "true",
+				"cacheLimitMB":            "1000",
+				"enableCompression":       "true",
+				"fullMaintenanceInterval": "fastGC",
 			},
 		},
 	}
