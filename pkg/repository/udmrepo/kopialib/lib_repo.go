@@ -622,7 +622,9 @@ func writeInitParameters(ctx context.Context, repoOption udmrepo.RepoOptions, lo
 		default:
 			return errors.Errorf("invalid full maintenance interval option %s", fullMaintIntervalOption)
 		}
-		logger.Infof("Full maintenance interval change from %v to %v", priorMaintInterval, p.FullCycle.Interval)
+		if priorMaintInterval != p.FullCycle.Interval {
+			logger.Infof("Full maintenance interval change from %v to %v", priorMaintInterval, p.FullCycle.Interval)
+		}
 
 		p.Owner = r.ClientOptions().UsernameAtHost()
 
