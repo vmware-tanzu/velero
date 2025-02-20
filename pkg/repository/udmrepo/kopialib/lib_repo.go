@@ -619,6 +619,7 @@ func writeInitParameters(ctx context.Context, repoOption udmrepo.RepoOptions, lo
 			p.FullCycle.Interval = udmrepo.EagerGCInterval
 		case udmrepo.NormalGC:
 			p.FullCycle.Interval = udmrepo.NormalGCInterval
+		case "": // do nothing
 		default:
 			return errors.Errorf("invalid full maintenance interval option %s", fullMaintIntervalOption)
 		}
