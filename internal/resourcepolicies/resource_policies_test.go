@@ -120,6 +120,43 @@ volumePolicies:
 `,
 			wantErr: false,
 		},
+		{
+			name: "supported format pvcLabels",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      pvcLabels:
+        environment: production
+        app: database
+    action:
+      type: skip
+`,
+			wantErr: false,
+		},
+		{
+			name: "error format of pvcLabels (not a map)",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      pvcLabels: "production"
+    action:
+      type: skip
+`,
+			wantErr: true,
+		},
+		{
+			name: "supported format pvcLabels with extra keys",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      pvcLabels:
+        environment: production
+        region: us-west
+    action:
+      type: skip
+`,
+			wantErr: false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -178,6 +215,14 @@ func TestGetResourceMatchedAction(t *testing.T) {
 						}),
 				},
 			},
+			{
+				Action: Action{Type: "snapshot"},
+				Conditions: map[string]any{
+					"pvcLabels": map[string]string{
+						"environment": "production",
+					},
+				},
+			},
 		},
 	}
 	testCases := []struct {
@@ -230,6 +275,29 @@ func TestGetResourceMatchedAction(t *testing.T) {
 			},
 			expectedAction: nil,
 		},
+		{
+			name: "match pvcLabels condition",
+			volume: &structuredVolume{
+				capacity:     *resource.NewQuantity(5<<30, resource.BinarySI),
+				storageClass: "some-class",
+				pvcLabels: map[string]string{
+					"environment": "production",
+					"team":        "backend",
+				},
+			},
+			expectedAction: &Action{Type: "snapshot"},
+		},
+		{
+			name: "mismatch pvcLabels condition",
+			volume: &structuredVolume{
+				capacity:     *resource.NewQuantity(5<<30, resource.BinarySI),
+				storageClass: "some-class",
+				pvcLabels: map[string]string{
+					"environment": "staging",
+				},
+			},
+			expectedAction: nil,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -266,7 +334,27 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 			Namespace: "test-namespace",
 		},
 		Data: map[string]string{
-			"test-data": "version: v1\nvolumePolicies:\n  - conditions:\n      capacity: '0,10Gi'\n      csi:\n        driver: disks.csi.driver\n    action:\n      type: skip\n  - conditions:\n      csi:\n        driver: files.csi.driver\n        volumeAttributes:\n          protocol: nfs\n    action:\n      type: skip",
+			"test-data": `version: v1
+volumePolicies:
+  - conditions:
+      capacity: '0,10Gi'
+      csi:
+        driver: disks.csi.driver
+    action:
+      type: skip
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip
+  - conditions:
+      pvcLabels:
+        environment: production
+    action:
+      type: skip
+`,
 		},
 	}
 
@@ -276,7 +364,9 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 
 	// Check that the returned resourcePolicies object contains the expected data
 	assert.Equal(t, "v1", resPolicies.version)
-	assert.Len(t, resPolicies.volumePolicies, 2)
+
+	assert.Len(t, resPolicies.volumePolicies, 3)
+
 	policies := ResourcePolicies{
 		Version: "v1",
 		VolumePolicies: []VolumePolicy{
@@ -302,13 +392,25 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 					Type: Skip,
 				},
 			},
+			{
+				Conditions: map[string]any{
+					"pvcLabels": map[string]string{
+						"environment": "production",
+					},
+				},
+				Action: Action{
+					Type: Skip,
+				},
+			},
 		},
 	}
+
 	p := &Policies{}
 	err = p.BuildPolicy(&policies)
 	if err != nil {
-		t.Fatalf("failed to build policy with error %v", err)
+		t.Fatalf("failed to build policy: %v", err)
 	}
+
 	assert.Equal(t, p, resPolicies)
 }
 
@@ -317,6 +419,7 @@ func TestGetMatchAction(t *testing.T) {
 		name     string
 		yamlData string
 		vol      *v1.PersistentVolume
+		pvc      *v1.PersistentVolumeClaim
 		skip     bool
 	}{
 		{
@@ -635,6 +738,143 @@ volumePolicies:
 			},
 			skip: false,
 		},
+		{
+			name: "PVC labels match",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+    pvcLabels:
+      environment: production
+  action:
+    type: skip`,
+			vol: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-1",
+				},
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{},
+					ClaimRef: &v1.ObjectReference{
+						Namespace: "default",
+						Name:      "pvc-1",
+					},
+				},
+			},
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-1",
+					Labels:    map[string]string{"environment": "production"},
+				},
+			},
+			skip: true,
+		},
+		{
+			name: "PVC labels match, criteria label is a subset of the pvc labels",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+    pvcLabels:
+      environment: production
+  action:
+    type: skip`,
+			vol: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-1",
+				},
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{},
+					ClaimRef: &v1.ObjectReference{
+						Namespace: "default",
+						Name:      "pvc-1",
+					},
+				},
+			},
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-1",
+					Labels:    map[string]string{"environment": "production", "app": "backend"},
+				},
+			},
+			skip: true,
+		},
+		{
+			name: "PVC labels match don't match exactly",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+    pvcLabels:
+      environment: production
+      app: frontend
+  action:
+    type: skip`,
+			vol: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-1",
+				},
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{},
+					ClaimRef: &v1.ObjectReference{
+						Namespace: "default",
+						Name:      "pvc-1",
+					},
+				},
+			},
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-1",
+					Labels:    map[string]string{"environment": "production"},
+				},
+			},
+			skip: false,
+		},
+		{
+			name: "PVC labels mismatch",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+    pvcLabels:
+      environment: production
+  action:
+    type: skip`,
+			vol: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-2",
+				},
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{},
+					ClaimRef: &v1.ObjectReference{
+						Namespace: "default",
+						Name:      "pvc-2",
+					},
+				},
+			},
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-1",
+					Labels:    map[string]string{"environment": "staging"},
+				},
+			},
+			skip: false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -646,7 +886,8 @@ volumePolicies:
 			policies := &Policies{}
 			err = policies.BuildPolicy(resPolicies)
 			assert.NoError(t, err)
-			action, err := policies.GetMatchAction(tc.vol)
+
+			action, err := policies.GetMatchAction(tc.vol, tc.pvc)
 			assert.NoError(t, err)
 
 			if tc.skip {
@@ -658,4 +899,24 @@ volumePolicies:
 			}
 		})
 	}
+}
+
+func TestGetMatchAction_Errors(t *testing.T) {
+	p := &Policies{}
+
+	action, err := p.GetMatchAction("invalid volume", nil)
+	assert.Error(t, err, "Expected error when volumeRes is not a valid volume type")
+	assert.Contains(t, err.Error(), "failed to convert object")
+	assert.Nil(t, action)
+
+	vol := &v1.PersistentVolume{
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")},
+		},
+	}
+
+	action, err = p.GetMatchAction(vol, 123)
+	assert.Error(t, err, "Expected error when pvcRes is not a valid PVC type")
+	assert.Contains(t, err.Error(), "failed to convert object")
+	assert.Nil(t, action)
 }

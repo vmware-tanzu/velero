@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/labels"
+
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 	corev1api "k8s.io/api/core/v1"
@@ -48,6 +50,7 @@ type structuredVolume struct {
 	nfs          *nFSVolumeSource
 	csi          *csiVolumeSource
 	volumeType   SupportedVolume
+	pvcLabels    map[string]string
 }
 
 func (s *structuredVolume) parsePV(pv *corev1api.PersistentVolume) {
@@ -78,6 +81,27 @@ func (s *structuredVolume) parsePodVolume(vol *corev1api.Volume) {
 	}
 
 	s.volumeType = getVolumeTypeFromVolume(vol)
+}
+
+// pvcLabelsCondition defines a condition that matches if the PVC's labels contain all the provided key/value pairs.
+type pvcLabelsCondition struct {
+	labels map[string]string
+}
+
+func (c *pvcLabelsCondition) match(v *structuredVolume) bool {
+	// No labels specified: always match.
+	if len(c.labels) == 0 {
+		return true
+	}
+	if v.pvcLabels == nil {
+		return false
+	}
+	selector := labels.SelectorFromSet(c.labels)
+	return selector.Matches(labels.Set(v.pvcLabels))
+}
+
+func (c *pvcLabelsCondition) validate() error {
+	return nil
 }
 
 type capacityCondition struct {

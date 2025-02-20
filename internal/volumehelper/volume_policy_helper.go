@@ -81,7 +81,7 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 	}
 
 	if v.volumePolicy != nil {
-		action, err := v.volumePolicy.GetMatchAction(pv)
+		action, err := v.volumePolicy.GetMatchAction(pv, pvc)
 		if err != nil {
 			v.logger.WithError(err).Errorf("fail to get VolumePolicy match action for PV %s", pv.Name)
 			return false, err
@@ -144,9 +144,11 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 
 	if v.volumePolicy != nil {
 		var resource any
+		var err error
 		resource = &volume
+		var pvc = &corev1api.PersistentVolumeClaim{}
 		if volume.VolumeSource.PersistentVolumeClaim != nil {
-			pvc, err := kubeutil.GetPVCForPodVolume(&volume, &pod, v.client)
+			pvc, err = kubeutil.GetPVCForPodVolume(&volume, &pod, v.client)
 			if err != nil {
 				v.logger.WithError(err).Errorf("fail to get PVC for pod %s", pod.Namespace+"/"+pod.Name)
 				return false, err
@@ -158,7 +160,7 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 			}
 		}
 
-		action, err := v.volumePolicy.GetMatchAction(resource)
+		action, err := v.volumePolicy.GetMatchAction(resource, pvc)
 		if err != nil {
 			v.logger.WithError(err).Error("fail to get VolumePolicy match action for volume")
 			return false, err
