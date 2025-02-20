@@ -20,17 +20,124 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
 	"github.com/stretchr/testify/assert"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func setStructuredVolume(capacity resource.Quantity, sc string, nfs *nFSVolumeSource, csi *csiVolumeSource) *structuredVolume {
+func setStructuredVolume(capacity resource.Quantity, sc string, nfs *nFSVolumeSource, csi *csiVolumeSource, pvcLabels map[string]string) *structuredVolume {
 	return &structuredVolume{
 		capacity:     capacity,
 		storageClass: sc,
 		nfs:          nfs,
 		csi:          csi,
+		pvcLabels:    pvcLabels,
+	}
+}
+
+func TestPVCLabelsMatch(t *testing.T) {
+	tests := []struct {
+		name          string
+		condition     *pvcLabelsCondition
+		volume        *structuredVolume
+		expectedMatch bool
+	}{
+		{
+			name: "match exact label (single)",
+			condition: &pvcLabelsCondition{
+				labels: map[string]string{"environment": "production"},
+			},
+			volume: setStructuredVolume(
+				*resource.NewQuantity(0, resource.BinarySI),
+				"any",
+				nil,
+				nil,
+				map[string]string{"environment": "production", "app": "database"},
+			),
+			expectedMatch: true,
+		},
+		{
+			name: "match exact label (multiple)",
+			condition: &pvcLabelsCondition{
+				labels: map[string]string{"environment": "production", "app": "database"},
+			},
+			volume: setStructuredVolume(
+				*resource.NewQuantity(0, resource.BinarySI),
+				"any",
+				nil,
+				nil,
+				map[string]string{"environment": "production", "app": "database"},
+			),
+			expectedMatch: true,
+		},
+		{
+			name: "mismatch label value",
+			condition: &pvcLabelsCondition{
+				labels: map[string]string{"environment": "production"},
+			},
+			volume: setStructuredVolume(
+				*resource.NewQuantity(0, resource.BinarySI),
+				"any",
+				nil,
+				nil,
+				map[string]string{"environment": "staging", "app": "database"},
+			),
+			expectedMatch: false,
+		},
+		{
+			name: "missing label key",
+			condition: &pvcLabelsCondition{
+				labels: map[string]string{"environment": "production", "region": "us-west"},
+			},
+			volume: setStructuredVolume(
+				*resource.NewQuantity(0, resource.BinarySI),
+				"any",
+				nil,
+				nil,
+				map[string]string{"environment": "production", "app": "database"},
+			),
+			expectedMatch: false,
+		},
+		{
+			name: "empty condition always matches",
+			condition: &pvcLabelsCondition{
+				labels: map[string]string{},
+			},
+			volume: setStructuredVolume(
+				*resource.NewQuantity(0, resource.BinarySI),
+				"any",
+				nil,
+				nil,
+				map[string]string{"environment": "staging"},
+			),
+			expectedMatch: true,
+		},
+		{
+			name: "nil pvcLabels fails non-empty condition",
+			condition: &pvcLabelsCondition{
+				labels: map[string]string{"environment": "production"},
+			},
+			volume: setStructuredVolume(
+				*resource.NewQuantity(0, resource.BinarySI),
+				"any",
+				nil,
+				nil,
+				nil,
+			),
+			expectedMatch: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			match := tt.condition.match(tt.volume)
+			assert.Equal(t, tt.expectedMatch, match, "expected match %v, got %v", tt.expectedMatch, match)
+		})
 	}
 }
 
@@ -100,31 +207,31 @@ func TestStorageClassConditionMatch(t *testing.T) {
 		{
 			name:          "match single storage class",
 			condition:     &storageClassCondition{[]string{"gp2"}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "gp2", nil, nil),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "gp2", nil, nil, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "match multiple storage classes",
 			condition:     &storageClassCondition{[]string{"gp2", "ebs-sc"}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "gp2", nil, nil),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "gp2", nil, nil, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "mismatch storage class",
 			condition:     &storageClassCondition{[]string{"gp2"}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "ebs-sc", nil, nil),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "ebs-sc", nil, nil, nil),
 			expectedMatch: false,
 		},
 		{
 			name:          "empty storage class",
 			condition:     &storageClassCondition{[]string{}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "ebs-sc", nil, nil),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "ebs-sc", nil, nil, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty volume storage class",
 			condition:     &storageClassCondition{[]string{"gp2"}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, nil),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, nil, nil),
 			expectedMatch: false,
 		},
 	}
@@ -149,37 +256,37 @@ func TestNFSConditionMatch(t *testing.T) {
 		{
 			name:          "match nfs condition",
 			condition:     &nfsCondition{&nFSVolumeSource{Server: "192.168.10.20"}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: "192.168.10.20"}, nil),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: "192.168.10.20"}, nil, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty nfs condition",
 			condition:     &nfsCondition{nil},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: "192.168.10.20"}, nil),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: "192.168.10.20"}, nil, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty nfs server and path condition",
 			condition:     &nfsCondition{&nFSVolumeSource{Server: "", Path: ""}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: "192.168.10.20"}, nil),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: "192.168.10.20"}, nil, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "server mismatch",
 			condition:     &nfsCondition{&nFSVolumeSource{Server: "192.168.10.20", Path: ""}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: ""}, nil),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: ""}, nil, nil),
 			expectedMatch: false,
 		},
 		{
 			name:          "empty nfs server condition",
 			condition:     &nfsCondition{&nFSVolumeSource{Path: "/mnt/data"}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: "192.168.10.20", Path: "/mnt/data"}, nil),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", &nFSVolumeSource{Server: "192.168.10.20", Path: "/mnt/data"}, nil, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty nfs volume",
 			condition:     &nfsCondition{&nFSVolumeSource{Server: "192.168.10.20"}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, nil),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, nil, nil),
 			expectedMatch: false,
 		},
 	}
@@ -203,43 +310,43 @@ func TestCSIConditionMatch(t *testing.T) {
 		{
 			name:          "match csi driver condition",
 			condition:     &csiCondition{&csiVolumeSource{Driver: "test"}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty csi driver condition",
 			condition:     &csiCondition{nil},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty csi driver volume",
 			condition:     &csiCondition{&csiVolumeSource{Driver: "test"}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{}),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{}, nil),
 			expectedMatch: false,
 		},
 		{
 			name:          "match csi volumeAttributes condition",
 			condition:     &csiCondition{&csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty csi volumeAttributes condition",
 			condition:     &csiCondition{&csiVolumeSource{Driver: "test"}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}, nil),
 			expectedMatch: true,
 		},
 		{
 			name:          "empty csi volumeAttributes volume",
 			condition:     &csiCondition{&csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": ""}}),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": ""}}, nil),
 			expectedMatch: false,
 		},
 		{
 			name:          "empty csi volumeAttributes volume",
 			condition:     &csiCondition{&csiVolumeSource{Driver: "test", VolumeAttributes: map[string]string{"protocol": "nfs"}}},
-			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}),
+			volume:        setStructuredVolume(*resource.NewQuantity(0, resource.BinarySI), "", nil, &csiVolumeSource{Driver: "test"}, nil),
 			expectedMatch: false,
 		},
 	}
@@ -300,6 +407,35 @@ func TestUnmarshalVolumeConditions(t *testing.T) {
 				"unknown": "foo",
 			},
 			expectedError: "field unknown not found in type",
+		},
+		{
+			name: "Valid pvcLabels input as map[string]string",
+			input: map[string]any{
+				"capacity": "1Gi,10Gi",
+				"pvcLabels": map[string]string{
+					"environment": "production",
+				},
+			},
+			expectedError: "",
+		},
+		{
+			name: "Valid pvcLabels input as map[string]any",
+			input: map[string]any{
+				"capacity": "1Gi,10Gi",
+				"pvcLabels": map[string]any{
+					"environment": "production",
+					"app":         "database",
+				},
+			},
+			expectedError: "",
+		},
+		{
+			name: "Invalid pvcLabels input: not a map",
+			input: map[string]any{
+				"capacity":  "1Gi,10Gi",
+				"pvcLabels": "production",
+			},
+			expectedError: "!!str `production` into map[string]string",
 		},
 	}
 
@@ -391,7 +527,7 @@ func TestParsePodVolume(t *testing.T) {
 	}
 }
 
-func TestParsePV(t *testing.T) {
+func TestParsePVWithPVC(t *testing.T) {
 	// Mock data
 	nfsVolume := corev1api.PersistentVolume{}
 	nfsVolume.Spec.Capacity = corev1api.ResourceList{corev1api.ResourceStorage: resource.MustParse("1Gi")}
@@ -400,13 +536,26 @@ func TestParsePV(t *testing.T) {
 	csiVolume.Spec.Capacity = corev1api.ResourceList{corev1api.ResourceStorage: resource.MustParse("2Gi")}
 	csiVolume.Spec.CSI = &corev1api.CSIPersistentVolumeSource{Driver: "csi.example.com", VolumeAttributes: map[string]string{"protocol": "nfs"}}
 	emptyVolume := corev1api.PersistentVolume{}
+	pvcNFSVolume := corev1api.PersistentVolume{}
+	pvcNFSVolume.Spec.Capacity = corev1api.ResourceList{
+		corev1api.ResourceStorage: resource.MustParse("1Gi"),
+	}
+	pvcNFSVolume.Spec.NFS = &corev1api.NFSVolumeSource{
+		Server: "nfs.example.com",
+		Path:   "/exports/data",
+	}
+	pvcNFSVolume.Spec.ClaimRef = &corev1api.ObjectReference{
+		Namespace: "default",
+		Name:      "pvc-nfs",
+	}
 
 	// Test cases
 	testCases := []struct {
-		name        string
-		inputVolume *corev1api.PersistentVolume
-		expectedNFS *nFSVolumeSource
-		expectedCSI *csiVolumeSource
+		name              string
+		inputVolume       *corev1api.PersistentVolume
+		expectedNFS       *nFSVolumeSource
+		expectedCSI       *csiVolumeSource
+		expectedPVCLabels map[string]string
 	}{
 		{
 			name:        "NFS volume",
@@ -426,13 +575,52 @@ func TestParsePV(t *testing.T) {
 			expectedNFS: nil,
 			expectedCSI: nil,
 		},
+		{
+			name:              "PVC-bound NFS volume",
+			inputVolume:       &pvcNFSVolume,
+			expectedNFS:       &nFSVolumeSource{Server: "nfs.example.com", Path: "/exports/data"},
+			expectedCSI:       nil,
+			expectedPVCLabels: map[string]string{"environment": "production"},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Call the function
 			structuredVolume := &structuredVolume{}
-			structuredVolume.parsePV(tc.inputVolume)
+
+			// Build a fake client if the PV has a ClaimRef.
+			var cli crclient.Client
+			if tc.inputVolume.Spec.ClaimRef != nil {
+				// Build a slice of runtime.Object.
+				var objsRuntime []runtime.Object
+				if tc.expectedPVCLabels != nil {
+					pvc := &corev1api.PersistentVolumeClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: tc.inputVolume.Spec.ClaimRef.Namespace,
+							Name:      tc.inputVolume.Spec.ClaimRef.Name,
+							Labels:    tc.expectedPVCLabels,
+						},
+					}
+					objsRuntime = append(objsRuntime, pvc)
+				}
+
+				var objsClient []crclient.Object
+				for _, obj := range objsRuntime {
+					if o, ok := obj.(crclient.Object); ok {
+						objsClient = append(objsClient, o)
+					} else {
+						t.Fatalf("object %v does not implement client.Object", obj)
+					}
+				}
+				cli = fake.NewClientBuilder().WithObjects(objsClient...).Build()
+			} else {
+				cli = fake.NewClientBuilder().Build()
+			}
+			err := structuredVolume.parsePVWithPVC(tc.inputVolume, cli)
+			if err != nil {
+				t.Errorf("error parsing PV: %v", err)
+			}
 			// Check the results
 			if structuredVolume.capacity != *tc.inputVolume.Spec.Capacity.Storage() {
 				t.Errorf("capacity does not match expected value")
@@ -460,6 +648,18 @@ func TestParsePV(t *testing.T) {
 					for k, v := range tc.expectedCSI.VolumeAttributes {
 						if structuredVolume.csi.VolumeAttributes[k] != v {
 							t.Errorf("CSI volume attributes does not match expected value")
+						}
+					}
+				}
+			}
+			// Check PVC labels for PVC-bound volumes.
+			if tc.inputVolume.Spec.ClaimRef != nil {
+				if structuredVolume.pvcLabels == nil {
+					t.Errorf("expected non-nil pvcLabels for PVC-bound volume")
+				} else if tc.expectedPVCLabels != nil {
+					for k, v := range tc.expectedPVCLabels {
+						if structuredVolume.pvcLabels[k] != v {
+							t.Errorf("PVC label for key %s mismatch: expected %s, got %s", k, v, structuredVolume.pvcLabels[k])
 						}
 					}
 				}
