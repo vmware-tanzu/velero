@@ -81,7 +81,7 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 	}
 
 	if v.volumePolicy != nil {
-		action, err := v.volumePolicy.GetMatchAction(pv)
+		action, err := v.volumePolicy.GetMatchAction(pv, v.client)
 		if err != nil {
 			v.logger.WithError(err).Errorf("fail to get VolumePolicy match action for PV %s", pv.Name)
 			return false, err
@@ -158,7 +158,7 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 			}
 		}
 
-		action, err := v.volumePolicy.GetMatchAction(resource)
+		action, err := v.volumePolicy.GetMatchAction(resource, v.client)
 		if err != nil {
 			v.logger.WithError(err).Error("fail to get VolumePolicy match action for volume")
 			return false, err

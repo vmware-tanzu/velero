@@ -196,11 +196,11 @@ func (b *backupper) getMatchAction(resPolicies *resourcepolicies.Policies, pvc *
 		if err != nil {
 			return nil, errors.Wrapf(err, "error getting pv for pvc %s", pvc.Spec.VolumeName)
 		}
-		return resPolicies.GetMatchAction(pv)
+		return resPolicies.GetMatchAction(pv, b.crClient)
 	}
 
 	if volume != nil {
-		return resPolicies.GetMatchAction(volume)
+		return resPolicies.GetMatchAction(volume, b.crClient)
 	}
 
 	return nil, errors.Errorf("failed to check resource policies for empty volume")
