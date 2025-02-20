@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -30,7 +30,7 @@ func TestInstall(t *testing.T) {
 
 	c := fake.NewClientBuilder().WithObjects(
 		&apiextv1.CustomResourceDefinition{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "backuprepositories.velero.io",
 			},
 
@@ -59,7 +59,7 @@ func TestInstall(t *testing.T) {
 func Test_crdsAreReady(t *testing.T) {
 	c := fake.NewClientBuilder().WithObjects(
 		&apiextv1beta1.CustomResourceDefinition{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "backuprepositories.velero.io",
 			},
 
@@ -79,11 +79,11 @@ func Test_crdsAreReady(t *testing.T) {
 	).Build()
 
 	crd := &apiextv1beta1.CustomResourceDefinition{
-		TypeMeta: v1.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "CustomResourceDefinition",
 			APIVersion: "v1beta1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "backuprepositories.velero.io",
 		},
 	}
@@ -102,13 +102,13 @@ func Test_crdsAreReady(t *testing.T) {
 }
 
 func TestDeploymentIsReady(t *testing.T) {
-	deployment := &appsv1.Deployment{
-		Status: appsv1.DeploymentStatus{
-			Conditions: []appsv1.DeploymentCondition{
+	deployment := &appsv1api.Deployment{
+		Status: appsv1api.DeploymentStatus{
+			Conditions: []appsv1api.DeploymentCondition{
 				{
-					Type:               appsv1.DeploymentAvailable,
-					Status:             corev1.ConditionTrue,
-					LastTransitionTime: v1.NewTime(time.Now().Add(-15 * time.Second)),
+					Type:               appsv1api.DeploymentAvailable,
+					Status:             corev1api.ConditionTrue,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-15 * time.Second)),
 				},
 			},
 		},
@@ -128,8 +128,8 @@ func TestDeploymentIsReady(t *testing.T) {
 }
 
 func TestNodeAgentIsReady(t *testing.T) {
-	daemonset := &appsv1.DaemonSet{
-		Status: appsv1.DaemonSetStatus{
+	daemonset := &appsv1api.DaemonSet{
+		Status: appsv1api.DaemonSetStatus{
 			NumberAvailable:        1,
 			DesiredNumberScheduled: 1,
 		},
@@ -149,8 +149,8 @@ func TestNodeAgentIsReady(t *testing.T) {
 }
 
 func TestNodeAgentWindowsIsReady(t *testing.T) {
-	daemonset := &appsv1.DaemonSet{
-		Status: appsv1.DaemonSetStatus{
+	daemonset := &appsv1api.DaemonSet{
+		Status: appsv1api.DaemonSetStatus{
 			NumberAvailable:        0,
 			DesiredNumberScheduled: 0,
 		},
