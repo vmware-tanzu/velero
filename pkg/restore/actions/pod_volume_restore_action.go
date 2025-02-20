@@ -147,7 +147,7 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 
 	resourceReqs, err := kube.ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit)
 	if err != nil {
-		log.Errorf("Using default resource values, couldn't parse resource requirements: %s.", err)
+		log.Errorf("couldn't parse resource requirements: %s.", err)
 		resourceReqs, _ = kube.ParseResourceRequirements(
 			defaultCPURequestLimit, defaultMemRequestLimit, // requests
 			defaultCPURequestLimit, defaultMemRequestLimit, // limits
@@ -157,14 +157,23 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 	runAsUser, runAsGroup, allowPrivilegeEscalation, secCtx := getSecurityContext(log, config)
 
 	var securityContext corev1.SecurityContext
-	if runAsUser == "" && runAsGroup == "" && allowPrivilegeEscalation == "" && secCtx == "" {
-		securityContext = defaultSecurityCtx()
-	} else {
+	securityContextSet := false
+	// Use securityContext settings from configmap if available
+	if runAsUser != "" || runAsGroup != "" || allowPrivilegeEscalation != "" || secCtx != "" {
 		securityContext, err = kube.ParseSecurityContext(runAsUser, runAsGroup, allowPrivilegeEscalation, secCtx)
 		if err != nil {
 			log.Errorf("Using default securityContext values, couldn't parse securityContext requirements: %s.", err)
-			securityContext = defaultSecurityCtx()
+		} else {
+			securityContextSet = true
 		}
+	}
+	// if first container in pod has a SecurityContext set, then copy this security context
+	if len(pod.Spec.Containers) != 0 && pod.Spec.Containers[0].SecurityContext != nil {
+		securityContext = *pod.Spec.Containers[0].SecurityContext.DeepCopy()
+		securityContextSet = true
+	}
+	if !securityContextSet {
+		securityContext = defaultSecurityCtx()
 	}
 
 	initContainerBuilder := newRestoreInitContainerBuilder(image, string(input.Restore.UID))
