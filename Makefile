@@ -22,6 +22,18 @@ PKG := github.com/vmware-tanzu/velero
 
 # Where to push the docker image.
 REGISTRY ?= velero
+# In order to push images to an insecure registry, follow the two steps:
+#   1. Set "INSECURE_REGISTRY=true" 
+#   2. Provide your own buildx builder instance by setting "BUILDX_INSTANCE=your-own-builder-instance"
+#      The builder can be created with the following command:
+#        cat << EOF > buildkitd.toml
+#        [registry."insecure-registry-ip:port"]
+#        http = true
+#        insecure = true
+#        EOF
+#        docker buildx create --name=velero-builder --driver=docker-container --bootstrap --use --config ./buildkitd.toml
+#      Refer to https://github.com/docker/buildx/issues/1370#issuecomment-1288516840 for more details
+INSECURE_REGISTRY ?= false
 GCR_REGISTRY ?= gcr.io/velero-gcp
 
 # Image name
@@ -289,22 +301,22 @@ container-windows:
 
 push-manifest:
 	@echo "building manifest: $(IMAGE_TAG) for $(foreach osarch, $(ALL_OS_ARCH), $(IMAGE_TAG)-${osarch})"
-	@docker manifest create --amend $(IMAGE_TAG) $(foreach osarch, $(ALL_OS_ARCH), $(IMAGE_TAG)-${osarch})
+	@docker manifest create --amend --insecure=$(INSECURE_REGISTRY) $(IMAGE_TAG) $(foreach osarch, $(ALL_OS_ARCH), $(IMAGE_TAG)-${osarch})
 
 	@set -x; \
 	for arch in $(ALL_ARCH.windows); do \
 		for osversion in $(ALL_OSVERSIONS.windows); do \
 			BASEIMAGE=mcr.microsoft.com/windows/nanoserver:$${osversion}; \
-			full_version=`docker manifest inspect $${BASEIMAGE} | jq -r '.manifests[0].platform["os.version"]'`; \
+			full_version=`docker manifest inspect --insecure=$(INSECURE_REGISTRY) $${BASEIMAGE} | jq -r '.manifests[0].platform["os.version"]'`; \
 			docker manifest annotate --os windows --arch $${arch} --os-version $${full_version} $(IMAGE_TAG) $(IMAGE_TAG)-windows-$${osversion}-$${arch}; \
 		done; \
 	done
 
 	@echo "pushing manifest $(IMAGE_TAG)"
-	@docker manifest push --purge $(IMAGE_TAG)
+	@docker manifest push --purge --insecure=$(INSECURE_REGISTRY) $(IMAGE_TAG)
 
 	@echo "pushed manifest $(IMAGE_TAG):"
-	@docker manifest inspect $(IMAGE_TAG)
+	@docker manifest inspect --insecure=$(INSECURE_REGISTRY) $(IMAGE_TAG)
 
 SKIP_TESTS ?=
 test: build-dirs
