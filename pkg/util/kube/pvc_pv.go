@@ -441,10 +441,34 @@ func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, nodeClient core
 		return NodeOSLinux, nil
 	}
 
+	if pvc.Spec.VolumeName == "" {
+		log.Warnf("PVC %s/%s is not bound to a PV", pvc.Namespace, pvc.Name)
+	}
+
+	if pvc.Spec.StorageClassName == nil {
+		log.Warnf("PVC %s/%s is not with storage class", pvc.Namespace, pvc.Name)
+	}
+
+	nodeName := ""
 	if value := pvc.Annotations[KubeAnnSelectedNode]; value != "" {
-		os, err := GetNodeOS(context.Background(), value, nodeClient)
+		nodeName = value
+	}
+
+	if nodeName == "" {
+		if pvc.Spec.VolumeName != "" {
+			n, err := GetPVAttachedNode(context.Background(), pvc.Spec.VolumeName, storageClient)
+			if err != nil {
+				return "", errors.Wrapf(err, "error to get attached node for PVC %s/%s", pvc.Namespace, pvc.Name)
+			}
+
+			nodeName = n
+		}
+	}
+
+	if nodeName != "" {
+		os, err := GetNodeOS(context.Background(), nodeName, nodeClient)
 		if err != nil {
-			return "", errors.Wrapf(err, "error to get os from node %s for PVC %s/%s", value, pvc.Namespace, pvc.Name)
+			return "", errors.Wrapf(err, "error to get os from node %s for PVC %s/%s", nodeName, pvc.Namespace, pvc.Name)
 		}
 
 		nodeOS = os
@@ -473,4 +497,19 @@ func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, nodeClient core
 
 	log.Warnf("Cannot deduce node os for PVC %s/%s, default to linux", pvc.Namespace, pvc.Name)
 	return NodeOSLinux, nil
+}
+
+func GetPVAttachedNode(ctx context.Context, pv string, storageClient storagev1.StorageV1Interface) (string, error) {
+	vaList, err := storageClient.VolumeAttachments().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", errors.Wrapf(err, "error listing volumeattachment")
+	}
+
+	for _, va := range vaList.Items {
+		if va.Spec.Source.PersistentVolumeName != nil && *va.Spec.Source.PersistentVolumeName == pv {
+			return va.Spec.NodeName, nil
+		}
+	}
+
+	return "", nil
 }
