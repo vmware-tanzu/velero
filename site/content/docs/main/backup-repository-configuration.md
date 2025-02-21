@@ -30,7 +30,8 @@ metadata:
 data:
   <kopia>: |
     {
-      "cacheLimitMB": 2048    
+      "cacheLimitMB": 2048,
+      "fullMaintenanceInterval": "fastGC"
     }
   <other-repository-type>: |
     {
@@ -49,6 +50,14 @@ Below is the supported configurations by Velero and the specific backup reposito
 ***Kopia repository:***  
 `cacheLimitMB`: specifies the size limit(in MB) for the local data cache. The more data is cached locally, the less data may be downloaded from the backup storage, so the better performance may be achieved. Practically, you can specify any size that is smaller than the free space so that the disk space won't run out. This parameter is for repository connection, that is, you could change it before connecting to the repository. E.g., before a backup/restore/maintenance.  
 
+`fullMaintenanceInterval`: The full maintenance interval defaults to kopia defaults of 24 hours. Override options below allows for faster removal of deleted velero backups from kopia repo.
+- normalGC: 24 hours
+- fastGC: 12 hours
+- eagerGC: 6 hours
+
+Per kopia [Maintenance Safety](https://kopia.io/docs/advanced/maintenance/#maintenance-safety), it is expected that velero backup deletion will not result in immediate kopia repository data removal. Reducing full maintenance interval using above options should help reduce time taken to remove blobs not in use.
+
+On the other hand, the not-in-use data will be deleted permanently after the full maintenance, so shorter full maintenance intervals may weaken the data safety if they are used incorrectly.
 
 [1]: file-system-backup.md
 [2]: csi-snapshot-data-movement.md
