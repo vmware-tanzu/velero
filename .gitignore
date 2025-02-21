@@ -54,6 +54,7 @@ tilt-resources/cloud
 test/e2e/report.xml
 coverage.out
 __debug_bin*
+debug.test*
 
 # make lint cache
 .cache/
