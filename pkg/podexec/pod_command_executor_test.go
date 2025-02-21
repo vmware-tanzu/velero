@@ -263,7 +263,7 @@ func TestEnsureContainerExists(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestPodCompeted(t *testing.T) {
+func TestPodCompleted(t *testing.T) {
 	pod := &corev1api.Pod{
 		Spec: corev1api.PodSpec{
 			Containers: []corev1api.Container{
