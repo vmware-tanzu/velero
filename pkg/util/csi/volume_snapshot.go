@@ -70,8 +70,8 @@ func WaitVolumeSnapshotReady(
 			if err != nil {
 				return false, errors.Wrapf(
 					err,
-					fmt.Sprintf("error to get VolumeSnapshot %s/%s",
-						volumeSnapshotNS, volumeSnapshot),
+					"error to get VolumeSnapshot %s/%s",
+					volumeSnapshotNS, volumeSnapshot,
 				)
 			}
 
@@ -175,7 +175,7 @@ func EnsureDeleteVS(ctx context.Context, snapshotClient snapshotter.SnapshotV1In
 				return true, nil
 			}
 
-			return false, errors.Wrapf(err, fmt.Sprintf("error to get VolumeSnapshot %s", vsName))
+			return false, errors.Wrapf(err, "error to get VolumeSnapshot %s", vsName)
 		}
 
 		updated = vs
@@ -234,7 +234,7 @@ func EnsureDeleteVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1I
 				return true, nil
 			}
 
-			return false, errors.Wrapf(err, fmt.Sprintf("error to get VolumeSnapshotContent %s", vscName))
+			return false, errors.Wrapf(err, "error to get VolumeSnapshotContent %s", vscName)
 		}
 
 		updated = vsc
@@ -635,7 +635,7 @@ func recreateVolumeSnapshotContent(
 				}
 				return false, errors.Wrapf(
 					err,
-					fmt.Sprintf("failed to get VolumeSnapshotContent %s", vsc.Name),
+					"failed to get VolumeSnapshotContent %s", vsc.Name,
 				)
 			}
 			return false, nil
@@ -718,9 +718,9 @@ func WaitUntilVSCHandleIsReady(
 				vs,
 			); err != nil {
 				return false,
-					errors.Wrapf(err, fmt.Sprintf(
+					errors.Wrapf(err,
 						"failed to get volumesnapshot %s/%s",
-						volSnap.Namespace, volSnap.Name),
+						volSnap.Namespace, volSnap.Name,
 					)
 			}
 
@@ -740,8 +740,8 @@ func WaitUntilVSCHandleIsReady(
 				return false,
 					errors.Wrapf(
 						err,
-						fmt.Sprintf("failed to get VolumeSnapshotContent %s for VolumeSnapshot %s/%s",
-							*vs.Status.BoundVolumeSnapshotContentName, vs.Namespace, vs.Name),
+						"failed to get VolumeSnapshotContent %s for VolumeSnapshot %s/%s",
+						*vs.Status.BoundVolumeSnapshotContentName, vs.Namespace, vs.Name,
 					)
 			}
 

@@ -27,7 +27,6 @@ run:
   # If false (default) - golangci-lint acquires file lock on start.
   allow-parallel-runners: false
 
-
 # output configuration options
 output:
   # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"
@@ -41,18 +40,25 @@ output:
   # print linter name in the end of issue text, default is true
   print-linter-name: true
 
-  # make issues output unique by line, default is true
-  uniq-by-line: true
-
-
 # all available settings of specific linters
 linters-settings:
+
+  depguard:
+    rules:
+      main:
+        deny:
+          # specify an error message to output when a denylisted package is used
+          - pkg: github.com/sirupsen/logrus
+            desc: "logging is allowed only by logutils.Log"
+
   dogsled:
     # checks assignments with too many blank identifiers; default is 2
     max-blank-identifiers: 2
+
   dupl:
     # tokens count to trigger issue, 150 by default
     threshold: 100
+
   errcheck:
     # report about not checking of errors in type assertions: `a := b.(MyStruct)`;
     # default is false: such cases aren't reported by default.
@@ -70,25 +76,31 @@ linters-settings:
     # path to a file containing a list of functions to exclude from checking
     # see https://github.com/kisielk/errcheck#excluding-functions for details
     # exclude: /path/to/file.txt
+
   exhaustive:
     # indicates that switch statements are to be considered exhaustive if a
     # 'default' case is present, even if all enum members aren't listed in the
     # switch
     default-signifies-exhaustive: false
+
   funlen:
     lines: 60
     statements: 40
+
   gocognit:
     # minimal code complexity to report, 30 by default (but we recommend 10-20)
     min-complexity: 10
+
   nestif:
     # minimal complexity of if statements to report, 5 by default
     min-complexity: 4
+
   goconst:
     # minimal length of string constant, 3 by default
     min-len: 3
     # minimal occurrences count to trigger, 3 by default
     min-occurrences: 5
+
   gocritic:
     # Which checks should be enabled; can't be combined with 'disabled-checks';
     # See https://go-critic.github.io/overview#checks-overview
@@ -113,12 +125,15 @@ linters-settings:
         paramsOnly: true
     #  rangeValCopy:
     #    sizeThreshold: 32
+
   gocyclo:
     # minimal code complexity to report, 30 by default (but we recommend 10-20)
     min-complexity: 10
+
   godot:
     # check all top-level comments, not only declarations
     check-all: false
+
   godox:
     # report any comments starting with keywords, this is useful for TODO or FIXME comments that
     # might be left in the code accidentally and should be resolved before merging
@@ -126,13 +141,20 @@ linters-settings:
       - NOTE
       - OPTIMIZE # marks code that should be optimized before merging
       - HACK # marks hack-arounds that should be removed before merging
+
   gofmt:
     # simplify code: gofmt with `-s` option, true by default
     simplify: true
+
   goimports:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
     local-prefixes: github.com/org/project
+
+  gosec:
+    excludes:
+      - G115
+
   govet:
     # report about shadowed variables
     # check-shadowing: true
@@ -153,12 +175,14 @@ linters-settings:
     disable:
       - shadow
     disable-all: false
+
   lll:
     # max line length, lines longer will be reported. Default is 120.
     # '\t' is counted as 1 character by default, and can be changed with the tab-width option
     line-length: 120
     # tab width in spaces. Default to 1.
     tab-width: 1
+
   misspell:
     # Correct spellings using locale preferences for US or UK.
     # Default is to use a neutral variety of English.
@@ -166,9 +190,11 @@ linters-settings:
     locale: US
     ignore-words:
       - someword
+
   nakedret:
     # make an issue if func has more lines of code than this setting and it has naked returns; default is 30
     max-func-lines: 30
+
   prealloc:
     # XXX: we don't recommend using this linter before doing performance profiling.
     # For most programs usage of prealloc will be a premature optimization.
@@ -178,6 +204,7 @@ linters-settings:
     simple: true
     range-loops: true # Report preallocation suggestions on range loops, true by default
     for-loops: false # Report preallocation suggestions on for loops, false by default
+
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
     allow-unused: false
@@ -187,11 +214,13 @@ linters-settings:
     require-explanation: true
     # Enable to require nolint directives to mention the specific linter being suppressed. Default is false.
     require-specific: true
+
   perfsprint:
     strconcat: false
     sprintf1: false
     errorf: false
     int-conversion: true
+
   revive:
     rules:
       - name: blank-imports
@@ -238,10 +267,11 @@ linters-settings:
       - name: var-declaration
       - name: var-naming
         disabled: true
-    
+
   rowserrcheck:
     packages:
       - github.com/jmoiron/sqlx
+
   testifylint:
       # TODO: enable them all
       disable:
@@ -249,6 +279,7 @@ linters-settings:
         - float-compare
         - require-error
       enable-all: true
+
   testpackage:
     # regexp pattern to skip files
     skip-regexp: (export|internal)_test\.go
@@ -258,9 +289,11 @@ linters-settings:
     # if it's called for subdir of a project it can't find external interfaces. All text editor integrations
     # with golangci-lint call it on a directory with the changed file.
     check-exported: false
+
   whitespace:
     multi-if: false   # Enforces newlines (or comments) after every multi-line if statement
     multi-func: false # Enforces newlines (or comments) after every multi-line function signature
+
   wsl:
     # If true append is only allowed to be cuddled if appending value is
     # matching variables, fields or types on line above. Default is true.
@@ -288,11 +321,11 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
+    - copyloopvar
     - dogsled
     - durationcheck
     - dupword
     - errcheck
-    - exportloopref
     - errchkjson
     - goconst
     - gofmt
@@ -325,8 +358,16 @@ linters:
     - whitespace
   fast: false
 
-
 issues:
+  # which dirs to skip: issues from them won't be reported;
+  # can use regexp here: generated.*, regexp is applied on full path;
+  # default value is empty list, but default dirs are skipped independently
+  # from this option's value (see skip-dirs-use-default).
+  # "/" will be replaced by current OS file path separator to properly work
+  # on Windows.
+  exclude-dirs:
+    - pkg/plugin/generated/*
+
   exclude-rules:
     - linters:
         - staticcheck
@@ -370,17 +411,8 @@ issues:
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
   max-same-issues: 0
 
-  # Show only new issues created after git revision `REV`
-  # new-from-rev: origin/main
-
-  # which dirs to skip: issues from them won't be reported;
-  # can use regexp here: generated.*, regexp is applied on full path;
-  # default value is empty list, but default dirs are skipped independently
-  # from this option's value (see skip-dirs-use-default).
-  # "/" will be replaced by current OS file path separator to properly work
-  # on Windows.
-  exclude-dirs:
-    - pkg/plugin/generated/*
+  # make issues output unique by line, default is true
+  uniq-by-line: true
 
 severity:
   # Default value is empty string.
