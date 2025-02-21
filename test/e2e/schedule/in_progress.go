@@ -13,7 +13,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/test"
-	framework "github.com/vmware-tanzu/velero/test/e2e/test"
+	framework "github.com/vmware-tanzu/velero/test/e2e/framework"
 	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
 	veleroutil "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -21,7 +21,7 @@ import (
 var ScheduleInProgressTest func() = framework.TestFunc(&InProgressCase{})
 
 type InProgressCase struct {
-	framework.TestCase
+	framework.BRCase
 	namespace        string
 	ScheduleName     string
 	ScheduleArgs     []string
@@ -33,7 +33,7 @@ type InProgressCase struct {
 }
 
 func (s *InProgressCase) Init() error {
-	Expect(s.TestCase.Init()).To(Succeed())
+	Expect(s.BRCase.Init()).To(Succeed())
 
 	s.CaseBaseName = "schedule-backup-creation-test" + s.UUIDgen
 	s.ScheduleName = "schedule-" + s.CaseBaseName
@@ -189,7 +189,7 @@ func (s *InProgressCase) Clean() error {
 				s.ScheduleName,
 			),
 		).To(Succeed())
-		Expect(s.TestCase.Clean()).To(Succeed())
+		Expect(s.BRCase.Clean()).To(Succeed())
 	}
 
 	return nil
