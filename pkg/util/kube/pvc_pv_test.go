@@ -1594,6 +1594,16 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 		},
 	}
 
+	pvcObjWithVolume := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeName: "fake-volume-name",
+		},
+	}
+
 	pvcObjWithStorageClass := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-namespace",
@@ -1604,13 +1614,26 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 		},
 	}
 
-	pvcObjWithBoth := &corev1api.PersistentVolumeClaim{
+	pvName := "fake-volume-name"
+	pvcObjWithAll := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   "fake-namespace",
 			Name:        "fake-pvc",
 			Annotations: map[string]string{KubeAnnSelectedNode: "fake-node"},
 		},
 		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeName:       pvName,
+			StorageClassName: &storageClass,
+		},
+	}
+
+	pvcObjWithVolumeSC := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-namespace",
+			Name:      "fake-pvc",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeName:       pvName,
 			StorageClassName: &storageClass,
 		},
 	}
@@ -1628,6 +1651,35 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 		Parameters: map[string]string{"csi.storage.k8s.io/fstype": "ntfs"},
 	}
 
+	volAttachEmpty := &storagev1api.VolumeAttachment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-volume-attach-1",
+		},
+	}
+
+	volAttachWithVolume := &storagev1api.VolumeAttachment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-volume-attach-2",
+		},
+		Spec: storagev1api.VolumeAttachmentSpec{
+			Source: storagev1api.VolumeAttachmentSource{
+				PersistentVolumeName: &pvName,
+			},
+		},
+	}
+
+	otherPVName := "other-volume-name"
+	volAttachWithOtherVolume := &storagev1api.VolumeAttachment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-volume-attach-3",
+		},
+		Spec: storagev1api.VolumeAttachmentSpec{
+			Source: storagev1api.VolumeAttachmentSource{
+				PersistentVolumeName: &otherPVName,
+			},
+		},
+	}
+
 	tests := []struct {
 		name           string
 		pvc            *corev1api.PersistentVolumeClaim
@@ -1636,7 +1688,7 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 		err            string
 	}{
 		{
-			name:           "no selected node and storage class",
+			name:           "no selected node, volume name and storage class",
 			pvc:            pvcObj,
 			expectedNodeOS: NodeOSLinux,
 		},
@@ -1654,9 +1706,25 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 			expectedNodeOS: NodeOSLinux,
 		},
 		{
+			name:           "no attach volume",
+			pvc:            pvcObjWithVolume,
+			expectedNodeOS: NodeOSLinux,
+		},
+		{
 			name: "sc doesn't exist",
 			pvc:  pvcObjWithStorageClass,
 			err:  "error to get storage class fake-storage-class: storageclasses.storage.k8s.io \"fake-storage-class\" not found",
+		},
+		{
+			name: "volume attachment not exist",
+			pvc:  pvcObjWithVolume,
+			kubeClientObj: []runtime.Object{
+				nodeWindows,
+				scObjWithFSType,
+				volAttachEmpty,
+				volAttachWithOtherVolume,
+			},
+			expectedNodeOS: NodeOSLinux,
 		},
 		{
 			name: "sc without fsType",
@@ -1668,7 +1736,7 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 		},
 		{
 			name: "deduce from node os",
-			pvc:  pvcObjWithBoth,
+			pvc:  pvcObjWithAll,
 			kubeClientObj: []runtime.Object{
 				nodeWindows,
 				scObjWithFSType,
@@ -1677,10 +1745,22 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 		},
 		{
 			name: "deduce from sc",
-			pvc:  pvcObjWithBoth,
+			pvc:  pvcObjWithAll,
 			kubeClientObj: []runtime.Object{
 				nodeNoOSLabel,
 				scObjWithFSType,
+			},
+			expectedNodeOS: NodeOSWindows,
+		},
+		{
+			name: "deduce from attached node os",
+			pvc:  pvcObjWithVolumeSC,
+			kubeClientObj: []runtime.Object{
+				nodeWindows,
+				scObjWithFSType,
+				volAttachEmpty,
+				volAttachWithOtherVolume,
+				volAttachWithVolume,
 			},
 			expectedNodeOS: NodeOSWindows,
 		},
