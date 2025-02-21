@@ -20,6 +20,7 @@ import (
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // VolumeSnapshotContentBuilder builds VolumeSnapshotContent object.
@@ -60,12 +61,13 @@ func (v *VolumeSnapshotContentBuilder) DeletionPolicy(policy snapshotv1api.Delet
 }
 
 // VolumeSnapshotRef sets the built VolumeSnapshotContent's spec.VolumeSnapshotRef value.
-func (v *VolumeSnapshotContentBuilder) VolumeSnapshotRef(namespace, name string) *VolumeSnapshotContentBuilder {
+func (v *VolumeSnapshotContentBuilder) VolumeSnapshotRef(namespace, name, uid string) *VolumeSnapshotContentBuilder {
 	v.object.Spec.VolumeSnapshotRef = v1.ObjectReference{
 		APIVersion: "snapshot.storage.k8s.io/v1",
 		Kind:       "VolumeSnapshot",
 		Namespace:  namespace,
 		Name:       name,
+		UID:        types.UID(uid),
 	}
 	return v
 }
