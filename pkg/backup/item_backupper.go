@@ -603,7 +603,8 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 				return err
 			}
 		}
-		if action, err := ib.backupRequest.ResPolicies.GetMatchAction(pv, pvc); err != nil {
+		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
+		if action, err := ib.backupRequest.ResPolicies.GetMatchAction(vfd); err != nil {
 			log.WithError(err).Errorf("Error getting matched resource policies for pv %s", pv.Name)
 			return nil
 		} else if action != nil && action.Type == resourcepolicies.Skip {
@@ -720,7 +721,8 @@ func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource 
 		if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
 			return nil, errors.WithStack(err)
 		}
-		return ib.backupRequest.ResPolicies.GetMatchAction(pv, pvc)
+		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
+		return ib.backupRequest.ResPolicies.GetMatchAction(vfd)
 	}
 
 	return nil, nil

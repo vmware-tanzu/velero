@@ -419,6 +419,7 @@ func TestGetMatchAction(t *testing.T) {
 		name     string
 		yamlData string
 		vol      *v1.PersistentVolume
+		podVol   *v1.Volume
 		pvc      *v1.PersistentVolumeClaim
 		skip     bool
 	}{
@@ -875,6 +876,87 @@ volumePolicies:
 			},
 			skip: false,
 		},
+		{
+			name: "PodVolume case with PVC labels match",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    pvcLabels:
+      environment: production
+  action:
+    type: skip`,
+			vol:    nil,
+			podVol: &v1.Volume{Name: "pod-vol-1"},
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-1",
+					Labels:    map[string]string{"environment": "production"},
+				},
+			},
+			skip: true,
+		},
+		{
+			name: "PodVolume case with PVC labels mismatch",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    pvcLabels:
+      environment: production
+  action:
+    type: skip`,
+			vol:    nil,
+			podVol: &v1.Volume{Name: "pod-vol-2"},
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-2",
+					Labels:    map[string]string{"environment": "staging"},
+				},
+			},
+			skip: false,
+		},
+		{
+			name: "PodVolume case with PVC labels match with extra keys on PVC",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    pvcLabels:
+      environment: production
+  action:
+    type: skip`,
+			vol:    nil,
+			podVol: &v1.Volume{Name: "pod-vol-3"},
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-3",
+					Labels:    map[string]string{"environment": "production", "app": "backend"},
+				},
+			},
+			skip: true,
+		},
+		{
+			name: "PodVolume case with PVC labels don't match exactly",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    pvcLabels:
+      environment: production
+      app: frontend
+  action:
+    type: skip`,
+			vol:    nil,
+			podVol: &v1.Volume{Name: "pod-vol-4"},
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-4",
+					Labels:    map[string]string{"environment": "production"},
+				},
+			},
+			skip: false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -886,8 +968,20 @@ volumePolicies:
 			policies := &Policies{}
 			err = policies.BuildPolicy(resPolicies)
 			assert.NoError(t, err)
+			vfd := VolumeFilterData{}
+			if tc.pvc != nil {
+				vfd.PVC = tc.pvc
+			}
 
-			action, err := policies.GetMatchAction(tc.vol, tc.pvc)
+			if tc.vol != nil {
+				vfd.PersistentVolume = tc.vol
+			}
+
+			if tc.podVol != nil {
+				vfd.PodVolume = tc.podVol
+			}
+
+			action, err := policies.GetMatchAction(vfd)
 			assert.NoError(t, err)
 
 			if tc.skip {
@@ -904,19 +998,78 @@ volumePolicies:
 func TestGetMatchAction_Errors(t *testing.T) {
 	p := &Policies{}
 
-	action, err := p.GetMatchAction("invalid volume", nil)
-	assert.Error(t, err, "Expected error when volumeRes is not a valid volume type")
-	assert.Contains(t, err.Error(), "failed to convert object")
-	assert.Nil(t, action)
-
-	vol := &v1.PersistentVolume{
-		Spec: v1.PersistentVolumeSpec{
-			Capacity: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")},
+	testCases := []struct {
+		name        string
+		input       any
+		expectedErr string
+	}{
+		{
+			name:        "invalid input type",
+			input:       "invalid input",
+			expectedErr: "failed to convert input to VolumeFilterData",
+		},
+		{
+			name: "no volume provided",
+			input: VolumeFilterData{
+				PersistentVolume: nil,
+				PodVolume:        nil,
+				PVC:              nil,
+			},
+			expectedErr: "failed to convert object",
 		},
 	}
 
-	action, err = p.GetMatchAction(vol, 123)
-	assert.Error(t, err, "Expected error when pvcRes is not a valid PVC type")
-	assert.Contains(t, err.Error(), "failed to convert object")
-	assert.Nil(t, action)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			action, err := p.GetMatchAction(tc.input)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tc.expectedErr)
+			assert.Nil(t, action)
+		})
+	}
+}
+
+func TestParsePVC(t *testing.T) {
+	tests := []struct {
+		name           string
+		pvc            *v1.PersistentVolumeClaim
+		expectedLabels map[string]string
+		expectErr      bool
+	}{
+		{
+			name: "valid PVC with labels",
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"env": "prod"},
+				},
+			},
+			expectedLabels: map[string]string{"env": "prod"},
+			expectErr:      false,
+		},
+		{
+			name: "valid PVC with empty labels",
+			pvc: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{},
+				},
+			},
+			expectedLabels: nil,
+			expectErr:      false,
+		},
+		{
+			name:           "nil PVC pointer",
+			pvc:            (*v1.PersistentVolumeClaim)(nil),
+			expectedLabels: nil,
+			expectErr:      false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &structuredVolume{}
+			s.parsePVC(tc.pvc)
+
+			assert.Equal(t, tc.expectedLabels, s.pvcLabels)
+		})
+	}
 }

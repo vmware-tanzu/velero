@@ -135,27 +135,28 @@ func (p *Policies) match(res *structuredVolume) *Action {
 	return nil
 }
 
-func (p *Policies) GetMatchAction(volumeRes any, pvcRes any) (*Action, error) {
+func (p *Policies) GetMatchAction(res any) (*Action, error) {
+	data, ok := res.(VolumeFilterData)
+	if !ok {
+		return nil, errors.New("failed to convert input to VolumeFilterData")
+	}
+
 	volume := &structuredVolume{}
-	switch obj := volumeRes.(type) {
-	case *v1.PersistentVolume:
-		volume.parsePV(obj)
-	case *v1.Volume:
-		volume.parsePodVolume(obj)
+	switch {
+	case data.PersistentVolume != nil:
+		volume.parsePV(data.PersistentVolume)
+		if data.PVC != nil {
+			volume.parsePVC(data.PVC)
+		}
+	case data.PodVolume != nil:
+		volume.parsePodVolume(data.PodVolume)
+		if data.PVC != nil {
+			volume.parsePVC(data.PVC)
+		}
 	default:
 		return nil, errors.New("failed to convert object")
 	}
 
-	// If a PVC is provided, set the pvcLabels on structured volume
-	if pvcRes != nil {
-		pvc, ok := pvcRes.(*v1.PersistentVolumeClaim)
-		if !ok {
-			return nil, errors.New("failed to convert object")
-		}
-		if pvc != nil && len(pvc.GetLabels()) > 0 {
-			volume.pvcLabels = pvc.Labels
-		}
-	}
 	return p.match(volume), nil
 }
 

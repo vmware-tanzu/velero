@@ -69,6 +69,12 @@ func (s *structuredVolume) parsePV(pv *corev1api.PersistentVolume) {
 	s.volumeType = getVolumeTypeFromPV(pv)
 }
 
+func (s *structuredVolume) parsePVC(pvc *corev1api.PersistentVolumeClaim) {
+	if pvc != nil && len(pvc.GetLabels()) > 0 {
+		s.pvcLabels = pvc.Labels
+	}
+}
+
 func (s *structuredVolume) parsePodVolume(vol *corev1api.Volume) {
 	nfs := vol.NFS
 	if nfs != nil {

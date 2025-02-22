@@ -706,3 +706,37 @@ func TestVolumeHelperImpl_ShouldPerformFSBackup(t *testing.T) {
 		})
 	}
 }
+
+func TestGetVolumeFromResource(t *testing.T) {
+	helper := &volumeHelperImpl{}
+
+	t.Run("PersistentVolume input", func(t *testing.T) {
+		pv := &corev1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pv",
+			},
+		}
+		outPV, outPod, err := helper.getVolumeFromResource(pv)
+		assert.NoError(t, err)
+		assert.NotNil(t, outPV)
+		assert.Nil(t, outPod)
+		assert.Equal(t, "test-pv", outPV.Name)
+	})
+
+	t.Run("Volume input", func(t *testing.T) {
+		vol := &corev1.Volume{
+			Name: "test-volume",
+		}
+		outPV, outPod, err := helper.getVolumeFromResource(vol)
+		assert.NoError(t, err)
+		assert.Nil(t, outPV)
+		assert.NotNil(t, outPod)
+		assert.Equal(t, "test-volume", outPod.Name)
+	})
+
+	t.Run("Invalid input", func(t *testing.T) {
+		_, _, err := helper.getVolumeFromResource("invalid")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "resource is not a PersistentVolume or Volume")
+	})
+}
