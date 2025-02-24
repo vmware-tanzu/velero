@@ -432,13 +432,23 @@ func GetVolumeSnapshotClassForStorageClass(
 			}
 		}
 	}
+	// not found by label, pick by annotation
+	for _, sc := range snapshotClasses.Items {
+		_, hasDefaultAnnotation := sc.Annotations[velerov1api.VolumeSnapshotClassKubernetesAnnotation]
+		if sc.Driver == provisioner {
+			vsClass = sc
+			if hasDefaultAnnotation {
+				return &sc, nil
+			}
+		}
+	}
 	// If there's only one volumesnapshotclass for the driver, return it.
 	if n == 1 {
 		return &vsClass, nil
 	}
 	return nil, fmt.Errorf(
-		"failed to get VolumeSnapshotClass for provisioner %s, ensure that the desired VolumeSnapshot class has the %s label",
-		provisioner, velerov1api.VolumeSnapshotClassSelectorLabel)
+		"failed to get VolumeSnapshotClass for provisioner %s, ensure that the desired VolumeSnapshot class has the %s label or %s annotation",
+		provisioner, velerov1api.VolumeSnapshotClassSelectorLabel, velerov1api.VolumeSnapshotClassKubernetesAnnotation)
 }
 
 // IsVolumeSnapshotClassHasListerSecret returns whether a volumesnapshotclass has a snapshotlister secret
