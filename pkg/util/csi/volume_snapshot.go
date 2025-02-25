@@ -447,8 +447,8 @@ func GetVolumeSnapshotClassForStorageClass(
 		return &vsClass, nil
 	}
 	return nil, fmt.Errorf(
-		"failed to get VolumeSnapshotClass for provisioner %s, ensure that the desired VolumeSnapshot class has the %s label",
-		provisioner, velerov1api.VolumeSnapshotClassSelectorLabel)
+		"failed to get VolumeSnapshotClass for provisioner %s, ensure that the desired VolumeSnapshot class has the %s label or %s annotation",
+		provisioner, velerov1api.VolumeSnapshotClassSelectorLabel, velerov1api.VolumeSnapshotClassKubernetesAnnotation)
 }
 
 // IsVolumeSnapshotClassHasListerSecret returns whether a volumesnapshotclass has a snapshotlister secret
