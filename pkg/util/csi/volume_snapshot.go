@@ -424,13 +424,19 @@ func GetVolumeSnapshotClassForStorageClass(
 	// values for the other fields in the spec.
 	for _, sc := range snapshotClasses.Items {
 		_, hasLabelSelector := sc.Labels[velerov1api.VolumeSnapshotClassSelectorLabel]
-		_, hasDefaultAnnotation := sc.Annotations[velerov1api.VolumeSnapshotClassKubernetesAnnotation]
 		if sc.Driver == provisioner {
 			n++
 			vsClass = sc
 			if hasLabelSelector {
 				return &sc, nil
 			}
+		}
+	}
+	// not found by label, pick by annotation
+	for _, sc := range snapshotClasses.Items {
+		_, hasDefaultAnnotation := sc.Annotations[velerov1api.VolumeSnapshotClassKubernetesAnnotation]
+		if sc.Driver == provisioner {
+			vsClass = sc
 			if hasDefaultAnnotation {
 				return &sc, nil
 			}
