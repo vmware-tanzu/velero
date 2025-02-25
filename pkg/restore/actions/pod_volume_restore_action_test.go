@@ -128,6 +128,18 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 		RunAsUser:    &id,
 		RunAsNonRoot: boolptr.True(),
 	}
+	customID := int64(44444)
+	customSecurityContext := corev1api.SecurityContext{
+		AllowPrivilegeEscalation: boolptr.False(),
+		Capabilities: &corev1api.Capabilities{
+			Drop: []corev1api.Capability{"ALL"},
+		},
+		SeccompProfile: &corev1api.SeccompProfile{
+			Type: corev1api.SeccompProfileTypeRuntimeDefault,
+		},
+		RunAsUser:    &customID,
+		RunAsNonRoot: boolptr.True(),
+	}
 
 	var (
 		restoreName = "my-restore"
@@ -263,6 +275,28 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 						VolumeMounts(builder.ForVolumeMount("vol-1", "/restores/vol-1").Result(), builder.ForVolumeMount("vol-2", "/restores/vol-2").Result()).
 						Command([]string{"/velero-restore-helper"}).Result()).
 				Result(),
+		},
+		{
+			name: "Restoring pod with custom container SecurityContext uses this SecurityContext for the restore initContainer",
+			pod: builder.ForPod("ns-1", "my-pod").
+				ObjectMeta(
+					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				Containers(
+					builder.ForContainer("app-container", "app-image").
+						SecurityContext(&customSecurityContext).Result()).
+				Result(),
+			want: builder.ForPod("ns-1", "my-pod").
+				ObjectMeta(
+					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				Containers(
+					builder.ForContainer("app-container", "app-image").
+						SecurityContext(&customSecurityContext).Result()).
+				InitContainers(
+					newRestoreInitContainerBuilder(defaultRestoreHelperImage, "").
+						Resources(&resourceReqs).
+						SecurityContext(&customSecurityContext).
+						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).
+						Command([]string{"/velero-restore-helper"}).Result()).Result(),
 		},
 	}
 
