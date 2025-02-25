@@ -51,7 +51,7 @@ For example, the following BackupRepository's key should be `test-default-kopia`
 
 You can still customize the maintenance job resource requests and limit when using the [velero install][1] CLI command.
 
-The `LoadAffinity` structure is reused from design [node-agent affinity configuration](2).
+The `LoadAffinity` structure is reused from design [node-agent affinity configuration][2].
 
 ### Affinity Example
 It's possible that the users want to choose nodes that match condition A or condition B to run the job.
@@ -130,8 +130,12 @@ velero install --default-repo-maintain-frequency <DURATION>
 ```
 For Kopia the default maintenance frequency is 1 hour, and Restic is 7 * 24 hours.
 
+### Full Maintenance Interval customization
+See [backup repository configuration][3]
+
 ### Others
 Maintenance jobs will inherit the labels, annotations, toleration, nodeSelector, service account, image, environment variables, cloud-credentials etc. from Velero deployment.
 
 [1]: velero-install.md#usage
 [2]: node-agent-concurrency.md
+[3]: backup-repository-configuration.md#full-maintenance-interval-customization
