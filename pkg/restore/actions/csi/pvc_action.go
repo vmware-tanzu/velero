@@ -220,8 +220,10 @@ func (p *pvcRestoreItemAction) Execute(
 			logger.Infof("DataDownload %s/%s is created successfully.",
 				dataDownload.Namespace, dataDownload.Name)
 		} else {
-			volumeSnapshotName, ok := pvcFromBackup.Annotations[velerov1api.VolumeSnapshotLabel]
-			if !ok {
+			targetVSName := ""
+			if vsName, nameOK := pvcFromBackup.Annotations[velerov1api.VolumeSnapshotLabel]; nameOK {
+				targetVSName = util.GenerateSha256FromRestoreUIDAndVsName(string(input.Restore.UID), vsName)
+			} else {
 				logger.Info("Skipping PVCRestoreItemAction for PVC,",
 					"PVC does not have a CSI VolumeSnapshot.")
 				// Make no change in the input PVC.
@@ -229,8 +231,9 @@ func (p *pvcRestoreItemAction) Execute(
 					UpdatedItem: input.Item,
 				}, nil
 			}
+
 			if err := restoreFromVolumeSnapshot(
-				&pvc, newNamespace, p.crClient, volumeSnapshotName, logger,
+				&pvc, newNamespace, p.crClient, targetVSName, logger,
 			); err != nil {
 				logger.Errorf("Failed to restore PVC from VolumeSnapshot.")
 				return nil, errors.WithStack(err)
@@ -502,19 +505,17 @@ func restoreFromVolumeSnapshot(
 		},
 		vs,
 	); err != nil {
-		return errors.Wrapf(err,
-			fmt.Sprintf("Failed to get Volumesnapshot %s/%s to restore PVC %s/%s",
-				newNamespace, volumeSnapshotName, newNamespace, pvc.Name),
-		)
+		return errors.Wrapf(err, "Failed to get Volumesnapshot %s/%s to restore PVC %s/%s",
+			newNamespace, volumeSnapshotName, newNamespace, pvc.Name)
 	}
 
 	if _, exists := vs.Annotations[velerov1api.VolumeSnapshotRestoreSize]; exists {
 		restoreSize, err := resource.ParseQuantity(
 			vs.Annotations[velerov1api.VolumeSnapshotRestoreSize])
 		if err != nil {
-			return errors.Wrapf(err, fmt.Sprintf(
+			return errors.Wrapf(err,
 				"Failed to parse %s from annotation on Volumesnapshot %s/%s into restore size",
-				vs.Annotations[velerov1api.VolumeSnapshotRestoreSize], vs.Namespace, vs.Name))
+				vs.Annotations[velerov1api.VolumeSnapshotRestoreSize], vs.Namespace, vs.Name)
 		}
 		// It is possible that the volume provider allocated a larger
 		// capacity volume than what was requested in the backed up PVC.

@@ -95,7 +95,7 @@ func DeleteReadyVolumeSnapshot(
 
 ### Restore
 
-#### Restore the VolumeSnapshotContent from the backup instead of creating a new one dynamically
+#### Restore the VolumeSnapshotContent
 The current behavior of VSC restoration is that the VSC from the backup is restore, and the restored VS also triggers creating a new VSC dynamically.
 
 Two VSCs created for the same VS in one restore seems not right.
@@ -106,6 +106,16 @@ If the `SkipRestore` is set true in the restore action's result, the secret retu
 
 As a result, restore the VSC from the backup, and setup the VSC and the VS's relation is a better choice.
 
+Another consideration is the VSC name should not be the same as the backed-up VSC's, because the older version Velero's restore and backup keep the VSC after completion.
+
+There's high possibility that the restore will fail due to the VSC already exists in the cluster.
+
+Multiple restores of the same backup will also meet the same problem.
+
+The proposed solution is using the restore's UID and the VS's name to generate sha256 hash value as the new VSC name. Both the VS and VSC RestoreItemAction can access those UIDs, and it will avoid the conflicts issues.
+
+The restored VS name also shares the same generated name.
+
 The VS-referenced VSC name and the VSC's snapshot handle name are in their status.
 
 Velero restore process purges the restore resources' metadata and status before running the RestoreItemActions.
@@ -114,6 +124,78 @@ As a result, we cannot read these information in the VS and VSC RestoreItemActio
 
 Fortunately, RestoreItemAction input parameters includes the `ItemFromBackup`. The status is intact in `ItemFromBackup`.
 
+``` go
+func (p *volumeSnapshotRestoreItemAction) Execute(
+	input *velero.RestoreItemActionExecuteInput,
+) (*velero.RestoreItemActionExecuteOutput, error) {
+	p.log.Info("Starting VolumeSnapshotRestoreItemAction")
+
+	if boolptr.IsSetToFalse(input.Restore.Spec.RestorePVs) {
+		p.log.Infof("Restore %s/%s did not request for PVs to be restored.",
+			input.Restore.Namespace, input.Restore.Name)
+		return &velero.RestoreItemActionExecuteOutput{SkipRestore: true}, nil
+	}
+
+	var vs snapshotv1api.VolumeSnapshot
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(
+		input.Item.UnstructuredContent(), &vs); err != nil {
+		return &velero.RestoreItemActionExecuteOutput{},
+			errors.Wrapf(err, "failed to convert input.Item from unstructured")
+	}
+
+	var vsFromBackup snapshotv1api.VolumeSnapshot
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(
+		input.ItemFromBackup.UnstructuredContent(), &vsFromBackup); err != nil {
+		return &velero.RestoreItemActionExecuteOutput{},
+			errors.Wrapf(err, "failed to convert input.Item from unstructured")
+	}
+
+	// If cross-namespace restore is configured, change the namespace
+	// for VolumeSnapshot object to be restored
+	newNamespace, ok := input.Restore.Spec.NamespaceMapping[vs.GetNamespace()]
+	if !ok {
+		// Use original namespace
+		newNamespace = vs.Namespace
+	}
+
+	if csiutil.IsVolumeSnapshotExists(newNamespace, vs.Name, p.crClient) {
+		p.log.Debugf("VolumeSnapshot %s already exists in the cluster. Return without change.", vs.Namespace+"/"+vs.Name)
+		return &velero.RestoreItemActionExecuteOutput{UpdatedItem: input.Item}, nil
+	}
+
+	newVSCName := generateSha256FromRestoreAndVsUID(string(input.Restore.UID), string(vsFromBackup.UID))
+	// Reset Spec to convert the VolumeSnapshot from using
+	// the dynamic VolumeSnapshotContent to the static one.
+	resetVolumeSnapshotSpecForRestore(&vs, &newVSCName)
+
+	// Reset VolumeSnapshot annotation. By now, only change
+	// DeletionPolicy to Retain.
+	resetVolumeSnapshotAnnotation(&vs)
+
+	vsMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&vs)
+	if err != nil {
+		p.log.Errorf("Fail to convert VS %s to unstructured", vs.Namespace+"/"+vs.Name)
+		return nil, errors.WithStack(err)
+	}
+
+	p.log.Infof(`Returning from VolumeSnapshotRestoreItemAction with 
+		no additionalItems`)
+
+	return &velero.RestoreItemActionExecuteOutput{
+		UpdatedItem:     &unstructured.Unstructured{Object: vsMap},
+		AdditionalItems: []velero.ResourceIdentifier{},
+	}, nil
+}
+
+// generateSha256FromRestoreAndVsUID Use the restore UID and the VS UID to generate the new VSC name.
+// By this way, VS and VSC RIA action can get the same VSC name.
+func generateSha256FromRestoreAndVsUID(restoreUID string, vsUID string) string {
+	sha256Bytes := sha256.Sum256([]byte(restoreUID + "/" + vsUID))
+	return "vsc-" + hex.EncodeToString(sha256Bytes[:])
+}
+```
+
+#### Restore the VolumeSnapshot
 ``` go
 // Execute restores a VolumeSnapshotContent object without modification
 // returning the snapshot lister secret, if any, as additional items to restore.
@@ -128,9 +210,9 @@ func (p *volumeSnapshotContentRestoreItemAction) Execute(
 
 	p.log.Info("Starting VolumeSnapshotContentRestoreItemAction")
 
-	var snapCont snapshotv1api.VolumeSnapshotContent
+	var vsc snapshotv1api.VolumeSnapshotContent
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(
-		input.Item.UnstructuredContent(), &snapCont); err != nil {
+		input.Item.UnstructuredContent(), &vsc); err != nil {
 		return &velero.RestoreItemActionExecuteOutput{},
 			errors.Wrapf(err, "failed to convert input.Item from unstructured")
 	}
@@ -144,39 +226,42 @@ func (p *volumeSnapshotContentRestoreItemAction) Execute(
 
 	// If cross-namespace restore is configured, change the namespace
 	// for VolumeSnapshot object to be restored
-	newNamespace, ok := input.Restore.Spec.NamespaceMapping[snapCont.Spec.VolumeSnapshotRef.Namespace]
+	newNamespace, ok := input.Restore.Spec.NamespaceMapping[vsc.Spec.VolumeSnapshotRef.Namespace]
 	if ok {
 		// Update the referenced VS namespace to the mapping one.
-		snapCont.Spec.VolumeSnapshotRef.Namespace = newNamespace
+		vsc.Spec.VolumeSnapshotRef.Namespace = newNamespace
 	}
 
+	// Reset VSC name to align with VS.
+	vsc.Name = generateSha256FromRestoreAndVsUID(string(input.Restore.UID), string(vscFromBackup.Spec.VolumeSnapshotRef.UID))
+
 	// Reset the ResourceVersion and UID of referenced VolumeSnapshot.
-	snapCont.Spec.VolumeSnapshotRef.ResourceVersion = ""
-	snapCont.Spec.VolumeSnapshotRef.UID = ""
+	vsc.Spec.VolumeSnapshotRef.ResourceVersion = ""
+	vsc.Spec.VolumeSnapshotRef.UID = ""
 
 	// Set the DeletionPolicy to Retain to avoid VS deletion will not trigger snapshot deletion
-	snapCont.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
+	vsc.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
 
 	if vscFromBackup.Status != nil && vscFromBackup.Status.SnapshotHandle != nil {
-		snapCont.Spec.Source.VolumeHandle = nil
-		snapCont.Spec.Source.SnapshotHandle = vscFromBackup.Status.SnapshotHandle
+		vsc.Spec.Source.VolumeHandle = nil
+		vsc.Spec.Source.SnapshotHandle = vscFromBackup.Status.SnapshotHandle
 	} else {
-		p.log.Errorf("fail to get snapshot handle from VSC %s status", snapCont.Name)
-		return nil, errors.Errorf("fail to get snapshot handle from VSC %s status", snapCont.Name)
+		p.log.Errorf("fail to get snapshot handle from VSC %s status", vsc.Name)
+		return nil, errors.Errorf("fail to get snapshot handle from VSC %s status", vsc.Name)
 	}
 
 	additionalItems := []velero.ResourceIdentifier{}
-	if csi.IsVolumeSnapshotContentHasDeleteSecret(&snapCont) {
+	if csi.IsVolumeSnapshotContentHasDeleteSecret(&vsc) {
 		additionalItems = append(additionalItems,
 			velero.ResourceIdentifier{
 				GroupResource: schema.GroupResource{Group: "", Resource: "secrets"},
-				Name:          snapCont.Annotations[velerov1api.PrefixedSecretNameAnnotation],
-				Namespace:     snapCont.Annotations[velerov1api.PrefixedSecretNamespaceAnnotation],
+				Name:          vsc.Annotations[velerov1api.PrefixedSecretNameAnnotation],
+				Namespace:     vsc.Annotations[velerov1api.PrefixedSecretNamespaceAnnotation],
 			},
 		)
 	}
 
-	vscMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&snapCont)
+	vscMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&vsc)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -190,61 +275,6 @@ func (p *volumeSnapshotContentRestoreItemAction) Execute(
 }
 ```
 
-Because VSC is not restored dynamically, if we run restores two times for the same backup in the same cluster, the second restore will fail due to the VSC is there in the cluster, and it is already bound to an existing VS.
-
-To avoid this issue, it's better to delete the restored VS and VSC after restore completes.
-
-The VolumeSnapshot and VolumeSnapshotContent are delete in the `restore_finalizer_controller`.
-
-``` go
-func (ctx *finalizerContext) deleteVolumeSnapshotAndVolumeSnapshotContent() (errs results.Result) {
-	for _, operation := range ctx.restoreItemOperationList.items {
-		if operation.Spec.RestoreItemAction == constant.PluginCsiVolumeSnapshotRestoreRIA &&
-			operation.Status.Phase == itemoperation.OperationPhaseCompleted {
-			if operation.Spec.OperationID == "" || !strings.Contains(operation.Spec.OperationID, "/") {
-				ctx.logger.Errorf("invalid OperationID: %s", operation.Spec.OperationID)
-				errs.Add("", errors.Errorf("invalid OperationID: %s", operation.Spec.OperationID))
-				continue
-			}
-
-			operationIDParts := strings.Split(operation.Spec.OperationID, "/")
-
-			vs := new(snapshotv1api.VolumeSnapshot)
-			vsc := new(snapshotv1api.VolumeSnapshotContent)
-
-			if err := ctx.crClient.Get(
-				context.TODO(),
-				client.ObjectKey{Namespace: operationIDParts[0], Name: operationIDParts[1]},
-				vs,
-			); err != nil {
-				ctx.logger.Errorf("Fail to get the VolumeSnapshot %s: %s", operation.Spec.OperationID, err.Error())
-				errs.Add(operationIDParts[0], errors.Errorf("Fail to get the VolumeSnapshot %s: %s", operation.Spec.OperationID, err.Error()))
-				continue
-			}
-
-			if err := ctx.crClient.Delete(context.TODO(), vs); err != nil {
-				ctx.logger.Errorf("Fail to delete VolumeSnapshot %s: %s", operation.Spec.OperationID, err.Error())
-				errs.Add(vs.Namespace, err)
-			}
-
-			if vs.Status != nil && vs.Status.BoundVolumeSnapshotContentName != nil {
-				vsc.Name = *vs.Status.BoundVolumeSnapshotContentName
-			} else {
-				ctx.logger.Errorf("VolumeSnapshotContent %s is not ready.", vsc.Name)
-				errs.Add("", errors.Errorf("VolumeSnapshotContent %s is not ready.", vsc.Name))
-				continue
-			}
-
-			if err := ctx.crClient.Delete(context.TODO(), vsc); err != nil {
-				ctx.logger.Errorf("Fail to delete VolumeSnapshotContent %s: %s", vsc.Name, err.Error())
-				errs.Add("", errors.Errorf("Fail to delete the VolumeSnapshotContent %s", err))
-			}
-		}
-	}
-
-	return errs
-}
-```
 
 ### Backup Sync
 csi-volumesnapshotclasses.json, csi-volumesnapshotcontents.json, and csi-volumesnapshots.json are CSI-related metadata files in the BSL for each backup.
@@ -266,8 +296,17 @@ For the VSC DeleteItemAction, we need to generate a VSC. Because we only care ab
 
 Create a static VSC, then point it to a pseudo VS, and reference to the snapshot handle should be enough.
 
+To avoid the created VSC conflict with older version Velero B/R generated ones, the VSC name is set to `vsc-uuid`.
+
 The following is an example of the implementation.
 ``` go
+	uuid, err := uuid.NewRandom()
+	if err != nil {
+		p.log.WithError(err).Errorf("Fail to generate the UUID to create VSC %s", snapCont.Name)
+		return errors.Wrapf(err, "Fail to generate the UUID to create VSC %s", snapCont.Name)
+	}
+	snapCont.Name = "vsc-" + uuid.String()
+
 	snapCont.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentDelete
 
 	snapCont.Spec.Source = snapshotv1api.VolumeSnapshotContentSource{

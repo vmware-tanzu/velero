@@ -22,10 +22,13 @@ import (
 	"testing"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -37,11 +40,15 @@ import (
 func TestVSCExecute(t *testing.T) {
 	snapshotHandleStr := "test"
 	tests := []struct {
-		name      string
-		item      runtime.Unstructured
-		vsc       *snapshotv1api.VolumeSnapshotContent
-		backup    *velerov1api.Backup
-		createVSC bool
+		name     string
+		item     runtime.Unstructured
+		vsc      *snapshotv1api.VolumeSnapshotContent
+		backup   *velerov1api.Backup
+		function func(
+			ctx context.Context,
+			vsc *snapshotv1api.VolumeSnapshotContent,
+			client crclient.Client,
+		) (bool, error)
 		expectErr bool
 	}{
 		{
@@ -62,17 +69,30 @@ func TestVSCExecute(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name:      "VolumeSnapshotContent doesn't exist in the cluster, no error",
+			name:      "Normal case, VolumeSnapshot should be deleted",
 			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
-			backup:    builder.ForBackup("velero", "backup").Result(),
+			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
 			expectErr: false,
+			function: func(
+				ctx context.Context,
+				vsc *snapshotv1api.VolumeSnapshotContent,
+				client crclient.Client,
+			) (bool, error) {
+				return true, nil
+			},
 		},
 		{
 			name:      "Normal case, VolumeSnapshot should be deleted",
 			vsc:       builder.ForVolumeSnapshotContent("bar").ObjectMeta(builder.WithLabelsMap(map[string]string{velerov1api.BackupNameLabel: "backup"})).Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleStr}).Result(),
-			backup:    builder.ForBackup("velero", "backup").Result(),
-			expectErr: false,
-			createVSC: true,
+			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
+			expectErr: true,
+			function: func(
+				ctx context.Context,
+				vsc *snapshotv1api.VolumeSnapshotContent,
+				client crclient.Client,
+			) (bool, error) {
+				return false, errors.Errorf("test error case")
+			},
 		},
 	}
 
@@ -80,6 +100,7 @@ func TestVSCExecute(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			crClient := velerotest.NewFakeControllerRuntimeClient(t)
 			logger := logrus.StandardLogger()
+			checkVSCReadiness = test.function
 
 			p := volumeSnapshotContentDeleteItemAction{log: logger, crClient: crClient}
 
@@ -87,10 +108,6 @@ func TestVSCExecute(t *testing.T) {
 				vscMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(test.vsc)
 				require.NoError(t, err)
 				test.item = &unstructured.Unstructured{Object: vscMap}
-			}
-
-			if test.createVSC {
-				require.NoError(t, crClient.Create(context.TODO(), test.vsc))
 			}
 
 			err := p.Execute(
@@ -139,4 +156,55 @@ func TestNewVolumeSnapshotContentDeleteItemAction(t *testing.T) {
 	plugin1 := NewVolumeSnapshotContentDeleteItemAction(f1)
 	_, err1 := plugin1(logger)
 	require.NoError(t, err1)
+}
+
+func TestCheckVSCReadiness(t *testing.T) {
+	tests := []struct {
+		name      string
+		vsc       *snapshotv1api.VolumeSnapshotContent
+		createVSC bool
+		expectErr bool
+		ready     bool
+	}{
+		{
+			name: "VSC not exist",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "vsc-1",
+					Namespace: "velero",
+				},
+			},
+			createVSC: false,
+			expectErr: true,
+			ready:     false,
+		},
+		{
+			name: "VSC not ready",
+			vsc: &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "vsc-1",
+					Namespace: "velero",
+				},
+			},
+			createVSC: true,
+			expectErr: false,
+			ready:     false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.TODO()
+			crClient := velerotest.NewFakeControllerRuntimeClient(t)
+			if test.createVSC {
+				require.NoError(t, crClient.Create(ctx, test.vsc))
+			}
+
+			ready, err := checkVSCReadiness(ctx, test.vsc, crClient)
+			require.Equal(t, test.ready, ready)
+			if test.expectErr {
+				require.Error(t, err)
+			}
+		})
+	}
 }

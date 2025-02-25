@@ -124,8 +124,8 @@ func TestExecute(t *testing.T) {
 			operationID: ".",
 			expectedErr: nil,
 			expectedPVC: builder.ForPersistentVolumeClaim("velero", "testPVC").
-				ObjectMeta(builder.WithAnnotations(velerov1api.MustIncludeAdditionalItemAnnotation, "true", velerov1api.DataUploadNameAnnotation, "velero/", velerov1api.VolumeSnapshotLabel, ""),
-					builder.WithLabels(velerov1api.BackupNameLabel, "test", velerov1api.VolumeSnapshotLabel, "")).
+				ObjectMeta(builder.WithAnnotations(velerov1api.MustIncludeAdditionalItemAnnotation, "true", velerov1api.DataUploadNameAnnotation, "velero/"),
+					builder.WithLabels(velerov1api.BackupNameLabel, "test")).
 				VolumeName("testPV").StorageClass("testSC").Phase(corev1.ClaimBound).Result(),
 		},
 		{

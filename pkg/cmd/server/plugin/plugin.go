@@ -139,10 +139,6 @@ func NewCommand(f client.Factory) *cobra.Command {
 					newDateUploadDeleteItemAction(f),
 				).
 				RegisterDeleteItemAction(
-					"velero.io/csi-volumesnapshot-delete",
-					newVolumeSnapshotDeleteItemAction(f),
-				).
-				RegisterDeleteItemAction(
 					"velero.io/csi-volumesnapshotcontent-delete",
 					newVolumeSnapshotContentDeleteItemAction(f),
 				).
@@ -167,12 +163,12 @@ func NewCommand(f client.Factory) *cobra.Command {
 					newPvcRestoreItemAction(f),
 				).
 				RegisterRestoreItemActionV2(
-					"velero.io/csi-volumesnapshot-restorer",
+					constant.PluginCsiVolumeSnapshotRestoreRIA,
 					newVolumeSnapshotRestoreItemAction(f),
 				).
 				RegisterRestoreItemActionV2(
 					"velero.io/csi-volumesnapshotcontent-restorer",
-					newVolumeSnapshotContentRestoreItemAction,
+					newVolumeSnapshotContentRestoreItemAction(f),
 				).
 				RegisterRestoreItemActionV2(
 					"velero.io/csi-volumesnapshotclass-restorer",
@@ -432,10 +428,6 @@ func newVolumeSnapshotClassBackupItemAction(logger logrus.FieldLogger) (any, err
 
 // DeleteItemAction plugins
 
-func newVolumeSnapshotDeleteItemAction(f client.Factory) plugincommon.HandlerInitializer {
-	return dia.NewVolumeSnapshotDeleteItemAction(f)
-}
-
 func newVolumeSnapshotContentDeleteItemAction(f client.Factory) plugincommon.HandlerInitializer {
 	return dia.NewVolumeSnapshotContentDeleteItemAction(f)
 }
@@ -450,8 +442,8 @@ func newVolumeSnapshotRestoreItemAction(f client.Factory) plugincommon.HandlerIn
 	return csiria.NewVolumeSnapshotRestoreItemAction(f)
 }
 
-func newVolumeSnapshotContentRestoreItemAction(logger logrus.FieldLogger) (any, error) {
-	return csiria.NewVolumeSnapshotContentRestoreItemAction(logger)
+func newVolumeSnapshotContentRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return csiria.NewVolumeSnapshotContentRestoreItemAction(f)
 }
 
 func newVolumeSnapshotClassRestoreItemAction(logger logrus.FieldLogger) (any, error) {
