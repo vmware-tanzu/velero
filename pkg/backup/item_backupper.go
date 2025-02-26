@@ -593,7 +593,18 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	}
 
 	if ib.backupRequest.ResPolicies != nil {
-		if action, err := ib.backupRequest.ResPolicies.GetMatchAction(pv); err != nil {
+		pvc := new(corev1api.PersistentVolumeClaim)
+		if pv.Spec.ClaimRef != nil {
+			err = ib.kbClient.Get(context.Background(), kbClient.ObjectKey{
+				Namespace: pv.Spec.ClaimRef.Namespace,
+				Name:      pv.Spec.ClaimRef.Name},
+				pvc)
+			if err != nil {
+				return err
+			}
+		}
+		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
+		if action, err := ib.backupRequest.ResPolicies.GetMatchAction(vfd); err != nil {
 			log.WithError(err).Errorf("Error getting matched resource policies for pv %s", pv.Name)
 			return nil
 		} else if action != nil && action.Type == resourcepolicies.Skip {
@@ -696,8 +707,8 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 
 func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource schema.GroupResource, backupItemActionName string) (*resourcepolicies.Action, error) {
 	if ib.backupRequest.ResPolicies != nil && groupResource == kuberesource.PersistentVolumeClaims && (backupItemActionName == csiBIAPluginName || backupItemActionName == vsphereBIAPluginName) {
-		pvc := corev1api.PersistentVolumeClaim{}
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
+		pvc := &corev1api.PersistentVolumeClaim{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pvc); err != nil {
 			return nil, errors.WithStack(err)
 		}
 
@@ -710,7 +721,8 @@ func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource 
 		if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
 			return nil, errors.WithStack(err)
 		}
-		return ib.backupRequest.ResPolicies.GetMatchAction(pv)
+		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
+		return ib.backupRequest.ResPolicies.GetMatchAction(vfd)
 	}
 
 	return nil, nil

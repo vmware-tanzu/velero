@@ -81,7 +81,8 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 	}
 
 	if v.volumePolicy != nil {
-		action, err := v.volumePolicy.GetMatchAction(pv)
+		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
+		action, err := v.volumePolicy.GetMatchAction(vfd)
 		if err != nil {
 			v.logger.WithError(err).Errorf("fail to get VolumePolicy match action for PV %s", pv.Name)
 			return false, err
@@ -144,9 +145,11 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 
 	if v.volumePolicy != nil {
 		var resource any
+		var err error
 		resource = &volume
+		var pvc = &corev1api.PersistentVolumeClaim{}
 		if volume.VolumeSource.PersistentVolumeClaim != nil {
-			pvc, err := kubeutil.GetPVCForPodVolume(&volume, &pod, v.client)
+			pvc, err = kubeutil.GetPVCForPodVolume(&volume, &pod, v.client)
 			if err != nil {
 				v.logger.WithError(err).Errorf("fail to get PVC for pod %s", pod.Namespace+"/"+pod.Name)
 				return false, err
@@ -158,7 +161,13 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 			}
 		}
 
-		action, err := v.volumePolicy.GetMatchAction(resource)
+		pv, podVolume, err := v.getVolumeFromResource(resource)
+		if err != nil {
+			return false, err
+		}
+
+		vfd := resourcepolicies.NewVolumeFilterData(pv, podVolume, pvc)
+		action, err := v.volumePolicy.GetMatchAction(vfd)
 		if err != nil {
 			v.logger.WithError(err).Error("fail to get VolumePolicy match action for volume")
 			return false, err
@@ -246,4 +255,13 @@ func (v *volumeHelperImpl) shouldIncludeVolumeInBackup(vol corev1api.Volume) boo
 		includeVolumeInBackup = false
 	}
 	return includeVolumeInBackup
+}
+
+func (v *volumeHelperImpl) getVolumeFromResource(resource any) (*corev1api.PersistentVolume, *corev1api.Volume, error) {
+	if pv, ok := resource.(*corev1api.PersistentVolume); ok {
+		return pv, nil, nil
+	} else if podVol, ok := resource.(*corev1api.Volume); ok {
+		return nil, podVol, nil
+	}
+	return nil, nil, fmt.Errorf("resource is not a PersistentVolume or Volume")
 }
