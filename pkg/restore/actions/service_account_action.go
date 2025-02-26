@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -47,7 +47,7 @@ func (a *ServiceAccountAction) Execute(input *velero.RestoreItemActionExecuteInp
 	a.logger.Info("Executing ServiceAccountAction")
 	defer a.logger.Info("Done executing ServiceAccountAction")
 
-	var serviceAccount corev1.ServiceAccount
+	var serviceAccount corev1api.ServiceAccount
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), &serviceAccount); err != nil {
 		return nil, errors.Wrap(err, "unable to convert serviceaccount from runtime.Unstructured")
 	}

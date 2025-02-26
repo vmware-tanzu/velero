@@ -35,7 +35,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -1399,12 +1399,12 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 					builder.ForPersistentVolume("pv-1").StorageClass("gp2").Result(),
 				),
 				test.PVCs(
-					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").StorageClass("gp2").Phase(corev1.ClaimBound).Result(),
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").StorageClass("gp2").Phase(corev1api.ClaimBound).Result(),
 				),
 			},
 			runtimeResources: []runtime.Object{
 				builder.ForPersistentVolume("pv-1").StorageClass("gp2").Result(),
-				builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").StorageClass("gp2").Phase(corev1.ClaimBound).Result(),
+				builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").StorageClass("gp2").Phase(corev1api.ClaimBound).Result(),
 			},
 			actions: []*recordResourcesAction{
 				new(recordResourcesAction).WithName(csiBIAPluginName).ForNamespace("ns-1").ForResource("persistentvolumeclaims").WithSkippedCSISnapshotFlag(true),
@@ -1433,11 +1433,11 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 			},
 			apiResources: []*test.APIResource{
 				test.PVCs(
-					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Phase(corev1.ClaimBound).Result(),
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Phase(corev1api.ClaimBound).Result(),
 				),
 			},
 			runtimeResources: []runtime.Object{
-				builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Phase(corev1.ClaimBound).Result(),
+				builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Phase(corev1api.ClaimBound).Result(),
 				builder.ForPersistentVolume("pv-1").StorageClass("gp2").Result(),
 			},
 			actions: []*recordResourcesAction{
@@ -4014,7 +4014,7 @@ type fakePodVolumeBackupper struct {
 
 // BackupPodVolumes returns one pod volume backup per entry in volumes, with namespace "velero"
 // and name "pvb-<pod-namespace>-<pod-name>-<volume-name>".
-func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1.Pod, volumes []string, _ *resourcepolicies.Policies, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, *podvolume.PVCBackupSummary, []error) {
+func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1api.Pod, volumes []string, _ *resourcepolicies.Policies, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, *podvolume.PVCBackupSummary, []error) {
 	var res []*velerov1.PodVolumeBackup
 	pvcSummary := podvolume.NewPVCBackupSummary()
 
@@ -4064,7 +4064,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 		name              string
 		backup            *velerov1.Backup
 		apiResources      []*test.APIResource
-		pod               *corev1.Pod
+		pod               *corev1api.Pod
 		vsl               *velerov1.VolumeSnapshotLocation
 		snapshotterGetter volumeSnapshotterGetter
 		want              []*velerov1.PodVolumeBackup
@@ -4076,10 +4076,10 @@ func TestBackupWithPodVolume(t *testing.T) {
 				test.Pods(
 					builder.ForPod("ns-1", "pod-1").
 						ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "foo")).
-						Volumes(&corev1.Volume{
+						Volumes(&corev1api.Volume{
 							Name: "foo",
-							VolumeSource: corev1.VolumeSource{
-								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							VolumeSource: corev1api.VolumeSource{
+								PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 									ClaimName: "foo",
 								},
 							},
