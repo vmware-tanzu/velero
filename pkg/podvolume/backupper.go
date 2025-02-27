@@ -387,13 +387,19 @@ func (b *backupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velero
 		}
 	}()
 
+	var podVolumeBackups []*velerov1api.PodVolumeBackup
+	// if no pod volume backups are tracked, return directly to avoid issue mentioned in
+	// https://github.com/vmware-tanzu/velero/issues/8723
+	if len(b.pvbIndexer.List()) == 0 {
+		return podVolumeBackups
+	}
+
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		b.wg.Wait()
 	}()
 
-	var podVolumeBackups []*velerov1api.PodVolumeBackup
 	select {
 	case <-b.ctx.Done():
 		log.Error("timed out waiting for all PodVolumeBackups to complete")
