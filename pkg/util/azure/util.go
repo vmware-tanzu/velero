@@ -31,6 +31,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
+	"sigs.k8s.io/cloud-provider-azure/pkg/azclient"
 )
 
 const (
@@ -49,8 +50,8 @@ const (
 	CredentialKeySendCertChain              = "AZURE_CLIENT_SEND_CERTIFICATE_CHAIN" // #nosec
 	CredentialKeyUsername                   = "AZURE_USERNAME"                      // #nosec
 	CredentialKeyPassword                   = "AZURE_PASSWORD"                      // #nosec
-
-	credentialFile = "credentialsFile"
+	CredentialResourceManagerEndpoint       = "AZURE_RESOURCE_MANAGER_ENDPOINT"     // #nosec
+	credentialFile                          = "credentialsFile"
 )
 
 // LoadCredentials gets the credential file from config and loads it into a map
@@ -127,6 +128,10 @@ func GetClientOptions(locationCfg, creds map[string]string) (policy.ClientOption
 		}
 	}
 
+	if locationCfg["apiVersion"] != "" {
+		options.APIVersion = locationCfg["apiVersion"]
+	}
+
 	return options, nil
 }
 
@@ -144,7 +149,23 @@ func getCloudConfiguration(locationCfg, creds map[string]string) (cloud.Configur
 	case "AZUREUSGOVERNMENT", "AZUREUSGOVERNMENTCLOUD":
 		cfg = cloud.AzureGovernment
 	default:
-		return cloud.Configuration{}, errors.New(fmt.Sprintf("unknown cloud: %s", name))
+		var env *azclient.Environment
+		var err error
+		cfg, env, err = azclient.GetAzureCloudConfigAndEnvConfig(&azclient.ARMClientConfig{
+			Cloud: name,
+			ResourceManagerEndpoint: creds[CredentialResourceManagerEndpoint],
+		})
+		if err != nil {
+			return cloud.Configuration{}, err
+		}
+		// GetAzureCloudConfigAndEnvConfig will only return env.StorageEndpointSuffix if the Cloud configuration was loaded either
+		// through the resourceManagerEndpoint or environment file
+		if env.StorageEndpointSuffix == "" {
+			return cloud.Configuration{}, fmt.Errorf("unknown cloud: %s", name)
+		}
+		cfg.Services[serviceNameBlob] = cloud.ServiceConfiguration{
+			Endpoint: fmt.Sprintf("blob.%s", env.StorageEndpointSuffix),
+		}
 	}
 	if activeDirectoryAuthorityURI != "" {
 		cfg.ActiveDirectoryAuthorityHost = activeDirectoryAuthorityURI

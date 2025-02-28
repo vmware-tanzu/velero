@@ -17,14 +17,26 @@ limitations under the License.
 package azure
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/cloud-provider-azure/pkg/azclient"
 )
+
+type RoundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (fn RoundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return fn(r)
+}
 
 func TestLoadCredentials(t *testing.T) {
 	// no credential file
@@ -85,17 +97,125 @@ func TestGetClientOptions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, options.Cloud, cloud.AzurePublic)
 	assert.Nil(t, options.Transport)
+
+	// specify apiVersion
+	bslCfg = map[string]string{
+		CredentialKeyCloudName: "",
+		"apiVersion":           "2020-test",
+	}
+	creds = map[string]string{}
+	options, err = GetClientOptions(bslCfg, creds)
+	require.NoError(t, err)
+	assert.Equal(t, options.Cloud, cloud.AzurePublic)
+	assert.Equal(t, options.APIVersion, "2020-test")
+
+	// doesn't specify apiVesion
+	bslCfg = map[string]string{
+		CredentialKeyCloudName: "",
+	}
+	creds = map[string]string{}
+	options, err = GetClientOptions(bslCfg, creds)
+	require.NoError(t, err)
+	assert.Equal(t, options.Cloud, cloud.AzurePublic)
+	assert.Equal(t, options.APIVersion, "")
 }
 
 func Test_getCloudConfiguration(t *testing.T) {
+	// Change the default client to be our mock here, which will respond for either a custom cloud
+	//	or AzureStackHub
+	http.DefaultClient = &http.Client{
+		Transport: RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			var content any = nil
+			if req.URL.Path == "/metadata/endpoints" {
+				if req.Host == "management.customcloudapi.net" {
+					content = []map[string]interface{}{
+						{
+							"authentication": map[string]interface{}{
+								"loginEndpoint": "https://login.customcloudapi.net",
+								"audiences": []string{
+									"https://management.core.customcloudapi.net",
+									"https://management.customcloudapi.net",
+								},
+							},
+							"name": "AzureCustomCloud",
+							"suffixes": map[string]interface{}{
+								"storage": "core.customcloudapi.net",
+							},
+							"resourceManager": "https://management.customcloudapi.net",
+						},
+					}
+				}
+				if req.Host == "management.local.azurestack.external" {
+					content = []map[string]interface{}{
+						{
+							"authentication": map[string]interface{}{
+								"loginEndpoint": "https://adfs.local.azurestack.external/adfs",
+								"audiences": []string{
+									"https://management.adfs.azurestack.local/1234567890",
+								},
+							},
+							"name": "AzureStack-User-1234567890",
+							"suffixes": map[string]interface{}{
+								"storage": "local.azurestack.external",
+							},
+						},
+					}
+				}
+			}
+
+			if content != nil {
+				data, _ := json.Marshal(content)
+				return &http.Response{
+					StatusCode:    http.StatusOK,
+					Status:        http.StatusText(http.StatusOK),
+					ContentLength: int64(len(data)),
+					Body:          io.NopCloser(bytes.NewBuffer(data)),
+				}, nil
+			}
+
+			return &http.Response{
+				StatusCode:    http.StatusNotFound,
+				Status:        http.StatusText(http.StatusNotFound),
+				ContentLength: 0,
+			}, nil
+		}),
+	}
 	publicCloudWithADURI := cloud.AzurePublic
 	publicCloudWithADURI.ActiveDirectoryAuthorityHost = "https://example.com"
+	// Represents a custom AzureCloud environment
+	azureCustomCloud := cloud.Configuration{
+		ActiveDirectoryAuthorityHost: "https://login.customcloudapi.net",
+		Services: map[cloud.ServiceName]cloud.ServiceConfiguration{
+			serviceNameBlob: {
+				Endpoint: "blob.core.customcloudapi.net",
+			},
+			cloud.ResourceManager: {
+				Audience: "https://management.core.customcloudapi.net",
+				Endpoint: "https://management.customcloudapi.net",
+			},
+		},
+	}
+	// Represents an AzureStackCloud environment (using ADFS)
+	azureStackCloud := cloud.Configuration{
+		ActiveDirectoryAuthorityHost: "https://adfs.local.azurestack.external/adfs",
+		Services: map[cloud.ServiceName]cloud.ServiceConfiguration{
+			serviceNameBlob: {
+				Endpoint: "blob.local.azurestack.external",
+			},
+			cloud.ResourceManager: {
+				Audience: "https://management.adfs.azurestack.local/1234567890",
+				Endpoint: "https://management.local.azurestack.external",
+			},
+		},
+	}
 	cases := []struct {
-		name     string
-		bslCfg   map[string]string
-		creds    map[string]string
-		err      bool
-		expected cloud.Configuration
+		name      string
+		bslCfg    map[string]string
+		creds     map[string]string
+		err       bool
+		expected  cloud.Configuration
+		pretestFn func()
+		postestFn func()
 	}{
 		{
 			name:   "invalid cloud name",
@@ -179,14 +299,65 @@ func Test_getCloudConfiguration(t *testing.T) {
 			err:      false,
 			expected: publicCloudWithADURI,
 		},
+		{
+			name:   "azure custom cloud",
+			bslCfg: map[string]string{},
+			creds: map[string]string{
+				CredentialResourceManagerEndpoint: "https://management.customcloudapi.net",
+				CredentialKeyCloudName:            "AZURECUSTOMCLOUD",
+			},
+			err:      false,
+			expected: azureCustomCloud,
+		},
+		{
+			name:   "azure stack no configuration provided",
+			bslCfg: map[string]string{},
+			creds: map[string]string{
+				CredentialKeyCloudName: "AZURESTACKCLOUD",
+			},
+			err: true,
+		},
+		{
+			name:   "azure stack cloud resourceManagerEndpoint provided",
+			bslCfg: map[string]string{},
+			creds: map[string]string{
+				CredentialResourceManagerEndpoint: "https://management.local.azurestack.external",
+				// when using the ARM endpoint, the cloud name follows this pattern where the numbers match AZURE_TENANT_ID
+				CredentialKeyCloudName: "AzureStack-User-1234567890",
+			},
+			err:      false,
+			expected: azureStackCloud,
+		},
+		{
+			name:   "azure stack cloud configuration file provided",
+			bslCfg: map[string]string{},
+			creds: map[string]string{
+				CredentialKeyCloudName: "AzureStackCloud",
+			},
+			err:      false,
+			expected: azureStackCloud,
+			pretestFn: func() {
+				_, filename, _, _ := runtime.Caller(0)
+				os.Setenv(azclient.EnvironmentFilepathName, filepath.Join(filepath.Dir(filename), "testdata/azurestackcloud.json"))
+			},
+			postestFn: func() {
+				os.Setenv(azclient.EnvironmentFilepathName, "")
+			},
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			if c.pretestFn != nil {
+				c.pretestFn()
+			}
 			cfg, err := getCloudConfiguration(c.bslCfg, c.creds)
 			require.Equal(t, c.err, err != nil)
 			if !c.err {
 				assert.Equal(t, c.expected, cfg)
+			}
+			if c.postestFn != nil {
+				c.postestFn()
 			}
 		})
 	}
