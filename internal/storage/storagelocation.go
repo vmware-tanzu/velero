@@ -18,7 +18,6 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -98,7 +97,7 @@ func GetDefaultBackupStorageLocations(ctx context.Context, kbClient client.Clien
 	locations := new(velerov1api.BackupStorageLocationList)
 	defaultLocations := new(velerov1api.BackupStorageLocationList)
 	if err := kbClient.List(context.Background(), locations, &client.ListOptions{Namespace: namespace}); err != nil {
-		return defaultLocations, errors.Wrapf(err, fmt.Sprintf("failed to list backup storage locations in namespace %s", namespace))
+		return defaultLocations, errors.Wrapf(err, "failed to list backup storage locations in namespace %s", namespace)
 	}
 
 	for _, location := range locations.Items {

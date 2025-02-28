@@ -555,7 +555,7 @@ func (r *backupDeletionReconciler) deleteMovedSnapshots(ctx context.Context, bac
 	directSnapshots := map[string][]repotypes.SnapshotIdentifier{}
 	for i := range list.Items {
 		cm := list.Items[i]
-		if cm.Data == nil || len(cm.Data) == 0 {
+		if len(cm.Data) == 0 {
 			errs = append(errs, errors.New("no snapshot info in config"))
 			continue
 		}
