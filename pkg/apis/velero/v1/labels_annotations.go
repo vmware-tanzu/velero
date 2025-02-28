@@ -127,6 +127,9 @@ const (
 	VolumeSnapshotClassDriverBackupAnnotationPrefix = "velero.io/csi-volumesnapshot-class"
 	VolumeSnapshotClassDriverPVCAnnotation          = "velero.io/csi-volumesnapshot-class"
 
+	// https://kubernetes.io/zh-cn/docs/concepts/storage/volume-snapshot-classes/
+	VolumeSnapshotClassKubernetesAnnotation = "snapshot.storage.kubernetes.io/is-default-class"
+
 	// There is no release w/ these constants exported. Using the strings for now.
 	// CSI Annotation volumesnapshotclass
 	// https://github.com/kubernetes-csi/external-snapshotter/blob/master/pkg/utils/util.go#L59-L60
