@@ -18,7 +18,7 @@ As mentioned in [Image building][2], a hybrid image is provided for all platform
 
 In order to backup/restore volumes for stateful workloads, Velero node-agent needs to run in the Windows nodes. Velero provides a dedicated daemonset for Windows nodes, called `node-agent-windows`.  
 Therefore, in a typical cluster with linux and Windows nodes, there are two daemonsets for Velero node-agent, the existing `node-agent` deamonset for linux nodes, and the `node-agent-windows` daemonset for Windows nodes.  
-If you want to install `node-agent` deamonset, sepecify `--use-node-agent` parameter in `velero install` command; and if you want to install `node-agent-windows` daemonset, specify `--use-node-agent-windows` parameter.  
+If you want to install `node-agent` deamonset, specify `--use-node-agent` parameter in `velero install` command; and if you want to install `node-agent-windows` daemonset, specify `--use-node-agent-windows` parameter.  
 
 ## Resource backup restore
 
@@ -44,7 +44,7 @@ For volume backups/restores conducted through Velero plugins, the supportive sta
 During backup, Velero automatically identifies the OS type of the workload and schedules data mover pods to the right nodes. Specifically, for a linux workload, linux nodes in the cluster will be used; for a Windows workload, Windows nodes in the cluster will be used.  
 You could view the OS type that a data mover pod is running with from the DataUpload status's `nodeOS` field.   
 
-Velero takes several measures to deduce the OS type for volumes of workloads, from PVCs, VolumeAttach CRs, nodes and storage classes. If Velero fails to deduce the OS type, it fallbacks to linux, then the data mover pods will be scheduled to linux nodes. As a result, the data mover pods may not be able to start and the corresponding DataUploads will be cancelled because of tiemout, so the backup will be partially failed.  
+Velero takes several measures to deduce the OS type for volumes of workloads, from PVCs, VolumeAttach CRs, nodes and storage classes. If Velero fails to deduce the OS type, it fallbacks to linux, then the data mover pods will be scheduled to linux nodes. As a result, the data mover pods may not be able to start and the corresponding DataUploads will be cancelled because of timeout, so the backup will be partially failed.  
 
 Therefore, it is highly recommended you provide a dedicated storage class for Windows workloads volumes, and set `csi.storage.k8s.io/fstype` correctly. E.g., for linux workload volumes, set `csi.storage.k8s.io/fstype=ext4`; for Windows workload volumes set `csi.storage.k8s.io/fstype=ntfs`.  
 Specifically, if you have X number of storage classes for linux workloads, you need to create another X number of storage classes for Windows workloads.  
@@ -64,6 +64,10 @@ Backup Repository Maintenance jobs and pods are supported to run in Windows node
 ## Backup restore hooks
 
 Pre/post backup/restore hooks are supported for Windows workloads, the commands run in the same Windows nodes hosting the workload pods. For more information, check [Backup Hooks][5] and [Restore Hooks][6].  
+
+## Limitations
+
+NTFS extended attributes/advanced features are not supported, i.e., Security Descriptors, System/Hidden/ReadOnly attributes, Creation Time, NTFS Streams, etc. That is, after backup/restore, these data will be lost.  
 
 
 
