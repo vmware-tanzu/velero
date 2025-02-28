@@ -725,26 +725,33 @@ func (l *logHook) Fire(entry *logrus.Entry) error {
 }
 
 func TestWaitAllPodVolumesProcessed(t *testing.T) {
-	timeoutCtx, cancelFunc := context.WithTimeout(context.Background(), 1*time.Second)
-	defer func() {
-		cancelFunc()
-	}()
+	timeoutCtx, cancelFunc := context.WithCancel(context.Background())
+	cancelFunc()
 	log := logrus.New()
+	pvb := builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb").
+		PodNamespace("pod-namespace").PodName("pod-name").Volume("volume").Result()
 	cases := []struct {
 		name              string
 		ctx               context.Context
+		pvb               *velerov1api.PodVolumeBackup
 		statusToBeUpdated *velerov1api.PodVolumeBackupStatus
 		expectedErr       string
 		expectedPVBPhase  velerov1api.PodVolumeBackupPhase
 	}{
 		{
+			name: "contains no pvb should report no error",
+			ctx:  timeoutCtx,
+		},
+		{
 			name:        "context canceled",
 			ctx:         timeoutCtx,
+			pvb:         pvb,
 			expectedErr: "timed out waiting for all PodVolumeBackups to complete",
 		},
 		{
 			name: "failed pvbs",
 			ctx:  context.Background(),
+			pvb:  pvb,
 			statusToBeUpdated: &velerov1api.PodVolumeBackupStatus{
 				Phase:   velerov1api.PodVolumeBackupPhaseFailed,
 				Message: "failed",
@@ -755,6 +762,7 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 		{
 			name: "completed pvbs",
 			ctx:  context.Background(),
+			pvb:  pvb,
 			statusToBeUpdated: &velerov1api.PodVolumeBackupStatus{
 				Phase:   velerov1api.PodVolumeBackupPhaseCompleted,
 				Message: "completed",
@@ -764,10 +772,13 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		newPVB := builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb").Result()
+		var objs []ctrlclient.Object
+		if c.pvb != nil {
+			objs = append(objs, c.pvb)
+		}
 		scheme := runtime.NewScheme()
 		velerov1api.AddToScheme(scheme)
-		client := ctrlfake.NewClientBuilder().WithScheme(scheme).WithObjects(newPVB).Build()
+		client := ctrlfake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 		lw := kube.InternalLW{
 			Client:     client,
@@ -786,11 +797,14 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 		logger.Hooks.Add(logHook)
 
 		backuper := newBackupper(c.ctx, log, nil, nil, informer, nil, "", &velerov1api.Backup{})
-		backuper.wg.Add(1)
+		if c.pvb != nil {
+			backuper.pvbIndexer.Add(c.pvb)
+			backuper.wg.Add(1)
+		}
 
 		if c.statusToBeUpdated != nil {
 			pvb := &velerov1api.PodVolumeBackup{}
-			err := client.Get(context.Background(), ctrlclient.ObjectKey{Namespace: newPVB.Namespace, Name: newPVB.Name}, pvb)
+			err := client.Get(context.Background(), ctrlclient.ObjectKey{Namespace: c.pvb.Namespace, Name: c.pvb.Name}, pvb)
 			require.NoError(t, err)
 
 			pvb.Status = *c.statusToBeUpdated
@@ -802,6 +816,8 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 
 		if c.expectedErr != "" {
 			assert.Equal(t, c.expectedErr, logHook.entry.Message)
+		} else {
+			assert.Nil(t, logHook.entry)
 		}
 
 		if c.expectedPVBPhase != "" {
