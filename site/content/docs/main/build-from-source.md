@@ -89,24 +89,35 @@ More information in the [docker docs][23] and in the [buildx github][24] repo.
 
 ### Image building
 
-Set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:main` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the default is `velero`.
+#### Build local image
 
-Optionally, set the `$VERSION` environment variable to change the image tag or `$BIN` to change which binary to build a container image for. Then, run:
-
+If you want to build an image with the same OS type and CPU architecture with your local machine, you can keep most the build parameters as default.  
+Run below command to build the local image:  
 ```bash
 make container
 ```
-_Note: To build container images for both `velero` and `velero-restore-helper`, run: `make all-containers`_
+Optionally, set the `$VERSION` environment variable to change the image tag or `$BIN` to change which binary to build a container image for.  
+Optionally, you can set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:main` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the default is `velero`.  
+The image is preserved in the local machine, you can run `docker push` to push the image to the specified registry, or if not specified, docker hub by default.  
 
-### Publishing container images to a registry
+#### Build hybrid image
 
-To publish container images to a registry, the following one time setup is necessary:
+You can also build a hybrid image that supports multiple OS types or CPU architectures. A hybrid image contains a manifest list with one or more manifests each of which maps to a single `os type/arch/os version` configuration.  
+Below `os type/arch/os version` configurations are tested and supported:
+* `linux/amd64`
+* `linux/arm64`
+* `windows/amd64/ltsc2022`
+
+The hybrid image must be pushed to a registry as the local system doesn't support all the manifests in the image. So `BUILDX_OUTPUT_TYPE` parameter must be set as `registry`.  
+By default, `$REGISTRY` is set as `velero`, you can change it to your own registry.  
+
+To build a hybrid image, the following one time setup is necessary:
 
 1. If you are building cross platform container images
     ```bash
     $ docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
     ```
-1. Create and bootstrap a new docker buildx builder
+2. Create and bootstrap a new docker buildx builder
     ```bash
     $ docker buildx create --use --name builder
       builder
@@ -157,36 +168,24 @@ Status:    running
 Platforms: linux/amd64, linux/arm64, linux/riscv64, linux/ppc64le, linux/s390x, linux/386, linux/arm/v7, linux/arm/v
 ```
 
-Now build and push the container image by running the `make container` command with `$BUILDX_OUTPUT_TYPE` set to `registry`
+Now build and push the container image by running the `make container` command with `$BUILDX_OUTPUT_TYPE` set to `registry`.
+
+Blow command builds a hybrid image with single configuration `linux/amd64`:  
 ```bash
 $ REGISTRY=myrepo BUILDX_OUTPUT_TYPE=registry make container
 ```
 
-### Cross platform building
-
-Docker `buildx` platforms supported:
-* `linux/amd64`
-* `linux/arm64`
-* `linux/arm/v7`
-* `linux/ppc64le`
-
-For any specific platform, run `BUILDX_PLATFORMS=<GOOS>/<GOARCH> make container`
-
-For example, to build an image for arm64, run:
-
+Blow command builds a hybrid image with configurations `linux/amd64` and `linux/arm64`:  
 ```bash
-BUILDX_PLATFORMS=linux/arm64 make container
+$ REGISTRY=myrepo BUILDX_OUTPUT_TYPE=registry BUILD_ARCH=amd64,arm64 make container
 ```
-_Note: By default, `$BUILDX_PLATFORMS` is set to `linux/amd64`_
 
-With `buildx`, you can also build all supported platforms at the same time and push a multi-arch image to the registry. For example:
-
+Blow command builds a hybrid image with configurations `linux/amd64`, `linux/arm64` and `windows/amd64/ltsc2022`:  
 ```bash
-REGISTRY=myrepo VERSION=foo BUILDX_PLATFORMS=linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le BUILDX_OUTPUT_TYPE=registry make all-containers
+$ REGISTRY=myrepo BUILDX_OUTPUT_TYPE=registry BUILD_OS=linux,windows BUILD_ARCH=amd64,arm64 make container
 ```
-_Note: when building for more than 1 platform at the same time, you need to set `BUILDX_OUTPUT_TYPE` to `registry` as local multi-arch images are not supported [yet][25]._
 
-Note: if you want to update the image but not change its name, you will have to trigger Kubernetes to pick up the new image. One way of doing so is by deleting the Velero deployment pod:
+Note: if you want to update the image but not change its name, you will have to trigger Kubernetes to pick up the new image. One way of doing so is by deleting the Velero deployment pod and node-agent pods:
 
 ```bash
 kubectl -n velero delete pods -l deploy=velero
@@ -197,4 +196,3 @@ kubectl -n velero delete pods -l deploy=velero
 [22]: https://github.com/vmware-tanzu/velero/releases
 [23]: https://docs.docker.com/buildx/working-with-buildx/
 [24]: https://github.com/docker/buildx
-[25]: https://github.com/moby/moby/pull/38738
