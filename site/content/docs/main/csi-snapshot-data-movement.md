@@ -379,8 +379,13 @@ For the restore, this is not supported because sometimes the data movement resto
 ### BackupPVC Configuration
 
 The `BackupPVC` serves as an intermediate Persistent Volume Claim (PVC) utilized during data movement backup operations, providing efficient access to data.
-In complex storage environments, optimizing `BackupPVC` configurations can significantly enhance the performance of backup operations. [This document][16] outlines
-advanced configuration options for `BackupPVC`, allowing users to fine-tune access modes and storage class settings based on their storage provider's capabilities.
+In complex storage environments, optimizing `BackupPVC` configurations can significantly enhance the performance of backup operations. [This document][16] outlines advanced configuration options for `BackupPVC`, allowing users to fine-tune access modes and storage class settings based on their storage provider's capabilities.  
+
+### RestorePVC Configuration
+
+The `RestorePVC` serves as an intermediate Persistent Volume Claim (PVC) utilized during data movement restore operations, providing efficient access to data.  
+Sometimes, `RestorePVC` needs to be configured to increase the performance of restore operations. [This document][19] outlines advanced configuration options for `RestorePVC`, allowing users to fine-tune access modes and storage class settings based on their storage provider's capabilities.  
+
 
 [1]: https://github.com/vmware-tanzu/velero/pull/5968
 [2]: csi.md
@@ -399,4 +404,5 @@ advanced configuration options for `BackupPVC`, allowing users to fine-tune acce
 [16]: data-movement-backup-pvc-configuration.md
 [17]: backup-repository-configuration.md
 [18]: https://github.com/vmware-tanzu/velero/pull/7576
+[19]: data-movement-restore-pvc-configuration.md
 
