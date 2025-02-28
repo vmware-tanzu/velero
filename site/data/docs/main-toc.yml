@@ -67,6 +67,8 @@ toc:
         url: /proxy
       - page: Repository Maintenance
         url: /repository-maintenance
+      - page: Backup Restore Windows Workloads
+        url: /backup-restore-windows        
   - title: Plugins
     subfolderitems:
       - page: Overview
