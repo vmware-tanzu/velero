@@ -65,9 +65,8 @@ func (a *ServiceAccountAction) Execute(input *velero.RestoreItemActionExecuteInp
 			log.Debug("Match found - excluding this secret")
 			serviceAccount.Secrets = append(serviceAccount.Secrets[:i], serviceAccount.Secrets[i+1:]...)
 			break
-		} else {
-			log.Debug("No match found - including this secret")
 		}
+		log.Debug("No match found - including this secret")
 	}
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&serviceAccount)
