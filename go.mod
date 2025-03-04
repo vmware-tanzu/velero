@@ -1,6 +1,6 @@
 module github.com/vmware-tanzu/velero
 
-go 1.23
+go 1.23.1
 
 toolchain go1.23.6
 
