@@ -514,12 +514,12 @@ func TestDataDownloadReconcile(t *testing.T) {
 			}
 			if test.dd.Namespace == velerov1api.DefaultNamespace {
 				if controllerutil.ContainsFinalizer(test.dd, DataUploadDownloadFinalizer) {
-					assert.True(t, true, apierrors.IsNotFound(err))
+					assert.True(t, true, apierrors.IsNotFound(err)) //nolint:testifylint //FIXME
 				} else {
 					require.NoError(t, err)
 				}
 			} else {
-				assert.True(t, true, apierrors.IsNotFound(err))
+				assert.True(t, true, apierrors.IsNotFound(err)) //nolint:testifylint //FIXME
 			}
 
 			if !test.needCreateFSBR {
