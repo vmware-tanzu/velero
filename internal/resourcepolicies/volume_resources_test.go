@@ -150,7 +150,6 @@ func TestParseCapacity(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test // capture range variable
 		t.Run(test.input, func(t *testing.T) {
 			actual, actualErr := parseCapacity(test.input)
 			if test.expected != emptyCapacity {
@@ -181,7 +180,6 @@ func TestCapacityIsInRange(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test // capture range variable
 		t.Run(fmt.Sprintf("%v with %v", test.capacity, test.quantity), func(t *testing.T) {
 			t.Parallel()
 

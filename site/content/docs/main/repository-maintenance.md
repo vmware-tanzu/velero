@@ -131,10 +131,32 @@ velero install --default-repo-maintain-frequency <DURATION>
 For Kopia the default maintenance frequency is 1 hour, and Restic is 7 * 24 hours.
 
 ### Full Maintenance Interval customization
-See [backup repository configuration][3]
+See [backup repository configuration][3]  
+
+### Maintenance History
+You can view the maintenance history by describing the corresponding backupRepository CR:
+
+```
+Status:
+  Last Maintenance Time:  <timestamp>
+  Recent Maintenance:
+    Complete Timestamp:  <timestamp>
+    Result:              Succeeded
+    Start Timestamp:     <timestamp>
+    Complete Timestamp:  <timestamp>
+    Result:              Succeeded
+    Start Timestamp:     <timestamp>
+    Message:             <error message>
+    Result:              Failed
+    Start Timestamp:     <timestamp>
+```
+
+- `Last Maintenance Time` indicates the time of the latest successful maintenance job
+- `Recent Maintenance` keeps the status of the recent 3 maintenance jobs, including its start time, result (succeeded/failed), completion time (if the maintenance job succeeded), or error message (if the maintenance failed)
 
 ### Others
-Maintenance jobs will inherit the labels, annotations, toleration, nodeSelector, service account, image, environment variables, cloud-credentials etc. from Velero deployment.
+Maintenance jobs will inherit the labels, annotations, toleration, nodeSelector, service account, image, environment variables, cloud-credentials etc. from Velero deployment.  
+Maintenance jobs will not run for backup repositories whose backup storage location is set as readOnly.  
 
 [1]: velero-install.md#usage
 [2]: node-agent-concurrency.md

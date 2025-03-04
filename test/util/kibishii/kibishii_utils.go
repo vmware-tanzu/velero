@@ -333,7 +333,7 @@ func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiD
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Failed to wait generate data in namespace %s", namespace))
+		return errors.Wrapf(err, "Failed to wait generate data in namespace %s", namespace)
 	}
 	return nil
 }
@@ -363,7 +363,7 @@ func verifyData(ctx context.Context, namespace string, kibishiiData *KibishiiDat
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Failed to verify kibishii data in namespace %s\n", namespace))
+		return errors.Wrapf(err, "Failed to verify kibishii data in namespace %s\n", namespace)
 	}
 	fmt.Printf("Success to verify kibishii data in namespace %s\n", namespace)
 	return nil
@@ -430,7 +430,7 @@ func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, one
 		for _, pod := range KibishiiPodNameList {
 			exist, err := FileExistInPV(oneHourTimeout, kibishiiNamespace, pod, "kibishii", "data", incrementalFileName)
 			if err != nil {
-				return errors.Wrapf(err, fmt.Sprintf("fail to get file %s", incrementalFileName))
+				return errors.Wrapf(err, "fail to get file %s", incrementalFileName)
 			}
 
 			if exist {
