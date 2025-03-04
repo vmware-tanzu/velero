@@ -1,6 +1,6 @@
 module github.com/vmware-tanzu/velero
 
-go 1.23
+go 1.23.0
 
 toolchain go1.23.6
 
@@ -45,7 +45,7 @@ require (
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 	golang.org/x/mod v0.22.0
 	golang.org/x/net v0.34.0
-	golang.org/x/oauth2 v0.25.0
+	golang.org/x/oauth2 v0.27.0
 	golang.org/x/text v0.21.0
 	google.golang.org/api v0.218.0
 	google.golang.org/grpc v1.69.4
