@@ -55,6 +55,8 @@ toc:
         url: /node-agent-concurrency
       - page: Data Movement Backup PVC Configuration
         url: /data-movement-backup-pvc-configuration
+      - page: Data Movement Restore PVC Configuration
+        url: /data-movement-restore-pvc-configuration        
       - page: Data Movement Pod Resource Configuration
         url: /data-movement-pod-resource-configuration        
       - page: Backup Repository Configuration
