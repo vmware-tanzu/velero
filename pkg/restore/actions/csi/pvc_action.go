@@ -46,14 +46,7 @@ import (
 )
 
 const (
-	AnnBindCompleted          = "pv.kubernetes.io/bind-completed"
-	AnnBoundByController      = "pv.kubernetes.io/bound-by-controller"
-	AnnStorageProvisioner     = "volume.kubernetes.io/storage-provisioner"
-	AnnBetaStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
-	AnnSelectedNode           = "volume.kubernetes.io/selected-node"
-)
-
-const (
+	AnnSelectedNode          = "volume.kubernetes.io/selected-node"
 	GenerateNameRandomLength = 5
 )
 
@@ -70,18 +63,6 @@ func (p *pvcRestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
 		IncludedResources: []string{"persistentvolumeclaims"},
 		//TODO: add label selector volumeSnapshotLabel
 	}, nil
-}
-
-func removePVCAnnotations(pvc *corev1api.PersistentVolumeClaim, remove []string) {
-	if pvc.Annotations == nil {
-		pvc.Annotations = make(map[string]string)
-		return
-	}
-	for k := range pvc.Annotations {
-		if util.Contains(remove, k) {
-			delete(pvc.Annotations, k)
-		}
-	}
 }
 
 func resetPVCSpec(pvc *corev1api.PersistentVolumeClaim, vsName string) {
@@ -147,21 +128,6 @@ func (p *pvcRestoreItemAction) Execute(
 			UpdatedItem: input.Item,
 		}, nil
 	}
-
-	// remove the VolumeSnapshot name annotation as well
-	// clean the DataUploadNameLabel for snapshot data mover case.
-	removePVCAnnotations(
-		&pvc,
-		[]string{
-			AnnBindCompleted,
-			AnnBoundByController,
-			AnnStorageProvisioner,
-			AnnBetaStorageProvisioner,
-			AnnSelectedNode,
-			velerov1api.VolumeSnapshotLabel,
-			velerov1api.DataUploadNameAnnotation,
-		},
-	)
 
 	// If cross-namespace restore is configured, change the namespace
 	// for PVC object to be restored
