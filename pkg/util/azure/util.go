@@ -50,7 +50,7 @@ const (
 	CredentialKeySendCertChain              = "AZURE_CLIENT_SEND_CERTIFICATE_CHAIN" // #nosec
 	CredentialKeyUsername                   = "AZURE_USERNAME"                      // #nosec
 	CredentialKeyPassword                   = "AZURE_PASSWORD"                      // #nosec
-	CredentialResourceManagerEndpoint       = "AZURE_RESOURCE_MANAGER_ENDPOINT"     // #nosec
+	CredentialKeyResourceManagerEndpoint    = "AZURE_RESOURCE_MANAGER_ENDPOINT"     // #nosec
 	credentialFile                          = "credentialsFile"
 )
 
@@ -153,7 +153,7 @@ func getCloudConfiguration(locationCfg, creds map[string]string) (cloud.Configur
 		var err error
 		cfg, env, err = azclient.GetAzureCloudConfigAndEnvConfig(&azclient.ARMClientConfig{
 			Cloud: name,
-			ResourceManagerEndpoint: creds[CredentialResourceManagerEndpoint],
+			ResourceManagerEndpoint: creds[CredentialKeyResourceManagerEndpoint],
 		})
 		if err != nil {
 			return cloud.Configuration{}, err

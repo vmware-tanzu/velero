@@ -303,7 +303,7 @@ func Test_getCloudConfiguration(t *testing.T) {
 			name:   "azure custom cloud",
 			bslCfg: map[string]string{},
 			creds: map[string]string{
-				CredentialResourceManagerEndpoint: "https://management.customcloudapi.net",
+				CredentialKeyResourceManagerEndpoint: "https://management.customcloudapi.net",
 				CredentialKeyCloudName:            "AZURECUSTOMCLOUD",
 			},
 			err:      false,
@@ -321,7 +321,7 @@ func Test_getCloudConfiguration(t *testing.T) {
 			name:   "azure stack cloud resourceManagerEndpoint provided",
 			bslCfg: map[string]string{},
 			creds: map[string]string{
-				CredentialResourceManagerEndpoint: "https://management.local.azurestack.external",
+				CredentialKeyResourceManagerEndpoint: "https://management.local.azurestack.external",
 				// when using the ARM endpoint, the cloud name follows this pattern where the numbers match AZURE_TENANT_ID
 				CredentialKeyCloudName: "AzureStack-User-1234567890",
 			},
