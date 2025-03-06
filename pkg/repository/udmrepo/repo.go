@@ -33,7 +33,7 @@ type ManifestEntryMetadata struct {
 }
 
 type RepoManifest struct {
-	Payload  any            // The user data of manifest
+	Payload  any                    // The user data of manifest
 	Metadata *ManifestEntryMetadata // The metadata data of manifest
 }
 

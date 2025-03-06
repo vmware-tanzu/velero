@@ -684,7 +684,7 @@ func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroCo
 }
 
 func VeleroUninstall(ctx context.Context, veleroCfg test.VeleroConfig) error {
-	if stdout, stderr, err := velerexec.RunCommand(exec.CommandContext( //nolint:gosec // test code
+	if stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(
 		ctx,
 		veleroCfg.VeleroCLI,
 		"uninstall",

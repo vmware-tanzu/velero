@@ -46,10 +46,10 @@ import (
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	. "github.com/vmware-tanzu/velero/test" //nolint:stylecheck // test code
+	. "github.com/vmware-tanzu/velero/test"
 	common "github.com/vmware-tanzu/velero/test/util/common"
 	util "github.com/vmware-tanzu/velero/test/util/csi"
-	. "github.com/vmware-tanzu/velero/test/util/k8s" //nolint:stylecheck // test code
+	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 const BackupObjectsPrefix = "backups"
@@ -926,7 +926,7 @@ func InstallVeleroCLI(version string) (string, error) {
 			return false, errors.WithMessagef(err, "failed to create temp dir for tarball extraction")
 		}
 
-		cmd := exec.Command("tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir) //nolint:gosec // test code
+		cmd := exec.Command("tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir)
 		defer os.Remove(tempFile.Name())
 
 		if _, err := cmd.Output(); err != nil {

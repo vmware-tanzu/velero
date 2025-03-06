@@ -53,7 +53,7 @@ type Action struct {
 type VolumePolicy struct {
 	// Conditions defined list of conditions to match Volumes
 	Conditions map[string]any `yaml:"conditions"`
-	Action     Action                 `yaml:"action"`
+	Action     Action         `yaml:"action"`
 }
 
 // resourcePolicies currently defined slice of volume policies to handle backup
