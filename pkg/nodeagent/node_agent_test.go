@@ -461,3 +461,132 @@ func TestGetLabelValue(t *testing.T) {
 		})
 	}
 }
+
+func TestGetAnnotationValue(t *testing.T) {
+	daemonSet := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+	}
+
+	daemonSetWithOtherAnnotation := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"fake-other-annotation": "fake-value-1",
+					},
+				},
+			},
+		},
+	}
+
+	daemonSetWithAnnotation := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"fake-annotation": "fake-value-2",
+					},
+				},
+			},
+		},
+	}
+
+	daemonSetWithEmptyAnnotation := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"fake-annotation": "",
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name          string
+		kubeClientObj []runtime.Object
+		namespace     string
+		expectedValue string
+		expectErr     string
+	}{
+		{
+			name:      "ds get error",
+			namespace: "fake-ns",
+			expectErr: "error getting node-agent daemonset: daemonsets.apps \"node-agent\" not found",
+		},
+		{
+			name:      "no annotation",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectErr: ErrNodeAgentAnnotationNotFound.Error(),
+		},
+		{
+			name:      "no expecting annotation",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithOtherAnnotation,
+			},
+			expectErr: ErrNodeAgentAnnotationNotFound.Error(),
+		},
+		{
+			name:      "expecting annotation",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithAnnotation,
+			},
+			expectedValue: "fake-value-2",
+		},
+		{
+			name:      "expecting empty annotation",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithEmptyAnnotation,
+			},
+			expectedValue: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			value, err := GetAnnotationValue(context.TODO(), fakeKubeClient, test.namespace, "fake-annotation", kube.NodeOSLinux)
+			if test.expectErr == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, test.expectedValue, value)
+			} else {
+				assert.EqualError(t, err, test.expectErr)
+			}
+		})
+	}
+}

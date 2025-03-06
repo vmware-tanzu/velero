@@ -19,3 +19,7 @@ package util
 var ThirdPartyLabels = []string{
 	"azure.workload.identity/use",
 }
+
+var ThirdPartyAnnotations = []string{
+	"iam.amazonaws.com/role",
+}

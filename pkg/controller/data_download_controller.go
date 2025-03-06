@@ -748,15 +748,27 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		}
 	}
 
+	hostingPodAnnotation := map[string]string{}
+	for _, k := range util.ThirdPartyAnnotations {
+		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, dd.Namespace, k, nodeOS); err != nil {
+			if err != nodeagent.ErrNodeAgentAnnotationNotFound {
+				log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
+			}
+		} else {
+			hostingPodAnnotation[k] = v
+		}
+	}
+
 	return exposer.GenericRestoreExposeParam{
-		TargetPVCName:    dd.Spec.TargetVolume.PVC,
-		TargetNamespace:  dd.Spec.TargetVolume.Namespace,
-		HostingPodLabels: hostingPodLabels,
-		Resources:        r.podResources,
-		OperationTimeout: dd.Spec.OperationTimeout.Duration,
-		ExposeTimeout:    r.preparingTimeout,
-		NodeOS:           nodeOS,
-		RestorePVCConfig: r.restorePVCConfig,
+		TargetPVCName:         dd.Spec.TargetVolume.PVC,
+		TargetNamespace:       dd.Spec.TargetVolume.Namespace,
+		HostingPodLabels:      hostingPodLabels,
+		HostingPodAnnotations: hostingPodAnnotation,
+		Resources:             r.podResources,
+		OperationTimeout:      dd.Spec.OperationTimeout.Duration,
+		ExposeTimeout:         r.preparingTimeout,
+		NodeOS:                nodeOS,
+		RestorePVCConfig:      r.restorePVCConfig,
 	}, nil
 }
 
