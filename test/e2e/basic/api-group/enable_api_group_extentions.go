@@ -39,12 +39,12 @@ func APIExtensionsVersionsTest() {
 	label := "for=backup"
 	srcCrdYaml := "testdata/enable_api_group_versions/case-a-source-v1beta1.yaml"
 	BeforeEach(func() {
-		if veleroCfg.DefaultClusterContext == "" && veleroCfg.StandbyClusterContext == "" {
+		if veleroCfg.ActiveClusterContext == "" && veleroCfg.StandbyClusterContext == "" {
 			Skip("CRD with apiextension versions migration test needs 2 clusters")
 		}
 		veleroCfg = VeleroCfg
-		Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
-		srcVersions, err := GetAPIVersions(veleroCfg.DefaultClient, resourceName)
+		Expect(KubectlConfigUseContext(context.Background(), veleroCfg.ActiveClusterContext)).To(Succeed())
+		srcVersions, err := GetAPIVersions(veleroCfg.ActiveClient, resourceName)
 		Expect(err).ShouldNot(HaveOccurred())
 		dstVersions, err := GetAPIVersions(veleroCfg.StandbyClient, resourceName)
 		Expect(err).ShouldNot(HaveOccurred())
@@ -67,9 +67,9 @@ func APIExtensionsVersionsTest() {
 		})
 	})
 	AfterEach(func() {
-		By(fmt.Sprintf("Switch to default kubeconfig context %s", veleroCfg.DefaultClusterContext), func() {
-			Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
-			veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
+		By(fmt.Sprintf("Switch to default kubeconfig context %s", veleroCfg.ActiveClusterContext), func() {
+			Expect(KubectlConfigUseContext(context.Background(), veleroCfg.ActiveClusterContext)).To(Succeed())
+			veleroCfg.ClientToInstallVelero = veleroCfg.ActiveClient
 		})
 
 		if CurrentSpecReport().Failed() && veleroCfg.FailFast {
@@ -82,7 +82,7 @@ func APIExtensionsVersionsTest() {
 				By("Uninstall Velero and delete CRD ", func() {
 					ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 					defer ctxCancel()
-					Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
+					Expect(KubectlConfigUseContext(context.Background(), veleroCfg.ActiveClusterContext)).To(Succeed())
 					Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 					Expect(DeleteCRDByName(context.Background(), crdName)).To(Succeed())
 
@@ -98,14 +98,14 @@ func APIExtensionsVersionsTest() {
 			backupName = "backup-" + UUIDgen.String()
 			restoreName = "restore-" + UUIDgen.String()
 
-			By(fmt.Sprintf("Install Velero in cluster-A (%s) to backup workload", veleroCfg.DefaultClusterContext), func() {
-				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
+			By(fmt.Sprintf("Install Velero in cluster-A (%s) to backup workload", veleroCfg.ActiveClusterContext), func() {
+				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.ActiveClusterContext)).To(Succeed())
 				veleroCfg.Features = "EnableAPIGroupVersions"
 				veleroCfg.UseVolumeSnapshots = false
 				Expect(VeleroInstall(context.Background(), &veleroCfg, false)).To(Succeed())
 			})
 
-			By(fmt.Sprintf("Install CRD of apiextenstions v1beta1 in cluster-A (%s)", veleroCfg.DefaultClusterContext), func() {
+			By(fmt.Sprintf("Install CRD of apiextenstions v1beta1 in cluster-A (%s)", veleroCfg.ActiveClusterContext), func() {
 				Expect(InstallCRD(context.Background(), srcCrdYaml)).To(Succeed())
 				Expect(CRDShouldExist(context.Background(), crdName)).To(Succeed())
 				Expect(WaitForCRDEstablished(crdName)).To(Succeed())

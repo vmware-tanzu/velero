@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -53,8 +52,16 @@ type installOptions struct {
 	WithoutDisableInformerCacheParam bool
 }
 
-func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyCluster bool) error {
+func VeleroInstall(
+	ctx context.Context,
+	veleroCfg *test.VeleroConfig,
+	isStandbyCluster bool,
+) error {
 	fmt.Printf("Velero install %s\n", time.Now().Format("2006-01-02 15:04:05"))
+
+	cloudProvider := veleroCfg.CloudProvider
+	objectStoreProvider := veleroCfg.ObjectStoreProvider
+	client := veleroCfg.ActiveClient
 
 	// veleroCfg struct including a set of BSL params and a set of additional BSL params,
 	// additional BSL set is for additional BSL test only, so only default BSL set is effective
@@ -69,19 +76,9 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 	// the only one veleroCfg setting is provided as current design, since it will not introduce any issues as
 	// we can predict, so keep it intact for now.
 	if isStandbyCluster {
-		veleroCfg.CloudProvider = veleroCfg.StandbyClusterCloudProvider
-	}
-
-	if slices.Contains(test.PublicCloudProviders, veleroCfg.CloudProvider) {
-		fmt.Println("For public cloud platforms, object store plugin provider will be set as cloud provider")
-		// If ObjectStoreProvider is not provided, then using the value same as CloudProvider
-		if veleroCfg.ObjectStoreProvider == "" {
-			veleroCfg.ObjectStoreProvider = veleroCfg.CloudProvider
-		}
-	} else {
-		if veleroCfg.ObjectStoreProvider == "" {
-			return errors.New("No object store provider specified - must be specified when using kind as the cloud provider") // Must have an object store provider
-		}
+		cloudProvider = veleroCfg.StandbyClusterCloudProvider
+		objectStoreProvider = veleroCfg.StandbyObjectStoreProvider
+		client = veleroCfg.StandbyClient
 	}
 
 	pluginsTmp, err := getPlugins(ctx, *veleroCfg)
@@ -94,23 +91,17 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 	}
 
 	// TODO - handle this better
-	if veleroCfg.CloudProvider == test.Vsphere {
-		// We overrider the ObjectStoreProvider here for vSphere because we want to use the aws plugin for the
-		// backup, but needed to pick up the provider plugins earlier.  vSphere plugin no longer needs a Volume
-		// Snapshot location specified
-		if veleroCfg.ObjectStoreProvider == "" {
-			veleroCfg.ObjectStoreProvider = test.AWS
-		}
-
+	if cloudProvider == test.Vsphere {
 		if err := cleanVSpherePluginConfig(
-			veleroCfg.ClientToInstallVelero.ClientGo,
+			client.ClientGo,
 			veleroCfg.VeleroNamespace,
 			test.VeleroVSphereSecretName,
 			test.VeleroVSphereConfigMapName,
 		); err != nil {
 			return errors.WithMessagef(err, "Failed to clear up vsphere plugin config %s namespace", veleroCfg.VeleroNamespace)
 		}
-		if err := generateVSpherePlugin(veleroCfg); err != nil {
+
+		if err := generateVSpherePlugin(client, veleroCfg); err != nil {
 			return errors.WithMessagef(err, "Failed to config vsphere plugin")
 		}
 	}
@@ -173,12 +164,11 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 
 // generateVSpherePlugin refers to
 // https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/v1.3.0/docs/vanilla.md
-func generateVSpherePlugin(veleroCfg *test.VeleroConfig) error {
-	cli := veleroCfg.ClientToInstallVelero
+func generateVSpherePlugin(client *k8s.TestClient, veleroCfg *test.VeleroConfig) error {
 
 	if err := k8s.CreateNamespace(
 		context.Background(),
-		*cli,
+		*client,
 		veleroCfg.VeleroNamespace,
 	); err != nil {
 		return errors.WithMessagef(
@@ -190,7 +180,7 @@ func generateVSpherePlugin(veleroCfg *test.VeleroConfig) error {
 
 	clusterFlavor := "VANILLA"
 
-	if err := createVCCredentialSecret(cli.ClientGo, veleroCfg.VeleroNamespace); err != nil {
+	if err := createVCCredentialSecret(client.ClientGo, veleroCfg.VeleroNamespace); err != nil {
 		// For TKGs/uTKG the VC secret is not supposed to exist.
 		if apierrors.IsNotFound(err) {
 			clusterFlavor = "GUEST"
@@ -204,7 +194,7 @@ func generateVSpherePlugin(veleroCfg *test.VeleroConfig) error {
 	}
 
 	_, err := k8s.CreateConfigMap(
-		cli.ClientGo,
+		client.ClientGo,
 		veleroCfg.VeleroNamespace,
 		test.VeleroVSphereConfigMapName,
 		nil,
@@ -223,7 +213,7 @@ func generateVSpherePlugin(veleroCfg *test.VeleroConfig) error {
 	}
 
 	if err := k8s.WaitForConfigMapComplete(
-		cli.ClientGo,
+		client.ClientGo,
 		veleroCfg.VeleroNamespace,
 		test.VeleroVSphereConfigMapName,
 	); err != nil {

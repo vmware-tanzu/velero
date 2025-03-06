@@ -18,7 +18,7 @@ package scale
 
 import (
 	basic "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 )
 
 var MultiNSBackupRestore func() = TestFunc(&basic.MultiNSBackup{IsScalTest: true})
