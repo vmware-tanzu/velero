@@ -46,10 +46,10 @@ import (
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
-	. "github.com/vmware-tanzu/velero/test"
+	. "github.com/vmware-tanzu/velero/test" //nolint:stylecheck // test code
 	common "github.com/vmware-tanzu/velero/test/util/common"
 	util "github.com/vmware-tanzu/velero/test/util/csi"
-	. "github.com/vmware-tanzu/velero/test/util/k8s"
+	. "github.com/vmware-tanzu/velero/test/util/k8s" //nolint:stylecheck // test code
 )
 
 const BackupObjectsPrefix = "backups"
@@ -926,7 +926,7 @@ func InstallVeleroCLI(version string) (string, error) {
 			return false, errors.WithMessagef(err, "failed to create temp dir for tarball extraction")
 		}
 
-		cmd := exec.Command("tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir)
+		cmd := exec.Command("tar", "-xvf", tempFile.Name(), "-C", tempVeleroCliDir) //nolint:gosec // test code
 		defer os.Remove(tempFile.Name())
 
 		if _, err := cmd.Output(); err != nil {
@@ -940,12 +940,12 @@ func InstallVeleroCLI(version string) (string, error) {
 	return tempVeleroCliDir + "/" + name + "/velero", nil
 }
 
-func getVeleroCliTarball(cliTarballUrl string) (*os.File, error) {
-	lastInd := strings.LastIndex(cliTarballUrl, "/")
-	tarball := cliTarballUrl[lastInd+1:]
+func getVeleroCliTarball(cliTarballURL string) (*os.File, error) {
+	lastInd := strings.LastIndex(cliTarballURL, "/")
+	tarball := cliTarballURL[lastInd+1:]
 
 	cli := &http.Client{}
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, cliTarballUrl, nil)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, cliTarballURL, nil)
 	resp, err := cli.Do(req)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "failed to access Velero CLI tarball")

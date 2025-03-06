@@ -262,7 +262,7 @@ func cleanVSpherePluginConfig(c clientset.Interface, ns, secretName, configMapNa
 	return nil
 }
 
-func installVeleroServer(ctx context.Context, cli, cloudProvider string, options *installOptions) error {
+func installVeleroServer(ctx context.Context, cli, _ string, options *installOptions) error {
 	args := []string{"install"}
 	namespace := "velero"
 	if len(options.Namespace) > 0 {
@@ -684,7 +684,7 @@ func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroCo
 }
 
 func VeleroUninstall(ctx context.Context, veleroCfg test.VeleroConfig) error {
-	if stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(
+	if stdout, stderr, err := velerexec.RunCommand(exec.CommandContext( //nolint:gosec // test code
 		ctx,
 		veleroCfg.VeleroCLI,
 		"uninstall",
