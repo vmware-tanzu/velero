@@ -19,6 +19,7 @@ package csi
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
@@ -484,9 +485,7 @@ func newDataUpload(
 	if backup.Spec.UploaderConfig != nil &&
 		backup.Spec.UploaderConfig.ParallelFilesUpload > 0 {
 		dataUpload.Spec.DataMoverConfig = make(map[string]string)
-		dataUpload.Spec.DataMoverConfig[uploaderUtil.ParallelFilesUpload] = fmt.Sprintf(
-			"%d", backup.Spec.UploaderConfig.ParallelFilesUpload,
-		)
+		dataUpload.Spec.DataMoverConfig[uploaderUtil.ParallelFilesUpload] = strconv.Itoa(backup.Spec.UploaderConfig.ParallelFilesUpload)
 	}
 
 	return dataUpload

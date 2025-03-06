@@ -74,7 +74,7 @@ func ErrorStack(err error) *proto.Stack {
 
 		stackTrace.Frames = append(stackTrace.Frames, &proto.StackFrame{
 			File:     location.File,
-			Line:     int32(min(location.Line, math.MaxInt32)), //nolint:gosec // false positive: https://github.com/securego/gosec/issues/1212#issuecomment-2704299019
+			Line:     int32(min(location.Line, math.MaxInt32)),
 			Function: location.Function,
 		})
 	}

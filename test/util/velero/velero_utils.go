@@ -787,15 +787,15 @@ func WaitForVSphereUploadCompletion(ctx context.Context, timeout time.Duration, 
 			fmt.Printf("%s %s\n", curLine, time.Now().Format("2006-01-02 15:04:05"))
 			comps := strings.Split(curLine, "=")
 			// SnapshotPhase represents the lifecycle phase of a Snapshot.
-			// New - No work yet, next phase is InProgress
+			// New - No work yet, next phase is
 			// InProgress - snapshot being taken
-			// Snapshotted - local snapshot complete, next phase is Protecting or SnapshotFailed
+			// Snapshotted - local snapshot complete, next phase is Protecting or
 			// SnapshotFailed - end state, snapshot was not able to be taken
 			// Uploading - snapshot is being moved to durable storage
 			// Uploaded - end state, snapshot has been protected
 			// UploadFailed - end state, unable to move to durable storage
 			// Canceling - when the SanpshotCancel flag is set, if the Snapshot has not already moved into a terminal state, the
-			//             status will move to Canceling.  The snapshot ID will be removed from the status status if has been filled in
+			//             status will move to Canceling.  The snapshot ID will be removed from the status if has been filled in
 			//             and the snapshot ID will not longer be valid for a Clone operation
 			// Canceled - the operation was canceled, the snapshot ID is not valid
 			// Canceled - the operation was canceled, the snapshot ID is not valid

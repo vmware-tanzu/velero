@@ -524,7 +524,7 @@ func getManifestEntryFromKopia(mani *manifest.EntryMetadata) *udmrepo.ManifestEn
 	return &udmrepo.ManifestEntryMetadata{
 		ID:      udmrepo.ID(mani.ID),
 		Labels:  mani.Labels,
-		Length:  int32(min(mani.Length, math.MaxInt32)), //nolint:gosec // false positive: https://github.com/securego/gosec/issues/1212#issuecomment-2704299019
+		Length:  int32(min(mani.Length, math.MaxInt32)),
 		ModTime: mani.ModTime,
 	}
 }
@@ -536,7 +536,7 @@ func getManifestEntriesFromKopia(mani []*manifest.EntryMetadata) []*udmrepo.Mani
 		ret = append(ret, &udmrepo.ManifestEntryMetadata{
 			ID:      udmrepo.ID(entry.ID),
 			Labels:  entry.Labels,
-			Length:  int32(min(entry.Length, math.MaxInt32)), //nolint:gosec // false positive: https://github.com/securego/gosec/issues/1212#issuecomment-2704299019
+			Length:  int32(min(entry.Length, math.MaxInt32)),
 			ModTime: entry.ModTime,
 		})
 	}
