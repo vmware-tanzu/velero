@@ -955,9 +955,10 @@ type ddResumeTestHelper struct {
 	asyncBR      datapath.AsyncBR
 }
 
-func (dt *ddResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler, _ context.Context, _ *velerov2alpha1api.DataUpload, _ logrus.FieldLogger) error {
-	return dt.resumeErr
-}
+// Unused function - golangci-lint
+// func (dt *ddResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler, _ context.Context, _ *velerov2alpha1api.DataUpload, _ logrus.FieldLogger) error {
+// 	return dt.resumeErr
+// }
 
 func (dt *ddResumeTestHelper) Expose(context.Context, corev1.ObjectReference, string, string, map[string]string, corev1.ResourceRequirements, time.Duration) error {
 	return nil
