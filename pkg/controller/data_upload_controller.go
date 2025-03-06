@@ -798,7 +798,7 @@ func (r *DataUploadReconciler) closeDataPath(ctx context.Context, duName string)
 	r.dataPathMgr.RemoveAsyncBR(duName)
 }
 
-func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload) (interface{}, error) {
+func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload) (any, error) {
 	if du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
 		pvc := &corev1.PersistentVolumeClaim{}
 		err := r.client.Get(context.Background(), types.NamespacedName{
@@ -843,7 +843,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 	return nil, nil
 }
 
-func (r *DataUploadReconciler) setupWaitExposePara(du *velerov2alpha1api.DataUpload) interface{} {
+func (r *DataUploadReconciler) setupWaitExposePara(du *velerov2alpha1api.DataUpload) any {
 	if du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
 		return &exposer.CSISnapshotExposeWaitParam{
 			NodeClient: r.client,

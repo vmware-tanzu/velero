@@ -67,7 +67,7 @@ func (tw *TarWriter) AddItems(groupResource string, items ...metav1.Object) *Tar
 	return tw
 }
 
-func (tw *TarWriter) Add(name string, obj interface{}) *TarWriter {
+func (tw *TarWriter) Add(name string, obj any) *TarWriter {
 	tw.t.Helper()
 
 	var data []byte

@@ -36,7 +36,7 @@ import (
 func TestRestartableGetBackupItemAction(t *testing.T) {
 	tests := []struct {
 		name          string
-		plugin        interface{}
+		plugin        any
 		getError      error
 		expectedError string
 	}{
@@ -105,13 +105,13 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 	b := new(v1.Backup)
 
 	pv := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"color": "blue",
 		},
 	}
 
 	pvToReturn := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"color": "green",
 		},
 	}
@@ -125,7 +125,7 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 	restartabletest.RunRestartableDelegateTests(
 		t,
 		common.PluginKindBackupItemAction,
-		func(key process.KindAndName, p process.RestartableProcess) interface{} {
+		func(key process.KindAndName, p process.RestartableProcess) any {
 			return &RestartableBackupItemAction{
 				Key:                 key,
 				SharedPluginProcess: p,
@@ -136,15 +136,15 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "AppliesTo",
-			Inputs:                  []interface{}{},
-			ExpectedErrorOutputs:    []interface{}{velero.ResourceSelector{}, errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{velero.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
+			Inputs:                  []any{},
+			ExpectedErrorOutputs:    []any{velero.ResourceSelector{}, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{velero.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "Execute",
-			Inputs:                  []interface{}{pv, b},
-			ExpectedErrorOutputs:    []interface{}{nil, ([]velero.ResourceIdentifier)(nil), errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{pvToReturn, additionalItems, errors.Errorf("delegate error")},
+			Inputs:                  []any{pv, b},
+			ExpectedErrorOutputs:    []any{nil, ([]velero.ResourceIdentifier)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{pvToReturn, additionalItems, errors.Errorf("delegate error")},
 		},
 	)
 }

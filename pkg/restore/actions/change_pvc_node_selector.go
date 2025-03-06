@@ -81,7 +81,7 @@ func (p *ChangePVCNodeSelectorAction) Execute(input *velero.RestoreItemActionExe
 		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
-	log := p.logger.WithFields(map[string]interface{}{
+	log := p.logger.WithFields(map[string]any{
 		"kind":      typeAcc.GetKind(),
 		"namespace": metadata.GetNamespace(),
 		"name":      metadata.GetName(),

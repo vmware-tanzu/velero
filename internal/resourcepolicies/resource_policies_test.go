@@ -126,32 +126,32 @@ func TestGetResourceMatchedAction(t *testing.T) {
 		VolumePolicies: []VolumePolicy{
 			{
 				Action: Action{Type: "skip"},
-				Conditions: map[string]interface{}{
+				Conditions: map[string]any{
 					"capacity":     "0,10Gi",
 					"storageClass": []string{"gp2", "ebs-sc"},
-					"csi": interface{}(
-						map[string]interface{}{
+					"csi": any(
+						map[string]any{
 							"driver": "aws.efs.csi.driver",
 						}),
 				},
 			},
 			{
 				Action: Action{Type: "snapshot"},
-				Conditions: map[string]interface{}{
+				Conditions: map[string]any{
 					"capacity":     "10,100Gi",
 					"storageClass": []string{"gp2", "ebs-sc"},
-					"csi": interface{}(
-						map[string]interface{}{
+					"csi": any(
+						map[string]any{
 							"driver": "aws.efs.csi.driver",
 						}),
 				},
 			},
 			{
 				Action: Action{Type: "fs-backup"},
-				Conditions: map[string]interface{}{
+				Conditions: map[string]any{
 					"storageClass": []string{"gp2", "ebs-sc"},
-					"csi": interface{}(
-						map[string]interface{}{
+					"csi": any(
+						map[string]any{
 							"driver": "aws.efs.csi.driver",
 						}),
 				},
@@ -241,7 +241,7 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 		Version: "v1",
 		VolumePolicies: []VolumePolicy{
 			{
-				Conditions: map[string]interface{}{
+				Conditions: map[string]any{
 					"capacity": "0,10Gi",
 				},
 				Action: Action{

@@ -30,7 +30,7 @@ func ExampleNewServer_volumeSnapshotter() {
 			Serve() // serve the plugin
 }
 
-func newVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
+func newVolumeSnapshotter(logger logrus.FieldLogger) (any, error) {
 	return &VolumeSnapshotter{FieldLogger: logger}, nil
 }
 
@@ -97,7 +97,7 @@ func (b *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 
 // Implement all methods for the DeleteItemAction interface
 
-func newDeleteItemAction(logger logrus.FieldLogger) (interface{}, error) {
+func newDeleteItemAction(logger logrus.FieldLogger) (any, error) {
 	return DeleteItemAction{FieldLogger: logger}, nil
 }
 

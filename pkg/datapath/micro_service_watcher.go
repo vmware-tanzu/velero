@@ -104,7 +104,7 @@ func newMicroServiceBRWatcher(client client.Client, kubeClient kubernetes.Interf
 	return ms
 }
 
-func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) error {
+func (ms *microServiceBRWatcher) Init(ctx context.Context, param any) error {
 	eventInformer, err := ms.mgr.GetCache().GetInformer(ctx, &v1.Event{})
 	if err != nil {
 		return errors.Wrap(err, "error getting event informer")
@@ -117,7 +117,7 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) er
 
 	eventHandler, err := eventInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
+			AddFunc: func(obj any) {
 				evt := obj.(*v1.Event)
 				if evt.InvolvedObject.Namespace != ms.namespace || evt.InvolvedObject.Name != ms.associatedObject {
 					return
@@ -125,7 +125,7 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) er
 
 				ms.eventCh <- evt
 			},
-			UpdateFunc: func(_, obj interface{}) {
+			UpdateFunc: func(_, obj any) {
 				evt := obj.(*v1.Event)
 				if evt.InvolvedObject.Namespace != ms.namespace || evt.InvolvedObject.Name != ms.associatedObject {
 					return
@@ -141,7 +141,7 @@ func (ms *microServiceBRWatcher) Init(ctx context.Context, param interface{}) er
 
 	podHandler, err := podInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: func(_, obj interface{}) {
+			UpdateFunc: func(_, obj any) {
 				pod := obj.(*v1.Pod)
 				if pod.Namespace != ms.namespace || pod.Name != ms.thisPod {
 					return
@@ -213,7 +213,7 @@ func (ms *microServiceBRWatcher) close() {
 	}
 }
 
-func (ms *microServiceBRWatcher) StartBackup(source AccessPoint, uploaderConfig map[string]string, param interface{}) error {
+func (ms *microServiceBRWatcher) StartBackup(source AccessPoint, uploaderConfig map[string]string, param any) error {
 	ms.log.Infof("Start watching backup ms for source %v", source.ByPath)
 
 	ms.startWatch()

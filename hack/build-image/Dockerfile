@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM --platform=$TARGETPLATFORM golang:1.22.10-bookworm
+FROM --platform=$TARGETPLATFORM golang:1.23.6-bookworm
 
 ARG GOPROXY
 
@@ -94,7 +94,7 @@ RUN ARCH=$(go env GOARCH) && \
     chmod +x /usr/bin/goreleaser
 
 # get golangci-lint
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.57.2
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.6
 
 # install kubectl
 RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/$(go env GOARCH)/kubectl

@@ -110,7 +110,7 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		log.WithError(err).Error("Error listing backups in backup store")
 		return ctrl.Result{}, nil
 	}
-	backupStoreBackups := sets.New[string](res...)
+	backupStoreBackups := sets.New(res...)
 	log.WithField("backupCount", len(backupStoreBackups)).Debug("Got backups from backup store")
 
 	// get a list of all the backups that exist as custom resources in the cluster

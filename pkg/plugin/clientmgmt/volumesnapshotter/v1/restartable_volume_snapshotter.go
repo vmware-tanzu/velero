@@ -69,7 +69,7 @@ func NewRestartableVolumeSnapshotter(name string, sharedPluginProcess process.Re
 }
 
 // reinitialize reinitializes a re-dispensed plugin using the initial data passed to Init().
-func (r *RestartableVolumeSnapshotter) Reinitialize(dispensed interface{}) error {
+func (r *RestartableVolumeSnapshotter) Reinitialize(dispensed any) error {
 	volumeSnapshotter, ok := dispensed.(vsv1.VolumeSnapshotter)
 	if !ok {
 		return errors.Errorf("plugin %T is not a VolumeSnapshotter", dispensed)

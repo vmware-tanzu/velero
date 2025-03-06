@@ -96,13 +96,13 @@ type RepoOptions struct {
 
 // PasswordGetter defines the method to get a repository password.
 type PasswordGetter interface {
-	GetPassword(param interface{}) (string, error)
+	GetPassword(param any) (string, error)
 }
 
 // StoreOptionsGetter defines the methods to get the storage related options.
 type StoreOptionsGetter interface {
-	GetStoreType(param interface{}) (string, error)
-	GetStoreOptions(param interface{}) (map[string]string, error)
+	GetStoreType(param any) (string, error)
+	GetStoreOptions(param any) (map[string]string, error)
 }
 
 // NewRepoOptions creates a new RepoOptions for different purpose
@@ -124,7 +124,7 @@ func NewRepoOptions(optionFuncs ...func(*RepoOptions) error) (*RepoOptions, erro
 
 // WithPassword sets the RepoPassword to RepoOptions, the password is acquired through
 // the provided interface
-func WithPassword(getter PasswordGetter, param interface{}) func(*RepoOptions) error {
+func WithPassword(getter PasswordGetter, param any) func(*RepoOptions) error {
 	return func(options *RepoOptions) error {
 		password, err := getter.GetPassword(param)
 		if err != nil {
@@ -158,7 +158,7 @@ func WithGenOptions(genOptions map[string]string) func(*RepoOptions) error {
 
 // WithStoreOptions sets the StorageOptions to RepoOptions, the store options are acquired through
 // the provided interface
-func WithStoreOptions(getter StoreOptionsGetter, param interface{}) func(*RepoOptions) error {
+func WithStoreOptions(getter StoreOptionsGetter, param any) func(*RepoOptions) error {
 	return func(options *RepoOptions) error {
 		storeType, err := getter.GetStoreType(param)
 		if err != nil {

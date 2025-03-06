@@ -368,7 +368,7 @@ func (urp *unifiedRepoProvider) DefaultMaintenanceFrequency(ctx context.Context,
 	return urp.repoService.DefaultMaintenanceFrequency()
 }
 
-func (urp *unifiedRepoProvider) GetPassword(param interface{}) (string, error) {
+func (urp *unifiedRepoProvider) GetPassword(param any) (string, error) {
 	_, ok := param.(RepoParam)
 	if !ok {
 		return "", errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
@@ -382,7 +382,7 @@ func (urp *unifiedRepoProvider) GetPassword(param interface{}) (string, error) {
 	return repoPassword, nil
 }
 
-func (urp *unifiedRepoProvider) GetStoreType(param interface{}) (string, error) {
+func (urp *unifiedRepoProvider) GetStoreType(param any) (string, error) {
 	repoParam, ok := param.(RepoParam)
 	if !ok {
 		return "", errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
@@ -391,7 +391,7 @@ func (urp *unifiedRepoProvider) GetStoreType(param interface{}) (string, error) 
 	return getStorageType(repoParam.BackupLocation), nil
 }
 
-func (urp *unifiedRepoProvider) GetStoreOptions(param interface{}) (map[string]string, error) {
+func (urp *unifiedRepoProvider) GetStoreOptions(param any) (map[string]string, error) {
 	repoParam, ok := param.(RepoParam)
 	if !ok {
 		return map[string]string{}, errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)

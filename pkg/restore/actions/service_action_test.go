@@ -49,9 +49,9 @@ func svcJSON(ports ...corev1api.ServicePort) string {
 	return string(data)
 }
 
-func svcJSONFromUnstructured(ports ...map[string]interface{}) string {
-	svc := map[string]interface{}{
-		"spec": map[string]interface{}{
+func svcJSONFromUnstructured(ports ...map[string]any) string {
+	svc := map[string]any{
+		"spec": map[string]any{
 			"ports": ports,
 		},
 	}
@@ -259,7 +259,7 @@ func TestServiceActionExecute(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "svc-1",
 					Annotations: map[string]string{
-						annotationLastAppliedConfig: svcJSONFromUnstructured(map[string]interface{}{"name": "http", "nodePort": "8080"}),
+						annotationLastAppliedConfig: svcJSONFromUnstructured(map[string]any{"name": "http", "nodePort": "8080"}),
 					},
 				},
 				Spec: corev1api.ServiceSpec{
@@ -275,7 +275,7 @@ func TestServiceActionExecute(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "svc-1",
 					Annotations: map[string]string{
-						annotationLastAppliedConfig: svcJSONFromUnstructured(map[string]interface{}{"name": "http", "nodePort": "8080"}),
+						annotationLastAppliedConfig: svcJSONFromUnstructured(map[string]any{"name": "http", "nodePort": "8080"}),
 					},
 				},
 				Spec: corev1api.ServiceSpec{

@@ -45,7 +45,7 @@ type ItemBlockActionGRPCClient struct {
 	grpcClient protoibav1.ItemBlockActionClient
 }
 
-func newItemBlockActionGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) interface{} {
+func newItemBlockActionGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) any {
 	return &ItemBlockActionGRPCClient{
 		ClientBase: base,
 		grpcClient: protoibav1.NewItemBlockActionClient(clientConn),

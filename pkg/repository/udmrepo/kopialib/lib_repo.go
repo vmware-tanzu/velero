@@ -18,6 +18,7 @@ package kopialib
 
 import (
 	"context"
+	"math"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -515,7 +516,7 @@ func (kow *kopiaObjectWriter) Close() error {
 }
 
 // getCompressorForObject returns the compressor for an object, at present, we don't support compression
-func getCompressorForObject(opt udmrepo.ObjectWriteOptions) compression.Name {
+func getCompressorForObject(_ udmrepo.ObjectWriteOptions) compression.Name {
 	return ""
 }
 
@@ -523,7 +524,7 @@ func getManifestEntryFromKopia(mani *manifest.EntryMetadata) *udmrepo.ManifestEn
 	return &udmrepo.ManifestEntryMetadata{
 		ID:      udmrepo.ID(mani.ID),
 		Labels:  mani.Labels,
-		Length:  int32(mani.Length),
+		Length:  int32(min(mani.Length, math.MaxInt32)),
 		ModTime: mani.ModTime,
 	}
 }
@@ -535,7 +536,7 @@ func getManifestEntriesFromKopia(mani []*manifest.EntryMetadata) []*udmrepo.Mani
 		ret = append(ret, &udmrepo.ManifestEntryMetadata{
 			ID:      udmrepo.ID(entry.ID),
 			Labels:  entry.Labels,
-			Length:  int32(entry.Length),
+			Length:  int32(min(entry.Length, math.MaxInt32)),
 			ModTime: entry.ModTime,
 		})
 	}

@@ -17,6 +17,8 @@ limitations under the License.
 package common
 
 import (
+	"math"
+
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -72,7 +74,7 @@ func ErrorStack(err error) *proto.Stack {
 
 		stackTrace.Frames = append(stackTrace.Frames, &proto.StackFrame{
 			File:     location.File,
-			Line:     int32(location.Line),
+			Line:     int32(min(location.Line, math.MaxInt32)),
 			Function: location.Function,
 		})
 	}
