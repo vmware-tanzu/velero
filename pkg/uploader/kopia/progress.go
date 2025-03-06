@@ -17,6 +17,7 @@ limitations under the License.
 package kopia
 
 import (
+	"math"
 	"sync/atomic"
 	"time"
 
@@ -90,7 +91,7 @@ func (p *Progress) Error(path string, err error, isIgnored bool) {
 // EstimatedDataSize statistic the total size of files to be processed and total files to be processed
 func (p *Progress) EstimatedDataSize(fileCount int, totalBytes int64) {
 	atomic.StoreInt64(&p.estimatedTotalBytes, totalBytes)
-	atomic.StoreInt32(&p.estimatedFileCount, int32(fileCount))
+	atomic.StoreInt32(&p.estimatedFileCount, int32(min(fileCount, math.MaxInt32)))
 
 	p.UpdateProgress()
 }
