@@ -245,10 +245,10 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	io.BucketName = veleroCfg.BSLBucket
 	io.Prefix = veleroCfg.BSLPrefix
 	io.BackupStorageConfig = flag.NewMap()
-	io.BackupStorageConfig.Set(veleroCfg.BSLConfig)
+	_ = io.BackupStorageConfig.Set(veleroCfg.BSLConfig)
 
 	io.VolumeSnapshotConfig = flag.NewMap()
-	io.VolumeSnapshotConfig.Set(veleroCfg.VSLConfig)
+	_ = io.VolumeSnapshotConfig.Set(veleroCfg.VSLConfig)
 
 	io.Plugins = flag.NewStringArray(plugins...)
 	io.Features = veleroCfg.Features

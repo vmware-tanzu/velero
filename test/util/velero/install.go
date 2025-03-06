@@ -672,7 +672,7 @@ func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroCo
 		fmt.Printf("error in checking velero status with %v", err)
 		ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 		defer ctxCancel()
-		VeleroUninstall(ctx, veleroCfg)
+		_ = VeleroUninstall(ctx, veleroCfg)
 		ready = false
 	}
 	if ready {
