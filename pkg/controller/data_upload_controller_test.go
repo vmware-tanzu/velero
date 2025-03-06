@@ -267,7 +267,7 @@ type fakeSnapshotExposer struct {
 	peekErr    error
 }
 
-func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param interface{}) error {
+func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param any) error {
 	du := velerov2alpha1api.DataUpload{}
 	err := f.kubeClient.Get(ctx, kbclient.ObjectKey{
 		Name:      dataUploadName,
@@ -284,7 +284,7 @@ func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obj
 	return nil
 }
 
-func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1.ObjectReference, tm time.Duration, para interface{}) (*exposer.ExposeResult, error) {
+func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1.ObjectReference, tm time.Duration, para any) (*exposer.ExposeResult, error) {
 	pod := &corev1.Pod{}
 	err := f.kubeClient.Get(ctx, kbclient.ObjectKey{
 		Name:      dataUploadName,
@@ -315,11 +315,11 @@ type fakeDataUploadFSBR struct {
 	startErr   error
 }
 
-func (f *fakeDataUploadFSBR) Init(ctx context.Context, param interface{}) error {
+func (f *fakeDataUploadFSBR) Init(ctx context.Context, param any) error {
 	return f.initErr
 }
 
-func (f *fakeDataUploadFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param interface{}) error {
+func (f *fakeDataUploadFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param any) error {
 	return f.startErr
 }
 
@@ -1035,11 +1035,11 @@ func (dt *duResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler,
 	return dt.resumeErr
 }
 
-func (dt *duResumeTestHelper) Expose(context.Context, corev1.ObjectReference, interface{}) error {
+func (dt *duResumeTestHelper) Expose(context.Context, corev1.ObjectReference, any) error {
 	return nil
 }
 
-func (dt *duResumeTestHelper) GetExposed(context.Context, corev1.ObjectReference, time.Duration, interface{}) (*exposer.ExposeResult, error) {
+func (dt *duResumeTestHelper) GetExposed(context.Context, corev1.ObjectReference, time.Duration, any) (*exposer.ExposeResult, error) {
 	return dt.exposeResult, dt.getExposeErr
 }
 

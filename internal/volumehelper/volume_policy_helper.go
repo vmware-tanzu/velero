@@ -143,7 +143,7 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 	}
 
 	if v.volumePolicy != nil {
-		var resource interface{}
+		var resource any
 		resource = &volume
 		if volume.VolumeSource.PersistentVolumeClaim != nil {
 			pvc, err := kubeutil.GetPVCForPodVolume(&volume, &pod, v.client)

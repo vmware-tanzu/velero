@@ -36,7 +36,7 @@ func (cp *mockClientProtocol) Close() error {
 	return args.Error(0)
 }
 
-func (cp *mockClientProtocol) Dispense(name string) (interface{}, error) {
+func (cp *mockClientProtocol) Dispense(name string) (any, error) {
 	args := cp.Called(name)
 	return args.Get(0), args.Error(1)
 }
@@ -50,7 +50,7 @@ type mockClientDispenser struct {
 	mock.Mock
 }
 
-func (cd *mockClientDispenser) ClientFor(name string) interface{} {
+func (cd *mockClientDispenser) ClientFor(name string) any {
 	args := cd.Called(name)
 	return args.Get(0)
 }
@@ -93,7 +93,7 @@ func TestDispense(t *testing.T) {
 			clientDispenser := new(mockClientDispenser)
 			defer clientDispenser.AssertExpectations(t)
 
-			var client interface{}
+			var client any
 
 			key := KindAndName{}
 			if tc.clientDispenser {

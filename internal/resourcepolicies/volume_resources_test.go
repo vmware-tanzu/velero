@@ -232,12 +232,12 @@ func TestCSIConditionMatch(t *testing.T) {
 func TestUnmarshalVolumeConditions(t *testing.T) {
 	testCases := []struct {
 		name          string
-		input         map[string]interface{}
+		input         map[string]any
 		expectedError string
 	}{
 		{
 			name: "Valid input",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"capacity": "1Gi,10Gi",
 				"storageClass": []string{
 					"gp2",
@@ -251,28 +251,28 @@ func TestUnmarshalVolumeConditions(t *testing.T) {
 		},
 		{
 			name: "Invalid input: invalid capacity filed name",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"Capacity": "1Gi,10Gi",
 			},
 			expectedError: "field Capacity not found",
 		},
 		{
 			name: "Invalid input: invalid storage class format",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"storageClass": "ebs-sc",
 			},
 			expectedError: "str `ebs-sc` into []string",
 		},
 		{
 			name: "Invalid input: invalid csi format",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"csi": "csi.driver",
 			},
 			expectedError: "str `csi.driver` into resourcepolicies.csiVolumeSource",
 		},
 		{
 			name: "Invalid input: unknown field",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"unknown": "foo",
 			},
 			expectedError: "field unknown not found in type",

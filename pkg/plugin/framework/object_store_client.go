@@ -44,7 +44,7 @@ type ObjectStoreGRPCClient struct {
 	grpcClient proto.ObjectStoreClient
 }
 
-func newObjectStoreGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) interface{} {
+func newObjectStoreGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) any {
 	return &ObjectStoreGRPCClient{
 		ClientBase: base,
 		grpcClient: proto.NewObjectStoreClient(clientConn),

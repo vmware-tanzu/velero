@@ -119,6 +119,6 @@ func (p *volumeSnapshotClassBackupItemAction) Cancel(
 
 // NewVolumeSnapshotClassBackupItemAction returns a
 // VolumeSnapshotClassBackupItemAction instance.
-func NewVolumeSnapshotClassBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
+func NewVolumeSnapshotClassBackupItemAction(logger logrus.FieldLogger) (any, error) {
 	return &volumeSnapshotClassBackupItemAction{log: logger}, nil
 }

@@ -196,7 +196,7 @@ func (kp *kopiaProvider) RunBackup(
 	return snapshotInfo.ID, false, nil
 }
 
-func (kp *kopiaProvider) GetPassword(param interface{}) (string, error) {
+func (kp *kopiaProvider) GetPassword(param any) (string, error) {
 	if kp.credGetter.FromSecret == nil {
 		return "", errors.New("invalid credentials interface")
 	}

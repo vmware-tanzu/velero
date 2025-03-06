@@ -40,11 +40,11 @@ import (
 func TestChangeImageRepositoryActionExecute(t *testing.T) {
 	tests := []struct {
 		name             string
-		podOrObj         interface{}
+		podOrObj         any
 		configMap        *corev1.ConfigMap
 		freshedImageName string
 		imageNameSlice   []string
-		want             interface{}
+		want             any
 		wantErr          error
 	}{
 		{

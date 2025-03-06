@@ -177,7 +177,7 @@ func TestNewAdmissionWebhookConfigurationActionExecute(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			o := map[string]interface{}{}
+			o := map[string]any{}
 			json.Unmarshal([]byte(tt.itemJSON), &o)
 			input := &velero.RestoreItemActionExecuteInput{
 				Item: &unstructured.Unstructured{

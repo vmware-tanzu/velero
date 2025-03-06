@@ -56,7 +56,7 @@ func TestExitWithMessage(t *testing.T) {
 		name             string
 		message          string
 		succeed          bool
-		args             []interface{}
+		args             []any
 		createErr        error
 		writeFail        bool
 		expectedExitCode int
@@ -77,7 +77,7 @@ func TestExitWithMessage(t *testing.T) {
 		{
 			name:    "not succeed",
 			message: "fake-message-1, arg-1 %s, arg-2 %v, arg-3 %v",
-			args: []interface{}{
+			args: []any{
 				"arg-1-1",
 				10,
 				false,
@@ -88,7 +88,7 @@ func TestExitWithMessage(t *testing.T) {
 		{
 			name:    "not succeed",
 			message: "fake-message-2, arg-1 %s, arg-2 %v, arg-3 %v",
-			args: []interface{}{
+			args: []any{
 				"arg-1-2",
 				20,
 				true,
