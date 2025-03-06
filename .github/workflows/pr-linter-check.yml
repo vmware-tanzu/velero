@@ -15,5 +15,6 @@ jobs:
       - name: Linter check
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.57.2
+          version: v1.64.6
           args: --verbose
+          verify: false # don't verify jsonschema
