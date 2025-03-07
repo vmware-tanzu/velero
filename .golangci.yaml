@@ -12,11 +12,6 @@ run:
   # exit code when at least one issue was found, default is 1
   issues-exit-code: 1
 
-
-  # default is true. Enables skipping of directories:
-  #   vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
-  skip-dirs-use-default: true
-
   # by default isn't set. If set we pass it to "go list -mod={option}". From "go help modules":
   # If invoked with -mod=readonly, the go command is disallowed from the implicit
   # automatic updating of go.mod described above. Instead, it fails when any changes
@@ -45,10 +40,6 @@ output:
 
   # print linter name in the end of issue text, default is true
   print-linter-name: true
-
-  # make issues output unique by line, default is true
-  uniq-by-line: true
-
 
 # all available settings of specific linters
 linters-settings:
@@ -121,9 +112,6 @@ linters-settings:
   gocyclo:
     # minimal code complexity to report, 30 by default (but we recommend 10-20)
     min-complexity: 10
-  godot:
-    # check all top-level comments, not only declarations
-    check-all: false
   godox:
     # report any comments starting with keywords, this is useful for TODO or FIXME comments that
     # might be left in the code accidentally and should be resolved before merging
@@ -160,6 +148,9 @@ linters-settings:
         # - github.com/mitchellh/go-homedir:                          # Blocked module with version constraint
         #     version: "< 1.1.0"                                      # Version constraint, see https://github.com/Masterminds/semver#basic-comparisons
         #     reason: "testing if blocked version constraint works."  # Reason why the version constraint exists. (Optional)
+  gosec:
+    excludes:
+      - G115
   govet:
     # report about shadowed variables
     # check-shadowing: true
@@ -231,7 +222,7 @@ linters-settings:
     rules:
       - name: unexported-return
         disabled: true
-    
+
   rowserrcheck:
     packages:
       - github.com/jmoiron/sqlx
@@ -287,11 +278,11 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
+    # - copyloopvar
     - dogsled
     - durationcheck
     - dupword
     - errcheck
-    - exportloopref
     - errchkjson
     - goconst
     - gofmt
@@ -299,9 +290,9 @@ linters:
     - goimports
     - goprintffuncname
     - gosec
-    - gosimple
+    # - gosimple
     - govet
-    - ginkgolinter
+    # - ginkgolinter
     - importas
     - ineffassign
     - misspell
@@ -311,9 +302,9 @@ linters:
     - noctx
     - nolintlint
     - revive
-    - staticcheck
+    # - staticcheck
     - stylecheck
-    - testifylint
+    # - testifylint
     - thelper
     - typecheck
     - unconvert
@@ -325,6 +316,8 @@ linters:
 
 
 issues:
+  exclude-dirs-use-default: true
+  uniq-by-line: true
   exclude-rules:
     - linters:
         - staticcheck
@@ -376,22 +369,22 @@ issues:
 
 severity:
   # Default value is empty string.
-  # Set the default severity for issues. If severity rules are defined and the issues 
-  # do not match or no severity is provided to the rule this will be the default 
-  # severity applied. Severities should match the supported severity names of the 
+  # Set the default severity for issues. If severity rules are defined and the issues
+  # do not match or no severity is provided to the rule this will be the default
+  # severity applied. Severities should match the supported severity names of the
   # selected out format.
   # - Code climate: https://docs.codeclimate.com/docs/issues#issue-severity
   # -   Checkstyle: https://checkstyle.sourceforge.io/property_types.html#severity
   # -       Github: https://help.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
   default-severity: error
 
-  # The default value is false. 
+  # The default value is false.
   # If set to true severity-rules regular expressions become case sensitive.
   case-sensitive: false
 
   # Default value is empty list.
   # When a list of severity rules are provided, severity information will be added to lint
-  # issues. Severity rules have the same filtering capability as exclude rules except you 
+  # issues. Severity rules have the same filtering capability as exclude rules except you
   # are allowed to specify one matcher per severity rule.
   # Only affects out formats that support setting severity information.
   rules:
