@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -50,7 +50,7 @@ func TestDescribeUploaderConfig(t *testing.T) {
 }
 
 func TestDescribeResourcePolicies(t *testing.T) {
-	input := &v1.TypedLocalObjectReference{
+	input := &corev1api.TypedLocalObjectReference{
 		Kind: "configmap",
 		Name: "test-resource-policy",
 	}

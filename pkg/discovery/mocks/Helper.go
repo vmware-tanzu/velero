@@ -6,7 +6,7 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	version "k8s.io/apimachinery/pkg/version"
 )
@@ -17,15 +17,15 @@ type Helper struct {
 }
 
 // APIGroups provides a mock function with given fields:
-func (_m *Helper) APIGroups() []v1.APIGroup {
+func (_m *Helper) APIGroups() []metav1.APIGroup {
 	ret := _m.Called()
 
-	var r0 []v1.APIGroup
-	if rf, ok := ret.Get(0).(func() []v1.APIGroup); ok {
+	var r0 []metav1.APIGroup
+	if rf, ok := ret.Get(0).(func() []metav1.APIGroup); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]v1.APIGroup)
+			r0 = ret.Get(0).([]metav1.APIGroup)
 		}
 	}
 
@@ -33,13 +33,13 @@ func (_m *Helper) APIGroups() []v1.APIGroup {
 }
 
 // KindFor provides a mock function with given fields: input
-func (_m *Helper) KindFor(input schema.GroupVersionKind) (schema.GroupVersionResource, v1.APIResource, error) {
+func (_m *Helper) KindFor(input schema.GroupVersionKind) (schema.GroupVersionResource, metav1.APIResource, error) {
 	ret := _m.Called(input)
 
 	var r0 schema.GroupVersionResource
-	var r1 v1.APIResource
+	var r1 metav1.APIResource
 	var r2 error
-	if rf, ok := ret.Get(0).(func(schema.GroupVersionKind) (schema.GroupVersionResource, v1.APIResource, error)); ok {
+	if rf, ok := ret.Get(0).(func(schema.GroupVersionKind) (schema.GroupVersionResource, metav1.APIResource, error)); ok {
 		return rf(input)
 	}
 	if rf, ok := ret.Get(0).(func(schema.GroupVersionKind) schema.GroupVersionResource); ok {
@@ -48,10 +48,10 @@ func (_m *Helper) KindFor(input schema.GroupVersionKind) (schema.GroupVersionRes
 		r0 = ret.Get(0).(schema.GroupVersionResource)
 	}
 
-	if rf, ok := ret.Get(1).(func(schema.GroupVersionKind) v1.APIResource); ok {
+	if rf, ok := ret.Get(1).(func(schema.GroupVersionKind) metav1.APIResource); ok {
 		r1 = rf(input)
 	} else {
-		r1 = ret.Get(1).(v1.APIResource)
+		r1 = ret.Get(1).(metav1.APIResource)
 	}
 
 	if rf, ok := ret.Get(2).(func(schema.GroupVersionKind) error); ok {
@@ -78,13 +78,13 @@ func (_m *Helper) Refresh() error {
 }
 
 // ResourceFor provides a mock function with given fields: input
-func (_m *Helper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, v1.APIResource, error) {
+func (_m *Helper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, metav1.APIResource, error) {
 	ret := _m.Called(input)
 
 	var r0 schema.GroupVersionResource
-	var r1 v1.APIResource
+	var r1 metav1.APIResource
 	var r2 error
-	if rf, ok := ret.Get(0).(func(schema.GroupVersionResource) (schema.GroupVersionResource, v1.APIResource, error)); ok {
+	if rf, ok := ret.Get(0).(func(schema.GroupVersionResource) (schema.GroupVersionResource, metav1.APIResource, error)); ok {
 		return rf(input)
 	}
 	if rf, ok := ret.Get(0).(func(schema.GroupVersionResource) schema.GroupVersionResource); ok {
@@ -93,10 +93,10 @@ func (_m *Helper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVe
 		r0 = ret.Get(0).(schema.GroupVersionResource)
 	}
 
-	if rf, ok := ret.Get(1).(func(schema.GroupVersionResource) v1.APIResource); ok {
+	if rf, ok := ret.Get(1).(func(schema.GroupVersionResource) metav1.APIResource); ok {
 		r1 = rf(input)
 	} else {
-		r1 = ret.Get(1).(v1.APIResource)
+		r1 = ret.Get(1).(metav1.APIResource)
 	}
 
 	if rf, ok := ret.Get(2).(func(schema.GroupVersionResource) error); ok {
@@ -109,15 +109,15 @@ func (_m *Helper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVe
 }
 
 // Resources provides a mock function with given fields:
-func (_m *Helper) Resources() []*v1.APIResourceList {
+func (_m *Helper) Resources() []*metav1.APIResourceList {
 	ret := _m.Called()
 
-	var r0 []*v1.APIResourceList
-	if rf, ok := ret.Get(0).(func() []*v1.APIResourceList); ok {
+	var r0 []*metav1.APIResourceList
+	if rf, ok := ret.Get(0).(func() []*metav1.APIResourceList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*v1.APIResourceList)
+			r0 = ret.Get(0).([]*metav1.APIResourceList)
 		}
 	}
 
