@@ -379,12 +379,12 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "No backups found for schedule")
 		}
 
-		if backup := mostRecentCompletedBackup(backupList.Items); backup.Name != "" {
-			restore.Spec.BackupName = backup.Name
-		} else {
+		backup := mostRecentCompletedBackup(backupList.Items)
+		if backup.Name == "" {
 			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "No completed backups found for schedule")
 			return backupInfo{}, nil
 		}
+		restore.Spec.BackupName = backup.Name
 	}
 
 	info, err := r.fetchBackupInfo(restore.Spec.BackupName)
