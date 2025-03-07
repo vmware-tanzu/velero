@@ -49,92 +49,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
-func TestRemovePVCAnnotations(t *testing.T) {
-	testCases := []struct {
-		name                string
-		pvc                 corev1api.PersistentVolumeClaim
-		removeAnnotations   []string
-		expectedAnnotations map[string]string
-	}{
-		{
-			name: "should create empty annotation map",
-			pvc: corev1api.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: nil,
-				},
-			},
-			removeAnnotations:   []string{"foo"},
-			expectedAnnotations: map[string]string{},
-		},
-		{
-			name: "should preserve all existing annotations",
-			pvc: corev1api.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						"ann1": "ann1-val",
-						"ann2": "ann2-val",
-						"ann3": "ann3-val",
-						"ann4": "ann4-val",
-					},
-				},
-			},
-			removeAnnotations: []string{},
-			expectedAnnotations: map[string]string{
-				"ann1": "ann1-val",
-				"ann2": "ann2-val",
-				"ann3": "ann3-val",
-				"ann4": "ann4-val",
-			},
-		},
-		{
-			name: "should remove all existing annotations",
-			pvc: corev1api.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						"ann1": "ann1-val",
-						"ann2": "ann2-val",
-						"ann3": "ann3-val",
-						"ann4": "ann4-val",
-					},
-				},
-			},
-			removeAnnotations:   []string{"ann1", "ann2", "ann3", "ann4"},
-			expectedAnnotations: map[string]string{},
-		},
-		{
-			name: "should preserve some existing annotations",
-			pvc: corev1api.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						"ann1": "ann1-val",
-						"ann2": "ann2-val",
-						"ann3": "ann3-val",
-						"ann4": "ann4-val",
-						"ann5": "ann5-val",
-						"ann6": "ann6-val",
-						"ann7": "ann7-val",
-						"ann8": "ann8-val",
-					},
-				},
-			},
-			removeAnnotations: []string{"ann1", "ann2", "ann3", "ann4"},
-			expectedAnnotations: map[string]string{
-				"ann5": "ann5-val",
-				"ann6": "ann6-val",
-				"ann7": "ann7-val",
-				"ann8": "ann8-val",
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			removePVCAnnotations(&tc.pvc, tc.removeAnnotations)
-			assert.Equal(t, tc.expectedAnnotations, tc.pvc.Annotations)
-		})
-	}
-}
-
 func TestResetPVCSpec(t *testing.T) {
 	fileMode := corev1api.PersistentVolumeFilesystem
 	blockMode := corev1api.PersistentVolumeBlock
@@ -591,7 +505,7 @@ func TestExecute(t *testing.T) {
 			vs: builder.ForVolumeSnapshot("velero", vsName).ObjectMeta(
 				builder.WithAnnotations(velerov1api.VolumeSnapshotRestoreSize, "10Gi"),
 			).Result(),
-			expectedPVC: builder.ForPersistentVolumeClaim("velero", "testPVC").Result(),
+			expectedPVC: builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations(velerov1api.VolumeSnapshotLabel, "vsName")).Result(),
 		},
 		{
 			name:        "Restore from VolumeSnapshot without volume-snapshot-name annotation",
@@ -615,7 +529,7 @@ func TestExecute(t *testing.T) {
 			restore:          builder.ForRestore("velero", "testRestore").Backup("testBackup").ObjectMeta(builder.WithUID("uid")).Result(),
 			pvc:              builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations(velerov1api.VolumeSnapshotRestoreSize, "10Gi", velerov1api.DataUploadNameAnnotation, "velero/")).Result(),
 			dataUploadResult: builder.ForConfigMap("velero", "testCM").Data("uid", "{}").ObjectMeta(builder.WithLabels(velerov1api.RestoreUIDLabel, "uid", velerov1api.PVCNamespaceNameLabel, "velero.testPVC", velerov1api.ResourceUsageLabel, label.GetValidName(string(velerov1api.VeleroResourceUsageDataUploadResult)))).Result(),
-			expectedPVC:      builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations("velero.io/csi-volumesnapshot-restore-size", "10Gi")).Result(),
+			expectedPVC:      builder.ForPersistentVolumeClaim("velero", "testPVC").ObjectMeta(builder.WithAnnotations("velero.io/csi-volumesnapshot-restore-size", "10Gi", velerov1api.DataUploadNameAnnotation, "velero/")).Result(),
 			expectedDataDownload: builder.ForDataDownload("velero", "name").TargetVolume(velerov2alpha1.TargetVolumeSpec{PVC: "testPVC", Namespace: "velero"}).
 				ObjectMeta(builder.WithOwnerReference([]metav1.OwnerReference{{APIVersion: velerov1api.SchemeGroupVersion.String(), Kind: "Restore", Name: "testRestore", UID: "uid", Controller: boolptr.True()}}),
 					builder.WithLabelsMap(map[string]string{velerov1api.AsyncOperationIDLabel: "dd-uid.", velerov1api.RestoreNameLabel: "testRestore", velerov1api.RestoreUIDLabel: "uid"}),
@@ -627,7 +541,7 @@ func TestExecute(t *testing.T) {
 			restore:          builder.ForRestore("migre209d0da-49c7-45ba-8d5a-3e59fd591ec1", "testRestore").Backup("testBackup").ObjectMeta(builder.WithUID("uid")).Result(),
 			pvc:              builder.ForPersistentVolumeClaim("migre209d0da-49c7-45ba-8d5a-3e59fd591ec1", "kibishii-data-kibishii-deployment-0").ObjectMeta(builder.WithAnnotations(velerov1api.VolumeSnapshotRestoreSize, "10Gi", velerov1api.DataUploadNameAnnotation, "velero/")).Result(),
 			dataUploadResult: builder.ForConfigMap("migre209d0da-49c7-45ba-8d5a-3e59fd591ec1", "testCM").Data("uid", "{}").ObjectMeta(builder.WithLabels(velerov1api.RestoreUIDLabel, "uid", velerov1api.PVCNamespaceNameLabel, "migre209d0da-49c7-45ba-8d5a-3e59fd591ec1.kibishii-data-ki152333", velerov1api.ResourceUsageLabel, label.GetValidName(string(velerov1api.VeleroResourceUsageDataUploadResult)))).Result(),
-			expectedPVC:      builder.ForPersistentVolumeClaim("migre209d0da-49c7-45ba-8d5a-3e59fd591ec1", "kibishii-data-kibishii-deployment-0").ObjectMeta(builder.WithAnnotations("velero.io/csi-volumesnapshot-restore-size", "10Gi")).Result(),
+			expectedPVC:      builder.ForPersistentVolumeClaim("migre209d0da-49c7-45ba-8d5a-3e59fd591ec1", "kibishii-data-kibishii-deployment-0").ObjectMeta(builder.WithAnnotations("velero.io/csi-volumesnapshot-restore-size", "10Gi", velerov1api.DataUploadNameAnnotation, "velero/")).Result(),
 		},
 		{
 			name:    "PVC had no DataUploadNameLabel annotation",

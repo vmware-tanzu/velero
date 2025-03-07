@@ -91,10 +91,6 @@ func NewCommand(f client.Factory) *cobra.Command {
 					newAddPVCFromPodRestoreItemAction,
 				).
 				RegisterRestoreItemAction(
-					"velero.io/add-pv-from-pvc",
-					newAddPVFromPVCRestoreItemAction,
-				).
-				RegisterRestoreItemAction(
 					"velero.io/change-storage-class",
 					newChangeStorageClassRestoreItemAction(f),
 				).
@@ -115,8 +111,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 					newCRDV1PreserveUnknownFieldsItemAction,
 				).
 				RegisterRestoreItemAction(
-					"velero.io/change-pvc-node-selector",
-					newChangePVCNodeSelectorItemAction(f),
+					"velero.io/pvc",
+					newPVCRestoreItemAction(f),
 				).
 				RegisterRestoreItemAction(
 					"velero.io/apiservice",
@@ -308,10 +304,6 @@ func newAddPVCFromPodRestoreItemAction(logger logrus.FieldLogger) (any, error) {
 	return ria.NewAddPVCFromPodAction(logger), nil
 }
 
-func newAddPVFromPVCRestoreItemAction(logger logrus.FieldLogger) (any, error) {
-	return ria.NewAddPVFromPVCAction(logger), nil
-}
-
 func newCRDV1PreserveUnknownFieldsItemAction(logger logrus.FieldLogger) (any, error) {
 	return ria.NewCRDV1PreserveUnknownFieldsAction(logger), nil
 }
@@ -352,14 +344,14 @@ func newClusterRoleBindingItemAction(logger logrus.FieldLogger) (any, error) {
 	return ria.NewClusterRoleBindingAction(logger), nil
 }
 
-func newChangePVCNodeSelectorItemAction(f client.Factory) plugincommon.HandlerInitializer {
+func newPVCRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (any, error) {
 		client, err := f.KubeClient()
 		if err != nil {
 			return nil, err
 		}
 
-		return ria.NewChangePVCNodeSelectorAction(
+		return ria.NewPVCAction(
 			logger,
 			client.CoreV1().ConfigMaps(f.Namespace()),
 			client.CoreV1().Nodes(),

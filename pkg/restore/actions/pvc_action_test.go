@@ -32,14 +32,16 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-// TestChangePVCNodeSelectorActionExecute runs the ChangePVCNodeSelectorAction's Execute
+// TestPVCActionExecute runs the PVCAction's Execute
 // method and validates that the item's PVC is modified (or not) as expected.
 // Validation is done by comparing the result of the Execute method to the test case's
 // desired result.
-func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
+func TestPVCActionExecute(t *testing.T) {
 	tests := []struct {
 		name      string
 		pvc       *corev1api.PersistentVolumeClaim
@@ -133,7 +135,7 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 			logger := logrus.StandardLogger()
 			buf := bytes.Buffer{}
 			logrus.SetOutput(&buf)
-			a := NewChangePVCNodeSelectorAction(
+			a := NewPVCAction(
 				logger,
 				clientset.CoreV1().ConfigMaps("velero"),
 				clientset.CoreV1().Nodes(),
@@ -160,6 +162,9 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 				Item: &unstructured.Unstructured{
 					Object: unstructuredMap,
 				},
+				ItemFromBackup: &unstructured.Unstructured{
+					Object: unstructuredMap,
+				},
 			}
 
 			// execute method under test
@@ -183,6 +188,159 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 
 				assert.Equal(t, &unstructured.Unstructured{Object: wantUnstructured}, res.UpdatedItem)
 			}
+		})
+	}
+}
+
+func TestAddPVFromPVCActionExecute(t *testing.T) {
+	tests := []struct {
+		name           string
+		itemFromBackup *corev1api.PersistentVolumeClaim
+		want           []velero.ResourceIdentifier
+	}{
+		{
+			name: "bound PVC with volume name returns associated PV",
+			itemFromBackup: &corev1api.PersistentVolumeClaim{
+				Spec: corev1api.PersistentVolumeClaimSpec{
+					VolumeName: "bound-pv",
+				},
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimBound,
+				},
+			},
+			want: []velero.ResourceIdentifier{
+				{
+					GroupResource: kuberesource.PersistentVolumes,
+					Name:          "bound-pv",
+				},
+			},
+		},
+		{
+			name: "unbound PVC with volume name does not return any additional items",
+			itemFromBackup: &corev1api.PersistentVolumeClaim{
+				Spec: corev1api.PersistentVolumeClaimSpec{
+					VolumeName: "pending-pv",
+				},
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimPending,
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "bound PVC without volume name does not return any additional items",
+			itemFromBackup: &corev1api.PersistentVolumeClaim{
+				Spec: corev1api.PersistentVolumeClaimSpec{},
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimBound,
+				},
+			},
+			want: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			itemFromBackupData, err := runtime.DefaultUnstructuredConverter.ToUnstructured(test.itemFromBackup)
+			require.NoError(t, err)
+
+			itemData, err := runtime.DefaultUnstructuredConverter.ToUnstructured(test.itemFromBackup)
+			require.NoError(t, err)
+			// item should have no status
+			delete(itemData, "status")
+
+			clientset := fake.NewSimpleClientset()
+			action := NewPVCAction(
+				velerotest.NewLogger(),
+				clientset.CoreV1().ConfigMaps("velero"),
+				clientset.CoreV1().Nodes(),
+			)
+
+			input := &velero.RestoreItemActionExecuteInput{
+				Item:           &unstructured.Unstructured{Object: itemData},
+				ItemFromBackup: &unstructured.Unstructured{Object: itemFromBackupData},
+			}
+
+			res, err := action.Execute(input)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.want, res.AdditionalItems)
+		})
+	}
+}
+
+func TestRemovePVCAnnotations(t *testing.T) {
+	testCases := []struct {
+		name                string
+		pvc                 corev1api.PersistentVolumeClaim
+		removeAnnotations   []string
+		expectedAnnotations map[string]string
+	}{
+		{
+			name: "should preserve all existing annotations",
+			pvc: corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"ann1": "ann1-val",
+						"ann2": "ann2-val",
+						"ann3": "ann3-val",
+						"ann4": "ann4-val",
+					},
+				},
+			},
+			removeAnnotations: []string{},
+			expectedAnnotations: map[string]string{
+				"ann1": "ann1-val",
+				"ann2": "ann2-val",
+				"ann3": "ann3-val",
+				"ann4": "ann4-val",
+			},
+		},
+		{
+			name: "should remove all existing annotations",
+			pvc: corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"ann1": "ann1-val",
+						"ann2": "ann2-val",
+						"ann3": "ann3-val",
+						"ann4": "ann4-val",
+					},
+				},
+			},
+			removeAnnotations:   []string{"ann1", "ann2", "ann3", "ann4"},
+			expectedAnnotations: map[string]string{},
+		},
+		{
+			name: "should preserve some existing annotations",
+			pvc: corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"ann1": "ann1-val",
+						"ann2": "ann2-val",
+						"ann3": "ann3-val",
+						"ann4": "ann4-val",
+						"ann5": "ann5-val",
+						"ann6": "ann6-val",
+						"ann7": "ann7-val",
+						"ann8": "ann8-val",
+					},
+				},
+			},
+			removeAnnotations: []string{"ann1", "ann2", "ann3", "ann4"},
+			expectedAnnotations: map[string]string{
+				"ann5": "ann5-val",
+				"ann6": "ann6-val",
+				"ann7": "ann7-val",
+				"ann8": "ann8-val",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			removePVCAnnotations(&tc.pvc, tc.removeAnnotations)
+			assert.Equal(t, tc.expectedAnnotations, tc.pvc.Annotations)
 		})
 	}
 }
