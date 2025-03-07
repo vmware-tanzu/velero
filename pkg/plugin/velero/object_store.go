@@ -21,6 +21,8 @@ import (
 	"time"
 )
 
+const CaCertKey = "caCert"
+
 // ObjectStore exposes basic object-storage operations required
 // by Velero.
 type ObjectStore interface {
