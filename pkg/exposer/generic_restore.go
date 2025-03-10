@@ -46,6 +46,9 @@ type GenericRestoreExposeParam struct {
 	// HostingPodLabels is the labels that are going to apply to the hosting pod
 	HostingPodLabels map[string]string
 
+	// HostingPodAnnotations is the annotations that are going to apply to the hosting pod
+	HostingPodAnnotations map[string]string
+
 	// Resources defines the resource requirements of the hosting pod
 	Resources corev1.ResourceRequirements
 
@@ -119,7 +122,7 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1.O
 		return errors.Errorf("Target PVC %s/%s has already been bound, abort", param.TargetNamespace, param.TargetPVCName)
 	}
 
-	restorePod, err := e.createRestorePod(ctx, ownerObject, targetPVC, param.OperationTimeout, param.HostingPodLabels, selectedNode, param.Resources, param.NodeOS)
+	restorePod, err := e.createRestorePod(ctx, ownerObject, targetPVC, param.OperationTimeout, param.HostingPodLabels, param.HostingPodAnnotations, selectedNode, param.Resources, param.NodeOS)
 	if err != nil {
 		return errors.Wrapf(err, "error to create restore pod")
 	}
@@ -374,7 +377,7 @@ func (e *genericRestoreExposer) RebindVolume(ctx context.Context, ownerObject co
 }
 
 func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObject corev1.ObjectReference, targetPVC *corev1.PersistentVolumeClaim,
-	operationTimeout time.Duration, label map[string]string, selectedNode string, resources corev1.ResourceRequirements, nodeType string) (*corev1.Pod, error) {
+	operationTimeout time.Duration, label map[string]string, annotation map[string]string, selectedNode string, resources corev1.ResourceRequirements, nodeType string) (*corev1.Pod, error) {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
@@ -464,7 +467,8 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 					Controller: boolptr.True(),
 				},
 			},
-			Labels: label,
+			Labels:      label,
+			Annotations: annotation,
 		},
 		Spec: corev1.PodSpec{
 			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{

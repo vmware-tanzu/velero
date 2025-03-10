@@ -835,19 +835,31 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			}
 		}
 
+		hostingPodAnnotation := map[string]string{}
+		for _, k := range util.ThirdPartyAnnotations {
+			if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, du.Namespace, k, nodeOS); err != nil {
+				if err != nodeagent.ErrNodeAgentAnnotationNotFound {
+					log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
+				}
+			} else {
+				hostingPodAnnotation[k] = v
+			}
+		}
+
 		return &exposer.CSISnapshotExposeParam{
-			SnapshotName:     du.Spec.CSISnapshot.VolumeSnapshot,
-			SourceNamespace:  du.Spec.SourceNamespace,
-			StorageClass:     du.Spec.CSISnapshot.StorageClass,
-			HostingPodLabels: hostingPodLabels,
-			AccessMode:       accessMode,
-			OperationTimeout: du.Spec.OperationTimeout.Duration,
-			ExposeTimeout:    r.preparingTimeout,
-			VolumeSize:       pvc.Spec.Resources.Requests[corev1.ResourceStorage],
-			Affinity:         r.loadAffinity,
-			BackupPVCConfig:  r.backupPVCConfig,
-			Resources:        r.podResources,
-			NodeOS:           nodeOS,
+			SnapshotName:          du.Spec.CSISnapshot.VolumeSnapshot,
+			SourceNamespace:       du.Spec.SourceNamespace,
+			StorageClass:          du.Spec.CSISnapshot.StorageClass,
+			HostingPodLabels:      hostingPodLabels,
+			HostingPodAnnotations: hostingPodAnnotation,
+			AccessMode:            accessMode,
+			OperationTimeout:      du.Spec.OperationTimeout.Duration,
+			ExposeTimeout:         r.preparingTimeout,
+			VolumeSize:            pvc.Spec.Resources.Requests[corev1.ResourceStorage],
+			Affinity:              r.loadAffinity,
+			BackupPVCConfig:       r.backupPVCConfig,
+			Resources:             r.podResources,
+			NodeOS:                nodeOS,
 		}, nil
 	}
 
