@@ -162,14 +162,14 @@ func EnsureDeletePVC(ctx context.Context, pvcGetter corev1client.CoreV1Interface
 }
 
 // EnsureDeletePV ensures a PV has been deleted. This function is supposed to be called after EnsureDeletePVC
+// If timeout is 0, it doesn't wait and return nil
 func EnsureDeletePV(ctx context.Context, pvGetter corev1client.CoreV1Interface, pvName string, timeout time.Duration) error {
 	if timeout == 0 {
 		return nil
 	}
 
-	var updated *corev1api.PersistentVolume
 	err := wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
-		pv, err := pvGetter.PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+		_, err := pvGetter.PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -178,15 +178,14 @@ func EnsureDeletePV(ctx context.Context, pvGetter corev1client.CoreV1Interface, 
 			return false, errors.Wrapf(err, "error to get pv %s", pvName)
 		}
 
-		updated = pv
 		return false, nil
 	})
 
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return errors.Errorf("timeout to assure pv %s is deleted, finalizers in pv %v", pvName, updated.Finalizers)
+			return errors.Errorf("timeout to assure pv %s is deleted", pvName)
 		} else {
-			return errors.Wrapf(err, "error to ensure pv deleted for %s", pvName)
+			return errors.Wrapf(err, "error to ensure pv is deleted for %s", pvName)
 		}
 	}
 
