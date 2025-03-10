@@ -6,7 +6,9 @@ module github.com/vmware-tanzu/velero
 // or GOTOOLCHAIN=goX.Y.Z to use a specific toolchain version
 // See: https://go.dev/doc/toolchain#select and https://github.com/vmware-tanzu/velero/issues/8397
 // To bump minor version, run `go get go@X.Y.0 toolchain@none` (ie. `go get go@1.23.0 toolchain@none`)
-go 1.22.0
+go 1.23.0
+
+toolchain go1.23.6
 
 require (
 	cloud.google.com/go/storage v1.40.0
@@ -48,8 +50,8 @@ require (
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 	golang.org/x/mod v0.17.0
 	golang.org/x/net v0.33.0
-	golang.org/x/oauth2 v0.19.0
-	golang.org/x/text v0.21.0
+	golang.org/x/oauth2 v0.27.0
+	golang.org/x/text v0.22.0
 	google.golang.org/api v0.172.0
 	google.golang.org/grpc v1.63.2
 	google.golang.org/protobuf v1.33.0
@@ -70,8 +72,7 @@ require (
 
 require (
 	cloud.google.com/go v0.112.1 // indirect
-	cloud.google.com/go/compute v1.24.0 // indirect
-	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	cloud.google.com/go/iam v1.1.7 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.8.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
@@ -166,10 +167,10 @@ require (
 	go.opentelemetry.io/otel/trace v1.25.0 // indirect
 	go.starlark.net v0.0.0-20201006213952-227f4aabceb5 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/term v0.27.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
