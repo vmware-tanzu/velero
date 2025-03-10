@@ -37,10 +37,11 @@ import (
 
 func Test_validatePodVolumesHostPath(t *testing.T) {
 	tests := []struct {
-		name    string
-		pods    []*corev1.Pod
-		dirs    []string
-		wantErr bool
+		name      string
+		pods      []*corev1.Pod
+		dirs      []string
+		createDir bool
+		wantErr   bool
 	}{
 		{
 			name: "no error when pod volumes are present",
@@ -48,8 +49,9 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
 				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo")).Result(),
 			},
-			dirs:    []string{"foo", "zoo"},
-			wantErr: false,
+			dirs:      []string{"foo", "zoo"},
+			createDir: true,
+			wantErr:   false,
 		},
 		{
 			name: "no error when pod volumes are present and there are mirror pods",
@@ -57,8 +59,9 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
 				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo"), builder.WithAnnotations(corev1.MirrorPodAnnotationKey, "baz")).Result(),
 			},
-			dirs:    []string{"foo", "baz"},
-			wantErr: false,
+			dirs:      []string{"foo", "baz"},
+			createDir: true,
+			wantErr:   false,
 		},
 		{
 			name: "error when all pod volumes missing",
@@ -66,8 +69,9 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
 				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo")).Result(),
 			},
-			dirs:    []string{"unexpected-dir"},
-			wantErr: true,
+			dirs:      []string{"unexpected-dir"},
+			createDir: true,
+			wantErr:   true,
 		},
 		{
 			name: "error when some pod volumes missing",
@@ -75,8 +79,18 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
 				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo")).Result(),
 			},
-			dirs:    []string{"foo"},
-			wantErr: true,
+			dirs:      []string{"foo"},
+			createDir: true,
+			wantErr:   true,
+		},
+		{
+			name: "no error when pod volumes are not present",
+			pods: []*corev1.Pod{
+				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
+			},
+			dirs:      []string{"foo"},
+			createDir: false,
+			wantErr:   false,
 		},
 	}
 	for _, tt := range tests {
@@ -84,9 +98,11 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 			fs := testutil.NewFakeFileSystem()
 
 			for _, dir := range tt.dirs {
-				err := fs.MkdirAll(filepath.Join("/host_pods/", dir), os.ModePerm)
-				if err != nil {
-					t.Error(err)
+				if tt.createDir {
+					err := fs.MkdirAll(filepath.Join(defaultHostPodsPath, dir), os.ModePerm)
+					if err != nil {
+						t.Error(err)
+					}
 				}
 			}
 

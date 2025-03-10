@@ -80,6 +80,8 @@ const (
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
 
+	defaultHostPodsPath = "/host_pods"
+
 	defaultResourceTimeout         = 10 * time.Minute
 	defaultDataMoverPrepareTimeout = 30 * time.Minute
 	defaultDataPathConcurrentNum   = 1
@@ -414,8 +416,12 @@ func (s *nodeAgentServer) waitCacheForResume() error {
 // validatePodVolumesHostPath validates that the pod volumes path contains a
 // directory for each Pod running on this node
 func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface) error {
-	files, err := s.fileSystem.ReadDir("/host_pods/")
+	files, err := s.fileSystem.ReadDir(defaultHostPodsPath)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			s.logger.Warnf("Pod volumes host path [%s] doesn't exist, fs-backup is disabled", defaultHostPodsPath)
+			return nil
+		}
 		return errors.Wrap(err, "could not read pod volumes host path")
 	}
 
@@ -446,7 +452,7 @@ func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface
 			valid = false
 			s.logger.WithFields(logrus.Fields{
 				"pod":  fmt.Sprintf("%s/%s", pod.GetNamespace(), pod.GetName()),
-				"path": "/host_pods/" + dirName,
+				"path": defaultHostPodsPath + "/" + dirName,
 			}).Debug("could not find volumes for pod in host path")
 		}
 	}
