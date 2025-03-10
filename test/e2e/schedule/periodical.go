@@ -11,13 +11,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	framework "github.com/vmware-tanzu/velero/test/e2e/test"
+	framework "github.com/vmware-tanzu/velero/test/e2e/framework"
 	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
 	veleroutil "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 type PeriodicalCase struct {
-	framework.TestCase
+	framework.BRCase
 	ScheduleName string
 	ScheduleArgs []string
 	Period       int // The minimum unit is minute.
@@ -26,7 +26,7 @@ type PeriodicalCase struct {
 var SchedulePeriodicalTest func() = framework.TestFunc(&PeriodicalCase{})
 
 func (n *PeriodicalCase) Init() error {
-	Expect(n.TestCase.Init()).To(Succeed())
+	Expect(n.BRCase.Init()).To(Succeed())
 
 	n.CaseBaseName = "schedule-backup-" + n.UUIDgen
 	n.NSIncluded = &[]string{n.CaseBaseName}
@@ -203,7 +203,7 @@ func (n *PeriodicalCase) Clean() error {
 			),
 		).To(Succeed())
 
-		Expect(n.TestCase.Clean()).To(Succeed())
+		Expect(n.BRCase.Clean()).To(Succeed())
 	}
 
 	return nil
