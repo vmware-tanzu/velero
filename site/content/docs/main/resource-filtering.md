@@ -362,6 +362,52 @@ Velero supported conditions and format listed below:
   ```
    Volume types could be found in [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes) and pod [Volume](https://kubernetes.io/docs/concepts/storage/volumes)
 
+- pvc Labels
+
+  This condition filters volumes based on the labels on their associated PVCs. The condition is specified as a simple key/value mapping. The volume matches this condition if all the key/value pairs defined in the policy are present on the PVC. 
+    ```yaml
+    pvcLabels:
+      environment: production
+    ```
+
+    Some examples:
+  - Environment specific labels: Snapshot volumes whose associated PVC has the label `environment: production`.
+      ```yaml
+      volumePolicies:
+      - conditions:
+          pvcLabels:
+            environment: production
+      action:
+        type: snapshot
+      ```
+  - Subset Matching: Even if the PVC contains extra labels, it will match as long as the required key/value pair is present. For example, if the PVC has:
+      ```yaml
+      labels:
+        environment: production
+        team: backend
+      ```
+    the following policy will match because it only requires `environment: production`:
+      ```yaml
+      volumePolicies:
+      - conditions:
+          pvcLabels:
+            environment: production
+        action:
+          type: skip
+      ```
+  - Mismatched PVC Labels: If the policy requires both `environment: production` and `app: frontend`, but the PVC only has `environment: production`, the volume will not match.
+      ```yaml
+      volumePolicies:
+      - conditions:
+          pvcLabels:
+            environment: production
+            app: frontend
+        action:
+          type: skip
+      ```
+
+
+
 ### Resource policies rules
 - Velero already has lots of include or exclude filters. the resource policies are the final filters after others include or exclude filters in one backup processing workflow. So if use a defined similar filter like the opt-in approach to backup one pod volume but skip backup of the same pod volume in resource policies, as resource policies are the final filters that are applied, the volume will not be backed up.
 - If volume resource policies conflict with themselves the first matched policy will be respected when many policies are defined.
