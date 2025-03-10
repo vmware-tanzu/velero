@@ -276,7 +276,7 @@ func (v *volumeHelperImpl) ShouldPerformSnapshot(obj runtime.Unstructured, group
 
 	if !boolptr.IsSetToFalse(v.snapshotVolumes) {
 		// If the backup.Spec.SnapshotVolumes is not set, or set to true, then should take the snapshot.
-		v.logger.Infof("performing snapshot action for pv %s as the snapshotVolumes is not set to false")
+		v.logger.Infof("performing snapshot action for pv %s as the snapshotVolumes is not set to false", pv.Name)
 		return true, nil
 	}
 
