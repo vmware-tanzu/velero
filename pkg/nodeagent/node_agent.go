@@ -44,8 +44,9 @@ const (
 )
 
 var (
-	ErrDaemonSetNotFound      = errors.New("daemonset not found")
-	ErrNodeAgentLabelNotFound = errors.New("node-agent label not found")
+	ErrDaemonSetNotFound           = errors.New("daemonset not found")
+	ErrNodeAgentLabelNotFound      = errors.New("node-agent label not found")
+	ErrNodeAgentAnnotationNotFound = errors.New("node-agent annotation not found")
 )
 
 type LoadConcurrency struct {
@@ -221,6 +222,29 @@ func GetLabelValue(ctx context.Context, kubeClient kubernetes.Interface, namespa
 	val, found := ds.Spec.Template.Labels[key]
 	if !found {
 		return "", ErrNodeAgentLabelNotFound
+	}
+
+	return val, nil
+}
+
+func GetAnnotationValue(ctx context.Context, kubeClient kubernetes.Interface, namespace string, key string, osType string) (string, error) {
+	dsName := daemonSet
+	if osType == kube.NodeOSWindows {
+		dsName = daemonsetWindows
+	}
+
+	ds, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, dsName, metav1.GetOptions{})
+	if err != nil {
+		return "", errors.Wrapf(err, "error getting %s daemonset", dsName)
+	}
+
+	if ds.Spec.Template.Annotations == nil {
+		return "", ErrNodeAgentAnnotationNotFound
+	}
+
+	val, found := ds.Spec.Template.Annotations[key]
+	if !found {
+		return "", ErrNodeAgentAnnotationNotFound
 	}
 
 	return val, nil
