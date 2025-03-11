@@ -69,7 +69,7 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 			}
 			// If any pod is still waiting we don't need to check any more so return and wait for next poll interval
 			if checkPod.Status.Phase != corev1.PodRunning {
-				fmt.Printf("Pod %s is in state %s waiting for it to be %s\n", podName, checkPod.Status.Phase, corev1.PodRunning)
+				fmt.Printf("Pod %s is in state %s waiting for it to be %s, pod status %+v\n", podName, checkPod.Status.Phase, corev1.PodRunning, checkPod.Status) // TODO: remove after debug?
 				return false, nil
 			}
 		}
