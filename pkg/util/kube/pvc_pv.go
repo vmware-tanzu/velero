@@ -76,7 +76,7 @@ func DeletePVAndPVCIfAny(ctx context.Context, client corev1client.CoreV1Interfac
 	}
 
 	if err := EnsureDeletePV(ctx, client, pvcObj.Spec.VolumeName, ensureTimeout); err != nil {
-		log.Warnf("pv %s was not removed with err %v", &pvcObj.Spec.VolumeName, err)
+		log.Warnf("pv %s was not removed with err %v", pvcObj.Spec.VolumeName, err)
 	}
 }
 
