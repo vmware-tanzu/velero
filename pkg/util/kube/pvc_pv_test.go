@@ -785,7 +785,7 @@ func TestEnsureDeletePV(t *testing.T) {
 
 			var kubeClient kubernetes.Interface = fakeKubeClient
 
-			err := EnsureDeletePV(context.Background(), kubeClient.CoreV1(), test.pvName, test.timeout)
+			err := EnsurePVDeleted(context.Background(), kubeClient.CoreV1(), test.pvName, test.timeout)
 			if err != nil {
 				assert.EqualError(t, err, test.err)
 			} else {

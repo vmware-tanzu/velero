@@ -75,7 +75,7 @@ func DeletePVAndPVCIfAny(ctx context.Context, client corev1client.CoreV1Interfac
 		log.Warnf("failed to delete pvc %s/%s with err %v", pvcNamespace, pvcName, err)
 	}
 
-	if err := EnsureDeletePV(ctx, client, pvcObj.Spec.VolumeName, ensureTimeout); err != nil {
+	if err := EnsurePVDeleted(ctx, client, pvcObj.Spec.VolumeName, ensureTimeout); err != nil {
 		log.Warnf("pv %s was not removed with err %v", pvcObj.Spec.VolumeName, err)
 	}
 }
@@ -161,9 +161,9 @@ func EnsureDeletePVC(ctx context.Context, pvcGetter corev1client.CoreV1Interface
 	return nil
 }
 
-// EnsureDeletePV ensures a PV has been deleted. This function is supposed to be called after EnsureDeletePVC
+// EnsurePVDeleted ensures a PV has been deleted. This function is supposed to be called after EnsureDeletePVC
 // If timeout is 0, it doesn't wait and return nil
-func EnsureDeletePV(ctx context.Context, pvGetter corev1client.CoreV1Interface, pvName string, timeout time.Duration) error {
+func EnsurePVDeleted(ctx context.Context, pvGetter corev1client.CoreV1Interface, pvName string, timeout time.Duration) error {
 	if timeout == 0 {
 		return nil
 	}
