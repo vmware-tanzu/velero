@@ -63,7 +63,7 @@ The sample of the ```repo-maintenance-job-configmap``` ConfigMap for the above s
 cat <<EOF > repo-maintenance-job-config.json
 {
     "global": {
-        podResources: {
+        "podResources": {
             "cpuRequest": "100m",
             "cpuLimit": "200m",
             "memoryRequest": "100Mi",
