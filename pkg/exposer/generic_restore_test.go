@@ -370,9 +370,8 @@ func TestRebindVolume(t *testing.T) {
 						if hookCount == 0 {
 							hookCount++
 							return false, nil, nil
-						} else {
-							return true, nil, errors.New("fake-patch-error")
 						}
+						return true, nil, errors.New("fake-patch-error")
 					},
 				},
 			},
