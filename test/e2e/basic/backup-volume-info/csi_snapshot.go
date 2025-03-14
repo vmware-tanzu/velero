@@ -21,7 +21,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/providers"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -29,7 +29,7 @@ import (
 var CSISnapshotVolumeInfoTest func() = TestFunc(&CSISnapshotVolumeInfo{
 	BackupVolumeInfo{
 		SnapshotVolumes: true,
-		TestCase: TestCase{
+		BRCase: BRCase{
 			CaseBaseName: "csi-snapshot-volumeinfo",
 			TestMsg: &TestMSG{
 				Desc: "Test backup's VolumeInfo metadata content for CSI snapshot case.",

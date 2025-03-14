@@ -14,22 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the Licensm.
 */
 
-/*
-Copyright 2021 the Velero contributors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package basic
 
 import (
@@ -39,16 +23,16 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/pkg/errors"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 type RBACCase struct {
-	TestCase
+	BRCase
 }
 
 func (r *RBACCase) Init() error {
-	r.TestCase.Init()
+	r.BRCase.Init()
 	r.CaseBaseName = "rabc-" + r.UUIDgen
 	r.BackupName = "backup-" + r.CaseBaseName
 	r.RestoreName = "restore-" + r.CaseBaseName
@@ -155,7 +139,7 @@ func (r *RBACCase) Verify() error {
 	return nil
 }
 
-func (r *RBACCase) Destroy() error {
+func (r *RBACCase) DeleteResources() error {
 	//cleanup clusterrole
 	err := CleanupClusterRole(r.Ctx, r.Client, r.CaseBaseName)
 	if err != nil {
@@ -180,7 +164,7 @@ func (r *RBACCase) Clean() error {
 	if CurrentSpecReport().Failed() && r.VeleroCfg.FailFast {
 		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
 	} else {
-		return r.Destroy()
+		return r.DeleteResources()
 	}
 
 	return nil
