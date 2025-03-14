@@ -83,7 +83,7 @@ func (e *ExcludeFromBackup) CreateResources() error {
 		velerov1api.ExcludeFromBackupLabel: "false",
 	}
 	fmt.Printf("Creating resources in namespace ...%s\n", namespace)
-	if err := CreateNamespace(e.Ctx, e.Client, namespace); err != nil {
+	if err := CreateNamespace(e.Ctx, e.Client, namespace, false); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 	}
 	//Create deployment: to be included
