@@ -229,6 +229,11 @@ func (p *pvcRestoreItemAction) Execute(
 							Name:          pvcFromBackup.Annotations[velerov1api.VolumeSnapshotLabel],
 							Namespace:     newNamespace,
 						},
+						{
+							GroupResource: kuberesource.PersistentVolumeClaims,
+							Name:          pvc.Name,
+							Namespace:     newNamespace,
+						},
 					}
 					return &velero.RestoreItemActionExecuteOutput{
 						UpdatedItem:     input.Item,
