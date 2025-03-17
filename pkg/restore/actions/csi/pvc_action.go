@@ -120,6 +120,12 @@ func (p *pvcRestoreItemAction) Execute(
 		"PVC":     pvc.Namespace + "/" + pvc.Name,
 		"Restore": input.Restore.Namespace + "/" + input.Restore.Name,
 	})
+
+	// TODD: find the proper place for this consotant
+	const waitVSAnnotation = "velero.io/csi-volumesnapshot-waiting"
+	var additionalItems = []velero.ResourceIdentifier{}
+
+
 	logger.Info("Starting PVCRestoreItemAction for PVC")
 
 	// If PVC already exists, returns early.
@@ -213,8 +219,6 @@ func (p *pvcRestoreItemAction) Execute(
 				}
 			} else {
 
-				// TODD: find the proper place for this consotant
-				const waitVSAnnotation = "velero.io/csi-volumesnapshot-waiting"
 				if _, waiting := pvc.Annotations[waitVSAnnotation]; !waiting {
 					logger.Warning("PVC's VolumeSnapshot was not found, queuing it for restore and will try again next time.")
 					// Not waiting yet, so add the annotation and queue the VS and PVC.
@@ -223,7 +227,7 @@ func (p *pvcRestoreItemAction) Execute(
 					}
 					pvc.Annotations[waitVSAnnotation] = "true"
 
-					additionalItems := []velero.ResourceIdentifier{
+					additionalItems = []velero.ResourceIdentifier{
 						{
 							GroupResource: kuberesource.VolumeSnapshots,
 							Name:          pvcFromBackup.Annotations[velerov1api.VolumeSnapshotLabel],
@@ -235,10 +239,6 @@ func (p *pvcRestoreItemAction) Execute(
 							Namespace:     newNamespace,
 						},
 					}
-					return &velero.RestoreItemActionExecuteOutput{
-						UpdatedItem:     input.Item,
-						AdditionalItems: additionalItems,
-					}, nil
 				} else {
 					logger.Error("PVC's VolumeSnapshot was not found again.")
 					return nil, errors.WithStack(err)
@@ -255,6 +255,7 @@ func (p *pvcRestoreItemAction) Execute(
 
 	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem: &unstructured.Unstructured{Object: pvcMap},
+		AdditionalItems: additionalItems,
 		OperationID: operationID,
 	}, nil
 }
