@@ -707,6 +707,94 @@ func TestEnsureDeletePVC(t *testing.T) {
 	}
 }
 
+func TestEnsureDeletePV(t *testing.T) {
+	pvObject := &corev1api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-pv",
+		},
+	}
+
+	tests := []struct {
+		name      string
+		clientObj []runtime.Object
+		pvName    string
+		reactors  []reactor
+		timeout   time.Duration
+		err       string
+	}{
+		{
+			name:   "get fail",
+			pvName: "fake-pv",
+			err:    "error to get pv fake-pv: persistentvolumes \"fake-pv\" not found",
+		},
+		{
+			name:      "0 timeout",
+			pvName:    "fake-pv",
+			clientObj: []runtime.Object{pvObject},
+			reactors: []reactor{
+				{
+					verb:     "get",
+					resource: "persistentvolumes",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvObject, nil
+					},
+				},
+			},
+		},
+		{
+			name:      "wait fail",
+			pvName:    "fake-pv",
+			clientObj: []runtime.Object{pvObject},
+			timeout:   time.Millisecond,
+			reactors: []reactor{
+				{
+					verb:     "get",
+					resource: "persistentvolumes",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-get-error")
+					},
+				},
+			},
+			err: "error to ensure pv is deleted for fake-pv: error to get pv fake-pv: fake-get-error",
+		},
+		{
+			name:      "wait timeout",
+			pvName:    "fake-pv",
+			clientObj: []runtime.Object{pvObject},
+			timeout:   time.Millisecond,
+			reactors: []reactor{
+				{
+					verb:     "get",
+					resource: "persistentvolumes",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, pvObject, nil
+					},
+				},
+			},
+			err: "timeout to assure pv fake-pv is deleted",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.clientObj...)
+
+			for _, reactor := range test.reactors {
+				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
+
+			var kubeClient kubernetes.Interface = fakeKubeClient
+
+			err := EnsurePVDeleted(context.Background(), kubeClient.CoreV1(), test.pvName, test.timeout)
+			if err != nil {
+				assert.EqualError(t, err, test.err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestRebindPVC(t *testing.T) {
 	pvcObject := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{

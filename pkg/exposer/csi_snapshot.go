@@ -56,6 +56,9 @@ type CSISnapshotExposeParam struct {
 	// HostingPodLabels is the labels that are going to apply to the hosting pod
 	HostingPodLabels map[string]string
 
+	// HostingPodAnnotations is the annotations that are going to apply to the hosting pod
+	HostingPodAnnotations map[string]string
+
 	// OperationTimeout specifies the time wait for resources operations in Expose
 	OperationTimeout time.Duration
 
@@ -211,6 +214,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		backupPVC,
 		csiExposeParam.OperationTimeout,
 		csiExposeParam.HostingPodLabels,
+		csiExposeParam.HostingPodAnnotations,
 		csiExposeParam.Affinity,
 		csiExposeParam.Resources,
 		backupPVCReadOnly,
@@ -523,6 +527,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	backupPVC *corev1.PersistentVolumeClaim,
 	operationTimeout time.Duration,
 	label map[string]string,
+	annotation map[string]string,
 	affinity *kube.LoadAffinity,
 	resources corev1.ResourceRequirements,
 	backupPVCReadOnly bool,
@@ -633,7 +638,8 @@ func (e *csiSnapshotExposer) createBackupPod(
 					Controller: boolptr.True(),
 				},
 			},
-			Labels: label,
+			Labels:      label,
+			Annotations: annotation,
 		},
 		Spec: corev1.PodSpec{
 			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{

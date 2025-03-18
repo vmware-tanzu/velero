@@ -377,8 +377,8 @@ Velero supported conditions and format listed below:
       - conditions:
           pvcLabels:
             environment: production
-      action:
-        type: snapshot
+        action:
+          type: snapshot
       ```
   - Subset Matching: Even if the PVC contains extra labels, it will match as long as the required key/value pair is present. For example, if the PVC has:
       ```yaml
