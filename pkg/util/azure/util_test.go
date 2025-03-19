@@ -107,7 +107,7 @@ func TestGetClientOptions(t *testing.T) {
 	options, err = GetClientOptions(bslCfg, creds)
 	require.NoError(t, err)
 	assert.Equal(t, options.Cloud, cloud.AzurePublic)
-	assert.Equal(t, options.APIVersion, "2020-test")
+	assert.Equal(t, "2020-test", options.APIVersion)
 
 	// doesn't specify apiVesion
 	bslCfg = map[string]string{
@@ -117,7 +117,7 @@ func TestGetClientOptions(t *testing.T) {
 	options, err = GetClientOptions(bslCfg, creds)
 	require.NoError(t, err)
 	assert.Equal(t, options.Cloud, cloud.AzurePublic)
-	assert.Equal(t, options.APIVersion, "")
+	assert.Equal(t, "", options.APIVersion)
 }
 
 func Test_getCloudConfiguration(t *testing.T) {
@@ -125,12 +125,12 @@ func Test_getCloudConfiguration(t *testing.T) {
 	//	or AzureStackHub
 	http.DefaultClient = &http.Client{
 		Transport: RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
-			var content any = nil
+			var content any
 			if req.URL.Path == "/metadata/endpoints" {
 				if req.Host == "management.customcloudapi.net" {
-					content = []map[string]interface{}{
+					content = []map[string]any{
 						{
-							"authentication": map[string]interface{}{
+							"authentication": map[string]any{
 								"loginEndpoint": "https://login.customcloudapi.net",
 								"audiences": []string{
 									"https://management.core.customcloudapi.net",
@@ -138,7 +138,7 @@ func Test_getCloudConfiguration(t *testing.T) {
 								},
 							},
 							"name": "AzureCustomCloud",
-							"suffixes": map[string]interface{}{
+							"suffixes": map[string]any{
 								"storage": "core.customcloudapi.net",
 							},
 							"resourceManager": "https://management.customcloudapi.net",
@@ -146,16 +146,16 @@ func Test_getCloudConfiguration(t *testing.T) {
 					}
 				}
 				if req.Host == "management.local.azurestack.external" {
-					content = []map[string]interface{}{
+					content = []map[string]any{
 						{
-							"authentication": map[string]interface{}{
+							"authentication": map[string]any{
 								"loginEndpoint": "https://adfs.local.azurestack.external/adfs",
 								"audiences": []string{
 									"https://management.adfs.azurestack.local/1234567890",
 								},
 							},
 							"name": "AzureStack-User-1234567890",
-							"suffixes": map[string]interface{}{
+							"suffixes": map[string]any{
 								"storage": "local.azurestack.external",
 							},
 						},
@@ -164,7 +164,10 @@ func Test_getCloudConfiguration(t *testing.T) {
 			}
 
 			if content != nil {
-				data, _ := json.Marshal(content)
+				data, ok := json.Marshal(content)
+				if ok != nil {
+					return nil, ok
+				}
 				return &http.Response{
 					StatusCode:    http.StatusOK,
 					Status:        http.StatusText(http.StatusOK),
@@ -304,7 +307,7 @@ func Test_getCloudConfiguration(t *testing.T) {
 			bslCfg: map[string]string{},
 			creds: map[string]string{
 				CredentialKeyResourceManagerEndpoint: "https://management.customcloudapi.net",
-				CredentialKeyCloudName:            "AZURECUSTOMCLOUD",
+				CredentialKeyCloudName:               "AZURECUSTOMCLOUD",
 			},
 			err:      false,
 			expected: azureCustomCloud,

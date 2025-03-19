@@ -152,7 +152,7 @@ func getCloudConfiguration(locationCfg, creds map[string]string) (cloud.Configur
 		var env *azclient.Environment
 		var err error
 		cfg, env, err = azclient.GetAzureCloudConfigAndEnvConfig(&azclient.ARMClientConfig{
-			Cloud: name,
+			Cloud:                   name,
 			ResourceManagerEndpoint: creds[CredentialKeyResourceManagerEndpoint],
 		})
 		if err != nil {
