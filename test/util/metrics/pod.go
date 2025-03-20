@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -50,8 +50,8 @@ func GetPodUsageMetrics(ctx context.Context, metricsClient *metricsclientset.Cli
 	// Variables to store the max and sum of CPU and memory usage
 	// For velero pod we only return the main container
 	for _, container := range podMetrics.Containers {
-		cpuUsage = container.Usage[corev1.ResourceCPU]
-		memoryUsage = container.Usage[corev1.ResourceMemory]
+		cpuUsage = container.Usage[corev1api.ResourceCPU]
+		memoryUsage = container.Usage[corev1api.ResourceMemory]
 		return
 	}
 

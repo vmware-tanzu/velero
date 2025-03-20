@@ -4,31 +4,31 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestNewVolumeFilterData(t *testing.T) {
 	testCases := []struct {
 		name            string
-		pv              *corev1.PersistentVolume
-		podVol          *corev1.Volume
-		pvc             *corev1.PersistentVolumeClaim
+		pv              *corev1api.PersistentVolume
+		podVol          *corev1api.Volume
+		pvc             *corev1api.PersistentVolumeClaim
 		expectedPVName  string
 		expectedPodName string
 		expectedPVCName string
 	}{
 		{
 			name: "all provided",
-			pv: &corev1.PersistentVolume{
+			pv: &corev1api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pv-test",
 				},
 			},
-			podVol: &corev1.Volume{
+			podVol: &corev1api.Volume{
 				Name: "pod-vol-test",
 			},
-			pvc: &corev1.PersistentVolumeClaim{
+			pvc: &corev1api.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pvc-test",
 				},
@@ -39,7 +39,7 @@ func TestNewVolumeFilterData(t *testing.T) {
 		},
 		{
 			name: "only PV provided",
-			pv: &corev1.PersistentVolume{
+			pv: &corev1api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pv-only",
 				},
@@ -53,7 +53,7 @@ func TestNewVolumeFilterData(t *testing.T) {
 		{
 			name: "only PodVolume provided",
 			pv:   nil,
-			podVol: &corev1.Volume{
+			podVol: &corev1api.Volume{
 				Name: "pod-only",
 			},
 			pvc:             nil,
@@ -65,7 +65,7 @@ func TestNewVolumeFilterData(t *testing.T) {
 			name:   "only PVC provided",
 			pv:     nil,
 			podVol: nil,
-			pvc: &corev1.PersistentVolumeClaim{
+			pvc: &corev1api.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pvc-only",
 				},

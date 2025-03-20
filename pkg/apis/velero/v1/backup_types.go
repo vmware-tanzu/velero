@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -164,7 +164,7 @@ type BackupSpec struct {
 	ItemOperationTimeout metav1.Duration `json:"itemOperationTimeout,omitempty"`
 	// ResourcePolicy specifies the referenced resource policies that backup should follow
 	// +optional
-	ResourcePolicy *v1.TypedLocalObjectReference `json:"resourcePolicy,omitempty"`
+	ResourcePolicy *corev1api.TypedLocalObjectReference `json:"resourcePolicy,omitempty"`
 
 	// SnapshotMoveData specifies whether snapshot data should be moved
 	// +optional

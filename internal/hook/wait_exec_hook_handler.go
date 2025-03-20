@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -37,7 +37,7 @@ type WaitExecHookHandler interface {
 	HandleHooks(
 		ctx context.Context,
 		log logrus.FieldLogger,
-		pod *v1.Pod,
+		pod *corev1api.Pod,
 		byContainer map[string][]PodExecRestoreHook,
 		multiHookTracker *MultiHookTracker,
 		restoreName string,
@@ -73,7 +73,7 @@ var _ WaitExecHookHandler = &DefaultWaitExecHookHandler{}
 func (e *DefaultWaitExecHookHandler) HandleHooks(
 	ctx context.Context,
 	log logrus.FieldLogger,
-	pod *v1.Pod,
+	pod *corev1api.Pod,
 	byContainer map[string][]PodExecRestoreHook,
 	multiHookTracker *MultiHookTracker,
 	restoreName string,
@@ -117,7 +117,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	// When a container is observed running and its hooks are executed, the container is deleted
 	// from the byContainer map. When the map is empty the watch is ended.
 	handler := func(newObj any) {
-		newPod, ok := newObj.(*v1.Pod)
+		newPod, ok := newObj.(*corev1api.Pod)
 		if !ok {
 			return
 		}
@@ -128,7 +128,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 			},
 		)
 
-		if newPod.Status.Phase == v1.PodSucceeded || newPod.Status.Phase == v1.PodFailed {
+		if newPod.Status.Phase == corev1api.PodSucceeded || newPod.Status.Phase == corev1api.PodFailed {
 			err := fmt.Errorf("pod entered phase %s before some post-restore exec hooks ran", newPod.Status.Phase)
 			podLog.Warning(err)
 			cancel()
@@ -265,7 +265,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	return errors
 }
 
-func podHasContainer(pod *v1.Pod, containerName string) bool {
+func podHasContainer(pod *corev1api.Pod, containerName string) bool {
 	if pod == nil {
 		return false
 	}
@@ -278,7 +278,7 @@ func podHasContainer(pod *v1.Pod, containerName string) bool {
 	return false
 }
 
-func isContainerUp(pod *v1.Pod, containerName string, hooks []PodExecRestoreHook) bool {
+func isContainerUp(pod *corev1api.Pod, containerName string, hooks []PodExecRestoreHook) bool {
 	if pod == nil {
 		return false
 	}

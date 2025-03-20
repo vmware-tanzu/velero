@@ -19,32 +19,32 @@ package k8s
 import (
 	"context"
 
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PVCBuilder builds PVC objects.
 type PVCBuilder struct {
-	*corev1.PersistentVolumeClaim
+	*corev1api.PersistentVolumeClaim
 }
 
-func (p *PVCBuilder) Result() *corev1.PersistentVolumeClaim {
+func (p *PVCBuilder) Result() *corev1api.PersistentVolumeClaim {
 	return p.PersistentVolumeClaim
 }
 
 func NewPVC(ns, name string) *PVCBuilder {
 	oMeta := metav1.ObjectMeta{Name: name, Namespace: ns}
 	return &PVCBuilder{
-		&corev1.PersistentVolumeClaim{
+		&corev1api.PersistentVolumeClaim{
 			ObjectMeta: oMeta,
-			Spec: corev1.PersistentVolumeClaimSpec{
-				AccessModes: []corev1.PersistentVolumeAccessMode{
-					corev1.ReadWriteOnce, // Default read write once
+			Spec: corev1api.PersistentVolumeClaimSpec{
+				AccessModes: []corev1api.PersistentVolumeAccessMode{
+					corev1api.ReadWriteOnce, // Default read write once
 				},
-				Resources: corev1.VolumeResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: resource.MustParse("1Gi"), // Default 1Gi
+				Resources: corev1api.VolumeResourceRequirements{
+					Requests: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"), // Default 1Gi
 					},
 				},
 			},
@@ -63,11 +63,11 @@ func (p *PVCBuilder) WithStorageClass(sc string) *PVCBuilder {
 }
 
 func (p *PVCBuilder) WithResourceStorage(q resource.Quantity) *PVCBuilder {
-	p.Spec.Resources.Requests[corev1.ResourceStorage] = q
+	p.Spec.Resources.Requests[corev1api.ResourceStorage] = q
 	return p
 }
 
-func CreatePVC(client TestClient, ns, name, sc string, ann map[string]string) (*corev1.PersistentVolumeClaim, error) {
+func CreatePVC(client TestClient, ns, name, sc string, ann map[string]string) (*corev1api.PersistentVolumeClaim, error) {
 	pvcBulder := NewPVC(ns, name)
 	if ann != nil {
 		pvcBulder.WithAnnotation(ann)
@@ -84,6 +84,6 @@ func CreatePvc(client TestClient, pvcBulder *PVCBuilder) error {
 	return err
 }
 
-func GetPVC(ctx context.Context, client TestClient, namespace string, pvcName string) (*corev1.PersistentVolumeClaim, error) {
+func GetPVC(ctx context.Context, client TestClient, namespace string, pvcName string) (*corev1api.PersistentVolumeClaim, error) {
 	return client.ClientGo.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, metav1.GetOptions{})
 }
