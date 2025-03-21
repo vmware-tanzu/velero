@@ -176,7 +176,7 @@ func TestIsPodRunning(t *testing.T) {
 					Phase: "fake-phase",
 				},
 			},
-			err: "pod is not in the expected status, name=fake-pod, namespace=fake-ns, phase=fake-phase: pod is not running",
+			err: "pod is not in the expected status, name=fake-pod, namespace=fake-ns, phase=fake-phase: pod is not running. status: {Phase:fake-phase Conditions:[] Message: Reason: NominatedNodeName: HostIP: HostIPs:[] PodIP: PodIPs:[] StartTime:<nil> InitContainerStatuses:[] ContainerStatuses:[] QOSClass: EphemeralContainerStatuses:[] Resize: ResourceClaimStatuses:[]}",
 		},
 		{
 			name: "pod is being deleted",
@@ -261,7 +261,7 @@ func TestIsPodScheduled(t *testing.T) {
 					Phase: "fake-phase",
 				},
 			},
-			err: "pod is not in the expected status, name=fake-pod, namespace=fake-ns, phase=fake-phase: pod is not running or pending",
+			err: "pod is not in the expected status, name=fake-pod, namespace=fake-ns, phase=fake-phase: pod is not running or pending. status: {Phase:fake-phase Conditions:[] Message: Reason: NominatedNodeName: HostIP: HostIPs:[] PodIP: PodIPs:[] StartTime:<nil> InitContainerStatuses:[] ContainerStatuses:[] QOSClass: EphemeralContainerStatuses:[] Resize: ResourceClaimStatuses:[]}",
 		},
 		{
 			name: "pod is being deleted",
