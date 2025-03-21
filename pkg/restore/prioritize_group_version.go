@@ -155,7 +155,7 @@ func (ctx *restoreContext) gatherSourceTargetUserGroupVersions() (
 	map[string]metav1.APIGroup,
 	error,
 ) {
-	sourceRGVersions, err := archive.NewParser(ctx.log, ctx.fileSystem).ParseGroupVersions(ctx.restoreDir)
+	sourceRGVersions, err := archive.NewParser(ctx.log, ctx.fileSystem).ParseGroupVersions(ctx.restoreDir, ctx.restoreDirLongNames)
 	if err != nil {
 		return nil, nil, nil, errors.Wrap(err, "parsing versions from directory names")
 	}
