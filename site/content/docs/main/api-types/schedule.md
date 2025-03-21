@@ -9,6 +9,22 @@ The `Schedule` API type is used as a repeatable request for the Velero server to
 Velero Server will start the backup process. It will then wait for the next valid point of the given cron expression and execute the backup
 process on a repeating basis.
 
+### Schedule Control Fields
+
+The Schedule API provides several fields to control backup execution behavior:
+
+- **paused**: When set to `true`, the schedule is paused and no new backups will be created. When set back to `false`, the schedule is unpaused and will resume creating backups according to the cron schedule.
+
+- **skipImmediately**: Controls whether to skip an immediate backup when a schedule is created or unpaused. By default (when `false`), if a backup is due immediately upon creation or unpausing, it will be executed right away. When set to `true`, the controller will:
+  1. Skip the immediate backup
+  2. Record the current time in the `lastSkipped` status field
+  3. Automatically reset `skipImmediately` back to `false` (one-time use)
+  4. Schedule the next backup based on the cron expression, using `lastSkipped` as the reference time
+
+- **lastSkipped**: A status field (not directly settable) that records when a backup was last skipped due to `skipImmediately` being `true`. The controller uses this timestamp, if more recent than `lastBackup`, to calculate the next scheduled backup time.
+
+This "consume and reset" pattern for `skipImmediately` ensures that after skipping one immediate backup, the schedule returns to normal behavior for subsequent runs without requiring user intervention.
+
 ## API GroupVersion
 
 Schedule belongs to the API group version `velero.io/v1`.
@@ -32,6 +48,10 @@ metadata:
 spec:
   # Paused specifies whether the schedule is paused or not
   paused: false
+  # SkipImmediately specifies whether to skip backup if schedule is due immediately when unpaused or created.
+  # This is a one-time flag that will be automatically reset to false after being consumed.
+  # When true, the controller will skip the immediate backup, set LastSkipped timestamp, and reset this to false.
+  skipImmediately: false
   # Schedule is a Cron expression defining when to run the Backup
   schedule: 0 7 * * *
   # Specifies whether to use OwnerReferences on backups created by this Schedule. 
@@ -189,6 +209,8 @@ status:
   phase: ""
   # Date/time of the last backup for a given schedule
   lastBackup:
+  # Date/time when a backup was last skipped due to skipImmediately being true
+  lastSkipped:
   # An array of any validation errors encountered.
   validationErrors:
 ```

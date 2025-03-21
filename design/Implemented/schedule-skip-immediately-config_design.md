@@ -71,6 +71,20 @@ type ScheduleSpec struct {
 }
 ```
 
+**Note:** The Velero server automatically patches the `skipImmediately` field back to `false` after it's been used. This is because `skipImmediately` is designed to be a one-time operation rather than a persistent state. When the controller detects that `skipImmediately` is set to `true`, it:
+1. Sets the flag back to `false`
+2. Records the current time in `schedule.Status.LastSkipped`
+
+This "consume and reset" pattern ensures that after skipping one immediate backup, the schedule returns to normal behavior for subsequent runs. The `LastSkipped` timestamp is then used to determine when the next backup should run.
+
+```go
+// From pkg/controller/schedule_controller.go
+if schedule.Spec.SkipImmediately != nil && *schedule.Spec.SkipImmediately { 
+    *schedule.Spec.SkipImmediately = false 
+    schedule.Status.LastSkipped = &metav1.Time{Time: c.clock.Now()} 
+} 
+```
+
 `LastSkipped` will be added to `ScheduleStatus` struct to track the last time a schedule was skipped.
 ```diff
 // ScheduleStatus captures the current state of a Velero schedule
@@ -96,6 +110,8 @@ type ScheduleStatus struct {
 	ValidationErrors []string `json:"validationErrors,omitempty"`
 }
 ```
+
+The `LastSkipped` field is crucial for the schedule controller to determine the next run time. When a backup is skipped, this timestamp is used instead of `LastBackup` to calculate when the next backup should occur, ensuring the schedule maintains its intended cadence even after skipping a backup.
 
 When `schedule.spec.SkipImmediately` is `true`, `LastSkipped` will be set to the current time, and `schedule.spec.SkipImmediately` set to nil so it can be used again.
 
