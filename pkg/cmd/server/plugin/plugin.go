@@ -50,6 +50,10 @@ func NewCommand(f client.Factory) *cobra.Command {
 			f.SetClientQPS(config.ClientQPS)
 			f.SetClientBurst(config.ClientBurst)
 			pluginServer = pluginServer.
+				RegisterRestoreItemActionV2(
+					constant.PluginCSIPVCVSDURestoreRIA,
+					newPvcVSDVRestoreItemAction(f),
+				).
 				RegisterBackupItemAction(
 					"velero.io/pv",
 					newPVBackupItemAction,
@@ -425,6 +429,9 @@ func newVolumeSnapshotContentDeleteItemAction(f client.Factory) plugincommon.Han
 }
 
 // RestoreItemAction plugins
+func newPvcVSDVRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
+	return csiria.NewPvcVSDVRestoreItemAction(f)
+} 
 
 func newPvcRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
 	return csiria.NewPvcRestoreItemAction(f)

@@ -24,7 +24,6 @@ import (
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	kuberesource "github.com/vmware-tanzu/velero/pkg/kuberesource"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -120,12 +119,6 @@ func (p *pvcRestoreItemAction) Execute(
 		"PVC":     pvc.Namespace + "/" + pvc.Name,
 		"Restore": input.Restore.Namespace + "/" + input.Restore.Name,
 	})
-
-	// TODD: find the proper place for this consotant
-	const waitVSAnnotation = "velero.io/csi-volumesnapshot-waiting"
-	var additionalItems = []velero.ResourceIdentifier{}
-
-
 	logger.Info("Starting PVCRestoreItemAction for PVC")
 
 	// If PVC already exists, returns early.
@@ -205,44 +198,11 @@ func (p *pvcRestoreItemAction) Execute(
 				}, nil
 			}
 
-			exists, err := pvcVolumeSnapshotResourceExists(newNamespace, p.crClient, targetVSName)
-			if err != nil {
-				logger.Errorf("Failed to verify if VolumeSnapshot exists.")
+			if err := restoreFromVolumeSnapshot(
+				&pvc, newNamespace, p.crClient, targetVSName, logger,
+			); err != nil {
+				logger.Errorf("Failed to restore PVC from VolumeSnapshot.")
 				return nil, errors.WithStack(err)
-			}
-			if exists { // TODO: rename the function restoreFromVolumeSnapshot so it reflects the action (patching the pvc requst size to the vs's restore size if needed.)
-				if err := restoreFromVolumeSnapshot(
-					&pvc, newNamespace, p.crClient, targetVSName, logger,
-				); err != nil {
-					logger.Errorf("Failed to restore PVC from VolumeSnapshot.")
-					return nil, errors.WithStack(err)
-				}
-			} else {
-
-				if _, waiting := pvc.Annotations[waitVSAnnotation]; !waiting {
-					logger.Warning("PVC's VolumeSnapshot was not found, queuing it for restore and will try again next time.")
-					// Not waiting yet, so add the annotation and queue the VS and PVC.
-					if pvc.Annotations == nil {
-						pvc.Annotations = make(map[string]string)
-					}
-					pvc.Annotations[waitVSAnnotation] = "true"
-
-					additionalItems = []velero.ResourceIdentifier{
-						{
-							GroupResource: kuberesource.VolumeSnapshots,
-							Name:          pvcFromBackup.Annotations[velerov1api.VolumeSnapshotLabel],
-							Namespace:     newNamespace,
-						},
-						{
-							GroupResource: kuberesource.PersistentVolumeClaims,
-							Name:          pvc.Name,
-							Namespace:     newNamespace,
-						},
-					}
-				} else {
-					logger.Error("PVC's VolumeSnapshot was not found again.")
-					return nil, errors.WithStack(err)
-				}
 			}
 		}
 	}
@@ -255,7 +215,6 @@ func (p *pvcRestoreItemAction) Execute(
 
 	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem: &unstructured.Unstructured{Object: pvcMap},
-		AdditionalItems: additionalItems,
 		OperationID: operationID,
 	}, nil
 }
@@ -511,7 +470,7 @@ func restoreFromVolumeSnapshot(
 			Name:      volumeSnapshotName,
 		},
 		vs,
-	); err != nil { //TODO: check if we can remove this error check soince we already checked for the existence of the volumesnapshot.
+	); err != nil {
 		return errors.Wrapf(err, "Failed to get Volumesnapshot %s/%s to restore PVC %s/%s",
 			newNamespace, volumeSnapshotName, newNamespace, pvc.Name)
 	}
@@ -603,25 +562,6 @@ func (p *pvcRestoreItemAction) isResourceExist(
 		return true
 	}
 	return false
-}
-
-func pvcVolumeSnapshotResourceExists(
-	newNamespace string,
-	crClient crclient.Client,
-	volumeSnapshotName string,
-	) (bool, error) {
-	vs := &snapshotv1api.VolumeSnapshot{}
-	err := crClient.Get(context.TODO(), crclient.ObjectKey{
-		Namespace: newNamespace,
-		Name:      volumeSnapshotName,
-	}, vs)
-	if err != nil {
-		if crclient.IgnoreNotFound(err) == nil {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
 }
 
 func NewPvcRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {

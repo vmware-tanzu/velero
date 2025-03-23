@@ -1375,6 +1375,8 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		obj = unstructuredObj
 
 		var filteredAdditionalItems []velero.ResourceIdentifier
+		ctx.log.Debugf("Will Restore the following AdditionalItems: %+v", executeOutput.AdditionalItems)
+
 		for _, additionalItem := range executeOutput.AdditionalItems {
 			itemPath := archive.GetItemFilePath(ctx.restoreDir, additionalItem.GroupResource.String(), additionalItem.Namespace, additionalItem.Name)
 

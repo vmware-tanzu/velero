@@ -21,5 +21,6 @@ const (
 	ControllerRestoreFinalizer      = "restore-finalizer"
 
 	PluginCSIPVCRestoreRIA            = "velero.io/csi-pvc-restorer"
+	PluginCSIPVCVSDURestoreRIA            = "velero.io/csi-pvc-vs-dv-restorer"
 	PluginCsiVolumeSnapshotRestoreRIA = "velero.io/csi-volumesnapshot-restorer"
 )
