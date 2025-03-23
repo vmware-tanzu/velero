@@ -106,13 +106,33 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 		return nil, errors.WithStack(err)
 	}
 
-	p.log.Infof(`Returning from VolumeSnapshotRestoreItemAction with 
-		no additionalItems`)
+	// Extract the original VolumeSnapshotContent name from the backup object.
+	originalVSCName := vsFromBackup.Spec.Source.VolumeSnapshotContentName
 
-	return &velero.RestoreItemActionExecuteOutput{
-		UpdatedItem:     &unstructured.Unstructured{Object: vsMap},
-		AdditionalItems: []velero.ResourceIdentifier{},
-	}, nil
+	// Convert the updated VolumeSnapshot to an unstructured object.
+	vsMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&vs)
+	if err != nil {
+		p.log.Errorf("Fail to convert VS %s to unstructured", vs.Namespace+"/"+vs.Name)
+		return nil, errors.WithStack(err)
+	}
+
+	// Include the original VolumeSnapshotContent as an additional item.
+	additionalItems := []velero.ResourceIdentifier{
+		{
+			GroupResource: schema.GroupResource{
+				Group:    "snapshot.storage.k8s.io",
+				Resource: "volumesnapshotcontents",
+			},
+			Name: originalVSCName,
+    },
+}
+
+p.log.Infof("Returning from VolumeSnapshotRestoreItemAction with additionalItems including original VSC (%s)", originalVSCName)
+
+return &velero.RestoreItemActionExecuteOutput{
+    UpdatedItem:     &unstructured.Unstructured{Object: vsMap},
+    AdditionalItems: additionalItems,
+}, nil}, nil
 }
 
 func (p *volumeSnapshotRestoreItemAction) Name() string {
