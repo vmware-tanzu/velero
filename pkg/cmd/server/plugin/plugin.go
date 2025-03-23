@@ -50,7 +50,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			f.SetClientQPS(config.ClientQPS)
 			f.SetClientBurst(config.ClientBurst)
 			pluginServer = pluginServer.
-				RegisterRestoreItemActionV2(
+				RegisterRestoreItemAction(
 					constant.PluginCSIPVCVSDURestoreRIA,
 					newPvcVSDVRestoreItemAction(f),
 				).
