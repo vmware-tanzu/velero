@@ -103,7 +103,7 @@ flowchart TD
 3. Pod Mounts: Pod1 mounts both PVC1 and PVC2, Pod2 mounts PVC1 and PVC3.  
    Grouping:   
      Group A: PVC1 and PVC2  
-     Group B: PVC1 and PVC3  
+     Group B: PVC3  
    ItemBlock: All objects-Pod1, Pod2, PVC1, PVC2, and PVC3, are collected into a single item block.  
    VolumeGroupSnapshots:  
      PVC1 and PVC2 (group A) point to the same VGS (VGS (group: A)).   
@@ -113,7 +113,7 @@ flowchart TD
     subgraph ItemBlock
         P1[Pod1]
         P2[Pod2]
-        PVC1[PVC1 group: A, group: B]
+        PVC1[PVC1 group: A]
         PVC2[PVC2 group: A]
         PVC3[PVC3 group: B]
     end
