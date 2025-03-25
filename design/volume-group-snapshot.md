@@ -42,7 +42,7 @@ Velero currently enables snapshot-based backups on an individual Volume basis th
       - This helps in building the ItemBlock we need for VGS processing, i.e. we have the relevant pods and PVCs in the ItemBlock.
 
 **Note:** The ItemBlock to VGS relationship will not always be 1:1. There might be scenarios when the ItemBlock might have multiple VGS instances associated with it.
-Lets go ove some ItemBlock/VGS scenarios that we might encounter and visualize them for clarity:
+Lets go over some ItemBlock/VGS scenarios that we might encounter and visualize them for clarity:
 1. Pod Mounts: Pod1 mounts both PVC1 and PVC2.  
    Grouping: PVC1 and PVC2 share the same group label (group: A)  
    ItemBlock: The item block includes Pod1, PVC1, and PVC2.  
@@ -137,119 +137,97 @@ flowchart TD
 #### Updates to CSI PVC plugin:
   - This is the plugin which creates VolumeSnapshots for the CSI PVCs if required.
   - We might encounter the following cases:
-    - PVC has VGS label and VGS already exists:
+    - PVC has VGS label and VGS does not exist:
       - We can check if VGS exists by listing the VGS in the namespace using the backup UUID 
         along with the label used for the VGS (we will be creating VGS with backup UUID and user specified VGS  group label) and see if the PVC is part of any of the existing VGS for the particular backup operation we are currently in.
       - If not then create the VGS object with the required labels (in this case backup UUID and the user specified VGS group label) and also add the PVC names (that are included in the VGS) as 
-        annotations. (This will be useful for our VGS restore operation where we would need PVC resource identifiers).
+        annotations.
+      - Once VGS is created, wait for VGS object to be `readyToUse`, it implies that all the related VS/VSC objects are ready to use too.
+      - Add the VGS object as an additional item.
       - For non-datamover case:
-        - Once VGS is created, add the VGS as an additional item to be included in the backup.
-        - The VGS BIA plugin will add the related VS as additional items later.
+        - Here, we need to skip the creation of VS as the VS object get created via creation of VGS object.
+        - We just need to add the VS objects that got created via VGS object as additional items and the rest of the workflow remains the same for non-datamover cases.
       - For datamover case:
-        - We need to bypass creation of VS but need to create DataUploads for the VS instance that got created due to VGS creation.
+        - We need to skip creation of VS but need to create DataUploads for the VS instance that got created due to VGS creation.
         - Fetch the correct VS instances that got created via VGS and is related to the current PVC.
         - Finally create DataUpload object for this VS/PVC pair.
         - Add the DataUpload as an additional item.
-    - PVC has VGS label and VGS exists:
+    - PVC has VGS label and VGS already exists:
       - In this case we do not want to re-create VGS object.
       - The required VS/DU for the PVC already exists as VGS instance exists for the PVC and backup UUID.
     - PVC does not possess VGS label:
       - Create VS and follow the existing legacy workflow.
 
-
 #### Add a new VolumeGroupSnapshot(VGS) BIA plugin
-  - We need this plugin only for non-datamover case.
-  - For a particular instance of VGS, this plugin will wait for all the related VS instances to be in ready state.
-  - And once they are ready, add all the VS instances as additional items for the backup.
-  - This plugin will also add VolumeGroupSnapshotClass(VGSClass) and VolumeGroupSnapshotContent(VGSC) as additional items to be included in the backup.
-
-### Add a new VolumeGroupSnapshotClass(VGSClass) BIA plugin
-  - We need this plugin only for non-datamover case.
-  - This plugin will be similar to the VSClass plugin.
-  - This will check if the VGSClass has any lister secret annotations and then add it as an additional item.
-
-### Add a new VolumeGroupSnapshotContent(VGSC) BIA Plugin
-  - We need this plugin only for non-datamover case.
-  - This will also be similar to the VSC plugin
-  - This will check if the VGSC has any delete secret annotations and then add it as an additional item.
+  - Cleanup the VGS object, here we need to be careful, we want to delete VGS and VGSC objects but keep the VS and VSC objects for further processing of our backup.
+  - We will first check the `deletionPolicy` of VGSC,
+    - if its `Retain` then we can go ahead with the deletion of VGS and VGSC objects.
+    - But if its `Delete` then we need to first patch the VGSC `deletionPolicy` to `Retain` and then delete the VGS and VGSC objects.
 
 ```mermaid
 flowchart TD
-%% User Input Section
-    subgraph User_Input [User Input]
-        A[User sets VGS label<br/>via default, server arg, or Backup spec]
+%% User Input
+    subgraph "User Input"
+        A[User sets VGS label key<br/>default, server arg, or Backup spec]
+        B[User labels PVCs before backup]
+        A --> B
     end
 
-%% PVC ItemBlockAction Plugin Section
-    subgraph PVC_IBA [PVC ItemBlockAction Plugin]
-        B[PVC has VGS label?]
-        C[If Yes: List all PVCs in namespace<br/>with same label]
-        D[Add grouped PVCs to relatedItems]
-        E[Pod IBA adds pods mounting the PVC]
+%% PVC ItemBlockAction Plugin
+    subgraph "PVC IBA Plugin"
+        C[Check: PVC is bound & VolumeName non-empty]
+        D[Add related PV and pods]
+        E[Check if PVC has VGS label]
+        F[List all PVCs with same label in namespace]
+        G[Add PVCs to relatedItems]
+        C --> D
+        D --> E
+        E -- Yes --> F
+        F --> G
     end
 
-%% CSI PVC Plugin Section
-    subgraph CSI_PVC [CSI PVC Plugin]
-        F[Does PVC have VGS label?]
-        G[If Yes: Check if VGS exists<br/>using backup UID & label]
-        H[If VGS NOT found,<br/>create new VGS object<br/>backup UID, label, PVC names in annotation]
-        I[If VGS exists, skip VGS as well as VS creation]
-        J[If No label: Create individual VS legacy flow]
-        K[For non-datamover:<br/>Add VGS as additional item]
-        L[For datamover:<br/>Create DataUpload for VS and add as additional item]
-    end
+%% CSI PVC Plugin
+subgraph "CSI PVC Plugin"
+H[For each PVC, check for VGS label]
+I[If VGS label exists:]
+J[Lookup VGS using backup UID and label]
+K[Create VGS object]
+L[Wait until VGS is readyToUse, add VGS as an additional item]
+M[Non-datamover: Skip individual VS creation; add VS  objects from VGS as additional items]
+N[Datamover: Create DataUpload for VS PVC pair; add DU as an additional item]
+O[If VGS already exists, skip creation]
+P[If no VGS label, follow legacy workflow: create VS]
+H --> I
+I -- Yes --> J
+J -- Not found --> K
+K --> L
+L --> M
+L --> N
+I -- Yes and found --> O
+I -- No --> P
+end
 
-%% VGS BackupItemAction Plugin Section
-    subgraph VGS_BIA [VGS BackupItemAction Plugin]
-        M[Wait for all related VS to be ready]
-        N[Add all ready VS, VGSClass and VGSC as additional items]
-    end
+%% VGS BackupItemAction Plugin
+subgraph "VGS BIA Plugin"
+Q[Check VGSC deletionPolicy]
+R[If Retain, delete VGS and VGSC objects]
+S[If Delete, patch VGSC to Retain then delete VGS and VGSC]
+Q --> R
+Q --> S
+end
 
-%% Existing VS and VSC BIA Plugins
-    subgraph VS_VSC_BIA [VS and VSC BIA Plugin]
-        P[Legacy VS and VSC BIA actions]
-    end
-
-%% VGSClass and VGSC BIA Plugins
-    subgraph VSClass_VGSC_BIA [VGSClass and VGSC BIA Plugin]
-        Q[Similar actions to VSClass and VSC BIA Actions]
-    end
-
-%% Flow Connections
-    A --> B
-    B -- Yes --> C
-    C --> D
-    D --> E
-    B -- No --> E
-
-    E --> F
-    F -- Yes --> G
-    G -- VGS not found --> H
-    H --> K
-    G -- VGS exists --> I
-    F -- No --> J
-
-    K --> VGS_BIA
-    J -- snapshotMoveData is true --> L
-
-    VGS_BIA --> M
-    M --> N
-    N --> P
-    N --> Q
+%% Connect the flows
+B --> C
+G --> H
+M --> Q
+N --> Q
 
 ```
 
 
-Restore workflow (WIP):
+Restore workflow:
 
-- Update the Default Resource Restore priority for Velero restore
-    - Modify the default priority so that VGS, VGSClass are restored earlier than Pods and PVCs.
-
-- Add a new VGS RIA plugin
-    - This plugin will skip restore of the VGS resource.
-    - It will add the PVCs of the VGS as additional Items.
-    - The PVC identifiers will be obtained from the VGS annotation that we added during the backup workflow.
-
+No changes required for the restore workflow.
 
 ## Detailed Design
 
@@ -515,85 +493,6 @@ func (p *vgsBackupItemAction) Execute(
 }
 ```
 
-Restore workflow:
-
-- Update the [Default Resource Restore priority](https://github.com/vmware-tanzu/velero/blob/512199723ff95d5016b32e91e3bf06b65f57d608/pkg/cmd/server/config/config.go#L116) for Velero restore
-```go
-defaultRestorePriorities = types.Priorities{
-		HighPriorities: []string{
-			"customresourcedefinitions",
-			"namespaces",
-			"storageclasses",
-            // updated list from here
-            "volumegroupsnaoshotclass.snapshot.k8s.io",
-            "volumegroupsnapshots.snapshot.storage.k8s.io",
-			"volumesnapshotclass.snapshot.storage.k8s.io",
-			"volumesnapshotcontents.snapshot.storage.k8s.io",
-			"volumesnapshots.snapshot.storage.k8s.io",
-			"datauploads.velero.io",
-			"persistentvolumes",
-			"persistentvolumeclaims",
-```
-- Add a VGS RIA plugin
-```go
-
-// AppliesTo returns a selector that matches VolumeGroupSnapshot resources.
-func (p *vgsRestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
-	return velero.ResourceSelector{
-		IncludedResources: []string{"volumegroupsnapshots"},
-	}, nil
-}
-
-
-// Execute skips restoring the VGS resource and extracts the PVC identifiers from the "pvcList" annotation,
-// adding each PVC as an additional restore item.
-func (p *vgsRestoreItemAction) Execute(
-	input *velero.RestoreItemActionExecuteInput,
-) (*velero.RestoreItemActionExecuteOutput, error) {
-	p.log.Info("Starting VGS RestoreItemAction")
-
-	// Convert the backup VGS object to an unstructured type.
-	// We use input.ItemFromBackup as the backed-up version of the VGS.
-	var vgs unstructured.Unstructured
-	vgs.SetUnstructuredContent(input.ItemFromBackup.UnstructuredContent())
-
-	// Retrieve the pvcList annotation.
-	annotations := vgs.GetAnnotations()
-	pvcListStr, ok := annotations["pvcList"]
-	if !ok || pvcListStr == "" {
-		p.log.Infof("No pvcList annotation found on VGS %s", vgs.GetName())
-		return &velero.RestoreItemActionExecuteOutput{SkipRestore: true}, nil
-	}
-
-	// Parse the comma-separated list of PVC names.
-	pvcNames := strings.Split(pvcListStr, ",")
-	var additionalItems []velero.ResourceIdentifier
-	namespace := vgs.GetNamespace()
-	for _, pvcName := range pvcNames {
-		pvcName = strings.TrimSpace(pvcName)
-		if pvcName == "" {
-			continue
-		}
-		additionalItems = append(additionalItems, velero.ResourceIdentifier{
-			GroupResource: schema.GroupResource{
-				Group:    "", 
-				Resource: "persistentvolumeclaims",
-			},
-			Namespace: namespace,
-			Name:      pvcName,
-		})
-	}
-
-	p.log.Infof("Skipping restore of VGS %s and adding %d PVC(s) as additional restore items", vgs.GetName(), len(additionalItems))
-
-	// Return output indicating that the VGS resource itself should be skipped,
-	// and providing the list of PVCs to be restored as additional items
-	return &velero.RestoreItemActionExecuteOutput{
-		SkipRestore:     true,
-		AdditionalItems: additionalItems,
-	}, nil
-}
-```
 ## Implementation
 
 This design proposal is targeted for velero 1.16.
