@@ -460,6 +460,13 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 		}
 	}
 
+	podAnnotations := map[string]string{}
+	for _, k := range util.ThirdPartyAnnotations {
+		if v := veleroutil.GetVeleroServerAnnotationValue(deployment, k); v != "" {
+			podAnnotations[k] = v
+		}
+	}
+
 	// Set arguments
 	args := []string{"repo-maintenance"}
 	args = append(args, fmt.Sprintf("--repo-name=%s", repo.Spec.VolumeNamespace))
@@ -481,8 +488,9 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 			BackoffLimit: new(int32), // Never retry
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "velero-repo-maintenance-pod",
-					Labels: podLabels,
+					Name:        "velero-repo-maintenance-pod",
+					Labels:      podLabels,
+					Annotations: podAnnotations,
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
