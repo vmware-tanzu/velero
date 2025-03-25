@@ -94,9 +94,9 @@ func GetBackupRepository(ctx context.Context, cli client.Client, namespace strin
 func NewBackupRepository(namespace string, key BackupRepositoryKey) *velerov1api.BackupRepository {
 	return &velerov1api.BackupRepository{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:    namespace,
-			GenerateName: fmt.Sprintf("%s-%s-%s-", key.VolumeNamespace, key.BackupLocation, key.RepositoryType),
-			Labels:       repoLabelsFromKey(key),
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s-%s-%s", key.VolumeNamespace, key.BackupLocation, key.RepositoryType),
+			Labels:    repoLabelsFromKey(key),
 		},
 		Spec: velerov1api.BackupRepositorySpec{
 			VolumeNamespace:       key.VolumeNamespace,
