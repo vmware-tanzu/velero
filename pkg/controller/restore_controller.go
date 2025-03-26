@@ -44,7 +44,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
-	"github.com/vmware-tanzu/velero/internal/volume"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
@@ -59,6 +58,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 	pkgrestoreUtil "github.com/vmware-tanzu/velero/pkg/util/velero/restore"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 // nonRestorableResources is an exclusion list  for the restoration process. Any resources

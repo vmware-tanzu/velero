@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
