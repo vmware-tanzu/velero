@@ -96,3 +96,12 @@ func GetVeleroServerLabelValue(deployment *appsv1.Deployment, key string) string
 
 	return deployment.Spec.Template.Labels[key]
 }
+
+// GetVeleroServerAnnotationValue returns the value of specified annotation of Velero server deployment
+func GetVeleroServerAnnotationValue(deployment *appsv1.Deployment, key string) string {
+	if deployment.Spec.Template.Annotations == nil {
+		return ""
+	}
+
+	return deployment.Spec.Template.Annotations[key]
+}

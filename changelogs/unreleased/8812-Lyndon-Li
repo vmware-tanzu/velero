@@ -1,0 +1,1 @@
+Add third party annotation support for maintenance job, so that the declared third party annotations could be added to the maintenance job pods
