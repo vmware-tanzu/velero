@@ -499,6 +499,3 @@ This design proposal is targeted for velero 1.16.
 
 The implementation of this proposed design is targeted for velero 1.17.
 
-## Open Questions
-
-How to handle VGSC ? Do we need VGSC for non-datamover operations ?
