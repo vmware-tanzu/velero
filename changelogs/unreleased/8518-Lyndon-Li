@@ -1,1 +1,0 @@
-Make fs-backup work on linux nodes with the new Velero deployment and disable fs-backup if the source/target pod is running in non-linux node (#8424)

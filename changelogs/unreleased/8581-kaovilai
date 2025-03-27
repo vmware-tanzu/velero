@@ -1,1 +1,0 @@
-Configurable Kopia Maintenance Interval. backup-repository-configmap adds an option for configurable`fullMaintenanceInterval` where fastGC (12 hours), and eagerGC (6 hours) allowing for faster removal of deleted velero backups from kopia repo.
