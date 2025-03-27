@@ -15,6 +15,7 @@ params:
   latest: v1.15
   versions:
     - main
+    - v1.16
     - v1.15
     - v1.14
     - v1.13
