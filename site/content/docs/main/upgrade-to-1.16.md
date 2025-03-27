@@ -1,13 +1,13 @@
 ---
-title: "Upgrading to Velero 1.15"
+title: "Upgrading to Velero 1.16"
 layout: docs
 ---
 
 ## Prerequisites
 
-- Velero [v1.14.x][7] installed.
+- Velero [v1.15.x][8] installed.
 
-If you're not yet running at least Velero v1.14, see the following:
+If you're not yet running at least Velero v1.15, see the following:
 
 - [Upgrading to v1.8][1]
 - [Upgrading to v1.9][2]
@@ -16,13 +16,14 @@ If you're not yet running at least Velero v1.14, see the following:
 - [Upgrading to v1.12][5]
 - [Upgrading to v1.13][6]
 - [Upgrading to v1.14][7]
+- [Upgrading to v1.15][8]
 
 Before upgrading, check the [Velero compatibility matrix](https://github.com/vmware-tanzu/velero#velero-compatibility-matrix) to make sure your version of Kubernetes is supported by the new version of Velero.
 
 ## Instructions
 
-### Upgrade from v1.14
-1. Install the Velero v1.15 command-line interface (CLI) by following the [instructions here][0].
+### Upgrade from v1.15
+1. Install the Velero v1.16 command-line interface (CLI) by following the [instructions here][0].
 
     Verify that you've properly installed it by running:
 
@@ -34,7 +35,7 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 
     ```bash
     Client:
-        Version: v1.15.0
+        Version: v1.16.0
         Git commit: <git SHA>
     ```
 
@@ -49,13 +50,13 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
    # set the container and image of the init container for plugin accordingly,
    # if you are using other plugin
     kubectl set image deployment/velero \
-        velero=velero/velero:v1.15.0 \
-        velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.11.0 \
+        velero=velero/velero:v1.16.0 \
+        velero-plugin-for-aws=velero/velero-plugin-for-aws:v1.12.0 \
         --namespace velero
 
     # optional, if using the node agent daemonset
     kubectl set image daemonset/node-agent \
-        node-agent=velero/velero:v1.15.0 \
+        node-agent=velero/velero:v1.16.0 \
         --namespace velero
     ```
 4. Confirm that the deployment is up and running with the correct version by running:
@@ -68,11 +69,11 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 
     ```bash
     Client:
-        Version: v1.15.0
+        Version: v1.16.0
         Git commit: <git SHA>
 
     Server:
-        Version: v1.15.0
+        Version: v1.16.0
     ```
 
 [0]: basic-install.md#install-the-cli
@@ -83,3 +84,4 @@ Before upgrading, check the [Velero compatibility matrix](https://github.com/vmw
 [5]: https://velero.io/docs/v1.12/upgrade-to-1.12
 [6]: https://velero.io/docs/v1.13/upgrade-to-1.13
 [7]: https://velero.io/docs/v1.14/upgrade-to-1.14
+[8]: https://velero.io/docs/v1.15/upgrade-to-1.15
