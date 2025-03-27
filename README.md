@@ -42,6 +42,7 @@ The following is a list of the supported Kubernetes versions for each Velero ver
 
 | Velero version | Expected Kubernetes version compatibility | Tested on Kubernetes version        |
 |----------------|-------------------------------------------|-------------------------------------|
+| 1.16           | 1.18-latest                               | 1.31.4, 1.32.3, and 1.33.0          |
 | 1.15           | 1.18-latest                               | 1.28.8, 1.29.8, 1.30.4 and 1.31.1   |
 | 1.14           | 1.18-latest                               | 1.27.9, 1.28.9, and 1.29.4          |
 | 1.13           | 1.18-latest                               | 1.26.5, 1.27.3, 1.27.8, and 1.28.3  |
