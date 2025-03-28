@@ -749,13 +749,7 @@ func (ctx *restoreContext) processSelectedResource(
 			}
 			// For namespaces resources we restore metadata when existing resource policy is update, else continue
 			if groupResource == kuberesource.Namespaces {
-				if existingNamespaces.Has(targetNS) {
-					// Skip updating namespace metadata if the existing resource policy is not set to 'update'
-					if len(ctx.restore.Spec.ExistingResourcePolicy) == 0 || ctx.restore.Spec.ExistingResourcePolicy != velerov1api.PolicyTypeUpdate {
-						ctx.log.Infof("Skipping update for existing namespace %s because existing resource policy is not 'update'", targetNS)
-						continue
-					}
-
+				if existingNamespaces.Has(targetNS) && velerov1api.PolicyTypeUpdate == ctx.restore.Spec.ExistingResourcePolicy {
 					// Fetch the current namespace from the cluster
 					existingNS, err := ctx.namespaceClient.Get(go_context.TODO(), targetNS, metav1.GetOptions{})
 					if err != nil {
@@ -782,6 +776,9 @@ func (ctx *restoreContext) processSelectedResource(
 						continue
 					}
 
+					// Add restore labels to backup object to ensure accurate patch diff
+					backupNSUnstructuredObj := &unstructured.Unstructured{Object: backupNSUnstructured}
+					addRestoreLabels(backupNSUnstructuredObj, ctx.restore.Name, ctx.restore.Spec.BackupName)
 					// Construct the GroupResource for namespaces
 					namespaceGR := schema.GroupResource{Group: "", Resource: "namespaces"}
 
@@ -796,38 +793,10 @@ func (ctx *restoreContext) processSelectedResource(
 					warningsFromUpdateRP, errsFromUpdateRP := ctx.processUpdateResourcePolicy(
 						&unstructured.Unstructured{Object: existingNSUnstructured},
 						&unstructured.Unstructured{Object: existingNSUnstructured}, // Pass existingNS with restore labels for the second parameter
-						&unstructured.Unstructured{Object: backupNSUnstructured},
+						backupNSUnstructuredObj,
 						targetNS,
 						resourceClient,
 					)
-
-					// Fall back to manual label/annotation update if the patch fails
-					if !errsFromUpdateRP.IsEmpty() {
-						ctx.log.Warnf("Patch failed for namespace %s, falling back to manual label/annotation update", targetNS)
-
-						// Ensure existingNS.Labels and Annotations are not nil
-						if existingNS.Labels == nil {
-							existingNS.Labels = make(map[string]string)
-						}
-						if existingNS.Annotations == nil {
-							existingNS.Annotations = make(map[string]string)
-						}
-
-						// Merge labels and annotations
-						for k, v := range backupNS.Labels {
-							existingNS.Labels[k] = v
-						}
-						for k, v := range backupNS.Annotations {
-							existingNS.Annotations[k] = v
-						}
-
-						// Apply the updated namespace
-						_, err = ctx.namespaceClient.Update(go_context.TODO(), existingNS, metav1.UpdateOptions{})
-						if err != nil {
-							errs.AddVeleroError(errors.Wrap(err, "updating namespace manually"))
-						}
-					}
-
 					warnings.Merge(&warningsFromUpdateRP)
 					errs.Merge(&errsFromUpdateRP)
 				}
@@ -2340,7 +2309,8 @@ func (ctx *restoreContext) getOrderedResourceCollection(
 			}
 
 			if groupResource.Resource == "namespaces" {
-				ctx.log.Infof("Including resource namespaces despite being cluster-scoped")
+				// Allow restoring namespaces even when cluster-scoped resources are excluded.
+				// No-op: intentionally do not `continue` here.
 			} else if namespace == "" && !boolptr.IsSetToTrue(ctx.restore.Spec.IncludeClusterResources) && !ctx.namespaceIncludesExcludes.IncludeEverything() {
 				ctx.log.Infof("Skipping resource %s because it's cluster-scoped and only specific namespaces are included in the restore", resource)
 				continue
