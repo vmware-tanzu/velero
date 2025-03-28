@@ -109,8 +109,8 @@ var ImagesMatrix = map[string]map[string][]string{
 		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
 		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.11.0"},
 		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.11.0"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.15.0"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.15.0"},
+		"velero":                {"gcr.io/velero-gcp/velero:v1.15.2"},
+		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.15.2"},
 	},
 	"v1.16": {
 		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.12.0"},
