@@ -140,17 +140,18 @@ flowchart TD
     - PVC has VGS label and VGS does not exist:
       - We can check if VGS exists by listing the VGS in the namespace using the backup UUID 
         along with the label used for the VGS (we will be creating VGS with backup UUID and user specified VGS  group label) and see if the PVC is part of any of the existing VGS for the particular backup operation we are currently in.
-      - If not then create the VGS object with the required labels (in this case backup UUID and the user specified VGS group label) and also add the PVC names (that are included in the VGS) as 
-        annotations.
-      - Once VGS is created, wait for VGS object to be `readyToUse`, it implies that all the related VS/VSC objects are ready to use too.
-      - Add the VGS object as an additional item.
+      - If not then create the VGS object with the required labels (in this case backup UUID and the user specified VGS group label).
+      - Once VGS is created, we just wait for the related VS/VSC objects to exist and not wait for them to be `readyToUse`.
+      - Add the VGS object to the list of itemToUpdate, so that its BIA plugin runs in finalize backup phase. (we will run all the cleanup tasks in this plugin)
       - For non-datamover case:
         - Here, we need to skip the creation of VS as the VS object get created via creation of VGS object.
+        - We will skip the cleanup of VS here in VS BIA plugin as VGS related VS/VSC will get cleaned up in VGS BIA plugin.
         - We just need to add the VS objects that got created via VGS object as additional items and the rest of the workflow remains the same for non-datamover cases.
       - For datamover case:
         - We need to skip creation of VS but need to create DataUploads for the VS instance that got created due to VGS creation.
         - Fetch the correct VS instances that got created via VGS and is related to the current PVC.
         - Finally create DataUpload object for this VS/PVC pair.
+        - We will skip the cleanup of VS here as VGS related VS/VSC will get cleaned up in VGS BIA plugin.
         - Add the DataUpload as an additional item.
     - PVC has VGS label and VGS already exists:
       - In this case we do not want to re-create VGS object.
@@ -158,76 +159,87 @@ flowchart TD
     - PVC does not possess VGS label:
       - Create VS and follow the existing legacy workflow.
 
+#### Modify the CleanupVolumeSnapshot function to skip deletion of VGS related VS
+- We use a common cleanupVolumeSnapshot function to cleanup VS objects in both datamover and non-datamover cases
+- We are delegating the VGS related cleanup tasks to VGS BIA plugin which will run during the backup finalize phase when all the async actions are complete
+- We need to modify this function skip deletion of VS objects that were created via VGS objects.
+
 #### Add a new VolumeGroupSnapshot(VGS) BIA plugin
-  - Cleanup the VGS object, here we need to be careful, we want to delete VGS and VGSC objects but keep the VS and VSC objects for further processing of our backup.
-  - We will first check the `deletionPolicy` of VGSC,
-    - if its `Retain` then we can go ahead with the deletion of VGS and VGSC objects.
-    - But if its `Delete` then we need to first patch the VGSC `deletionPolicy` to `Retain` and then delete the VGS and VGSC objects.
+  - This plugin will run in backup finalize phase.
+  - We will process cleanup of all the VGS related artifacts like VGS, VGSC, VS and VSC that got created durring the backup process.
 
 ```mermaid
 flowchart TD
-%% User Input
+%% User Input Section
     subgraph "User Input"
-        A[User sets VGS label key<br/>default, server arg, or Backup spec]
-        B[User labels PVCs before backup]
-        A --> B
+        U1[User sets VGS label key using default, server arg or Backup API spec]
+        U2[User labels PVCs before backup]
+        U1 --> U2
     end
 
-%% PVC ItemBlockAction Plugin
+%% PVC ItemBlockAction Plugin Section
     subgraph "PVC IBA Plugin"
-        C[Check: PVC is bound & VolumeName non-empty]
-        D[Add related PV and pods]
-        E[Check if PVC has VGS label]
-        F[List all PVCs with same label in namespace]
-        G[Add PVCs to relatedItems]
-        C --> D
-        D --> E
-        E -- Yes --> F
-        F --> G
+        I1[Check PVC is bound and has VolumeName]
+        I2[Add related PV to relatedItems]
+        I3[Add pods mounting PVC to relatedItems]
+        I4[Check if PVC has user-specified VGS label]
+        I5[List PVCs in namespace matching label criteria]
+        I6[Add matching PVCs to relatedItems]
+        I1 --> I2
+        I2 --> I3
+        I3 --> I4
+        I4 -- Yes --> I5
+        I5 --> I6
     end
 
-%% CSI PVC Plugin
+%% CSI PVC Plugin Section
 subgraph "CSI PVC Plugin"
-H[For each PVC, check for VGS label]
-I[If VGS label exists:]
-J[Lookup VGS using backup UID and label]
-K[Create VGS object]
-L[Wait until VGS is readyToUse, add VGS as an additional item]
-M[Non-datamover: Skip individual VS creation; add VS  objects from VGS as additional items]
-N[Datamover: Create DataUpload for VS PVC pair; add DU as an additional item]
-O[If VGS already exists, skip creation]
-P[If no VGS label, follow legacy workflow: create VS]
-H --> I
-I -- Yes --> J
-J -- Not found --> K
-K --> L
-L --> M
-L --> N
-I -- Yes and found --> O
-I -- No --> P
+C1[For each PVC, check for VGS label]
+C2[If VGS label exists then lookup VGS using backup UID and label]
+C3[If VGS not found then create new VGS with backup UID and group label]
+C4[Wait for related VS and VGSC objects to exist]
+C5[Add VGS object to itemToUpdate]
+C6[Non-datamover case: Skip individual VS creation; add VS from VGS as additional item]
+C7[Datamover case: Create DataUpload for VS-PVC pair; add DU as additional item]
+C8[If VGS already exists then do not re-create VGS]
+C9[If no VGS label then follow legacy workflow to create VS]
+C1 --> C2
+C2 -- Not Found --> C3
+C3 --> C4
+C4 --> C5
+C5 --> C6
+C2 -- Found --> C8
+C1 -- No VGS label --> C9
 end
 
-%% VGS BackupItemAction Plugin
+%% Cleanup Modification Section
+subgraph "Cleanup Modification"
+CL1[Modify cleanupVolumeSnapshot to skip deletion of VS created via VGS]
+CL2[Delegate VGS related cleanup to VGS BIA Plugin in finalize phase]
+CL1 --> CL2
+end
+
+%% VGS BackupItemAction Plugin Section
 subgraph "VGS BIA Plugin"
-Q[Check VGSC deletionPolicy]
-R[If Retain, delete VGS and VGSC objects]
-S[If Delete, patch VGSC to Retain then delete VGS and VGSC]
-Q --> R
-Q --> S
+V1[Run in backup finalize phase]
+V2[Process cleanup of VGS, VGSC, VS and VSC artifacts]
+V1 --> V2
 end
 
-%% Connect the flows
-B --> C
-G --> H
-M --> Q
-N --> Q
+%% Connect Major Sections
+U2 --> I1
+I6 --> C1
+C6 --> CL1
+C7 --> CL1
+CL2 --> V1
 
 ```
 
 
 Restore workflow:
 
-No changes required for the restore workflow.
+#### Add a new VolumeGroupSnapshot(VGS) RIA plugin
+- This plugin will just skip the restore VGS object
 
 ## Detailed Design
 
