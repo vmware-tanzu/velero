@@ -166,7 +166,7 @@ flowchart TD
 
 #### Add a new VolumeGroupSnapshot(VGS) BIA plugin
   - This plugin will run in backup finalize phase.
-  - We will process cleanup of all the VGS related artifacts like VGS, VGSC, VS and VSC that got created durring the backup process.
+  - We will process cleanup of all the VGS related artifacts like VGS, VGSC, VS and VSC that got created during the backup process.
 
 ```mermaid
 flowchart TD
