@@ -1,1 +1,0 @@
-Fix issue #8044, allow users to ignore delay binding the restorePVC of data mover when it is in WaitForFirstConsumer mode

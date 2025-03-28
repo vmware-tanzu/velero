@@ -1,1 +1,0 @@
-Upgrade go.mod k8s.io/ go.mod to v0.31.3 and implemented proper logger configuration for both client-go and controller-runtime libraries. This change ensures that logging format and level settings are properly applied throughout the codebase. The update improves logging consistency and control across the Velero system.
