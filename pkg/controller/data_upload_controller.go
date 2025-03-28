@@ -25,7 +25,7 @@ import (
 	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -74,7 +74,7 @@ type DataUploadReconciler struct {
 	dataPathMgr         *datapath.Manager
 	loadAffinity        *kube.LoadAffinity
 	backupPVCConfig     map[string]nodeagent.BackupPVC
-	podResources        corev1.ResourceRequirements
+	podResources        corev1api.ResourceRequirements
 	preparingTimeout    time.Duration
 	metrics             *metrics.ServerMetrics
 }
@@ -87,7 +87,7 @@ func NewDataUploadReconciler(
 	dataPathMgr *datapath.Manager,
 	loadAffinity *kube.LoadAffinity,
 	backupPVCConfig map[string]nodeagent.BackupPVC,
-	podResources corev1.ResourceRequirements,
+	podResources corev1api.ResourceRequirements,
 	clock clocks.WithTickerAndDelayedExecution,
 	nodeName string,
 	preparingTimeout time.Duration,
@@ -569,10 +569,10 @@ func (r *DataUploadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov2alpha1api.DataUpload{}).
 		WatchesRawSource(s).
-		Watches(&corev1.Pod{}, kube.EnqueueRequestsFromMapUpdateFunc(r.findDataUploadForPod),
+		Watches(&corev1api.Pod{}, kube.EnqueueRequestsFromMapUpdateFunc(r.findDataUploadForPod),
 			builder.WithPredicates(predicate.Funcs{
 				UpdateFunc: func(ue event.UpdateEvent) bool {
-					newObj := ue.ObjectNew.(*corev1.Pod)
+					newObj := ue.ObjectNew.(*corev1api.Pod)
 
 					if _, ok := newObj.Labels[velerov1api.DataUploadLabel]; !ok {
 						return false
@@ -598,7 +598,7 @@ func (r *DataUploadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *DataUploadReconciler) findDataUploadForPod(ctx context.Context, podObj client.Object) []reconcile.Request {
-	pod := podObj.(*corev1.Pod)
+	pod := podObj.(*corev1api.Pod)
 	du, err := findDataUploadByPod(r.client, *pod)
 	log := r.logger.WithFields(logrus.Fields{
 		"Backup pod": pod.Name,
@@ -619,7 +619,7 @@ func (r *DataUploadReconciler) findDataUploadForPod(ctx context.Context, podObj 
 		return []reconcile.Request{}
 	}
 
-	if pod.Status.Phase == corev1.PodRunning {
+	if pod.Status.Phase == corev1api.PodRunning {
 		log.Info("Preparing dataupload")
 		// we don't expect anyone else update the CR during the Prepare process
 		updated, err := r.exclusiveUpdateDataUpload(context.Background(), du, r.prepareDataUpload)
@@ -800,7 +800,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 	log := r.logger.WithField("dataupload", du.Name)
 
 	if du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
-		pvc := &corev1.PersistentVolumeClaim{}
+		pvc := &corev1api.PersistentVolumeClaim{}
 		err := r.client.Get(context.Background(), types.NamespacedName{
 			Namespace: du.Spec.SourceNamespace,
 			Name:      du.Spec.SourcePVC,
@@ -820,7 +820,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 		}
 
 		accessMode := exposer.AccessModeFileSystem
-		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == corev1.PersistentVolumeBlock {
+		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == corev1api.PersistentVolumeBlock {
 			accessMode = exposer.AccessModeBlock
 		}
 
@@ -855,7 +855,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			AccessMode:            accessMode,
 			OperationTimeout:      du.Spec.OperationTimeout.Duration,
 			ExposeTimeout:         r.preparingTimeout,
-			VolumeSize:            pvc.Spec.Resources.Requests[corev1.ResourceStorage],
+			VolumeSize:            pvc.Spec.Resources.Requests[corev1api.ResourceStorage],
 			Affinity:              r.loadAffinity,
 			BackupPVCConfig:       r.backupPVCConfig,
 			Resources:             r.podResources,
@@ -876,8 +876,8 @@ func (r *DataUploadReconciler) setupWaitExposePara(du *velerov2alpha1api.DataUpl
 	return nil
 }
 
-func getOwnerObject(du *velerov2alpha1api.DataUpload) corev1.ObjectReference {
-	return corev1.ObjectReference{
+func getOwnerObject(du *velerov2alpha1api.DataUpload) corev1api.ObjectReference {
+	return corev1api.ObjectReference{
 		Kind:       du.Kind,
 		Namespace:  du.Namespace,
 		Name:       du.Name,
@@ -886,7 +886,7 @@ func getOwnerObject(du *velerov2alpha1api.DataUpload) corev1.ObjectReference {
 	}
 }
 
-func findDataUploadByPod(client client.Client, pod corev1.Pod) (*velerov2alpha1api.DataUpload, error) {
+func findDataUploadByPod(client client.Client, pod corev1api.Pod) (*velerov2alpha1api.DataUpload, error) {
 	if label, exist := pod.Labels[velerov1api.DataUploadLabel]; exist {
 		du := &velerov2alpha1api.DataUpload{}
 		err := client.Get(context.Background(), types.NamespacedName{

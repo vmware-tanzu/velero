@@ -21,7 +21,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,7 +31,7 @@ import (
 )
 
 func TestGetResourceModifiersFromConfig(t *testing.T) {
-	cm1 := &v1.ConfigMap{
+	cm1 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -64,7 +64,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			},
 		},
 	}
-	cm2 := &v1.ConfigMap{
+	cm2 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -99,7 +99,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
-	cm3 := &v1.ConfigMap{
+	cm3 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -109,7 +109,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
-	cm4 := &v1.ConfigMap{
+	cm4 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -135,7 +135,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
-	cm5 := &v1.ConfigMap{
+	cm5 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -170,7 +170,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
-	cm6 := &v1.ConfigMap{
+	cm6 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -199,7 +199,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
-	cm7 := &v1.ConfigMap{
+	cm7 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -228,7 +228,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 		},
 	}
 
-	cm8 := &v1.ConfigMap{
+	cm8 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -256,7 +256,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			},
 		},
 	}
-	cm9 := &v1.ConfigMap{
+	cm9 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -285,7 +285,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 			},
 		},
 	}
-	cm10 := &v1.ConfigMap{
+	cm10 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
@@ -316,7 +316,7 @@ func TestGetResourceModifiersFromConfig(t *testing.T) {
 	}
 
 	type args struct {
-		cm *v1.ConfigMap
+		cm *corev1api.ConfigMap
 	}
 	tests := []struct {
 		name    string

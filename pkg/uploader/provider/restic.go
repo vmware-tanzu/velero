@@ -24,7 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -57,7 +57,7 @@ func NewResticUploaderProvider(
 	repoIdentifier string,
 	bsl *velerov1api.BackupStorageLocation,
 	credGetter *credentials.CredentialGetter,
-	repoKeySelector *v1.SecretKeySelector,
+	repoKeySelector *corev1api.SecretKeySelector,
 	log logrus.FieldLogger,
 ) (Provider, error) {
 	provider := resticProvider{

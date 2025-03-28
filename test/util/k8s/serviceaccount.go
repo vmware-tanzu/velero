@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -60,7 +60,7 @@ func PatchServiceAccountWithImagePullSecret(ctx context.Context, client TestClie
 	}
 	secretName := "image-pull-secret"
 	secret := builder.ForSecret(namespace, secretName).Data(map[string][]byte{".dockerconfigjson": credential}).Result()
-	secret.Type = corev1.SecretTypeDockerConfigJson
+	secret.Type = corev1api.SecretTypeDockerConfigJson
 	if _, err = client.ClientGo.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
 		return errors.Wrapf(err, "failed to create secret %q under namespace %q", secretName, namespace)
 	}
@@ -73,7 +73,7 @@ func PatchServiceAccountWithImagePullSecret(ctx context.Context, client TestClie
 }
 
 func CreateServiceAccount(ctx context.Context, client TestClient, namespace string, serviceaccount string) error {
-	sa := &corev1.ServiceAccount{
+	sa := &corev1api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: serviceaccount,
 		},
@@ -88,6 +88,6 @@ func CreateServiceAccount(ctx context.Context, client TestClient, namespace stri
 	return nil
 }
 
-func GetServiceAccount(ctx context.Context, client TestClient, namespace string, serviceAccount string) (*corev1.ServiceAccount, error) {
+func GetServiceAccount(ctx context.Context, client TestClient, namespace string, serviceAccount string) (*corev1api.ServiceAccount, error) {
 	return client.ClientGo.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), serviceAccount, metav1.GetOptions{})
 }

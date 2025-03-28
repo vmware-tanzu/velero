@@ -25,7 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -64,12 +64,12 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 			if err != nil {
 				//Should ignore "etcdserver: request timed out" kind of errors, try to get pod status again before timeout.
-				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...\n", namespace, podName, corev1.PodRunning)))
+				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...\n", namespace, podName, corev1api.PodRunning)))
 				return false, nil
 			}
 			// If any pod is still waiting we don't need to check any more so return and wait for next poll interval
-			if checkPod.Status.Phase != corev1.PodRunning {
-				fmt.Printf("Pod %s is in state %s waiting for it to be %s\n", podName, checkPod.Status.Phase, corev1.PodRunning)
+			if checkPod.Status.Phase != corev1api.PodRunning {
+				fmt.Printf("Pod %s is in state %s waiting for it to be %s\n", podName, checkPod.Status.Phase, corev1api.PodRunning)
 				return false, nil
 			}
 		}
@@ -284,12 +284,12 @@ func GetPVByPVCName(client TestClient, namespace, pvcName string) (string, error
 	return pv_value.Name, nil
 }
 
-func PrepareVolumeList(volumeNameList []string) (vols []*corev1.Volume) {
+func PrepareVolumeList(volumeNameList []string) (vols []*corev1api.Volume) {
 	for i, volume := range volumeNameList {
-		vols = append(vols, &corev1.Volume{
+		vols = append(vols, &corev1api.Volume{
 			Name: volume,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+			VolumeSource: corev1api.VolumeSource{
+				PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 					ClaimName: fmt.Sprintf("pvc-%d", i),
 					ReadOnly:  false,
 				},
@@ -415,13 +415,13 @@ func GetAllService(ctx context.Context) (string, error) {
 	return stdout, nil
 }
 
-func CreateVolumes(pvcName string, volumeNameList []string) (vols []*corev1.Volume) {
-	vols = []*corev1.Volume{}
+func CreateVolumes(pvcName string, volumeNameList []string) (vols []*corev1api.Volume) {
+	vols = []*corev1api.Volume{}
 	for _, volume := range volumeNameList {
-		vols = append(vols, &corev1.Volume{
+		vols = append(vols, &corev1api.Volume{
 			Name: volume,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+			VolumeSource: corev1api.VolumeSource{
+				PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 					ClaimName: pvcName,
 					ReadOnly:  false,
 				},

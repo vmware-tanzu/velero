@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubefake "k8s.io/client-go/kubernetes/fake"
@@ -247,7 +247,7 @@ func Test_newServer(t *testing.T) {
 }
 
 func Test_namespaceExists(t *testing.T) {
-	client := kubefake.NewSimpleClientset(&corev1.Namespace{
+	client := kubefake.NewSimpleClientset(&corev1api.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "velero",
 		},
