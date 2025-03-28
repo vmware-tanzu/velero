@@ -25,7 +25,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

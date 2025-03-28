@@ -34,12 +34,12 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 func TestGetVolumesRepositoryType(t *testing.T) {
