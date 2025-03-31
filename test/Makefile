@@ -116,6 +116,8 @@ FEATURES ?=
 DEBUG_VELERO_POD_RESTART ?= false
 VELERO_SERVER_DEBUG_MODE ?= false
 
+ITEM_BLOCK_WORKER_COUNT ?= 1
+
 # Parameters to run migration tests along with all other E2E tests, and both of them should
 #   be provided or left them all empty to skip migration tests with no influence to other
 #   E2E tests.
@@ -167,7 +169,8 @@ COMMON_ARGS := --velerocli=$(VELERO_CLI) \
 	--uploader-type=$(UPLOADER_TYPE) \
 	--debug-velero-pod-restart=$(DEBUG_VELERO_POD_RESTART) \
 	--fail-fast=$(FAIL_FAST) \
-	--has-vsphere-plugin=$(HAS_VSPHERE_PLUGIN)
+	--has-vsphere-plugin=$(HAS_VSPHERE_PLUGIN) \
+	--item-block-worker-count=$(ITEM_BLOCK_WORKER_COUNT)
 
 # Make sure ginkgo is in $GOBIN
 .PHONY:ginkgo
