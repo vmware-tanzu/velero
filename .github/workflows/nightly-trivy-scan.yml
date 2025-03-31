@@ -13,7 +13,7 @@ jobs:
         # maintain the versions of Velero those need security scan
         versions: [main]
         # list of images that need scan
-        images: [velero, velero-restore-helper]
+        images: [velero, velero-plugin-for-aws, velero-plugin-for-gcp, velero-plugin-for-microsoft-azure]
     permissions:
       security-events: write  # for github/codeql-action/upload-sarif to upload SARIF results
 
