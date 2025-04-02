@@ -26,7 +26,8 @@ import (
 type RestoreSpec struct {
 	// BackupName is the unique name of the Velero backup to restore
 	// from.
-	BackupName string `json:"backupName"`
+	// +optional
+	BackupName string `json:"backupName,omitempty"`
 
 	// ScheduleName is the unique name of the Velero schedule to restore
 	// from. If specified, and BackupName is empty, Velero will restore
@@ -136,6 +137,9 @@ type UploaderConfigForRestore struct {
 	// +optional
 	// +nullable
 	WriteSparseFiles *bool `json:"writeSparseFiles,omitempty"`
+	// ParallelFilesDownload is the concurrency number setting for restore.
+	// +optional
+	ParallelFilesDownload int `json:"parallelFilesDownload,omitempty"`
 }
 
 // RestoreHooks contains custom behaviors that should be executed during or post restore.

@@ -29,22 +29,22 @@ func TestGetAzureResticEnvVars(t *testing.T) {
 
 	// no storage account specified
 	_, err := GetAzureResticEnvVars(config)
-	require.NotNil(t, err)
+	require.Error(t, err)
 
 	// specify storage account access key
 	name := filepath.Join(os.TempDir(), "credential")
 	file, err := os.Create(name)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer file.Close()
 	defer os.Remove(name)
 	_, err = file.WriteString("AccessKey: accesskey")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	config[azure.BSLConfigStorageAccount] = "account01"
 	config[azure.BSLConfigStorageAccountAccessKeyName] = "AccessKey"
 	config["credentialsFile"] = name
 	envs, err := GetAzureResticEnvVars(config)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, "account01", envs["AZURE_ACCOUNT_NAME"])
 	assert.Equal(t, "accesskey", envs["AZURE_ACCOUNT_KEY"])

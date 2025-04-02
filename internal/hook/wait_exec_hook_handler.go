@@ -39,7 +39,8 @@ type WaitExecHookHandler interface {
 		log logrus.FieldLogger,
 		pod *v1.Pod,
 		byContainer map[string][]PodExecRestoreHook,
-		hookTrack *HookTracker,
+		multiHookTracker *MultiHookTracker,
+		restoreName string,
 	) []error
 }
 
@@ -74,7 +75,8 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	log logrus.FieldLogger,
 	pod *v1.Pod,
 	byContainer map[string][]PodExecRestoreHook,
-	hookTracker *HookTracker,
+	multiHookTracker *MultiHookTracker,
+	restoreName string,
 ) []error {
 	if pod == nil {
 		return nil
@@ -114,7 +116,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 	// not yet been observed to be running. It relies on the Informer not to be called concurrently.
 	// When a container is observed running and its hooks are executed, the container is deleted
 	// from the byContainer map. When the map is empty the watch is ended.
-	handler := func(newObj interface{}) {
+	handler := func(newObj any) {
 		newPod, ok := newObj.(*v1.Pod)
 		if !ok {
 			return
@@ -167,7 +169,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					hookLog.Error(err)
 					errors = append(errors, err)
 
-					errTracker := hookTracker.Record(newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true)
+					errTracker := multiHookTracker.Record(restoreName, newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, HookPhase(""), true, err)
 					if errTracker != nil {
 						hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 					}
@@ -193,7 +195,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 					hookFailed = true
 				}
 
-				errTracker := hookTracker.Record(newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), hookFailed)
+				errTracker := multiHookTracker.Record(restoreName, newPod.Namespace, newPod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, HookPhase(""), hookFailed, hookErr)
 				if errTracker != nil {
 					hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 				}
@@ -212,18 +214,23 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 
 	selector := fields.OneTermEqualSelector("metadata.name", pod.Name)
 	lw := e.ListWatchFactory.NewListWatch(pod.Namespace, selector)
-
-	_, podWatcher := cache.NewInformer(lw, pod, 0, cache.ResourceEventHandlerFuncs{
-		AddFunc: handler,
-		UpdateFunc: func(_, newObj interface{}) {
-			handler(newObj)
+	_, podWatcher := cache.NewInformerWithOptions(cache.InformerOptions{
+		ListerWatcher: lw,
+		ObjectType:    pod,
+		ResyncPeriod:  0,
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: handler,
+			UpdateFunc: func(_, newObj any) {
+				handler(newObj)
+			},
+			DeleteFunc: func(obj any) {
+				err := fmt.Errorf("pod %s deleted before all hooks were executed", kube.NamespaceAndName(pod))
+				log.Error(err)
+				cancel()
+			},
 		},
-		DeleteFunc: func(obj interface{}) {
-			err := fmt.Errorf("pod %s deleted before all hooks were executed", kube.NamespaceAndName(pod))
-			log.Error(err)
-			cancel()
-		},
-	})
+	},
+	)
 
 	podWatcher.Run(ctx.Done())
 
@@ -245,7 +252,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 				},
 			)
 
-			errTracker := hookTracker.Record(pod.Namespace, pod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, hookPhase(""), true)
+			errTracker := multiHookTracker.Record(restoreName, pod.Namespace, pod.Name, hook.Hook.Container, hook.HookSource, hook.HookName, HookPhase(""), true, err)
 			if errTracker != nil {
 				hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 			}

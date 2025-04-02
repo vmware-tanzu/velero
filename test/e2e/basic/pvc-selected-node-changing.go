@@ -3,9 +3,8 @@ package basic
 import (
 	"context"
 	"fmt"
-	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -64,18 +63,9 @@ func (p *PVCSelectedNodeChanging) Init() error {
 }
 
 func (p *PVCSelectedNodeChanging) CreateResources() error {
-	p.Ctx, p.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
 		Expect(CreateNamespace(p.Ctx, p.Client, p.namespace)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", p.namespace))
-	})
-
-	By(fmt.Sprintf("Create a storage class %s.", StorageClassName), func() {
-		Expect(InstallStorageClass(context.Background(), fmt.Sprintf("../testdata/storage-class/%s.yaml", p.VeleroCfg.CloudProvider))).To(Succeed())
-	})
-
-	By(fmt.Sprintf("Create a storage class %s.", StorageClassName), func() {
-		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", p.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
 	})
 
 	By(fmt.Sprintf("Create pod %s in namespace %s", p.podName, p.namespace), func() {
@@ -96,7 +86,7 @@ func (p *PVCSelectedNodeChanging) CreateResources() error {
 	By("Prepare ConfigMap data", func() {
 		nodeNameList, err := GetWorkerNodes(p.Ctx)
 		Expect(err).To(Succeed())
-		Expect(len(nodeNameList) >= 2).To(Equal(true))
+		Expect(len(nodeNameList)).To(BeNumerically(">=", 2))
 		for _, nodeName := range nodeNameList {
 			if nodeName != p.oldNodeName {
 				p.newNodeName = nodeName
@@ -142,7 +132,7 @@ func (p *PVCSelectedNodeChanging) Verify() error {
 	By(fmt.Sprintf("PVC selected node should be %s", p.newNodeName), func() {
 		pvcNameList, err := GetPvcByPVCName(p.Ctx, p.mappedNS, p.pvcName)
 		Expect(err).To(Succeed())
-		Expect(len(pvcNameList)).Should(Equal(1))
+		Expect(pvcNameList).Should(HaveLen(1))
 		pvc, err := GetPVC(p.Ctx, p.Client, p.mappedNS, pvcNameList[0])
 		Expect(err).To(Succeed())
 		Expect(pvc.Annotations[p.ann]).To(Equal(p.newNodeName))
@@ -151,11 +141,14 @@ func (p *PVCSelectedNodeChanging) Verify() error {
 }
 
 func (p *PVCSelectedNodeChanging) Clean() error {
-	if !p.VeleroCfg.Debug {
+	if CurrentSpecReport().Failed() && p.VeleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
 		p.TestCase.Clean()
 		By(fmt.Sprintf("Clean namespace with prefix %s after test", p.mappedNS), func() {
 			CleanupNamespaces(p.Ctx, p.Client, p.mappedNS)
 		})
 	}
+
 	return nil
 }

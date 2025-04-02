@@ -47,12 +47,12 @@ func Describe(fn func(d *Describer)) string {
 	return d.buf.String()
 }
 
-func (d *Describer) Printf(msg string, args ...interface{}) {
+func (d *Describer) Printf(msg string, args ...any) {
 	fmt.Fprint(d.out, d.Prefix)
 	fmt.Fprintf(d.out, msg, args...)
 }
 
-func (d *Describer) Println(args ...interface{}) {
+func (d *Describer) Println(args ...any) {
 	fmt.Fprint(d.out, d.Prefix)
 	fmt.Fprintln(d.out, args...)
 }
@@ -122,14 +122,14 @@ func BoolPointerString(b *bool, falseString, trueString, nilString string) strin
 }
 
 type StructuredDescriber struct {
-	output map[string]interface{}
+	output map[string]any
 	format string
 }
 
 // NewStructuredDescriber creates a StructuredDescriber.
 func NewStructuredDescriber(format string) *StructuredDescriber {
 	return &StructuredDescriber{
-		output: make(map[string]interface{}),
+		output: make(map[string]any),
 		format: format,
 	}
 }
@@ -144,13 +144,13 @@ func DescribeInSF(fn func(d *StructuredDescriber), format string) string {
 }
 
 // Describe adds all types of argument to d.output.
-func (d *StructuredDescriber) Describe(name string, arg interface{}) {
+func (d *StructuredDescriber) Describe(name string, arg any) {
 	d.output[name] = arg
 }
 
 // DescribeMetadata describes standard object metadata.
 func (d *StructuredDescriber) DescribeMetadata(metadata metav1.ObjectMeta) {
-	metadataInfo := make(map[string]interface{})
+	metadataInfo := make(map[string]any)
 	metadataInfo["name"] = metadata.Name
 	metadataInfo["namespace"] = metadata.Namespace
 	metadataInfo["labels"] = metadata.Labels

@@ -19,7 +19,7 @@ package v1
 import (
 	"testing"
 
-	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +34,7 @@ import (
 func TestRestartableGetVolumeSnapshotter(t *testing.T) {
 	tests := []struct {
 		name          string
-		plugin        interface{}
+		plugin        any
 		getError      error
 		expectedError string
 	}{
@@ -186,13 +186,13 @@ func TestRestartableVolumeSnapshotterInit(t *testing.T) {
 
 func TestRestartableVolumeSnapshotterDelegatedFunctions(t *testing.T) {
 	pv := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"color": "blue",
 		},
 	}
 
 	pvToReturn := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"color": "green",
 		},
 	}
@@ -200,7 +200,7 @@ func TestRestartableVolumeSnapshotterDelegatedFunctions(t *testing.T) {
 	restartabletest.RunRestartableDelegateTests(
 		t,
 		common.PluginKindVolumeSnapshotter,
-		func(key process.KindAndName, p process.RestartableProcess) interface{} {
+		func(key process.KindAndName, p process.RestartableProcess) any {
 			return &RestartableVolumeSnapshotter{
 				Key:                 key,
 				SharedPluginProcess: p,
@@ -211,39 +211,39 @@ func TestRestartableVolumeSnapshotterDelegatedFunctions(t *testing.T) {
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "CreateVolumeFromSnapshot",
-			Inputs:                  []interface{}{"snapshotID", "volumeID", "volumeAZ", to.Int64Ptr(10000)},
-			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{"volumeID", errors.Errorf("delegate error")},
+			Inputs:                  []any{"snapshotID", "volumeID", "volumeAZ", to.Ptr(int64(10000))},
+			ExpectedErrorOutputs:    []any{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{"volumeID", errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "GetVolumeID",
-			Inputs:                  []interface{}{pv},
-			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{"volumeID", errors.Errorf("delegate error")},
+			Inputs:                  []any{pv},
+			ExpectedErrorOutputs:    []any{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{"volumeID", errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "SetVolumeID",
-			Inputs:                  []interface{}{pv, "volumeID"},
-			ExpectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{pvToReturn, errors.Errorf("delegate error")},
+			Inputs:                  []any{pv, "volumeID"},
+			ExpectedErrorOutputs:    []any{nil, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{pvToReturn, errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "GetVolumeInfo",
-			Inputs:                  []interface{}{"volumeID", "volumeAZ"},
-			ExpectedErrorOutputs:    []interface{}{"", (*int64)(nil), errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{"volumeType", to.Int64Ptr(10000), errors.Errorf("delegate error")},
+			Inputs:                  []any{"volumeID", "volumeAZ"},
+			ExpectedErrorOutputs:    []any{"", (*int64)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{"volumeType", to.Ptr(int64(10000)), errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "CreateSnapshot",
-			Inputs:                  []interface{}{"volumeID", "volumeAZ", map[string]string{"a": "b"}},
-			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{"snapshotID", errors.Errorf("delegate error")},
+			Inputs:                  []any{"volumeID", "volumeAZ", map[string]string{"a": "b"}},
+			ExpectedErrorOutputs:    []any{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{"snapshotID", errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "DeleteSnapshot",
-			Inputs:                  []interface{}{"snapshotID"},
-			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+			Inputs:                  []any{"snapshotID"},
+			ExpectedErrorOutputs:    []any{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{errors.Errorf("delegate error")},
 		},
 	)
 }

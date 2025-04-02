@@ -14,15 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package filtering
+package resourcepolicies
 
 import (
-	"context"
 	"fmt"
 	"strings"
-	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
@@ -31,7 +29,6 @@ import (
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
-	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 const FileName = "test-data.txt"
@@ -103,13 +100,6 @@ func (r *ResourcePoliciesCase) Init() error {
 }
 
 func (r *ResourcePoliciesCase) CreateResources() error {
-	// It's better to set a global timeout in CreateResources function which is the real beginning of one e2e test
-	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
-
-	By(("Installing storage class..."), func() {
-		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s.yaml", r.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install storage class")
-	})
-
 	By(fmt.Sprintf("Create configmap %s in namespaces %s for workload\n", r.cmName, r.VeleroCfg.VeleroNamespace), func() {
 		Expect(CreateConfigMapFromYAMLData(r.Client.ClientGo, r.yamlConfig, r.cmName, r.VeleroCfg.VeleroNamespace)).To(Succeed(), fmt.Sprintf("Failed to create configmap %s in namespaces %s for workload\n", r.cmName, r.VeleroCfg.VeleroNamespace))
 	})
@@ -171,30 +161,28 @@ func (r *ResourcePoliciesCase) Verify() error {
 						content = strings.Replace(content, "\n", "", -1)
 						originContent := strings.Replace(fmt.Sprintf("ns-%s pod-%s volume-%s", ns, pod.Name, vol.Name), "\n", "", -1)
 
-						Expect(content == originContent).To(BeTrue(), fmt.Sprintf("File %s does not exist in volume %s of pod %s in namespace %s",
+						Expect(content).To(Equal(originContent), fmt.Sprintf("File %s does not exist in volume %s of pod %s in namespace %s",
 							FileName, vol.Name, pod.Name, ns))
 					}
 				}
 			}
 		})
-
 	}
 	return nil
 }
 
 func (r *ResourcePoliciesCase) Clean() error {
 	// If created some resources which is not in current test namespace, we NEED to override the base Clean function
-	if !r.VeleroCfg.Debug {
-		if err := r.deleteTestStorageClassList([]string{StorageClassName, StorageClassName2}); err != nil {
-			return err
-		}
-
-		if err := DeleteConfigmap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
+	if CurrentSpecReport().Failed() && r.VeleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
+		if err := DeleteConfigMap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
 			return err
 		}
 
 		return r.GetTestCase().Clean() // only clean up resources in test namespace
 	}
+
 	return nil
 }
 
@@ -247,15 +235,6 @@ func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) erro
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("failed to create file into pod %s in namespace: %q", pod.Name, namespace))
 			}
-		}
-	}
-	return nil
-}
-
-func (r *ResourcePoliciesCase) deleteTestStorageClassList(scList []string) error {
-	for _, v := range scList {
-		if err := DeleteStorageClass(r.Ctx, r.Client, v); err != nil {
-			return err
 		}
 	}
 	return nil

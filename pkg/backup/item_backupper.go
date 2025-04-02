@@ -24,28 +24,29 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-
 	kbClient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
+	"github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/internal/volumehelper"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
+	"github.com/vmware-tanzu/velero/pkg/itemblock"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -53,16 +54,11 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	csiutil "github.com/vmware-tanzu/velero/pkg/util/csi"
-	pdvolumeutil "github.com/vmware-tanzu/velero/pkg/util/podvolume"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 const (
-	mustIncludeAdditionalItemAnnotation = "backup.velero.io/must-include-additional-items"
-	skippedNoCSIPVAnnotation            = "backup.velero.io/skipped-no-csi-pv"
-	excludeFromBackupLabel              = "velero.io/exclude-from-backup"
-	csiBIAPluginName                    = "velero.io/csi-pvc-backupper"
-	vsphereBIAPluginName                = "velero.io/vsphere-pvc-backupper"
+	csiBIAPluginName     = "velero.io/csi-pvc-backupper"
+	vsphereBIAPluginName = "velero.io/vsphere-pvc-backupper"
 )
 
 // itemBackupper can back up individual items to a tar writer.
@@ -73,12 +69,14 @@ type itemBackupper struct {
 	kbClient                 kbClient.Client
 	discoveryHelper          discovery.Helper
 	podVolumeBackupper       podvolume.Backupper
-	podVolumeSnapshotTracker *pvcSnapshotTracker
+	podVolumeSnapshotTracker *podvolume.Tracker
 	volumeSnapshotterGetter  VolumeSnapshotterGetter
+	kubernetesBackupper      *kubernetesBackupper
 
 	itemHookHandler                    hook.ItemHookHandler
 	snapshotLocationVolumeSnapshotters map[string]vsv1.VolumeSnapshotter
 	hookTracker                        *hook.HookTracker
+	volumeHelperImpl                   volumehelper.VolumeHelper
 }
 
 type FileForArchive struct {
@@ -92,12 +90,14 @@ type FileForArchive struct {
 // If finalize is true, then it returns the bytes instead of writing them to the tarWriter
 // In addition to the error return, backupItem also returns a bool indicating whether the item
 // was actually backed up.
-func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool) (bool, []FileForArchive, error) {
-	selectedForBackup, files, err := ib.backupItemInternal(logger, obj, groupResource, preferredGVR, mustInclude, finalize)
+func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool, itemBlock *BackupItemBlock) (bool, []FileForArchive, error) {
+	selectedForBackup, files, err := ib.backupItemInternal(logger, obj, groupResource, preferredGVR, mustInclude, finalize, itemBlock)
 	// return if not selected, an error occurred, there are no files to add, or for finalize
 	if !selectedForBackup || err != nil || len(files) == 0 || finalize {
 		return selectedForBackup, files, err
 	}
+	ib.tarWriter.Lock()
+	defer ib.tarWriter.Unlock()
 	for _, file := range files {
 		if err := ib.tarWriter.WriteHeader(file.Header); err != nil {
 			return false, []FileForArchive{}, errors.WithStack(err)
@@ -110,35 +110,21 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 	return true, []FileForArchive{}, nil
 }
 
-func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool) (bool, []FileForArchive, error) {
-	var itemFiles []FileForArchive
-	metadata, err := meta.Accessor(obj)
-	if err != nil {
-		return false, itemFiles, err
-	}
-
-	namespace := metadata.GetNamespace()
-	name := metadata.GetName()
-
-	log := logger.WithFields(map[string]interface{}{
-		"name":      name,
-		"resource":  groupResource.String(),
-		"namespace": namespace,
-	})
-
+func (ib *itemBackupper) itemInclusionChecks(log logrus.FieldLogger, mustInclude bool, metadata metav1.Object, obj runtime.Unstructured, groupResource schema.GroupResource) bool {
 	if mustInclude {
 		log.Infof("Skipping the exclusion checks for this resource")
 	} else {
-		if metadata.GetLabels()[excludeFromBackupLabel] == "true" {
-			log.Infof("Excluding item because it has label %s=true", excludeFromBackupLabel)
-			ib.trackSkippedPV(obj, groupResource, "", fmt.Sprintf("item has label %s=true", excludeFromBackupLabel), log)
-			return false, itemFiles, nil
+		if metadata.GetLabels()[velerov1api.ExcludeFromBackupLabel] == "true" {
+			log.Infof("Excluding item because it has label %s=true", velerov1api.ExcludeFromBackupLabel)
+			ib.trackSkippedPV(obj, groupResource, "", fmt.Sprintf("item has label %s=true", velerov1api.ExcludeFromBackupLabel), log)
+			return false
 		}
 		// NOTE: we have to re-check namespace & resource includes/excludes because it's possible that
 		// backupItem can be invoked by a custom action.
+		namespace := metadata.GetNamespace()
 		if namespace != "" && !ib.backupRequest.NamespaceIncludesExcludes.ShouldInclude(namespace) {
 			log.Info("Excluding item because namespace is excluded")
-			return false, itemFiles, nil
+			return false
 		}
 
 		// NOTE: we specifically allow namespaces to be backed up even if it's excluded.
@@ -148,19 +134,41 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		if namespace == "" && groupResource != kuberesource.Namespaces &&
 			ib.backupRequest.ResourceIncludesExcludes.ShouldExclude(groupResource.String()) {
 			log.Info("Excluding item because resource is cluster-scoped and is excluded by cluster filter.")
-			return false, itemFiles, nil
+			return false
 		}
 
 		// Only check namespace-scoped resource to avoid expelling cluster resources
 		// are not specified in included list.
 		if namespace != "" && !ib.backupRequest.ResourceIncludesExcludes.ShouldInclude(groupResource.String()) {
 			log.Info("Excluding item because resource is excluded")
-			return false, itemFiles, nil
+			return false
 		}
 	}
 
 	if metadata.GetDeletionTimestamp() != nil {
 		log.Info("Skipping item because it's being deleted.")
+		return false
+	}
+	return true
+}
+
+func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource, mustInclude, finalize bool, itemBlock *BackupItemBlock) (bool, []FileForArchive, error) {
+	var itemFiles []FileForArchive
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return false, itemFiles, err
+	}
+
+	namespace := metadata.GetNamespace()
+	name := metadata.GetName()
+
+	log := logger.WithFields(map[string]any{
+		"name":      name,
+		"resource":  groupResource.String(),
+		"namespace": namespace,
+	})
+
+	if !ib.itemInclusionChecks(log, mustInclude, metadata, obj, groupResource) {
 		return false, itemFiles, nil
 	}
 
@@ -170,12 +178,12 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		name:      name,
 	}
 
-	if _, exists := ib.backupRequest.BackedUpItems[key]; exists {
+	if ib.backupRequest.BackedUpItems.Has(key) {
 		log.Info("Skipping item because it's already been backed up.")
 		// returning true since this item *is* in the backup, even though we're not backing it up here
 		return true, itemFiles, nil
 	}
-	ib.backupRequest.BackedUpItems[key] = struct{}{}
+	ib.backupRequest.BackedUpItems.AddItem(key)
 	log.Info("Backing up item")
 
 	var (
@@ -184,10 +192,6 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		pvbVolumes []string
 	)
 
-	log.Debug("Executing pre hooks")
-	if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePre, ib.hookTracker); err != nil {
-		return false, itemFiles, err
-	}
 	if optedOut, podName := ib.podVolumeSnapshotTracker.OptedoutByPod(namespace, name); optedOut {
 		ib.trackSkippedPV(obj, groupResource, podVolumeApproach, fmt.Sprintf("opted out due to annotation in pod %s", podName), log)
 	}
@@ -200,32 +204,33 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 			// nil it on error since it's not valid
 			pod = nil
 		} else {
-			// Get the list of volumes to back up using pod volume backup from the pod's annotations. Remove from this list
-			// any volumes that use a PVC that we've already backed up (this would be in a read-write-many scenario,
+			// Get the list of volumes to back up using pod volume backup from the pod's annotations
+			// or volume policy approach. Remove from this list any volumes that use a PVC that we've
+			// already backed up (this would be in a read-write-many scenario,
 			// where it's been backed up from another pod), since we don't need >1 backup per PVC.
-			includedVolumes, optedOutVolumes := pdvolumeutil.GetVolumesByPod(
-				pod,
-				boolptr.IsSetToTrue(ib.backupRequest.Spec.DefaultVolumesToFsBackup),
-				!ib.backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()),
-			)
-
-			for _, volume := range includedVolumes {
-				// track the volumes that are PVCs using the PVC snapshot tracker, so that when we backup PVCs/PVs
-				// via an item action in the next step, we don't snapshot PVs that will have their data backed up
-				// with pod volume backup.
-				ib.podVolumeSnapshotTracker.Track(pod, volume)
-
-				if found, pvcName := ib.podVolumeSnapshotTracker.TakenForPodVolume(pod, volume); found {
-					log.WithFields(map[string]interface{}{
-						"podVolume": volume,
-						"pvcName":   pvcName,
-					}).Info("Pod volume uses a persistent volume claim which has already been backed up from another pod, skipping.")
-					continue
+			for _, volume := range pod.Spec.Volumes {
+				shouldDoFSBackup, err := ib.volumeHelperImpl.ShouldPerformFSBackup(volume, *pod)
+				if err != nil {
+					backupErrs = append(backupErrs, errors.WithStack(err))
 				}
-				pvbVolumes = append(pvbVolumes, volume)
-			}
-			for _, optedOutVol := range optedOutVolumes {
-				ib.podVolumeSnapshotTracker.Optout(pod, optedOutVol)
+
+				if shouldDoFSBackup {
+					// track the volumes backing up by PVB , so that when we backup PVCs/PVs
+					// via an item action in the next step, we don't snapshot PVs that will have their data backed up
+					// with pod volume backup.
+					ib.podVolumeSnapshotTracker.Track(pod, volume.Name)
+
+					if found, pvcName := ib.podVolumeSnapshotTracker.TakenForPodVolume(pod, volume.Name); found {
+						log.WithFields(map[string]any{
+							"podVolume": volume,
+							"pvcName":   pvcName,
+						}).Info("Pod volume uses a persistent volume claim which has already been backed up from another pod, skipping.")
+						continue
+					}
+					pvbVolumes = append(pvbVolumes, volume.Name)
+				} else {
+					ib.podVolumeSnapshotTracker.Optout(pod, volume.Name)
+				}
 			}
 		}
 	}
@@ -234,15 +239,9 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	// the group version of the object.
 	versionPath := resourceVersion(obj)
 
-	updatedObj, additionalItemFiles, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata, finalize)
+	updatedObj, additionalItemFiles, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata, finalize, itemBlock)
 	if err != nil {
 		backupErrs = append(backupErrs, err)
-
-		// if there was an error running actions, execute post hooks and return
-		log.Debug("Executing post hooks")
-		if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePost, ib.hookTracker); err != nil {
-			backupErrs = append(backupErrs, err)
-		}
 		return false, itemFiles, kubeerrs.NewAggregate(backupErrs)
 	}
 
@@ -270,7 +269,6 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 		// even if there are errors.
 		podVolumeBackups, podVolumePVCBackupSummary, errs := ib.backupPodVolumes(log, pod, pvbVolumes)
 
-		ib.backupRequest.PodVolumeBackups = append(ib.backupRequest.PodVolumeBackups, podVolumeBackups...)
 		backupErrs = append(backupErrs, errs...)
 
 		// Mark the volumes that has been processed by pod volume backup as Taken in the tracker.
@@ -296,11 +294,6 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 				}
 			}
 		}
-	}
-
-	log.Debug("Executing post hooks")
-	if err := ib.itemHookHandler.HandleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hook.PhasePost, ib.hookTracker); err != nil {
-		backupErrs = append(backupErrs, err)
 	}
 
 	if len(backupErrs) != 0 {
@@ -357,6 +350,7 @@ func (ib *itemBackupper) executeActions(
 	name, namespace string,
 	metadata metav1.Object,
 	finalize bool,
+	itemBlock *BackupItemBlock,
 ) (runtime.Unstructured, []FileForArchive, error) {
 	var itemFiles []FileForArchive
 	for _, action := range ib.backupRequest.ResolvedActions {
@@ -380,23 +374,48 @@ func (ib *itemBackupper) executeActions(
 			continue
 		}
 
+		if groupResource == kuberesource.PersistentVolumeClaims &&
+			actionName == csiBIAPluginName {
+			snapshotVolume, err := ib.volumeHelperImpl.ShouldPerformSnapshot(obj, kuberesource.PersistentVolumeClaims)
+			if err != nil {
+				return nil, itemFiles, errors.WithStack(err)
+			}
+
+			if !snapshotVolume {
+				ib.trackSkippedPV(
+					obj,
+					kuberesource.PersistentVolumeClaims,
+					volumeSnapshotApproach,
+					"not satisfy the criteria for VolumePolicy or the legacy snapshot way",
+					log,
+				)
+				continue
+			}
+		}
+
 		updatedItem, additionalItemIdentifiers, operationID, postOperationItems, err := action.Execute(obj, ib.backupRequest.Backup)
 		if err != nil {
 			return nil, itemFiles, errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
 		}
+
 		u := &unstructured.Unstructured{Object: updatedItem.UnstructuredContent()}
-		if actionName == csiBIAPluginName && additionalItemIdentifiers == nil && u.GetAnnotations()[skippedNoCSIPVAnnotation] == "true" {
-			// snapshot was skipped by CSI plugin
-			ib.trackSkippedPV(obj, groupResource, csiSnapshotApproach, "skipped b/c it's not a CSI volume", log)
-			delete(u.GetAnnotations(), skippedNoCSIPVAnnotation)
-		} else if (actionName == csiBIAPluginName || actionName == vsphereBIAPluginName) && !boolptr.IsSetToFalse(ib.backupRequest.Backup.Spec.SnapshotVolumes) {
-			// the snapshot has been taken by the BIA plugin
-			ib.unTrackSkippedPV(obj, groupResource, log)
+		if actionName == csiBIAPluginName {
+			if additionalItemIdentifiers == nil && u.GetAnnotations()[velerov1api.SkippedNoCSIPVAnnotation] == "true" {
+				// snapshot was skipped by CSI plugin
+				log.Infof("skip CSI snapshot for PVC %s as it's not a CSI compatible volume", namespace+"/"+name)
+				ib.trackSkippedPV(obj, groupResource, csiSnapshotApproach, "skipped b/c it's not a CSI volume", log)
+				delete(u.GetAnnotations(), velerov1api.SkippedNoCSIPVAnnotation)
+			} else {
+				// the snapshot has been taken by the BIA plugin
+				log.Infof("Untrack the PVC %s, because it's backed up by CSI BIA.", namespace+"/"+name)
+				ib.unTrackSkippedPV(obj, kuberesource.PersistentVolumeClaims, log)
+			}
 		}
-		mustInclude := u.GetAnnotations()[mustIncludeAdditionalItemAnnotation] == "true" || finalize
+
+		mustInclude := u.GetAnnotations()[velerov1api.MustIncludeAdditionalItemAnnotation] == "true" || finalize
 		// remove the annotation as it's for communication between BIA and velero server,
 		// we don't want the resource be restored with this annotation.
-		delete(u.GetAnnotations(), mustIncludeAdditionalItemAnnotation)
+		delete(u.GetAnnotations(), velerov1api.MustIncludeAdditionalItemAnnotation)
 		obj = u
 
 		// If async plugin started async operation, add it to the ItemOperations list
@@ -430,35 +449,54 @@ func (ib *itemBackupper) executeActions(
 		}
 
 		for _, additionalItem := range additionalItemIdentifiers {
-			gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
-			if err != nil {
-				return nil, itemFiles, err
+			var itemList []itemblock.ItemBlockItem
+
+			// get item content from itemBlock if it's there to avoid the additional APIServer call
+			// We could have multiple versions to back up if EnableAPIGroupVersions is set
+			if itemBlock != nil {
+				itemList = itemBlock.FindItem(additionalItem.GroupResource, additionalItem.Namespace, additionalItem.Name)
+			}
+			// if item is not in itemblock, pull it from the cluster
+			if len(itemList) == 0 {
+				log.Infof("Additional Item %s %s/%s not found in ItemBlock, getting from cluster", additionalItem.GroupResource, additionalItem.Namespace, additionalItem.Name)
+
+				gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
+				if err != nil {
+					return nil, itemFiles, err
+				}
+
+				client, err := ib.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), resource, additionalItem.Namespace)
+				if err != nil {
+					return nil, itemFiles, err
+				}
+
+				item, err := client.Get(additionalItem.Name, metav1.GetOptions{})
+
+				if apierrors.IsNotFound(err) {
+					log.WithFields(logrus.Fields{
+						"groupResource": additionalItem.GroupResource,
+						"namespace":     additionalItem.Namespace,
+						"name":          additionalItem.Name,
+					}).Warnf("Additional item was not found in Kubernetes API, can't back it up")
+					continue
+				}
+				if err != nil {
+					return nil, itemFiles, errors.WithStack(err)
+				}
+				itemList = append(itemList, itemblock.ItemBlockItem{
+					Gr:           additionalItem.GroupResource,
+					Item:         item,
+					PreferredGVR: gvr,
+				})
 			}
 
-			client, err := ib.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), resource, additionalItem.Namespace)
-			if err != nil {
-				return nil, itemFiles, err
+			for _, item := range itemList {
+				_, additionalItemFiles, err := ib.backupItem(log, item.Item, additionalItem.GroupResource, item.PreferredGVR, mustInclude, finalize, itemBlock)
+				if err != nil {
+					return nil, itemFiles, err
+				}
+				itemFiles = append(itemFiles, additionalItemFiles...)
 			}
-
-			item, err := client.Get(additionalItem.Name, metav1.GetOptions{})
-
-			if apierrors.IsNotFound(err) {
-				log.WithFields(logrus.Fields{
-					"groupResource": additionalItem.GroupResource,
-					"namespace":     additionalItem.Namespace,
-					"name":          additionalItem.Name,
-				}).Warnf("Additional item was not found in Kubernetes API, can't back it up")
-				continue
-			}
-			if err != nil {
-				return nil, itemFiles, errors.WithStack(err)
-			}
-
-			_, additionalItemFiles, err := ib.backupItem(log, item, gvr.GroupResource(), gvr, mustInclude, finalize)
-			if err != nil {
-				return nil, itemFiles, err
-			}
-			itemFiles = append(itemFiles, additionalItemFiles...)
 		}
 	}
 	return obj, itemFiles, nil
@@ -513,12 +551,6 @@ const (
 func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.FieldLogger) error {
 	log.Info("Executing takePVSnapshot")
 
-	if boolptr.IsSetToFalse(ib.backupRequest.Spec.SnapshotVolumes) {
-		log.Info("Backup has volume snapshots disabled; skipping volume snapshot action.")
-		ib.trackSkippedPV(obj, kuberesource.PersistentVolumes, volumeSnapshotApproach, "backup has volume snapshots disabled", log)
-		return nil
-	}
-
 	pv := new(corev1api.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pv); err != nil {
 		return errors.WithStack(err)
@@ -526,13 +558,20 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 
 	log = log.WithField("persistentVolume", pv.Name)
 
-	// If this PV is claimed, see if we've already taken a (pod volume backup) snapshot of the contents
-	// of this PV. If so, don't take a snapshot.
-	if pv.Spec.ClaimRef != nil {
-		if ib.podVolumeSnapshotTracker.Has(pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name) {
-			log.Info("Skipping snapshot of persistent volume because volume is being backed up with pod volume backup.")
-			return nil
-		}
+	snapshotVolume, err := ib.volumeHelperImpl.ShouldPerformSnapshot(obj, kuberesource.PersistentVolumes)
+	if err != nil {
+		return err
+	}
+
+	if !snapshotVolume {
+		ib.trackSkippedPV(
+			obj,
+			kuberesource.PersistentVolumes,
+			volumeSnapshotApproach,
+			"not satisfy the criteria for VolumePolicy or the legacy snapshot way",
+			log,
+		)
+		return nil
 	}
 
 	// #4758 Do not take snapshot for CSI PV to avoid duplicated snapshotting, when CSI feature is enabled.
@@ -554,7 +593,18 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	}
 
 	if ib.backupRequest.ResPolicies != nil {
-		if action, err := ib.backupRequest.ResPolicies.GetMatchAction(pv); err != nil {
+		pvc := new(corev1api.PersistentVolumeClaim)
+		if pv.Spec.ClaimRef != nil {
+			err = ib.kbClient.Get(context.Background(), kbClient.ObjectKey{
+				Namespace: pv.Spec.ClaimRef.Namespace,
+				Name:      pv.Spec.ClaimRef.Name},
+				pvc)
+			if err != nil {
+				return err
+			}
+		}
+		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
+		if action, err := ib.backupRequest.ResPolicies.GetMatchAction(vfd); err != nil {
 			log.WithError(err).Errorf("Error getting matched resource policies for pv %s", pv.Name)
 			return nil
 		} else if action != nil && action.Type == resourcepolicies.Skip {
@@ -639,6 +689,7 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	snapshot := volumeSnapshot(ib.backupRequest.Backup, pv.Name, volumeID, volumeType, pvFailureDomainZone, location, iops)
 
 	var errs []error
+	log.Info("Untrack the PV %s from the skipped volumes, because it's backed by Velero native snapshot.", pv.Name)
 	ib.backupRequest.SkippedPVTracker.Untrack(pv.Name)
 	snapshotID, err := volumeSnapshotter.CreateSnapshot(snapshot.Spec.ProviderVolumeID, snapshot.Spec.VolumeAZ, tags)
 	if err != nil {
@@ -656,8 +707,8 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 
 func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource schema.GroupResource, backupItemActionName string) (*resourcepolicies.Action, error) {
 	if ib.backupRequest.ResPolicies != nil && groupResource == kuberesource.PersistentVolumeClaims && (backupItemActionName == csiBIAPluginName || backupItemActionName == vsphereBIAPluginName) {
-		pvc := corev1api.PersistentVolumeClaim{}
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
+		pvc := &corev1api.PersistentVolumeClaim{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pvc); err != nil {
 			return nil, errors.WithStack(err)
 		}
 
@@ -670,7 +721,8 @@ func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource 
 		if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
 			return nil, errors.WithStack(err)
 		}
-		return ib.backupRequest.ResPolicies.GetMatchAction(pv)
+		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
+		return ib.backupRequest.ResPolicies.GetMatchAction(vfd)
 	}
 
 	return nil, nil

@@ -77,7 +77,7 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 		return true, nil
 	})
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Failed to wait for pods in namespace %s to start running", namespace))
+		return errors.Wrapf(err, "Failed to wait for pods in namespace %s to start running", namespace)
 	}
 	return nil
 }
@@ -190,6 +190,12 @@ func KubectlGetNS(ctx context.Context, name string) ([]string, error) {
 	}
 	cmds = append(cmds, cmd)
 
+	cmd = &common.OsCommandLine{
+		Cmd:  "awk",
+		Args: []string{"{print $1}"},
+	}
+	cmds = append(cmds, cmd)
+
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
@@ -244,7 +250,6 @@ func GetAPIVersions(client *TestClient, name string) ([]string, error) {
 		return nil, errors.Wrap(err, "Fail to get server API groups")
 	}
 	for _, group := range APIGroup.Groups {
-		fmt.Println(group.Name)
 		if group.Name == name {
 			for _, v := range group.Versions {
 				fmt.Println(v.Version)
@@ -253,7 +258,7 @@ func GetAPIVersions(client *TestClient, name string) ([]string, error) {
 			return version, nil
 		}
 	}
-	return nil, errors.New("Server API groups is empty")
+	return nil, errors.New("Fail to get server API groups")
 }
 
 func GetPVByPVCName(client TestClient, namespace, pvcName string) (string, error) {
@@ -294,6 +299,29 @@ func PrepareVolumeList(volumeNameList []string) (vols []*corev1.Volume) {
 	return
 }
 
+func CalFileHashInPod(ctx context.Context, namespace, podName, containerName, filePath string) (string, error) {
+	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
+		"--", "/bin/sh", "-c", fmt.Sprintf("sha256sum %s | awk '{ print $1 }'", filePath)}
+	cmd := exec.CommandContext(ctx, "kubectl", arg...)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	// Trim any leading or trailing whitespace characters from the output
+	hash := string(output)
+	hash = strings.TrimSpace(hash)
+
+	return hash, nil
+}
+
+func WriteRandomDataToFileInPod(ctx context.Context, namespace, podName, containerName, volume, filename string, fileSize int64) error {
+	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
+		"--", "/bin/sh", "-c", fmt.Sprintf("dd if=/dev/urandom of=/%s/%s bs=%d count=1", volume, filename, fileSize)}
+	cmd := exec.CommandContext(ctx, "kubectl", arg...)
+	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
+	return cmd.Run()
+}
+
 func CreateFileToPod(ctx context.Context, namespace, podName, containerName, volume, filename, content string) error {
 	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("echo ns-%s pod-%s volume-%s  > /%s/%s", namespace, podName, volume, volume, filename)}
@@ -301,6 +329,7 @@ func CreateFileToPod(ctx context.Context, namespace, podName, containerName, vol
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	return cmd.Run()
 }
+
 func FileExistInPV(ctx context.Context, namespace, podName, containerName, volume, filename string) (bool, error) {
 	stdout, stderr, err := ReadFileFromPodVolume(ctx, namespace, podName, containerName, volume, filename)
 

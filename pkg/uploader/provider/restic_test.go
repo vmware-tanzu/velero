@@ -150,13 +150,13 @@ func TestResticRunBackup(t *testing.T) {
 			}
 			if !tc.nilUpdater {
 				updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: tc.rp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
-				_, _, err = tc.rp.RunBackup(context.Background(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, map[string]string{}, &updater)
+				_, _, _, err = tc.rp.RunBackup(context.Background(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, map[string]string{}, &updater)
 			} else {
-				_, _, err = tc.rp.RunBackup(context.Background(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, map[string]string{}, nil)
+				_, _, _, err = tc.rp.RunBackup(context.Background(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, map[string]string{}, nil)
 			}
 
 			tc.rp.log.Infof("test name %v error %v", tc.name, err)
-			require.Equal(t, true, tc.errorHandleFunc(err))
+			require.True(t, tc.errorHandleFunc(err))
 		})
 	}
 }
@@ -223,16 +223,15 @@ func TestResticRunRestore(t *testing.T) {
 			var err error
 			if !tc.nilUpdater {
 				updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: tc.rp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
-				err = tc.rp.RunRestore(context.Background(), "", "var", tc.volMode, map[string]string{}, &updater)
+				_, err = tc.rp.RunRestore(context.Background(), "", "var", tc.volMode, map[string]string{}, &updater)
 			} else {
-				err = tc.rp.RunRestore(context.Background(), "", "var", tc.volMode, map[string]string{}, nil)
+				_, err = tc.rp.RunRestore(context.Background(), "", "var", tc.volMode, map[string]string{}, nil)
 			}
 
 			tc.rp.log.Infof("test name %v error %v", tc.name, err)
-			require.Equal(t, true, tc.errorHandleFunc(err))
+			require.True(t, tc.errorHandleFunc(err))
 		})
 	}
-
 }
 
 func TestClose(t *testing.T) {
@@ -431,6 +430,13 @@ func TestParseUploaderConfig(t *testing.T) {
 			name: "SparseFilesDisabled",
 			uploaderConfig: map[string]string{
 				"writeSparseFiles": "false",
+			},
+			expectedFlags: []string{},
+		},
+		{
+			name: "RestoreConcorrency",
+			uploaderConfig: map[string]string{
+				"Parallel": "5",
 			},
 			expectedFlags: []string{},
 		},

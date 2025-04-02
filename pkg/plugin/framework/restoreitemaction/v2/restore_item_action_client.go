@@ -48,7 +48,7 @@ type RestoreItemActionGRPCClient struct {
 	grpcClient protoriav2.RestoreItemActionClient
 }
 
-func newRestoreItemActionGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) interface{} {
+func newRestoreItemActionGRPCClient(base *common.ClientBase, clientConn *grpc.ClientConn) any {
 	return &RestoreItemActionGRPCClient{
 		ClientBase: base,
 		grpcClient: protoriav2.NewRestoreItemActionClient(clientConn),

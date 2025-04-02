@@ -72,6 +72,8 @@ type kopiaObjectWriter struct {
 	rawWriter object.Writer
 }
 
+type openOptions struct{}
+
 const (
 	defaultLogInterval             = time.Second * 10
 	defaultMaintainCheckPeriod     = time.Hour
@@ -115,7 +117,7 @@ func (ks *kopiaRepoService) Open(ctx context.Context, repoOption udmrepo.RepoOpt
 
 	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
 
-	r, err := openKopiaRepo(repoCtx, repoConfig, repoOption.RepoPassword)
+	r, err := openKopiaRepo(repoCtx, repoConfig, repoOption.RepoPassword, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -158,10 +160,14 @@ func (ks *kopiaRepoService) Maintain(ctx context.Context, repoOption udmrepo.Rep
 
 	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
 
-	r, err := openKopiaRepo(repoCtx, repoConfig, repoOption.RepoPassword)
+	ks.logger.Info("Start to open repo for maintenance, allow index write on load")
+
+	r, err := openKopiaRepo(repoCtx, repoConfig, repoOption.RepoPassword, nil)
 	if err != nil {
 		return err
 	}
+
+	ks.logger.Info("Succeeded to open repo for maintenance")
 
 	defer func() {
 		c := r.Close(repoCtx)
@@ -312,10 +318,11 @@ func (kr *kopiaRepository) NewObjectWriter(ctx context.Context, opt udmrepo.Obje
 	}
 
 	writer := kr.rawWriter.NewObjectWriter(kopia.SetupKopiaLog(ctx, kr.logger), object.WriterOptions{
-		Description: opt.Description,
-		Prefix:      index.IDPrefix(opt.Prefix),
-		AsyncWrites: opt.AsyncWrites,
-		Compressor:  getCompressorForObject(opt),
+		Description:        opt.Description,
+		Prefix:             index.IDPrefix(opt.Prefix),
+		AsyncWrites:        opt.AsyncWrites,
+		Compressor:         getCompressorForObject(opt),
+		MetadataCompressor: getMetadataCompressor(),
 	})
 
 	if writer == nil {
@@ -391,7 +398,9 @@ func (kr *kopiaRepository) ConcatenateObjects(ctx context.Context, objectIDs []u
 		rawIDs = append(rawIDs, rawID)
 	}
 
-	result, err := kr.rawWriter.ConcatenateObjects(ctx, rawIDs)
+	result, err := kr.rawWriter.ConcatenateObjects(ctx, rawIDs, repo.ConcatenateOptions{
+		Compressor: getMetadataCompressor(),
+	})
 	if err != nil {
 		return udmrepo.ID(""), errors.Wrap(err, "error to concatenate objects")
 	}
@@ -507,8 +516,13 @@ func (kow *kopiaObjectWriter) Close() error {
 }
 
 // getCompressorForObject returns the compressor for an object, at present, we don't support compression
-func getCompressorForObject(opt udmrepo.ObjectWriteOptions) compression.Name {
+func getCompressorForObject(_ udmrepo.ObjectWriteOptions) compression.Name {
 	return ""
+}
+
+// getMetadataCompressor returns the compressor for metadata, return kopia's default since we don't support compression
+func getMetadataCompressor() compression.Name {
+	return "zstd-fastest"
 }
 
 func getManifestEntryFromKopia(mani *manifest.EntryMetadata) *udmrepo.ManifestEntryMetadata {
@@ -546,7 +560,7 @@ func (lt *logThrottle) shouldLog() bool {
 	return false
 }
 
-func openKopiaRepo(ctx context.Context, configFile string, password string) (repo.Repository, error) {
+func openKopiaRepo(ctx context.Context, configFile string, password string, _ *openOptions) (repo.Repository, error) {
 	r, err := kopiaRepoOpen(ctx, configFile, password, &repo.Options{})
 	if os.IsNotExist(err) {
 		return nil, errors.Wrap(err, "error to open repo, repo doesn't exist")
@@ -560,7 +574,7 @@ func openKopiaRepo(ctx context.Context, configFile string, password string) (rep
 }
 
 func writeInitParameters(ctx context.Context, repoOption udmrepo.RepoOptions, logger logrus.FieldLogger) error {
-	r, err := openKopiaRepo(ctx, repoOption.ConfigFilePath, repoOption.RepoPassword)
+	r, err := openKopiaRepo(ctx, repoOption.ConfigFilePath, repoOption.RepoPassword, nil)
 	if err != nil {
 		return err
 	}
@@ -585,6 +599,32 @@ func writeInitParameters(ctx context.Context, repoOption udmrepo.RepoOptions, lo
 		if overwriteQuickMaintainInterval != time.Duration(0) {
 			logger.Infof("Quick maintenance interval change from %v to %v", p.QuickCycle.Interval, overwriteQuickMaintainInterval)
 			p.QuickCycle.Interval = overwriteQuickMaintainInterval
+		}
+		// the repoOption.StorageOptions are set via
+		// udmrepo.WithStoreOptions -> udmrepo.GetStoreOptions (interface)
+		// -> pkg/repository/provider.GetStoreOptions(param interface{}) -> pkg/repository/provider.getStorageVariables(..., backupRepoConfig)
+		// where backupRepoConfig comes from param.(RepoParam).BackupRepo.Spec.RepositoryConfig map[string]string
+		// where RepositoryConfig comes from pkg/controller/getBackupRepositoryConfig(...)
+		// where it gets a configMap name from pkg/cmd/server/config/Config.BackupRepoConfig
+		// which gets set via velero server flag `backup-repository-configmap` "The name of ConfigMap containing backup repository configurations."
+		// and data stored as json under ConfigMap.Data[repoType] where repoType is BackupRepository.Spec.RepositoryType: either kopia or restic
+		// repoOption.StorageOptions[udmrepo.StoreOptionKeyFullMaintenanceInterval] would for example look like
+		// configMapName.data.kopia: {"fullMaintenanceInterval": "eagerGC"}
+		fullMaintIntervalOption := udmrepo.FullMaintenanceIntervalOptions(repoOption.StorageOptions[udmrepo.StoreOptionKeyFullMaintenanceInterval])
+		priorMaintInterval := p.FullCycle.Interval
+		switch fullMaintIntervalOption {
+		case udmrepo.FastGC:
+			p.FullCycle.Interval = udmrepo.FastGCInterval
+		case udmrepo.EagerGC:
+			p.FullCycle.Interval = udmrepo.EagerGCInterval
+		case udmrepo.NormalGC:
+			p.FullCycle.Interval = udmrepo.NormalGCInterval
+		case "": // do nothing
+		default:
+			return errors.Errorf("invalid full maintenance interval option %s", fullMaintIntervalOption)
+		}
+		if priorMaintInterval != p.FullCycle.Interval {
+			logger.Infof("Full maintenance interval change from %v to %v", priorMaintInterval, p.FullCycle.Interval)
 		}
 
 		p.Owner = r.ClientOptions().UsernameAtHost()

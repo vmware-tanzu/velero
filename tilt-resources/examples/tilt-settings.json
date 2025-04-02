@@ -9,8 +9,7 @@
     "providers": { 
         "aws": "../velero-plugin-for-aws",
         "gcp": "../velero-plugin-for-gcp",
-        "azure": "../velero-plugin-for-microsoft-azure",
-        "csi": "../velero-plugin-for-csi"
+        "azure": "../velero-plugin-for-microsoft-azure"
     },
     "allowed_contexts": [
         "development"

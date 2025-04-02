@@ -19,10 +19,12 @@ package backup
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -43,6 +45,7 @@ import (
 func TestCreateOptions_BuildBackup(t *testing.T) {
 	o := NewCreateOptions()
 	o.Labels.Set("velero.io/test=true")
+	o.Annotations.Set("velero.io/annTest=true")
 	o.OrderedResources = "pods=p1,p2;persistentvolumeclaims=pvc1,pvc2"
 	orders, err := ParseOrderedResources(o.OrderedResources)
 	o.CSISnapshotTimeout = 20 * time.Minute
@@ -76,9 +79,48 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 		"velero.io/test": "true",
 	}, backup.GetLabels())
 	assert.Equal(t, map[string]string{
+		"velero.io/annTest": "true",
+	}, backup.GetAnnotations())
+	assert.Equal(t, map[string]string{
 		"pods":                   "p1,p2",
 		"persistentvolumeclaims": "pvc1,pvc2",
 	}, backup.Spec.OrderedResources)
+}
+
+func TestCreateOptions_ValidateFromScheduleFlag(t *testing.T) {
+	cmd := &cobra.Command{}
+	o := NewCreateOptions()
+	o.BindFromSchedule(cmd.Flags())
+
+	t.Run("from-schedule with empty or no value", func(t *testing.T) {
+		cmd.Flags().Set("from-schedule", "")
+		err := o.validateFromScheduleFlag(cmd)
+		require.True(t, cmd.Flags().Changed("from-schedule"))
+		require.Error(t, err)
+		require.Equal(t, "flag must have a non-empty value: --from-schedule", err.Error())
+	})
+
+	t.Run("from-schedule with spaces only", func(t *testing.T) {
+		cmd.Flags().Set("from-schedule", " ")
+		err := o.validateFromScheduleFlag(cmd)
+		require.True(t, cmd.Flags().Changed("from-schedule"))
+		require.Error(t, err)
+		require.Equal(t, "flag must have a non-empty value: --from-schedule", err.Error())
+	})
+
+	t.Run("from-schedule with valid value", func(t *testing.T) {
+		cmd.Flags().Set("from-schedule", "daily")
+		err := o.validateFromScheduleFlag(cmd)
+		require.NoError(t, err)
+		require.Equal(t, "daily", o.FromSchedule)
+	})
+
+	t.Run("from-schedule with leading and trailing spaces", func(t *testing.T) {
+		cmd.Flags().Set("from-schedule", " daily ")
+		err := o.validateFromScheduleFlag(cmd)
+		require.NoError(t, err)
+		require.Equal(t, "daily", o.FromSchedule)
+	})
 }
 
 func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
@@ -113,8 +155,9 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 		}, backup.GetAnnotations())
 	})
 
-	t.Run("command line labels take precedence over schedule labels", func(t *testing.T) {
+	t.Run("command line labels and annotations take precedence over scheduled ones", func(t *testing.T) {
 		o.Labels.Set("velero.io/test=yes,custom-label=true")
+		o.Annotations.Set("velero.io/test=yes,custom-annotation=true")
 		backup, err := o.BuildBackup(cmdtest.VeleroNameSpace)
 		assert.NoError(t, err)
 
@@ -124,12 +167,16 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 			velerov1api.ScheduleNameLabel: "test",
 			"custom-label":                "true",
 		}, backup.GetLabels())
+		assert.Equal(t, map[string]string{
+			"velero.io/test":    "yes",
+			"custom-annotation": "true",
+		}, backup.GetAnnotations())
 	})
 }
 
 func TestCreateOptions_OrderedResources(t *testing.T) {
 	_, err := ParseOrderedResources("pods= ns1/p1; ns1/p2; persistentvolumeclaims=ns2/pvc1, ns2/pvc2")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	orderedResources, err := ParseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumeclaims=ns2/pvc1,ns2/pvc2")
 	assert.NoError(t, err)
@@ -138,7 +185,7 @@ func TestCreateOptions_OrderedResources(t *testing.T) {
 		"pods":                   "ns1/p1,ns1/p2",
 		"persistentvolumeclaims": "ns2/pvc1,ns2/pvc2",
 	}
-	assert.Equal(t, orderedResources, expectedResources)
+	assert.Equal(t, expectedResources, orderedResources)
 
 	orderedResources, err = ParseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumes=pv1,pv2")
 	assert.NoError(t, err)
@@ -147,8 +194,7 @@ func TestCreateOptions_OrderedResources(t *testing.T) {
 		"pods":              "ns1/p1,ns1/p2",
 		"persistentvolumes": "pv1,pv2",
 	}
-	assert.Equal(t, orderedResources, expectedMixedResources)
-
+	assert.Equal(t, expectedMixedResources, orderedResources)
 }
 
 func TestCreateCommand(t *testing.T) {
@@ -156,7 +202,6 @@ func TestCreateCommand(t *testing.T) {
 	args := []string{name}
 
 	t.Run("create a backup create command with full options except fromSchedule and wait, then run by create option", func(t *testing.T) {
-
 		// create a factory
 		f := &factorymocks.Factory{}
 
@@ -173,6 +218,7 @@ func TestCreateCommand(t *testing.T) {
 		includeNamespaceScopedResources := "Endpoints,Event,PodTemplate"
 		excludeNamespaceScopedResources := "Secret,MultiClusterIngress"
 		labels := "c=foo"
+		annotations := "ann=foo"
 		storageLocation := "bsl-name-1"
 		snapshotLocations := "region=minio"
 		selector := "a=pod"
@@ -201,6 +247,7 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--include-namespace-scoped-resources", includeNamespaceScopedResources})
 		flags.Parse([]string{"--exclude-namespace-scoped-resources", excludeNamespaceScopedResources})
 		flags.Parse([]string{"--labels", labels})
+		flags.Parse([]string{"--annotations", annotations})
 		flags.Parse([]string{"--storage-location", storageLocation})
 		flags.Parse([]string{"--volume-snapshot-locations", snapshotLocations})
 		flags.Parse([]string{"--selector", selector})
@@ -213,7 +260,7 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--default-volumes-to-fs-backup", defaultVolumesToFsBackup})
 		flags.Parse([]string{"--resource-policies-configmap", resPoliciesConfigmap})
 		flags.Parse([]string{"--data-mover", dataMover})
-		flags.Parse([]string{"--parallel-files-upload", fmt.Sprintf("%d", parallelFilesUpload)})
+		flags.Parse([]string{"--parallel-files-upload", strconv.Itoa(parallelFilesUpload)})
 		//flags.Parse([]string{"--wait"})
 
 		client := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
@@ -227,8 +274,8 @@ func TestCreateCommand(t *testing.T) {
 
 		//Validate
 		e = o.Validate(cmd, args, f)
-		require.Contains(t, e.Error(), "include-resources, exclude-resources and include-cluster-resources are old filter parameters")
-		require.Contains(t, e.Error(), "include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\nThey cannot be used together")
+		require.ErrorContains(t, e, "include-resources, exclude-resources and include-cluster-resources are old filter parameters")
+		require.ErrorContains(t, e, "include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\nThey cannot be used together")
 
 		//cmd
 		e = o.Run(cmd, f)
@@ -249,7 +296,8 @@ func TestCreateCommand(t *testing.T) {
 		require.Equal(t, excludeClusterScopedResources, o.ExcludeClusterScopedResources.String())
 		require.Equal(t, includeNamespaceScopedResources, o.IncludeNamespaceScopedResources.String())
 		require.Equal(t, excludeNamespaceScopedResources, o.ExcludeNamespaceScopedResources.String())
-		require.Equal(t, true, test.CompareSlice(strings.Split(labels, ","), strings.Split(o.Labels.String(), ",")))
+		require.True(t, test.CompareSlice(strings.Split(labels, ","), strings.Split(o.Labels.String(), ",")))
+		require.True(t, test.CompareSlice(strings.Split(annotations, ","), strings.Split(o.Annotations.String(), ",")))
 		require.Equal(t, storageLocation, o.StorageLocation)
 		require.Equal(t, snapshotLocations, strings.Split(o.SnapshotLocations[0], ",")[0])
 		require.Equal(t, selector, o.Selector.String())
@@ -267,7 +315,7 @@ func TestCreateCommand(t *testing.T) {
 
 		// verify oldAndNewFilterParametersUsedTogether
 		mix := o.oldAndNewFilterParametersUsedTogether()
-		require.Equal(t, true, mix)
+		require.True(t, mix)
 	})
 
 	t.Run("create a backup create command with specific storage-location setting", func(t *testing.T) {
@@ -294,7 +342,7 @@ func TestCreateCommand(t *testing.T) {
 
 		// Validate
 		e = o.Validate(cmd, args, f)
-		assert.Contains(t, e.Error(), fmt.Sprintf("backupstoragelocations.velero.io \"%s\" not found", bsl))
+		assert.ErrorContains(t, e, fmt.Sprintf("backupstoragelocations.velero.io \"%s\" not found", bsl))
 	})
 
 	t.Run("create a backup create command with specific volume-snapshot-locations setting", func(t *testing.T) {

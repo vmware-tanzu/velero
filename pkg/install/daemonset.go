@@ -50,11 +50,20 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 		daemonSetArgs = append(daemonSetArgs, fmt.Sprintf("--features=%s", strings.Join(c.features, ",")))
 	}
 
+	if len(c.nodeAgentConfigMap) > 0 {
+		daemonSetArgs = append(daemonSetArgs, fmt.Sprintf("--node-agent-configmap=%s", c.nodeAgentConfigMap))
+	}
+
 	userID := int64(0)
 	mountPropagationMode := corev1.MountPropagationHostToContainer
 
+	dsName := "node-agent"
+	if c.forWindows {
+		dsName = "node-agent-windows"
+	}
+
 	daemonSet := &appsv1.DaemonSet{
-		ObjectMeta: objectMeta(namespace, "node-agent"),
+		ObjectMeta: objectMeta(namespace, dsName),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
 			APIVersion: appsv1.SchemeGroupVersion.String(),
@@ -62,13 +71,14 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"name": "node-agent",
+					"name": dsName,
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabels(c.labels, map[string]string{
-						"name": "node-agent",
+						"name": dsName,
+						"role": "node-agent",
 					}),
 					Annotations: c.annotations,
 				},
@@ -103,7 +113,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 					},
 					Containers: []corev1.Container{
 						{
-							Name:            "node-agent",
+							Name:            dsName,
 							Image:           c.image,
 							Ports:           containerPorts(),
 							ImagePullPolicy: pullPolicy,
@@ -199,6 +209,32 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 				Value: "/credentials/cloud",
 			},
 		}...)
+	}
+
+	if c.forWindows {
+		daemonSet.Spec.Template.Spec.SecurityContext = nil
+		daemonSet.Spec.Template.Spec.Containers[0].SecurityContext = nil
+		daemonSet.Spec.Template.Spec.NodeSelector = map[string]string{
+			"kubernetes.io/os": "windows",
+		}
+		daemonSet.Spec.Template.Spec.OS = &corev1.PodOS{
+			Name: "windows",
+		}
+		daemonSet.Spec.Template.Spec.Tolerations = []corev1.Toleration{
+			{
+				Key:      "os",
+				Operator: "Equal",
+				Effect:   "NoSchedule",
+				Value:    "windows",
+			},
+		}
+	} else {
+		daemonSet.Spec.Template.Spec.NodeSelector = map[string]string{
+			"kubernetes.io/os": "linux",
+		}
+		daemonSet.Spec.Template.Spec.OS = &corev1.PodOS{
+			Name: "linux",
+		}
 	}
 
 	daemonSet.Spec.Template.Spec.Containers[0].Env = append(daemonSet.Spec.Template.Spec.Containers[0].Env, c.envVars...)

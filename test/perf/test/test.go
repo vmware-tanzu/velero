@@ -22,7 +22,7 @@ import (
 	"math/rand"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 
@@ -161,7 +161,7 @@ func (t *TestCase) Verify() error {
 }
 
 func (t *TestCase) Clean() error {
-	if !VeleroCfg.Debug || VeleroCfg.DeleteClusterResource {
+	if (!CurrentSpecReport().Failed() || !VeleroCfg.FailFast) || VeleroCfg.DeleteClusterResource {
 		By("Clean backups and restore after test", func() {
 			if len(t.BackupArgs) != 0 {
 				if err := VeleroBackupDelete(t.Ctx, VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace, t.BackupName); err != nil {

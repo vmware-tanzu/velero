@@ -86,6 +86,7 @@ func TestImageRegistry(t *testing.T) {
 }
 
 func testDefaultImage(t *testing.T, defaultImageFn func() string, imageName string) {
+	t.Helper()
 	testCases := []struct {
 		name              string
 		buildInfoVersion  string
@@ -128,13 +129,8 @@ func testDefaultImage(t *testing.T, defaultImageFn func() string, imageName stri
 			assert.Equal(t, tc.want, defaultImageFn())
 		})
 	}
-
 }
 
 func TestDefaultVeleroImage(t *testing.T) {
 	testDefaultImage(t, DefaultVeleroImage, "velero")
-}
-
-func TestDefaultRestoreHelperImage(t *testing.T) {
-	testDefaultImage(t, DefaultRestoreHelperImage, "velero-restore-helper")
 }

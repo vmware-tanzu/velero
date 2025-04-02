@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/robfig/cron"
+	cron "github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +39,7 @@ import (
 
 // Test reconcile function of schedule controller. Pause is not covered as event filter will not allow it through
 func TestReconcileOfSchedule(t *testing.T) {
-	require.Nil(t, velerov1.AddToScheme(scheme.Scheme))
+	require.NoError(t, velerov1.AddToScheme(scheme.Scheme))
 
 	newScheduleBuilder := func(phase velerov1.SchedulePhase) *builder.ScheduleBuilder {
 		return builder.ForSchedule("ns", "name").Phase(phase)
@@ -169,39 +169,39 @@ func TestReconcileOfSchedule(t *testing.T) {
 			reconciler.clock = testclocks.NewFakeClock(testTime)
 
 			if test.schedule != nil {
-				require.Nil(t, client.Create(ctx, test.schedule))
+				require.NoError(t, client.Create(ctx, test.schedule))
 			}
 
 			if test.backup != nil {
-				require.Nil(t, client.Create(ctx, test.backup))
+				require.NoError(t, client.Create(ctx, test.backup))
 			}
 
 			scheduleb4reconcile := &velerov1.Schedule{}
 			err = client.Get(ctx, types.NamespacedName{Namespace: "ns", Name: "name"}, scheduleb4reconcile)
 			if test.schedule != nil {
-				require.Nil(t, err)
+				require.NoError(t, err)
 			}
 
 			_, err = reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "ns", Name: "name"}})
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			schedule := &velerov1.Schedule{}
 			err = client.Get(ctx, types.NamespacedName{Namespace: "ns", Name: "name"}, schedule)
 			if len(test.expectedPhase) > 0 {
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, test.expectedPhase, string(schedule.Status.Phase))
 			}
 			if len(test.expectedValidationErrors) > 0 {
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assert.EqualValues(t, test.expectedValidationErrors, schedule.Status.ValidationErrors)
 			}
 			if len(test.expectedLastBackup) > 0 {
-				require.Nil(t, err)
+				require.NoError(t, err)
 				require.NotNil(t, schedule.Status.LastBackup)
 				assert.Equal(t, parseTime(test.expectedLastBackup).Unix(), schedule.Status.LastBackup.Unix())
 			}
 			if len(test.expectedLastSkipped) > 0 {
-				require.Nil(t, err)
+				require.NoError(t, err)
 				require.NotNil(t, schedule.Status.LastSkipped)
 				assert.Equal(t, parseTime(test.expectedLastSkipped).Unix(), schedule.Status.LastSkipped.Unix())
 			}
@@ -213,22 +213,22 @@ func TestReconcileOfSchedule(t *testing.T) {
 			}
 
 			backups := &velerov1.BackupList{}
-			require.Nil(t, client.List(ctx, backups))
+			require.NoError(t, client.List(ctx, backups))
 
 			// If backup associated with schedule's status is in New or InProgress,
 			// new backup shouldn't be submitted.
 			if test.backup != nil &&
 				(test.backup.Status.Phase == velerov1.BackupPhaseNew || test.backup.Status.Phase == velerov1.BackupPhaseInProgress) {
-				assert.Equal(t, 1, len(backups.Items))
-				require.Nil(t, client.Delete(ctx, test.backup))
+				assert.Len(t, backups.Items, 1)
+				require.NoError(t, client.Delete(ctx, test.backup))
 			}
 
-			require.Nil(t, client.List(ctx, backups))
+			require.NoError(t, client.List(ctx, backups))
 
 			if test.expectedBackupCreate == nil {
-				assert.Equal(t, 0, len(backups.Items))
+				assert.Empty(t, backups.Items)
 			} else {
-				assert.Equal(t, 1, len(backups.Items))
+				assert.Len(t, backups.Items, 1)
 			}
 		})
 	}
@@ -289,7 +289,7 @@ func TestGetNextRunTime(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cronSchedule, err := cron.Parse(test.schedule.Spec.Schedule)
+			cronSchedule, err := cron.ParseStandard(test.schedule.Spec.Schedule)
 			require.NoError(t, err, "unable to parse test.schedule.Spec.Schedule: %v", err)
 
 			testClock := testclocks.NewFakeClock(time.Now())
@@ -444,7 +444,7 @@ func TestGetBackup(t *testing.T) {
 }
 
 func TestCheckIfBackupInNewOrProgress(t *testing.T) {
-	require.Nil(t, velerov1.AddToScheme(scheme.Scheme))
+	require.NoError(t, velerov1.AddToScheme(scheme.Scheme))
 
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	logger := velerotest.NewLogger()

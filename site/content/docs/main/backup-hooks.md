@@ -13,6 +13,9 @@ processing ("pre" hooks), or after all custom actions have been completed and an
 specified by custom action have been backed up ("post" hooks). Note that hooks are _not_ executed within a shell
 on the containers.
 
+As of Velero 1.15, related items that must be backed up together are grouped into ItemBlocks, and pod hooks run before and after the ItemBlock is backed up.
+In particular, this means that if an ItemBlock contains more than one pod (such as in a scenario where an RWX volume is mounted by multiple pods), pre hooks are run for all pods in the ItemBlock, then the items are backed up, then all post hooks are run.
+
 There are two ways to specify hooks: annotations on the pod itself, and in the Backup spec.
 
 ### Specifying Hooks As Pod Annotations
@@ -26,9 +29,9 @@ You can use the following annotations on a pod to make Velero execute a hook whe
 * `pre.hook.backup.velero.io/command`
   * The command to execute. This command is not executed within a shell by default. If a shell is needed to run your command, include a shell command, like `/bin/sh`, that is supported by the container at the beginning of your command. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]`. See [examples of using pre hook commands](#backup-hook-commands-examples). Optional.
 * `pre.hook.backup.velero.io/on-error`
-  * What to do if the command returns a non-zero exit code.  Defaults is `Fail`. Valid values are Fail and Continue. Optional.
+  * What to do if the command returns a non-zero exit code.  Defaults to `Fail`. Valid values are Fail and Continue. Optional.
 * `pre.hook.backup.velero.io/timeout`
-  * How long to wait for the command to execute. The hook is considered in error if the command exceeds the timeout. Defaults is 30s. Optional.
+  * How long to wait for the command to execute. The hook is considered in error if the command exceeds the timeout. Defaults to 30s. Optional.
 
 
 #### Post hooks
@@ -38,9 +41,9 @@ You can use the following annotations on a pod to make Velero execute a hook whe
 * `post.hook.backup.velero.io/command`
   * The command to execute. This command is not executed within a shell by default. If a shell is needed to run your command, include a shell command, like `/bin/sh`, that is supported by the container at the beginning of your command. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]`. See [examples of using pre hook commands](#backup-hook-commands-examples). Optional.
 * `post.hook.backup.velero.io/on-error`
-  * What to do if the command returns a non-zero exit code.  Defaults is `Fail`. Valid values are Fail and Continue. Optional.
+  * What to do if the command returns a non-zero exit code.  Defaults to `Fail`. Valid values are Fail and Continue. Optional.
 * `post.hook.backup.velero.io/timeout`
-  * How long to wait for the command to execute. The hook is considered in error if the command exceeds the timeout. Defaults is 30s. Optional.
+  * How long to wait for the command to execute. The hook is considered in error if the command exceeds the timeout. Defaults to 30s. Optional.
 
 ### Specifying Hooks in the Backup Spec
 
@@ -101,6 +104,22 @@ pre:
 ```
 
 Note that the container must support the shell command you use. 
+
+## Backup Hook Execution Results
+### Viewing Results
+
+Velero records the execution results of hooks, allowing users to obtain this information by running the following command:
+
+```bash
+$ velero backup describe <backup name>
+```
+
+The displayed results include the number of hooks that were attempted to be executed and the number of hooks that failed execution. Any detailed failure reasons will be present in `Errors` section if applicable. 
+
+```bash
+HooksAttempted:   1
+HooksFailed:      0
+```
 
 
 [1]: api-types/backup.md

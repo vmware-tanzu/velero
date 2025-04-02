@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"regexp"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -86,8 +86,22 @@ func GetResourceModifiersFromConfig(cm *v1.ConfigMap) (*ResourceModifiers, error
 
 func (p *ResourceModifiers) ApplyResourceModifierRules(obj *unstructured.Unstructured, groupResource string, scheme *runtime.Scheme, log logrus.FieldLogger) []error {
 	var errs []error
+	origin := obj
+	// If there are more than one rules, we need to keep the original object for condition matching
+	if len(p.ResourceModifierRules) > 1 {
+		origin = obj.DeepCopy()
+	}
 	for _, rule := range p.ResourceModifierRules {
-		err := rule.apply(obj, groupResource, scheme, log)
+		matched, err := rule.match(origin, groupResource, log)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		} else if !matched {
+			continue
+		}
+
+		log.Infof("Applying resource modifier patch on %s/%s", origin.GetNamespace(), origin.GetName())
+		err = rule.applyPatch(obj, scheme, log)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -96,59 +110,54 @@ func (p *ResourceModifiers) ApplyResourceModifierRules(obj *unstructured.Unstruc
 	return errs
 }
 
-func (r *ResourceModifierRule) apply(obj *unstructured.Unstructured, groupResource string, scheme *runtime.Scheme, log logrus.FieldLogger) error {
+func (r *ResourceModifierRule) match(obj *unstructured.Unstructured, groupResource string, log logrus.FieldLogger) (bool, error) {
 	ns := obj.GetNamespace()
 	if ns != "" {
 		namespaceInclusion := collections.NewIncludesExcludes().Includes(r.Conditions.Namespaces...)
 		if !namespaceInclusion.ShouldInclude(ns) {
-			return nil
+			return false, nil
 		}
 	}
 
 	g, err := glob.Compile(r.Conditions.GroupResource, '.')
 	if err != nil {
 		log.Errorf("Bad glob pattern of groupResource in condition, groupResource: %s, err: %s", r.Conditions.GroupResource, err)
-		return err
+		return false, err
 	}
 
 	if !g.Match(groupResource) {
-		return nil
+		return false, nil
 	}
 
 	if r.Conditions.ResourceNameRegex != "" {
 		match, err := regexp.MatchString(r.Conditions.ResourceNameRegex, obj.GetName())
 		if err != nil {
-			return errors.Errorf("error in matching regex %s", err.Error())
+			return false, errors.Errorf("error in matching regex %s", err.Error())
 		}
 		if !match {
-			return nil
+			return false, nil
 		}
 	}
 
 	if r.Conditions.LabelSelector != nil {
 		selector, err := metav1.LabelSelectorAsSelector(r.Conditions.LabelSelector)
 		if err != nil {
-			return errors.Errorf("error in creating label selector %s", err.Error())
+			return false, errors.Errorf("error in creating label selector %s", err.Error())
 		}
 		if !selector.Matches(labels.Set(obj.GetLabels())) {
-			return nil
+			return false, nil
 		}
 	}
 
 	match, err := matchConditions(obj, r.Conditions.Matches, log)
 	if err != nil {
-		return err
+		return false, err
 	} else if !match {
 		log.Info("Conditions do not match, skip it")
-		return nil
+		return false, nil
 	}
 
-	log.Infof("Applying resource modifier patch on %s/%s", obj.GetNamespace(), obj.GetName())
-	err = r.applyPatch(obj, scheme, log)
-	if err != nil {
-		return err
-	}
-	return nil
+	return true, nil
 }
 
 func matchConditions(u *unstructured.Unstructured, rules []MatchRule, _ logrus.FieldLogger) (bool, error) {
@@ -172,7 +181,7 @@ func matchConditions(u *unstructured.Unstructured, rules []MatchRule, _ logrus.F
 	p := &JSONPatcher{patches: fixed}
 	_, err := p.applyPatch(u)
 	if err != nil {
-		if errors.Is(err, jsonpatch.ErrTestFailed) {
+		if errors.Is(err, jsonpatch.ErrTestFailed) || errors.Is(err, jsonpatch.ErrMissing) {
 			return false, nil
 		}
 		return false, err

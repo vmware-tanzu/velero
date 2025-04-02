@@ -25,10 +25,10 @@ import (
 	hcplugin "github.com/hashicorp/go-plugin"
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/framework/backupitemaction/v2"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
+	ibav1 "github.com/vmware-tanzu/velero/pkg/plugin/framework/itemblockaction/v1"
 	riav2 "github.com/vmware-tanzu/velero/pkg/plugin/framework/restoreitemaction/v2"
 )
 
@@ -52,11 +52,8 @@ func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus
 		// For plugins compiled into the velero executable, we need to run "velero run-plugins"
 		b.commandArgs = []string{"run-plugins"}
 	}
-
-	b.commandArgs = append(b.commandArgs, "--log-level", logLevel.String())
-	if len(features.All()) > 0 {
-		b.commandArgs = append(b.commandArgs, "--features", features.Serialize())
-	}
+	// exclude "velero" and "server" from "velero server --flags ..."
+	b.commandArgs = append(b.commandArgs, os.Args[2:]...)
 
 	return b
 }
@@ -78,6 +75,7 @@ func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 			string(common.PluginKindRestoreItemAction):   framework.NewRestoreItemActionPlugin(common.ClientLogger(b.clientLogger)),
 			string(common.PluginKindRestoreItemActionV2): riav2.NewRestoreItemActionPlugin(common.ClientLogger(b.clientLogger)),
 			string(common.PluginKindDeleteItemAction):    framework.NewDeleteItemActionPlugin(common.ClientLogger(b.clientLogger)),
+			string(common.PluginKindItemBlockAction):     ibav1.NewItemBlockActionPlugin(common.ClientLogger(b.clientLogger)),
 		},
 		Logger: b.pluginLogger,
 		Cmd:    exec.Command(b.commandName, b.commandArgs...), //nolint:gosec // Internal call. No need to check the command line.

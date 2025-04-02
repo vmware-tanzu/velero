@@ -34,7 +34,7 @@ func CheckError(err error) {
 }
 
 // Exit prints msg (with optional args), plus a newline, to stderr and exits with code 1.
-func Exit(msg string, args ...interface{}) {
+func Exit(msg string, args ...any) {
 	fmt.Fprintf(os.Stderr, msg+"\n", args...)
 	os.Exit(1)
 }

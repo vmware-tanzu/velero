@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/robfig/cron"
+	cron "github.com/robfig/cron/v3"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,9 +31,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	bld "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -69,19 +71,21 @@ func NewScheduleReconciler(
 }
 
 func (c *scheduleReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	s := kube.NewPeriodicalEnqueueSource(c.logger, mgr.GetClient(), &velerov1.ScheduleList{}, scheduleSyncPeriod, kube.PeriodicalEnqueueSourceOption{})
+	pred := kube.NewAllEventPredicate(func(obj client.Object) bool {
+		schedule := obj.(*velerov1.Schedule)
+		if pause := schedule.Spec.Paused; pause {
+			c.logger.Infof("schedule %s is paused, skip", schedule.Name)
+			return false
+		}
+		return true
+	})
+	s := kube.NewPeriodicalEnqueueSource(c.logger.WithField("controller", constant.ControllerSchedule), mgr.GetClient(), &velerov1.ScheduleList{}, scheduleSyncPeriod,
+		kube.PeriodicalEnqueueSourceOption{
+			Predicates: []predicate.Predicate{pred},
+		})
 	return ctrl.NewControllerManagedBy(mgr).
-		// global predicate, works for both For and Watch
-		WithEventFilter(kube.NewAllEventPredicate(func(obj client.Object) bool {
-			schedule := obj.(*velerov1.Schedule)
-			if pause := schedule.Spec.Paused; pause {
-				c.logger.Infof("schedule %s is paused, skip", schedule.Name)
-				return false
-			}
-			return true
-		})).
-		For(&velerov1.Schedule{}, bld.WithPredicates(kube.SpecChangePredicate{})).
-		Watches(s, nil).
+		For(&velerov1.Schedule{}, bld.WithPredicates(kube.SpecChangePredicate{}, pred)).
+		WatchesRawSource(s).
 		Complete(c)
 }
 
@@ -124,6 +128,7 @@ func (c *scheduleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		schedule.Status.ValidationErrors = errs
 	} else {
 		schedule.Status.Phase = velerov1.SchedulePhaseEnabled
+		schedule.Status.ValidationErrors = nil
 	}
 
 	scheduleNeedsPatch := false

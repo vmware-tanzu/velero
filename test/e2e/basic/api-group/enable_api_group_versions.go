@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
@@ -53,7 +53,7 @@ type apiGropuVersionsTest struct {
 	want       map[string]map[string]string
 }
 
-func APIGropuVersionsTest() {
+func APIGroupVersionsTest() {
 	var (
 		group       string
 		err         error
@@ -79,7 +79,9 @@ func APIGropuVersionsTest() {
 	})
 
 	AfterEach(func() {
-		if !veleroCfg.Debug {
+		if CurrentSpecReport().Failed() && veleroCfg.FailFast {
+			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+		} else {
 			for i := 0; i < testCaseNum; i++ {
 				curResource := fmt.Sprintf("rockband%ds", i)
 				curGroup := fmt.Sprintf("%s.%d", group, i)
@@ -98,7 +100,7 @@ func APIGropuVersionsTest() {
 			})
 			if InstallVelero {
 				By("Uninstall Velero in api group version case", func() {
-					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).NotTo(HaveOccurred())
+					Expect(VeleroUninstall(ctx, veleroCfg)).NotTo(HaveOccurred())
 				})
 			}
 		}
@@ -238,7 +240,6 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, grou
 				fmt.Println(errors.Wrapf(err, "failed to delete crd %q", crdName))
 			}
 		}(fmt.Sprintf("rockband%ds.music.example.io.%d", i, i))
-
 	}
 
 	time.Sleep(6 * time.Minute)
@@ -328,7 +329,6 @@ func runEnableAPIGroupVersionsTests(ctx context.Context, client TestClient, grou
 				)
 				return errors.New(msg)
 			}
-
 		}
 	}
 
@@ -419,20 +419,20 @@ func resourceInfo(ctx context.Context, g, v, r string, index int) (map[string]ma
 		return nil, errors.Wrap(err, errMsg)
 	}
 
-	var info map[string]interface{}
+	var info map[string]any
 	if err := json.Unmarshal([]byte(stdout), &info); err != nil {
 		return nil, errors.Wrap(err, "unmarshal resource info JSON")
 	}
-	items := info["items"].([]interface{})
+	items := info["items"].([]any)
 
 	if len(items) < 1 {
 		return nil, errors.New("resource info is empty")
 	}
 
-	item := items[0].(map[string]interface{})
-	metadata := item["metadata"].(map[string]interface{})
-	annotations := metadata["annotations"].(map[string]interface{})
-	specs := item["spec"].(map[string]interface{})
+	item := items[0].(map[string]any)
+	metadata := item["metadata"].(map[string]any)
+	annotations := metadata["annotations"].(map[string]any)
+	specs := item["spec"].(map[string]any)
 
 	annoSpec := make(map[string]map[string]string)
 
@@ -465,7 +465,6 @@ func resourceInfo(ctx context.Context, g, v, r string, index int) (map[string]ma
 // are found in the haystack argument values.
 func containsAll(haystack, needles map[string]string) bool {
 	for nkey, nval := range needles {
-
 		hval, ok := haystack[nkey]
 		if !ok {
 			return false

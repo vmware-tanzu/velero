@@ -25,7 +25,7 @@ If you've already run `velero install` without the `--use-node-agent` flag, you 
 
 ## CSI Snapshot Data Movement
 
-Velero node-agent is required by CSI snapshot data movement when Velero built-in data mover is used. By default, `velero install` does not install Velero's node-agent. To enable it, specify the `--use-node-agent` flag.
+Velero node-agent is required by [CSI Snapshot Data Movement][12] when Velero built-in data mover is used. By default, `velero install` does not install Velero's node-agent. To enable it, specify the `--use-node-agent` flag.
 
 For some use cases, Velero node-agent requires to run under privileged mode. For example, when backing up block volumes, it is required to allow the node-agent to access the block device. To enable it set velero install flags `--privileged-node-agent`.
 
@@ -95,20 +95,23 @@ the config file setting.
 
 ## Customize resource requests and limits
 
-At installation, Velero sets default resource requests and limits for the Velero pod and the node-agent pod, if you using the [File System Backup][3].
+At installation, You could set resource requests and limits for the Velero pod, the node-agent pod and the [repository maintenance job][14], if you are using the [File System Backup][3] or [CSI Snapshot Data Movement][12].  
 
 {{< table caption="Velero Customize resource requests and limits defaults" >}}
 |Setting|Velero pod defaults|node-agent pod defaults|
 |--- |--- |--- |
-|CPU request|500m|500m|
-|Memory requests|128Mi|512Mi|
-|CPU limit|1000m (1 CPU)|1000m (1 CPU)|
-|Memory limit|512Mi|1024Mi|
+|CPU request|500m|N/A|
+|Memory requests|128Mi|N/A|
+|CPU limit|1000m (1 CPU)|N/A|
+|Memory limit|512Mi|N/A|
 {{< /table >}}
+  
+For Velero pod, through testing, the Velero maintainers have found these defaults work well when backing up and restoring 1000 or less resources.  
+For node-agent pod, by default it doesn't have CPU/memory request/limit, so that the backups/restores won't break due to resource throttling. The Velero maintainers have also done some [Performance Tests][13] to show the relationship of CPU/memory usage and the scale of data being backed up/restored.
 
-Depending on the cluster resources, you may need to increase these defaults. Through testing, the Velero maintainers have found these defaults work well when backing up and restoring 1000 or less resources and total size of files is 100GB or below. If the resources you are planning to backup or restore exceed this, you will need to increase the CPU or memory resources available to Velero. In general, the Velero maintainer's testing found that backup operations needed more CPU & memory resources but were less time-consuming than restore operations, when comparing backing up and restoring the same amount of data. The exact CPU and memory limits you will need depend on the scale of the files and directories of your resources and your hardware. It's recommended that you perform your own testing to find the best resource limits for your clusters and resources.
+For repository maintenance job, it's no limit on resources by default. You could configure the job resource limitation based on target data to be backed up, some further settings please refer to [repository maintenance job][14].
 
-You may need to increase the resource limits if you are using File System Backup, see the details in [File System Backup][3].
+You don't have to change the defaults all the time, but if you need, it's recommended that you perform your own testing to find the best resource limits for your clusters and resources.   
 
 ### Install with custom resource requests and limits
 
@@ -125,7 +128,11 @@ velero install \
   [--node-agent-pod-cpu-request <CPU_REQUEST>] \
   [--node-agent-pod-mem-request <MEMORY_REQUEST>] \
   [--node-agent-pod-cpu-limit <CPU_LIMIT>] \
-  [--node-agent-pod-mem-limit <MEMORY_LIMIT>]
+  [--node-agent-pod-mem-limit <MEMORY_LIMIT>] \
+  [--maintenance-job-cpu-request <CPU_REQUEST>] \
+  [--maintenance-job-mem-request <MEMORY_REQUEST>] \
+  [--maintenance-job-cpu-limit <CPU_LIMIT>] \
+  [--maintenance-job-mem-limit <MEMORY_LIMIT>]
 ```
 
 ### Update resource requests and limits after install
@@ -421,3 +428,6 @@ If you get an error like `complete:13: command not found: compdef`, then add the
 [9]: self-signed-certificates.md
 [10]: csi.md
 [11]: https://github.com/vmware-tanzu/velero/blob/main/pkg/apis/velero/v1/constants.go
+[12]: csi-snapshot-data-movement.md
+[13]: performance-guidance.md
+[14]: repository-maintenance.md

@@ -14,90 +14,58 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
-      id: go
-
-    - uses: actions/checkout@v3
-
-    # Fix issue of setup-gcloud
-    - run: |
-        sudo apt-get install python2.7
-        export CLOUDSDK_PYTHON="/usr/bin/python2"
-
-    - uses: google-github-actions/setup-gcloud@v0
-      with:
-        version: '285.0.0'
-        service_account_key: ${{ secrets.GCS_SA_KEY }}
-        export_default_credentials: true
-    - run: gcloud info
-
-    - name: Set up QEMU
-      id: qemu
-      uses: docker/setup-qemu-action@v1
-      with:
-        platforms: all
-
-    - name: Set up Docker Buildx
-      id: buildx
-      uses: docker/setup-buildx-action@v1
-      with:
-        version: latest
-
-    - name: Build
-      run: |
-        make local
-        # Clean go cache to ease the build environment storage pressure.
-        go clean -modcache -cache
-
-    - name: Test
-      run: make test
-
-    - name: Upload test coverage
-      uses: codecov/codecov-action@v2
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: coverage.out
-        verbose: true
-
-    # Use the JSON key in secret to login gcr.io
-    - uses: 'docker/login-action@v2'
-      with:
-        registry: 'gcr.io' # or REGION.docker.pkg.dev
-        username: '_json_key'
-        password: '${{ secrets.GCR_SA_KEY }}'
-
-    # Only try to publish the container image from the root repo; forks don't have permission to do so and will always get failures.
-    - name: Publish container image
-      if: github.repository == 'vmware-tanzu/velero'
-      run: |
-        sudo swapoff -a
-        sudo rm -f /mnt/swapfile
-        docker system prune -a --force
+      - name: Check out the code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+      - id: 'auth'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCS_SA_KEY }}'
+      - name: 'set up GCloud SDK'
+        uses: google-github-actions/setup-gcloud@v2
+      - name: 'use gcloud CLI'
+        run: |
+          gcloud info
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: latest
+      - name: Build
+        run: |
+          make local
+          # Clean go cache to ease the build environment storage pressure.
+          go clean -modcache -cache
+      - name: Test
+        run: make test
+      - name: Upload test coverage
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.out
+          verbose: true
+      # Use the JSON key in secret to login gcr.io
+      - uses: 'docker/login-action@v3'
+        with:
+          registry: 'gcr.io' # or REGION.docker.pkg.dev
+          username: '_json_key'
+          password: '${{ secrets.GCR_SA_KEY }}'
+      # Only try to publish the container image from the root repo; forks don't have permission to do so and will always get failures.
+      - name: Publish container image
+        if: github.repository == 'vmware-tanzu/velero'
+        run: |
+          sudo swapoff -a
+          sudo rm -f /mnt/swapfile
+          docker system prune -a --force
               
-        # Build and push Velero image to docker registry
-        docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
-        VERSION=$(./hack/docker-push.sh | grep 'VERSION:' | awk -F: '{print $2}' | xargs)
-
-        # Upload Velero image package to GCS
-        source hack/ci/build_util.sh
-        BIN=velero
-        RESTORE_HELPER_BIN=velero-restore-helper
-        GCS_BUCKET=velero-builds
-        VELERO_IMAGE=${BIN}-${VERSION}
-        VELERO_RESTORE_HELPER_IMAGE=${RESTORE_HELPER_BIN}-${VERSION}
-        VELERO_IMAGE_FILE=${VELERO_IMAGE}.tar.gz
-        VELERO_RESTORE_HELPER_IMAGE_FILE=${VELERO_RESTORE_HELPER_IMAGE}.tar.gz
-        VELERO_IMAGE_BACKUP_FILE=${VELERO_IMAGE}-'build.'${GITHUB_RUN_NUMBER}.tar.gz
-        VELERO_RESTORE_HELPER_IMAGE_BACKUP_FILE=${VELERO_RESTORE_HELPER_IMAGE}-'build.'${GITHUB_RUN_NUMBER}.tar.gz
-
-        cp ${VELERO_IMAGE_FILE} ${VELERO_IMAGE_BACKUP_FILE}
-        cp ${VELERO_RESTORE_HELPER_IMAGE_FILE} ${VELERO_RESTORE_HELPER_IMAGE_BACKUP_FILE}
-
-        uploader ${VELERO_IMAGE_FILE} ${GCS_BUCKET}
-        uploader ${VELERO_RESTORE_HELPER_IMAGE_FILE} ${GCS_BUCKET}
-        uploader ${VELERO_IMAGE_BACKUP_FILE} ${GCS_BUCKET}
-        uploader ${VELERO_RESTORE_HELPER_IMAGE_BACKUP_FILE} ${GCS_BUCKET}
+          # Build and push Velero image to docker registry
+          docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+          ./hack/docker-push.sh

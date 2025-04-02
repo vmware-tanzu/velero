@@ -23,155 +23,209 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	waitutil "k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
-	. "github.com/vmware-tanzu/velero/test/util/k8s"
-	. "github.com/vmware-tanzu/velero/test/util/velero"
+	framework "github.com/vmware-tanzu/velero/test/e2e/test"
+	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
+	veleroutil "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
-var ScheduleOrderedResources func() = TestFunc(&OrderedResources{})
+var ScheduleOrderedResources func() = framework.TestFunc(&OrderedResources{})
 
 type OrderedResources struct {
-	Namespace    string
-	ScheduleName string
-	OrderMap     map[string]string
-	ScheduleArgs []string
-	TestCase
+	Namespace     string
+	ScheduleName  string
+	OrderResource map[string]string
+	ScheduleArgs  []string
+	framework.TestCase
 }
 
 func (o *OrderedResources) Init() error {
-	o.TestCase.Init()
+	Expect(o.TestCase.Init()).To(Succeed())
+
 	o.CaseBaseName = "ordered-resources-" + o.UUIDgen
 	o.ScheduleName = "schedule-" + o.CaseBaseName
 	o.Namespace = o.CaseBaseName + "-" + o.UUIDgen
-	o.OrderMap = map[string]string{
+
+	o.OrderResource = map[string]string{
 		"deployments": fmt.Sprintf("deploy-%s", o.CaseBaseName),
 		"secrets":     fmt.Sprintf("secret-%s", o.CaseBaseName),
 		"configmaps":  fmt.Sprintf("configmap-%s", o.CaseBaseName),
 	}
-	o.TestMsg = &TestMSG{
+
+	orderResourceArray := make([]string, 0)
+	for k, v := range o.OrderResource {
+		orderResourceArray = append(
+			orderResourceArray,
+			fmt.Sprintf("%s=%s", k, v),
+		)
+	}
+	orderResourceStr := strings.Join(orderResourceArray, ";")
+
+	o.TestMsg = &framework.TestMSG{
 		Desc:      "Create a schedule to backup resources in a specific order should be successful",
 		FailedMSG: "Failed to verify schedule backup resources in a specific order",
 		Text:      "Create a schedule to backup resources in a specific order should be successful",
 	}
-	o.ScheduleArgs = []string{"--schedule", "@every 1m",
-		"--include-namespaces", o.Namespace, "--default-volumes-to-fs-backup", "--ordered-resources"}
-	var orderStr string
-	for kind, resource := range o.OrderMap {
-		orderStr += fmt.Sprintf("%s=%s;", kind, resource)
+
+	o.ScheduleArgs = []string{
+		"--schedule",
+		"@every 1m",
+		"--include-namespaces",
+		o.Namespace,
+		"--default-volumes-to-fs-backup",
+		"--ordered-resources",
+		orderResourceStr,
 	}
-	o.ScheduleArgs = append(o.ScheduleArgs, strings.TrimRight(orderStr, ";"))
 
 	return nil
 }
 
 func (o *OrderedResources) CreateResources() error {
-	o.Ctx, o.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	label := map[string]string{
 		"orderedresources": "true",
 	}
 	fmt.Printf("Creating resources in %s namespace ...\n", o.Namespace)
-	if err := CreateNamespace(o.Ctx, o.Client, o.Namespace); err != nil {
+	if err := k8sutil.CreateNamespace(o.Ctx, o.Client, o.Namespace); err != nil {
 		return errors.Wrapf(err, "failed to create namespace %s", o.Namespace)
 	}
+
 	//Create deployment
 	deploymentName := fmt.Sprintf("deploy-%s", o.CaseBaseName)
 	fmt.Printf("Creating deployment %s in %s namespaces ...\n", deploymentName, o.Namespace)
-	deployment := NewDeployment(deploymentName, o.Namespace, 1, label, nil).Result()
-	deployment, err := CreateDeployment(o.Client.ClientGo, o.Namespace, deployment)
+	deployment := k8sutil.NewDeployment(deploymentName, o.Namespace, 1, label, nil).Result()
+	_, err := k8sutil.CreateDeployment(o.Client.ClientGo, o.Namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create namespace %q with err %v", o.Namespace, err))
 	}
-	err = WaitForReadyDeployment(o.Client.ClientGo, o.Namespace, deployment.Name)
+	err = k8sutil.WaitForReadyDeployment(o.Client.ClientGo, o.Namespace, deployment.Name)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to ensure job completion in namespace: %q", o.Namespace))
 	}
+
 	//Create Secret
 	secretName := fmt.Sprintf("secret-%s", o.CaseBaseName)
 	fmt.Printf("Creating secret %s in %s namespaces ...\n", secretName, o.Namespace)
-	_, err = CreateSecret(o.Client.ClientGo, o.Namespace, secretName, label)
+	_, err = k8sutil.CreateSecret(o.Client.ClientGo, o.Namespace, secretName, label)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create secret in the namespace %q", o.Namespace))
 	}
-	err = WaitForSecretsComplete(o.Client.ClientGo, o.Namespace, secretName)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to ensure secret completion in namespace: %q", o.Namespace))
+
+	//Create ConfigMap
+	cmName := fmt.Sprintf("configmap-%s", o.CaseBaseName)
+	fmt.Printf("Creating ConfigMap %s in %s namespaces ...\n", cmName, o.Namespace)
+	if _, err := k8sutil.CreateConfigMap(
+		o.Client.ClientGo,
+		o.Namespace,
+		cmName,
+		label,
+		nil,
+	); err != nil {
+		return errors.Wrap(
+			err,
+			fmt.Sprintf("failed to create ConfigMap in the namespace %q", o.Namespace),
+		)
 	}
-	//Create Configmap
-	configmapName := fmt.Sprintf("configmap-%s", o.CaseBaseName)
-	fmt.Printf("Creating configmap %s in %s namespaces ...\n", configmapName, o.Namespace)
-	_, err = CreateConfigMap(o.Client.ClientGo, o.Namespace, configmapName, label, nil)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to create configmap in the namespace %q", o.Namespace))
-	}
-	err = WaitForConfigMapComplete(o.Client.ClientGo, o.Namespace, configmapName)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to ensure secret completion in namespace: %q", o.Namespace))
-	}
+
 	return nil
 }
 
 func (o *OrderedResources) Backup() error {
 	By(fmt.Sprintf("Create schedule the workload in %s namespace", o.Namespace), func() {
-		err := VeleroScheduleCreate(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, o.ScheduleName, o.ScheduleArgs)
+		err := veleroutil.VeleroScheduleCreate(
+			o.Ctx,
+			o.VeleroCfg.VeleroCLI,
+			o.VeleroCfg.VeleroNamespace,
+			o.ScheduleName,
+			o.ScheduleArgs,
+		)
 		Expect(err).To(Succeed(), fmt.Sprintf("Failed to create schedule %s  with err %v", o.ScheduleName, err))
 	})
-	return nil
-}
 
-func (o *OrderedResources) Destroy() error {
-	return nil
-}
-
-func (o *OrderedResources) Verify() error {
-	By(fmt.Sprintf("Checking resource order in %s schedule cr", o.ScheduleName), func() {
-		err := CheckScheduleWithResourceOrder(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, o.ScheduleName, o.OrderMap)
-		Expect(err).To(Succeed(), fmt.Sprintf("Failed to check schedule %s with err %v", o.ScheduleName, err))
+	By(fmt.Sprintf("Checking resource order in %s schedule CR", o.ScheduleName), func() {
+		err := veleroutil.CheckScheduleWithResourceOrder(
+			o.Ctx,
+			o.VeleroCfg.VeleroCLI,
+			o.VeleroCfg.VeleroNamespace,
+			o.ScheduleName,
+			o.OrderResource,
+		)
+		Expect(err).To(
+			Succeed(),
+			fmt.Sprintf("Failed to check schedule %s with err %v", o.ScheduleName, err),
+		)
 	})
 
 	By("Checking resource order in backup cr", func() {
-		backupList := new(velerov1api.BackupList)
-		err := waitutil.PollImmediate(10*time.Second, time.Minute*5, func() (bool, error) {
-			if err := o.Client.Kubebuilder.List(o.Ctx, backupList, &kbclient.ListOptions{Namespace: o.VeleroCfg.VeleroNamespace}); err != nil {
-				return false, fmt.Errorf("failed to list backup object in %s namespace with err %v", o.VeleroCfg.VeleroNamespace, err)
-			}
+		err := waitutil.PollUntilContextTimeout(
+			o.Ctx,
+			30*time.Second,
+			time.Minute*5,
+			true,
+			func(ctx context.Context) (bool, error) {
+				backupList := new(velerov1api.BackupList)
 
-			for _, backup := range backupList.Items {
-				if err := CheckBackupWithResourceOrder(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, backup.Name, o.OrderMap); err == nil {
-					return true, nil
+				if err := o.Client.Kubebuilder.List(
+					o.Ctx,
+					backupList,
+					&kbclient.ListOptions{
+						Namespace: o.VeleroCfg.VeleroNamespace,
+						LabelSelector: labels.SelectorFromSet(map[string]string{
+							velerov1api.ScheduleNameLabel: o.ScheduleName,
+						}),
+					},
+				); err != nil {
+					return false, fmt.Errorf("failed to list backup in %s namespace for schedule %s: %s",
+						o.VeleroCfg.VeleroNamespace, o.ScheduleName, err.Error())
 				}
-			}
-			fmt.Printf("still finding backup created by schedule %s ...\n", o.ScheduleName)
-			return false, nil
-		})
-		Expect(err).To(Succeed(), fmt.Sprintf("Failed to check schedule %s created backup with err %v", o.ScheduleName, err))
+
+				for _, backup := range backupList.Items {
+					if err := veleroutil.CheckBackupWithResourceOrder(
+						o.Ctx,
+						o.VeleroCfg.VeleroCLI,
+						o.VeleroCfg.VeleroNamespace,
+						backup.Name,
+						o.OrderResource,
+					); err == nil {
+						// After schedule successfully triggers a backup,
+						// the workload namespace is deleted.
+						// It's possible the following backup may fail.
+						// As a result, as long as there is one backup in Completed state,
+						// the case assumes test pass.
+						return true, nil
+					}
+				}
+				fmt.Printf("still finding backup created by schedule %s ...\n", o.ScheduleName)
+				return false, nil
+			})
+		Expect(err).To(
+			Succeed(),
+			fmt.Sprintf("Failed to check schedule %s created backup with err %v",
+				o.ScheduleName, err),
+		)
 	})
 	return nil
 }
 
 func (o *OrderedResources) Clean() error {
-	if !o.VeleroCfg.Debug {
-		Expect(VeleroScheduleDelete(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, o.ScheduleName)).To(Succeed())
+	if CurrentSpecReport().Failed() && o.VeleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
+		Expect(veleroutil.VeleroScheduleDelete(
+			o.Ctx,
+			o.VeleroCfg.VeleroCLI,
+			o.VeleroCfg.VeleroNamespace,
+			o.ScheduleName,
+		)).To(Succeed())
+
 		Expect(o.TestCase.Clean()).To(Succeed())
 	}
-	return nil
-}
 
-func (o *OrderedResources) DeleteAllBackups() error {
-	backupList := new(velerov1api.BackupList)
-	if err := o.Client.Kubebuilder.List(o.Ctx, backupList, &kbclient.ListOptions{Namespace: o.VeleroCfg.VeleroNamespace}); err != nil {
-		return fmt.Errorf("failed to list backup object in %s namespace with err %v", o.VeleroCfg.VeleroNamespace, err)
-	}
-	for _, backup := range backupList.Items {
-		if err := VeleroBackupDelete(o.Ctx, o.VeleroCfg.VeleroCLI, o.VeleroCfg.VeleroNamespace, backup.Name); err != nil {
-			return err
-		}
-	}
 	return nil
 }

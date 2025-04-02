@@ -22,9 +22,10 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	waitutil "k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -49,7 +50,7 @@ func SSRTest() {
 	})
 
 	It(fmt.Sprintf("Should create an ssr object in the %s namespace and later removed by controller", veleroCfg.VeleroNamespace), func() {
-		ctx, ctxCancel := context.WithTimeout(context.Background(), time.Duration(time.Minute*10))
+		ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*10)
 		defer ctxCancel()
 		defer DeleteNamespace(context.TODO(), *veleroCfg.ClientToInstallVelero, testNS, false)
 		By(fmt.Sprintf("Create %s namespace", testNS))
@@ -66,8 +67,8 @@ func SSRTest() {
 		})
 		ssrListResp := new(v1.ServerStatusRequestList)
 		By(fmt.Sprintf("Check ssr object in %s namespace", veleroCfg.VeleroNamespace))
-		err = waitutil.PollImmediate(5*time.Second, time.Minute,
-			func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second, time.Minute, true,
+			func(context.Context) (bool, error) {
 				if err = veleroCfg.ClientToInstallVelero.Kubebuilder.List(ctx, ssrListResp, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
 					return false, fmt.Errorf("failed to list ssr object in %s namespace with err %v", veleroCfg.VeleroNamespace, err)
 				}
@@ -85,16 +86,14 @@ func SSRTest() {
 				}
 				return true, nil
 			})
-		if err == waitutil.ErrWaitTimeout {
-			fmt.Printf("exceed test case deadline and failed to check ssr object in %s namespace", veleroCfg.VeleroNamespace)
-		}
+		fmt.Printf("exceed test case deadline and failed to check ssr object in %s namespace", veleroCfg.VeleroNamespace)
+
 		Expect(err).To(Succeed(), fmt.Sprintf("Failed to check ssr object in %s namespace", veleroCfg.VeleroNamespace))
 
 		By(fmt.Sprintf("Check ssr object in %s namespace", testNS))
 		Expect(veleroCfg.ClientToInstallVelero.Kubebuilder.List(ctx, ssrListResp, &kbclient.ListOptions{Namespace: testNS})).To(Succeed(),
 			fmt.Sprintf("Failed to list ssr object in %s namespace", testNS))
-		Expect(len(ssrListResp.Items)).To(BeNumerically("==", 1),
-			fmt.Sprintf("Count of ssr object in %s namespace is not 1 but %d", testNS, len(ssrListResp.Items)))
+		Expect(ssrListResp.Items).To(HaveLen(1), fmt.Sprintf("Count of ssr object in %s namespace is not 1 but %d", testNS, len(ssrListResp.Items)))
 		Expect(ssrListResp.Items[0].Status.Phase).To(BeEmpty(),
 			fmt.Sprintf("Status of ssr object in %s namespace should be empty", testNS))
 		Expect(ssrListResp.Items[0].Status.ServerVersion).To(BeEmpty(),

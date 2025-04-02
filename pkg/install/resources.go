@@ -30,6 +30,7 @@ import (
 	v1crds "github.com/vmware-tanzu/velero/config/crd/v1/crds"
 	v2alpha1crds "github.com/vmware-tanzu/velero/config/crd/v2alpha1/crds"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
@@ -245,6 +246,7 @@ type VeleroOptions struct {
 	SecretData                      []byte
 	RestoreOnly                     bool
 	UseNodeAgent                    bool
+	UseNodeAgentWindows             bool
 	PrivilegedNodeAgent             bool
 	UseVolumeSnapshots              bool
 	BSLConfig                       map[string]string
@@ -261,6 +263,12 @@ type VeleroOptions struct {
 	DefaultSnapshotMoveData         bool
 	DisableInformerCache            bool
 	ScheduleSkipImmediately         bool
+	PodResources                    kube.PodResources
+	KeepLatestMaintenanceJobs       int
+	BackupRepoConfigMap             string
+	RepoMaintenanceJobConfigMap     string
+	NodeAgentConfigMap              string
+	ItemBlockWorkerCount            int
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -345,6 +353,9 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		WithPodVolumeOperationTimeout(o.PodVolumeOperationTimeout),
 		WithUploaderType(o.UploaderType),
 		WithScheduleSkipImmediately(o.ScheduleSkipImmediately),
+		WithPodResources(o.PodResources),
+		WithKeepLatestMaintenanceJobs(o.KeepLatestMaintenanceJobs),
+		WithItemBlockWorkerCount(o.ItemBlockWorkerCount),
 	}
 
 	if len(o.Features) > 0 {
@@ -352,7 +363,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 	}
 
 	if o.RestoreOnly {
-		deployOpts = append(deployOpts, WithRestoreOnly())
+		deployOpts = append(deployOpts, WithRestoreOnly(true))
 	}
 
 	if len(o.Plugins) > 0 {
@@ -360,15 +371,23 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 	}
 
 	if o.DefaultVolumesToFsBackup {
-		deployOpts = append(deployOpts, WithDefaultVolumesToFsBackup())
+		deployOpts = append(deployOpts, WithDefaultVolumesToFsBackup(true))
 	}
 
 	if o.DefaultSnapshotMoveData {
-		deployOpts = append(deployOpts, WithDefaultSnapshotMoveData())
+		deployOpts = append(deployOpts, WithDefaultSnapshotMoveData(true))
 	}
 
 	if o.DisableInformerCache {
-		deployOpts = append(deployOpts, WithDisableInformerCache())
+		deployOpts = append(deployOpts, WithDisableInformerCache(true))
+	}
+
+	if len(o.BackupRepoConfigMap) > 0 {
+		deployOpts = append(deployOpts, WithBackupRepoConfigMap(o.BackupRepoConfigMap))
+	}
+
+	if len(o.RepoMaintenanceJobConfigMap) > 0 {
+		deployOpts = append(deployOpts, WithRepoMaintenanceJobConfigMap(o.RepoMaintenanceJobConfigMap))
 	}
 
 	deploy := Deployment(o.Namespace, deployOpts...)
@@ -377,7 +396,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		fmt.Printf("error appending Deployment %s: %s\n", deploy.GetName(), err.Error())
 	}
 
-	if o.UseNodeAgent {
+	if o.UseNodeAgent || o.UseNodeAgentWindows {
 		dsOpts := []podTemplateOption{
 			WithAnnotations(o.PodAnnotations),
 			WithLabels(o.PodLabels),
@@ -390,11 +409,26 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 			dsOpts = append(dsOpts, WithFeatures(o.Features))
 		}
 		if o.PrivilegedNodeAgent {
-			dsOpts = append(dsOpts, WithPrivilegedNodeAgent())
+			dsOpts = append(dsOpts, WithPrivilegedNodeAgent(true))
 		}
-		ds := DaemonSet(o.Namespace, dsOpts...)
-		if err := appendUnstructured(resources, ds); err != nil {
-			fmt.Printf("error appending DaemonSet %s: %s\n", ds.GetName(), err.Error())
+		if len(o.NodeAgentConfigMap) > 0 {
+			dsOpts = append(dsOpts, WithNodeAgentConfigMap(o.NodeAgentConfigMap))
+		}
+
+		if o.UseNodeAgent {
+			ds := DaemonSet(o.Namespace, dsOpts...)
+			if err := appendUnstructured(resources, ds); err != nil {
+				fmt.Printf("error appending DaemonSet %s: %s\n", ds.GetName(), err.Error())
+			}
+		}
+
+		if o.UseNodeAgentWindows {
+			dsOpts = append(dsOpts, WithForWindows())
+
+			dsWin := DaemonSet(o.Namespace, dsOpts...)
+			if err := appendUnstructured(resources, dsWin); err != nil {
+				fmt.Printf("error appending DaemonSet %s: %s\n", dsWin.GetName(), err.Error())
+			}
 		}
 	}
 

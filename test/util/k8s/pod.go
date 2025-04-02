@@ -107,7 +107,6 @@ func GetPod(ctx context.Context, client TestClient, namespace string, pod string
 }
 
 func AddAnnotationToPod(ctx context.Context, client TestClient, namespace, podName string, ann map[string]string) (*corev1.Pod, error) {
-
 	newPod, err := GetPod(ctx, client, namespace, podName)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Fail to ge pod %s in namespace %s", podName, namespace))

@@ -1,1 +1,0 @@
-Adjust the logic for the backup_last_status metrics to stop incorrectly incrementing over time

@@ -30,7 +30,8 @@ var NativeSnapshotVolumeInfoTest func() = TestFunc(&NativeSnapshotVolumeInfo{
 	BackupVolumeInfo{
 		SnapshotVolumes: true,
 		TestCase: TestCase{
-			CaseBaseName: "native-snapshot-volumeinfo",
+			UseVolumeSnapshots: true,
+			CaseBaseName:       "native-snapshot-volumeinfo",
 			TestMsg: &TestMSG{
 				Desc: "Test backup's VolumeInfo metadata content for native snapshot case.",
 				Text: "The VolumeInfo should be generated, and the NativeSnapshotInfo structure should not be nil.",
@@ -54,12 +55,11 @@ func (n *NativeSnapshotVolumeInfo) Verify() error {
 		BackupObjectsPrefix+"/"+n.BackupName,
 	)
 
-	Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("Fail to get VolumeInfo metadata in the Backup Repository."))
+	Expect(err).ShouldNot(HaveOccurred(), "Fail to get VolumeInfo metadata in the Backup Repository.")
 
 	fmt.Printf("The VolumeInfo metadata content: %+v\n", *volumeInfo[0])
-	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
+	Expect(volumeInfo).ToNot(BeEmpty())
 	Expect(volumeInfo[0].NativeSnapshotInfo).NotTo(BeNil())
 
-	// Clean SC and VSC
-	return n.cleanResource()
+	return nil
 }

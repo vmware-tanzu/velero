@@ -34,12 +34,6 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-func TestIsResourcePolicyValid(t *testing.T) {
-	require.True(t, isResourcePolicyValid(string(velerov1api.PolicyTypeNone)))
-	require.True(t, isResourcePolicyValid(string(velerov1api.PolicyTypeUpdate)))
-	require.False(t, isResourcePolicyValid(""))
-}
-
 func TestMostRecentBackup(t *testing.T) {
 	backups := []velerov1api.Backup{
 		*builder.ForBackup(cmdtest.VeleroNameSpace, "backup0").StartTimestamp(time.Now().Add(3 * time.Second)).Phase(velerov1api.BackupPhaseDeleting).Result(),
@@ -59,7 +53,6 @@ func TestCreateCommand(t *testing.T) {
 	args := []string{name}
 
 	t.Run("create a backup create command with full options except fromSchedule and wait, then run by create option", func(t *testing.T) {
-
 		// create a factory
 		f := &factorymocks.Factory{}
 
@@ -72,6 +65,7 @@ func TestCreateCommand(t *testing.T) {
 		restoreVolumes := "true"
 		preserveNodePorts := "true"
 		labels := "c=foo"
+		annotations := "ann=foo"
 		includeNamespaces := "app1,app2"
 		excludeNamespaces := "pod1,pod2,pod3"
 		existingResourcePolicy := "none"
@@ -85,7 +79,7 @@ func TestCreateCommand(t *testing.T) {
 		allowPartiallyFailed := "true"
 		itemOperationTimeout := "10m0s"
 		writeSparseFiles := "true"
-
+		parallel := 2
 		flags := new(pflag.FlagSet)
 		o := NewCreateOptions()
 		o.BindFlags(flags)
@@ -95,6 +89,7 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--restore-volumes", restoreVolumes})
 		flags.Parse([]string{"--preserve-nodeports", preserveNodePorts})
 		flags.Parse([]string{"--labels", labels})
+		flags.Parse([]string{"--annotations", annotations})
 		flags.Parse([]string{"--existing-resource-policy", existingResourcePolicy})
 		flags.Parse([]string{"--include-namespaces", includeNamespaces})
 		flags.Parse([]string{"--exclude-namespaces", excludeNamespaces})
@@ -108,6 +103,7 @@ func TestCreateCommand(t *testing.T) {
 		flags.Parse([]string{"--allow-partially-failed", allowPartiallyFailed})
 		flags.Parse([]string{"--item-operation-timeout", itemOperationTimeout})
 		flags.Parse([]string{"--write-sparse-files", writeSparseFiles})
+		flags.Parse([]string{"--parallel-files-download", "2"})
 		client := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
 		f.On("Namespace").Return(mock.Anything)
@@ -119,7 +115,7 @@ func TestCreateCommand(t *testing.T) {
 
 		//Validate
 		e = o.Validate(cmd, args, f)
-		require.Contains(t, e.Error(), "either a backup or schedule must be specified, but not both")
+		require.ErrorContains(t, e, "either a backup or schedule must be specified, but not both")
 
 		//cmd
 		e = o.Run(cmd, f)
@@ -130,6 +126,7 @@ func TestCreateCommand(t *testing.T) {
 		require.Equal(t, restoreVolumes, o.RestoreVolumes.String())
 		require.Equal(t, preserveNodePorts, o.PreserveNodePorts.String())
 		require.Equal(t, labels, o.Labels.String())
+		require.Equal(t, annotations, o.Annotations.String())
 		require.Equal(t, includeNamespaces, o.IncludeNamespaces.String())
 		require.Equal(t, excludeNamespaces, o.ExcludeNamespaces.String())
 		require.Equal(t, existingResourcePolicy, o.ExistingResourcePolicy)
@@ -144,6 +141,7 @@ func TestCreateCommand(t *testing.T) {
 		require.Equal(t, allowPartiallyFailed, o.AllowPartiallyFailed.String())
 		require.Equal(t, itemOperationTimeout, o.ItemOperationTimeout.String())
 		require.Equal(t, writeSparseFiles, o.WriteSparseFiles.String())
+		require.Equal(t, parallel, o.ParallelFilesDownload)
 	})
 
 	t.Run("create a restore from schedule", func(t *testing.T) {

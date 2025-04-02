@@ -33,11 +33,10 @@ limitations under the License.
 package basic
 
 import (
-	"context"
 	"fmt"
 	"strings"
-	"time"
 
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/pkg/errors"
 
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
@@ -79,7 +78,6 @@ func (r *RBACCase) Init() error {
 }
 
 func (r *RBACCase) CreateResources() error {
-	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
 		fmt.Printf("Creating namespaces ...%s\n", createNSName)
@@ -179,8 +177,11 @@ func (r *RBACCase) Destroy() error {
 }
 
 func (r *RBACCase) Clean() error {
-	if !r.VeleroCfg.Debug {
+	if CurrentSpecReport().Failed() && r.VeleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
 		return r.Destroy()
 	}
+
 	return nil
 }

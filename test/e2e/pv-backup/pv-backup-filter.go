@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 
@@ -55,7 +54,6 @@ func (p *PVBackupFiltering) Init() error {
 	//   annotation will be ignored, so it's only set for opt-out test
 	if p.annotation == OPT_OUT_ANN {
 		p.BackupArgs = append(p.BackupArgs, "--default-volumes-to-fs-backup")
-
 	}
 	p.RestoreArgs = []string{
 		"create", "--namespace", p.VeleroCfg.VeleroNamespace, "restore", p.RestoreName,
@@ -65,12 +63,6 @@ func (p *PVBackupFiltering) Init() error {
 }
 
 func (p *PVBackupFiltering) CreateResources() error {
-	p.Ctx, p.CtxCancel = context.WithTimeout(context.Background(), 30*time.Minute)
-	err := InstallStorageClass(p.Ctx, fmt.Sprintf("../testdata/storage-class/%s.yaml", p.VeleroCfg.CloudProvider))
-	if err != nil {
-		return errors.Wrapf(err, "failed to install storage class for pv backup filtering test")
-	}
-
 	for _, ns := range *p.NSIncluded {
 		By(fmt.Sprintf("Create namespaces %s for workload\n", ns), func() {
 			Expect(CreateNamespace(p.Ctx, p.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))

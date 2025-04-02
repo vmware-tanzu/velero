@@ -34,7 +34,7 @@ func TestAsyncBackup(t *testing.T) {
 	var asyncErr error
 	var asyncResult Result
 	finish := make(chan struct{})
-
+	var failErr = errors.New("fake-fail-error")
 	tests := []struct {
 		name         string
 		uploaderProv provider.Provider
@@ -49,12 +49,12 @@ func TestAsyncBackup(t *testing.T) {
 				OnCompleted: nil,
 				OnCancelled: nil,
 				OnFailed: func(ctx context.Context, namespace string, job string, err error) {
-					asyncErr = err
+					asyncErr = failErr
 					asyncResult = Result{}
 					finish <- struct{}{}
 				},
 			},
-			err: errors.New("fake-error"),
+			err: failErr,
 		},
 		{
 			name: "async backup cancel",
@@ -85,6 +85,7 @@ func TestAsyncBackup(t *testing.T) {
 					SnapshotID:    "fake-snapshot",
 					EmptySnapshot: false,
 					Source:        AccessPoint{ByPath: "fake-path"},
+					TotalBytes:    1000,
 				},
 			},
 			path: "fake-path",
@@ -95,18 +96,19 @@ func TestAsyncBackup(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fs := newFileSystemBR("job-1", "test", nil, "velero", Callbacks{}, velerotest.NewLogger()).(*fileSystemBR)
 			mockProvider := providerMock.NewProvider(t)
-			mockProvider.On("RunBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.result.Backup.SnapshotID, test.result.Backup.EmptySnapshot, test.err)
+			mockProvider.On("RunBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.result.Backup.SnapshotID, test.result.Backup.EmptySnapshot, test.result.Backup.TotalBytes, test.err)
+			mockProvider.On("Close", mock.Anything).Return(nil)
 			fs.uploaderProv = mockProvider
 			fs.initialized = true
 			fs.callbacks = test.callbacks
 
-			err := fs.StartBackup(AccessPoint{ByPath: test.path}, "", "", false, nil, map[string]string{})
-			require.Equal(t, nil, err)
+			err := fs.StartBackup(AccessPoint{ByPath: test.path}, map[string]string{}, &FSBRStartParam{})
+			require.NoError(t, err)
 
 			<-finish
 
-			assert.Equal(t, asyncErr, test.err)
-			assert.Equal(t, asyncResult, test.result)
+			assert.Equal(t, test.err, asyncErr)
+			assert.Equal(t, test.result, asyncResult)
 		})
 	}
 
@@ -117,7 +119,7 @@ func TestAsyncRestore(t *testing.T) {
 	var asyncErr error
 	var asyncResult Result
 	finish := make(chan struct{})
-
+	var failErr = errors.New("fake-fail-error")
 	tests := []struct {
 		name         string
 		uploaderProv provider.Provider
@@ -133,12 +135,12 @@ func TestAsyncRestore(t *testing.T) {
 				OnCompleted: nil,
 				OnCancelled: nil,
 				OnFailed: func(ctx context.Context, namespace string, job string, err error) {
-					asyncErr = err
+					asyncErr = failErr
 					asyncResult = Result{}
 					finish <- struct{}{}
 				},
 			},
-			err: errors.New("fake-error"),
+			err: failErr,
 		},
 		{
 			name: "async restore cancel",
@@ -166,7 +168,8 @@ func TestAsyncRestore(t *testing.T) {
 			},
 			result: Result{
 				Restore: RestoreResult{
-					Target: AccessPoint{ByPath: "fake-path"},
+					Target:     AccessPoint{ByPath: "fake-path"},
+					TotalBytes: 1000,
 				},
 			},
 			path:     "fake-path",
@@ -178,13 +181,14 @@ func TestAsyncRestore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fs := newFileSystemBR("job-1", "test", nil, "velero", Callbacks{}, velerotest.NewLogger()).(*fileSystemBR)
 			mockProvider := providerMock.NewProvider(t)
-			mockProvider.On("RunRestore", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.err)
+			mockProvider.On("RunRestore", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.result.Restore.TotalBytes, test.err)
+			mockProvider.On("Close", mock.Anything).Return(nil)
 			fs.uploaderProv = mockProvider
 			fs.initialized = true
 			fs.callbacks = test.callbacks
 
 			err := fs.StartRestore(test.snapshot, AccessPoint{ByPath: test.path}, map[string]string{})
-			require.Equal(t, nil, err)
+			require.NoError(t, err)
 
 			<-finish
 

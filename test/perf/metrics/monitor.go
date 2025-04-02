@@ -70,7 +70,7 @@ func (m *MetricsCollector) UpdateMetrics() {
 	}
 }
 
-// UpdateMetrics periodically updates the one-time metrics for all metrics
+// UpdateOneTimeMetrics periodically updates the one-time metrics for all metrics
 func (m *MetricsCollector) UpdateOneTimeMetrics() {
 	// NotifyOneTimeMonitors notifies the one-time metrics about the metric
 	for _, metric := range m.OneTimeMetrics {
@@ -82,11 +82,11 @@ func (m *MetricsCollector) UpdateOneTimeMetrics() {
 }
 
 // GetMetrics returns the metrics from all metrics
-func (m *MetricsCollector) GetMetrics() map[string]interface{} {
+func (m *MetricsCollector) GetMetrics() map[string]any {
 	m.Mu.Lock()         // Acquire the lock before accessing shared resources
 	defer m.Mu.Unlock() // Release the lock after the function returns
 
-	dataMap := make(map[string]interface{})
+	dataMap := make(map[string]any)
 	resData := make(map[string]([]map[string]map[string]string))
 	for _, metric := range m.Metrics {
 		monitorMetrics := metric.GetMetrics()
@@ -102,7 +102,7 @@ func (m *MetricsCollector) GetMetrics() map[string]interface{} {
 	}
 
 	for _, metric := range m.OneTimeMetrics {
-		oneTimeMetricsMap := make(map[string]interface{})
+		oneTimeMetricsMap := make(map[string]any)
 		monitorMetrics := metric.GetMetrics()
 		for key, value := range monitorMetrics {
 			oneTimeMetricsMap[key] = value

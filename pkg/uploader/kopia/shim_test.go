@@ -28,6 +28,7 @@ import (
 	"github.com/kopia/kopia/repo/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/mocks"
@@ -109,12 +110,12 @@ func TestOpenObject(t *testing.T) {
 			ctx := context.Background()
 			reader, err := NewShimRepo(tc.backupRepo).OpenObject(ctx, object.ID{})
 			if tc.isOpenObjectError {
-				assert.Contains(t, err.Error(), "failed to open object")
+				require.ErrorContains(t, err, "failed to open object")
 			} else if tc.isReaderNil {
 				assert.Nil(t, reader)
 			} else {
 				assert.NotNil(t, reader)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -151,9 +152,9 @@ func TestFindManifests(t *testing.T) {
 			ctx := context.Background()
 			_, err := NewShimRepo(tc.backupRepo).FindManifests(ctx, map[string]string{})
 			if tc.isGetManifestError {
-				assert.Contains(t, err.Error(), "failed")
+				require.ErrorContains(t, err, "failed")
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -337,7 +338,7 @@ func TestConcatenateObjects(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			_, err := NewShimRepo(tc.backupRepo).ConcatenateObjects(ctx, tc.objectIDs)
+			_, err := NewShimRepo(tc.backupRepo).ConcatenateObjects(ctx, tc.objectIDs, repo.ConcatenateOptions{})
 
 			if tc.expectedError != "" {
 				assert.EqualError(t, err, tc.expectedError)

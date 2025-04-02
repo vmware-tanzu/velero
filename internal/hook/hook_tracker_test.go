@@ -17,6 +17,7 @@ limitations under the License.
 package hook
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,13 +33,13 @@ func TestNewHookTracker(t *testing.T) {
 func TestHookTracker_Add(t *testing.T) {
 	tracker := NewHookTracker()
 
-	tracker.Add("ns1", "pod1", "container1", HookSourceAnnotation, "h1", PhasePre)
+	tracker.Add("ns1", "pod1", "container1", HookSourceAnnotation, "h1", "")
 
-	key := hookTrackerKey{
+	key := hookKey{
 		podNamespace: "ns1",
 		podName:      "pod1",
 		container:    "container1",
-		hookPhase:    PhasePre,
+		hookPhase:    "",
 		hookSource:   HookSourceAnnotation,
 		hookName:     "h1",
 	}
@@ -49,45 +50,148 @@ func TestHookTracker_Add(t *testing.T) {
 
 func TestHookTracker_Record(t *testing.T) {
 	tracker := NewHookTracker()
-	tracker.Add("ns1", "pod1", "container1", HookSourceAnnotation, "h1", PhasePre)
-	err := tracker.Record("ns1", "pod1", "container1", HookSourceAnnotation, "h1", PhasePre, true)
+	tracker.Add("ns1", "pod1", "container1", HookSourceAnnotation, "h1", "")
+	err := tracker.Record("ns1", "pod1", "container1", HookSourceAnnotation, "h1", "", true, fmt.Errorf("err"))
 
-	key := hookTrackerKey{
+	key := hookKey{
 		podNamespace: "ns1",
 		podName:      "pod1",
 		container:    "container1",
-		hookPhase:    PhasePre,
+		hookPhase:    "",
 		hookSource:   HookSourceAnnotation,
 		hookName:     "h1",
 	}
 
 	info := tracker.tracker[key]
 	assert.True(t, info.hookFailed)
-	assert.Nil(t, err)
+	assert.True(t, info.hookExecuted)
+	assert.NoError(t, err)
 
-	err = tracker.Record("ns2", "pod2", "container1", HookSourceAnnotation, "h1", PhasePre, true)
-	assert.NotNil(t, err)
+	err = tracker.Record("ns2", "pod2", "container1", HookSourceAnnotation, "h1", "", true, fmt.Errorf("err"))
+	assert.Error(t, err)
 
+	err = tracker.Record("ns1", "pod1", "container1", HookSourceAnnotation, "h1", "", false, nil)
+	assert.NoError(t, err)
+	assert.True(t, info.hookFailed)
 }
 
 func TestHookTracker_Stat(t *testing.T) {
 	tracker := NewHookTracker()
 
-	tracker.Add("ns1", "pod1", "container1", HookSourceAnnotation, "h1", PhasePre)
-	tracker.Add("ns2", "pod2", "container1", HookSourceAnnotation, "h2", PhasePre)
-	tracker.Record("ns1", "pod1", "container1", HookSourceAnnotation, "h1", PhasePre, true)
+	tracker.Add("ns1", "pod1", "container1", HookSourceAnnotation, "h1", "")
+	tracker.Add("ns2", "pod2", "container1", HookSourceAnnotation, "h2", "")
+	tracker.Record("ns1", "pod1", "container1", HookSourceAnnotation, "h1", "", true, fmt.Errorf("err"))
 
 	attempted, failed := tracker.Stat()
-	assert.Equal(t, 1, attempted)
+	assert.Equal(t, 2, attempted)
 	assert.Equal(t, 1, failed)
 }
 
-func TestHookTracker_Get(t *testing.T) {
+func TestHookTracker_IsComplete(t *testing.T) {
 	tracker := NewHookTracker()
 	tracker.Add("ns1", "pod1", "container1", HookSourceAnnotation, "h1", PhasePre)
+	tracker.Record("ns1", "pod1", "container1", HookSourceAnnotation, "h1", PhasePre, true, fmt.Errorf("err"))
+	assert.True(t, tracker.IsComplete())
 
-	tr := tracker.GetTracker()
-	assert.NotNil(t, tr)
+	tracker.Add("ns1", "pod1", "container1", HookSourceAnnotation, "h1", "")
+	assert.False(t, tracker.IsComplete())
+}
 
-	t.Logf("tracker :%+v", tr)
+func TestHookTracker_HookErrs(t *testing.T) {
+	tracker := NewHookTracker()
+	tracker.Add("ns1", "pod1", "container1", HookSourceAnnotation, "h1", "")
+	tracker.Record("ns1", "pod1", "container1", HookSourceAnnotation, "h1", "", true, fmt.Errorf("err"))
+
+	hookErrs := tracker.HookErrs()
+	assert.Len(t, hookErrs, 1)
+}
+
+func TestMultiHookTracker_Add(t *testing.T) {
+	mht := NewMultiHookTracker()
+
+	mht.Add("restore1", "ns1", "pod1", "container1", HookSourceAnnotation, "h1", "")
+
+	key := hookKey{
+		podNamespace: "ns1",
+		podName:      "pod1",
+		container:    "container1",
+		hookPhase:    "",
+		hookSource:   HookSourceAnnotation,
+		hookName:     "h1",
+	}
+
+	_, ok := mht.trackers["restore1"].tracker[key]
+	assert.True(t, ok)
+}
+
+func TestMultiHookTracker_Record(t *testing.T) {
+	mht := NewMultiHookTracker()
+	mht.Add("restore1", "ns1", "pod1", "container1", HookSourceAnnotation, "h1", "")
+	err := mht.Record("restore1", "ns1", "pod1", "container1", HookSourceAnnotation, "h1", "", true, fmt.Errorf("err"))
+
+	key := hookKey{
+		podNamespace: "ns1",
+		podName:      "pod1",
+		container:    "container1",
+		hookPhase:    "",
+		hookSource:   HookSourceAnnotation,
+		hookName:     "h1",
+	}
+
+	info := mht.trackers["restore1"].tracker[key]
+	assert.True(t, info.hookFailed)
+	assert.True(t, info.hookExecuted)
+	assert.NoError(t, err)
+
+	err = mht.Record("restore1", "ns2", "pod2", "container1", HookSourceAnnotation, "h1", "", true, fmt.Errorf("err"))
+	assert.Error(t, err)
+
+	err = mht.Record("restore2", "ns2", "pod2", "container1", HookSourceAnnotation, "h1", "", true, fmt.Errorf("err"))
+	assert.Error(t, err)
+}
+
+func TestMultiHookTracker_Stat(t *testing.T) {
+	mht := NewMultiHookTracker()
+
+	mht.Add("restore1", "ns1", "pod1", "container1", HookSourceAnnotation, "h1", "")
+	mht.Add("restore1", "ns2", "pod2", "container1", HookSourceAnnotation, "h2", "")
+	mht.Record("restore1", "ns1", "pod1", "container1", HookSourceAnnotation, "h1", "", true, fmt.Errorf("err"))
+	mht.Record("restore1", "ns2", "pod2", "container1", HookSourceAnnotation, "h2", "", false, nil)
+
+	attempted, failed := mht.Stat("restore1")
+	assert.Equal(t, 2, attempted)
+	assert.Equal(t, 1, failed)
+}
+
+func TestMultiHookTracker_Delete(t *testing.T) {
+	mht := NewMultiHookTracker()
+	mht.Add("restore1", "ns1", "pod1", "container1", HookSourceAnnotation, "h1", "")
+	mht.Delete("restore1")
+
+	_, ok := mht.trackers["restore1"]
+	assert.False(t, ok)
+}
+
+func TestMultiHookTracker_IsComplete(t *testing.T) {
+	mht := NewMultiHookTracker()
+	mht.Add("backup1", "ns1", "pod1", "container1", HookSourceAnnotation, "h1", PhasePre)
+	mht.Record("backup1", "ns1", "pod1", "container1", HookSourceAnnotation, "h1", PhasePre, true, fmt.Errorf("err"))
+	assert.True(t, mht.IsComplete("backup1"))
+
+	mht.Add("restore1", "ns1", "pod1", "container1", HookSourceAnnotation, "h1", "")
+	assert.False(t, mht.IsComplete("restore1"))
+
+	assert.True(t, mht.IsComplete("restore2"))
+}
+
+func TestMultiHookTracker_HookErrs(t *testing.T) {
+	mht := NewMultiHookTracker()
+	mht.Add("restore1", "ns1", "pod1", "container1", HookSourceAnnotation, "h1", "")
+	mht.Record("restore1", "ns1", "pod1", "container1", HookSourceAnnotation, "h1", "", true, fmt.Errorf("err"))
+
+	hookErrs := mht.HookErrs("restore1")
+	assert.Len(t, hookErrs, 1)
+
+	hookErrs2 := mht.HookErrs("restore2")
+	assert.Empty(t, hookErrs2)
 }

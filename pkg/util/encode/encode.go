@@ -78,7 +78,7 @@ func EncoderFor(format string, obj runtime.Object) (runtime.Encoder, error) {
 }
 
 // ToJSONGzip takes arbitrary Go data and encodes it to GZip compressed JSON in a buffer, as well as a description of the data to put into an error should encoding fail.
-func ToJSONGzip(data interface{}, desc string) (*bytes.Buffer, []error) {
+func ToJSONGzip(data any, desc string) (*bytes.Buffer, []error) {
 	buf := new(bytes.Buffer)
 	gzw := gzip.NewWriter(buf)
 

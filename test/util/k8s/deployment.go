@@ -114,7 +114,6 @@ func (d *DeploymentBuilder) WithVolume(volumes []*v1.Volume) *DeploymentBuilder 
 			MountPath: "/" + v.Name,
 		})
 		d.Spec.Template.Spec.Volumes = append(d.Spec.Template.Spec.Volumes, *v)
-
 	}
 
 	// NOTE here just mount volumes to the first container

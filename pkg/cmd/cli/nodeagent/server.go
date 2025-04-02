@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bombsimon/logrusr/v3"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -38,14 +39,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -54,13 +55,17 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+
+	cacheutil "k8s.io/client-go/tools/cache"
 )
 
 var (
@@ -75,6 +80,8 @@ const (
 	// files will be written to
 	defaultCredentialsDirectory = "/tmp/credentials"
 
+	defaultHostPodsPath = "/host_pods"
+
 	defaultResourceTimeout         = 10 * time.Minute
 	defaultDataMoverPrepareTimeout = 30 * time.Minute
 	defaultDataPathConcurrentNum   = 1
@@ -84,6 +91,7 @@ type nodeAgentServerConfig struct {
 	metricsAddress          string
 	resourceTimeout         time.Duration
 	dataMoverPrepareTimeout time.Duration
+	nodeAgentConfig         string
 }
 
 func NewServerCommand(f client.Factory) *cobra.Command {
@@ -104,7 +112,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 			logLevel := logLevelFlag.Parse()
 			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))
 
-			logger := logging.DefaultLogger(logLevel, formatFlag.Parse())
+			logger := logging.DefaultMergeLogger(logLevel, formatFlag.Parse())
 			logger.Infof("Starting Velero node-agent server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
 
 			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
@@ -120,6 +128,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters. Default is 10 minutes.")
 	command.Flags().DurationVar(&config.dataMoverPrepareTimeout, "data-mover-prepare-timeout", config.dataMoverPrepareTimeout, "How long to wait for preparing a DataUpload/DataDownload. Default is 30 minutes.")
 	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "The address to expose prometheus metrics")
+	command.Flags().StringVar(&config.nodeAgentConfig, "node-agent-configmap", config.nodeAgentConfig, "The name of ConfigMap containing node-agent configurations.")
 
 	return command
 }
@@ -138,6 +147,7 @@ type nodeAgentServer struct {
 	kubeClient        kubernetes.Interface
 	csiSnapshotClient *snapshotv1client.Clientset
 	dataPathMgr       *datapath.Manager
+	dataPathConfigs   *nodeagent.Configs
 }
 
 func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, config nodeAgentServerConfig) (*nodeAgentServer, error) {
@@ -149,7 +159,8 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		return nil, err
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	ctrl.SetLogger(logrusr.New(logger))
+	klog.SetLogger(logrusr.New(logger)) // klog.Logger is used by k8s.io/client-go
 
 	if err := velerov1api.AddToScheme(scheme); err != nil {
 		cancelFunc()
@@ -172,7 +183,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 
 	// use a field selector to filter to only pods scheduled on this node.
 	cacheOption := cache.Options{
-		SelectorsByObject: cache.SelectorsByObject{
+		ByObject: map[ctrlclient.Object]cache.ByObject{
 			&v1.Pod{}: {
 				Field: fields.Set{"spec.nodeName": nodeName}.AsSelector(),
 			},
@@ -188,15 +199,36 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 			&velerov2alpha1api.DataDownload{}: {
 				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
 			},
+			&v1.Event{}: {
+				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
+			},
 		},
 	}
-	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
-		Scheme:   scheme,
-		NewCache: cache.BuilderWithOptions(cacheOption),
-	})
+
+	var mgr manager.Manager
+	retry := 10
+	for {
+		mgr, err = ctrl.NewManager(clientConfig, ctrl.Options{
+			Scheme: scheme,
+			Cache:  cacheOption,
+		})
+		if err == nil {
+			break
+		}
+
+		retry--
+		if retry == 0 {
+			break
+		}
+
+		logger.WithError(err).Warn("Failed to create controller manager, need retry")
+
+		time.Sleep(time.Second)
+	}
+
 	if err != nil {
 		cancelFunc()
-		return nil, err
+		return nil, errors.Wrap(err, "error creating controller manager")
 	}
 
 	s := &nodeAgentServer{
@@ -226,8 +258,8 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		return nil, err
 	}
 
-	dataPathConcurrentNum := s.getDataPathConcurrentNum(defaultDataPathConcurrentNum)
-	s.dataPathMgr = datapath.NewManager(dataPathConcurrentNum)
+	s.getDataPathConfigs()
+	s.dataPathMgr = datapath.NewManager(s.getDataPathConcurrentNum(defaultDataPathConcurrentNum))
 
 	return s, nil
 }
@@ -277,24 +309,79 @@ func (s *nodeAgentServer) run() {
 		credentialGetter, s.nodeName, s.mgr.GetScheme(), s.metrics, s.logger)
 
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", controller.PodVolumeBackup)
+		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
 	}
 
 	if err = controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.dataPathMgr, repoEnsurer, credentialGetter, s.logger).SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
 
-	dataUploadReconciler := controller.NewDataUploadReconciler(s.mgr.GetClient(), s.kubeClient, s.csiSnapshotClient.SnapshotV1(), s.dataPathMgr, repoEnsurer, clock.RealClock{}, credentialGetter, s.nodeName, s.fileSystem, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
-	s.attemptDataUploadResume(dataUploadReconciler)
+	var loadAffinity *kube.LoadAffinity
+	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
+		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
+		s.logger.Infof("Using customized loadAffinity %v", loadAffinity)
+	}
+
+	var backupPVCConfig map[string]nodeagent.BackupPVC
+	if s.dataPathConfigs != nil && s.dataPathConfigs.BackupPVCConfig != nil {
+		backupPVCConfig = s.dataPathConfigs.BackupPVCConfig
+		s.logger.Infof("Using customized backupPVC config %v", backupPVCConfig)
+	}
+
+	podResources := v1.ResourceRequirements{}
+	if s.dataPathConfigs != nil && s.dataPathConfigs.PodResources != nil {
+		if res, err := kube.ParseResourceRequirements(s.dataPathConfigs.PodResources.CPURequest, s.dataPathConfigs.PodResources.MemoryRequest, s.dataPathConfigs.PodResources.CPULimit, s.dataPathConfigs.PodResources.MemoryLimit); err != nil {
+			s.logger.WithError(err).Warn("Pod resource requirements are invalid, ignore")
+		} else {
+			podResources = res
+			s.logger.Infof("Using customized pod resource requirements %v", s.dataPathConfigs.PodResources)
+		}
+	}
+
+	dataUploadReconciler := controller.NewDataUploadReconciler(
+		s.mgr.GetClient(),
+		s.mgr,
+		s.kubeClient,
+		s.csiSnapshotClient.SnapshotV1(),
+		s.dataPathMgr,
+		loadAffinity,
+		backupPVCConfig,
+		podResources,
+		clock.RealClock{},
+		s.nodeName,
+		s.config.dataMoverPrepareTimeout,
+		s.logger,
+		s.metrics,
+	)
 	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.kubeClient, s.dataPathMgr, repoEnsurer, credentialGetter, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
-	s.attemptDataDownloadResume(dataDownloadReconciler)
+	var restorePVCConfig nodeagent.RestorePVC
+	if s.dataPathConfigs != nil && s.dataPathConfigs.RestorePVCConfig != nil {
+		restorePVCConfig = *s.dataPathConfigs.RestorePVCConfig
+		s.logger.Infof("Using customized restorePVC config %v", restorePVCConfig)
+	}
+
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, restorePVCConfig, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
 	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}
+
+	go func() {
+		if err := s.waitCacheForResume(); err != nil {
+			s.logger.WithError(err).Error("Failed to wait cache for resume, will not resume DU/DD")
+			return
+		}
+
+		if err := dataUploadReconciler.AttemptDataUploadResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt data upload resume")
+		}
+
+		if err := dataDownloadReconciler.AttemptDataDownloadResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt data download resume")
+		}
+	}()
 
 	s.logger.Info("Controllers starting...")
 
@@ -303,11 +390,38 @@ func (s *nodeAgentServer) run() {
 	}
 }
 
+func (s *nodeAgentServer) waitCacheForResume() error {
+	podInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &v1.Pod{})
+	if err != nil {
+		return errors.Wrap(err, "error getting pod informer")
+	}
+
+	duInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov2alpha1api.DataUpload{})
+	if err != nil {
+		return errors.Wrap(err, "error getting du informer")
+	}
+
+	ddInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov2alpha1api.DataDownload{})
+	if err != nil {
+		return errors.Wrap(err, "error getting dd informer")
+	}
+
+	if !cacheutil.WaitForCacheSync(s.ctx.Done(), podInformer.HasSynced, duInformer.HasSynced, ddInformer.HasSynced) {
+		return errors.New("error waiting informer synced")
+	}
+
+	return nil
+}
+
 // validatePodVolumesHostPath validates that the pod volumes path contains a
 // directory for each Pod running on this node
 func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface) error {
-	files, err := s.fileSystem.ReadDir("/host_pods/")
+	files, err := s.fileSystem.ReadDir(defaultHostPodsPath)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			s.logger.Warnf("Pod volumes host path [%s] doesn't exist, fs-backup is disabled", defaultHostPodsPath)
+			return nil
+		}
 		return errors.Wrap(err, "could not read pod volumes host path")
 	}
 
@@ -338,7 +452,7 @@ func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface
 			valid = false
 			s.logger.WithFields(logrus.Fields{
 				"pod":  fmt.Sprintf("%s/%s", pod.GetNamespace(), pod.GetName()),
-				"path": "/host_pods/" + dirName,
+				"path": defaultHostPodsPath + "/" + dirName,
 			}).Debug("could not find volumes for pod in host path")
 		}
 	}
@@ -365,31 +479,6 @@ func (s *nodeAgentServer) markInProgressCRsFailed() {
 	s.markInProgressPVRsFailed(client)
 }
 
-func (s *nodeAgentServer) attemptDataUploadResume(r *controller.DataUploadReconciler) {
-	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
-	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
-	if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
-		return
-	}
-	if err := r.AttemptDataUploadResume(s.ctx, client, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data upload resume")
-	}
-}
-
-func (s *nodeAgentServer) attemptDataDownloadResume(r *controller.DataDownloadReconciler) {
-	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
-	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
-	if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
-		return
-	}
-
-	if err := r.AttemptDataDownloadResume(s.ctx, client, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to attempt data download resume")
-	}
-}
-
 func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 	pvbs := &velerov1api.PodVolumeBackupList{}
 	if err := client.List(s.ctx, pvbs, &ctrlclient.ListOptions{Namespace: s.namespace}); err != nil {
@@ -407,8 +496,8 @@ func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {
 		}
 
 		if err := controller.UpdatePVBStatusToFailed(s.ctx, client, &pvbs.Items[i],
-			fmt.Sprintf("get a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, velerov1api.PodVolumeBackupPhaseFailed),
-			time.Now(), s.logger); err != nil {
+			fmt.Errorf("found a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, velerov1api.PodVolumeBackupPhaseFailed),
+			"", time.Now(), s.logger); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumebackup %q", pvb.GetName())
 			continue
 		}
@@ -454,12 +543,23 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 
 var getConfigsFunc = nodeagent.GetConfigs
 
-func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
-	configs, err := getConfigsFunc(s.ctx, s.namespace, s.kubeClient)
-	if err != nil {
-		s.logger.WithError(err).Warn("Failed to get node agent configs")
-		return defaultNum
+func (s *nodeAgentServer) getDataPathConfigs() {
+	if s.config.nodeAgentConfig == "" {
+		s.logger.Info("No node-agent configMap is specified")
+		return
 	}
+
+	configs, err := getConfigsFunc(s.ctx, s.namespace, s.kubeClient, s.config.nodeAgentConfig)
+	if err != nil {
+		s.logger.WithError(err).Warnf("Failed to get node agent configs from configMap %s, ignore it", s.config.nodeAgentConfig)
+		return
+	}
+
+	s.dataPathConfigs = configs
+}
+
+func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
+	configs := s.dataPathConfigs
 
 	if configs == nil || configs.LoadConcurrency == nil {
 		s.logger.Infof("Concurrency configs are not found, use the default number %v", defaultNum)

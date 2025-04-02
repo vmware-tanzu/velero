@@ -17,12 +17,10 @@ limitations under the License.
 package resourcemodifiers
 
 import (
-	"context"
 	"fmt"
 	"strings"
-	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 
@@ -97,9 +95,6 @@ func (r *ResourceModifiersCase) Init() error {
 }
 
 func (r *ResourceModifiersCase) CreateResources() error {
-	// It's better to set a global timeout in CreateResources function which is the real beginning of one e2e test
-	r.Ctx, r.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
-
 	By(fmt.Sprintf("Create configmap %s in namespaces %s for workload\n", r.cmName, r.VeleroCfg.VeleroNamespace), func() {
 		Expect(CreateConfigMapFromYAMLData(r.Client.ClientGo, r.yamlConfig, r.cmName, r.VeleroCfg.VeleroNamespace)).To(Succeed(), fmt.Sprintf("Failed to create configmap %s in namespaces %s for workload\n", r.cmName, r.VeleroCfg.VeleroNamespace))
 	})
@@ -125,7 +120,7 @@ func (r *ResourceModifiersCase) Verify() error {
 	for _, ns := range *r.NSIncluded {
 		By("Verify deployment has updated values", func() {
 			deploy, err := GetDeployment(r.Client.ClientGo, ns, r.CaseBaseName)
-			Expect(err).To(BeNil(), fmt.Sprintf("Failed to get deployment %s in namespace %s", r.CaseBaseName, ns))
+			Expect(err).ToNot(HaveOccurred(), fmt.Sprintf("Failed to get deployment %s in namespace %s", r.CaseBaseName, ns))
 
 			Expect(*deploy.Spec.Replicas).To(Equal(int32(2)), fmt.Sprintf("Failed to verify deployment %s's replicas in namespace %s", r.CaseBaseName, ns))
 			Expect(deploy.Spec.Template.Spec.Containers[1].Image).To(Equal("nginx:1.14.2"), fmt.Sprintf("Failed to verify deployment %s's image in namespace %s", r.CaseBaseName, ns))
@@ -136,13 +131,16 @@ func (r *ResourceModifiersCase) Verify() error {
 
 func (r *ResourceModifiersCase) Clean() error {
 	// If created some resources which is not in current test namespace, we NEED to override the base Clean function
-	if !r.VeleroCfg.Debug {
-		if err := DeleteConfigmap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
+	if CurrentSpecReport().Failed() && r.VeleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
+		if err := DeleteConfigMap(r.Client.ClientGo, r.VeleroCfg.VeleroNamespace, r.cmName); err != nil {
 			return err
 		}
 
 		return r.GetTestCase().Clean() // only clean up resources in test namespace
 	}
+
 	return nil
 }
 

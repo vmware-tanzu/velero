@@ -148,22 +148,22 @@ func TestCreateCommand_Run(t *testing.T) {
 
 	o.Complete(args, f)
 	e := o.Validate(c, args, f)
-	assert.Equal(t, e, nil)
+	assert.NoError(t, e)
 
 	e = o.Run(c, f)
-	assert.Contains(t, e.Error(), fmt.Sprintf("%s: no such file or directory", caCertFile))
+	assert.ErrorContains(t, e, fmt.Sprintf("%s: no such file or directory", caCertFile))
 
 	// verify all options are set as expected
 	assert.Equal(t, name, o.Name)
 	assert.Equal(t, provider, o.Provider)
 	assert.Equal(t, bucket, o.Bucket)
-	assert.Equal(t, true, reflect.DeepEqual(credential, o.Credential))
+	assert.True(t, reflect.DeepEqual(credential, o.Credential))
 	assert.Equal(t, defaultBackupStorageLocation, o.DefaultBackupStorageLocation)
 	assert.Equal(t, prefix, o.Prefix)
 	assert.Equal(t, backupSyncPeriod, o.BackupSyncPeriod.String())
 	assert.Equal(t, validationFrequency, o.ValidationFrequency.String())
-	assert.Equal(t, true, reflect.DeepEqual(bslConfig, o.Config))
-	assert.Equal(t, true, velerotest.CompareSlice(strings.Split(labels, ","), strings.Split(o.Labels.String(), ",")))
+	assert.True(t, reflect.DeepEqual(bslConfig, o.Config))
+	assert.True(t, velerotest.CompareSlice(strings.Split(labels, ","), strings.Split(o.Labels.String(), ",")))
 	assert.Equal(t, caCertFile, o.CACertFile)
 	assert.Equal(t, accessMode, o.AccessMode.String())
 

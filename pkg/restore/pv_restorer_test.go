@@ -20,18 +20,20 @@ import (
 	"context"
 	"testing"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks/volumesnapshotter/v1"
 	vsv1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/volumesnapshotter/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 func defaultBackup() *builder.BackupBuilder {
@@ -39,6 +41,7 @@ func defaultBackup() *builder.BackupBuilder {
 }
 
 func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
+	fakeClient := velerotest.NewFakeControllerRuntimeClient(t)
 	tests := []struct {
 		name            string
 		obj             *unstructured.Unstructured
@@ -115,13 +118,13 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			r := &pvRestorer{
-				logger:     velerotest.NewLogger(),
-				restorePVs: tc.restore.Spec.RestorePVs,
-				kbclient:   velerotest.NewFakeControllerRuntimeClient(t),
+				logger:         velerotest.NewLogger(),
+				restorePVs:     tc.restore.Spec.RestorePVs,
+				kbclient:       velerotest.NewFakeControllerRuntimeClient(t),
+				volInfoTracker: volume.NewRestoreVolInfoTracker(tc.restore, logrus.New(), fakeClient),
 			}
 			if tc.backup != nil {
 				r.backup = tc.backup
-				r.snapshotVolumes = tc.backup.Spec.SnapshotVolumes
 			}
 
 			for _, loc := range tc.locations {
@@ -132,10 +135,10 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			switch tc.expectedErr {
 			case true:
 				assert.Nil(t, res)
-				assert.NotNil(t, err)
+				assert.Error(t, err)
 			case false:
 				assert.Equal(t, tc.expectedRes, res)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -180,6 +183,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
+				logger                  = velerotest.NewLogger()
 				volumeSnapshotter       = new(providermocks.VolumeSnapshotter)
 				volumeSnapshotterGetter = providerToVolumeSnapshotterMap(map[string]vsv1.VolumeSnapshotter{
 					tc.expectedProvider: volumeSnapshotter,
@@ -192,11 +196,12 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 			}
 
 			r := &pvRestorer{
-				logger:                  velerotest.NewLogger(),
+				logger:                  logger,
 				backup:                  tc.backup,
 				volumeSnapshots:         tc.volumeSnapshots,
 				kbclient:                fakeClient,
 				volumeSnapshotterGetter: volumeSnapshotterGetter,
+				volInfoTracker:          volume.NewRestoreVolInfoTracker(tc.restore, logger, fakeClient),
 			}
 
 			volumeSnapshotter.On("Init", mock.Anything).Return(nil)
@@ -248,7 +253,7 @@ type testUnstructured struct {
 func newTestUnstructured() *testUnstructured {
 	obj := &testUnstructured{
 		Unstructured: &unstructured.Unstructured{
-			Object: make(map[string]interface{}),
+			Object: make(map[string]any),
 		},
 	}
 
@@ -270,15 +275,15 @@ func (obj *testUnstructured) WithStatus(fields ...string) *testUnstructured {
 	return obj.withMap("status", fields...)
 }
 
-func (obj *testUnstructured) WithMetadataField(field string, value interface{}) *testUnstructured {
+func (obj *testUnstructured) WithMetadataField(field string, value any) *testUnstructured {
 	return obj.withMapEntry("metadata", field, value)
 }
 
-func (obj *testUnstructured) WithSpecField(field string, value interface{}) *testUnstructured {
+func (obj *testUnstructured) WithSpecField(field string, value any) *testUnstructured {
 	return obj.withMapEntry("spec", field, value)
 }
 
-func (obj *testUnstructured) WithStatusField(field string, value interface{}) *testUnstructured {
+func (obj *testUnstructured) WithStatusField(field string, value any) *testUnstructured {
 	return obj.withMapEntry("status", field, value)
 }
 
@@ -292,7 +297,7 @@ func (obj *testUnstructured) WithAnnotations(fields ...string) *testUnstructured
 }
 
 func (obj *testUnstructured) WithAnnotationValues(fieldVals map[string]string) *testUnstructured {
-	annotations := make(map[string]interface{})
+	annotations := make(map[string]any)
 	for field, val := range fieldVals {
 		annotations[field] = val
 	}
@@ -307,7 +312,7 @@ func (obj *testUnstructured) WithName(name string) *testUnstructured {
 }
 
 func (obj *testUnstructured) withMap(name string, fields ...string) *testUnstructured {
-	m := make(map[string]interface{})
+	m := make(map[string]any)
 	obj.Object[name] = m
 
 	for _, field := range fields {
@@ -317,14 +322,14 @@ func (obj *testUnstructured) withMap(name string, fields ...string) *testUnstruc
 	return obj
 }
 
-func (obj *testUnstructured) withMapEntry(mapName, field string, value interface{}) *testUnstructured {
-	var m map[string]interface{}
+func (obj *testUnstructured) withMapEntry(mapName, field string, value any) *testUnstructured {
+	var m map[string]any
 
 	if res, ok := obj.Unstructured.Object[mapName]; !ok {
-		m = make(map[string]interface{})
+		m = make(map[string]any)
 		obj.Unstructured.Object[mapName] = m
 	} else {
-		m = res.(map[string]interface{})
+		m = res.(map[string]any)
 	}
 
 	m[field] = value

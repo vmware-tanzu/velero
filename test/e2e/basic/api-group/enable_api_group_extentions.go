@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	. "github.com/vmware-tanzu/velero/test"
@@ -61,13 +61,20 @@ func APIExtensionsVersionsTest() {
 			Skip("CRD with apiextension versions dstVersions should have v1")
 			return ""
 		})
-		Expect(len(srcVersions) > 1 && len(dstVersions) == 1).Should(Equal(true), func() string {
+		Expect(len(srcVersions) > 1 && len(dstVersions) == 1).Should(BeTrue(), func() string {
 			Skip("Source cluster should support apiextension v1 and v1beta1, destination cluster should only support apiextension v1")
 			return ""
 		})
 	})
 	AfterEach(func() {
-		if !veleroCfg.Debug {
+		By(fmt.Sprintf("Switch to default kubeconfig context %s", veleroCfg.DefaultClusterContext), func() {
+			Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
+			veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
+		})
+
+		if CurrentSpecReport().Failed() && veleroCfg.FailFast {
+			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+		} else {
 			By("Clean backups after test", func() {
 				DeleteAllBackups(context.Background(), &veleroCfg)
 			})
@@ -76,22 +83,15 @@ func APIExtensionsVersionsTest() {
 					ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 					defer ctxCancel()
 					Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
-					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
-						veleroCfg.VeleroNamespace)).To(Succeed())
+					Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 					Expect(DeleteCRDByName(context.Background(), crdName)).To(Succeed())
 
 					Expect(KubectlConfigUseContext(context.Background(), veleroCfg.StandbyClusterContext)).To(Succeed())
-					Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI,
-						veleroCfg.VeleroNamespace)).To(Succeed())
+					Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 					Expect(DeleteCRDByName(context.Background(), crdName)).To(Succeed())
 				})
 			}
-			By(fmt.Sprintf("Switch to default kubeconfig context %s", veleroCfg.DefaultClusterContext), func() {
-				Expect(KubectlConfigUseContext(context.Background(), veleroCfg.DefaultClusterContext)).To(Succeed())
-				veleroCfg.ClientToInstallVelero = veleroCfg.DefaultClient
-			})
 		}
-
 	})
 	Context("When EnableAPIGroupVersions flag is set", func() {
 		It("Enable API Group to B/R CRD APIExtensionsVersions", func() {

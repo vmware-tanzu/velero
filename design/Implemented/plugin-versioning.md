@@ -241,7 +241,7 @@ In cases where the methods signatures remain the same, the adaptation layer will
 Examples where an adaptation may be safe:
 - A method signature is being changed to add a new parameter but the parameter could be optional (for example, adding a context parameter). The adaptation could call through to the method provided in the previous version but omit the parameter.
 - A method signature is being changed to remove a parameter, but it is safe to pass a default value to the previous version. The adaptation could call through to the method provided in the previous version but use a default value for the parameter.
-- A new method is being added but does not impact any existing behaviour of Velero (for example, a new method which will allow Velero to [wait for additional items to be ready](https://github.com/vmware-tanzu/velero/blob/main/design/wait-for-additional-items.md)). The adaptation would return a value which allows the existing behaviour to be performed.
+- A new method is being added but does not impact any existing behaviour of Velero (for example, a new method which will allow Velero to [wait for additional items to be ready](https://github.com/vmware-tanzu/velero/blob/main/design/Implemented/wait-for-additional-items.md)). The adaptation would return a value which allows the existing behaviour to be performed.
 - A method is being deleted as it is no longer used. The adaptation would call through to any methods which are still included but would omit the deleted method in the adaptation.
 
 Examples where an adaptation may not be safe:

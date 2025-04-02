@@ -26,10 +26,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
-	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/internal/volume"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type PVRestorer interface {
@@ -39,23 +38,18 @@ type PVRestorer interface {
 type pvRestorer struct {
 	logger                  logrus.FieldLogger
 	backup                  *api.Backup
-	snapshotVolumes         *bool
 	restorePVs              *bool
 	volumeSnapshots         []*volume.Snapshot
 	volumeSnapshotterGetter VolumeSnapshotterGetter
 	kbclient                client.Client
 	credentialFileStore     credentials.FileStore
+	volInfoTracker          *volume.RestoreVolumeInfoTracker
 }
 
 func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	pvName := obj.GetName()
 	if pvName == "" {
 		return nil, errors.New("PersistentVolume is missing its name")
-	}
-
-	if boolptr.IsSetToFalse(r.snapshotVolumes) {
-		// The backup had snapshots disabled, so we can return early
-		return obj, nil
 	}
 
 	if boolptr.IsSetToFalse(r.restorePVs) {
@@ -98,6 +92,11 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 	if !ok {
 		return nil, errors.Errorf("unexpected type %T", updated1)
 	}
+	var iops int64
+	if snapshotInfo.volumeIOPS != nil {
+		iops = *snapshotInfo.volumeIOPS
+	}
+	r.volInfoTracker.TrackNativeSnapshot(updated2.GetName(), snapshotInfo.providerSnapshotID, snapshotInfo.volumeType, snapshotInfo.volumeAZ, iops)
 	return updated2, nil
 }
 
@@ -133,7 +132,7 @@ func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volum
 	}
 
 	// add credential to config
-	err = internalVolume.UpdateVolumeSnapshotLocationWithCredentialConfig(snapshotLocation, credentialStore)
+	err = volume.UpdateVolumeSnapshotLocationWithCredentialConfig(snapshotLocation, credentialStore)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

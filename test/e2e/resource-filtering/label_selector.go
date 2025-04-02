@@ -17,10 +17,8 @@ limitations under the License.
 package filtering
 
 import (
-	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -75,7 +73,6 @@ func (l *LabelSelector) Init() error {
 }
 
 func (l *LabelSelector) CreateResources() error {
-	l.Ctx, l.CtxCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 	for nsNum := 0; nsNum < l.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", l.CaseBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
@@ -145,7 +142,7 @@ func (l *LabelSelector) Verify() error {
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("failed to list secrets in namespace: %q", namespace))
 			} else if len(secretsList.Items) == 0 {
-				return errors.Errorf(fmt.Sprintf("no secrets found in namespace: %q", namespace))
+				return errors.Errorf("no secrets found in namespace: %q", namespace)
 			}
 		} else { //exclude
 			if err == nil {

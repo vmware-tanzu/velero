@@ -15,7 +15,7 @@ import (
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/repository"
+	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 )
 
 type DataUploadDeleteAction struct {
@@ -52,11 +52,13 @@ func genConfigmap(bak *velerov1.Backup, du velerov2alpha1.DataUpload) *corev1api
 	if !IsBuiltInUploader(du.Spec.DataMover) || du.Status.SnapshotID == "" {
 		return nil
 	}
-	snapshot := repository.SnapshotIdentifier{
+	snapshot := repotypes.SnapshotIdentifier{
 		VolumeNamespace:       du.Spec.SourceNamespace,
 		BackupStorageLocation: bak.Spec.StorageLocation,
 		SnapshotID:            du.Status.SnapshotID,
-		RepositoryType:        GetUploaderType(du.Spec.DataMover),
+		RepositoryType:        velerov1.BackupRepositoryTypeKopia,
+		UploaderType:          GetUploaderType(du.Spec.DataMover),
+		Source:                GetRealSource(du.Spec.SourceNamespace, du.Spec.SourcePVC),
 	}
 	b, err := json.Marshal(snapshot)
 	if err != nil {

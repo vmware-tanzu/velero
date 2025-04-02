@@ -22,6 +22,18 @@ PKG := github.com/vmware-tanzu/velero
 
 # Where to push the docker image.
 REGISTRY ?= velero
+# In order to push images to an insecure registry, follow the two steps:
+#   1. Set "INSECURE_REGISTRY=true" 
+#   2. Provide your own buildx builder instance by setting "BUILDX_INSTANCE=your-own-builder-instance"
+#      The builder can be created with the following command:
+#        cat << EOF > buildkitd.toml
+#        [registry."insecure-registry-ip:port"]
+#        http = true
+#        insecure = true
+#        EOF
+#        docker buildx create --name=velero-builder --driver=docker-container --bootstrap --use --config ./buildkitd.toml
+#      Refer to https://github.com/docker/buildx/issues/1370#issuecomment-1288516840 for more details
+INSECURE_REGISTRY ?= false
 GCR_REGISTRY ?= gcr.io/velero-gcp
 
 # Image name
@@ -31,6 +43,7 @@ GCR_IMAGE ?= $(GCR_REGISTRY)/$(BIN)
 # We allow the Dockerfile to be configurable to enable the use of custom Dockerfiles
 # that pull base images from different registries.
 VELERO_DOCKERFILE ?= Dockerfile
+VELERO_DOCKERFILE_WINDOWS ?= Dockerfile-Windows
 BUILDER_IMAGE_DOCKERFILE ?= hack/build-image/Dockerfile
 
 # Calculate the realpath of the build-image Dockerfile as we `cd` into the hack/build
@@ -74,7 +87,17 @@ else
 	GCR_IMAGE_TAGS ?= $(GCR_IMAGE):$(VERSION)
 endif
 
-ifeq ($(shell docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
+# check buildx is enabled only if docker is in path
+# macOS/Windows docker cli without Docker Desktop license: https://github.com/abiosoft/colima
+# To add buildx to docker cli: https://github.com/abiosoft/colima/discussions/273#discussioncomment-2684502
+ifeq ($(shell which docker 2>/dev/null 1>&2 && docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
+	BUILDX_ENABLED ?= true
+# if emulated docker cli from podman, assume enabled
+# emulated docker cli from podman: https://podman-desktop.io/docs/migrating-from-docker/emulating-docker-cli-with-podman
+# podman known issues:
+# - on remote podman, such as on macOS,
+#   --output issue: https://github.com/containers/podman/issues/15922
+else ifeq ($(shell which docker 2>/dev/null 1>&2 && cat $(shell which docker) | grep -c "exec podman"), 1)
 	BUILDX_ENABLED ?= true
 else
 	BUILDX_ENABLED ?= false
@@ -84,13 +107,36 @@ define BUILDX_ERROR
 buildx not enabled, refusing to run this recipe
 see: https://velero.io/docs/main/build-from-source/#making-images-and-updating-velero for more info
 endef
-
+# comma cannot be escaped and can only be used in Make function arguments by putting into variable
+comma=,
 # The version of restic binary to be downloaded
 RESTIC_VERSION ?= 0.15.0
 
 CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le linux-s390x
-BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
-BUILDX_OUTPUT_TYPE ?= docker
+BUILD_OUTPUT_TYPE ?= docker
+BUILD_OS ?= linux
+BUILD_ARCH ?= amd64
+BUILD_TAG_GCR ?= false
+BUILD_WINDOWS_VERSION ?= ltsc2022
+
+ifeq ($(BUILD_OUTPUT_TYPE), docker)
+	ALL_OS = linux
+	ALL_ARCH.linux = $(word 2, $(subst -, ,$(shell go env GOOS)-$(shell go env GOARCH)))
+else
+	ALL_OS = $(subst $(comma), ,$(BUILD_OS))
+	ALL_ARCH.linux = $(subst $(comma), ,$(BUILD_ARCH))
+endif
+
+ALL_ARCH.windows = $(if $(filter windows,$(ALL_OS)),amd64,)
+ALL_OSVERSIONS.windows = $(if $(filter windows,$(ALL_OS)),$(BUILD_WINDOWS_VERSION),)
+ALL_OS_ARCH.linux =  $(foreach os, $(filter linux,$(ALL_OS)), $(foreach arch, ${ALL_ARCH.linux}, ${os}-$(arch)))
+ALL_OS_ARCH.windows = $(foreach os, $(filter windows,$(ALL_OS)), $(foreach arch, $(ALL_ARCH.windows), $(foreach osversion, ${ALL_OSVERSIONS.windows}, ${os}-${osversion}-${arch})))
+ALL_OS_ARCH = $(ALL_OS_ARCH.linux)$(ALL_OS_ARCH.windows)
+
+ALL_IMAGE_TAGS = $(IMAGE_TAGS)
+ifeq ($(BUILD_TAG_GCR), true)
+	ALL_IMAGE_TAGS += $(GCR_IMAGE_TAGS)
+endif
 
 # set git sha and tree state
 GIT_SHA = $(shell git rev-parse HEAD)
@@ -114,17 +160,14 @@ GOBIN=$$(pwd)/.go/bin
 # If you want to build all containers, see the 'all-containers' rule.
 all:
 	@$(MAKE) build
-	@$(MAKE) build BIN=velero-restore-helper
 
 build-%:
 	@$(MAKE) --no-print-directory ARCH=$* build
-	@$(MAKE) --no-print-directory ARCH=$* build BIN=velero-restore-helper
 
 all-build: $(addprefix build-, $(CLI_PLATFORMS))
 
 all-containers:
 	@$(MAKE) --no-print-directory container
-	@$(MAKE) --no-print-directory container BIN=velero-restore-helper
 
 local: build-dirs
 # Add DEBUG=1 to enable debug locally
@@ -186,11 +229,38 @@ container:
 ifneq ($(BUILDX_ENABLED), true)
 	$(error $(BUILDX_ERROR))
 endif
+
+ifeq ($(BUILDX_INSTANCE),)
+	@echo creating a buildx instance
+	-docker buildx rm velero-builder || true
+	@docker buildx create --use --name=velero-builder
+else
+	@echo using a specified buildx instance $(BUILDX_INSTANCE)
+	@docker buildx use $(BUILDX_INSTANCE)
+endif
+
+	@mkdir -p _output
+
+	@for osarch in $(ALL_OS_ARCH); do \
+		$(MAKE) container-$${osarch}; \
+	done
+
+ifeq ($(BUILD_OUTPUT_TYPE), registry)
+	@for tag in $(ALL_IMAGE_TAGS); do \
+		IMAGE_TAG=$${tag} $(MAKE) push-manifest; \
+	done
+endif
+
+container-linux-%:
+	@BUILDX_ARCH=$* $(MAKE) container-linux
+
+container-linux:
+	@echo "building container: $(IMAGE):$(VERSION)-linux-$(BUILDX_ARCH)"
+
 	@docker buildx build --pull \
-	--output=type=$(BUILDX_OUTPUT_TYPE) \
-	--platform $(BUILDX_PLATFORMS) \
-	$(addprefix -t , $(IMAGE_TAGS)) \
-	$(addprefix -t , $(GCR_IMAGE_TAGS)) \
+	--output="type=$(BUILD_OUTPUT_TYPE)$(if $(findstring tar, $(BUILD_OUTPUT_TYPE)),$(comma)dest=_output/$(BIN)-$(VERSION)-linux-$(BUILDX_ARCH).tar,)" \
+	--platform="linux/$(BUILDX_ARCH)" \
+	$(addprefix -t , $(addsuffix "-linux-$(BUILDX_ARCH)",$(ALL_IMAGE_TAGS))) \
 	--build-arg=GOPROXY=$(GOPROXY) \
 	--build-arg=PKG=$(PKG) \
 	--build-arg=BIN=$(BIN) \
@@ -199,14 +269,54 @@ endif
 	--build-arg=GIT_TREE_STATE=$(GIT_TREE_STATE) \
 	--build-arg=REGISTRY=$(REGISTRY) \
 	--build-arg=RESTIC_VERSION=$(RESTIC_VERSION) \
+	--provenance=false \
+	--sbom=false \
 	-f $(VELERO_DOCKERFILE) .
-	@echo "container: $(IMAGE):$(VERSION)"
-ifeq ($(BUILDX_OUTPUT_TYPE)_$(REGISTRY), registry_velero)
-	docker pull $(IMAGE):$(VERSION)
-	rm -f $(BIN)-$(VERSION).tar
-	docker save $(IMAGE):$(VERSION) -o $(BIN)-$(VERSION).tar
-	gzip -f $(BIN)-$(VERSION).tar
-endif
+
+	@echo "built container: $(IMAGE):$(VERSION)-linux-$(BUILDX_ARCH)"
+
+container-windows-%:
+	@BUILDX_OSVERSION=$(firstword $(subst -, ,$*)) BUILDX_ARCH=$(lastword $(subst -, ,$*)) $(MAKE) container-windows
+
+container-windows:
+	@echo "building container: $(IMAGE):$(VERSION)-windows-$(BUILDX_OSVERSION)-$(BUILDX_ARCH)"
+
+	@docker buildx build --pull \
+	--output="type=$(BUILD_OUTPUT_TYPE)$(if $(findstring tar, $(BUILD_OUTPUT_TYPE)),$(comma)dest=_output/$(BIN)-$(VERSION)-windows-$(BUILDX_OSVERSION)-$(BUILDX_ARCH).tar,)" \
+	--platform="windows/$(BUILDX_ARCH)" \
+	$(addprefix -t , $(addsuffix "-windows-$(BUILDX_OSVERSION)-$(BUILDX_ARCH)",$(ALL_IMAGE_TAGS))) \
+	--build-arg=GOPROXY=$(GOPROXY) \
+	--build-arg=PKG=$(PKG) \
+	--build-arg=BIN=$(BIN) \
+	--build-arg=VERSION=$(VERSION) \
+	--build-arg=OS_VERSION=$(BUILDX_OSVERSION) \
+	--build-arg=GIT_SHA=$(GIT_SHA) \
+    --build-arg=GIT_TREE_STATE=$(GIT_TREE_STATE) \
+	--build-arg=REGISTRY=$(REGISTRY) \
+	--provenance=false \
+	--sbom=false \
+	-f $(VELERO_DOCKERFILE_WINDOWS) .
+
+	@echo "built container: $(IMAGE):$(VERSION)-windows-$(BUILDX_OSVERSION)-$(BUILDX_ARCH)"
+
+push-manifest:
+	@echo "building manifest: $(IMAGE_TAG) for $(foreach osarch, $(ALL_OS_ARCH), $(IMAGE_TAG)-${osarch})"
+	@docker manifest create --amend --insecure=$(INSECURE_REGISTRY) $(IMAGE_TAG) $(foreach osarch, $(ALL_OS_ARCH), $(IMAGE_TAG)-${osarch})
+
+	@set -x; \
+	for arch in $(ALL_ARCH.windows); do \
+		for osversion in $(ALL_OSVERSIONS.windows); do \
+			BASEIMAGE=mcr.microsoft.com/windows/nanoserver:$${osversion}; \
+			full_version=`docker manifest inspect --insecure=$(INSECURE_REGISTRY) $${BASEIMAGE} | jq -r '.manifests[0].platform["os.version"]'`; \
+			docker manifest annotate --os windows --arch $${arch} --os-version $${full_version} $(IMAGE_TAG) $(IMAGE_TAG)-windows-$${osversion}-$${arch}; \
+		done; \
+	done
+
+	@echo "pushing manifest $(IMAGE_TAG)"
+	@docker manifest push --purge --insecure=$(INSECURE_REGISTRY) $(IMAGE_TAG)
+
+	@echo "pushed manifest $(IMAGE_TAG):"
+	@docker manifest inspect --insecure=$(INSECURE_REGISTRY) $(IMAGE_TAG)
 
 SKIP_TESTS ?=
 test: build-dirs
@@ -360,11 +470,29 @@ gen-docs:
 
 .PHONY: test-e2e
 test-e2e: local
-	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) -C test/ run-e2e
 
 .PHONY: test-perf
 test-perf: local
-	$(MAKE) -e VERSION=$(VERSION) -C test/perf run
+	$(MAKE) -e VERSION=$(VERSION) -C test/ run-perf
 
 go-generate:
 	go generate ./pkg/...
+
+# requires an authenticated gh cli
+# gh: https://cli.github.com/
+# First create a PR
+# gh pr create --title 'Title name' --body 'PR body'
+# by default uses PR title as changelog body but can be overwritten like so
+# make new-changelog CHANGELOG_BODY="Changes you have made"
+new-changelog: GH_LOGIN ?= $(shell gh pr view --json author --jq .author.login 2> /dev/null)
+new-changelog: GH_PR_NUMBER ?= $(shell gh pr view --json number --jq .number 2> /dev/null)
+new-changelog: CHANGELOG_BODY ?= '$(shell gh pr view --json title --jq .title)'
+new-changelog:
+	@if [ "$(GH_LOGIN)" = "" ]; then \
+		echo "branch does not have PR or cli not logged in, try 'gh auth login' or 'gh pr create'"; \
+		exit 1; \
+	fi
+	@mkdir -p ./changelogs/unreleased/ && \
+	echo $(CHANGELOG_BODY) > ./changelogs/unreleased/$(GH_PR_NUMBER)-$(GH_LOGIN) && \
+	echo \"$(CHANGELOG_BODY)\" added to "./changelogs/unreleased/$(GH_PR_NUMBER)-$(GH_LOGIN)"

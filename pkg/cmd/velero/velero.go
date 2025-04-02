@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/debug"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/repomantenance"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backup"
@@ -50,6 +51,7 @@ import (
 	veleroflag "github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/features"
 
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/datamover"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/nodeagent"
 )
 
@@ -122,6 +124,8 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		backuplocation.NewCommand(f),
 		snapshotlocation.NewCommand(f),
 		debug.NewCommand(f),
+		repomantenance.NewCommand(f),
+		datamover.NewCommand(f),
 	)
 
 	// init and add the klog flags

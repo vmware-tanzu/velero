@@ -100,7 +100,7 @@ func (b *PersistentVolumeClaimBuilder) DataSource(dataSource *corev1api.TypedLoc
 }
 
 // DataSourceRef sets the PersistentVolumeClaim's spec.DataSourceRef.
-func (b *PersistentVolumeClaimBuilder) DataSourceRef(dataSourceRef *corev1api.TypedLocalObjectReference) *PersistentVolumeClaimBuilder {
+func (b *PersistentVolumeClaimBuilder) DataSourceRef(dataSourceRef *corev1api.TypedObjectReference) *PersistentVolumeClaimBuilder {
 	b.object.Spec.DataSourceRef = dataSourceRef
 	return b
 }

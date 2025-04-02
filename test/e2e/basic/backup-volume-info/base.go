@@ -17,13 +17,12 @@ limitations under the License.
 package basic
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
@@ -32,7 +31,6 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
 	. "github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
-	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 type BackupVolumeInfo struct {
@@ -45,26 +43,6 @@ type BackupVolumeInfo struct {
 
 func (v *BackupVolumeInfo) Init() error {
 	v.TestCase.Init()
-
-	BeforeEach(func() {
-		if v.VeleroCfg.CloudProvider == Vsphere && (!strings.Contains(v.CaseBaseName, "fs-upload") && !strings.Contains(v.CaseBaseName, "skipped")) {
-			fmt.Printf("Skip snapshot case %s for vsphere environment.\n", v.CaseBaseName)
-			Skip("Skip snapshot case due to vsphere environment doesn't cover the CSI test, and it doesn't have a Velero native snapshot plugin.")
-		}
-
-		if strings.Contains(v.VeleroCfg.Features, FeatureCSI) {
-			if strings.Contains(v.CaseBaseName, "native-snapshot") {
-				fmt.Printf("Skip native snapshot case %s when the CSI feature is enabled.\n", v.CaseBaseName)
-				Skip("Skip native snapshot case due to CSI feature is enabled.")
-			}
-		} else {
-			if strings.Contains(v.CaseBaseName, "csi") {
-				fmt.Printf("Skip CSI related case %s when the CSI feature is not enabled.\n", v.CaseBaseName)
-				Skip("Skip CSI cases due to CSI feature is not enabled.")
-			}
-		}
-	})
-
 	v.CaseBaseName = v.CaseBaseName + v.UUIDgen
 	v.BackupName = "backup-" + v.CaseBaseName
 	v.RestoreName = "restore-" + v.CaseBaseName
@@ -98,8 +76,27 @@ func (v *BackupVolumeInfo) Init() error {
 	return nil
 }
 
+func (v *BackupVolumeInfo) Start() error {
+	if v.VeleroCfg.CloudProvider == Vsphere && (!strings.Contains(v.CaseBaseName, "fs-upload") && !strings.Contains(v.CaseBaseName, "skipped")) {
+		fmt.Printf("Skip snapshot case %s for vsphere environment.\n", v.CaseBaseName)
+		Skip("Skip snapshot case due to vsphere environment doesn't cover the CSI test, and it doesn't have a Velero native snapshot plugin.")
+	}
+
+	if strings.Contains(v.VeleroCfg.Features, FeatureCSI) {
+		if strings.Contains(v.CaseBaseName, "native-snapshot") {
+			fmt.Printf("Skip native snapshot case %s when the CSI feature is enabled.\n", v.CaseBaseName)
+			Skip("Skip native snapshot case due to CSI feature is enabled.")
+		}
+	} else {
+		if strings.Contains(v.CaseBaseName, "csi") {
+			fmt.Printf("Skip CSI related case %s when the CSI feature is not enabled.\n", v.CaseBaseName)
+			Skip("Skip CSI cases due to CSI feature is not enabled.")
+		}
+	}
+	v.TestCase.Start()
+	return nil
+}
 func (v *BackupVolumeInfo) CreateResources() error {
-	v.Ctx, v.CtxCancel = context.WithTimeout(context.Background(), v.TimeoutDuration)
 	labels := map[string]string{
 		"volume-info": "true",
 	}
@@ -110,19 +107,16 @@ func (v *BackupVolumeInfo) CreateResources() error {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 
-		// Install StorageClass
-		Expect(InstallTestStorageClasses(fmt.Sprintf("../testdata/storage-class/%s-csi.yaml", v.VeleroCfg.CloudProvider))).To(Succeed(), "Failed to install StorageClass")
-
 		// Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", createNSName)
 		// Make sure PVC count is great than 3 to allow both empty volumes and file populated volumes exist per pod
 		pvcCount := 4
-		Expect(pvcCount > 3).To(Equal(true))
+		Expect(pvcCount).To(BeNumerically(">", 3))
 
 		var vols []*v1.Volume
 		for i := 0; i <= pvcCount-1; i++ {
 			pvcName := fmt.Sprintf("volume-info-pvc-%d", i)
-			pvc, err := CreatePVC(v.Client, createNSName, pvcName, CSIStorageClassName, nil)
+			pvc, err := CreatePVC(v.Client, createNSName, pvcName, StorageClassName, nil)
 			Expect(err).To(Succeed())
 			volumeName := fmt.Sprintf("volume-info-pv-%d", i)
 			vols = append(vols, CreateVolumes(pvc.Name, []string{volumeName})...)
@@ -160,12 +154,4 @@ func (v *BackupVolumeInfo) Destroy() error {
 	}
 
 	return WaitAllSelectedNSDeleted(v.Ctx, v.Client, "ns-test=true")
-}
-
-func (v *BackupVolumeInfo) cleanResource() error {
-	if err := DeleteStorageClass(v.Ctx, v.Client, CSIStorageClassName); err != nil {
-		return errors.Wrap(err, "fail to delete the StorageClass")
-	}
-
-	return nil
 }

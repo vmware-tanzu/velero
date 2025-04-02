@@ -19,7 +19,7 @@ package restore
 import (
 	"encoding/json"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -54,7 +54,7 @@ func mergeServiceAccounts(fromCluster, fromBackup *unstructured.Unstructured) (*
 	}
 	// The DefaultUnstructuredConverter.ToUnstructured function will populate the creation timestamp with the nil value
 	// However, we remove this on both the backup and cluster objects before comparison, and we don't want it in any patches.
-	delete(desiredUnstructured["metadata"].(map[string]interface{}), "creationTimestamp")
+	delete(desiredUnstructured["metadata"].(map[string]any), "creationTimestamp")
 
 	return &unstructured.Unstructured{Object: desiredUnstructured}, nil
 }

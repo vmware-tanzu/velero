@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
@@ -63,12 +64,25 @@ const (
 	StoreOptionGenRetentionPeriod = "retentionPeriod"
 	StoreOptionGenReadOnly        = "readOnly"
 
+	StoreOptionCacheLimit = "cacheLimitMB"
+
 	ThrottleOptionReadOps       = "readOPS"
 	ThrottleOptionWriteOps      = "writeOPS"
 	ThrottleOptionListOps       = "listOPS"
 	ThrottleOptionUploadBytes   = "uploadBytes"
 	ThrottleOptionDownloadBytes = "downloadBytes"
+	// FullMaintenanceInterval will overwrite kopia maintenance interval
+	// options are fastGC for 12 hours, eagerGC for 6 hours, normalGC for 24 hours
+	StoreOptionKeyFullMaintenanceInterval                                = "fullMaintenanceInterval"
+	FastGC                                FullMaintenanceIntervalOptions = "fastGC"
+	FastGCInterval                        time.Duration                  = 12 * time.Hour
+	EagerGC                               FullMaintenanceIntervalOptions = "eagerGC"
+	EagerGCInterval                       time.Duration                  = 6 * time.Hour
+	NormalGC                              FullMaintenanceIntervalOptions = "normalGC"
+	NormalGCInterval                      time.Duration                  = 24 * time.Hour
 )
+
+type FullMaintenanceIntervalOptions string
 
 const (
 	defaultUsername = "default"
@@ -94,13 +108,13 @@ type RepoOptions struct {
 
 // PasswordGetter defines the method to get a repository password.
 type PasswordGetter interface {
-	GetPassword(param interface{}) (string, error)
+	GetPassword(param any) (string, error)
 }
 
 // StoreOptionsGetter defines the methods to get the storage related options.
 type StoreOptionsGetter interface {
-	GetStoreType(param interface{}) (string, error)
-	GetStoreOptions(param interface{}) (map[string]string, error)
+	GetStoreType(param any) (string, error)
+	GetStoreOptions(param any) (map[string]string, error)
 }
 
 // NewRepoOptions creates a new RepoOptions for different purpose
@@ -122,7 +136,7 @@ func NewRepoOptions(optionFuncs ...func(*RepoOptions) error) (*RepoOptions, erro
 
 // WithPassword sets the RepoPassword to RepoOptions, the password is acquired through
 // the provided interface
-func WithPassword(getter PasswordGetter, param interface{}) func(*RepoOptions) error {
+func WithPassword(getter PasswordGetter, param any) func(*RepoOptions) error {
 	return func(options *RepoOptions) error {
 		password, err := getter.GetPassword(param)
 		if err != nil {
@@ -156,7 +170,7 @@ func WithGenOptions(genOptions map[string]string) func(*RepoOptions) error {
 
 // WithStoreOptions sets the StorageOptions to RepoOptions, the store options are acquired through
 // the provided interface
-func WithStoreOptions(getter StoreOptionsGetter, param interface{}) func(*RepoOptions) error {
+func WithStoreOptions(getter StoreOptionsGetter, param any) func(*RepoOptions) error {
 	return func(options *RepoOptions) error {
 		storeType, err := getter.GetStoreType(param)
 		if err != nil {
@@ -198,7 +212,12 @@ func GetRepoDomain() string {
 
 func getRepoConfigFile(workPath string, repoID string) string {
 	if workPath == "" {
-		workPath = filepath.Join(os.Getenv("HOME"), "udmrepo")
+		home := os.Getenv("HOME")
+		if home != "" {
+			workPath = filepath.Join(home, "udmrepo")
+		} else {
+			workPath = filepath.Join(os.TempDir(), "udmrepo")
+		}
 	}
 
 	name := "repo-" + strings.ToLower(repoID) + ".conf"

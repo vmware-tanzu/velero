@@ -27,13 +27,13 @@ import (
 
 // HandlerInitializer is a function that initializes and returns a new instance of one of Velero's plugin interfaces
 // (ObjectStore, VolumeSnapshotter, BackupItemAction, RestoreItemAction).
-type HandlerInitializer func(logger logrus.FieldLogger) (interface{}, error)
+type HandlerInitializer func(logger logrus.FieldLogger) (any, error)
 
 // ServerMux manages multiple implementations of a single plugin kind, such as pod and pvc BackupItemActions.
 type ServerMux struct {
 	kind         PluginKind
 	initializers map[string]HandlerInitializer
-	Handlers     map[string]interface{}
+	Handlers     map[string]any
 	ServerLog    logrus.FieldLogger
 }
 
@@ -41,7 +41,7 @@ type ServerMux struct {
 func NewServerMux(logger logrus.FieldLogger) *ServerMux {
 	return &ServerMux{
 		initializers: make(map[string]HandlerInitializer),
-		Handlers:     make(map[string]interface{}),
+		Handlers:     make(map[string]any),
 		ServerLog:    logger,
 	}
 }
@@ -63,7 +63,7 @@ func (m *ServerMux) Names() []string {
 
 // GetHandler returns the instance for a plugin with the given name. If an instance has already been initialized,
 // that is returned. Otherwise, the instance is initialized by calling its initialization function.
-func (m *ServerMux) GetHandler(name string) (interface{}, error) {
+func (m *ServerMux) GetHandler(name string) (any, error) {
 	if instance, found := m.Handlers[name]; found {
 		return instance, nil
 	}

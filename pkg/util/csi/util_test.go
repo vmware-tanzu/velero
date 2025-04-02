@@ -25,7 +25,6 @@ import (
 )
 
 func TestCSIFeatureNotEnabledAndPluginIsFromCSI(t *testing.T) {
-
 	features.NewFeatureFlagSet("EnableCSI")
 	require.False(t, ShouldSkipAction("abc"))
 	require.False(t, ShouldSkipAction("velero.io/csi-pvc-backupper"))

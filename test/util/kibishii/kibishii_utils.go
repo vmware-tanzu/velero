@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -55,9 +56,24 @@ var KibishiiPodNameList = []string{"kibishii-deployment-0", "kibishii-deployment
 var KibishiiPVCNameList = []string{"kibishii-data-kibishii-deployment-0", "kibishii-data-kibishii-deployment-1"}
 var KibishiiStorageClassName = "kibishii-storage-class"
 
+func GetKibishiiPVCNameList(workerCount int) []string {
+	var kibishiiPVCNameList []string
+	for i := 0; i < workerCount; i++ {
+		kibishiiPVCNameList = append(kibishiiPVCNameList, fmt.Sprintf("kibishii-data-kibishii-deployment-%d", i))
+	}
+	return kibishiiPVCNameList
+}
+
 // RunKibishiiTests runs kibishii tests on the provider.
-func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLocation, kibishiiNamespace string,
-	useVolumeSnapshots, defaultVolumesToFsBackup bool) error {
+func RunKibishiiTests(
+	veleroCfg VeleroConfig,
+	backupName string,
+	restoreName string,
+	backupLocation string,
+	kibishiiNamespace string,
+	useVolumeSnapshots bool,
+	defaultVolumesToFsBackup bool,
+) error {
 	pvCount := len(KibishiiPVCNameList)
 	client := *veleroCfg.ClientToInstallVelero
 	oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
@@ -78,7 +94,7 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", kibishiiNamespace)
 	}
 	defer func() {
-		if !veleroCfg.Debug {
+		if !CurrentSpecReport().Failed() || !veleroCfg.FailFast {
 			if err := DeleteNamespace(context.Background(), client, kibishiiNamespace, true); err != nil {
 				fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", kibishiiNamespace))
 			}
@@ -111,9 +127,8 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 
 	// Checkpoint for a successful backup
 	if useVolumeSnapshots {
-		if providerName == Vsphere {
+		if veleroCfg.HasVspherePlugin {
 			// Wait for uploads started by the Velero Plugin for vSphere to complete
-			// TODO - remove after upload progress monitoring is implemented
 			fmt.Println("Waiting for vSphere uploads to complete")
 			if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace, 2); err != nil {
 				return errors.Wrapf(err, "Error waiting for uploads to complete")
@@ -123,9 +138,12 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		if err != nil {
 			return errors.Wrap(err, "Fail to get snapshot checkpoint")
 		}
-		err = SnapshotsShouldBeCreatedInCloud(veleroCfg.CloudProvider,
-			veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLConfig,
-			backupName, snapshotCheckPoint)
+		err = CheckSnapshotsInProvider(
+			veleroCfg,
+			backupName,
+			snapshotCheckPoint,
+			false,
+		)
 		if err != nil {
 			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
@@ -158,9 +176,12 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 					return errors.Wrap(err, "failed to get snapshot checkPoint")
 				}
 			} else {
-				err = SnapshotsShouldNotExistInCloud(veleroCfg.CloudProvider,
-					veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLConfig,
-					backupName, SnapshotCheckPoint{})
+				err = CheckSnapshotsInProvider(
+					veleroCfg,
+					backupName,
+					SnapshotCheckPoint{},
+					false,
+				)
 				if err != nil {
 					return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 				}
@@ -211,10 +232,10 @@ func RunKibishiiTests(veleroCfg VeleroConfig, backupName, restoreName, backupLoc
 		}
 	}
 
-	// the snapshots of AWS may be still in pending status when do the restore, wait for a while
-	// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
-	// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
 	if useVolumeSnapshots {
+		// the snapshots of AWS may be still in pending status when do the restore, wait for a while
+		// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
+		// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
 		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
 		time.Sleep(5 * time.Minute)
 	}
@@ -248,7 +269,7 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 		strings.EqualFold(veleroFeatures, FeatureCSI) {
 		cloudPlatform = AzureCSI
 	}
-	if strings.EqualFold(cloudPlatform, Aws) &&
+	if strings.EqualFold(cloudPlatform, AWS) &&
 		strings.EqualFold(veleroFeatures, FeatureCSI) {
 		cloudPlatform = AwsCSI
 	}
@@ -312,7 +333,7 @@ func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiD
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Failed to wait generate data in namespace %s", namespace))
+		return errors.Wrapf(err, "Failed to wait generate data in namespace %s", namespace)
 	}
 	return nil
 }
@@ -342,7 +363,7 @@ func verifyData(ctx context.Context, namespace string, kibishiiData *KibishiiDat
 	})
 
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Failed to verify kibishii data in namespace %s\n", namespace))
+		return errors.Wrapf(err, "Failed to verify kibishii data in namespace %s\n", namespace)
 	}
 	fmt.Printf("Success to verify kibishii data in namespace %s\n", namespace)
 	return nil
@@ -409,7 +430,7 @@ func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, one
 		for _, pod := range KibishiiPodNameList {
 			exist, err := FileExistInPV(oneHourTimeout, kibishiiNamespace, pod, "kibishii", "data", incrementalFileName)
 			if err != nil {
-				return errors.Wrapf(err, fmt.Sprintf("fail to get file %s", incrementalFileName))
+				return errors.Wrapf(err, "fail to get file %s", incrementalFileName)
 			}
 
 			if exist {

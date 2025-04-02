@@ -32,6 +32,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/velero"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 )
@@ -77,7 +78,7 @@ func NewServerStatusRequestReconciler(
 
 func (r *serverStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.log.WithFields(logrus.Fields{
-		"controller":          ServerStatusRequest,
+		"controller":          constant.ControllerServerStatusRequest,
 		"serverStatusRequest": req.NamespacedName,
 	})
 
@@ -95,7 +96,7 @@ func (r *serverStatusRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 	}
 
 	log = r.log.WithFields(logrus.Fields{
-		"controller":          ServerStatusRequest,
+		"controller":          constant.ControllerServerStatusRequest,
 		"serverStatusRequest": req.NamespacedName,
 		"phase":               statusRequest.Status.Phase,
 	})

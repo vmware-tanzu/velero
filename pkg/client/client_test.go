@@ -45,7 +45,7 @@ func TestBuildUserAgent(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			resp := buildUserAgent(test.command, test.version, test.gitSha, test.os, test.arch)
-			assert.Equal(t, resp, test.expected)
+			assert.Equal(t, test.expected, resp)
 		})
 	}
 }
@@ -79,7 +79,7 @@ func TestConfig(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client, err := Config(test.kubeconfig, test.kubecontext, "velero", test.QPS, test.burst)
-			assert.Equal(t, err, nil)
+			assert.NoError(t, err)
 			assert.Equal(t, test.expectedHost, client.Host)
 			assert.Equal(t, test.QPS, client.QPS)
 			assert.Equal(t, test.burst, client.Burst)

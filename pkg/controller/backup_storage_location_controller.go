@@ -27,9 +27,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -80,7 +82,7 @@ func (r *backupStorageLocationReconciler) Reconcile(ctx context.Context, req ctr
 	var unavailableErrors []string
 	var location velerov1api.BackupStorageLocation
 
-	log := r.log.WithField("controller", BackupStorageLocation).WithField(BackupStorageLocation, req.NamespacedName.String())
+	log := r.log.WithField("controller", constant.ControllerBackupStorageLocation).WithField(constant.ControllerBackupStorageLocation, req.NamespacedName.String())
 	log.Debug("Validating availability of BackupStorageLocation")
 
 	locationList, err := storage.ListBackupStorageLocations(r.ctx, r.client, req.Namespace)
@@ -155,7 +157,7 @@ func (r *backupStorageLocationReconciler) logReconciledPhase(defaultFound bool, 
 	var availableBSLs []*velerov1api.BackupStorageLocation
 	var unAvailableBSLs []*velerov1api.BackupStorageLocation
 	var unknownBSLs []*velerov1api.BackupStorageLocation
-	log := r.log.WithField("controller", BackupStorageLocation)
+	log := r.log.WithField("controller", constant.ControllerBackupStorageLocation)
 
 	for i, location := range locationList.Items {
 		phase := location.Status.Phase
@@ -189,21 +191,25 @@ func (r *backupStorageLocationReconciler) logReconciledPhase(defaultFound bool, 
 }
 
 func (r *backupStorageLocationReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
+		location := object.(*velerov1api.BackupStorageLocation)
+		return storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.defaultBackupLocationInfo.ServerValidationFrequency, r.log.WithField("controller", constant.ControllerBackupStorageLocation))
+	})
 	g := kube.NewPeriodicalEnqueueSource(
-		r.log,
+		r.log.WithField("controller", constant.ControllerBackupStorageLocation),
 		mgr.GetClient(),
 		&velerov1api.BackupStorageLocationList{},
 		bslValidationEnqueuePeriod,
-		kube.PeriodicalEnqueueSourceOption{},
+		kube.PeriodicalEnqueueSourceOption{
+			Predicates: []predicate.Predicate{gp},
+		},
 	)
-	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
-		location := object.(*velerov1api.BackupStorageLocation)
-		return storage.IsReadyToValidate(location.Spec.ValidationFrequency, location.Status.LastValidationTime, r.defaultBackupLocationInfo.ServerValidationFrequency, r.log.WithField("controller", BackupStorageLocation))
-	})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		// As the "status.LastValidationTime" field is always updated, this triggers new reconciling process, skip the update event that include no spec change to avoid the reconcile loop
 		For(&velerov1api.BackupStorageLocation{}, builder.WithPredicates(kube.SpecChangePredicate{})).
-		Watches(g, nil, builder.WithPredicates(gp)).
+		WatchesRawSource(g).
+		Named(constant.ControllerBackupStorageLocation).
 		Complete(r)
 }
 

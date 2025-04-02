@@ -44,8 +44,9 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
-	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/internal/volume"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
@@ -57,6 +58,7 @@ import (
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
+	pkgrestoreUtil "github.com/vmware-tanzu/velero/pkg/util/velero/restore"
 )
 
 // nonRestorableResources is an exclusion list  for the restoration process. Any resources
@@ -107,6 +109,8 @@ type restoreReconciler struct {
 
 	newPluginManager  func(logger logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
+	globalCrClient    client.Client
+	resourceTimeout   time.Duration
 }
 
 type backupInfo struct {
@@ -127,6 +131,8 @@ func NewRestoreReconciler(
 	logFormat logging.Format,
 	defaultItemOperationTimeout time.Duration,
 	disableInformerCache bool,
+	globalCrClient client.Client,
+	resourceTimeout time.Duration,
 ) *restoreReconciler {
 	r := &restoreReconciler{
 		ctx:                         ctx,
@@ -145,6 +151,9 @@ func NewRestoreReconciler(
 		// replaced with fakes for testing.
 		newPluginManager:  newPluginManager,
 		backupStoreGetter: backupStoreGetter,
+
+		globalCrClient:  globalCrClient,
+		resourceTimeout: resourceTimeout,
 	}
 
 	// Move the periodical backup and restore metrics computing logic from controllers to here.
@@ -241,6 +250,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// patch to update status and persist to API
+	// This is patching from "" or New, no retry needed
 	err = kubeutil.PatchResource(original, restore, r.kbClient)
 	if err != nil {
 		// return the error so the restore can be re-processed; it's currently
@@ -269,10 +279,15 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		restore.Status.Phase == api.RestorePhaseCompleted {
 		restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 	}
-	log.Debug("Updating restore's final status")
-
-	if err = kubeutil.PatchResource(original, restore, r.kbClient); err != nil {
-		log.WithError(errors.WithStack(err)).Info("Error updating restore's final status")
+	log.Debug("Updating restore's status")
+	// Phases were updated in runValidatedRestore
+	// This patch with retry update Phase from InProgress to
+	// WaitingForPluginOperations
+	// WaitingForPluginOperationsPartiallyFailed
+	// Finalizing
+	// FinalizingPartiallyFailed
+	if err = kubeutil.PatchResourceWithRetriesOnErrors(r.resourceTimeout, original, restore, r.kbClient); err != nil {
+		log.WithError(errors.WithStack(err)).Infof("Error updating restore's status from %v to %v", original.Status.Phase, restore.Status.Phase)
 		// No need to re-enqueue here, because restore's already set to InProgress before.
 		// Controller only handle New restore.
 	}
@@ -283,6 +298,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *restoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Restore{}).
+		Named(constant.ControllerRestore).
 		Complete(r)
 }
 
@@ -342,6 +358,11 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 		}
 	}
 
+	// validate ExistingResourcePolicy
+	if restore.Spec.ExistingResourcePolicy != "" && !pkgrestoreUtil.IsResourcePolicyValid(string(restore.Spec.ExistingResourcePolicy)) {
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Invalid ExistingResourcePolicy: %s", restore.Spec.ExistingResourcePolicy))
+	}
+
 	// if ScheduleName is specified, fill in BackupName with the most recent successful backup from
 	// the schedule
 	if restore.Spec.ScheduleName != "" {
@@ -377,7 +398,7 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 		restore.Spec.ScheduleName = info.backup.GetLabels()[api.ScheduleNameLabel]
 	}
 
-	var resourceModifiers *resourcemodifiers.ResourceModifiers = nil
+	var resourceModifiers *resourcemodifiers.ResourceModifiers
 	if restore.Spec.ResourceModifier != nil && strings.EqualFold(restore.Spec.ResourceModifier.Kind, resourcemodifiers.ConfigmapRefType) {
 		ResourceModifierConfigMap := &corev1api.ConfigMap{}
 		err := r.kbClient.Get(context.Background(), client.ObjectKey{Namespace: restore.Namespace, Name: restore.Spec.ResourceModifier.Name}, ResourceModifierConfigMap)
@@ -387,10 +408,10 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 		}
 		resourceModifiers, err = resourcemodifiers.GetResourceModifiersFromConfig(ResourceModifierConfigMap)
 		if err != nil {
-			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("Error in parsing resource modifiers provided in configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name)).Error())
+			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrapf(err, "Error in parsing resource modifiers provided in configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name).Error())
 			return backupInfo{}, nil
 		} else if err = resourceModifiers.Validate(); err != nil {
-			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("Validation error in resource modifiers provided in configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name)).Error())
+			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrapf(err, "Validation error in resource modifiers provided in configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name).Error())
 			return backupInfo{}, nil
 		}
 		r.logger.Infof("Retrieved Resource modifiers provided in configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name)
@@ -521,7 +542,7 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 		return errors.Wrap(err, "fail to fetch CSI VolumeSnapshots metadata")
 	}
 
-	backupVolumeInfoMap := make(map[string]internalVolume.VolumeInfo)
+	backupVolumeInfoMap := make(map[string]volume.BackupVolumeInfo)
 	volumeInfos, err := backupStore.GetBackupVolumeInfos(restore.Spec.BackupName)
 	if err != nil {
 		restoreLog.WithError(err).Errorf("fail to get VolumeInfos metadata file for backup %s", restore.Spec.BackupName)
@@ -540,16 +561,18 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 	}
 
 	restoreReq := &pkgrestore.Request{
-		Log:                  restoreLog,
-		Restore:              restore,
-		Backup:               info.backup,
-		PodVolumeBackups:     podVolumeBackups,
-		VolumeSnapshots:      volumeSnapshots,
-		BackupReader:         backupFile,
-		ResourceModifiers:    resourceModifiers,
-		DisableInformerCache: r.disableInformerCache,
-		CSIVolumeSnapshots:   csiVolumeSnapshots,
-		VolumeInfoMap:        backupVolumeInfoMap,
+		Log:                           restoreLog,
+		Restore:                       restore,
+		Backup:                        info.backup,
+		PodVolumeBackups:              podVolumeBackups,
+		VolumeSnapshots:               volumeSnapshots,
+		BackupReader:                  backupFile,
+		ResourceModifiers:             resourceModifiers,
+		DisableInformerCache:          r.disableInformerCache,
+		CSIVolumeSnapshots:            csiVolumeSnapshots,
+		BackupVolumeInfoMap:           backupVolumeInfoMap,
+		RestoreVolumeInfoTracker:      volume.NewRestoreVolInfoTracker(restore, restoreLog, r.globalCrClient),
+		ResourceDeletionStatusTracker: kubeutil.NewResourceDeletionStatusTracker(),
 	}
 	restoreWarnings, restoreErrors := r.restorer.RestoreWithResolvers(restoreReq, actionsResolver, pluginManager)
 
@@ -638,6 +661,11 @@ func (r *restoreReconciler) runValidatedRestore(restore *api.Restore, info backu
 
 	if err := putOperationsForRestore(restore, *restoreReq.GetItemOperationsList(), backupStore); err != nil {
 		r.logger.WithError(err).Error("Error uploading restore item action operation resource list to backup storage")
+	}
+
+	restoreReq.RestoreVolumeInfoTracker.Populate(context.TODO(), restoreReq.RestoredResourceList())
+	if err := putRestoreVolumeInfoList(restore, restoreReq.RestoreVolumeInfoTracker.Result(), backupStore); err != nil {
+		r.logger.WithError(err).Error("Error uploading restored volume info to backup storage")
 	}
 
 	if restore.Status.Errors > 0 {
@@ -774,6 +802,22 @@ func putOperationsForRestore(restore *api.Restore, operations []*itemoperation.R
 	}
 
 	return nil
+}
+
+func putRestoreVolumeInfoList(restore *api.Restore, volInfoList []*volume.RestoreVolumeInfo, store persistence.BackupStore) error {
+	buf := new(bytes.Buffer)
+	gzw := gzip.NewWriter(buf)
+	defer gzw.Close()
+
+	if err := json.NewEncoder(gzw).Encode(volInfoList); err != nil {
+		return errors.Wrap(err, "error encoding restore volume info list to JSON")
+	}
+
+	if err := gzw.Close(); err != nil {
+		return errors.Wrap(err, "error closing gzip writer")
+	}
+
+	return store.PutRestoreVolumeInfo(restore.Name, buf)
 }
 
 func downloadToTempFile(backupName string, backupStore persistence.BackupStore, logger logrus.FieldLogger) (*os.File, error) {

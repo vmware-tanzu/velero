@@ -51,9 +51,6 @@ archives:
     files:
       - LICENSE
       - examples/**/*
-    # Add the setting to resolve the DEPRECATED warning. Actually, Velero's case is not affected by the rlcp behavior change.
-    # https://github.com/orgs/goreleaser/discussions/3659#discussioncomment-4587257
-    rlcp: true 
 checksum:
   name_template: 'CHECKSUM'
 release:

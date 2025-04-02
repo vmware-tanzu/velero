@@ -166,10 +166,10 @@ func TestListBackupStorageLocations(t *testing.T) {
 			client := fake.NewClientBuilder().WithScheme(util.VeleroScheme).WithRuntimeObjects(tt.backupLocations).Build()
 			if tt.expectError {
 				_, err := ListBackupStorageLocations(context.Background(), client, "ns-1")
-				g.Expect(err).NotTo(BeNil())
+				g.Expect(err).To(HaveOccurred())
 			} else {
 				_, err := ListBackupStorageLocations(context.Background(), client, "ns-1")
-				g.Expect(err).To(BeNil())
+				g.Expect(err).ToNot(HaveOccurred())
 			}
 		})
 	}

@@ -26,11 +26,20 @@ import (
 // SnapshotExposer is the interfaces for a snapshot exposer
 type SnapshotExposer interface {
 	// Expose starts the process to expose a snapshot, the expose process may take long time
-	Expose(context.Context, corev1.ObjectReference, interface{}) error
+	Expose(context.Context, corev1.ObjectReference, any) error
 	// GetExposed polls the status of the expose.
 	// If the expose is accessible by the current caller, it waits the expose ready and returns the expose result.
 	// Otherwise, it returns nil as the expose result without an error.
-	GetExposed(context.Context, corev1.ObjectReference, time.Duration, interface{}) (*ExposeResult, error)
+	GetExposed(context.Context, corev1.ObjectReference, time.Duration, any) (*ExposeResult, error)
+
+	// PeekExposed tests the status of the expose.
+	// If the expose is incomplete but not recoverable, it returns an error.
+	// Otherwise, it returns nil immediately.
+	PeekExposed(context.Context, corev1.ObjectReference) error
+
+	// DiagnoseExpose generate the diagnostic info when the expose is not finished for a long time.
+	// If it finds any problem, it returns an string about the problem.
+	DiagnoseExpose(context.Context, corev1.ObjectReference) string
 
 	// CleanUp cleans up any objects generated during the snapshot expose
 	CleanUp(context.Context, corev1.ObjectReference, string, string)

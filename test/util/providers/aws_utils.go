@@ -128,7 +128,6 @@ func newS3Client(cfg aws.Config, url string, forcePathStyle bool) (*s3.Client, e
 // GetBucketRegion returns the AWS region that a bucket is in, or an error
 // if the region cannot be determined.
 func GetBucketRegion(bucket string) (string, error) {
-
 	cfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
 		return "", errors.WithStack(err)

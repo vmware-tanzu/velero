@@ -23,8 +23,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/reporters"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 
@@ -70,7 +69,6 @@ func init() {
 	//vmware-tanzu-experiments
 	flag.StringVar(&VeleroCfg.Features, "features", "", "Comma-separated list of features to enable for this Velero process.")
 	flag.StringVar(&VeleroCfg.DefaultClusterContext, "default-cluster-context", "", "Default cluster context for migration test.")
-	flag.BoolVar(&VeleroCfg.Debug, "debug-e2e-test", true, "Switch to control namespace cleaning.")
 	flag.StringVar(&VeleroCfg.UploaderType, "uploader-type", "kopia", "Identify persistent volume backup uploader.")
 	flag.BoolVar(&VeleroCfg.VeleroServerDebugMode, "velero-server-debug-mode", false, "Identify persistent volume backup uploader.")
 	flag.StringVar(&VeleroCfg.NFSServerPath, "nfs-server-path", "", "the path of nfs server")
@@ -78,6 +76,7 @@ func init() {
 	flag.StringVar(&VeleroCfg.BackupForRestore, "backup-for-restore", "", "the name of backup for restore")
 	flag.BoolVar(&VeleroCfg.DeleteClusterResource, "delete-cluster-resource", false, "delete cluster resource after test")
 	flag.BoolVar(&VeleroCfg.DebugVeleroPodRestart, "debug-velero-pod-restart", false, "Switch for debugging velero pod restart.")
+	flag.BoolVar(&VeleroCfg.FailFast, "fail-fast", true, "a switch for failing fast on meeting error.")
 }
 
 func initConfig() error {
@@ -87,19 +86,24 @@ func initConfig() error {
 	}
 	VeleroCfg.DefaultClient = &cli
 
-	ReportData = &Report{
+	ReportData = &E2EReport{
 		TestDescription: VeleroCfg.TestCaseDescribe,
-		OtherFields:     make(map[string]interface{}),
+		OtherFields:     make(map[string]any),
 	}
 
 	return nil
 }
 
-var _ = Describe("[PerformanceTest][BackupAndRestore] Velero test on both backup and restore resources", test.TestFunc(&basic.BasicTest{}))
+var _ = Describe("Velero test on both backup and restore resources",
+	Label("PerformanceTest", "BackupAndRestore"), test.TestFunc(&basic.BasicTest{}))
 
-var _ = Describe("[PerformanceTest][Backup] Velero test on only backup resources", test.TestFunc(&backup.BackupTest{}))
+var _ = Describe("Velero test on only backup resources",
+	Label("PerformanceTest", "Backup"), test.TestFunc(&backup.BackupTest{}))
 
-var _ = Describe("[PerformanceTest][Restore] Velero test on only restore resources", test.TestFunc(&restore.RestoreTest{}))
+var _ = Describe("Velero test on only restore resources",
+	Label("PerformanceTest", "Restore"), test.TestFunc(&restore.RestoreTest{}))
+
+var testSuitePassed bool
 
 func TestE2e(t *testing.T) {
 	flag.Parse()
@@ -114,8 +118,7 @@ func TestE2e(t *testing.T) {
 	}
 
 	RegisterFailHandler(Fail)
-	junitReporter := reporters.NewJUnitReporter("report.xml")
-	RunSpecsWithDefaultAndCustomReporters(t, "E2e Suite", []Reporter{junitReporter})
+	testSuitePassed = RunSpecs(t, "E2e Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -127,8 +130,16 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	Expect(report.GenerateYamlReport()).To(Succeed())
-	if InstallVelero && !VeleroCfg.Debug {
-		By("release test resources after testing")
-		Expect(VeleroUninstall(context.Background(), VeleroCfg.VeleroCLI, VeleroCfg.VeleroNamespace)).To(Succeed())
+	// If the Velero is installed during test, and the FailFast is not enabled,
+	// uninstall Velero. If not, either Velero is not installed, or kept it for debug.
+	if InstallVelero {
+		if !testSuitePassed && VeleroCfg.FailFast {
+			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+		} else {
+			By("release test resources after testing")
+			ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
+			defer ctxCancel()
+			Expect(VeleroUninstall(ctx, VeleroCfg)).To(Succeed())
+		}
 	}
 })

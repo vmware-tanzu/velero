@@ -18,6 +18,7 @@ package podexec
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -51,7 +52,7 @@ func TestNewPodCommandExecutor(t *testing.T) {
 func TestExecutePodCommandMissingInputs(t *testing.T) {
 	tests := []struct {
 		name         string
-		item         map[string]interface{}
+		item         map[string]any
 		podNamespace string
 		podName      string
 		hookName     string
@@ -62,22 +63,22 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 		},
 		{
 			name: "missing pod namespace",
-			item: map[string]interface{}{},
+			item: map[string]any{},
 		},
 		{
 			name:         "missing pod name",
-			item:         map[string]interface{}{},
+			item:         map[string]any{},
 			podNamespace: "ns",
 		},
 		{
 			name:         "missing hookName",
-			item:         map[string]interface{}{},
+			item:         map[string]any{},
 			podNamespace: "ns",
 			podName:      "pod",
 		},
 		{
 			name:         "missing hook",
-			item:         map[string]interface{}{},
+			item:         map[string]any{},
 			podNamespace: "ns",
 			podName:      "pod",
 			hookName:     "hook",
@@ -231,7 +232,7 @@ func TestExecutePodCommand(t *testing.T) {
 				Stdout: &stdout,
 				Stderr: &stderr,
 			}
-			streamExecutor.On("Stream", expectedStreamOptions).Return(test.hookError)
+			streamExecutor.On("StreamWithContext", mock.Anything, expectedStreamOptions).Return(test.hookError)
 
 			err = podCommandExecutor.ExecutePodCommand(velerotest.NewLogger(), pod, "namespace", "name", "hookName", &hook)
 			if test.expectedError != "" {
@@ -307,8 +308,8 @@ type mockStreamExecutor struct {
 	remotecommand.Executor
 }
 
-func (e *mockStreamExecutor) Stream(options remotecommand.StreamOptions) error {
-	args := e.Called(options)
+func (e *mockStreamExecutor) StreamWithContext(ctx context.Context, options remotecommand.StreamOptions) error {
+	args := e.Called(ctx, options)
 	return args.Error(0)
 }
 

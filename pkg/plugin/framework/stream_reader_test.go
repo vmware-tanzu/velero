@@ -61,6 +61,6 @@ func TestStreamReader(t *testing.T) {
 
 	res, err := io.ReadAll(sr)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, s, string(res))
 }

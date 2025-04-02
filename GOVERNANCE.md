@@ -107,6 +107,29 @@ Lazy consensus does _not_ apply to the process of:
 
 * Removal of maintainers from Velero
 
+## Deprecation Policy
+
+### Deprecation Process
+
+Any contributor may introduce a request to deprecate a feature or an option of a feature by opening a feature request issue in the vmware-tanzu/velero GitHub project. The issue should describe why the feature is no longer needed or has become detrimental to Velero, as well as whether and how it has been superseded. The submitter should give as much detail as possible.
+
+Once the issue is filed, a one-month discussion period begins. Discussions take place within the issue itself as well as in the community meetings. The person who opens the issue, or a maintainer, should add the date and time marking the end of the discussion period in a comment on the issue as soon as possible after it is opened. A decision on the issue needs to be made within this one-month period.
+
+The feature will be deprecated by a supermajority vote of 50% plus one of the project maintainers at the time of the vote tallying, which is 72 hours after the end of the community meeting that is the end of the comment period. (Maintainers are permitted to vote in advance of the deadline, but should hold their votes until as close as possible to hear all possible discussion.) Votes will be tallied in comments on the issue. 
+
+Non-maintainers may add non-binding votes in comments to the issue as well; these are opinions to be taken into consideration by maintainers, but they do not count as votes. 
+
+If the vote passes, the deprecation window takes effect in the subsequent release, and the removal follows the schedule. 
+
+### Schedule
+If depreciation proposal passes by supermajority votes, the feature is deprecated in the next minor release and the feature can be removed completely after two minor version or equivalent major version e.g., if feature gets deprecated in Nth minor version, then feature can be removed after N+2 minor version or its equivalent if the major version number changes.
+
+### Deprecation Window
+
+The deprecation window is the period from the release in which the deprecation takes effect through the release in which the feature is removed. During this period, only critical security vulnerabilities and catastrophic bugs should be fixed.
+
+**Note:** If a backup relies on a deprecated feature, then backups made with the last Velero release before this feature is removed must still be restorable in version `n+2`. For instance, something like restic feature support, that might mean that restic is removed from the list of supported uploader types in version `n` but the underlying implementation required to restore from a restic backup won't be removed until release `n+2`.
+
 ## Updating Governance
 
 All substantive changes in Governance require a supermajority agreement by all maintainers.

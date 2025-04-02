@@ -20,19 +20,20 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/url"
 	"os"
 	"strings"
-	"time"
 
-	"github.com/Azure/azure-pipeline-go/pipeline"
-
-	disk "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-08-01/compute"
-	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
-	"github.com/Azure/azure-storage-blob-go/azblob"
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -53,6 +54,26 @@ const (
 	subscriptionID          = "subscriptionId"
 	resourceGroup           = "resourceGroup"
 )
+
+var environments = map[string]cloud.Configuration{
+	"AZURECHINACLOUD":        cloud.AzureChina,
+	"AZURECLOUD":             cloud.AzurePublic,
+	"AZUREGERMANCLOUD":       cloud.AzurePublic,
+	"AZUREPUBLICCLOUD":       cloud.AzurePublic,
+	"AZUREUSGOVERNMENT":      cloud.AzureGovernment,
+	"AZUREUSGOVERNMENTCLOUD": cloud.AzureGovernment,
+}
+
+// cloudConfigurationFromName returns cloud configuration based on the common name specified.
+func cloudConfigurationFromName(name string) (cloud.Configuration, error) {
+	name = strings.ToUpper(name)
+	env, ok := environments[name]
+	if !ok {
+		return env, fmt.Errorf("there is no cloud configuration matching the name %q", name)
+	}
+
+	return env, nil
+}
 
 func getStorageCredential(cloudCredentialsFile, bslConfig string) (string, string, error) {
 	config := flag.NewMap()
@@ -81,14 +102,14 @@ func loadCredentialsIntoEnv(credentialsFile string) error {
 	}
 	return nil
 }
-func parseAzureEnvironment(cloudName string) (*azure.Environment, error) {
+func parseCloudConfiguration(cloudName string) (cloud.Configuration, error) {
 	if cloudName == "" {
 		fmt.Println("cloudName is empty")
-		return &azure.PublicCloud, nil
+		return cloud.AzurePublic, nil
 	}
 
-	env, err := azure.EnvironmentFromName(cloudName)
-	return &env, errors.WithStack(err)
+	cloudConfiguration, err := cloudConfigurationFromName(cloudName)
+	return cloudConfiguration, errors.WithStack(err)
 }
 func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resourceGroupCfg string) (string, error) {
 	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
@@ -112,8 +133,8 @@ func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resource
 		resourceGroup = os.Getenv(resourceGroupEnvVar)
 	}
 	// get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
-	// exist, parseAzureEnvironment will return azure.PublicCloud.
-	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
+	// exist, parseCloudConfiguration will return cloud.AzurePublic.
+	cloudConfiguration, err := parseCloudConfiguration(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return "", errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
@@ -123,28 +144,38 @@ func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resource
 		return "", errors.New("azure subscription ID not found in object store's config or in environment variable")
 	}
 
-	authorizer, err := auth.NewAuthorizerFromEnvironment()
+	cred, err := azidentity.NewEnvironmentCredential(&azidentity.EnvironmentCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Cloud: cloudConfiguration,
+		},
+	})
 	if err != nil {
-		return "", errors.Wrap(err, "error getting authorizer from environment")
+		return "", errors.Wrap(err, "error getting credential from environment")
 	}
 
 	// get storageAccountsClient
-	storageAccountsClient := storagemgmt.NewAccountsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
-	storageAccountsClient.Authorizer = authorizer
+	storageAccountsClient, err := armstorage.NewAccountsClient(subscriptionID, cred, &arm.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Cloud: cloudConfiguration,
+		},
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "error creating new AccountsClient")
+	}
 
 	// get storage key
-	res, err := storageAccountsClient.ListKeys(context.TODO(), resourceGroup, accountName, storagemgmt.Kerb)
+	res, err := storageAccountsClient.ListKeys(context.TODO(), resourceGroup, accountName, &armstorage.AccountsClientListKeysOptions{Expand: to.Ptr("kerb")})
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
-	if res.Keys == nil || len(*res.Keys) == 0 {
+	if len(res.Keys) == 0 {
 		return "", errors.New("No storage keys found")
 	}
 
-	for _, key := range *res.Keys {
+	for _, key := range res.Keys {
 		// uppercase both strings for comparison because the ListKeys call returns e.g. "FULL" but
-		// the storagemgmt.Full constant in the SDK is defined as "Full".
-		if strings.EqualFold(string(key.Permissions), string(storagemgmt.Full)) {
+		// the armstorage.KeyPermissionFull constant in the SDK is defined as "Full".
+		if strings.EqualFold(string(*key.Permissions), string(armstorage.KeyPermissionFull)) {
 			storageKey = *key.Value
 			break
 		}
@@ -158,11 +189,8 @@ func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resource
 }
 func handleErrors(err error) {
 	if err != nil {
-		if serr, ok := err.(azblob.StorageError); ok { // This error is a Service-specific
-			switch serr.ServiceCode() { // Compare serviceCode to ServiceCodeXxx constants
-			case azblob.ServiceCodeContainerAlreadyExists:
-				return
-			}
+		if bloberror.HasCode(err, bloberror.ContainerAlreadyExists) {
+			return
 		}
 		log.Fatal(err)
 	}
@@ -187,18 +215,12 @@ func getRequiredValues(getValue func(string) string, keys ...string) (map[string
 	return results, nil
 }
 
-func deleteBlob(p pipeline.Pipeline, accountName, containerName, blobName string) error {
-	ctx := context.Background()
-
-	URL_BLOB, err := url.Parse(fmt.Sprintf("https://%s.blob.core.windows.net/%s/%s", accountName, containerName, blobName))
-	if err != nil {
-		return errors.Wrapf(err, "Fail to url.Parse")
-	}
-	blobURL := azblob.NewBlobURL(*URL_BLOB, p)
-	_, err = blobURL.Delete(ctx, azblob.DeleteSnapshotsOptionNone, azblob.BlobAccessConditions{})
+func deleteBlob(client *azblob.Client, containerName, blobName string) error {
+	_, err := client.DeleteBlob(context.Background(), containerName, blobName, nil)
 	return err
 }
 func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupName string) (bool, error) {
+	ctx := context.Background()
 	accountName, accountKey, err := getStorageCredential(cloudCredentialsFile, bslConfig)
 	if err != nil {
 		log.Fatal("Fail to get : accountName and accountKey, " + err.Error())
@@ -207,31 +229,29 @@ func (s AzureStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPref
 	if err != nil {
 		log.Fatal("Invalid credentials with error: " + err.Error())
 	}
-	p := azblob.NewPipeline(credential, azblob.PipelineOptions{})
 
 	containerName := bslBucket
 
-	URL, _ := url.Parse(
-		fmt.Sprintf("https://%s.blob.core.windows.net/%s", accountName, containerName))
+	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", accountName)
 
-	containerURL := azblob.NewContainerURL(*URL, p)
-
+	client, err := azblob.NewClientWithSharedKeyCredential(serviceURL, credential, nil)
+	if err != nil {
+		log.Fatal("Failed to get client with error: " + err.Error())
+	}
 	// Create the container, if container is already exist, then do nothing
-	ctx := context.Background()
-	_, err = containerURL.Create(ctx, azblob.Metadata{}, azblob.PublicAccessNone)
+	_, err = client.CreateContainer(ctx, containerName, &container.CreateOptions{})
 	handleErrors(err)
 
 	fmt.Printf("Finding backup %s blobs in Azure container/bucket %s\n", backupName, containerName)
-	for marker := (azblob.Marker{}); marker.NotDone(); {
-		listBlob, err := containerURL.ListBlobsFlatSegment(ctx, marker, azblob.ListBlobsSegmentOptions{})
+	pager := client.NewListBlobsFlatPager(containerName, nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return false, errors.Wrapf(err, "Fail to create gcloud client")
+			return false, errors.Wrapf(err, "Fail to list blobs client")
 		}
-		marker = listBlob.NextMarker
-
-		for _, blobInfo := range listBlob.Segment.BlobItems {
-			if strings.Contains(blobInfo.Name, backupName) {
-				fmt.Printf("Blob name: %s exist in %s\n", backupName, blobInfo.Name)
+		for _, blobInfo := range page.Segment.BlobItems {
+			if strings.Contains(*blobInfo.Name, backupName) {
+				fmt.Printf("Blob name: %s exist in %s\n", backupName, *blobInfo.Name)
 				return true, nil
 			}
 		}
@@ -250,33 +270,32 @@ func (s AzureStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bsl
 	if err != nil {
 		log.Fatal("Invalid credentials with error: " + err.Error())
 	}
-	p := azblob.NewPipeline(credential, azblob.PipelineOptions{})
 
 	containerName := bslBucket
 
-	URL, _ := url.Parse(
-		fmt.Sprintf("https://%s.blob.core.windows.net/%s", accountName, containerName))
+	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", accountName)
 
-	containerURL := azblob.NewContainerURL(*URL, p)
-	_, err = containerURL.Create(ctx, azblob.Metadata{}, azblob.PublicAccessNone)
+	client, err := azblob.NewClientWithSharedKeyCredential(serviceURL, credential, nil)
+	if err != nil {
+		log.Fatal("Failed to get client with error: " + err.Error())
+	}
+	_, err = client.CreateContainer(ctx, containerName, &container.CreateOptions{})
 	handleErrors(err)
 
 	fmt.Println("Listing the blobs in the container:")
-	for marker := (azblob.Marker{}); marker.NotDone(); {
-		listBlob, err := containerURL.ListBlobsFlatSegment(ctx, marker, azblob.ListBlobsSegmentOptions{})
+	pager := client.NewListBlobsFlatPager(containerName, nil)
+	for pager.More() {
+		page, err := pager.NextPage(context.TODO())
 		if err != nil {
 			return errors.Wrapf(err, "Fail to list blobs client")
 		}
-
-		marker = listBlob.NextMarker
-		for _, blobInfo := range listBlob.Segment.BlobItems {
-
-			if strings.Contains(blobInfo.Name, bslPrefix+backupObject+"/") {
-				deleteBlob(p, accountName, containerName, blobInfo.Name)
+		for _, blobInfo := range page.Segment.BlobItems {
+			if strings.Contains(*blobInfo.Name, bslPrefix+backupObject+"/") {
+				err := deleteBlob(client, containerName, *blobInfo.Name)
 				if err != nil {
 					log.Fatal("Invalid credentials with error: " + err.Error())
 				}
-				fmt.Printf("Deleted blob: %s according to backup resource %s\n", blobInfo.Name, bslPrefix+backupObject+"/")
+				fmt.Printf("Deleted blob: %s according to backup resource %s\n", *blobInfo.Name, bslPrefix+backupObject+"/")
 			}
 		}
 	}
@@ -284,7 +303,6 @@ func (s AzureStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bsl
 }
 
 func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupName string, snapshotCheck SnapshotCheckPoint) error {
-
 	ctx := context.Background()
 
 	if err := loadCredentialsIntoEnv(cloudCredentialsFile); err != nil {
@@ -297,8 +315,8 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupN
 	}
 
 	// Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
-	// exist, parseAzureEnvironment will return azure.PublicCloud.
-	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
+	// exist, parseCloudConfiguration will return cloud.AzurePublic.
+	cloudConfiguration, err := parseCloudConfiguration(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
@@ -306,57 +324,54 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupN
 	// set a different subscriptionId for snapshots if specified
 	snapshotsSubscriptionID := envVars[subscriptionIDEnvVar]
 
+	cred, err := azidentity.NewEnvironmentCredential(&azidentity.EnvironmentCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Cloud: cloudConfiguration,
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "error getting credential from environment")
+	}
+
 	// set up clients
-	snapsClient := disk.NewSnapshotsClientWithBaseURI(env.ResourceManagerEndpoint, snapshotsSubscriptionID)
-	snapsClient.PollingDelay = 5 * time.Second
-
-	authorizer, err := auth.NewAuthorizerFromEnvironment()
+	snapshotsClient, err := armcompute.NewSnapshotsClient(snapshotsSubscriptionID, cred, &arm.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Cloud: cloudConfiguration,
+		},
+	})
 	if err != nil {
-		return errors.Wrap(err, "error getting authorizer from environment")
+		return errors.Wrap(err, "error getting snapshots client")
 	}
-	// // if config["snapsIncrementalConfigKey"] is empty, default to nil; otherwise, parse i
-	snapsClient.Authorizer = authorizer
-	snaps := &snapsClient
-	//return ListByResourceGroup(ctx, snaps, envVars[resourceGroupEnvVar], backupName, snapshotCount)
-	req, err := snaps.ListByResourceGroupPreparer(ctx, envVars[resourceGroupEnvVar])
-	if err != nil {
-		return autorest.NewErrorWithError(err, "compute.SnapshotsClient", "ListByResourceGroup", nil, "Failure preparing request")
-	}
-
-	resp, err := snaps.ListByResourceGroupSender(req)
-	if err != nil {
-		return autorest.NewErrorWithError(err, "compute.SnapshotsClient", "ListByResourceGroup", resp, "Failure sending request")
-	}
-	result, err := snaps.ListByResourceGroupResponder(resp)
+	pager := snapshotsClient.NewListByResourceGroupPager(envVars[resourceGroupEnvVar], &armcompute.SnapshotsClientListByResourceGroupOptions{})
 	snapshotCountFound := 0
 	backupNameInSnapshot := ""
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Fail to list snapshots %s\n", envVars[resourceGroupEnvVar]))
-	}
-	if result.Value == nil {
-		return errors.New(fmt.Sprintf("No snapshots in Azure resource group %s\n", envVars[resourceGroupEnvVar]))
-	}
-	for _, v := range *result.Value {
-		if snapshotCheck.EnableCSI {
-			for _, s := range snapshotCheck.SnapshotIDList {
-				fmt.Println("Azure CSI local snapshot CR: " + s)
-				fmt.Println("Azure provider snapshot name: " + *v.Name)
-				if s == *v.Name {
-					fmt.Printf("Azure snapshot %s is created.\n", s)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			errors.Wrap(err, fmt.Sprintf("Fail to list snapshots %s\n", envVars[resourceGroupEnvVar]))
+		}
+		if page.Value == nil {
+			return errors.New(fmt.Sprintf("No snapshots in Azure resource group %s\n", envVars[resourceGroupEnvVar]))
+		}
+		for _, v := range page.Value {
+			if snapshotCheck.EnableCSI {
+				for _, s := range snapshotCheck.SnapshotIDList {
+					fmt.Println("Azure CSI local snapshot CR: " + s)
+					fmt.Println("Azure provider snapshot name: " + *v.Name)
+					if s == *v.Name {
+						fmt.Printf("Azure snapshot %s is created.\n", s)
+						snapshotCountFound++
+					}
+				}
+			} else {
+				fmt.Println(v.Tags)
+				backupNameInSnapshot = *v.Tags["velero.io-backup"]
+				fmt.Println(backupNameInSnapshot)
+				if backupName == backupNameInSnapshot {
 					snapshotCountFound++
 				}
 			}
-		} else {
-			fmt.Println(v.Tags)
-			backupNameInSnapshot = *v.Tags["velero.io-backup"]
-			fmt.Println(backupNameInSnapshot)
-			if backupName == backupNameInSnapshot {
-				snapshotCountFound++
-			}
 		}
-	}
-	if err != nil {
-		return autorest.NewErrorWithError(err, "compute.SnapshotsClient", "ListByResourceGroup", resp, "Failure responding to request")
 	}
 	if snapshotCountFound != snapshotCheck.ExpectCount {
 		return errors.New(fmt.Sprintf("Snapshot count %d is not as expected %d\n", snapshotCountFound, snapshotCheck.ExpectCount))
@@ -377,20 +392,23 @@ func (s AzureStorage) GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslC
 	if err != nil {
 		log.Fatal("Invalid credentials with error: " + err.Error())
 	}
-	p := azblob.NewPipeline(credential, azblob.PipelineOptions{})
 
-	URL, _ := url.Parse(
-		fmt.Sprintf("https://%s.blob.core.windows.net/%s", accountName, bslBucket))
+	containerName := bslBucket
 
-	containerURL := azblob.NewContainerURL(*URL, p)
-	_, err = containerURL.Create(ctx, azblob.Metadata{}, azblob.PublicAccessNone)
+	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", accountName)
+
+	client, err := azblob.NewClientWithSharedKeyCredential(serviceURL, credential, nil)
+	if err != nil {
+		log.Fatal("Failed to get client with error: " + err.Error())
+	}
+	_, err = client.CreateContainer(ctx, containerName, &container.CreateOptions{})
 	handleErrors(err)
 
-	blobURL := containerURL.NewBlockBlobURL(strings.Join([]string{bslPrefix, objectKey}, "/"))
-	downloadResponse, err := blobURL.Download(ctx, 0, 0, azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
+	blobName := strings.Join([]string{bslPrefix, objectKey}, "/")
+	downloadResponse, err := client.DownloadStream(ctx, containerName, blobName, &azblob.DownloadStreamOptions{})
 	if err != nil {
 		handleErrors(err)
 	}
 
-	return downloadResponse.Body(azblob.RetryReaderOptions{}), nil
+	return downloadResponse.Body, nil
 }

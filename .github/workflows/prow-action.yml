@@ -9,12 +9,21 @@ jobs:
   execute:
     runs-on: ubuntu-latest
     steps:
-      - uses: jpmcb/prow-github-actions@v1.1.2
+      - uses: jpmcb/prow-github-actions@v1.1.3
         with:
-          # Only support /kind command for now.
           # TODO: before allowing the /lgtm command, see if we can block merging if changelog labels are missing.
-          prow-commands: "/area
-            /kind
+          prow-commands: |
+            /approve
+            /area
+            /assign
             /cc
-            /uncc"
+            /close
+            /hold
+            /kind
+            /milestone
+            /retitle
+            /remove
+            /reopen
+            /uncc
+            /unassign
           github-token: "${{ secrets.GITHUB_TOKEN }}"

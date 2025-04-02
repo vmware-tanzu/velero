@@ -18,20 +18,31 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
+	storagev1api "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/clock"
-
+	"github.com/vmware-tanzu/velero/internal/hook"
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
@@ -44,6 +55,9 @@ type restoreFinalizerReconciler struct {
 	backupStoreGetter persistence.ObjectBackupStoreGetter
 	metrics           *metrics.ServerMetrics
 	clock             clock.WithTickerAndDelayedExecution
+	crClient          client.Client
+	multiHookTracker  *hook.MultiHookTracker
+	resourceTimeout   time.Duration
 }
 
 func NewRestoreFinalizerReconciler(
@@ -53,6 +67,9 @@ func NewRestoreFinalizerReconciler(
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	metrics *metrics.ServerMetrics,
+	crClient client.Client,
+	multiHookTracker *hook.MultiHookTracker,
+	resourceTimeout time.Duration,
 ) *restoreFinalizerReconciler {
 	return &restoreFinalizerReconciler{
 		Client:            client,
@@ -62,12 +79,16 @@ func NewRestoreFinalizerReconciler(
 		backupStoreGetter: backupStoreGetter,
 		metrics:           metrics,
 		clock:             &clock.RealClock{},
+		crClient:          crClient,
+		multiHookTracker:  multiHookTracker,
+		resourceTimeout:   resourceTimeout,
 	}
 }
 
 func (r *restoreFinalizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Restore{}).
+		Named(constant.ControllerRestoreFinalizer).
 		Complete(r)
 }
 
@@ -123,7 +144,38 @@ func (r *restoreFinalizerReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, errors.Wrap(err, "error getting backup store")
 	}
 
-	finalizerCtx := &finalizerContext{log: log}
+	volumeInfo, err := backupStore.GetBackupVolumeInfos(restore.Spec.BackupName)
+	if err != nil {
+		log.WithError(err).Errorf("error getting volumeInfo for backup %s", restore.Spec.BackupName)
+		return ctrl.Result{}, errors.Wrap(err, "error getting volumeInfo")
+	}
+
+	restoredResourceList, err := backupStore.GetRestoredResourceList(restore.Name)
+	if err != nil {
+		log.WithError(err).Error("error getting restoredResourceList")
+		return ctrl.Result{}, errors.Wrap(err, "error getting restoredResourceList")
+	}
+
+	restoredPVCList := volume.RestoredPVCFromRestoredResourceList(restoredResourceList)
+
+	restoreItemOperations, err := backupStore.GetRestoreItemOperations(restore.Name)
+	if err != nil {
+		log.WithError(err).Error("error getting itemOperationList")
+		return ctrl.Result{}, errors.Wrap(err, "error getting itemOperationList")
+	}
+
+	finalizerCtx := &finalizerContext{
+		logger:           log,
+		restore:          restore,
+		crClient:         r.crClient,
+		volumeInfo:       volumeInfo,
+		restoredPVCList:  restoredPVCList,
+		multiHookTracker: r.multiHookTracker,
+		resourceTimeout:  r.resourceTimeout,
+		restoreItemOperationList: restoreItemOperationList{
+			items: restoreItemOperations,
+		},
+	}
 	warnings, errs := finalizerCtx.execute()
 
 	warningCnt := len(warnings.Velero) + len(warnings.Cluster)
@@ -193,21 +245,260 @@ func (r *restoreFinalizerReconciler) finishProcessing(restorePhase velerov1api.R
 		r.metrics.RegisterRestoreSuccess(restore.Spec.ScheduleName)
 	}
 	restore.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+	// retry `Finalizing`/`FinalizingPartiallyFailed` to
+	// - `Completed`
+	// - `PartiallyFailed`
+	return kubeutil.PatchResourceWithRetriesOnErrors(r.resourceTimeout, original, restore, r.Client)
+}
 
-	return kubeutil.PatchResource(original, restore, r.Client)
+type restoreItemOperationList struct {
+	items []*itemoperation.RestoreOperation
+}
+
+func (r *restoreItemOperationList) selectByResource(group, resource, ns, name string) []*itemoperation.RestoreOperation {
+	var res []*itemoperation.RestoreOperation
+	rid := velero.ResourceIdentifier{
+		GroupResource: schema.GroupResource{
+			Group:    group,
+			Resource: resource,
+		},
+		Namespace: ns,
+		Name:      name,
+	}
+	for _, item := range r.items {
+		if item != nil && item.Spec.ResourceIdentifier == rid {
+			res = append(res, item)
+		}
+	}
+	return res
+}
+
+// SelectByPVC filters the restore item operation list by PVC namespace and name.
+func (r *restoreItemOperationList) SelectByPVC(ns, name string) []*itemoperation.RestoreOperation {
+	return r.selectByResource("", "persistentvolumeclaims", ns, name)
 }
 
 // finalizerContext includes all the dependencies required by finalization tasks and
 // a function execute() to orderly implement task logic.
 type finalizerContext struct {
-	log logrus.FieldLogger
+	logger                   logrus.FieldLogger
+	restore                  *velerov1api.Restore
+	crClient                 client.Client
+	volumeInfo               []*volume.BackupVolumeInfo
+	restoredPVCList          map[string]struct{}
+	restoreItemOperationList restoreItemOperationList
+	multiHookTracker         *hook.MultiHookTracker
+	resourceTimeout          time.Duration
 }
 
 func (ctx *finalizerContext) execute() (results.Result, results.Result) { //nolint:unparam //temporarily ignore the lint report: result 0 is always nil (unparam)
 	warnings, errs := results.Result{}, results.Result{}
 
 	// implement finalization tasks
-	ctx.log.Debug("Starting running execute()")
+	pdpErrs := ctx.patchDynamicPVWithVolumeInfo()
+	errs.Merge(&pdpErrs)
+
+	rehErrs := ctx.WaitRestoreExecHook()
+	errs.Merge(&rehErrs)
 
 	return warnings, errs
+}
+
+// patchDynamicPV patches newly dynamically provisioned PV using volume info
+// in order to restore custom settings that would otherwise be lost during dynamic PV recreation.
+func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result) {
+	ctx.logger.Info("patching newly dynamically provisioned PV starts")
+
+	var pvWaitGroup sync.WaitGroup
+	var resultLock sync.Mutex
+
+	maxConcurrency := 3
+	semaphore := make(chan struct{}, maxConcurrency)
+
+	for _, volumeItem := range ctx.volumeInfo {
+		if (volumeItem.BackupMethod == volume.PodVolumeBackup || volumeItem.BackupMethod == volume.CSISnapshot) && volumeItem.PVInfo != nil {
+			// Determine restored PVC namespace
+			restoredNamespace := volumeItem.PVCNamespace
+			if remapped, ok := ctx.restore.Spec.NamespaceMapping[restoredNamespace]; ok {
+				restoredNamespace = remapped
+			}
+
+			// Check if PVC was restored in previous phase
+			pvcKey := fmt.Sprintf("%s/%s", restoredNamespace, volumeItem.PVCName)
+			if _, restored := ctx.restoredPVCList[pvcKey]; !restored {
+				continue
+			}
+
+			pvWaitGroup.Add(1)
+			go func(volInfo volume.BackupVolumeInfo, restoredNamespace string) {
+				defer pvWaitGroup.Done()
+
+				semaphore <- struct{}{}
+
+				log := ctx.logger.WithField("PVC", volInfo.PVCName).WithField("PVCNamespace", restoredNamespace)
+				log.Debug("patching dynamic PV is in progress")
+
+				err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, ctx.resourceTimeout, true, func(context.Context) (bool, error) {
+					// wait for PVC to be bound
+					pvc := &v1.PersistentVolumeClaim{}
+					err := ctx.crClient.Get(context.Background(), client.ObjectKey{Name: volInfo.PVCName, Namespace: restoredNamespace}, pvc)
+					if apierrors.IsNotFound(err) {
+						log.Debug("error not finding PVC")
+						return false, nil
+					}
+					if err != nil {
+						return false, err
+					}
+
+					// Check whether the async operation to populate the PVC is successful.  If it's not, will skip patching the PV, instead of waiting.
+					operations := ctx.restoreItemOperationList.SelectByPVC(pvc.Namespace, pvc.Name)
+					for _, op := range operations {
+						if op.Spec.RestoreItemAction == constant.PluginCSIPVCRestoreRIA &&
+							op.Status.Phase != itemoperation.OperationPhaseCompleted {
+							log.Warnf("skipping PV patch, because the operation to restore the PVC is not completed, "+
+								"operation: %s, phase: %s", op.Spec.OperationID, op.Status.Phase)
+							return true, nil
+						}
+					}
+
+					// We are handling a common but specific scenario where a PVC is in a pending state and uses a storage class with
+					// VolumeBindingMode set to WaitForFirstConsumer. In this case, the PV patch step is skipped to avoid
+					// failures due to the PVC not being bound, which could cause a timeout and result in a failed restore.
+					if pvc.Status.Phase == v1.ClaimPending {
+						// check if storage class used has VolumeBindingMode as WaitForFirstConsumer
+						scName := *pvc.Spec.StorageClassName
+						sc := &storagev1api.StorageClass{}
+						err = ctx.crClient.Get(context.Background(), client.ObjectKey{Name: scName}, sc)
+
+						if err != nil {
+							errs.Add(restoredNamespace, err)
+							return false, err
+						}
+						// skip PV patch step for this scenario
+						// because pvc would not be bound and the PV patch step would fail due to timeout thus failing the restore
+						if *sc.VolumeBindingMode == storagev1api.VolumeBindingWaitForFirstConsumer {
+							log.Warnf("skipping PV patch to restore custom reclaim policy, if any: StorageClass %s used by PVC %s has VolumeBindingMode set to WaitForFirstConsumer, and the PVC is also in a pending state", scName, pvc.Name)
+							return true, nil
+						}
+					}
+
+					if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
+						log.Debugf("PVC: %s not ready", pvc.Name)
+						return false, nil
+					}
+
+					// wait for PV to be bound
+					pvName := pvc.Spec.VolumeName
+					pv := &v1.PersistentVolume{}
+					err = ctx.crClient.Get(context.Background(), client.ObjectKey{Name: pvName}, pv)
+					if apierrors.IsNotFound(err) {
+						log.Debugf("error not finding PV: %s", pvName)
+						return false, nil
+					}
+					if err != nil {
+						return false, err
+					}
+
+					if pv.Spec.ClaimRef == nil || pv.Status.Phase != v1.VolumeBound {
+						log.Debugf("PV: %s not ready", pvName)
+						return false, nil
+					}
+
+					// validate PV
+					if pv.Spec.ClaimRef.Name != pvc.Name || pv.Spec.ClaimRef.Namespace != restoredNamespace {
+						return false, fmt.Errorf("PV was bound by unexpected PVC, unexpected PVC: %s/%s, expected PVC: %s/%s",
+							pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name, restoredNamespace, pvc.Name)
+					}
+
+					// patch PV's reclaim policy and label using the corresponding data stored in volume info
+					if needPatch(pv, volInfo.PVInfo) {
+						updatedPV := pv.DeepCopy()
+						updatedPV.Labels = volInfo.PVInfo.Labels
+						updatedPV.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimPolicy(volInfo.PVInfo.ReclaimPolicy)
+						if err := kubeutil.PatchResource(pv, updatedPV, ctx.crClient); err != nil {
+							return false, err
+						}
+						log.Infof("newly dynamically provisioned PV:%s has been patched using volume info", pvName)
+					}
+
+					return true, nil
+				})
+
+				if err != nil {
+					err = fmt.Errorf("fail to patch dynamic PV, err: %s, PVC: %s, PV: %s", err, volInfo.PVCName, volInfo.PVName)
+					ctx.logger.WithError(errors.WithStack((err))).Error("err patching dynamic PV using volume info")
+					resultLock.Lock()
+					defer resultLock.Unlock()
+					errs.Add(restoredNamespace, err)
+				}
+
+				<-semaphore
+			}(*volumeItem, restoredNamespace)
+		}
+	}
+
+	pvWaitGroup.Wait()
+	ctx.logger.Info("patching newly dynamically provisioned PV ends")
+
+	return errs
+}
+
+func needPatch(newPV *v1.PersistentVolume, pvInfo *volume.PVInfo) bool {
+	if newPV.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimPolicy(pvInfo.ReclaimPolicy) {
+		return true
+	}
+
+	newPVLabels, pvLabels := newPV.Labels, pvInfo.Labels
+	for k, v := range pvLabels {
+		if _, ok := newPVLabels[k]; !ok {
+			return true
+		}
+		if newPVLabels[k] != v {
+			return true
+		}
+	}
+
+	return false
+}
+
+// WaitRestoreExecHook waits for restore exec hooks to finish then update the hook execution results
+func (ctx *finalizerContext) WaitRestoreExecHook() (errs results.Result) {
+	log := ctx.logger.WithField("restore", ctx.restore.Name)
+	log.Info("Waiting for restore exec hooks starts")
+
+	// wait for restore exec hooks to finish
+	err := wait.PollUntilContextCancel(context.Background(), 1*time.Second, true, func(context.Context) (bool, error) {
+		log.Debug("Checking the progress of hooks execution")
+		if ctx.multiHookTracker.IsComplete(ctx.restore.Name) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		errs.Add(ctx.restore.Namespace, err)
+		return errs
+	}
+	log.Info("Done waiting for restore exec hooks starts")
+
+	for _, ei := range ctx.multiHookTracker.HookErrs(ctx.restore.Name) {
+		errs.Add(ei.Namespace, ei.Err)
+	}
+
+	// update hooks execution status
+	updated := ctx.restore.DeepCopy()
+	if updated.Status.HookStatus == nil {
+		updated.Status.HookStatus = &velerov1api.HookStatus{}
+	}
+	updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed = ctx.multiHookTracker.Stat(ctx.restore.Name)
+	log.Debugf("hookAttempted: %d, hookFailed: %d", updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed)
+
+	if err := kubeutil.PatchResource(ctx.restore, updated, ctx.crClient); err != nil {
+		log.WithError(errors.WithStack((err))).Error("Updating restore status")
+		errs.Add(ctx.restore.Namespace, err)
+	}
+
+	// delete the hook data for this restore
+	ctx.multiHookTracker.Delete(ctx.restore.Name)
+
+	return errs
 }

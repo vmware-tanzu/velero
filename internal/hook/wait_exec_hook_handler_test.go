@@ -710,7 +710,6 @@ func TestWaitExecHandleHooks(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			source := fcache.NewFakeControllerSource()
 			go func() {
 				// This is the state of the pod that will be seen by the AddFunc handler.
@@ -733,7 +732,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 
 			for _, e := range test.expectedExecutions {
 				obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(e.pod)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				podCommandExecutor.On("ExecutePodCommand", mock.Anything, obj, e.pod.Namespace, e.pod.Name, e.name, e.hook).Return(e.error)
 			}
 
@@ -744,8 +743,8 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				defer ctxCancel()
 			}
 
-			hookTracker := NewHookTracker()
-			errs := h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer, hookTracker)
+			hookTracker := NewMultiHookTracker()
+			errs := h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer, hookTracker, "restore1")
 
 			// for i, ee := range test.expectedErrors {
 			require.Len(t, errs, len(test.expectedErrors))
@@ -1000,11 +999,6 @@ func TestMaxHookWait(t *testing.T) {
 }
 
 func TestRestoreHookTrackerUpdate(t *testing.T) {
-	type change struct {
-		// delta to wait since last change applied or pod added
-		wait    time.Duration
-		updated *v1.Pod
-	}
 	type expectedExecution struct {
 		hook  *velerov1api.ExecHook
 		name  string
@@ -1012,15 +1006,18 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 		pod   *v1.Pod
 	}
 
-	hookTracker1 := NewHookTracker()
-	hookTracker1.Add("default", "my-pod", "container1", HookSourceAnnotation, "<from-annotation>", hookPhase(""))
+	hookTracker1 := NewMultiHookTracker()
+	hookTracker1.Add("restore1", "default", "my-pod", "container1", HookSourceAnnotation, "<from-annotation>", HookPhase(""))
 
-	hookTracker2 := NewHookTracker()
-	hookTracker2.Add("default", "my-pod", "container1", HookSourceSpec, "my-hook-1", hookPhase(""))
+	hookTracker2 := NewMultiHookTracker()
+	hookTracker2.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""))
 
-	hookTracker3 := NewHookTracker()
-	hookTracker3.Add("default", "my-pod", "container1", HookSourceSpec, "my-hook-1", hookPhase(""))
-	hookTracker3.Add("default", "my-pod", "container2", HookSourceSpec, "my-hook-2", hookPhase(""))
+	hookTracker3 := NewMultiHookTracker()
+	hookTracker3.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""))
+	hookTracker3.Add("restore1", "default", "my-pod", "container2", HookSourceSpec, "my-hook-2", HookPhase(""))
+
+	hookTracker4 := NewMultiHookTracker()
+	hookTracker4.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""))
 
 	tests1 := []struct {
 		name               string
@@ -1028,7 +1025,7 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 		groupResource      string
 		byContainer        map[string][]PodExecRestoreHook
 		expectedExecutions []expectedExecution
-		hookTracker        *HookTracker
+		hookTracker        *MultiHookTracker
 		expectedFailed     int
 	}{
 		{
@@ -1160,7 +1157,7 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 					},
 				},
 			},
-			hookTracker:    hookTracker2,
+			hookTracker:    hookTracker4,
 			expectedFailed: 1,
 		},
 		{
@@ -1244,14 +1241,13 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 					},
 				},
 			},
-			hookTracker:    NewHookTracker(),
+			hookTracker:    NewMultiHookTracker(),
 			expectedFailed: 0,
 		},
 	}
 
 	for _, test := range tests1 {
 		t.Run(test.name, func(t *testing.T) {
-
 			source := fcache.NewFakeControllerSource()
 			go func() {
 				// This is the state of the pod that will be seen by the AddFunc handler.
@@ -1268,13 +1264,13 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 
 			for _, e := range test.expectedExecutions {
 				obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(e.pod)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				podCommandExecutor.On("ExecutePodCommand", mock.Anything, obj, e.pod.Namespace, e.pod.Name, e.name, e.hook).Return(e.error)
 			}
 
 			ctx := context.Background()
-			_ = h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer, test.hookTracker)
-			_, actualFailed := test.hookTracker.Stat()
+			_ = h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer, test.hookTracker, "restore1")
+			_, actualFailed := test.hookTracker.Stat("restore1")
 			assert.Equal(t, test.expectedFailed, actualFailed)
 		})
 	}

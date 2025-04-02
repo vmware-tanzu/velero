@@ -28,6 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -91,13 +92,6 @@ func TestRunBackup(t *testing.T) {
 			notError: false,
 		},
 		{
-			name: "got empty snapshot",
-			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
-				return nil, true, errors.New("snapshot is empty")
-			},
-			notError: false,
-		},
-		{
 			name: "success to backup block mode volume",
 			hookBackupFunc: func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error) {
 				return &uploader.SnapshotInfo{}, false, nil
@@ -112,7 +106,7 @@ func TestRunBackup(t *testing.T) {
 				tc.volMode = uploader.PersistentVolumeFilesystem
 			}
 			BackupFunc = tc.hookBackupFunc
-			_, _, err := kp.RunBackup(context.Background(), "var", "", nil, false, "", tc.volMode, map[string]string{}, &updater)
+			_, _, _, err := kp.RunBackup(context.Background(), "var", "", nil, false, "", tc.volMode, map[string]string{}, &updater)
 			if tc.notError {
 				assert.NoError(t, err)
 			} else {
@@ -163,7 +157,7 @@ func TestRunRestore(t *testing.T) {
 				tc.volMode = uploader.PersistentVolumeFilesystem
 			}
 			RestoreFunc = tc.hookRestoreFunc
-			err := kp.RunRestore(context.Background(), "", "/var", tc.volMode, map[string]string{}, &updater)
+			_, err := kp.RunRestore(context.Background(), "", "/var", tc.volMode, map[string]string{}, &updater)
 			if tc.notError {
 				assert.NoError(t, err)
 			} else {
@@ -228,7 +222,7 @@ func TestCheckContext(t *testing.T) {
 			kp.CheckContext(ctx, tc.finishChan, tc.restoreChan, tc.uploader)
 
 			if tc.expectCancel && tc.uploader != nil {
-				t.Error("Expected the uploader to be cancelled")
+				t.Error("Expected the uploader to be canceled")
 			}
 
 			if tc.expectBackup && tc.uploader == nil && len(tc.restoreChan) > 0 {
@@ -387,9 +381,9 @@ func TestNewKopiaUploaderProvider(t *testing.T) {
 
 			// Assertions
 			if tc.expectedError != "" {
-				assert.Contains(t, err.Error(), tc.expectedError)
+				require.ErrorContains(t, err, tc.expectedError)
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 
 			// Verify that the expected methods were called on the mocks.

@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	. "github.com/vmware-tanzu/velero/test"
@@ -63,17 +63,18 @@ func BackupsSyncTest() {
 	})
 
 	AfterEach(func() {
-		if !veleroCfg.Debug {
+		if CurrentSpecReport().Failed() && veleroCfg.FailFast {
+			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+		} else {
 			By("Clean backups after test", func() {
 				DeleteAllBackups(context.Background(), &veleroCfg)
 			})
 			if InstallVelero {
 				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 				defer ctxCancel()
-				Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
+				Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 			}
 		}
-
 	})
 
 	It("Backups in object storage should be synced to a new Velero successfully", func() {
@@ -83,7 +84,10 @@ func BackupsSyncTest() {
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace %s namespace", test.testNS))
 		Expect(CreateNamespace(ctx, *veleroCfg.ClientToInstallVelero, test.testNS)).To(Succeed(),
 			fmt.Sprintf("Failed to create %s namespace", test.testNS))
-		if !veleroCfg.Debug {
+
+		if CurrentSpecReport().Failed() && veleroCfg.FailFast {
+			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+		} else {
 			defer func() {
 				Expect(DeleteNamespace(ctx, *veleroCfg.ClientToInstallVelero, test.testNS, false)).To(Succeed(), fmt.Sprintf("Failed to delete the namespace %s", test.testNS))
 			}()
@@ -104,7 +108,7 @@ func BackupsSyncTest() {
 		})
 
 		By("Uninstall velero", func() {
-			Expect(VeleroUninstall(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace)).To(Succeed())
+			Expect(VeleroUninstall(ctx, veleroCfg)).To(Succeed())
 		})
 
 		By("Install velero", func() {
@@ -126,12 +130,16 @@ func BackupsSyncTest() {
 			Expect(CreateNamespace(ctx, *veleroCfg.ClientToInstallVelero, test.testNS)).To(Succeed(),
 				fmt.Sprintf("Failed to create %s namespace", test.testNS))
 		})
-		if !veleroCfg.Debug {
+
+		if !CurrentSpecReport().Failed() || !veleroCfg.FailFast {
 			defer func() {
 				Expect(DeleteNamespace(ctx, *veleroCfg.ClientToInstallVelero, test.testNS, false)).To(Succeed(),
 					fmt.Sprintf("Failed to delete the namespace %s", test.testNS))
 			}()
+		} else {
+			fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
 		}
+
 		var BackupCfg BackupConfig
 		BackupCfg.BackupName = test.backupName
 		BackupCfg.Namespace = test.testNS

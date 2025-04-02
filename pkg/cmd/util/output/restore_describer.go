@@ -20,10 +20,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -36,7 +40,15 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
-func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *velerov1api.Restore, podVolumeRestores []velerov1api.PodVolumeRestore, details bool, insecureSkipTLSVerify bool, caCertFile string) string {
+func DescribeRestore(
+	ctx context.Context,
+	kbClient kbclient.Client,
+	restore *velerov1api.Restore,
+	podVolumeRestores []velerov1api.PodVolumeRestore,
+	details bool,
+	insecureSkipTLSVerify bool,
+	caCertFile string,
+) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(restore.ObjectMeta)
 
@@ -167,6 +179,21 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 			describePodVolumeRestores(d, podVolumeRestores, details)
 		}
 
+		buf := new(bytes.Buffer)
+		if err := downloadrequest.Stream(ctx, kbClient, restore.Namespace, restore.Name, velerov1api.DownloadTargetKindRestoreVolumeInfo,
+			buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertFile); err == nil {
+			var restoreVolInfo []volume.RestoreVolumeInfo
+			if err := json.NewDecoder(buf).Decode(&restoreVolInfo); err != nil {
+				d.Printf("\t<error reading restore volume info: %v>\n", err)
+			} else {
+				describeCSISnapshotsRestores(d, restoreVolInfo, details)
+			}
+		} else if err != nil && !errors.Is(err, downloadrequest.ErrNotFound) {
+			// For the restores by older versions of velero, it will see NotFound Error when downloading the volume info.
+			// In that case, no errors will be printed.
+			d.Printf("\t<error getting restore volume info: %v>\n", err)
+		}
+
 		d.Println()
 		s = emptyDisplay
 		if restore.Spec.ExistingResourcePolicy != "" {
@@ -178,10 +205,12 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 		d.Println()
 		d.Printf("Preserve Service NodePorts:\t%s\n", BoolPointerString(restore.Spec.PreserveNodePorts, "false", "true", "auto"))
 
-		if restore.Spec.UploaderConfig != nil && boolptr.IsSetToTrue(restore.Spec.UploaderConfig.WriteSparseFiles) {
+		if restore.Spec.ResourceModifier != nil {
 			d.Println()
-			DescribeUploaderConfigForRestore(d, restore.Spec)
+			DescribeResourceModifier(d, restore.Spec.ResourceModifier)
 		}
+
+		describeUploaderConfigForRestore(d, restore.Spec)
 
 		d.Println()
 		describeRestoreItemOperations(ctx, kbClient, d, restore, details, insecureSkipTLSVerify, caCertFile)
@@ -199,10 +228,18 @@ func DescribeRestore(ctx context.Context, kbClient kbclient.Client, restore *vel
 	})
 }
 
-// DescribeUploaderConfigForRestore describes uploader config in human-readable format
-func DescribeUploaderConfigForRestore(d *Describer, spec velerov1api.RestoreSpec) {
-	d.Printf("Uploader config:\n")
-	d.Printf("\tWrite Sparse Files:\t%T\n", boolptr.IsSetToTrue(spec.UploaderConfig.WriteSparseFiles))
+// describeUploaderConfigForRestore describes uploader config in human-readable format
+func describeUploaderConfigForRestore(d *Describer, spec velerov1api.RestoreSpec) {
+	if spec.UploaderConfig != nil {
+		d.Println()
+		d.Printf("Uploader config:\n")
+		if boolptr.IsSetToTrue(spec.UploaderConfig.WriteSparseFiles) {
+			d.Printf("\tWrite Sparse Files:\t%v\n", boolptr.IsSetToTrue(spec.UploaderConfig.WriteSparseFiles))
+		}
+		if spec.UploaderConfig.ParallelFilesDownload > 0 {
+			d.Printf("\tParallel Restore:\t%d\n", spec.UploaderConfig.ParallelFilesDownload)
+		}
+	}
 }
 
 func describeRestoreItemOperations(ctx context.Context, kbClient kbclient.Client, d *Describer, restore *velerov1api.Restore, details bool, insecureSkipTLSVerify bool, caCertPath string) {
@@ -356,6 +393,50 @@ func describePodVolumeRestores(d *Describer, restores []velerov1api.PodVolumeRes
 	}
 }
 
+// describeCSISnapshotsRestores describes PVC restored via CSISnapshots, incl. data-movement, in human-readable format.
+func describeCSISnapshotsRestores(d *Describer, restoreVolInfo []volume.RestoreVolumeInfo, details bool) {
+	d.Println()
+	var nonDMInfoList, dmInfoList []volume.RestoreVolumeInfo
+	for _, info := range restoreVolInfo {
+		if info.RestoreMethod != volume.CSISnapshot {
+			continue
+		}
+		if info.SnapshotDataMoved {
+			dmInfoList = append(dmInfoList, info)
+		} else {
+			nonDMInfoList = append(nonDMInfoList, info)
+		}
+	}
+	if len(nonDMInfoList) == 0 && len(dmInfoList) == 0 {
+		d.Printf("CSI Snapshot Restores: <none included>\n")
+		return
+	}
+	d.Printf("CSI Snapshot Restores:\n")
+	for _, info := range nonDMInfoList {
+		// All CSI snapshots are restored via PVC
+		d.Printf("\t%s/%s:\n", info.PVCNamespace, info.PVCName)
+		if details {
+			d.Printf("\t\tSnapshot:\n")
+			d.Printf("\t\t\tSnapshot Content Name: %s\n", info.CSISnapshotInfo.VSCName)
+			d.Printf("\t\t\tStorage Snapshot ID: %s\n", info.CSISnapshotInfo.SnapshotHandle)
+			d.Printf("\t\t\tCSI Driver: %s\n", info.CSISnapshotInfo.Driver)
+		} else {
+			d.Printf("\t\tSnapshot: specify --details for more information\n")
+		}
+	}
+	for _, info := range dmInfoList {
+		d.Printf("\t%s/%s:\n", info.PVCNamespace, info.PVCName)
+		if details {
+			d.Printf("\t\tData Movement:\n")
+			d.Printf("\t\t\tOperation ID: %s\n", info.SnapshotDataMovementInfo.OperationID)
+			d.Printf("\t\t\tData Mover: %s\n", info.SnapshotDataMovementInfo.DataMover)
+			d.Printf("\t\t\tUploader Type: %s\n", info.SnapshotDataMovementInfo.UploaderType)
+		} else {
+			d.Printf("\t\tData Movement: specify --details for more information\n")
+		}
+	}
+}
+
 func groupRestoresByPhase(restores []velerov1api.PodVolumeRestore) map[string][]velerov1api.PodVolumeRestore {
 	restoresByPhase := make(map[string][]velerov1api.PodVolumeRestore)
 
@@ -404,4 +485,11 @@ func describeRestoreResourceList(ctx context.Context, kbClient kbclient.Client, 
 	for _, gvk := range gvks {
 		d.Printf("\t%s:\n\t\t- %s\n", gvk, strings.Join(resourceList[gvk], "\n\t\t- "))
 	}
+}
+
+// DescribeResourceModifier describes resource policies in human-readable format
+func DescribeResourceModifier(d *Describer, resModifier *v1.TypedLocalObjectReference) {
+	d.Printf("Resource modifier:\n")
+	d.Printf("\tType:\t%s\n", resModifier.Kind)
+	d.Printf("\tName:\t%s\n", resModifier.Name)
 }

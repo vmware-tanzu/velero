@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -100,12 +100,12 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 				NamespacedName: types.NamespacedName{Namespace: location.Namespace, Name: location.Name},
 			})
 			Expect(actualResult).To(BeEquivalentTo(ctrl.Result{}))
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
 			instance := &velerov1api.BackupStorageLocation{}
 			err = r.client.Get(ctx, key, instance)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(instance.Spec.Default).To(BeIdenticalTo(tests[i].expectedIsDefault))
 			Expect(instance.Status.Phase).To(BeIdenticalTo(tests[i].expectedPhase))
 		}
@@ -165,12 +165,12 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 				NamespacedName: types.NamespacedName{Namespace: location.Namespace, Name: location.Name},
 			})
 			Expect(actualResult).To(BeEquivalentTo(ctrl.Result{}))
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKey{Name: location.Name, Namespace: location.Namespace}
 			instance := &velerov1api.BackupStorageLocation{}
 			err = r.client.Get(ctx, key, instance)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(instance.Spec.Default).To(BeIdenticalTo(tests[i].expectedIsDefault))
 		}
 	})
@@ -238,7 +238,7 @@ func TestEnsureSingleDefaultBSL(t *testing.T) {
 
 	for _, test := range tests {
 		// Setup reconciler
-		assert.Nil(t, velerov1api.AddToScheme(scheme.Scheme))
+		assert.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
 		t.Run(test.name, func(t *testing.T) {
 			r := &backupStorageLocationReconciler{
 				ctx:                       context.Background(),
@@ -282,7 +282,7 @@ func TestBSLReconcile(t *testing.T) {
 	pluginManager.On("CleanupClients").Return(nil)
 	for _, test := range tests {
 		// Setup reconciler
-		assert.Nil(t, velerov1api.AddToScheme(scheme.Scheme))
+		assert.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
 		t.Run(test.name, func(t *testing.T) {
 			r := &backupStorageLocationReconciler{
 				ctx:              context.Background(),

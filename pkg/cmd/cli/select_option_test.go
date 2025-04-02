@@ -28,7 +28,7 @@ import (
 func TestCompleteOfSelectOption(t *testing.T) {
 	option := &SelectOptions{}
 	args := []string{"arg1", "arg2"}
-	require.Nil(t, option.Complete(args))
+	require.NoError(t, option.Complete(args))
 	assert.Equal(t, args, option.Names)
 }
 
@@ -38,8 +38,8 @@ func TestValidateOfSelectOption(t *testing.T) {
 		Selector: flag.LabelSelector{},
 		All:      false,
 	}
-	assert.NotNil(t, option.Validate())
+	assert.Error(t, option.Validate())
 
 	option.All = true
-	assert.Nil(t, option.Validate())
+	assert.NoError(t, option.Validate())
 }

@@ -58,6 +58,7 @@ func mockBackupFinalizerReconciler(fakeClient kbclient.Client, fakeGlobalClient 
 		NewFakeSingleObjectBackupStoreGetter(backupStore),
 		logrus.StandardLogger(),
 		metrics.NewServerMetrics(),
+		10*time.Minute,
 	), backupper
 }
 func TestBackupFinalizerReconcile(t *testing.T) {
@@ -222,8 +223,10 @@ func TestBackupFinalizerReconcile(t *testing.T) {
 			backupStore.On("GetBackupContents", mock.Anything).Return(io.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 			backupStore.On("PutBackupContents", mock.Anything, mock.Anything).Return(nil)
 			backupStore.On("PutBackupMetadata", mock.Anything, mock.Anything).Return(nil)
+			backupStore.On("GetBackupVolumeInfos", mock.Anything).Return(nil, nil)
+			backupStore.On("PutBackupVolumeInfos", mock.Anything, mock.Anything).Return(nil)
 			pluginManager.On("GetBackupItemActionsV2").Return(nil, nil)
-			backupper.On("FinalizeBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, framework.BackupItemActionResolverV2{}, mock.Anything).Return(nil)
+			backupper.On("FinalizeBackup", mock.Anything, mock.Anything, mock.Anything, mock.Anything, framework.BackupItemActionResolverV2{}, mock.Anything, mock.Anything).Return(nil)
 			_, err := reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			gotErr := err != nil
 			assert.Equal(t, test.expectError, gotErr)

@@ -27,6 +27,7 @@ import (
 const (
 	ParallelFilesUpload = "ParallelFilesUpload"
 	WriteSparseFiles    = "WriteSparseFiles"
+	RestoreConcurrency  = "ParallelFilesDownload"
 )
 
 func StoreBackupConfig(config *velerov1api.UploaderConfigForBackup) map[string]string {
@@ -41,6 +42,10 @@ func StoreRestoreConfig(config *velerov1api.UploaderConfigForRestore) map[string
 		data[WriteSparseFiles] = strconv.FormatBool(*config.WriteSparseFiles)
 	} else {
 		data[WriteSparseFiles] = strconv.FormatBool(false)
+	}
+
+	if config.ParallelFilesDownload > 0 {
+		data[RestoreConcurrency] = strconv.Itoa(config.ParallelFilesDownload)
 	}
 	return data
 }
@@ -67,4 +72,16 @@ func GetWriteSparseFiles(uploaderCfg map[string]string) (bool, error) {
 		return writeSparseFilesBool, nil
 	}
 	return false, nil
+}
+
+func GetRestoreConcurrency(uploaderCfg map[string]string) (int, error) {
+	restoreConcurrency, ok := uploaderCfg[RestoreConcurrency]
+	if ok {
+		restoreConcurrencyInt, err := strconv.Atoi(restoreConcurrency)
+		if err != nil {
+			return 0, errors.Wrap(err, "failed to parse RestoreConcurrency config")
+		}
+		return restoreConcurrencyInt, nil
+	}
+	return 0, nil
 }

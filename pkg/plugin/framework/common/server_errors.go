@@ -17,10 +17,10 @@ limitations under the License.
 package common
 
 import (
-	goproto "github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/protoadapt"
 
 	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -32,7 +32,7 @@ import (
 //
 // This function should be used in the internal plugin server code to wrap
 // all errors before they're returned.
-func NewGRPCErrorWithCode(err error, code codes.Code, details ...goproto.Message) error {
+func NewGRPCErrorWithCode(err error, code codes.Code, details ...protoadapt.MessageV1) error {
 	// if it's already a gRPC status error, use it; otherwise, create a new one
 	statusErr, ok := status.FromError(err)
 	if !ok {
@@ -54,7 +54,7 @@ func NewGRPCErrorWithCode(err error, code codes.Code, details ...goproto.Message
 
 // NewGRPCError is a convenience function for creating a new gRPC error
 // with code = codes.Unknown
-func NewGRPCError(err error, details ...goproto.Message) error {
+func NewGRPCError(err error, details ...protoadapt.MessageV1) error {
 	return NewGRPCErrorWithCode(err, codes.Unknown, details...)
 }
 

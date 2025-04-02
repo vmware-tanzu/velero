@@ -27,6 +27,8 @@ const currentSupportDataVersion = "v1"
 
 type csiVolumeSource struct {
 	Driver string `yaml:"driver,omitempty"`
+	// CSI volume attributes
+	VolumeAttributes map[string]string `yaml:"volumeAttributes,omitempty"`
 }
 
 type nFSVolumeSource struct {
@@ -43,6 +45,7 @@ type volumeConditions struct {
 	NFS          *nFSVolumeSource  `yaml:"nfs,omitempty"`
 	CSI          *csiVolumeSource  `yaml:"csi,omitempty"`
 	VolumeTypes  []SupportedVolume `yaml:"volumeTypes,omitempty"`
+	PVCLabels    map[string]string `yaml:"pvcLabels,omitempty"`
 }
 
 func (c *capacityCondition) validate() error {
@@ -68,12 +71,15 @@ func (c *nfsCondition) validate() error {
 }
 
 func (c *csiCondition) validate() error {
-	// validate by yamlv3
+	if c != nil && c.csi != nil && c.csi.Driver == "" && c.csi.VolumeAttributes != nil {
+		return errors.New("csi driver should not be empty when filtering by volume attributes")
+	}
+
 	return nil
 }
 
 // decodeStruct restric validate the keys in decoded mappings to exist as fields in the struct being decoded into
-func decodeStruct(r io.Reader, s interface{}) error {
+func decodeStruct(r io.Reader, s any) error {
 	dec := yaml.NewDecoder(r)
 	dec.KnownFields(true)
 	return dec.Decode(s)
@@ -82,7 +88,11 @@ func decodeStruct(r io.Reader, s interface{}) error {
 // validate check action format
 func (a *Action) validate() error {
 	// validate Type
-	if a.Type != Skip {
+	valid := false
+	if a.Type == Skip || a.Type == Snapshot || a.Type == FSBackup {
+		valid = true
+	}
+	if !valid {
 		return fmt.Errorf("invalid action type %s", a.Type)
 	}
 

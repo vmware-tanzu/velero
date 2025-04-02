@@ -3,6 +3,9 @@
 # that the navigation for older versions still work.
 
 main: main-toc
+v1.16: v1-16-toc
+v1.15: v1-15-toc
+v1.14: v1-14-toc
 v1.13: v1-13-toc
 v1.12: v1-12-toc
 v1.11: v1-11-toc

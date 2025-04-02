@@ -69,7 +69,7 @@ const (
 	// data mover metrics
 	DataUploadSuccessTotal   = "data_upload_success_total"
 	DataUploadFailureTotal   = "data_upload_failure_total"
-	DataUploadCancelTotal    = "data_upload_cancel_total" //nolint:gosec // Not a hard code secret.
+	DataUploadCancelTotal    = "data_upload_cancel_total"
 	DataDownloadSuccessTotal = "data_download_success_total"
 	DataDownloadFailureTotal = "data_download_failure_total"
 	DataDownloadCancelTotal  = "data_download_cancel_total"
@@ -587,7 +587,7 @@ func (m *ServerMetrics) RemoveSchedule(scheduleName string) {
 	}
 }
 
-// InitSchedule initializes counter metrics for a node.
+// InitMetricsForNode initializes counter metrics for a node.
 func (m *ServerMetrics) InitMetricsForNode(node string) {
 	if c, ok := m.metrics[podVolumeBackupEnqueueTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(node).Add(0)

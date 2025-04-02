@@ -34,7 +34,7 @@ func CreateRBACWithBindingSA(ctx context.Context, client TestClient, namespace s
 		},
 	}
 
-	_, err = client.ClientGo.RbacV1().ClusterRoles().Create(ctx, role, metav1.CreateOptions{})
+	_, err = client.ClientGo.RbacV1().ClusterRoles().Create(context.TODO(), role, metav1.CreateOptions{})
 
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
@@ -76,7 +76,6 @@ func GetClusterRoleBinding(ctx context.Context, client TestClient, rolebinding s
 }
 
 func CleanupClusterRole(ctx context.Context, client TestClient, CaseBaseName string) error {
-
 	clusterroles, err := client.ClientGo.RbacV1().ClusterRoles().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve clusterroles")
@@ -95,7 +94,6 @@ func CleanupClusterRole(ctx context.Context, client TestClient, CaseBaseName str
 }
 
 func CleanupClusterRoleBinding(ctx context.Context, client TestClient, CaseBaseName string) error {
-
 	clusterrolebindings, err := client.ClientGo.RbacV1().ClusterRoleBindings().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Could not retrieve clusterrolebindings")

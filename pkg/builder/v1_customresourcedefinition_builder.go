@@ -78,7 +78,7 @@ type V1CustomResourceDefinitionConditionBuilder struct {
 	object apiextv1.CustomResourceDefinitionCondition
 }
 
-// ForV1V1CustomResourceDefinitionConditionBuilder is the constructor for a V1CustomResourceDefinitionConditionBuilder.
+// ForV1CustomResourceDefinitionCondition is the constructor for a V1CustomResourceDefinitionConditionBuilder.
 func ForV1CustomResourceDefinitionCondition() *V1CustomResourceDefinitionConditionBuilder {
 	return &V1CustomResourceDefinitionConditionBuilder{
 		object: apiextv1.CustomResourceDefinitionCondition{},

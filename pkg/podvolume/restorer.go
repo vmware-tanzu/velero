@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -51,7 +53,7 @@ type RestoreData struct {
 // Restorer can execute pod volume restores of volumes in a pod.
 type Restorer interface {
 	// RestorePodVolumes restores all annotated volumes in a pod.
-	RestorePodVolumes(RestoreData) []error
+	RestorePodVolumes(RestoreData, *volume.RestoreVolumeInfoTracker) []error
 }
 
 type restorer struct {
@@ -88,9 +90,9 @@ func newRestorer(
 		log:     log,
 	}
 
-	pvrInformer.AddEventHandler(
+	_, _ = pvrInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: func(_, obj interface{}) {
+			UpdateFunc: func(_, obj any) {
 				pvr := obj.(*velerov1api.PodVolumeRestore)
 				if pvr.GetLabels()[velerov1api.RestoreUIDLabel] != string(restore.UID) {
 					return
@@ -114,13 +116,13 @@ func newRestorer(
 	return r
 }
 
-func (r *restorer) RestorePodVolumes(data RestoreData) []error {
+func (r *restorer) RestorePodVolumes(data RestoreData, tracker *volume.RestoreVolumeInfoTracker) []error {
 	volumesToRestore := getVolumeBackupInfoForPod(data.PodVolumeBackups, data.Pod, data.SourceNamespace)
 	if len(volumesToRestore) == 0 {
 		return nil
 	}
 
-	if err := nodeagent.IsRunning(r.ctx, r.kubeClient, data.Restore.Namespace); err != nil {
+	if err := nodeagent.IsRunningOnLinux(r.ctx, r.kubeClient, data.Restore.Namespace); err != nil {
 		return []error{errors.Wrapf(err, "error to check node agent status")}
 	}
 
@@ -205,12 +207,18 @@ func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 			return true, nil
 		}
 
-		err := wait.PollWithContext(checkCtx, time.Millisecond*500, time.Minute*10, checkFunc)
-		if err == wait.ErrWaitTimeout {
+		err := wait.PollUntilContextTimeout(checkCtx, time.Millisecond*500, time.Minute*10, true, checkFunc)
+		if wait.Interrupted(err) {
 			r.log.WithError(err).Error("Restoring pod is not scheduled until timeout or cancel, disengage")
 		} else if err != nil {
 			r.log.WithError(err).Error("Failed to check node-agent pod status, disengage")
 		} else {
+			if err := kube.IsLinuxNode(checkCtx, nodeName, r.crClient); err != nil {
+				r.log.WithField("node", nodeName).WithError(err).Error("Restored pod is not running in linux node")
+				r.nodeAgentCheck <- errors.Wrapf(err, "restored pod %s/%s is not running in linux node(%s)", data.Pod.Namespace, data.Pod.Name, nodeName)
+				return
+			}
+
 			err = nodeagent.IsRunningInNode(checkCtx, data.Restore.Namespace, nodeName, r.crClient)
 			if err != nil {
 				r.log.WithField("node", nodeName).WithError(err).Error("node-agent pod is not running in node, abort the restore")
@@ -229,6 +237,7 @@ ForEachVolume:
 			if res.Status.Phase == velerov1api.PodVolumeRestorePhaseFailed {
 				errs = append(errs, errors.Errorf("pod volume restore failed: %s", res.Status.Message))
 			}
+			tracker.TrackPodVolume(res)
 		case err := <-r.nodeAgentCheck:
 			errs = append(errs, err)
 			break ForEachVolume

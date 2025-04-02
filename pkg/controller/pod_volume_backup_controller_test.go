@@ -21,8 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/ginkgo/extensions/table"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -41,7 +40,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/repository"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -99,11 +97,11 @@ type fakeFSBR struct {
 	clock  clock.WithTickerAndDelayedExecution
 }
 
-func (b *fakeFSBR) Init(ctx context.Context, bslName string, sourceNamespace string, uploaderType string, repositoryType string, repoIdentifier string, repositoryEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter) error {
+func (b *fakeFSBR) Init(ctx context.Context, param any) error {
 	return nil
 }
 
-func (b *fakeFSBR) StartBackup(source datapath.AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, uploaderConfigs map[string]string) error {
+func (b *fakeFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param any) error {
 	pvb := b.pvb
 
 	original := b.pvb.DeepCopy()
@@ -141,7 +139,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 	// `now` will be used to set the fake clock's time; capture
 	// it here so it can be referenced in the test case defs.
 	now, err := time.Parse(time.RFC1123, time.RFC1123)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 	now = now.Local()
 
 	DescribeTable("a pod volume backup",
@@ -150,21 +148,21 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 			err = fakeClient.Create(ctx, test.pvb)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			err = fakeClient.Create(ctx, test.pod)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			err = fakeClient.Create(ctx, test.bsl)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			err = fakeClient.Create(ctx, test.backupRepo)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			fakeFS := velerotest.NewFakeFileSystem()
 			pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", "", "pvb-1-volume")
 			_, err = fakeFS.Create(pathGlob)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			credentialFileStore, err := credentials.NewNamespacedFileStore(
 				fakeClient,
@@ -173,7 +171,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 				fakeFS,
 			)
 
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			if test.dataMgr == nil {
 				test.dataMgr = datapath.NewManager(1)
@@ -208,7 +206,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 			})
 			Expect(actualResult).To(BeEquivalentTo(test.expectedRequeue))
 			if test.expectedErrMsg == "" {
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			} else {
 				Expect(err.Error()).To(BeEquivalentTo(test.expectedErrMsg))
 			}
@@ -222,7 +220,7 @@ var _ = Describe("PodVolumeBackup Reconciler", func() {
 			if test.expected == nil {
 				Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			} else {
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Eventually(pvb.Status.Phase).Should(Equal(test.expected.Status.Phase))
 			}
 

@@ -25,16 +25,16 @@ func TestStringOfOptionalBool(t *testing.T) {
 func TestSetOfOptionalBool(t *testing.T) {
 	// error
 	ob := NewOptionalBool(nil)
-	assert.NotNil(t, ob.Set("invalid"))
+	assert.Error(t, ob.Set("invalid"))
 
 	// nil
 	ob = NewOptionalBool(nil)
-	assert.Nil(t, ob.Set(""))
+	assert.NoError(t, ob.Set(""))
 	assert.Nil(t, ob.Value)
 
 	// true
 	ob = NewOptionalBool(nil)
-	assert.Nil(t, ob.Set("true"))
+	assert.NoError(t, ob.Set("true"))
 	assert.True(t, *ob.Value)
 }
 

@@ -94,6 +94,7 @@ type CreateOptions struct {
 	IncludeNamespaceScopedResources flag.StringArray
 	ExcludeNamespaceScopedResources flag.StringArray
 	Labels                          flag.Map
+	Annotations                     flag.Map
 	Selector                        flag.LabelSelector
 	OrSelector                      flag.OrLabelSelector
 	IncludeClusterResources         flag.OptionalBool
@@ -113,6 +114,7 @@ func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
 		IncludeNamespaces:       flag.NewStringArray("*"),
 		Labels:                  flag.NewMap(),
+		Annotations:             flag.NewMap(),
 		SnapshotVolumes:         flag.NewOptionalBool(nil),
 		IncludeClusterResources: flag.NewOptionalBool(nil),
 	}
@@ -129,6 +131,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.IncludeNamespaceScopedResources, "include-namespace-scoped-resources", "Namespaced resources to include in the backup, formatted as resource.group, such as deployments.apps(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
 	flags.Var(&o.ExcludeNamespaceScopedResources, "exclude-namespace-scoped-resources", "Namespaced resources to exclude from the backup, formatted as resource.group, such as deployments.apps(use '*' for all resources). Cannot work with include-resources, exclude-resources and include-cluster-resources.")
 	flags.Var(&o.Labels, "labels", "Labels to apply to the backup.")
+	flags.Var(&o.Annotations, "annotations", "Annotations to apply to the backup.")
 	flags.StringVar(&o.StorageLocation, "storage-location", "", "Location in which to store the backup.")
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "List of locations (at most one per provider) where volume snapshots should be stored.")
 	flags.VarP(&o.Selector, "selector", "l", "Only back up resources matching this label selector.")
@@ -150,7 +153,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f = flags.VarPF(&o.DefaultVolumesToFsBackup, "default-volumes-to-fs-backup", "", "Use pod volume file system backup by default for volumes")
 	f.NoOptDefVal = cmd.TRUE
 
-	flags.StringVar(&o.ResPoliciesConfigmap, "resource-policies-configmap", "", "Reference to the resource policies configmap that backup using")
+	flags.StringVar(&o.ResPoliciesConfigmap, "resource-policies-configmap", "", "Reference to the resource policies configmap that backup should use")
 	flags.StringVar(&o.DataMover, "data-mover", "", "Specify the data mover to be used by the backup. If the parameter is not set or set as 'velero', the built-in data mover will be used")
 	flags.IntVar(&o.ParallelFilesUpload, "parallel-files-upload", 0, "Number of files uploads simultaneously when running a backup. This is only applicable for the kopia uploader")
 }
@@ -174,6 +177,11 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	if o.Selector.LabelSelector != nil && o.OrSelector.OrLabelSelectors != nil {
 		return fmt.Errorf("either a 'selector' or an 'or-selector' can be specified, but not both")
+	}
+
+	// Ensure if FromSchedule is set, it has a non-empty value
+	if err := o.validateFromScheduleFlag(c); err != nil {
+		return err
 	}
 
 	// Ensure that unless FromSchedule is set, args contains a backup name
@@ -209,6 +217,17 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		}
 	}
 
+	return nil
+}
+
+func (o *CreateOptions) validateFromScheduleFlag(c *cobra.Command) error {
+	trimmed := strings.TrimSpace(o.FromSchedule)
+	if c.Flags().Changed("from-schedule") && trimmed == "" {
+		return fmt.Errorf("flag must have a non-empty value: --from-schedule")
+	}
+
+	// Assign the trimmed value back
+	o.FromSchedule = trimmed
 	return nil
 }
 
@@ -252,9 +271,9 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			ObjectList: new(velerov1api.BackupList),
 		}
 		backupInformer := cache.NewSharedInformer(&lw, &velerov1api.Backup{}, time.Second)
-		backupInformer.AddEventHandler(
+		_, _ = backupInformer.AddEventHandler(
 			cache.FilteringResourceEventHandler{
-				FilterFunc: func(obj interface{}) bool {
+				FilterFunc: func(obj any) bool {
 					backup, ok := obj.(*velerov1api.Backup)
 
 					if !ok {
@@ -263,14 +282,14 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					return backup.Name == o.Name
 				},
 				Handler: cache.ResourceEventHandlerFuncs{
-					UpdateFunc: func(_, obj interface{}) {
+					UpdateFunc: func(_, obj any) {
 						backup, ok := obj.(*velerov1api.Backup)
 						if !ok {
 							return
 						}
 						updates <- backup
 					},
-					DeleteFunc: func(obj interface{}) {
+					DeleteFunc: func(obj any) {
 						backup, ok := obj.(*velerov1api.Backup)
 						if !ok {
 							return
@@ -403,7 +422,7 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 		}
 	}
 
-	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data())).Result()
+	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data()), builder.WithAnnotationsMap(o.Annotations.Data())).Result()
 	return backup, nil
 }
 

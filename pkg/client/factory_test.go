@@ -36,14 +36,14 @@ func TestFactory(t *testing.T) {
 
 	// Env variable should set the namespace if no config or argument are used
 	os.Setenv("VELERO_NAMESPACE", "env-velero")
-	f := NewFactory("velero", make(map[string]interface{}))
+	f := NewFactory("velero", make(map[string]any))
 
 	assert.Equal(t, "env-velero", f.Namespace())
 
 	os.Unsetenv("VELERO_NAMESPACE")
 
 	// Argument should change the namespace
-	f = NewFactory("velero", make(map[string]interface{}))
+	f = NewFactory("velero", make(map[string]any))
 	s := "flag-velero"
 	flags := new(flag.FlagSet)
 
@@ -55,7 +55,7 @@ func TestFactory(t *testing.T) {
 
 	// An argument overrides the env variable if both are set.
 	os.Setenv("VELERO_NAMESPACE", "env-velero")
-	f = NewFactory("velero", make(map[string]interface{}))
+	f = NewFactory("velero", make(map[string]any))
 	flags = new(flag.FlagSet)
 
 	f.BindFlags(flags)
@@ -95,7 +95,7 @@ func TestFactory(t *testing.T) {
 
 	baseName := "velero-bn"
 	config, err := LoadConfig()
-	assert.Equal(t, err, nil)
+	assert.NoError(t, err)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			f = NewFactory(baseName, config)
@@ -129,17 +129,17 @@ func TestFactory(t *testing.T) {
 					LabelSelector: "none",
 				},
 			)
-			assert.Contains(t, e.Error(), fmt.Sprintf("Get \"%s/apis/%s/%s/namespaces/%s", test.expectedHost, resource.Group, resource.Version, namespace))
+			assert.ErrorContains(t, e, fmt.Sprintf("Get \"%s/apis/%s/%s/namespaces/%s", test.expectedHost, resource.Group, resource.Version, namespace))
 			assert.Nil(t, list)
 			assert.NotNil(t, dynamicClient)
 
 			kubebuilderClient, e := f.KubebuilderClient()
-			assert.Contains(t, e.Error(), fmt.Sprintf("Get \"%s/api?timeout=", test.expectedHost))
-			assert.Nil(t, kubebuilderClient)
+			assert.NoError(t, e)
+			assert.NotNil(t, kubebuilderClient)
 
 			kbClientWithWatch, e := f.KubebuilderWatchClient()
-			assert.Contains(t, e.Error(), fmt.Sprintf("Get \"%s/api?timeout=", test.expectedHost))
-			assert.Nil(t, kbClientWithWatch)
+			assert.NoError(t, e)
+			assert.NotNil(t, kbClientWithWatch)
 		})
 	}
 }

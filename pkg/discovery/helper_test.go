@@ -23,6 +23,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
@@ -194,9 +195,9 @@ func TestRefreshServerPreferredResources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			resources, err := refreshServerPreferredResources(fakeServer, logging.DefaultLogger(logrus.DebugLevel, formatFlag))
 			if test.returnError != nil {
-				assert.NotNil(t, err)
+				assert.Error(t, err)
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, test.returnError, err)
 			}
 
@@ -223,14 +224,15 @@ func TestHelper_ResourceFor(t *testing.T) {
 			},
 		},
 	}
-
 	h := &helper{
-		discoveryClient: fakeDiscoveryClient,
-		lock:            sync.RWMutex{},
-		mapper:          nil,
-		resources:       fakeDiscoveryClient.Resources,
-		resourcesMap:    make(map[schema.GroupVersionResource]metav1.APIResource),
-		serverVersion:   &version.Info{Major: "1", Minor: "22", GitVersion: "v1.22.1"},
+		discoveryClient: &velerotest.DiscoveryClient{
+			FakeDiscovery: fakeDiscoveryClient,
+		},
+		lock:          sync.RWMutex{},
+		mapper:        nil,
+		resources:     fakeDiscoveryClient.Resources,
+		resourcesMap:  make(map[schema.GroupVersionResource]metav1.APIResource),
+		serverVersion: &version.Info{Major: "1", Minor: "22", GitVersion: "v1.22.1"},
 	}
 
 	for _, resourceList := range h.resources {
@@ -311,7 +313,7 @@ func TestHelper_ResourceFor(t *testing.T) {
 			if tc.err == "" {
 				assert.NoError(t, err)
 			} else {
-				assert.Contains(t, err.Error(), tc.err)
+				require.ErrorContains(t, err, tc.err)
 			}
 			assert.Equal(t, *tc.expectedGVR, gvr)
 			assert.Equal(t, *tc.expectedAPIResource, apiResource)
@@ -351,11 +353,13 @@ func TestHelper_KindFor(t *testing.T) {
 	}
 
 	h := &helper{
-		discoveryClient: fakeDiscoveryClient,
-		lock:            sync.RWMutex{},
-		resources:       fakeDiscoveryClient.Resources,
-		resourcesMap:    make(map[schema.GroupVersionResource]metav1.APIResource),
-		serverVersion:   &version.Info{Major: "1", Minor: "22", GitVersion: "v1.22.1"},
+		discoveryClient: &velerotest.DiscoveryClient{
+			FakeDiscovery: fakeDiscoveryClient,
+		},
+		lock:          sync.RWMutex{},
+		resources:     fakeDiscoveryClient.Resources,
+		resourcesMap:  make(map[schema.GroupVersionResource]metav1.APIResource),
+		serverVersion: &version.Info{Major: "1", Minor: "22", GitVersion: "v1.22.1"},
 	}
 
 	h.kindMap = map[schema.GroupVersionKind]metav1.APIResource{pvGVK: pvAPIRes}
@@ -416,7 +420,7 @@ func TestHelper_KindFor(t *testing.T) {
 			if tc.err == "" {
 				assert.NoError(t, err)
 			} else {
-				assert.Contains(t, err.Error(), tc.err)
+				require.ErrorContains(t, err, tc.err)
 			}
 			assert.Equal(t, *tc.expectedGVR, gvr)
 			assert.Equal(t, *tc.expectedAPIResource, apiResource)
@@ -516,9 +520,11 @@ func TestHelper_Refresh(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			h := &helper{
-				lock:            sync.RWMutex{},
-				discoveryClient: fakeDiscoveryClient,
-				logger:          logrus.New(),
+				lock: sync.RWMutex{},
+				discoveryClient: &velerotest.DiscoveryClient{
+					FakeDiscovery: fakeDiscoveryClient,
+				},
+				logger: logrus.New(),
 			}
 			// Set feature flags
 			if testCase.features != "" {
@@ -567,9 +573,9 @@ func TestHelper_refreshServerPreferredResources(t *testing.T) {
 			resources, err := refreshServerPreferredResources(fakeClient, logrus.New())
 
 			if tc.expectedErr != nil {
-				assert.NotNil(t, err)
+				assert.Error(t, err)
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.NotNil(t, resources)
 			}
 		})
@@ -622,9 +628,9 @@ func TestHelper_refreshServerGroupsAndResources(t *testing.T) {
 			serverGroups, serverResources, err := refreshServerGroupsAndResources(fakeClient, logrus.New())
 
 			if tc.expectedErr != nil {
-				assert.NotNil(t, err)
+				assert.Error(t, err)
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.NotNil(t, serverGroups)
 				assert.NotNil(t, serverResources)
 			}
@@ -636,8 +642,10 @@ func TestHelper(t *testing.T) {
 	fakeDiscoveryClient := &fake.FakeDiscovery{
 		Fake: &clientgotesting.Fake{},
 	}
-	h, err := NewHelper(fakeDiscoveryClient, logrus.New())
-	assert.Nil(t, err)
+	h, err := NewHelper(&velerotest.DiscoveryClient{
+		FakeDiscovery: fakeDiscoveryClient,
+	}, logrus.New())
+	assert.NoError(t, err)
 	// All below calls put together for the implementation are empty or just very simple, and just want to cover testing
 	// If wanting to write unit tests for some functions could remove it and with writing new function alone
 	h.Resources()

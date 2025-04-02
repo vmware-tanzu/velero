@@ -75,7 +75,7 @@ func (sr *shimRepository) VerifyObject(ctx context.Context, id object.ID) ([]con
 }
 
 // Get one or more manifest data that match the specific manifest id
-func (sr *shimRepository) GetManifest(ctx context.Context, id manifest.ID, payload interface{}) (*manifest.EntryMetadata, error) {
+func (sr *shimRepository) GetManifest(ctx context.Context, id manifest.ID, payload any) (*manifest.EntryMetadata, error) {
 	repoMani := udmrepo.RepoManifest{
 		Payload: payload,
 	}
@@ -95,7 +95,7 @@ func (sr *shimRepository) FindManifests(ctx context.Context, labels map[string]s
 	return GetKopiaManifestEntries(metadata), nil
 }
 
-// GetKopiaManifestEntries get metadata from specific ManifestEntryMetadata
+// GetKopiaManifestEntry get metadata from specific ManifestEntryMetadata
 func GetKopiaManifestEntry(uMani *udmrepo.ManifestEntryMetadata) *manifest.EntryMetadata {
 	var ret manifest.EntryMetadata
 
@@ -194,7 +194,7 @@ func (sr *shimRepository) NewObjectWriter(ctx context.Context, option object.Wri
 }
 
 // PutManifest saves the given manifest payload with a set of labels.
-func (sr *shimRepository) PutManifest(ctx context.Context, labels map[string]string, payload interface{}) (manifest.ID, error) {
+func (sr *shimRepository) PutManifest(ctx context.Context, labels map[string]string, payload any) (manifest.ID, error) {
 	id, err := sr.udmRepo.PutManifest(ctx, udmrepo.RepoManifest{
 		Payload: payload,
 		Metadata: &udmrepo.ManifestEntryMetadata{
@@ -210,7 +210,7 @@ func (sr *shimRepository) DeleteManifest(ctx context.Context, id manifest.ID) er
 	return sr.udmRepo.DeleteManifest(ctx, udmrepo.ID(id))
 }
 
-func (sr *shimRepository) ReplaceManifests(ctx context.Context, labels map[string]string, payload interface{}) (manifest.ID, error) {
+func (sr *shimRepository) ReplaceManifests(ctx context.Context, labels map[string]string, payload any) (manifest.ID, error) {
 	const minReplaceManifestTimeDelta = 100 * time.Millisecond
 
 	md, err := sr.FindManifests(ctx, labels)
@@ -237,7 +237,7 @@ func (sr *shimRepository) Flush(ctx context.Context) error {
 	return sr.udmRepo.Flush(ctx)
 }
 
-func (sr *shimRepository) ConcatenateObjects(ctx context.Context, objectIDs []object.ID) (object.ID, error) {
+func (sr *shimRepository) ConcatenateObjects(ctx context.Context, objectIDs []object.ID, opt repo.ConcatenateOptions) (object.ID, error) {
 	if len(objectIDs) == 0 {
 		return object.EmptyID, errors.New("object list is empty")
 	}

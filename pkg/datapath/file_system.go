@@ -18,6 +18,7 @@ package datapath
 
 import (
 	"context"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -33,6 +34,26 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
+// FSBRInitParam define the input param for FSBR init
+type FSBRInitParam struct {
+	BSLName           string
+	SourceNamespace   string
+	UploaderType      string
+	RepositoryType    string
+	RepoIdentifier    string
+	RepositoryEnsurer *repository.Ensurer
+	CredentialGetter  *credentials.CredentialGetter
+	Filesystem        filesystem.Interface
+}
+
+// FSBRStartParam define the input param for FSBR start
+type FSBRStartParam struct {
+	RealSource     string
+	ParentSnapshot string
+	ForceFull      bool
+	Tags           map[string]string
+}
+
 type fileSystemBR struct {
 	ctx            context.Context
 	cancel         context.CancelFunc
@@ -46,6 +67,8 @@ type fileSystemBR struct {
 	callbacks      Callbacks
 	jobName        string
 	requestorType  string
+	wgDataPath     sync.WaitGroup
+	dataPathLock   sync.Mutex
 }
 
 func newFileSystemBR(jobName string, requestorType string, client client.Client, namespace string, callbacks Callbacks, log logrus.FieldLogger) AsyncBR {
@@ -55,14 +78,16 @@ func newFileSystemBR(jobName string, requestorType string, client client.Client,
 		client:        client,
 		namespace:     namespace,
 		callbacks:     callbacks,
+		wgDataPath:    sync.WaitGroup{},
 		log:           log,
 	}
 
 	return fs
 }
 
-func (fs *fileSystemBR) Init(ctx context.Context, bslName string, sourceNamespace string, uploaderType string, repositoryType string,
-	repoIdentifier string, repositoryEnsurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter) error {
+func (fs *fileSystemBR) Init(ctx context.Context, param any) error {
+	initParam := param.(*FSBRInitParam)
+
 	var err error
 	defer func() {
 		if err != nil {
@@ -75,27 +100,27 @@ func (fs *fileSystemBR) Init(ctx context.Context, bslName string, sourceNamespac
 	backupLocation := &velerov1api.BackupStorageLocation{}
 	if err = fs.client.Get(ctx, client.ObjectKey{
 		Namespace: fs.namespace,
-		Name:      bslName,
+		Name:      initParam.BSLName,
 	}, backupLocation); err != nil {
-		return errors.Wrapf(err, "error getting backup storage location %s", bslName)
+		return errors.Wrapf(err, "error getting backup storage location %s", initParam.BSLName)
 	}
 
 	fs.backupLocation = backupLocation
 
-	fs.backupRepo, err = repositoryEnsurer.EnsureRepo(ctx, fs.namespace, sourceNamespace, bslName, repositoryType)
+	fs.backupRepo, err = initParam.RepositoryEnsurer.EnsureRepo(ctx, fs.namespace, initParam.SourceNamespace, initParam.BSLName, initParam.RepositoryType)
 	if err != nil {
-		return errors.Wrapf(err, "error to ensure backup repository %s-%s-%s", bslName, sourceNamespace, repositoryType)
+		return errors.Wrapf(err, "error to ensure backup repository %s-%s-%s", initParam.BSLName, initParam.SourceNamespace, initParam.RepositoryType)
 	}
 
-	err = fs.boostRepoConnect(ctx, repositoryType, credentialGetter)
+	err = fs.boostRepoConnect(ctx, initParam.RepositoryType, initParam.CredentialGetter)
 	if err != nil {
-		return errors.Wrapf(err, "error to boost backup repository connection %s-%s-%s", bslName, sourceNamespace, repositoryType)
+		return errors.Wrapf(err, "error to boost backup repository connection %s-%s-%s", initParam.BSLName, initParam.SourceNamespace, initParam.RepositoryType)
 	}
 
-	fs.uploaderProv, err = provider.NewUploaderProvider(ctx, fs.client, uploaderType, fs.requestorType, repoIdentifier,
-		fs.backupLocation, fs.backupRepo, credentialGetter, repokey.RepoKeySelector(), fs.log)
+	fs.uploaderProv, err = provider.NewUploaderProvider(ctx, fs.client, initParam.UploaderType, fs.requestorType, initParam.RepoIdentifier,
+		fs.backupLocation, fs.backupRepo, initParam.CredentialGetter, repokey.RepoKeySelector(), fs.log)
 	if err != nil {
-		return errors.Wrapf(err, "error creating uploader %s", uploaderType)
+		return errors.Wrapf(err, "error creating uploader %s", initParam.UploaderType)
 	}
 
 	fs.initialized = true
@@ -103,16 +128,33 @@ func (fs *fileSystemBR) Init(ctx context.Context, bslName string, sourceNamespac
 	fs.log.WithFields(
 		logrus.Fields{
 			"jobName":          fs.jobName,
-			"bsl":              bslName,
-			"source namespace": sourceNamespace,
-			"uploader":         uploaderType,
-			"repository":       repositoryType,
+			"bsl":              initParam.BSLName,
+			"source namespace": initParam.SourceNamespace,
+			"uploader":         initParam.UploaderType,
+			"repository":       initParam.RepositoryType,
 		}).Info("FileSystemBR is initialized")
 
 	return nil
 }
 
 func (fs *fileSystemBR) Close(ctx context.Context) {
+	if fs.cancel != nil {
+		fs.cancel()
+	}
+
+	fs.log.WithField("user", fs.jobName).Info("Closing FileSystemBR")
+
+	fs.wgDataPath.Wait()
+
+	fs.close(ctx)
+
+	fs.log.WithField("user", fs.jobName).Info("FileSystemBR is closed")
+}
+
+func (fs *fileSystemBR) close(ctx context.Context) {
+	fs.dataPathLock.Lock()
+	defer fs.dataPathLock.Unlock()
+
 	if fs.uploaderProv != nil {
 		if err := fs.uploaderProv.Close(ctx); err != nil {
 			fs.log.Errorf("failed to close uploader provider with error %v", err)
@@ -120,30 +162,38 @@ func (fs *fileSystemBR) Close(ctx context.Context) {
 
 		fs.uploaderProv = nil
 	}
-
-	if fs.cancel != nil {
-		fs.cancel()
-		fs.cancel = nil
-	}
-
-	fs.log.WithField("user", fs.jobName).Info("FileSystemBR is closed")
 }
 
-func (fs *fileSystemBR) StartBackup(source AccessPoint, realSource string, parentSnapshot string, forceFull bool, tags map[string]string, uploaderConfig map[string]string) error {
+func (fs *fileSystemBR) StartBackup(source AccessPoint, uploaderConfig map[string]string, param any) error {
 	if !fs.initialized {
 		return errors.New("file system data path is not initialized")
 	}
 
+	fs.wgDataPath.Add(1)
+
+	backupParam := param.(*FSBRStartParam)
+
 	go func() {
-		snapshotID, emptySnapshot, err := fs.uploaderProv.RunBackup(fs.ctx, source.ByPath, realSource, tags, forceFull,
-			parentSnapshot, source.VolMode, uploaderConfig, fs)
+		fs.log.Info("Start data path backup")
+
+		defer func() {
+			fs.close(context.Background())
+			fs.wgDataPath.Done()
+		}()
+
+		snapshotID, emptySnapshot, totalBytes, err := fs.uploaderProv.RunBackup(fs.ctx, source.ByPath, backupParam.RealSource, backupParam.Tags, backupParam.ForceFull,
+			backupParam.ParentSnapshot, source.VolMode, uploaderConfig, fs)
 
 		if err == provider.ErrorCanceled {
 			fs.callbacks.OnCancelled(context.Background(), fs.namespace, fs.jobName)
 		} else if err != nil {
-			fs.callbacks.OnFailed(context.Background(), fs.namespace, fs.jobName, err)
+			dataPathErr := DataPathError{
+				snapshotID: snapshotID,
+				err:        err,
+			}
+			fs.callbacks.OnFailed(context.Background(), fs.namespace, fs.jobName, dataPathErr)
 		} else {
-			fs.callbacks.OnCompleted(context.Background(), fs.namespace, fs.jobName, Result{Backup: BackupResult{snapshotID, emptySnapshot, source}})
+			fs.callbacks.OnCompleted(context.Background(), fs.namespace, fs.jobName, Result{Backup: BackupResult{snapshotID, emptySnapshot, source, totalBytes}})
 		}
 	}()
 
@@ -155,15 +205,28 @@ func (fs *fileSystemBR) StartRestore(snapshotID string, target AccessPoint, uplo
 		return errors.New("file system data path is not initialized")
 	}
 
+	fs.wgDataPath.Add(1)
+
 	go func() {
-		err := fs.uploaderProv.RunRestore(fs.ctx, snapshotID, target.ByPath, target.VolMode, uploaderConfigs, fs)
+		fs.log.Info("Start data path restore")
+
+		defer func() {
+			fs.close(context.Background())
+			fs.wgDataPath.Done()
+		}()
+
+		totalBytes, err := fs.uploaderProv.RunRestore(fs.ctx, snapshotID, target.ByPath, target.VolMode, uploaderConfigs, fs)
 
 		if err == provider.ErrorCanceled {
 			fs.callbacks.OnCancelled(context.Background(), fs.namespace, fs.jobName)
 		} else if err != nil {
-			fs.callbacks.OnFailed(context.Background(), fs.namespace, fs.jobName, err)
+			dataPathErr := DataPathError{
+				snapshotID: snapshotID,
+				err:        err,
+			}
+			fs.callbacks.OnFailed(context.Background(), fs.namespace, fs.jobName, dataPathErr)
 		} else {
-			fs.callbacks.OnCompleted(context.Background(), fs.namespace, fs.jobName, Result{Restore: RestoreResult{Target: target}})
+			fs.callbacks.OnCompleted(context.Background(), fs.namespace, fs.jobName, Result{Restore: RestoreResult{Target: target, TotalBytes: totalBytes}})
 		}
 	}()
 

@@ -35,27 +35,41 @@ import (
 	veleroclient "github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	"github.com/vmware-tanzu/velero/pkg/podvolume/configs"
 	"github.com/vmware-tanzu/velero/pkg/repository"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 	uploaderutil "github.com/vmware-tanzu/velero/pkg/uploader/util"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+)
+
+const (
+	indexNamePod  = "POD"
+	pvbKeyPattern = "%s+%s+%s"
 )
 
 // Backupper can execute pod volume backups of volumes in a pod.
 type Backupper interface {
 	// BackupPodVolumes backs up all specified volumes in a pod.
 	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, resPolicies *resourcepolicies.Policies, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, *PVCBackupSummary, []error)
+	WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velerov1api.PodVolumeBackup
+	GetPodVolumeBackupByPodAndVolume(podNamespace, podName, volume string) (*velerov1api.PodVolumeBackup, error)
+	ListPodVolumeBackupsByPod(podNamespace, podName string) ([]*velerov1api.PodVolumeBackup, error)
 }
 
 type backupper struct {
-	ctx          context.Context
-	repoLocker   *repository.RepoLocker
-	repoEnsurer  *repository.Ensurer
-	crClient     ctrlclient.Client
-	uploaderType string
-
-	results     map[string]chan *velerov1api.PodVolumeBackup
-	resultsLock sync.Mutex
+	ctx                 context.Context
+	repoLocker          *repository.RepoLocker
+	repoEnsurer         *repository.Ensurer
+	crClient            ctrlclient.Client
+	uploaderType        string
+	pvbInformer         ctrlcache.Informer
+	handlerRegistration cache.ResourceEventHandlerRegistration
+	wg                  sync.WaitGroup
+	// pvbIndexer holds all PVBs created by this backuper and is capable to search
+	// the PVBs based on specific properties quickly because of the embedded indexes.
+	// The statuses of the PVBs are got updated when Informer receives update events.
+	pvbIndexer cache.Indexer
 }
 
 type skippedPVC struct {
@@ -97,15 +111,36 @@ func (pbs *PVCBackupSummary) addSkipped(volumeName string, reason string) {
 	}
 }
 
+func podIndexFunc(obj any) ([]string, error) {
+	pvb, ok := obj.(*velerov1api.PodVolumeBackup)
+	if !ok {
+		return nil, errors.Errorf("expected PodVolumeBackup, but got %T", obj)
+	}
+	if pvb == nil {
+		return nil, errors.New("PodVolumeBackup is nil")
+	}
+	return []string{cache.NewObjectName(pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name).String()}, nil
+}
+
+// the PVB's name is auto-generated when creating the PVB, we cannot get the name or uid before creating it.
+// So we cannot use namespace&name or uid as the key because we need to insert PVB into the indexer before creating it in API server
+func podVolumeBackupKey(obj any) (string, error) {
+	pvb, ok := obj.(*velerov1api.PodVolumeBackup)
+	if !ok {
+		return "", fmt.Errorf("expected PodVolumeBackup, but got %T", obj)
+	}
+	return fmt.Sprintf(pvbKeyPattern, pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name, pvb.Spec.Volume), nil
+}
+
 func newBackupper(
 	ctx context.Context,
+	log logrus.FieldLogger,
 	repoLocker *repository.RepoLocker,
 	repoEnsurer *repository.Ensurer,
 	pvbInformer ctrlcache.Informer,
 	crClient ctrlclient.Client,
 	uploaderType string,
 	backup *velerov1api.Backup,
-	log logrus.FieldLogger,
 ) *backupper {
 	b := &backupper{
 		ctx:          ctx,
@@ -113,30 +148,36 @@ func newBackupper(
 		repoEnsurer:  repoEnsurer,
 		crClient:     crClient,
 		uploaderType: uploaderType,
-
-		results: make(map[string]chan *velerov1api.PodVolumeBackup),
+		pvbInformer:  pvbInformer,
+		wg:           sync.WaitGroup{},
+		pvbIndexer: cache.NewIndexer(podVolumeBackupKey, cache.Indexers{
+			indexNamePod: podIndexFunc,
+		}),
 	}
 
-	pvbInformer.AddEventHandler(
+	b.handlerRegistration, _ = pvbInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: func(_, obj interface{}) {
-				pvb := obj.(*velerov1api.PodVolumeBackup)
+			UpdateFunc: func(_, obj any) {
+				pvb, ok := obj.(*velerov1api.PodVolumeBackup)
+				if !ok {
+					log.Errorf("expected PodVolumeBackup, but got %T", obj)
+					return
+				}
 
 				if pvb.GetLabels()[velerov1api.BackupUIDLabel] != string(backup.UID) {
 					return
 				}
 
-				if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseCompleted || pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed {
-					b.resultsLock.Lock()
-					defer b.resultsLock.Unlock()
-
-					resChan, ok := b.results[resultsKey(pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name)]
-					if !ok {
-						log.Errorf("No results channel found for pod %s/%s to send pod volume backup %s/%s on", pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name, pvb.Namespace, pvb.Name)
-						return
-					}
-					resChan <- pvb
+				if pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseCompleted &&
+					pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseFailed {
+					return
 				}
+
+				// the Indexer inserts PVB directly if the PVB to be updated doesn't exist
+				if err := b.pvbIndexer.Update(pvb); err != nil {
+					log.WithError(err).Errorf("failed to update PVB %s/%s in indexer", pvb.Namespace, pvb.Name)
+				}
+				b.wg.Done()
 			},
 		},
 	)
@@ -155,20 +196,25 @@ func (b *backupper) getMatchAction(resPolicies *resourcepolicies.Policies, pvc *
 		if err != nil {
 			return nil, errors.Wrapf(err, "error getting pv for pvc %s", pvc.Spec.VolumeName)
 		}
-		return resPolicies.GetMatchAction(pv)
+		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
+		return resPolicies.GetMatchAction(vfd)
 	}
 
 	if volume != nil {
-		return resPolicies.GetMatchAction(volume)
+		vfd := resourcepolicies.NewVolumeFilterData(nil, volume, pvc)
+		return resPolicies.GetMatchAction(vfd)
 	}
 
 	return nil, errors.Errorf("failed to check resource policies for empty volume")
 }
 
+var funcGetRepositoryType = getRepositoryType
+
 func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, resPolicies *resourcepolicies.Policies, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, *PVCBackupSummary, []error) {
 	if len(volumesToBackup) == 0 {
 		return nil, nil, nil
 	}
+
 	log.Infof("pod %s/%s has volumes to backup: %v", pod.Namespace, pod.Name, volumesToBackup)
 
 	var (
@@ -191,25 +237,41 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 	}
 
+	if msg, err := uploader.ValidateUploaderType(b.uploaderType); err != nil {
+		skipAllPodVolumes(pod, volumesToBackup, err, pvcSummary, log)
+		return nil, pvcSummary, []error{err}
+	} else if msg != "" {
+		log.Warn(msg)
+	}
+
 	if err := kube.IsPodRunning(pod); err != nil {
 		skipAllPodVolumes(pod, volumesToBackup, err, pvcSummary, log)
 		return nil, pvcSummary, nil
 	}
 
-	err := nodeagent.IsRunningInNode(b.ctx, backup.Namespace, pod.Spec.NodeName, b.crClient)
-	if err != nil {
-		return nil, nil, []error{err}
+	if err := kube.IsLinuxNode(b.ctx, pod.Spec.NodeName, b.crClient); err != nil {
+		err := errors.Wrapf(err, "Pod %s/%s is not running in linux node(%s), skip", pod.Namespace, pod.Name, pod.Spec.NodeName)
+		skipAllPodVolumes(pod, volumesToBackup, err, pvcSummary, log)
+		return nil, pvcSummary, []error{err}
 	}
 
-	repositoryType := getRepositoryType(b.uploaderType)
+	err := nodeagent.IsRunningInNode(b.ctx, backup.Namespace, pod.Spec.NodeName, b.crClient)
+	if err != nil {
+		skipAllPodVolumes(pod, volumesToBackup, err, pvcSummary, log)
+		return nil, pvcSummary, []error{err}
+	}
+
+	repositoryType := funcGetRepositoryType(b.uploaderType)
 	if repositoryType == "" {
 		err := errors.Errorf("empty repository type, uploader %s", b.uploaderType)
-		return nil, nil, []error{err}
+		skipAllPodVolumes(pod, volumesToBackup, err, pvcSummary, log)
+		return nil, pvcSummary, []error{err}
 	}
 
 	repo, err := b.repoEnsurer.EnsureRepo(b.ctx, backup.Namespace, pod.Namespace, backup.Spec.StorageLocation, repositoryType)
 	if err != nil {
-		return nil, nil, []error{err}
+		skipAllPodVolumes(pod, volumesToBackup, err, pvcSummary, log)
+		return nil, pvcSummary, []error{err}
 	}
 
 	// get a single non-exclusive lock since we'll wait for all individual
@@ -217,16 +279,10 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	b.repoLocker.Lock(repo.Name)
 	defer b.repoLocker.Unlock(repo.Name)
 
-	resultsChan := make(chan *velerov1api.PodVolumeBackup)
-
-	b.resultsLock.Lock()
-	b.results[resultsKey(pod.Namespace, pod.Name)] = resultsChan
-	b.resultsLock.Unlock()
-
 	var (
 		podVolumeBackups   []*velerov1api.PodVolumeBackup
-		mountedPodVolumes  = sets.String{}
-		attachedPodDevices = sets.String{}
+		mountedPodVolumes  = sets.Set[string]{}
+		attachedPodDevices = sets.Set[string]{}
 	)
 
 	for _, container := range pod.Spec.Containers {
@@ -243,7 +299,6 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		repoIdentifier = repo.Spec.ResticIdentifier
 	}
 
-	var numVolumeSnapshots int
 	for _, volumeName := range volumesToBackup {
 		volume, ok := podVolumes[volumeName]
 		if !ok {
@@ -255,6 +310,17 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			pvc, ok = pvcSummary.pvcMap[volumeName]
 			if !ok {
 				// there should have been error happened retrieving the PVC and it's recorded already
+				continue
+			}
+		}
+
+		if resPolicies != nil {
+			if action, err := b.getMatchAction(resPolicies, pvc, &volume); err != nil {
+				errs = append(errs, errors.Wrapf(err, "error getting pv for pvc %s", pvc.Spec.VolumeName))
+				continue
+			} else if action != nil && action.Type == resourcepolicies.Skip {
+				log.Infof("skip backup of volume %s for the matched resource policies", volumeName)
+				pvcSummary.addSkipped(volumeName, "matched action is 'skip' in chosen resource policies")
 				continue
 			}
 		}
@@ -289,48 +355,99 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			continue
 		}
 
-		if resPolicies != nil {
-			if action, err := b.getMatchAction(resPolicies, pvc, &volume); err != nil {
-				errs = append(errs, errors.Wrapf(err, "error getting pv for pvc %s", pvc.Spec.VolumeName))
-				continue
-			} else if action != nil && action.Type == resourcepolicies.Skip {
-				log.Infof("skip backup of volume %s for the matched resource policies", volumeName)
-				pvcSummary.addSkipped(volumeName, "matched action is 'skip' in chosen resource policies")
-				continue
-			}
-		}
-
 		volumeBackup := newPodVolumeBackup(backup, pod, volume, repoIdentifier, b.uploaderType, pvc)
+		// the PVB must be added into the indexer before creating it in API server otherwise unexpected behavior may happen:
+		// the PVB may be handled very quickly by the controller and the informer handler will insert the PVB before "b.pvbIndexer.Add(volumeBackup)" runs,
+		// this causes the PVB inserted by "b.pvbIndexer.Add(volumeBackup)" overrides the PVB in the indexer while the PVB inserted by "b.pvbIndexer.Add(volumeBackup)"
+		// contains empty "Status"
+		if err := b.pvbIndexer.Add(volumeBackup); err != nil {
+			errs = append(errs, errors.Wrapf(err, "failed to add PodVolumeBackup %s/%s to indexer", volumeBackup.Namespace, volumeBackup.Name))
+			continue
+		}
+		// similar with above: the PVB may be handled very quickly by the controller and the informer handler will call "b.wg.Done()" before "b.wg.Add(1)" runs which causes panic
+		// see https://github.com/vmware-tanzu/velero/issues/8657
+		b.wg.Add(1)
 		if err := veleroclient.CreateRetryGenerateName(b.crClient, b.ctx, volumeBackup); err != nil {
+			b.wg.Done()
 			errs = append(errs, err)
 			continue
 		}
+
+		podVolumeBackups = append(podVolumeBackups, volumeBackup)
 		pvcSummary.addBackedup(volumeName)
-		numVolumeSnapshots++
 	}
 
-ForEachVolume:
-	for i, count := 0, numVolumeSnapshots; i < count; i++ {
-		select {
-		case <-b.ctx.Done():
-			errs = append(errs, errors.New("timed out waiting for all PodVolumeBackups to complete"))
-			break ForEachVolume
-		case res := <-resultsChan:
-			switch res.Status.Phase {
-			case velerov1api.PodVolumeBackupPhaseCompleted:
-				podVolumeBackups = append(podVolumeBackups, res)
-			case velerov1api.PodVolumeBackupPhaseFailed:
-				errs = append(errs, errors.Errorf("pod volume backup failed: %s", res.Status.Message))
-				podVolumeBackups = append(podVolumeBackups, res)
+	return podVolumeBackups, pvcSummary, errs
+}
+
+func (b *backupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velerov1api.PodVolumeBackup {
+	defer func() {
+		if err := b.pvbInformer.RemoveEventHandler(b.handlerRegistration); err != nil {
+			log.Debugf("failed to remove the event handler for PVB: %v", err)
+		}
+	}()
+
+	var podVolumeBackups []*velerov1api.PodVolumeBackup
+	// if no pod volume backups are tracked, return directly to avoid issue mentioned in
+	// https://github.com/vmware-tanzu/velero/issues/8723
+	if len(b.pvbIndexer.List()) == 0 {
+		return podVolumeBackups
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		b.wg.Wait()
+	}()
+
+	select {
+	case <-b.ctx.Done():
+		log.Error("timed out waiting for all PodVolumeBackups to complete")
+	case <-done:
+		for _, obj := range b.pvbIndexer.List() {
+			pvb, ok := obj.(*velerov1api.PodVolumeBackup)
+			if !ok {
+				log.Errorf("expected PodVolumeBackup, but got %T", obj)
+				continue
+			}
+			podVolumeBackups = append(podVolumeBackups, pvb)
+			if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed {
+				log.Errorf("pod volume backup failed: %s", pvb.Status.Message)
 			}
 		}
 	}
+	return podVolumeBackups
+}
 
-	b.resultsLock.Lock()
-	delete(b.results, resultsKey(pod.Namespace, pod.Name))
-	b.resultsLock.Unlock()
+func (b *backupper) GetPodVolumeBackupByPodAndVolume(podNamespace, podName, volume string) (*velerov1api.PodVolumeBackup, error) {
+	obj, exist, err := b.pvbIndexer.GetByKey(fmt.Sprintf(pvbKeyPattern, podNamespace, podName, volume))
+	if err != nil {
+		return nil, err
+	}
+	if !exist {
+		return nil, nil
+	}
+	pvb, ok := obj.(*velerov1api.PodVolumeBackup)
+	if !ok {
+		return nil, errors.Errorf("expected PodVolumeBackup, but got %T", obj)
+	}
+	return pvb, nil
+}
 
-	return podVolumeBackups, pvcSummary, errs
+func (b *backupper) ListPodVolumeBackupsByPod(podNamespace, podName string) ([]*velerov1api.PodVolumeBackup, error) {
+	objs, err := b.pvbIndexer.ByIndex(indexNamePod, cache.NewObjectName(podNamespace, podName).String())
+	if err != nil {
+		return nil, err
+	}
+	var pvbs []*velerov1api.PodVolumeBackup
+	for _, obj := range objs {
+		pvb, ok := obj.(*velerov1api.PodVolumeBackup)
+		if !ok {
+			return nil, errors.Errorf("expected PodVolumeBackup, but got %T", obj)
+		}
+		pvbs = append(pvbs, pvb)
+	}
+	return pvbs, nil
 }
 
 func skipAllPodVolumes(pod *corev1api.Pod, volumesToBackup []string, err error, pvcSummary *PVCBackupSummary, log logrus.FieldLogger) {
@@ -406,7 +523,7 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume c
 		// this annotation is used in pkg/restore to identify if a PVC
 		// has a pod volume backup.
 		pvb.Annotations = map[string]string{
-			PVCNameAnnotation: pvc.Name,
+			configs.PVCNameAnnotation: pvc.Name,
 		}
 
 		// this label is used by the pod volume backup controller to tell

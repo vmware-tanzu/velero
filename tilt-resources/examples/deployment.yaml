@@ -84,12 +84,6 @@ spec:
           volumeMounts:
           - mountPath: /target
             name: plugins
-        - image: velero/velero-plugin-for-csi
-          imagePullPolicy: Always
-          name: velero-plugin-for-csi
-          volumeMounts:
-          - mountPath: /target
-            name: plugins
       restartPolicy: Always
       serviceAccountName: velero
       volumes:

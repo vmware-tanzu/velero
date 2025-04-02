@@ -16,6 +16,9 @@ limitations under the License.
 package test
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 
@@ -24,9 +27,26 @@ import (
 
 type MockPodCommandExecutor struct {
 	mock.Mock
+	// hook execution order
+	HookExecutionLog []HookExecutionEntry
 }
 
-func (e *MockPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *v1.ExecHook) error {
+type HookExecutionEntry struct {
+	Namespace, Name, HookName string
+	HookCommand               []string
+}
+
+func (h HookExecutionEntry) String() string {
+	return fmt.Sprintf("%s.%s.%s.%s", h.Namespace, h.Name, h.HookName, strings.Join(h.HookCommand, ","))
+}
+
+func (e *MockPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, item map[string]any, namespace, name, hookName string, hook *v1.ExecHook) error {
+	e.HookExecutionLog = append(e.HookExecutionLog, HookExecutionEntry{
+		Namespace:   namespace,
+		Name:        name,
+		HookName:    hookName,
+		HookCommand: hook.Command,
+	})
 	args := e.Called(log, item, namespace, name, hookName, hook)
 	return args.Error(0)
 }

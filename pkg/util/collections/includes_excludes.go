@@ -442,7 +442,7 @@ func generateIncludesExcludes(includes, excludes []string, mapFunc func(string) 
 	return res
 }
 
-// generateScopedIncludesExcludes's function is similar with generateIncludesExcludes,
+// generateScopedIncludesExcludes function is similar with generateIncludesExcludes,
 // but it's used for scoped Includes/Excludes.
 func generateScopedIncludesExcludes(namespacedIncludes, namespacedExcludes, clusterIncludes, clusterExcludes []string, mapFunc func(string, bool) string, nsIncludesExcludes IncludesExcludes, helper discovery.Helper, logger logrus.FieldLogger) *ScopeIncludesExcludes {
 	res := newScopeIncludesExcludes(nsIncludesExcludes, helper, logger)
@@ -508,7 +508,7 @@ func GetGlobalResourceIncludesExcludes(helper discovery.Helper, logger logrus.Fi
 	return ret
 }
 
-// GetScopeResourceIncludesExcludes's function is similar with GetResourceIncludesExcludes,
+// GetScopeResourceIncludesExcludes function is similar with GetResourceIncludesExcludes,
 // but it's used for scoped Includes/Excludes, and can handle both cluster-scoped and namespace-scoped resources.
 func GetScopeResourceIncludesExcludes(helper discovery.Helper, logger logrus.FieldLogger, namespaceIncludes, namespaceExcludes, clusterIncludes, clusterExcludes []string, nsIncludesExcludes IncludesExcludes) *ScopeIncludesExcludes {
 	ret := generateScopedIncludesExcludes(

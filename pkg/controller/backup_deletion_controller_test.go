@@ -18,10 +18,14 @@ package controller
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"sort"
+	"reflect"
 	"time"
+
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 
 	"context"
 
@@ -42,10 +46,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
-	"github.com/vmware-tanzu/velero/pkg/volume"
-
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -53,7 +54,12 @@ import (
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	"github.com/vmware-tanzu/velero/pkg/repository"
+	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
+	repomocks "github.com/vmware-tanzu/velero/pkg/repository/mocks"
+	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
@@ -73,7 +79,7 @@ func defaultTestDbr() *velerov1api.DeleteBackupRequest {
 }
 
 func setupBackupDeletionControllerTest(t *testing.T, req *velerov1api.DeleteBackupRequest, objects ...runtime.Object) *backupDeletionControllerTestData {
-
+	t.Helper()
 	var (
 		fakeClient        = velerotest.NewFakeControllerRuntimeClient(t, append(objects, req)...)
 		volumeSnapshotter = &velerotest.FakeVolumeSnapshotter{SnapshotsTaken: sets.NewString()}
@@ -95,6 +101,7 @@ func setupBackupDeletionControllerTest(t *testing.T, req *velerov1api.DeleteBack
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			NewFakeSingleObjectBackupStoreGetter(backupStore),
 			velerotest.NewFakeCredentialsFileStore("", nil),
+			nil,
 		),
 		req: ctrl.Request{NamespacedName: types.NamespacedName{Namespace: req.Namespace, Name: req.Name}},
 	}
@@ -120,11 +127,16 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 				},
 			},
 		}
-		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
+		dbr := defaultTestDbr()
+		td := setupBackupDeletionControllerTest(t, dbr, location, backup)
 		td.controller.backupStoreGetter = &fakeErrorBackupStoreGetter{}
 		_, err := td.controller.Reconcile(ctx, td.req)
-		assert.NotNil(t, err)
-		assert.True(t, strings.HasPrefix(err.Error(), "error getting the backup store"))
+		require.NoError(t, err)
+		res := &velerov1api.DeleteBackupRequest{}
+		td.fakeClient.Get(ctx, td.req.NamespacedName, res)
+		assert.Equal(t, "Processed", string(res.Status.Phase))
+		assert.Len(t, res.Status.Errors, 1)
+		assert.True(t, strings.HasPrefix(res.Status.Errors[0], "error getting the backup store"))
 	})
 
 	t.Run("missing spec.backupName", func(t *testing.T) {
@@ -139,7 +151,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		require.NoError(t, err)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
-		assert.Equal(t, 1, len(res.Status.Errors))
+		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "spec.backupName is required", res.Status.Errors[0])
 	})
 
@@ -207,12 +219,11 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		require.NoError(t, err)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
-		assert.Equal(t, 1, len(res.Status.Errors))
+		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "backup is still in progress", res.Status.Errors[0])
 	})
 
 	t.Run("unable to find backup", func(t *testing.T) {
-
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr())
 
 		_, err := td.controller.Reconcile(context.TODO(), td.req)
@@ -222,7 +233,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		require.NoError(t, err)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
-		assert.Equal(t, 1, len(res.Status.Errors))
+		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "backup not found", res.Status.Errors[0])
 	})
 	t.Run("unable to find backup storage location", func(t *testing.T) {
@@ -237,7 +248,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		require.NoError(t, err)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
-		assert.Equal(t, 1, len(res.Status.Errors))
+		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "backup storage location default not found", res.Status.Errors[0])
 	})
 
@@ -254,11 +265,10 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		require.NoError(t, err)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
-		assert.Equal(t, 1, len(res.Status.Errors))
+		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "cannot delete backup because backup storage location default is currently in read-only mode", res.Status.Errors[0])
 	})
 	t.Run("full delete, no errors", func(t *testing.T) {
-
 		input := defaultTestDbr()
 
 		// Clear out resource labels to make sure the controller adds them and does not
@@ -358,7 +368,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		td.backupStore.AssertCalled(t, "DeleteBackup", input.Spec.BackupName)
 
@@ -479,7 +489,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())
@@ -601,7 +611,13 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 				Provider: "provider-1",
 			},
 		}
-		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), backup, location, snapshotLocation)
+
+		csiSnapshot := builder.ForVolumeSnapshot("user-ns", "vs-1").ObjectMeta(
+			builder.WithLabelsMap(map[string]string{
+				"velero.io/backup-name": "foo",
+			})).SourcePVC("some-pvc").Result()
+
+		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), backup, location, snapshotLocation, csiSnapshot)
 		td.volumeSnapshotter.SnapshotsTaken.Insert("snap-1")
 
 		snapshots := []*volume.Snapshot{
@@ -646,6 +662,13 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		}, &velerov1api.Backup{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
+		// leaked CSI snapshot should be deleted
+		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+			Namespace: "user-ns",
+			Name:      "vs-1",
+		}, &snapshotv1api.VolumeSnapshot{})
+		assert.True(t, apierrors.IsNotFound(err), "Expected not found error for the leaked CSI snapshot, but actual value of error: %v", err)
+
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())
 	})
@@ -665,7 +688,6 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 		td.backupStore.AssertNotCalled(t, "DeleteBackup", mock.Anything)
-
 	})
 
 	t.Run("Expired request will not be deleted if the status is not processed", func(t *testing.T) {
@@ -685,9 +707,8 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
 		require.NoError(t, err)
 		assert.Equal(t, "Processed", string(res.Status.Phase))
-		assert.Equal(t, 1, len(res.Status.Errors))
+		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "backup not found", res.Status.Errors[0])
-
 	})
 }
 
@@ -695,13 +716,13 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 	tests := []struct {
 		name                  string
 		podVolumeBackups      []velerov1api.PodVolumeBackup
-		expected              []repository.SnapshotIdentifier
+		expected              map[string][]repotypes.SnapshotIdentifier
 		longBackupNameEnabled bool
 	}{
 		{
 			name:             "no pod volume backups",
 			podVolumeBackups: nil,
-			expected:         nil,
+			expected:         map[string][]repotypes.SnapshotIdentifier{},
 		},
 		{
 			name: "no pod volume backups with matching label",
@@ -721,7 +742,7 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-2"},
 				},
 			},
-			expected: nil,
+			expected: map[string][]repotypes.SnapshotIdentifier{},
 		},
 		{
 			name: "some pod volume backups with matching label",
@@ -762,16 +783,18 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: ""},
 				},
 			},
-			expected: []repository.SnapshotIdentifier{
-				{
-					VolumeNamespace: "ns-1",
-					SnapshotID:      "snap-3",
-					RepositoryType:  "restic",
-				},
-				{
-					VolumeNamespace: "ns-1",
-					SnapshotID:      "snap-4",
-					RepositoryType:  "restic",
+			expected: map[string][]repotypes.SnapshotIdentifier{
+				"ns-1": {
+					{
+						VolumeNamespace: "ns-1",
+						SnapshotID:      "snap-3",
+						RepositoryType:  "restic",
+					},
+					{
+						VolumeNamespace: "ns-1",
+						SnapshotID:      "snap-4",
+						RepositoryType:  "restic",
+					},
 				},
 			},
 		},
@@ -815,11 +838,13 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: ""},
 				},
 			},
-			expected: []repository.SnapshotIdentifier{
-				{
-					VolumeNamespace: "ns-1",
-					SnapshotID:      "snap-3",
-					RepositoryType:  "restic",
+			expected: map[string][]repotypes.SnapshotIdentifier{
+				"ns-1": {
+					{
+						VolumeNamespace: "ns-1",
+						SnapshotID:      "snap-3",
+						RepositoryType:  "restic",
+					},
 				},
 			},
 		},
@@ -844,21 +869,179 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			res, err := getSnapshotsInBackup(context.TODO(), veleroBackup, clientBuilder.Build())
 			assert.NoError(t, err)
 
-			// sort to ensure good compare of slices
-			less := func(snapshots []repository.SnapshotIdentifier) func(i, j int) bool {
-				return func(i, j int) bool {
-					if snapshots[i].VolumeNamespace == snapshots[j].VolumeNamespace {
-						return snapshots[i].SnapshotID < snapshots[j].SnapshotID
-					}
-					return snapshots[i].VolumeNamespace < snapshots[j].VolumeNamespace
+			assert.True(t, reflect.DeepEqual(res, test.expected))
+		})
+	}
+}
+
+func batchDeleteSucceed(ctx context.Context, repoEnsurer *repository.Ensurer, repoMgr repomanager.Manager, directSnapshots map[string][]repotypes.SnapshotIdentifier, backup *velerov1api.Backup, logger logrus.FieldLogger) []error {
+	return nil
+}
+
+func batchDeleteFail(ctx context.Context, repoEnsurer *repository.Ensurer, repoMgr repomanager.Manager, directSnapshots map[string][]repotypes.SnapshotIdentifier, backup *velerov1api.Backup, logger logrus.FieldLogger) []error {
+	return []error{
+		errors.New("fake-delete-1"),
+		errors.New("fake-delete-2"),
+	}
+}
+
+func generateSnapshotData(snapshot *repotypes.SnapshotIdentifier) (map[string]string, error) {
+	if snapshot == nil {
+		return nil, nil
+	}
+
+	b, err := json.Marshal(snapshot)
+	if err != nil {
+		return nil, err
+	}
+
+	data := make(map[string]string)
+	if err := json.Unmarshal(b, &data); err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
+func TestDeleteMovedSnapshots(t *testing.T) {
+	tests := []struct {
+		name               string
+		repoMgr            repomanager.Manager
+		batchDeleteSucceed bool
+		backupName         string
+		snapshots          []*repotypes.SnapshotIdentifier
+		expected           []string
+	}{
+		{
+			name: "repoMgr is nil",
+		},
+		{
+			name:    "no cm",
+			repoMgr: repomocks.NewManager(t),
+		},
+		{
+			name:       "bad cm info",
+			repoMgr:    repomocks.NewManager(t),
+			backupName: "backup-01",
+			snapshots:  []*repotypes.SnapshotIdentifier{nil},
+			expected:   []string{"no snapshot info in config"},
+		},
+		{
+			name:       "invalid snapshots",
+			repoMgr:    repomocks.NewManager(t),
+			backupName: "backup-01",
+			snapshots: []*repotypes.SnapshotIdentifier{
+				{
+					RepositoryType:  "repo-1",
+					VolumeNamespace: "ns-1",
+				},
+				{
+					SnapshotID:      "snapshot-1",
+					VolumeNamespace: "ns-1",
+				},
+				{
+					SnapshotID:     "snapshot-1",
+					RepositoryType: "repo-1",
+				},
+			},
+			batchDeleteSucceed: true,
+			expected: []string{
+				"invalid snapshot, ID , namespace ns-1, repository repo-1",
+				"invalid snapshot, ID snapshot-1, namespace ns-1, repository ",
+				"invalid snapshot, ID snapshot-1, namespace , repository repo-1",
+			},
+		},
+		{
+			name:       "batch delete succeed",
+			repoMgr:    repomocks.NewManager(t),
+			backupName: "backup-01",
+			snapshots: []*repotypes.SnapshotIdentifier{
+
+				{
+					SnapshotID:      "snapshot-1",
+					RepositoryType:  "repo-1",
+					VolumeNamespace: "ns-1",
+				},
+			},
+			batchDeleteSucceed: true,
+			expected:           []string{},
+		},
+		{
+			name:       "batch delete fail",
+			repoMgr:    repomocks.NewManager(t),
+			backupName: "backup-01",
+			snapshots: []*repotypes.SnapshotIdentifier{
+				{
+					RepositoryType:  "repo-1",
+					VolumeNamespace: "ns-1",
+				},
+				{
+					SnapshotID:      "snapshot-1",
+					RepositoryType:  "repo-1",
+					VolumeNamespace: "ns-1",
+				},
+			},
+			expected: []string{"invalid snapshot, ID , namespace ns-1, repository repo-1", "fake-delete-1", "fake-delete-2"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			objs := []runtime.Object{}
+			for i, snapshot := range test.snapshots {
+				snapshotData, err := generateSnapshotData(snapshot)
+				require.NoError(t, err)
+
+				cm := corev1api.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: corev1api.SchemeGroupVersion.String(),
+						Kind:       "ConfigMap",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "velero",
+						Name:      fmt.Sprintf("du-info-%d", i),
+						Labels: map[string]string{
+							velerov1api.BackupNameLabel:             test.backupName,
+							velerov1api.DataUploadSnapshotInfoLabel: "true",
+						},
+					},
+					Data: snapshotData,
 				}
 
+				objs = append(objs, &cm)
 			}
 
-			sort.Slice(test.expected, less(test.expected))
-			sort.Slice(res, less(res))
+			veleroBackup := &velerov1api.Backup{}
+			controller := NewBackupDeletionReconciler(
+				velerotest.NewLogger(),
+				velerotest.NewFakeControllerRuntimeClient(t, objs...),
+				NewBackupTracker(),
+				test.repoMgr,
+				metrics.NewServerMetrics(),
+				nil, // discovery helper
+				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+				NewFakeSingleObjectBackupStoreGetter(backupStore),
+				velerotest.NewFakeCredentialsFileStore("", nil),
+				nil,
+			)
 
-			assert.Equal(t, test.expected, res)
+			veleroBackup.Name = test.backupName
+
+			if test.batchDeleteSucceed {
+				batchDeleteSnapshotFunc = batchDeleteSucceed
+			} else {
+				batchDeleteSnapshotFunc = batchDeleteFail
+			}
+
+			errs := controller.deleteMovedSnapshots(context.Background(), veleroBackup)
+			if test.expected == nil {
+				assert.Nil(t, errs)
+			} else {
+				assert.Equal(t, len(test.expected), len(errs))
+				for i := range test.expected {
+					assert.EqualError(t, errs[i], test.expected[i])
+				}
+			}
 		})
 	}
 }

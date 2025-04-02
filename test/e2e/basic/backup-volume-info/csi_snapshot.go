@@ -54,12 +54,11 @@ func (c *CSISnapshotVolumeInfo) Verify() error {
 		BackupObjectsPrefix+"/"+c.BackupName,
 	)
 
-	Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("Fail to get VolumeInfo metadata in the Backup Repository."))
+	Expect(err).ShouldNot(HaveOccurred(), "Fail to get VolumeInfo metadata in the Backup Repository.")
 
 	fmt.Printf("The VolumeInfo metadata content: %+v\n", *volumeInfo[0])
-	Expect(len(volumeInfo) > 0).To(BeIdenticalTo(true))
+	Expect(volumeInfo).ToNot(BeEmpty())
 	Expect(volumeInfo[0].CSISnapshotInfo).NotTo(BeNil())
 
-	// Clean SC and VSC
-	return c.cleanResource()
+	return nil
 }

@@ -27,7 +27,7 @@ Both of these can be added with the `velero install` command.
 ```bash
 velero install \
 --features=EnableCSI \
---plugins=<object storage plugin>,velero/velero-plugin-for-csi:v0.1.0 \
+--plugins=<object storage plugin>,velero/velero-plugin-for-csi:v0.2.0 \
 ...
 ```
 

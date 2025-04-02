@@ -27,6 +27,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/velero"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 type podTemplateOption func(*podTemplateConfig)
@@ -51,6 +52,13 @@ type podTemplateConfig struct {
 	privilegedNodeAgent             bool
 	disableInformerCache            bool
 	scheduleSkipImmediately         bool
+	podResources                    kube.PodResources
+	keepLatestMaintenanceJobs       int
+	backupRepoConfigMap             string
+	repoMaintenanceJobConfigMap     string
+	nodeAgentConfigMap              string
+	itemBlockWorkerCount            int
+	forWindows                      bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -93,9 +101,9 @@ func WithSecret(secretPresent bool) podTemplateOption {
 	}
 }
 
-func WithRestoreOnly() podTemplateOption {
+func WithRestoreOnly(b bool) podTemplateOption {
 	return func(c *podTemplateConfig) {
-		c.restoreOnly = true
+		c.restoreOnly = b
 	}
 }
 
@@ -141,21 +149,21 @@ func WithUploaderType(t string) podTemplateOption {
 	}
 }
 
-func WithDefaultVolumesToFsBackup() podTemplateOption {
+func WithDefaultVolumesToFsBackup(b bool) podTemplateOption {
 	return func(c *podTemplateConfig) {
-		c.defaultVolumesToFsBackup = true
+		c.defaultVolumesToFsBackup = b
 	}
 }
 
-func WithDefaultSnapshotMoveData() podTemplateOption {
+func WithDefaultSnapshotMoveData(b bool) podTemplateOption {
 	return func(c *podTemplateConfig) {
-		c.defaultSnapshotMoveData = true
+		c.defaultSnapshotMoveData = b
 	}
 }
 
-func WithDisableInformerCache() podTemplateOption {
+func WithDisableInformerCache(b bool) podTemplateOption {
 	return func(c *podTemplateConfig) {
-		c.disableInformerCache = true
+		c.disableInformerCache = b
 	}
 }
 
@@ -165,15 +173,56 @@ func WithServiceAccountName(sa string) podTemplateOption {
 	}
 }
 
-func WithPrivilegedNodeAgent() podTemplateOption {
+func WithPrivilegedNodeAgent(b bool) podTemplateOption {
 	return func(c *podTemplateConfig) {
-		c.privilegedNodeAgent = true
+		c.privilegedNodeAgent = b
+	}
+}
+
+func WithNodeAgentConfigMap(nodeAgentConfigMap string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.nodeAgentConfigMap = nodeAgentConfigMap
 	}
 }
 
 func WithScheduleSkipImmediately(b bool) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.scheduleSkipImmediately = b
+	}
+}
+
+func WithPodResources(podResources kube.PodResources) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.podResources = podResources
+	}
+}
+
+func WithKeepLatestMaintenanceJobs(keepLatestMaintenanceJobs int) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.keepLatestMaintenanceJobs = keepLatestMaintenanceJobs
+	}
+}
+
+func WithBackupRepoConfigMap(backupRepoConfigMap string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.backupRepoConfigMap = backupRepoConfigMap
+	}
+}
+func WithRepoMaintenanceJobConfigMap(repoMaintenanceJobConfigMap string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.repoMaintenanceJobConfigMap = repoMaintenanceJobConfigMap
+	}
+}
+
+func WithItemBlockWorkerCount(itemBlockWorkerCount int) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.itemBlockWorkerCount = itemBlockWorkerCount
+	}
+}
+
+func WithForWindows() podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.forWindows = true
 	}
 }
 
@@ -234,6 +283,38 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 		args = append(args, fmt.Sprintf("--fs-backup-timeout=%v", c.podVolumeOperationTimeout))
 	}
 
+	if c.keepLatestMaintenanceJobs > 0 {
+		args = append(args, fmt.Sprintf("--keep-latest-maintenance-jobs=%d", c.keepLatestMaintenanceJobs))
+	}
+
+	if len(c.podResources.CPULimit) > 0 {
+		args = append(args, fmt.Sprintf("--maintenance-job-cpu-limit=%s", c.podResources.CPULimit))
+	}
+
+	if len(c.podResources.CPURequest) > 0 {
+		args = append(args, fmt.Sprintf("--maintenance-job-cpu-request=%s", c.podResources.CPURequest))
+	}
+
+	if len(c.podResources.MemoryLimit) > 0 {
+		args = append(args, fmt.Sprintf("--maintenance-job-mem-limit=%s", c.podResources.MemoryLimit))
+	}
+
+	if len(c.podResources.MemoryRequest) > 0 {
+		args = append(args, fmt.Sprintf("--maintenance-job-mem-request=%s", c.podResources.MemoryRequest))
+	}
+
+	if len(c.backupRepoConfigMap) > 0 {
+		args = append(args, fmt.Sprintf("--backup-repository-configmap=%s", c.backupRepoConfigMap))
+	}
+
+	if len(c.repoMaintenanceJobConfigMap) > 0 {
+		args = append(args, fmt.Sprintf("--repo-maintenance-job-configmap=%s", c.repoMaintenanceJobConfigMap))
+	}
+
+	if c.itemBlockWorkerCount > 0 {
+		args = append(args, fmt.Sprintf("--item-block-worker-count=%d", c.itemBlockWorkerCount))
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: objectMeta(namespace, "velero"),
 		TypeMeta: metav1.TypeMeta{
@@ -250,6 +331,12 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyAlways,
 					ServiceAccountName: c.serviceAccountName,
+					NodeSelector: map[string]string{
+						"kubernetes.io/os": "linux",
+					},
+					OS: &corev1.PodOS{
+						Name: "linux",
+					},
 					Containers: []corev1.Container{
 						{
 							Name:            "velero",

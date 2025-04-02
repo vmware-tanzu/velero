@@ -171,9 +171,3 @@ func (b *RestoreBuilder) ItemOperationTimeout(timeout time.Duration) *RestoreBui
 	b.object.Spec.ItemOperationTimeout.Duration = timeout
 	return b
 }
-
-// WriteSparseFiles sets the Restore's uploader write sparse files
-func (b *RestoreBuilder) WriteSparseFiles(val bool) *RestoreBuilder {
-	b.object.Spec.UploaderConfig.WriteSparseFiles = &val
-	return b
-}

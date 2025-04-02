@@ -39,11 +39,16 @@ func TestThrottle_ShouldOutput(t *testing.T) {
 		{interval: time.Second, expectedOutput: true},
 		{interval: time.Second, throttle: time.Now().UnixNano() + int64(time.Nanosecond*100000000), expectedOutput: false},
 	}
-	p := new(Progress)
+
 	for _, tc := range testCases {
 		// Setup
-		p.InitThrottle(tc.interval)
-		p.outputThrottle.throttle = int64(tc.throttle)
+		p := &Progress{
+			outputThrottle: Throttle{
+				interval: tc.interval,
+				throttle: tc.throttle,
+			},
+		}
+
 		// Perform the test
 
 		output := p.outputThrottle.ShouldOutput()
@@ -65,14 +70,18 @@ func TestProgress(t *testing.T) {
 		{interval: time.Second},
 		{interval: time.Second, throttle: time.Now().UnixNano() + int64(time.Nanosecond*10000)},
 	}
-	p := new(Progress)
-	p.Log = logrus.New()
-	p.Updater = &fakeProgressUpdater{}
+
 	for _, tc := range testCases {
 		// Setup
-		p.InitThrottle(tc.interval)
-		p.outputThrottle.throttle = int64(tc.throttle)
-		p.InitThrottle(time.Duration(time.Second))
+		p := &Progress{
+			outputThrottle: Throttle{
+				interval: tc.interval,
+				throttle: tc.throttle,
+			},
+			updater: &fakeProgressUpdater{},
+			log:     logrus.New(),
+		}
+
 		// All below calls put together for the implementation are empty or just very simple and just want to cover testing
 		// If wanting to write unit tests for some functions could remove it and with writing new function alone
 		p.UpdateProgress()

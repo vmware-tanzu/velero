@@ -31,7 +31,6 @@ import (
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
 
@@ -75,11 +74,11 @@ func DescribeBackupInSF(
 
 // DescribeBackupSpecInSF describes a backup spec in structured format.
 func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec) {
-	backupSpecInfo := make(map[string]interface{})
+	backupSpecInfo := make(map[string]any)
 	var s string
 
 	// describe namespaces
-	namespaceInfo := make(map[string]interface{})
+	namespaceInfo := make(map[string]any)
 	if len(spec.IncludedNamespaces) == 0 {
 		s = "*"
 	} else {
@@ -141,10 +140,10 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 	backupSpecInfo["CSISnapshotTimeout"] = spec.CSISnapshotTimeout.Duration.String()
 
 	// describe hooks
-	hooksInfo := make(map[string]interface{})
-	hooksResources := make(map[string]interface{})
+	hooksInfo := make(map[string]any)
+	hooksResources := make(map[string]any)
 	for _, backupResourceHookSpec := range spec.Hooks.Resources {
-		ResourceDetails := make(map[string]interface{})
+		ResourceDetails := make(map[string]any)
 		var s string
 		namespaceInfo := make(map[string]string)
 		if len(backupResourceHookSpec.IncludedNamespaces) == 0 {
@@ -182,10 +181,10 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 		}
 		ResourceDetails["labelSelector"] = s
 
-		preHooks := make([]map[string]interface{}, 0)
+		preHooks := make([]map[string]any, 0)
 		for _, hook := range backupResourceHookSpec.PreHooks {
 			if hook.Exec != nil {
-				preExecHook := make(map[string]interface{})
+				preExecHook := make(map[string]any)
 				preExecHook["container"] = hook.Exec.Container
 				preExecHook["command"] = strings.Join(hook.Exec.Command, " ")
 				preExecHook["onError:"] = hook.Exec.OnError
@@ -195,10 +194,10 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 		}
 		ResourceDetails["preExecHook"] = preHooks
 
-		postHooks := make([]map[string]interface{}, 0)
+		postHooks := make([]map[string]any, 0)
 		for _, hook := range backupResourceHookSpec.PostHooks {
 			if hook.Exec != nil {
-				postExecHook := make(map[string]interface{})
+				postExecHook := make(map[string]any)
 				postExecHook["container"] = hook.Exec.Container
 				postExecHook["command"] = strings.Join(hook.Exec.Command, " ")
 				postExecHook["onError:"] = hook.Exec.OnError
@@ -226,7 +225,7 @@ func DescribeBackupSpecInSF(d *StructuredDescriber, spec velerov1api.BackupSpec)
 func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *StructuredDescriber, backup *velerov1api.Backup, details bool,
 	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackups []velerov1api.PodVolumeBackup) {
 	status := backup.Status
-	backupStatusInfo := make(map[string]interface{})
+	backupStatusInfo := make(map[string]any)
 
 	// Status.Version has been deprecated, use Status.FormatVersion
 	backupStatusInfo["backupFormatVersion"] = status.FormatVersion
@@ -272,7 +271,7 @@ func DescribeBackupStatusInSF(ctx context.Context, kbClient kbclient.Client, d *
 	}
 }
 
-func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Client, backupStatusInfo map[string]interface{}, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) {
+func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Client, backupStatusInfo map[string]any, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) {
 	// In consideration of decoding structured output conveniently, the two separate fields were created here(in func describeBackupResourceList, there is only one field describing either error message or resource list)
 	// the field of 'errorGettingResourceList' gives specific error message when it fails to get resources list
 	// the field of 'resourceList' lists the rearranged resources
@@ -300,16 +299,11 @@ func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Clien
 }
 
 func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, backup *velerov1api.Backup, details bool,
-	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackupCRs []velerov1api.PodVolumeBackup, backupStatusInfo map[string]interface{}) {
-	if boolptr.IsSetToFalse(backup.Spec.SnapshotVolumes) {
-		backupStatusInfo["backupVolumes"] = "<none included>"
-		return
-	}
+	insecureSkipTLSVerify bool, caCertPath string, podVolumeBackupCRs []velerov1api.PodVolumeBackup, backupStatusInfo map[string]any) {
+	backupVolumes := make(map[string]any)
 
-	backupVolumes := make(map[string]interface{})
-
-	nativeSnapshots := []*volume.VolumeInfo{}
-	csiSnapshots := []*volume.VolumeInfo{}
+	nativeSnapshots := []*volume.BackupVolumeInfo{}
+	csiSnapshots := []*volume.BackupVolumeInfo{}
 	legacyInfoSource := false
 
 	buf := new(bytes.Buffer)
@@ -332,7 +326,7 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 		backupVolumes["errorGetBackupVolumeInfo"] = fmt.Sprintf("error getting backup volume info: %v", err)
 		return
 	} else {
-		var volumeInfos []volume.VolumeInfo
+		var volumeInfos []volume.BackupVolumeInfo
 		if err := json.NewDecoder(buf).Decode(&volumeInfos); err != nil {
 			backupVolumes["errorReadBackupVolumeInfo"] = fmt.Sprintf("error reading backup volume info: %v", err)
 			return
@@ -357,26 +351,27 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 	backupStatusInfo["backupVolumes"] = backupVolumes
 }
 
-func describeNativeSnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVolumes map[string]interface{}) {
+func describeNativeSnapshotsInSF(details bool, infos []*volume.BackupVolumeInfo, backupVolumes map[string]any) {
 	if len(infos) == 0 {
 		backupVolumes["nativeSnapshots"] = "<none included>"
 		return
 	}
 
-	snapshotDetails := make(map[string]interface{})
+	snapshotDetails := make(map[string]any)
 	for _, info := range infos {
 		describNativeSnapshotInSF(details, info, snapshotDetails)
 	}
 	backupVolumes["nativeSnapshots"] = snapshotDetails
 }
 
-func describNativeSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDetails map[string]interface{}) {
+func describNativeSnapshotInSF(details bool, info *volume.BackupVolumeInfo, snapshotDetails map[string]any) {
 	if details {
 		snapshotInfo := make(map[string]string)
 		snapshotInfo["snapshotID"] = info.NativeSnapshotInfo.SnapshotHandle
 		snapshotInfo["type"] = info.NativeSnapshotInfo.VolumeType
 		snapshotInfo["availabilityZone"] = info.NativeSnapshotInfo.VolumeAZ
 		snapshotInfo["IOPS"] = info.NativeSnapshotInfo.IOPS
+		snapshotInfo["result"] = string(info.Result)
 
 		snapshotDetails[info.PVName] = snapshotInfo
 	} else {
@@ -384,7 +379,7 @@ func describNativeSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDe
 	}
 }
 
-func describeCSISnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVolumes map[string]interface{}, legacyInfoSource bool) {
+func describeCSISnapshotsInSF(details bool, infos []*volume.BackupVolumeInfo, backupVolumes map[string]any, legacyInfoSource bool) {
 	if len(infos) == 0 {
 		if legacyInfoSource {
 			backupVolumes["csiSnapshots"] = "<none included or not detectable>"
@@ -394,15 +389,15 @@ func describeCSISnapshotsInSF(details bool, infos []*volume.VolumeInfo, backupVo
 		return
 	}
 
-	snapshotDetails := make(map[string]interface{})
+	snapshotDetails := make(map[string]any)
 	for _, info := range infos {
 		describeCSISnapshotInSF(details, info, snapshotDetails)
 	}
 	backupVolumes["csiSnapshots"] = snapshotDetails
 }
 
-func describeCSISnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDetails map[string]interface{}) {
-	snapshotDetail := make(map[string]interface{})
+func describeCSISnapshotInSF(details bool, info *volume.BackupVolumeInfo, snapshotDetails map[string]any) {
+	snapshotDetail := make(map[string]any)
 
 	describeLocalSnapshotInSF(details, info, snapshotDetail)
 	describeDataMovementInSF(details, info, snapshotDetail)
@@ -410,14 +405,14 @@ func describeCSISnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDeta
 	snapshotDetails[fmt.Sprintf("%s/%s", info.PVCNamespace, info.PVCName)] = snapshotDetail
 }
 
-// describeVSCInSF describes CSI volume snapshot contents in structured format.
-func describeLocalSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDetail map[string]interface{}) {
+// describeLocalSnapshotInSF describes CSI volume snapshot contents in structured format.
+func describeLocalSnapshotInSF(details bool, info *volume.BackupVolumeInfo, snapshotDetail map[string]any) {
 	if !info.PreserveLocalSnapshot {
 		return
 	}
 
 	if details {
-		localSnapshot := make(map[string]interface{})
+		localSnapshot := make(map[string]any)
 
 		if !info.SnapshotDataMoved {
 			localSnapshot["operationID"] = info.CSISnapshotInfo.OperationID
@@ -427,6 +422,7 @@ func describeLocalSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDe
 		localSnapshot["storageSnapshotID"] = info.CSISnapshotInfo.SnapshotHandle
 		localSnapshot["snapshotSize(bytes)"] = info.CSISnapshotInfo.Size
 		localSnapshot["csiDriver"] = info.CSISnapshotInfo.Driver
+		localSnapshot["result"] = string(info.Result)
 
 		snapshotDetail["snapshot"] = localSnapshot
 	} else {
@@ -434,13 +430,13 @@ func describeLocalSnapshotInSF(details bool, info *volume.VolumeInfo, snapshotDe
 	}
 }
 
-func describeDataMovementInSF(details bool, info *volume.VolumeInfo, snapshotDetail map[string]interface{}) {
+func describeDataMovementInSF(details bool, info *volume.BackupVolumeInfo, snapshotDetail map[string]any) {
 	if !info.SnapshotDataMoved {
 		return
 	}
 
 	if details {
-		dataMovement := make(map[string]interface{})
+		dataMovement := make(map[string]any)
 		dataMovement["operationID"] = info.SnapshotDataMovementInfo.OperationID
 
 		dataMover := "velero"
@@ -450,6 +446,7 @@ func describeDataMovementInSF(details bool, info *volume.VolumeInfo, snapshotDet
 		dataMovement["dataMover"] = dataMover
 
 		dataMovement["uploaderType"] = info.SnapshotDataMovementInfo.UploaderType
+		dataMovement["result"] = string(info.Result)
 
 		snapshotDetail["dataMovement"] = dataMovement
 	} else {
@@ -459,14 +456,14 @@ func describeDataMovementInSF(details bool, info *volume.VolumeInfo, snapshotDet
 
 // DescribeDeleteBackupRequestsInSF describes delete backup requests in structured format.
 func DescribeDeleteBackupRequestsInSF(d *StructuredDescriber, requests []velerov1api.DeleteBackupRequest) {
-	deletionAttempts := make(map[string]interface{})
+	deletionAttempts := make(map[string]any)
 	if count := failedDeletionCount(requests); count > 0 {
 		deletionAttempts["failed"] = count
 	}
 
-	deletionRequests := make([]map[string]interface{}, 0)
+	deletionRequests := make([]map[string]any, 0)
 	for _, req := range requests {
-		deletionReq := make(map[string]interface{})
+		deletionReq := make(map[string]any)
 		deletionReq["creationTimestamp"] = req.CreationTimestamp.String()
 		deletionReq["phase"] = req.Status.Phase
 
@@ -480,8 +477,8 @@ func DescribeDeleteBackupRequestsInSF(d *StructuredDescriber, requests []velerov
 }
 
 // describePodVolumeBackupsInSF describes pod volume backups in structured format.
-func describePodVolumeBackupsInSF(backups []velerov1api.PodVolumeBackup, details bool, backupVolumes map[string]interface{}) {
-	podVolumeBackupsInfo := make(map[string]interface{})
+func describePodVolumeBackupsInSF(backups []velerov1api.PodVolumeBackup, details bool, backupVolumes map[string]any) {
+	podVolumeBackupsInfo := make(map[string]any)
 	// Get the type of pod volume uploader. Since the uploader only comes from a single source, we can
 	// take the uploader type from the first element of the array.
 	var uploaderType string
@@ -494,7 +491,7 @@ func describePodVolumeBackupsInSF(backups []velerov1api.PodVolumeBackup, details
 	// type display the type of pod volume backups
 	podVolumeBackupsInfo["uploderType"] = uploaderType
 
-	podVolumeBackupsDetails := make(map[string]interface{})
+	podVolumeBackupsDetails := make(map[string]any)
 	// separate backups by phase (combining <none> and New into a single group)
 	backupsByPhase := groupByPhase(backups)
 
@@ -540,7 +537,7 @@ func DescribeBackupResultsInSF(ctx context.Context, kbClient kbclient.Client, d 
 	var buf bytes.Buffer
 	var resultMap map[string]results.Result
 
-	errors, warnings := make(map[string]interface{}), make(map[string]interface{})
+	errors, warnings := make(map[string]any), make(map[string]any)
 	defer func() {
 		d.Describe("errors", errors)
 		d.Describe("warnings", warnings)
@@ -575,13 +572,13 @@ func DescribeBackupResultsInSF(ctx context.Context, kbClient kbclient.Client, d 
 
 // DescribeResourcePoliciesInSF describes resource policies in structured format.
 func DescribeResourcePoliciesInSF(d *StructuredDescriber, resPolicies *v1.TypedLocalObjectReference) {
-	policiesInfo := make(map[string]interface{})
+	policiesInfo := make(map[string]any)
 	policiesInfo["type"] = resPolicies.Kind
 	policiesInfo["name"] = resPolicies.Name
 	d.Describe("resourcePolicies", policiesInfo)
 }
 
-func describeResultInSF(m map[string]interface{}, result results.Result) {
+func describeResultInSF(m map[string]any, result results.Result) {
 	m["velero"], m["cluster"], m["namespace"] = []string{}, []string{}, []string{}
 
 	if len(result.Velero) > 0 {

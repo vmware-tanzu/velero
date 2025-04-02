@@ -18,6 +18,8 @@
       @include media-breakpoint-up(md) {
         width: 120px;
         height: 120px;
+        object-fit: contain;
+        background-color: white;
       }
     }
   }

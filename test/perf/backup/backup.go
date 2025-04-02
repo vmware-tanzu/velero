@@ -18,7 +18,6 @@ package backup
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -48,7 +47,7 @@ func (b *BackupTest) Init() error {
 	b.TestMsg = &TestMSG{
 		Desc:      "Do backup resources for performance test",
 		FailedMSG: "Failed to backup resources",
-		Text:      fmt.Sprintf("Should backup resources success"),
+		Text:      "Should backup resources success",
 	}
 	return nil
 }

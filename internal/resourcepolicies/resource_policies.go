@@ -16,19 +16,29 @@ limitations under the License.
 package resourcepolicies
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 type VolumeActionType string
 
 const (
 	// currently only support configmap type of resource config
-	ConfigmapRefType string           = "configmap"
-	Skip             VolumeActionType = "skip"
+	ConfigmapRefType string = "configmap"
+	// skip action implies the volume would be skipped from the backup operation
+	Skip VolumeActionType = "skip"
+	// fs-backup action implies that the volume would be backed up via file system copy method using the uploader(kopia/restic) configured by the user
+	FSBackup VolumeActionType = "fs-backup"
+	// snapshot action can have 3 different meaning based on velero configuration and backup spec - cloud provider based snapshots, local csi snapshots and datamover snapshots
+	Snapshot VolumeActionType = "snapshot"
 )
 
 // Action defined as one action for a specific way of backup
@@ -36,20 +46,20 @@ type Action struct {
 	// Type defined specific type of action, currently only support 'skip'
 	Type VolumeActionType `yaml:"type"`
 	// Parameters defined map of parameters when executing a specific action
-	Parameters map[string]interface{} `yaml:"parameters,omitempty"`
+	Parameters map[string]any `yaml:"parameters,omitempty"`
 }
 
 // volumePolicy defined policy to conditions to match Volumes and related action to handle matched Volumes
-type volumePolicy struct {
+type VolumePolicy struct {
 	// Conditions defined list of conditions to match Volumes
-	Conditions map[string]interface{} `yaml:"conditions"`
-	Action     Action                 `yaml:"action"`
+	Conditions map[string]any `yaml:"conditions"`
+	Action     Action         `yaml:"action"`
 }
 
 // resourcePolicies currently defined slice of volume policies to handle backup
-type resourcePolicies struct {
+type ResourcePolicies struct {
 	Version        string         `yaml:"version"`
-	VolumePolicies []volumePolicy `yaml:"volumePolicies"`
+	VolumePolicies []VolumePolicy `yaml:"volumePolicies"`
 	// we may support other resource policies in the future, and they could be added separately
 	// OtherResourcePolicies []OtherResourcePolicy
 }
@@ -60,16 +70,26 @@ type Policies struct {
 	// OtherPolicies
 }
 
-func unmarshalResourcePolicies(yamlData *string) (*resourcePolicies, error) {
-	resPolicies := &resourcePolicies{}
+func unmarshalResourcePolicies(yamlData *string) (*ResourcePolicies, error) {
+	resPolicies := &ResourcePolicies{}
 	err := decodeStruct(strings.NewReader(*yamlData), resPolicies)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode yaml data into resource policies  %v", err)
 	}
+
+	for _, vp := range resPolicies.VolumePolicies {
+		if raw, ok := vp.Conditions["pvcLabels"]; ok {
+			switch raw.(type) {
+			case map[string]any, map[string]string:
+			default:
+				return nil, fmt.Errorf("pvcLabels must be a map of string to string, got %T", raw)
+			}
+		}
+	}
 	return resPolicies, nil
 }
 
-func (p *Policies) buildPolicy(resPolicies *resourcePolicies) error {
+func (p *Policies) BuildPolicy(resPolicies *ResourcePolicies) error {
 	for _, vp := range resPolicies.VolumePolicies {
 		con, err := unmarshalVolConditions(vp.Conditions)
 		if err != nil {
@@ -86,6 +106,9 @@ func (p *Policies) buildPolicy(resPolicies *resourcePolicies) error {
 		volP.conditions = append(volP.conditions, &nfsCondition{nfs: con.NFS})
 		volP.conditions = append(volP.conditions, &csiCondition{csi: con.CSI})
 		volP.conditions = append(volP.conditions, &volumeTypeCondition{volumeTypes: con.VolumeTypes})
+		if len(con.PVCLabels) > 0 {
+			volP.conditions = append(volP.conditions, &pvcLabelsCondition{labels: con.PVCLabels})
+		}
 		p.volumePolicies = append(p.volumePolicies, volP)
 	}
 
@@ -112,16 +135,28 @@ func (p *Policies) match(res *structuredVolume) *Action {
 	return nil
 }
 
-func (p *Policies) GetMatchAction(res interface{}) (*Action, error) {
+func (p *Policies) GetMatchAction(res any) (*Action, error) {
+	data, ok := res.(VolumeFilterData)
+	if !ok {
+		return nil, errors.New("failed to convert input to VolumeFilterData")
+	}
+
 	volume := &structuredVolume{}
-	switch obj := res.(type) {
-	case *v1.PersistentVolume:
-		volume.parsePV(obj)
-	case *v1.Volume:
-		volume.parsePodVolume(obj)
+	switch {
+	case data.PersistentVolume != nil:
+		volume.parsePV(data.PersistentVolume)
+		if data.PVC != nil {
+			volume.parsePVC(data.PVC)
+		}
+	case data.PodVolume != nil:
+		volume.parsePodVolume(data.PodVolume)
+		if data.PVC != nil {
+			volume.parsePVC(data.PVC)
+		}
 	default:
 		return nil, errors.New("failed to convert object")
 	}
+
 	return p.match(volume), nil
 }
 
@@ -143,7 +178,43 @@ func (p *Policies) Validate() error {
 	return nil
 }
 
-func GetResourcePoliciesFromConfig(cm *v1.ConfigMap) (*Policies, error) {
+func GetResourcePoliciesFromBackup(
+	backup velerov1api.Backup,
+	client crclient.Client,
+	logger logrus.FieldLogger,
+) (resourcePolicies *Policies, err error) {
+	if backup.Spec.ResourcePolicy != nil &&
+		strings.EqualFold(backup.Spec.ResourcePolicy.Kind, ConfigmapRefType) {
+		policiesConfigMap := &v1.ConfigMap{}
+		err = client.Get(
+			context.Background(),
+			crclient.ObjectKey{Namespace: backup.Namespace, Name: backup.Spec.ResourcePolicy.Name},
+			policiesConfigMap,
+		)
+		if err != nil {
+			logger.Errorf("Fail to get ResourcePolicies %s ConfigMap with error %s.",
+				backup.Namespace+"/"+backup.Spec.ResourcePolicy.Name, err.Error())
+			return nil, fmt.Errorf("fail to get ResourcePolicies %s ConfigMap with error %s",
+				backup.Namespace+"/"+backup.Spec.ResourcePolicy.Name, err.Error())
+		}
+		resourcePolicies, err = getResourcePoliciesFromConfig(policiesConfigMap)
+		if err != nil {
+			logger.Errorf("Fail to read ResourcePolicies from ConfigMap %s with error %s.",
+				backup.Namespace+"/"+backup.Name, err.Error())
+			return nil, fmt.Errorf("fail to read the ResourcePolicies from ConfigMap %s with error %s",
+				backup.Namespace+"/"+backup.Name, err.Error())
+		} else if err = resourcePolicies.Validate(); err != nil {
+			logger.Errorf("Fail to validate ResourcePolicies in ConfigMap %s with error %s.",
+				backup.Namespace+"/"+backup.Name, err.Error())
+			return nil, fmt.Errorf("fail to validate ResourcePolicies in ConfigMap %s with error %s",
+				backup.Namespace+"/"+backup.Name, err.Error())
+		}
+	}
+
+	return resourcePolicies, nil
+}
+
+func getResourcePoliciesFromConfig(cm *v1.ConfigMap) (*Policies, error) {
 	if cm == nil {
 		return nil, fmt.Errorf("could not parse config from nil configmap")
 	}
@@ -162,7 +233,7 @@ func GetResourcePoliciesFromConfig(cm *v1.ConfigMap) (*Policies, error) {
 	}
 
 	policies := &Policies{}
-	if err := policies.buildPolicy(resPolicies); err != nil {
+	if err := policies.BuildPolicy(resPolicies); err != nil {
 		return nil, errors.WithStack(err)
 	}
 

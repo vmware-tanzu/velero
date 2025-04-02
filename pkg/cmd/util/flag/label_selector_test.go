@@ -10,7 +10,7 @@ import (
 
 func TestStringOfLabelSelector(t *testing.T) {
 	ls, err := metav1.ParseToLabelSelector("k1=v1,k2=v2")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	selector := &LabelSelector{
 		LabelSelector: ls,
 	}
@@ -19,7 +19,7 @@ func TestStringOfLabelSelector(t *testing.T) {
 
 func TestSetOfLabelSelector(t *testing.T) {
 	selector := &LabelSelector{}
-	require.Nil(t, selector.Set("k1=v1,k2=v2"))
+	require.NoError(t, selector.Set("k1=v1,k2=v2"))
 	str := selector.String()
 	assert.True(t, str == "k1=v1,k2=v2" || str == "k2=v2,k2=v2")
 }

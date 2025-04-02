@@ -68,7 +68,7 @@ func TestNewDescribeCommand(t *testing.T) {
 	stdout, _, err := veleroexec.RunCommand(cmd)
 
 	if err == nil {
-		assert.Contains(t, stdout, "Backup Volumes: <none included>")
+		assert.Contains(t, stdout, "Backup Volumes:")
 		assert.Contains(t, stdout, "Or label selector:  <none>")
 		assert.Contains(t, stdout, fmt.Sprintf("Name:         %s", backupName))
 		return

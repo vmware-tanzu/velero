@@ -29,30 +29,30 @@ import (
 func TestFire(t *testing.T) {
 	tests := []struct {
 		name                string
-		preEntryFields      map[string]interface{}
-		expectedEntryFields map[string]interface{}
+		preEntryFields      map[string]any
+		expectedEntryFields map[string]any
 		expectedErr         bool
 	}{
 		{
 			name:                "no error",
-			preEntryFields:      map[string]interface{}{"foo": "bar"},
-			expectedEntryFields: map[string]interface{}{"foo": "bar"},
+			preEntryFields:      map[string]any{"foo": "bar"},
+			expectedEntryFields: map[string]any{"foo": "bar"},
 		},
 		{
 			name:                "basic (non-pkg/errors) error",
-			preEntryFields:      map[string]interface{}{logrus.ErrorKey: errors.New("a normal error")},
-			expectedEntryFields: map[string]interface{}{logrus.ErrorKey: errors.New("a normal error")},
+			preEntryFields:      map[string]any{logrus.ErrorKey: errors.New("a normal error")},
+			expectedEntryFields: map[string]any{logrus.ErrorKey: errors.New("a normal error")},
 		},
 		{
 			name:                "non-error logged in error field",
-			preEntryFields:      map[string]interface{}{logrus.ErrorKey: "not an error"},
-			expectedEntryFields: map[string]interface{}{logrus.ErrorKey: "not an error"},
+			preEntryFields:      map[string]any{logrus.ErrorKey: "not an error"},
+			expectedEntryFields: map[string]any{logrus.ErrorKey: "not an error"},
 			expectedErr:         false,
 		},
 		{
 			name:           "pkg/errors error",
-			preEntryFields: map[string]interface{}{logrus.ErrorKey: pkgerrs.New("a pkg/errors error")},
-			expectedEntryFields: map[string]interface{}{
+			preEntryFields: map[string]any{logrus.ErrorKey: pkgerrs.New("a pkg/errors error")},
+			expectedEntryFields: map[string]any{
 				logrus.ErrorKey:    pkgerrs.New("a pkg/errors error"),
 				errorFileField:     "",
 				errorFunctionField: "github.com/vmware-tanzu/velero/pkg/util/logging.TestFire",
@@ -60,12 +60,12 @@ func TestFire(t *testing.T) {
 		},
 		{
 			name: "already have error file and function fields",
-			preEntryFields: map[string]interface{}{
+			preEntryFields: map[string]any{
 				logrus.ErrorKey:    pkgerrs.New("a pkg/errors error"),
 				errorFileField:     "some_file.go:123",
 				errorFunctionField: "SomeFunction",
 			},
-			expectedEntryFields: map[string]interface{}{
+			expectedEntryFields: map[string]any{
 				logrus.ErrorKey:    pkgerrs.New("a pkg/errors error"),
 				errorFileField:     "some_file.go:123",
 				errorFunctionField: "SomeFunction",
@@ -166,7 +166,7 @@ func TestGetInnermostTrace(t *testing.T) {
 			res := getInnermostTrace(test.err)
 
 			if test.expectedRes == nil {
-				assert.Nil(t, res)
+				assert.NoError(t, res)
 				return
 			}
 

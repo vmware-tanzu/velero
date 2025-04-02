@@ -17,6 +17,8 @@ limitations under the License.
 package kube
 
 import (
+	"context"
+
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -24,46 +26,48 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type MapUpdateFunc func(client.Object) []reconcile.Request
-
 // EnqueueRequestsFromMapUpdateFunc has the same purpose with handler.EnqueueRequestsFromMapFunc.
-// MapUpdateFunc is simpler on Update event because mapAndEnqueue is called once with the new object. EnqueueRequestsFromMapFunc is called twice with the old and new object.
-func EnqueueRequestsFromMapUpdateFunc(fn MapUpdateFunc) handler.EventHandler {
-	return &enqueueRequestsFromMapFunc{
+// It's simpler on Update event because mapAndEnqueue is called once with the new object. EnqueueRequestsFromMapFunc is called twice with the old and new object.
+func EnqueueRequestsFromMapUpdateFunc(fn handler.MapFunc) handler.EventHandler {
+	return TypedEnqueueRequestsFromMapUpdateFunc(fn)
+}
+
+func TypedEnqueueRequestsFromMapUpdateFunc[object any, request comparable](fn handler.TypedMapFunc[object, request]) handler.TypedEventHandler[object, request] {
+	return &enqueueRequestsFromMapFunc[object, request]{
 		toRequests: fn,
 	}
 }
 
-var _ handler.EventHandler = &enqueueRequestsFromMapFunc{}
+var _ handler.EventHandler = &enqueueRequestsFromMapFunc[client.Object, reconcile.Request]{}
 
-type enqueueRequestsFromMapFunc struct {
-	toRequests MapUpdateFunc
+type enqueueRequestsFromMapFunc[object any, request comparable] struct {
+	toRequests handler.TypedMapFunc[object, request]
 }
 
 // Create implements EventHandler.
-func (e *enqueueRequestsFromMapFunc) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	e.mapAndEnqueue(q, evt.Object)
+func (e *enqueueRequestsFromMapFunc[object, request]) Create(ctx context.Context, evt event.TypedCreateEvent[object], q workqueue.TypedRateLimitingInterface[request]) {
+	e.mapAndEnqueue(ctx, q, evt.Object)
 }
 
 // Update implements EventHandler.
-func (e *enqueueRequestsFromMapFunc) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	e.mapAndEnqueue(q, evt.ObjectNew)
+func (e *enqueueRequestsFromMapFunc[object, request]) Update(ctx context.Context, evt event.TypedUpdateEvent[object], q workqueue.TypedRateLimitingInterface[request]) {
+	e.mapAndEnqueue(ctx, q, evt.ObjectNew)
 }
 
 // Delete implements EventHandler.
-func (e *enqueueRequestsFromMapFunc) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	e.mapAndEnqueue(q, evt.Object)
+func (e *enqueueRequestsFromMapFunc[object, request]) Delete(ctx context.Context, evt event.TypedDeleteEvent[object], q workqueue.TypedRateLimitingInterface[request]) {
+	e.mapAndEnqueue(ctx, q, evt.Object)
 }
 
 // Generic implements EventHandler.
-func (e *enqueueRequestsFromMapFunc) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
-	e.mapAndEnqueue(q, evt.Object)
+func (e *enqueueRequestsFromMapFunc[object, request]) Generic(ctx context.Context, evt event.TypedGenericEvent[object], q workqueue.TypedRateLimitingInterface[request]) {
+	e.mapAndEnqueue(ctx, q, evt.Object)
 }
 
-func (e *enqueueRequestsFromMapFunc) mapAndEnqueue(q workqueue.RateLimitingInterface, object client.Object) {
-	reqs := map[reconcile.Request]struct{}{}
+func (e *enqueueRequestsFromMapFunc[object, request]) mapAndEnqueue(ctx context.Context, q workqueue.TypedRateLimitingInterface[request], obj object) {
+	reqs := map[request]struct{}{}
 
-	for _, req := range e.toRequests(object) {
+	for _, req := range e.toRequests(ctx, obj) {
 		_, ok := reqs[req]
 		if !ok {
 			q.Add(req)

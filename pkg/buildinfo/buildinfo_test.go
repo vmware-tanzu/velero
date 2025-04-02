@@ -46,8 +46,7 @@ func TestFormattedGitSHA(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			GitSHA = test.sha
 			GitTreeState = test.state
-			assert.Equal(t, FormattedGitSHA(), test.expected)
+			assert.Equal(t, test.expected, FormattedGitSHA())
 		})
 	}
-
 }

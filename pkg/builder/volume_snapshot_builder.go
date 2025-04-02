@@ -17,7 +17,7 @@ limitations under the License.
 package builder
 
 import (
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -75,6 +75,12 @@ func (v *VolumeSnapshotBuilder) SourcePVC(name string) *VolumeSnapshotBuilder {
 	return v
 }
 
+// SourceVolumeSnapshotContentName set the built VolumeSnapshot's spec.Source.VolumeSnapshotContentName
+func (v *VolumeSnapshotBuilder) SourceVolumeSnapshotContentName(name string) *VolumeSnapshotBuilder {
+	v.object.Spec.Source.VolumeSnapshotContentName = &name
+	return v
+}
+
 // RestoreSize set the built VolumeSnapshot's status.RestoreSize.
 func (v *VolumeSnapshotBuilder) RestoreSize(size string) *VolumeSnapshotBuilder {
 	resourceSize := resource.MustParse(size)
@@ -85,5 +91,17 @@ func (v *VolumeSnapshotBuilder) RestoreSize(size string) *VolumeSnapshotBuilder 
 // VolumeSnapshotClass set the built VolumeSnapshot's spec.VolumeSnapshotClassName value.
 func (v *VolumeSnapshotBuilder) VolumeSnapshotClass(name string) *VolumeSnapshotBuilder {
 	v.object.Spec.VolumeSnapshotClassName = &name
+	return v
+}
+
+// StatusError set the built VolumeSnapshot's status.Error value.
+func (v *VolumeSnapshotBuilder) StatusError(snapshotError snapshotv1api.VolumeSnapshotError) *VolumeSnapshotBuilder {
+	v.object.Status.Error = &snapshotError
+	return v
+}
+
+// ReadyToUse set the built VolumeSnapshot's status.ReadyToUse value.
+func (v *VolumeSnapshotBuilder) ReadyToUse(readyToUse bool) *VolumeSnapshotBuilder {
+	v.object.Status.ReadyToUse = &readyToUse
 	return v
 }

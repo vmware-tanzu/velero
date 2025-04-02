@@ -57,6 +57,9 @@ type Provider interface {
 	// Forget is to delete a snapshot from the repository
 	Forget(ctx context.Context, snapshotID string, param RepoParam) error
 
+	// BatchForget is to delete a list of snapshots from the repository
+	BatchForget(ctx context.Context, snapshotIDs []string, param RepoParam) []error
+
 	// DefaultMaintenanceFrequency returns the default frequency to run maintenance
 	DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration
 }

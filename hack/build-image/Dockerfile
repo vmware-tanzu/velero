@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM --platform=$TARGETPLATFORM golang:1.21-bookworm
+FROM --platform=$TARGETPLATFORM golang:1.23-bookworm
 
 ARG GOPROXY
 
@@ -30,7 +30,7 @@ RUN wget --quiet https://github.com/kubernetes-sigs/kubebuilder/releases/downloa
     chmod +x /usr/local/kubebuilder/bin/kubebuilder
 
 # get controller-tools
-RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0
+RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.5
 
 # get goimports (the revision is pinned so we don't indiscriminately update, but the particular commit
 # is not important)
@@ -69,7 +69,8 @@ RUN ARCH=$(go env GOARCH) && \
     chmod a+x /usr/include/google/protobuf && \
     chmod a+r -R /usr/include/google && \
     chmod +x /usr/bin/protoc
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.32.0
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.33.0 \
+    && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 
 # get goreleaser
 # goreleaser name template per arch is basically goarch except for amd64 and 386 https://github.com/goreleaser/goreleaser/blob/ec8819a95c5527fae65e5cb41673f5bbc3245fda/.goreleaser.yaml#L167C1-L173C42
@@ -87,15 +88,18 @@ RUN ARCH=$(go env GOARCH) && \
     elif [ "$ARCH" = "ppc64le" ] ; then \
         ARCH="ppc64"; \
     fi && \
-    wget --quiet "https://github.com/goreleaser/goreleaser/releases/download/v1.15.2/goreleaser_Linux_$ARCH.tar.gz" && \
+    wget --quiet "https://github.com/goreleaser/goreleaser/releases/download/v1.26.2/goreleaser_Linux_$ARCH.tar.gz" && \
     tar xvf goreleaser_Linux_$ARCH.tar.gz; \
     mv goreleaser /usr/bin/goreleaser && \
     chmod +x /usr/bin/goreleaser
 
 # get golangci-lint
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.5
 
 # install kubectl
 RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/$(go env GOARCH)/kubectl
 RUN chmod +x ./kubectl
 RUN mv ./kubectl /usr/local/bin
+
+# Fix the "dubious ownership" issue from git when running goreleaser.sh
+RUN echo "[safe] \n\t directory = *" > /.gitconfig

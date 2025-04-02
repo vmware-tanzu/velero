@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
@@ -86,7 +85,6 @@ func (n *NamespaceMapping) Init() error {
 }
 
 func (n *NamespaceMapping) CreateResources() error {
-	n.Ctx, n.CtxCancel = context.WithTimeout(context.Background(), 60*time.Minute)
 	for index, ns := range *n.NSIncluded {
 		n.kibishiiData.Levels = len(*n.NSIncluded) + index
 		By(fmt.Sprintf("Creating namespaces ...%s\n", ns), func() {
@@ -118,7 +116,9 @@ func (n *NamespaceMapping) Verify() error {
 }
 
 func (n *NamespaceMapping) Clean() error {
-	if !n.VeleroCfg.Debug {
+	if CurrentSpecReport().Failed() && n.VeleroCfg.FailFast {
+		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
+	} else {
 		if err := DeleteStorageClass(context.Background(), n.Client, KibishiiStorageClassName); err != nil {
 			return err
 		}
@@ -130,5 +130,6 @@ func (n *NamespaceMapping) Clean() error {
 
 		return n.GetTestCase().Clean()
 	}
+
 	return nil
 }

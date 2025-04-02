@@ -1,0 +1,43 @@
+# This file is used by [prow github action](https://github.com/jpmcb/prow-github-actions/) in .github/workflows/prow-action.yml.
+# This file only has values for kind and area commands.
+area:
+  - CLI
+  - CSI
+  - Cloud/AWS
+  - Cloud/Azure
+  - Cloud/DigitalOcean
+  - Cloud/GCP
+  - Cloud/vSphere
+  - Design
+  - Documentation
+  - Filters
+  - Plugins
+  - Process
+  - Storage/Minio
+  - Storage/Cinder
+  - WindowsSupport
+  - datamover
+  - fs-backup
+  - fs-backup/deletion
+  - fs-backup/file-selectable
+  - fs-uploader
+  - kopia-integration
+  - migration
+  - multi-tenancy
+  - progress-monitoring
+  - resilience
+  - schedule
+  - storage/IBM-ObjectStorage
+  - upgrade
+  - volume-snapshot-dm
+kind:
+  - changelog-not-required
+  - question
+  - refactor
+  - requirement
+  - release-note
+  - release-blocker
+  - spike
+  - tech-debt
+  - usage-error
+  - voting

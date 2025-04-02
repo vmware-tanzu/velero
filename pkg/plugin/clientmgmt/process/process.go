@@ -17,8 +17,6 @@ limitations under the License.
 package process
 
 import (
-	"strings"
-
 	plugin "github.com/hashicorp/go-plugin"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -42,7 +40,7 @@ func (pf *processFactory) newProcess(command string, logger logrus.FieldLogger, 
 }
 
 type Process interface {
-	dispense(key KindAndName) (interface{}, error)
+	dispense(key KindAndName) (any, error)
 	exited() bool
 	kill()
 }
@@ -61,32 +59,7 @@ func newProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level
 	// This launches the plugin process.
 	protocolClient, err := client.Client()
 	if err != nil {
-		if !strings.Contains(err.Error(), "unknown flag: --features") {
-			return nil, err
-		}
-
-		// Velero started passing the --features flag to plugins in v1.2, however existing plugins
-		// may not support that flag and may not silently ignore unknown flags. The plugin server
-		// code that we make available to plugin authors has since been updated to ignore unknown
-		// flags, but to avoid breaking plugins that haven't updated to that code and don't support
-		// the --features flag, we specifically handle not passing the flag if we can detect that
-		// it's not supported.
-
-		logger.Debug("Plugin process does not support the --features flag, removing it and trying again")
-
-		builder.commandArgs = removeFeaturesFlag(builder.commandArgs)
-
-		logger.Debugf("Updated command args after removing --features flag: %v", builder.commandArgs)
-
-		// re-get the client and protocol client now that --features has been removed
-		// from the command args.
-		client = builder.client()
-		protocolClient, err = client.Client()
-		if err != nil {
-			return nil, err
-		}
-
-		logger.Debug("Plugin process successfully started without the --features flag")
+		return nil, err
 	}
 
 	p := &process{
@@ -124,7 +97,7 @@ func removeFeaturesFlag(args []string) []string {
 	return commandArgs
 }
 
-func (r *process) dispense(key KindAndName) (interface{}, error) {
+func (r *process) dispense(key KindAndName) (any, error) {
 	// This calls GRPCClient(clientConn) on the plugin instance registered for key.name.
 	dispensed, err := r.protocolClient.Dispense(key.Kind.String())
 	if err != nil {

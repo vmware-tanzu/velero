@@ -18,28 +18,25 @@ package exposer
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
-
-	"github.com/vmware-tanzu/velero/pkg/util/csi"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned/typed/volumesnapshot/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/csi"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 // CSISnapshotExposeParam define the input param for Expose of CSI snapshots
@@ -59,6 +56,9 @@ type CSISnapshotExposeParam struct {
 	// HostingPodLabels is the labels that are going to apply to the hosting pod
 	HostingPodLabels map[string]string
 
+	// HostingPodAnnotations is the annotations that are going to apply to the hosting pod
+	HostingPodAnnotations map[string]string
+
 	// OperationTimeout specifies the time wait for resources operations in Expose
 	OperationTimeout time.Duration
 
@@ -67,6 +67,18 @@ type CSISnapshotExposeParam struct {
 
 	// VolumeSize specifies the size of the source volume
 	VolumeSize resource.Quantity
+
+	// Affinity specifies the node affinity of the backup pod
+	Affinity *kube.LoadAffinity
+
+	// BackupPVCConfig is the config for backupPVC (intermediate PVC) of snapshot data movement
+	BackupPVCConfig map[string]nodeagent.BackupPVC
+
+	// Resources defines the resource requirements of the hosting pod
+	Resources corev1.ResourceRequirements
+
+	// NodeOS specifies the OS of node that the source volume is attaching
+	NodeOS string
 }
 
 // CSISnapshotExposeWaitParam define the input param for WaitExposed of CSI snapshots
@@ -91,7 +103,7 @@ type csiSnapshotExposer struct {
 	log               logrus.FieldLogger
 }
 
-func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param interface{}) error {
+func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param any) error {
 	csiExposeParam := param.(*CSISnapshotExposeParam)
 
 	curLog := e.log.WithFields(logrus.Fields{
@@ -114,41 +126,6 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 
 	curLog.WithField("vsc name", vsc.Name).WithField("vs name", volumeSnapshot.Name).Infof("Got VSC from VS in namespace %s", volumeSnapshot.Namespace)
 
-	retained, err := csi.RetainVSC(ctx, e.csiSnapshotClient, vsc)
-	if err != nil {
-		return errors.Wrap(err, "error to retain volume snapshot content")
-	}
-
-	curLog.WithField("vsc name", vsc.Name).WithField("retained", (retained != nil)).Info("Finished to retain VSC")
-
-	defer func() {
-		if retained != nil {
-			csi.DeleteVolumeSnapshotContentIfAny(ctx, e.csiSnapshotClient, retained.Name, curLog)
-		}
-	}()
-
-	err = csi.EnsureDeleteVS(ctx, e.csiSnapshotClient, volumeSnapshot.Name, volumeSnapshot.Namespace, csiExposeParam.OperationTimeout)
-	if err != nil {
-		return errors.Wrap(err, "error to delete volume snapshot")
-	}
-
-	curLog.WithField("vs name", volumeSnapshot.Name).Infof("VS is deleted in namespace %s", volumeSnapshot.Namespace)
-
-	err = csi.RemoveVSCProtect(ctx, e.csiSnapshotClient, vsc.Name, csiExposeParam.ExposeTimeout)
-	if err != nil {
-		return errors.Wrap(err, "error to remove protect from volume snapshot content")
-	}
-
-	curLog.WithField("vsc name", vsc.Name).Infof("Removed protect from VSC")
-
-	err = csi.EnsureDeleteVSC(ctx, e.csiSnapshotClient, vsc.Name, csiExposeParam.OperationTimeout)
-	if err != nil {
-		return errors.Wrap(err, "error to delete volume snapshot content")
-	}
-
-	curLog.WithField("vsc name", vsc.Name).Infof("VSC is deleted")
-	retained = nil
-
 	backupVS, err := e.createBackupVS(ctx, ownerObject, volumeSnapshot)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup volume snapshot")
@@ -169,6 +146,27 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 
 	curLog.WithField("vsc name", backupVSC.Name).Infof("Backup VSC is created from %s", vsc.Name)
 
+	retained, err := csi.RetainVSC(ctx, e.csiSnapshotClient, vsc)
+	if err != nil {
+		return errors.Wrap(err, "error to retain volume snapshot content")
+	}
+
+	curLog.WithField("vsc name", vsc.Name).WithField("retained", (retained != nil)).Info("Finished to retain VSC")
+
+	err = csi.EnsureDeleteVS(ctx, e.csiSnapshotClient, volumeSnapshot.Name, volumeSnapshot.Namespace, csiExposeParam.OperationTimeout)
+	if err != nil {
+		return errors.Wrap(err, "error to delete volume snapshot")
+	}
+
+	curLog.WithField("vs name", volumeSnapshot.Name).Infof("VS is deleted in namespace %s", volumeSnapshot.Namespace)
+
+	err = csi.EnsureDeleteVSC(ctx, e.csiSnapshotClient, vsc.Name, csiExposeParam.OperationTimeout)
+	if err != nil {
+		return errors.Wrap(err, "error to delete volume snapshot content")
+	}
+
+	curLog.WithField("vsc name", vsc.Name).Infof("VSC is deleted")
+
 	var volumeSize resource.Quantity
 	if volumeSnapshot.Status.RestoreSize != nil && !volumeSnapshot.Status.RestoreSize.IsZero() {
 		volumeSize = *volumeSnapshot.Status.RestoreSize
@@ -177,7 +175,28 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 		curLog.WithField("vs name", volumeSnapshot.Name).Warnf("The snapshot doesn't contain a valid restore size, use source volume's size %v", volumeSize)
 	}
 
-	backupPVC, err := e.createBackupPVC(ctx, ownerObject, backupVS.Name, csiExposeParam.StorageClass, csiExposeParam.AccessMode, volumeSize)
+	// check if there is a mapping for source pvc storage class in backupPVC config
+	// if the mapping exists then use the values(storage class, readOnly accessMode)
+	// for backupPVC (intermediate PVC in snapshot data movement) object creation
+	backupPVCStorageClass := csiExposeParam.StorageClass
+	backupPVCReadOnly := false
+	spcNoRelabeling := false
+	if value, exists := csiExposeParam.BackupPVCConfig[csiExposeParam.StorageClass]; exists {
+		if value.StorageClass != "" {
+			backupPVCStorageClass = value.StorageClass
+		}
+
+		backupPVCReadOnly = value.ReadOnly
+		if value.SPCNoRelabeling {
+			if backupPVCReadOnly {
+				spcNoRelabeling = true
+			} else {
+				curLog.WithField("vs name", volumeSnapshot.Name).Warn("Ignoring spcNoRelabling for read-write volume")
+			}
+		}
+	}
+
+	backupPVC, err := e.createBackupPVC(ctx, ownerObject, backupVS.Name, backupPVCStorageClass, csiExposeParam.AccessMode, volumeSize, backupPVCReadOnly)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pvc")
 	}
@@ -185,16 +204,28 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 	curLog.WithField("pvc name", backupPVC.Name).Info("Backup PVC is created")
 	defer func() {
 		if err != nil {
-			kube.DeletePVAndPVCIfAny(ctx, e.kubeClient.CoreV1(), backupPVC.Name, backupPVC.Namespace, curLog)
+			kube.DeletePVAndPVCIfAny(ctx, e.kubeClient.CoreV1(), backupPVC.Name, backupPVC.Namespace, 0, curLog)
 		}
 	}()
 
-	backupPod, err := e.createBackupPod(ctx, ownerObject, backupPVC, csiExposeParam.HostingPodLabels)
+	backupPod, err := e.createBackupPod(
+		ctx,
+		ownerObject,
+		backupPVC,
+		csiExposeParam.OperationTimeout,
+		csiExposeParam.HostingPodLabels,
+		csiExposeParam.HostingPodAnnotations,
+		csiExposeParam.Affinity,
+		csiExposeParam.Resources,
+		backupPVCReadOnly,
+		spcNoRelabeling,
+		csiExposeParam.NodeOS,
+	)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
 	}
 
-	curLog.WithField("pod name", backupPod.Name).Info("Backup pod is created")
+	curLog.WithField("pod name", backupPod.Name).WithField("affinity", csiExposeParam.Affinity).Info("Backup pod is created")
 
 	defer func() {
 		if err != nil {
@@ -205,11 +236,13 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1.Obje
 	return nil
 }
 
-func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.ObjectReference, timeout time.Duration, param interface{}) (*ExposeResult, error) {
+func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.ObjectReference, timeout time.Duration, param any) (*ExposeResult, error) {
 	exposeWaitParam := param.(*CSISnapshotExposeWaitParam)
 
 	backupPodName := ownerObject.Name
 	backupPVCName := ownerObject.Name
+
+	containerName := string(ownerObject.UID)
 	volumeName := string(ownerObject.UID)
 
 	curLog := e.log.WithFields(logrus.Fields{
@@ -252,8 +285,108 @@ func (e *csiSnapshotExposer) GetExposed(ctx context.Context, ownerObject corev1.
 
 	curLog.WithField("pod", pod.Name).Infof("Backup volume is found in pod at index %v", i)
 
-	return &ExposeResult{ByPod: ExposeByPod{HostingPod: pod, VolumeName: volumeName}}, nil
+	var nodeOS *string
+	if os, found := pod.Spec.NodeSelector[kube.NodeOSLabel]; found {
+		nodeOS = &os
+	}
+
+	return &ExposeResult{ByPod: ExposeByPod{
+		HostingPod:       pod,
+		HostingContainer: containerName,
+		VolumeName:       volumeName,
+		NodeOS:           nodeOS,
+	}}, nil
 }
+
+func (e *csiSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1.ObjectReference) error {
+	backupPodName := ownerObject.Name
+
+	curLog := e.log.WithFields(logrus.Fields{
+		"owner": ownerObject.Name,
+	})
+
+	pod, err := e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(ctx, backupPodName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+
+	if err != nil {
+		curLog.WithError(err).Warnf("error to peek backup pod %s", backupPodName)
+		return nil
+	}
+
+	if podFailed, message := kube.IsPodUnrecoverable(pod, curLog); podFailed {
+		return errors.New(message)
+	}
+
+	return nil
+}
+
+func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject corev1.ObjectReference) string {
+	backupPodName := ownerObject.Name
+	backupPVCName := ownerObject.Name
+	backupVSName := ownerObject.Name
+
+	diag := "begin diagnose CSI exposer\n"
+
+	pod, err := e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(ctx, backupPodName, metav1.GetOptions{})
+	if err != nil {
+		pod = nil
+		diag += fmt.Sprintf("error getting backup pod %s, err: %v\n", backupPodName, err)
+	}
+
+	pvc, err := e.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(ctx, backupPVCName, metav1.GetOptions{})
+	if err != nil {
+		pvc = nil
+		diag += fmt.Sprintf("error getting backup pvc %s, err: %v\n", backupPVCName, err)
+	}
+
+	vs, err := e.csiSnapshotClient.VolumeSnapshots(ownerObject.Namespace).Get(ctx, backupVSName, metav1.GetOptions{})
+	if err != nil {
+		vs = nil
+		diag += fmt.Sprintf("error getting backup vs %s, err: %v\n", backupVSName, err)
+	}
+
+	if pod != nil {
+		diag += kube.DiagnosePod(pod)
+
+		if pod.Spec.NodeName != "" {
+			if err := nodeagent.KbClientIsRunningInNode(ctx, ownerObject.Namespace, pod.Spec.NodeName, e.kubeClient); err != nil {
+				diag += fmt.Sprintf("node-agent is not running in node %s, err: %v\n", pod.Spec.NodeName, err)
+			}
+		}
+	}
+
+	if pvc != nil {
+		diag += kube.DiagnosePVC(pvc)
+
+		if pvc.Spec.VolumeName != "" {
+			if pv, err := e.kubeClient.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{}); err != nil {
+				diag += fmt.Sprintf("error getting backup pv %s, err: %v\n", pvc.Spec.VolumeName, err)
+			} else {
+				diag += kube.DiagnosePV(pv)
+			}
+		}
+	}
+
+	if vs != nil {
+		diag += csi.DiagnoseVS(vs)
+
+		if vs.Status != nil && vs.Status.BoundVolumeSnapshotContentName != nil && *vs.Status.BoundVolumeSnapshotContentName != "" {
+			if vsc, err := e.csiSnapshotClient.VolumeSnapshotContents().Get(ctx, *vs.Status.BoundVolumeSnapshotContentName, metav1.GetOptions{}); err != nil {
+				diag += fmt.Sprintf("error getting backup vsc %s, err: %v\n", *vs.Status.BoundVolumeSnapshotContentName, err)
+			} else {
+				diag += csi.DiagnoseVSC(vsc)
+			}
+		}
+	}
+
+	diag += "end diagnose CSI exposer"
+
+	return diag
+}
+
+const cleanUpTimeout = time.Minute
 
 func (e *csiSnapshotExposer) CleanUp(ctx context.Context, ownerObject corev1.ObjectReference, vsName string, sourceNamespace string) {
 	backupPodName := ownerObject.Name
@@ -261,7 +394,7 @@ func (e *csiSnapshotExposer) CleanUp(ctx context.Context, ownerObject corev1.Obj
 	backupVSName := ownerObject.Name
 
 	kube.DeletePodIfAny(ctx, e.kubeClient.CoreV1(), backupPodName, ownerObject.Namespace, e.log)
-	kube.DeletePVAndPVCIfAny(ctx, e.kubeClient.CoreV1(), backupPVCName, ownerObject.Namespace, e.log)
+	kube.DeletePVAndPVCIfAny(ctx, e.kubeClient.CoreV1(), backupPVCName, ownerObject.Namespace, cleanUpTimeout, e.log)
 
 	csi.DeleteVolumeSnapshotIfAny(ctx, e.csiSnapshotClient, backupVSName, ownerObject.Namespace, e.log)
 	csi.DeleteVolumeSnapshotIfAny(ctx, e.csiSnapshotClient, vsName, sourceNamespace, e.log)
@@ -329,12 +462,18 @@ func (e *csiSnapshotExposer) createBackupVSC(ctx context.Context, ownerObject co
 	return e.csiSnapshotClient.VolumeSnapshotContents().Create(ctx, vsc, metav1.CreateOptions{})
 }
 
-func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject corev1.ObjectReference, backupVS, storageClass, accessMode string, resource resource.Quantity) (*corev1.PersistentVolumeClaim, error) {
+func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject corev1.ObjectReference, backupVS, storageClass, accessMode string, resource resource.Quantity, readOnly bool) (*corev1.PersistentVolumeClaim, error) {
 	backupPVCName := ownerObject.Name
 
 	volumeMode, err := getVolumeModeByAccessMode(accessMode)
 	if err != nil {
 		return nil, err
+	}
+
+	pvcAccessMode := corev1.ReadWriteOnce
+
+	if readOnly {
+		pvcAccessMode = corev1.ReadOnlyMany
 	}
 
 	dataSource := &corev1.TypedLocalObjectReference{
@@ -359,14 +498,14 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
+				pvcAccessMode,
 			},
 			StorageClassName: &storageClass,
 			VolumeMode:       &volumeMode,
 			DataSource:       dataSource,
-			DataSourceRef:    dataSource,
+			DataSourceRef:    nil,
 
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: resource,
 				},
@@ -382,25 +521,109 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 	return created, err
 }
 
-func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject corev1.ObjectReference, backupPVC *corev1.PersistentVolumeClaim, label map[string]string) (*corev1.Pod, error) {
+func (e *csiSnapshotExposer) createBackupPod(
+	ctx context.Context,
+	ownerObject corev1.ObjectReference,
+	backupPVC *corev1.PersistentVolumeClaim,
+	operationTimeout time.Duration,
+	label map[string]string,
+	annotation map[string]string,
+	affinity *kube.LoadAffinity,
+	resources corev1.ResourceRequirements,
+	backupPVCReadOnly bool,
+	spcNoRelabeling bool,
+	nodeOS string,
+) (*corev1.Pod, error) {
 	podName := ownerObject.Name
 
-	volumeName := string(ownerObject.UID)
 	containerName := string(ownerObject.UID)
+	volumeName := string(ownerObject.UID)
 
-	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace)
+	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, nodeOS)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
 	}
 
-	var gracePeriod int64 = 0
-	volumeMounts, volumeDevices := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode)
+	var gracePeriod int64
+	volumeMounts, volumeDevices, volumePath := kube.MakePodPVCAttachment(volumeName, backupPVC.Spec.VolumeMode, backupPVCReadOnly)
+	volumeMounts = append(volumeMounts, podInfo.volumeMounts...)
+
+	volumes := []corev1.Volume{{
+		Name: volumeName,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: backupPVC.Name,
+			},
+		},
+	}}
+
+	if backupPVCReadOnly {
+		volumes[0].VolumeSource.PersistentVolumeClaim.ReadOnly = true
+	}
+
+	volumes = append(volumes, podInfo.volumes...)
 
 	if label == nil {
 		label = make(map[string]string)
 	}
-
 	label[podGroupLabel] = podGroupSnapshot
+
+	volumeMode := corev1.PersistentVolumeFilesystem
+	if backupPVC.Spec.VolumeMode != nil {
+		volumeMode = *backupPVC.Spec.VolumeMode
+	}
+
+	args := []string{
+		fmt.Sprintf("--volume-path=%s", volumePath),
+		fmt.Sprintf("--volume-mode=%s", volumeMode),
+		fmt.Sprintf("--data-upload=%s", ownerObject.Name),
+		fmt.Sprintf("--resource-timeout=%s", operationTimeout.String()),
+	}
+
+	args = append(args, podInfo.logFormatArgs...)
+	args = append(args, podInfo.logLevelArgs...)
+
+	affinityList := make([]*kube.LoadAffinity, 0)
+	if affinity != nil {
+		affinityList = append(affinityList, affinity)
+	}
+
+	var securityCtx *corev1.PodSecurityContext
+	nodeSelector := map[string]string{}
+	podOS := corev1.PodOS{}
+	toleration := []corev1.Toleration{}
+	if nodeOS == kube.NodeOSWindows {
+		userID := "ContainerAdministrator"
+		securityCtx = &corev1.PodSecurityContext{
+			WindowsOptions: &corev1.WindowsSecurityContextOptions{
+				RunAsUserName: &userID,
+			},
+		}
+
+		nodeSelector[kube.NodeOSLabel] = kube.NodeOSWindows
+		podOS.Name = kube.NodeOSWindows
+
+		toleration = append(toleration, corev1.Toleration{
+			Key:      "os",
+			Operator: "Equal",
+			Effect:   "NoSchedule",
+			Value:    "windows",
+		})
+	} else {
+		userID := int64(0)
+		securityCtx = &corev1.PodSecurityContext{
+			RunAsUser: &userID,
+		}
+
+		if spcNoRelabeling {
+			securityCtx.SELinuxOptions = &corev1.SELinuxOptions{
+				Type: "spc_t",
+			}
+		}
+
+		nodeSelector[kube.NodeOSLabel] = kube.NodeOSLinux
+		podOS.Name = kube.NodeOSLinux
+	}
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -415,7 +638,8 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 					Controller: boolptr.True(),
 				},
 			},
-			Labels: label,
+			Labels:      label,
+			Annotations: annotation,
 		},
 		Spec: corev1.PodSpec{
 			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
@@ -430,26 +654,33 @@ func (e *csiSnapshotExposer) createBackupPod(ctx context.Context, ownerObject co
 					},
 				},
 			},
+			NodeSelector: nodeSelector,
+			OS:           &podOS,
+			Affinity:     kube.ToSystemAffinity(affinityList),
 			Containers: []corev1.Container{
 				{
 					Name:            containerName,
 					Image:           podInfo.image,
 					ImagePullPolicy: corev1.PullNever,
-					Command:         []string{"/velero-helper", "pause"},
-					VolumeMounts:    volumeMounts,
-					VolumeDevices:   volumeDevices,
+					Command: []string{
+						"/velero",
+						"data-mover",
+						"backup",
+					},
+					Args:          args,
+					VolumeMounts:  volumeMounts,
+					VolumeDevices: volumeDevices,
+					Env:           podInfo.env,
+					EnvFrom:       podInfo.envFrom,
+					Resources:     resources,
 				},
 			},
 			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
-			Volumes: []corev1.Volume{{
-				Name: volumeName,
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: backupPVC.Name,
-					},
-				},
-			}},
+			Volumes:                       volumes,
+			RestartPolicy:                 corev1.RestartPolicyNever,
+			SecurityContext:               securityCtx,
+			Tolerations:                   toleration,
 		},
 	}
 

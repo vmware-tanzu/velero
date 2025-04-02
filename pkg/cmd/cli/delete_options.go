@@ -17,29 +17,27 @@ limitations under the License.
 package cli
 
 import (
-	"bufio"
 	"errors"
-	"fmt"
-	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/confirm"
 )
 
 // DeleteOptions contains parameters used for deleting a restore.
 type DeleteOptions struct {
 	*SelectOptions
-	Confirm   bool
+	confirm.ConfirmOptions
 	Client    controllerclient.Client
 	Namespace string
 }
 
 func NewDeleteOptions(singularTypeName string) *DeleteOptions {
 	o := &DeleteOptions{}
+	o.ConfirmOptions = *confirm.NewConfirmOptionsWithDescription("Confirm deletion")
 	o.SelectOptions = NewSelectOptions("delete", singularTypeName)
 	return o
 }
@@ -66,34 +64,8 @@ func (o *DeleteOptions) Validate(c *cobra.Command, f client.Factory, args []stri
 
 // BindFlags binds options for this command to flags.
 func (o *DeleteOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.BoolVar(&o.Confirm, "confirm", o.Confirm, "Confirm deletion")
+	o.ConfirmOptions.BindFlags(flags)
 	o.SelectOptions.BindFlags(flags)
-}
-
-// GetConfirmation ensures that the user confirms the action before proceeding.
-func GetConfirmation() bool {
-	reader := bufio.NewReader(os.Stdin)
-
-	for {
-		fmt.Printf("Are you sure you want to continue (Y/N)? ")
-
-		confirmation, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error reading user input: %v\n", err)
-			return false
-		}
-		confirmation = strings.TrimSpace(confirmation)
-		if len(confirmation) != 1 {
-			continue
-		}
-
-		switch strings.ToLower(confirmation) {
-		case "y":
-			return true
-		case "n":
-			return false
-		}
-	}
 }
 
 // Xor returns true if exactly one of the provided values is true,

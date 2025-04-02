@@ -5,7 +5,7 @@ metadata:
   annotations:
     storageclass.kubernetes.io/is-default-class: "false"
 parameters:
-  StoragePolicyName: "vSAN Default Storage Policy"
+  svStorageClass: worker-storagepolicy
 provisioner: csi.vsphere.vmware.com
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer

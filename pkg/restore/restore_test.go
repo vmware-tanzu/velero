@@ -25,7 +25,10 @@ import (
 	"testing"
 	"time"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/collections"
+
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -42,14 +45,13 @@ import (
 	"k8s.io/client-go/dynamic"
 	kubetesting "k8s.io/client-go/testing"
 
-	internalVolume "github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
-	verifiermocks "github.com/vmware-tanzu/velero/pkg/features/mocks"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -58,9 +60,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	uploadermocks "github.com/vmware-tanzu/velero/pkg/podvolume/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/types"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	. "github.com/vmware-tanzu/velero/pkg/util/results"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 func TestRestorePVWithVolumeInfo(t *testing.T) {
@@ -71,7 +74,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 		apiResources  []*test.APIResource
 		tarball       io.Reader
 		want          map[*test.APIResource][]string
-		volumeInfoMap map[string]internalVolume.VolumeInfo
+		volumeInfoMap map[string]volume.BackupVolumeInfo
 	}{
 		{
 			name:    "Restore PV with native snapshot",
@@ -84,11 +87,11 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]internalVolume.VolumeInfo{
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
 				"pv-1": {
-					BackupMethod: internalVolume.NativeSnapshot,
+					BackupMethod: volume.NativeSnapshot,
 					PVName:       "pv-1",
-					NativeSnapshotInfo: &internalVolume.NativeSnapshotInfo{
+					NativeSnapshotInfo: &volume.NativeSnapshotInfo{
 						SnapshotHandle: "testSnapshotHandle",
 					},
 				},
@@ -108,11 +111,11 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]internalVolume.VolumeInfo{
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
 				"pv-1": {
-					BackupMethod: internalVolume.PodVolumeBackup,
+					BackupMethod: volume.PodVolumeBackup,
 					PVName:       "pv-1",
-					PVBInfo: &internalVolume.PodVolumeBackupInfo{
+					PVBInfo: &volume.PodVolumeInfo{
 						SnapshotHandle: "testSnapshotHandle",
 						Size:           100,
 						NodeName:       "testNode",
@@ -134,12 +137,12 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]internalVolume.VolumeInfo{
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
 				"pv-1": {
-					BackupMethod:      internalVolume.CSISnapshot,
+					BackupMethod:      volume.CSISnapshot,
 					SnapshotDataMoved: false,
 					PVName:            "pv-1",
-					CSISnapshotInfo: &internalVolume.CSISnapshotInfo{
+					CSISnapshotInfo: &volume.CSISnapshotInfo{
 						Driver: "pd.csi.storage.gke.io",
 					},
 				},
@@ -159,15 +162,15 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]internalVolume.VolumeInfo{
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
 				"pv-1": {
-					BackupMethod:      internalVolume.CSISnapshot,
+					BackupMethod:      volume.CSISnapshot,
 					SnapshotDataMoved: true,
 					PVName:            "pv-1",
-					CSISnapshotInfo: &internalVolume.CSISnapshotInfo{
+					CSISnapshotInfo: &volume.CSISnapshotInfo{
 						Driver: "pd.csi.storage.gke.io",
 					},
-					SnapshotDataMovementInfo: &internalVolume.SnapshotDataMovementInfo{
+					SnapshotDataMovementInfo: &volume.SnapshotDataMovementInfo{
 						DataMover: "velero",
 					},
 				},
@@ -187,7 +190,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]internalVolume.VolumeInfo{
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
 				"pv-1": {
 					PVName:  "pv-1",
 					Skipped: true,
@@ -208,7 +211,7 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			apiResources: []*test.APIResource{
 				test.PVs(),
 			},
-			volumeInfoMap: map[string]internalVolume.VolumeInfo{
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
 				"pv-1": {
 					PVName:  "pv-1",
 					Skipped: true,
@@ -221,9 +224,6 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 	}
 
 	features.Enable("EnableCSI")
-	finder := new(verifiermocks.PluginFinder)
-	finder.On("Find", mock.Anything, mock.Anything).Return(true)
-	verifier := features.NewVerifier(finder)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -233,16 +233,15 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 				h.DiscoveryClient.WithAPIResource(r)
 			}
 			require.NoError(t, h.restorer.discoveryHelper.Refresh())
-			h.restorer.featureVerifier = verifier
 
 			data := &Request{
-				Log:              h.log,
-				Restore:          tc.restore,
-				Backup:           tc.backup,
-				PodVolumeBackups: nil,
-				VolumeSnapshots:  nil,
-				BackupReader:     tc.tarball,
-				VolumeInfoMap:    tc.volumeInfoMap,
+				Log:                 h.log,
+				Restore:             tc.restore,
+				Backup:              tc.backup,
+				PodVolumeBackups:    nil,
+				VolumeSnapshots:     nil,
+				BackupReader:        tc.tarball,
+				BackupVolumeInfoMap: tc.volumeInfoMap,
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
@@ -876,7 +875,7 @@ func TestRestoreResourcePriorities(t *testing.T) {
 		backup             *velerov1api.Backup
 		apiResources       []*test.APIResource
 		tarball            io.Reader
-		resourcePriorities Priorities
+		resourcePriorities types.Priorities
 	}{
 		{
 			name:    "resources are restored according to the specified resource priorities",
@@ -910,7 +909,7 @@ func TestRestoreResourcePriorities(t *testing.T) {
 				test.Deployments(),
 				test.ServiceAccounts(),
 			},
-			resourcePriorities: Priorities{
+			resourcePriorities: types.Priorities{
 				HighPriorities: []string{"persistentvolumes", "persistentvolumeclaims", "serviceaccounts"},
 				LowPriorities:  []string{"deployments.apps"},
 			},
@@ -1492,7 +1491,7 @@ func (a *recordResourcesAction) WithAdditionalItems(items []velero.ResourceIdent
 	return a
 }
 
-// TestRestoreActionsRunsForCorrectItems runs restores with restore item actions, and
+// TestRestoreActionsRunForCorrectItems runs restores with restore item actions, and
 // verifies that each restore item action is run for the correct set of resources based on its
 // AppliesTo() resource selector. Verification is done by using the recordResourcesAction struct,
 // which records which resources it's executed for.
@@ -1713,7 +1712,7 @@ func (a *pluggableAction) AreAdditionalItemsReady(additionalItems []velero.Resou
 }
 
 // TestRestoreActionModifications runs restores with restore item actions that modify resources, and
-// verifies that that the modified item is correctly created in the API. Verification is done by looking
+// verifies that the modified item is correctly created in the API. Verification is done by looking
 // at the full object in the API.
 func TestRestoreActionModifications(t *testing.T) {
 	// modifyingActionGetter is a helper function that returns a *pluggableAction, whose Execute(...)
@@ -1860,7 +1859,6 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 				UpdatedItem: obj,
 				OperationID: obj.GetName() + "-1",
 			}, nil
-
 		},
 		progressFunc: func(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
 			return velero.OperationProgress{
@@ -1882,7 +1880,6 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 				UpdatedItem: obj,
 				OperationID: obj.GetName() + "-1",
 			}, nil
-
 		},
 		progressFunc: func(operationID string, restore *velerov1api.Restore) (velero.OperationProgress, error) {
 			return velero.OperationProgress{
@@ -1903,7 +1900,6 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 			return &velero.RestoreItemActionExecuteOutput{
 				UpdatedItem: obj,
 			}, nil
-
 		},
 	}
 
@@ -2013,7 +2009,7 @@ func TestRestoreWithAsyncOperations(t *testing.T) {
 }
 
 // TestRestoreActionAdditionalItems runs restores with restore item actions that return additional items
-// to be restored, and verifies that that the correct set of items is created in the API. Verification is
+// to be restored, and verifies that the correct set of items is created in the API. Verification is
 // done by looking at the namespaces/names of the items in the API; contents are not checked.
 func TestRestoreActionAdditionalItems(t *testing.T) {
 	tests := []struct {
@@ -2238,7 +2234,7 @@ func TestShouldRestore(t *testing.T) {
 				),
 			},
 			want:    false,
-			wantErr: errors.New("timed out waiting for the condition"),
+			wantErr: errors.New("context deadline exceeded"),
 		},
 		{
 			name:   "when PV is found, has associated PVC that's not deleting, has associated NS that is terminating, result is false + timeout error",
@@ -2253,7 +2249,7 @@ func TestShouldRestore(t *testing.T) {
 				builder.ForNamespace("ns-1").Phase(corev1api.NamespaceTerminating).Result(),
 			},
 			want:    false,
-			wantErr: errors.New("timed out waiting for the condition"),
+			wantErr: errors.New("context deadline exceeded"),
 		},
 		{
 			name:   "when PV is found, has associated PVC that's not deleting, has associated NS that has deletion timestamp, result is false + timeout error",
@@ -2268,7 +2264,7 @@ func TestShouldRestore(t *testing.T) {
 				builder.ForNamespace("ns-1").ObjectMeta(builder.WithDeletionTimestamp(time.Now())).Result(),
 			},
 			want:    false,
-			wantErr: errors.New("timed out waiting for the condition"),
+			wantErr: errors.New("context deadline exceeded"),
 		},
 		{
 			name:   "when PV is found, associated PVC is not found, result is false + timeout error",
@@ -2279,7 +2275,7 @@ func TestShouldRestore(t *testing.T) {
 				),
 			},
 			want:    false,
-			wantErr: errors.New("timed out waiting for the condition"),
+			wantErr: errors.New("context deadline exceeded"),
 		},
 		{
 			name:   "when PV is found, has associated PVC, associated namespace not found, result is false + timeout error",
@@ -2291,7 +2287,7 @@ func TestShouldRestore(t *testing.T) {
 				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
 			},
 			want:    false,
-			wantErr: errors.New("timed out waiting for the condition"),
+			wantErr: errors.New("context deadline exceeded"),
 		},
 	}
 
@@ -2300,10 +2296,11 @@ func TestShouldRestore(t *testing.T) {
 			h := newHarness(t)
 
 			ctx := &restoreContext{
-				log:                        h.log,
-				dynamicFactory:             client.NewDynamicFactory(h.DynamicClient),
-				namespaceClient:            h.KubeClient.CoreV1().Namespaces(),
-				resourceTerminatingTimeout: time.Millisecond,
+				log:                           h.log,
+				dynamicFactory:                client.NewDynamicFactory(h.DynamicClient),
+				namespaceClient:               h.KubeClient.CoreV1().Namespaces(),
+				resourceTerminatingTimeout:    time.Millisecond,
+				resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 			}
 
 			for _, resource := range tc.apiResources {
@@ -2325,11 +2322,11 @@ func TestShouldRestore(t *testing.T) {
 			res, err := ctx.shouldRestore(tc.pvName, pvClient)
 			assert.Equal(t, tc.want, res)
 			if tc.wantErr != nil {
-				if assert.NotNil(t, err, "expected a non-nil error") {
+				if assert.Error(t, err, "expected a non-nil error") {
 					assert.EqualError(t, err, tc.wantErr.Error())
 				}
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -2360,7 +2357,7 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 
 			t.Logf("%v", string(itemJSON))
 
-			u := make(map[string]interface{})
+			u := make(map[string]any)
 			if !assert.NoError(t, json.Unmarshal(itemJSON, &u)) {
 				continue
 			}
@@ -3165,47 +3162,6 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			want: []*test.APIResource{},
 		},
 		{
-			name:    "when a PV has a CSI VolumeSnapshot, but CSI modules are not ready, the PV is not restored",
-			restore: defaultRestore().Result(),
-			backup:  defaultBackup().Result(),
-			tarball: test.NewTarWriter(t).
-				AddItems("persistentvolumes",
-					builder.ForPersistentVolume("pv-1").
-						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
-						ClaimRef("velero", testPVCName).
-						Result(),
-				).
-				Done(),
-			apiResources: []*test.APIResource{
-				test.PVs(),
-				test.PVCs(),
-			},
-			csiVolumeSnapshots: []*snapshotv1api.VolumeSnapshot{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "velero",
-						Name:      "test",
-					},
-					Spec: snapshotv1api.VolumeSnapshotSpec{
-						Source: snapshotv1api.VolumeSnapshotSource{
-							PersistentVolumeClaimName: &testPVCName,
-						},
-					},
-				},
-			},
-			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
-				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
-			},
-			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
-				"provider-1": &volumeSnapshotter{
-					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
-				},
-			},
-			want:                  []*test.APIResource{},
-			csiFeatureVerifierErr: "fake-feature-check-error",
-			wantError:             true,
-		},
-		{
 			name:    "when a PV with a reclaim policy of retain has a DataUpload result CM and does not exist in-cluster, the PV is not restored",
 			restore: defaultRestore().ObjectMeta(builder.WithUID("fakeUID")).Result(),
 			backup:  defaultBackup().Result(),
@@ -3237,58 +3193,16 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			})).Result(),
 			want: []*test.APIResource{},
 		},
-		{
-			name:    "when a PV has a DataUpload result CM, but CSI modules are not ready, the PV is not restored",
-			restore: defaultRestore().ObjectMeta(builder.WithUID("fakeUID")).Result(),
-			backup:  defaultBackup().Result(),
-			tarball: test.NewTarWriter(t).
-				AddItems("persistentvolumes",
-					builder.ForPersistentVolume("pv-1").
-						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
-						ClaimRef("velero", testPVCName).
-						Result(),
-				).
-				Done(),
-			apiResources: []*test.APIResource{
-				test.PVs(),
-				test.PVCs(),
-				test.ConfigMaps(),
-			},
-			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
-				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
-			},
-			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
-				"provider-1": &volumeSnapshotter{
-					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
-				},
-			},
-			dataUploadResult: builder.ForConfigMap("velero", "test").ObjectMeta(builder.WithLabelsMap(map[string]string{
-				velerov1api.RestoreUIDLabel:       "fakeUID",
-				velerov1api.PVCNamespaceNameLabel: "velero.testPVC",
-				velerov1api.ResourceUsageLabel:    string(velerov1api.VeleroResourceUsageDataUploadResult),
-			})).Result(),
-			want:                  []*test.APIResource{},
-			csiFeatureVerifierErr: "fake-feature-check-error",
-			wantError:             true,
-		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
-			h.restorer.resourcePriorities = Priorities{HighPriorities: []string{"persistentvolumes", "persistentvolumeclaims"}}
+			h.restorer.resourcePriorities = types.Priorities{HighPriorities: []string{"persistentvolumes", "persistentvolumeclaims"}}
 			h.restorer.pvRenamer = func(oldName string) (string, error) {
 				renamed := "renamed-" + oldName
 				return renamed, nil
 			}
-
-			verifierMock := new(verifiermocks.Verifier)
-			if tc.csiFeatureVerifierErr != "" {
-				verifierMock.On("Verify", mock.Anything, mock.Anything).Return(false, errors.New(tc.csiFeatureVerifierErr))
-			} else {
-				verifierMock.On("Verify", mock.Anything, mock.Anything).Return(true, nil)
-			}
-			h.restorer.featureVerifier = verifierMock
 
 			// set up the VolumeSnapshotLocation client and add test data to it
 			for _, vsl := range tc.volumeSnapshotLocations {
@@ -3315,12 +3229,13 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			}
 
 			data := &Request{
-				Log:                h.log,
-				Restore:            tc.restore,
-				Backup:             tc.backup,
-				VolumeSnapshots:    tc.volumeSnapshots,
-				BackupReader:       tc.tarball,
-				CSIVolumeSnapshots: tc.csiVolumeSnapshots,
+				Log:                      h.log,
+				Restore:                  tc.restore,
+				Backup:                   tc.backup,
+				VolumeSnapshots:          tc.volumeSnapshots,
+				BackupReader:             tc.tarball,
+				CSIVolumeSnapshots:       tc.csiVolumeSnapshots,
+				RestoreVolumeInfoTracker: volume.NewRestoreVolInfoTracker(tc.restore, h.log, test.NewFakeControllerRuntimeClient(t)),
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
@@ -3445,7 +3360,7 @@ func TestRestoreWithPodVolume(t *testing.T) {
 					BackupLocation:   "",
 				}
 				restorer.
-					On("RestorePodVolumes", expectedArgs).
+					On("RestorePodVolumes", expectedArgs, mock.Anything).
 					Return(nil)
 			}
 
@@ -3610,19 +3525,19 @@ func TestIsCompleted(t *testing.T) {
 func Test_getOrderedResources(t *testing.T) {
 	tests := []struct {
 		name               string
-		resourcePriorities Priorities
+		resourcePriorities types.Priorities
 		backupResources    map[string]*archive.ResourceItems
 		want               []string
 	}{
 		{
 			name:               "when only priorities are specified, they're returned in order",
-			resourcePriorities: Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}},
+			resourcePriorities: types.Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}},
 			backupResources:    nil,
 			want:               []string{"prio-3", "prio-2", "prio-1"},
 		},
 		{
 			name:               "when only backup resources are specified, they're returned in alphabetical order",
-			resourcePriorities: Priorities{},
+			resourcePriorities: types.Priorities{},
 			backupResources: map[string]*archive.ResourceItems{
 				"backup-resource-3": nil,
 				"backup-resource-2": nil,
@@ -3632,7 +3547,7 @@ func Test_getOrderedResources(t *testing.T) {
 		},
 		{
 			name:               "when priorities and backup resources are specified, they're returned in the correct order",
-			resourcePriorities: Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}},
+			resourcePriorities: types.Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}},
 			backupResources: map[string]*archive.ResourceItems{
 				"prio-3":            nil,
 				"backup-resource-3": nil,
@@ -3643,7 +3558,7 @@ func Test_getOrderedResources(t *testing.T) {
 		},
 		{
 			name:               "when priorities and backup resources are specified, they're returned in the correct order",
-			resourcePriorities: Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}, LowPriorities: []string{"prio-0"}},
+			resourcePriorities: types.Priorities{HighPriorities: []string{"prio-3", "prio-2", "prio-1"}, LowPriorities: []string{"prio-0"}},
 			backupResources: map[string]*archive.ResourceItems{
 				"prio-3":            nil,
 				"prio-0":            nil,
@@ -3666,6 +3581,7 @@ func Test_getOrderedResources(t *testing.T) {
 // order. Any resources *not* in resourcePriorities are required to come *after* all
 // resources in any order.
 func assertResourceCreationOrder(t *testing.T, resourcePriorities []string, createdResources []resourceID) {
+	t.Helper()
 	// lastSeen tracks the index in 'resourcePriorities' of the last resource type
 	// we saw created. Once we've seen a resource in 'resourcePriorities', we should
 	// never see another instance of a prior resource.
@@ -3689,7 +3605,7 @@ func assertResourceCreationOrder(t *testing.T, resourcePriorities []string, crea
 
 		// the index of the current resource must be the same as or greater than the index of
 		// the last resource we saw for the restored order to be correct.
-		assert.True(t, current >= lastSeen, "%s was restored out of order", r.groupResource)
+		assert.GreaterOrEqual(t, current, lastSeen, "%s was restored out of order", r.groupResource)
 		lastSeen = current
 	}
 }
@@ -3769,7 +3685,7 @@ func assertNonEmptyResults(t *testing.T, typeMsg string, res ...Result) {
 		total += len(r.Namespaces)
 		total += len(r.Velero)
 	}
-	assert.Greater(t, total, 0, "Expected at least one "+typeMsg)
+	assert.Positive(t, total, "Expected at least one "+typeMsg)
 }
 
 type harness struct {
@@ -3800,9 +3716,10 @@ func newHarness(t *testing.T) *harness {
 			fileSystem:                 test.NewFakeFileSystem(),
 
 			// unsupported
-			podVolumeRestorerFactory: nil,
-			podVolumeTimeout:         0,
-			kbClient:                 kbClient,
+			podVolumeRestorerFactory:      nil,
+			podVolumeTimeout:              0,
+			kbClient:                      kbClient,
+			resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 		},
 		log: log,
 	}
@@ -3847,7 +3764,7 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 				kubeutil.KubeAnnBindCompleted,
 				kubeutil.KubeAnnBoundByController,
 				kubeutil.KubeAnnDynamicallyProvisioned,
-			).WithSpecField("claimRef", map[string]interface{}{
+			).WithSpecField("claimRef", map[string]any{
 				"namespace":       "ns-1",
 				"name":            "pvc-1",
 				"uid":             "abc",
@@ -3855,7 +3772,7 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 			expected: newTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").
 				WithAnnotations(kubeutil.KubeAnnDynamicallyProvisioned).
-				WithSpecField("claimRef", map[string]interface{}{
+				WithSpecField("claimRef", map[string]any{
 					"namespace": "ns-1", "name": "pvc-1"}).Unstructured,
 		},
 		{
@@ -3895,7 +3812,7 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		{
 			name: "The input obj isn't service",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Pod",
 				},
 			},
@@ -3904,7 +3821,7 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		{
 			name: "The StatusError contains no causes",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Service",
 				},
 			},
@@ -3918,7 +3835,7 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		{
 			name: "The causes contains not only port already allocated error",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Service",
 				},
 			},
@@ -3938,9 +3855,9 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		{
 			name: "Get already allocated error but the service doesn't exist",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Service",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
@@ -3964,9 +3881,9 @@ func TestIsAlreadyExistsError(t *testing.T) {
 				builder.ForService("default", "test").Result(),
 			),
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Service",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
@@ -3989,9 +3906,10 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		h := newHarness(t)
 
 		ctx := &restoreContext{
-			log:             h.log,
-			dynamicFactory:  client.NewDynamicFactory(h.DynamicClient),
-			namespaceClient: h.KubeClient.CoreV1().Namespaces(),
+			log:                           h.log,
+			dynamicFactory:                client.NewDynamicFactory(h.DynamicClient),
+			namespaceClient:               h.KubeClient.CoreV1().Namespaces(),
+			resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 		}
 
 		if test.apiResource != nil {
@@ -4024,7 +3942,7 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		{
 			name: "Invalid PV, expect false.",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": 1,
 				},
 			},
@@ -4033,10 +3951,10 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		{
 			name: "Cannot find VS, expect false",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
@@ -4045,17 +3963,54 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 			expectedResult: false,
 		},
 		{
-			name: "Find VS, expect true.",
+			name: "VS's source PVC is nil, expect false",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
+						"namespace": "default",
+						"name":      "test",
+					},
+					"spec": map[string]any{
+						"claimRef": map[string]any{
+							"namespace": "velero",
+							"name":      "test",
+						},
+					},
+				},
+			},
+			vs:             builder.ForVolumeSnapshot("velero", "test").Result(),
+			expectedResult: false,
+		},
+		{
+			name: "PVs claimref is nil, expect false.",
+			obj: &unstructured.Unstructured{
+				Object: map[string]any{
+					"kind":       "PersistentVolume",
+					"apiVersion": "v1",
+					"metadata": map[string]any{
 						"namespace": "velero",
 						"name":      "test",
 					},
-					"spec": map[string]interface{}{
-						"claimRef": map[string]interface{}{
+				},
+			},
+			vs:             builder.ForVolumeSnapshot("velero", "test").SourcePVC("test").Result(),
+			expectedResult: false,
+		},
+
+		{
+			name: "Find VS, expect true.",
+			obj: &unstructured.Unstructured{
+				Object: map[string]any{
+					"kind":       "PersistentVolume",
+					"apiVersion": "v1",
+					"metadata": map[string]any{
+						"namespace": "velero",
+						"name":      "test",
+					},
+					"spec": map[string]any{
+						"claimRef": map[string]any{
 							"namespace": "velero",
 							"name":      "test",
 						},
@@ -4071,7 +4026,8 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		h := newHarness(t)
 
 		ctx := &restoreContext{
-			log: h.log,
+			log:                           h.log,
+			resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 		}
 
 		if tc.vs != nil {
@@ -4095,7 +4051,7 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		{
 			name: "Invalid PV, expect false.",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": 1,
 				},
 			},
@@ -4104,10 +4060,10 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		{
 			name: "PV without ClaimRef, expect false",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
@@ -4120,15 +4076,15 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		{
 			name: "Cannot find DataUploadResult CM, expect false",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
-					"spec": map[string]interface{}{
-						"claimRef": map[string]interface{}{
+					"spec": map[string]any{
+						"claimRef": map[string]any{
 							"namespace": "velero",
 							"name":      "testPVC",
 						},
@@ -4142,15 +4098,15 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		{
 			name: "Find DataUploadResult CM, expect true",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
-					"spec": map[string]interface{}{
-						"claimRef": map[string]interface{}{
+					"spec": map[string]any{
+						"claimRef": map[string]any{
 							"namespace": "velero",
 							"name":      "testPVC",
 						},
@@ -4171,9 +4127,10 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		h := newHarness(t)
 
 		ctx := &restoreContext{
-			log:      h.log,
-			kbClient: h.restorer.kbClient,
-			restore:  tc.restore,
+			log:                           h.log,
+			kbClient:                      h.restorer.kbClient,
+			restore:                       tc.restore,
+			resourceDeletionStatusTracker: kube.NewResourceDeletionStatusTracker(),
 		}
 
 		if tc.duResult != nil {
@@ -4182,6 +4139,104 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			require.Equal(t, tc.expectedResult, hasSnapshotDataUpload(ctx, tc.obj))
+		})
+	}
+}
+
+func TestDetermineRestoreStatus(t *testing.T) {
+	tests := []struct {
+		name                string
+		annotations         map[string]string
+		restoreSpecIncludes *bool
+		expectedDecision    bool
+	}{
+		{
+			name:                "No annotation, fallback to restore spec",
+			annotations:         nil,
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    true,
+		},
+		{
+			name:                "No annotation, restore spec excludes",
+			annotations:         nil,
+			restoreSpecIncludes: boolptr.False(),
+			expectedDecision:    false,
+		},
+		{
+			name:                "Annotation explicitly set to true, restore spec is false",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "true"},
+			restoreSpecIncludes: boolptr.False(),
+			expectedDecision:    true,
+		},
+		{
+			name:                "Annotation explicitly set to false, restore spec is true",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "false"},
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    false,
+		},
+		{
+			name:                "Invalid annotation value, fallback to restore spec",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "foo"},
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    true,
+		},
+		{
+			name:                "Empty annotation value, fallback to restore spec",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: ""},
+			restoreSpecIncludes: boolptr.False(),
+			expectedDecision:    false,
+		},
+		{
+			name:                "Mixed-case annotation value 'True' should be treated as true",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "True"},
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    true,
+		},
+		{
+			name:                "Mixed-case annotation value 'FALSE' should be treated as false",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "FALSE"},
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    false,
+		},
+		{
+			name:                "Nil IncludesExcludes, but annotation is 'true'",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "true"},
+			restoreSpecIncludes: nil,
+			expectedDecision:    true,
+		},
+		{
+			name:                "Nil IncludesExcludes, but annotation is 'false'",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "false"},
+			restoreSpecIncludes: nil,
+			expectedDecision:    false,
+		},
+		{
+			name:                "Nil IncludesExcludes, no annotation (default to false)",
+			annotations:         nil,
+			restoreSpecIncludes: nil,
+			expectedDecision:    false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			obj := &unstructured.Unstructured{}
+			obj.SetAnnotations(test.annotations)
+
+			var includesExcludes *collections.IncludesExcludes
+			if test.restoreSpecIncludes != nil {
+				includesExcludes = collections.NewIncludesExcludes()
+				if *test.restoreSpecIncludes {
+					includesExcludes.Includes("*")
+				} else {
+					includesExcludes.Excludes("*")
+				}
+			}
+
+			log := logrus.New()
+			result := determineRestoreStatus(obj, includesExcludes, "testGroupResource", log)
+
+			assert.Equal(t, test.expectedDecision, result)
 		})
 	}
 }

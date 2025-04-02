@@ -33,7 +33,7 @@ func TestVeleroConfig(t *testing.T) {
 
 	assert.Equal(t, "foo", c.Namespace())
 	assert.Equal(t, []string{"feature1", "feature2"}, c.Features())
-	assert.Equal(t, true, c.Colorized())
+	assert.True(t, c.Colorized())
 }
 
 func removeConfigfileName() error {
@@ -48,7 +48,6 @@ func removeConfigfileName() error {
 	return nil
 }
 func TestConfigOperations(t *testing.T) {
-
 	preHomeEnv := ""
 	prevEnv := os.Environ()
 	for _, entry := range prevEnv {
@@ -63,13 +62,13 @@ func TestConfigOperations(t *testing.T) {
 
 	// Remove config file if it exists
 	err := removeConfigfileName()
-	assert.Equal(t, err, nil)
+	assert.NoError(t, err)
 
 	// Test LoadConfig: expect an empty velero config
 	expectedConfig := VeleroConfig{}
 	config, err := LoadConfig()
 
-	assert.Equal(t, err, nil)
+	assert.NoError(t, err)
 	assert.True(t, reflect.DeepEqual(expectedConfig, config))
 
 	// Test savedConfig
@@ -85,13 +84,13 @@ func TestConfigOperations(t *testing.T) {
 
 	err = SaveConfig(config)
 
-	assert.Equal(t, err, nil)
+	assert.NoError(t, err)
 	savedConfig, err := LoadConfig()
-	assert.Equal(t, err, nil)
+	assert.NoError(t, err)
 
 	// Test Features
 	feature := savedConfig.Features()
-	assert.Equal(t, 1, len(feature))
+	assert.Len(t, feature, 1)
 	assert.Equal(t, expectedFeature, feature[0])
 
 	// Test Colorized
@@ -108,7 +107,7 @@ func TestConfigOperations(t *testing.T) {
 
 	t.Cleanup(func() {
 		err = removeConfigfileName()
-		assert.Equal(t, err, nil)
+		assert.NoError(t, err)
 		os.Unsetenv("HOME")
 		os.Setenv("HOME", preHomeEnv)
 	})

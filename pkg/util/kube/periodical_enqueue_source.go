@@ -31,8 +31,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func NewPeriodicalEnqueueSource(
@@ -62,13 +62,19 @@ type PeriodicalEnqueueSource struct {
 }
 
 type PeriodicalEnqueueSourceOption struct {
-	OrderFunc func(objList client.ObjectList) client.ObjectList
+	OrderFunc  func(objList client.ObjectList) client.ObjectList
+	Predicates []predicate.Predicate // the predicates only apply to the GenericEvent
 }
 
-// Start enqueue items periodically. The predicates only apply to the GenericEvent
-func (p *PeriodicalEnqueueSource) Start(ctx context.Context, h handler.EventHandler, q workqueue.RateLimitingInterface, predicates ...predicate.Predicate) error {
+// Start enqueue items periodically
+func (p *PeriodicalEnqueueSource) Start(ctx context.Context, q workqueue.TypedRateLimitingInterface[reconcile.Request]) error {
 	go wait.Until(func() {
 		p.logger.Debug("enqueueing resources ...")
+		// empty the list otherwise the result of the new list call will be appended
+		if err := meta.SetList(p.objList, nil); err != nil {
+			p.logger.WithError(err).Error("error reset resource list")
+			return
+		}
 		if err := p.List(ctx, p.objList); err != nil {
 			p.logger.WithError(err).Error("error listing resources")
 			return
@@ -87,7 +93,7 @@ func (p *PeriodicalEnqueueSource) Start(ctx context.Context, h handler.EventHand
 				return nil
 			}
 			event := event.GenericEvent{Object: obj}
-			for _, predicate := range predicates {
+			for _, predicate := range p.option.Predicates {
 				if !predicate.Generic(event) {
 					p.logger.Debugf("skip enqueue object %s/%s due to the predicate.", obj.GetNamespace(), obj.GetName())
 					return nil
@@ -113,7 +119,7 @@ func (p *PeriodicalEnqueueSource) Start(ctx context.Context, h handler.EventHand
 
 func (p *PeriodicalEnqueueSource) String() string {
 	if p.objList != nil {
-		return fmt.Sprintf("kind source: %T", p.objList)
+		return fmt.Sprintf("periodical enqueue source: %T", p.objList)
 	}
-	return "kind source: unknown type"
+	return "periodical enqueue source: unknown type"
 }

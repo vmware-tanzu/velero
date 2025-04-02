@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -37,9 +38,6 @@ type Registry interface {
 	List(kind common.PluginKind) []framework.PluginIdentifier
 	// Get returns the PluginIdentifier for kind and name.
 	Get(kind common.PluginKind, name string) (framework.PluginIdentifier, error)
-
-	// Find checks if the specified plugin exists in the registry
-	Find(kind common.PluginKind, name string) bool
 }
 
 // KindAndName is a convenience struct that combines a PluginKind and a name.
@@ -128,12 +126,6 @@ func (r *registry) Get(kind common.PluginKind, name string) (framework.PluginIde
 	return p, nil
 }
 
-// Contain if the specified plugin exists in the registry
-func (r *registry) Find(kind common.PluginKind, name string) bool {
-	_, found := r.pluginsByID[KindAndName{Kind: kind, Name: name}]
-	return found
-}
-
 // readPluginsDir recursively reads dir looking for plugins.
 func (r *registry) readPluginsDir(dir string) ([]string, error) {
 	if _, err := r.fs.Stat(dir); err != nil {
@@ -162,6 +154,7 @@ func (r *registry) readPluginsDir(dir string) ([]string, error) {
 		}
 
 		if !executable(file) {
+			r.logger.Warnf("Searching plugin skip file %s, not executable, mode %v, ext %s", file.Name(), file.Mode(), strings.ToLower(filepath.Ext(file.Name())))
 			continue
 		}
 
@@ -172,6 +165,15 @@ func (r *registry) readPluginsDir(dir string) ([]string, error) {
 
 // executable determines if a file is executable.
 func executable(info os.FileInfo) bool {
+	return executableLinux(info) || executableWindows(info)
+}
+
+func executableWindows(info os.FileInfo) bool {
+	ext := strings.ToLower(filepath.Ext(info.Name()))
+	return (ext == ".exe")
+}
+
+func executableLinux(info os.FileInfo) bool {
 	/*
 		When we AND the mode with 0111:
 

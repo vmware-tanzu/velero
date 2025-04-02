@@ -53,7 +53,7 @@ var getGCPCredentials = repoconfig.GetGCPCredentials
 var getS3BucketRegion = repoconfig.GetAWSBucketRegion
 
 type localFuncTable struct {
-	getStorageVariables   func(*velerov1api.BackupStorageLocation, string, string) (map[string]string, error)
+	getStorageVariables   func(*velerov1api.BackupStorageLocation, string, string, map[string]string) (map[string]string, error)
 	getStorageCredentials func(*velerov1api.BackupStorageLocation, credentials.FileStore) (map[string]string, error)
 }
 
@@ -94,6 +94,10 @@ func (urp *unifiedRepoProvider) InitRepo(ctx context.Context, param RepoParam) e
 	})
 
 	log.Debug("Start to init repo")
+
+	if param.BackupLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
+		return errors.Errorf("cannot create new backup repo for read-only backup storage location %s/%s", param.BackupLocation.Namespace, param.BackupLocation.Name)
+	}
 
 	repoOption, err := udmrepo.NewRepoOptions(
 		udmrepo.WithPassword(urp, param),
@@ -191,6 +195,10 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 	}
 	if !errors.Is(err, repo.ErrRepositoryNotInitialized) {
 		return errors.Wrap(err, "error to connect to backup repo")
+	}
+
+	if param.BackupLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
+		return errors.Errorf("cannot create new backup repo for read-only backup storage location %s/%s", param.BackupLocation.Namespace, param.BackupLocation.Name)
 	}
 
 	err = urp.repoService.Init(ctx, *repoOption, true)
@@ -314,11 +322,61 @@ func (urp *unifiedRepoProvider) Forget(ctx context.Context, snapshotID string, p
 	return nil
 }
 
+func (urp *unifiedRepoProvider) BatchForget(ctx context.Context, snapshotIDs []string, param RepoParam) []error {
+	log := urp.log.WithFields(logrus.Fields{
+		"BSL name":    param.BackupLocation.Name,
+		"repo name":   param.BackupRepo.Name,
+		"repo UID":    param.BackupRepo.UID,
+		"snapshotIDs": snapshotIDs,
+	})
+
+	log.Debug("Start to batch forget snapshot")
+
+	repoOption, err := udmrepo.NewRepoOptions(
+		udmrepo.WithPassword(urp, param),
+		udmrepo.WithConfigFile(urp.workPath, string(param.BackupRepo.UID)),
+		udmrepo.WithDescription(repoOpDescForget),
+	)
+
+	if err != nil {
+		return []error{errors.Wrap(err, "error to get repo options")}
+	}
+
+	bkRepo, err := urp.repoService.Open(ctx, *repoOption)
+	if err != nil {
+		return []error{errors.Wrap(err, "error to open backup repo")}
+	}
+
+	defer func() {
+		c := bkRepo.Close(ctx)
+		if c != nil {
+			log.WithError(c).Error("Failed to close repo")
+		}
+	}()
+
+	errs := []error{}
+	for _, snapshotID := range snapshotIDs {
+		err = bkRepo.DeleteManifest(ctx, udmrepo.ID(snapshotID))
+		if err != nil {
+			errs = append(errs, errors.Wrapf(err, "error to delete manifest %s", snapshotID))
+		}
+	}
+
+	err = bkRepo.Flush(ctx)
+	if err != nil {
+		return []error{errors.Wrap(err, "error to flush repo")}
+	}
+
+	log.Debug("Forget snapshot complete")
+
+	return errs
+}
+
 func (urp *unifiedRepoProvider) DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration {
 	return urp.repoService.DefaultMaintenanceFrequency()
 }
 
-func (urp *unifiedRepoProvider) GetPassword(param interface{}) (string, error) {
+func (urp *unifiedRepoProvider) GetPassword(param any) (string, error) {
 	_, ok := param.(RepoParam)
 	if !ok {
 		return "", errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
@@ -332,7 +390,7 @@ func (urp *unifiedRepoProvider) GetPassword(param interface{}) (string, error) {
 	return repoPassword, nil
 }
 
-func (urp *unifiedRepoProvider) GetStoreType(param interface{}) (string, error) {
+func (urp *unifiedRepoProvider) GetStoreType(param any) (string, error) {
 	repoParam, ok := param.(RepoParam)
 	if !ok {
 		return "", errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
@@ -341,13 +399,13 @@ func (urp *unifiedRepoProvider) GetStoreType(param interface{}) (string, error) 
 	return getStorageType(repoParam.BackupLocation), nil
 }
 
-func (urp *unifiedRepoProvider) GetStoreOptions(param interface{}) (map[string]string, error) {
+func (urp *unifiedRepoProvider) GetStoreOptions(param any) (map[string]string, error) {
 	repoParam, ok := param.(RepoParam)
 	if !ok {
 		return map[string]string{}, errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
 	}
 
-	storeVar, err := funcTable.getStorageVariables(repoParam.BackupLocation, urp.repoBackend, repoParam.BackupRepo.Spec.VolumeNamespace)
+	storeVar, err := funcTable.getStorageVariables(repoParam.BackupLocation, urp.repoBackend, repoParam.BackupRepo.Spec.VolumeNamespace, repoParam.BackupRepo.Spec.RepositoryConfig)
 	if err != nil {
 		return map[string]string{}, errors.Wrap(err, "error to get storage variables")
 	}
@@ -448,7 +506,11 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 	return result, nil
 }
 
-func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoBackend string, repoName string) (map[string]string, error) {
+// Translates user specified options (backupRepoConfig) to internal parameters
+// so we would accept only the options that are well defined in the internal system.
+// Users' inputs should not be treated as safe any time.
+// We remove the unnecessary parameters and keep the modules/logics below safe
+func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoBackend string, repoName string, backupRepoConfig map[string]string) (map[string]string, error) {
 	result := make(map[string]string)
 
 	backendType := repoconfig.GetBackendType(backupLocation.Spec.Provider, backupLocation.Spec.Config)
@@ -479,7 +541,7 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 		var err error
 		if s3URL == "" {
 			if region == "" {
-				region, err = getS3BucketRegion(bucket)
+				region, err = getS3BucketRegion(bucket, config)
 				if err != nil {
 					return map[string]string{}, errors.Wrap(err, "error get s3 bucket region")
 				}
@@ -517,6 +579,20 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 	}
 	result[udmrepo.StoreOptionOssRegion] = strings.Trim(region, "/")
 	result[udmrepo.StoreOptionFsPath] = config["fspath"]
+
+	// We remove the unnecessary parameters and keep the modules/logics below safe
+	if backupRepoConfig != nil {
+		// range of valid params to keep, everything else will be discarded.
+		validParams := []string{
+			udmrepo.StoreOptionCacheLimit,
+			udmrepo.StoreOptionKeyFullMaintenanceInterval,
+		}
+		for _, param := range validParams {
+			if v, found := backupRepoConfig[param]; found {
+				result[param] = v
+			}
+		}
+	}
 
 	return result, nil
 }

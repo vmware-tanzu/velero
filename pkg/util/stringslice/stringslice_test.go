@@ -36,7 +36,7 @@ func TestHas(t *testing.T) {
 func TestExcept(t *testing.T) {
 	items := []string{}
 	except := Except(items, "asdf")
-	assert.Len(t, except, 0)
+	assert.Empty(t, except)
 
 	items = []string{"a", "b", "c"}
 	assert.Equal(t, []string{"b", "c"}, Except(items, "a"))

@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v4/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -57,6 +57,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	biav2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
+	ibav1 "github.com/vmware-tanzu/velero/pkg/plugin/velero/itemblockaction/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -67,20 +68,28 @@ type fakeBackupper struct {
 	mock.Mock
 }
 
-func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []biav2.BackupItemAction, volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
-	args := b.Called(logger, backup, backupFile, actions, volumeSnapshotterGetter)
+func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []biav2.BackupItemAction, itemBlockActions []ibav1.ItemBlockAction, volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
+	args := b.Called(logger, backup, backupFile, actions, itemBlockActions, volumeSnapshotterGetter)
 	return args.Error(0)
 }
 
 func (b *fakeBackupper) BackupWithResolvers(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer,
-	backupItemActionResolver framework.BackupItemActionResolverV2, volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
+	backupItemActionResolver framework.BackupItemActionResolverV2,
+	itemBlockActionResolver framework.ItemBlockActionResolver,
+	volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
 	args := b.Called(logger, backup, backupFile, backupItemActionResolver, volumeSnapshotterGetter)
 	return args.Error(0)
 }
 
-func (b *fakeBackupper) FinalizeBackup(logger logrus.FieldLogger, backup *pkgbackup.Request, inBackupFile io.Reader, outBackupFile io.Writer,
+func (b *fakeBackupper) FinalizeBackup(
+	logger logrus.FieldLogger,
+	backup *pkgbackup.Request,
+	inBackupFile io.Reader,
+	outBackupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
-	asyncBIAOperations []*itemoperation.BackupOperation) error {
+	asyncBIAOperations []*itemoperation.BackupOperation,
+	backupStore persistence.BackupStore,
+) error {
 	args := b.Called(logger, backup, inBackupFile, outBackupFile, backupItemActionResolver, asyncBIAOperations)
 	return args.Error(0)
 }
@@ -128,13 +137,15 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 				kbClient:   velerotest.NewFakeControllerRuntimeClient(t),
 				formatFlag: formatFlag,
 				logger:     logger,
+				workerPool: pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 			if test.backup != nil {
 				require.NoError(t, c.kbClient.Create(context.Background(), test.backup))
 			}
 			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
-			assert.Equal(t, actualResult, ctrl.Result{})
-			assert.Nil(t, err)
+			assert.Equal(t, ctrl.Result{}, actualResult)
+			assert.NoError(t, err)
 
 			// Any backup that would actually proceed to validation will cause a segfault because this
 			// test hasn't set up the necessary controller dependencies for validation/etc. So the lack
@@ -168,7 +179,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		{
 			name:         "non-existent backup location fails validation",
 			backup:       defaultBackup().StorageLocation("nonexistent").Result(),
-			expectedErrs: []string{"an existing backup storage location wasn't specified at backup creation time and the default 'nonexistent' wasn't found. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"nonexistent\" not found"},
+			expectedErrs: []string{"an existing backup storage location was not specified at backup creation time and the default nonexistent was not found. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"nonexistent\" not found"},
 		},
 		{
 			name:           "backup for read-only backup location fails validation",
@@ -217,14 +228,16 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				clock:                 &clock.RealClock{},
 				formatFlag:            formatFlag,
 				metrics:               metrics.NewServerMetrics(),
+				workerPool:            pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			require.NotNil(t, test.backup)
 			require.NoError(t, c.kbClient.Create(context.Background(), test.backup))
 
 			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
-			assert.Equal(t, actualResult, ctrl.Result{})
-			assert.Nil(t, err)
+			assert.Equal(t, ctrl.Result{}, actualResult)
+			assert.NoError(t, err)
 			res := &velerov1api.Backup{}
 			err = c.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: test.backup.Namespace, Name: test.backup.Name}, res)
 			require.NoError(t, err)
@@ -280,7 +293,9 @@ func TestBackupLocationLabel(t *testing.T) {
 				defaultBackupLocation: test.backupLocation.Name,
 				clock:                 &clock.RealClock{},
 				formatFlag:            formatFlag,
+				workerPool:            pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			res := c.prepareBackupRequest(test.backup, logger)
 			assert.NotNil(t, res)
@@ -324,7 +339,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 			backupLocationInAPIServer:        nil,
 			defaultBackupLocationInAPIServer: nil,
 			expectedSuccess:                  false,
-			expectedValidationError:          "an existing backup storage location wasn't specified at backup creation time and the default 'test-backup-location' wasn't found. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"test-backup-location\" not found",
+			expectedValidationError:          "an existing backup storage location was not specified at backup creation time and the default test-backup-location was not found. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"test-backup-location\" not found",
 		},
 		{
 			name:                             "Using default BackupLocation and it can be found in ApiServer",
@@ -342,7 +357,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 			backupLocationInAPIServer:        nil,
 			defaultBackupLocationInAPIServer: nil,
 			expectedSuccess:                  false,
-			expectedValidationError:          fmt.Sprintf("an existing backup storage location wasn't specified at backup creation time and the server default '%s' doesn't exist. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"%s\" not found", defaultBackupLocation, defaultBackupLocation),
+			expectedValidationError:          fmt.Sprintf("an existing backup storage location was not specified at backup creation time and the server default %s does not exist. Please address this issue (see `velero backup-location -h` for options) and create a new backup. Error: backupstoragelocations.velero.io \"%s\" not found", defaultBackupLocation, defaultBackupLocation),
 		},
 	}
 
@@ -375,7 +390,9 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 				defaultBackupTTL:      defaultBackupTTL.Duration,
 				clock:                 testclocks.NewFakeClock(now),
 				formatFlag:            formatFlag,
+				workerPool:            pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			test.backup.Spec.StorageLocation = test.backupLocationNameInBackup
 
@@ -435,7 +452,6 @@ func TestDefaultBackupTTL(t *testing.T) {
 		)
 
 		t.Run(test.name, func(t *testing.T) {
-
 			apiServer := velerotest.NewAPIServer(t)
 			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
 			require.NoError(t, err)
@@ -452,7 +468,9 @@ func TestDefaultBackupTTL(t *testing.T) {
 				defaultBackupTTL: defaultBackupTTL.Duration,
 				clock:            testclocks.NewFakeClock(now),
 				formatFlag:       formatFlag,
+				workerPool:       pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			res := c.prepareBackupRequest(test.backup, logger)
 			assert.NotNil(t, res)
@@ -552,7 +570,9 @@ func TestDefaultVolumesToResticDeprecation(t *testing.T) {
 				clock:                    &clock.RealClock{},
 				formatFlag:               formatFlag,
 				defaultVolumesToFsBackup: test.globalVal,
+				workerPool:               pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			res := c.prepareBackupRequest(test.backup, logger)
 			assert.NotNil(t, res)
@@ -560,11 +580,11 @@ func TestDefaultVolumesToResticDeprecation(t *testing.T) {
 			if test.expectRemap {
 				assert.Equal(t, res.Spec.DefaultVolumesToRestic, res.Spec.DefaultVolumesToFsBackup)
 			} else if test.expectGlobal {
-				assert.False(t, res.Spec.DefaultVolumesToRestic == res.Spec.DefaultVolumesToFsBackup)
+				assert.NotSame(t, res.Spec.DefaultVolumesToRestic, res.Spec.DefaultVolumesToFsBackup)
 				assert.Equal(t, &c.defaultVolumesToFsBackup, res.Spec.DefaultVolumesToFsBackup)
 			} else {
-				assert.False(t, res.Spec.DefaultVolumesToRestic == res.Spec.DefaultVolumesToFsBackup)
-				assert.False(t, &c.defaultVolumesToFsBackup == res.Spec.DefaultVolumesToFsBackup)
+				assert.NotSame(t, res.Spec.DefaultVolumesToRestic, res.Spec.DefaultVolumesToFsBackup)
+				assert.NotEqual(t, &c.defaultVolumesToFsBackup, res.Spec.DefaultVolumesToFsBackup)
 			}
 
 			assert.Equal(t, test.expectVal, *res.Spec.DefaultVolumesToFsBackup)
@@ -1337,9 +1357,12 @@ func TestProcessBackupCompletions(t *testing.T) {
 				backupper:                backupper,
 				formatFlag:               formatFlag,
 				globalCRClient:           fakeGlobalClient,
+				workerPool:               pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			pluginManager.On("GetBackupItemActionsV2").Return(nil, nil)
+			pluginManager.On("GetItemBlockActions").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
 			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []biav2.BackupItemAction(nil), pluginManager).Return(nil)
 			backupper.On("BackupWithResolvers", mock.Anything, mock.Anything, mock.Anything, framework.BackupItemActionResolverV2{}, pluginManager).Return(nil)
@@ -1372,8 +1395,8 @@ func TestProcessBackupCompletions(t *testing.T) {
 			}
 
 			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
-			assert.Equal(t, actualResult, ctrl.Result{})
-			assert.Nil(t, err)
+			assert.Equal(t, ctrl.Result{}, actualResult)
+			assert.NoError(t, err)
 
 			// Disable CSI feature to not impact other test cases.
 			if test.enableCSI {
@@ -1478,7 +1501,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			expectedSuccess:                     true,
 		},
 		{
-			name:   "location name does not correspond to any existing location and snapshotvolume disabled; should return empty VSL and no error",
+			name:   "location name does not correspond to any existing location and snapshotvolume disabled; should return error",
 			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).VolumeSnapshotLocations("random-name").SnapshotVolumes(false).Result(),
 			locations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
@@ -1486,36 +1509,36 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "some-name").Provider("fake-provider").Result(),
 			},
 			expectedVolumeSnapshotLocationNames: nil,
-			expectedSuccess:                     true,
+			expectedErrors:                      "a VolumeSnapshotLocation CRD for the location random-name with the name specified in the backup spec needs to be created before this snapshot can be executed. Error: volumesnapshotlocations.velero.io \"random-name\" not found", expectedSuccess: false,
 		},
 		{
-			name:   "duplicate locationName per provider and snapshotvolume disabled; should return empty VSL and no error",
+			name:   "duplicate locationName per provider and snapshotvolume disabled; should return only one BSL",
 			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).VolumeSnapshotLocations("aws-us-west-1", "aws-us-west-1").SnapshotVolumes(false).Result(),
 			locations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-west-1").Provider("aws").Result(),
 			},
-			expectedVolumeSnapshotLocationNames: nil,
+			expectedVolumeSnapshotLocationNames: []string{"aws-us-west-1"},
 			expectedSuccess:                     true,
 		},
 		{
-			name:   "no location name for the provider exists, only one VSL created and snapshotvolume disabled; should return empty VSL and no error",
+			name:   "no location name for the provider exists, only one VSL created and snapshotvolume disabled; should return the VSL",
 			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).SnapshotVolumes(false).Result(),
 			locations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
 			},
-			expectedVolumeSnapshotLocationNames: nil,
+			expectedVolumeSnapshotLocationNames: []string{"aws-us-east-1"},
 			expectedSuccess:                     true,
 		},
 		{
-			name:   "multiple location names for a provider, no default location and backup has no location defined, but snapshotvolume disabled, should return empty VSL and no error",
+			name:   "multiple location names for a provider, no default location and backup has no location defined, but snapshotvolume disabled, should return error",
 			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).SnapshotVolumes(false).Result(),
 			locations: []*velerov1api.VolumeSnapshotLocation{
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-west-1").Provider("aws").Result(),
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
 			},
 			expectedVolumeSnapshotLocationNames: nil,
-			expectedSuccess:                     true,
+			expectedErrors:                      "provider aws has more than one possible volume snapshot location, and none were specified explicitly or as a default",
 		},
 	}
 
@@ -1530,7 +1553,9 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 				logger:                   logger,
 				defaultSnapshotLocations: test.defaultLocations,
 				kbClient:                 velerotest.NewFakeControllerRuntimeClient(t),
+				workerPool:               pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
 			}
+			defer c.workerPool.Stop()
 
 			// set up a Backup object to represent what we expect to be passed to backupper.Backup()
 			backup := test.backup.DeepCopy()
@@ -1735,6 +1760,5 @@ func TestPatchResourceWorksWithStatus(t *testing.T) {
 				t.Error(cmp.Diff(fromCluster, tt.args.updated))
 			}
 		})
-
 	}
 }

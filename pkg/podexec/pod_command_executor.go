@@ -18,6 +18,7 @@ package podexec
 
 import (
 	"bytes"
+	"context"
 	"net/url"
 	"time"
 
@@ -38,7 +39,7 @@ const defaultTimeout = 30 * time.Second
 type PodCommandExecutor interface {
 	// ExecutePodCommand executes a command in a container in a pod. If the command takes longer than
 	// the specified timeout, an error is returned.
-	ExecutePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *api.ExecHook) error
+	ExecutePodCommand(log logrus.FieldLogger, item map[string]any, namespace, name, hookName string, hook *api.ExecHook) error
 }
 
 type poster interface {
@@ -66,7 +67,7 @@ func NewPodCommandExecutor(restClientConfig *rest.Config, restClient poster) Pod
 // command takes longer than the specified timeout, an error is returned (NOTE: it is not currently
 // possible to ensure the command is terminated when the timeout occurs, so it may continue to run
 // in the background).
-func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *api.ExecHook) error {
+func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, item map[string]any, namespace, name, hookName string, hook *api.ExecHook) error {
 	if item == nil {
 		return errors.New("item is required")
 	}
@@ -159,7 +160,7 @@ func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, it
 	errCh := make(chan error)
 
 	go func() {
-		err = executor.Stream(streamOptions)
+		err = executor.StreamWithContext(context.Background(), streamOptions)
 		errCh <- err
 	}()
 

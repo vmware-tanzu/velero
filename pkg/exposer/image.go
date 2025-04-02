@@ -18,8 +18,10 @@ package exposer
 
 import (
 	"context"
+	"strings"
 
 	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
@@ -28,22 +30,46 @@ import (
 type inheritedPodInfo struct {
 	image          string
 	serviceAccount string
+	env            []v1.EnvVar
+	envFrom        []v1.EnvFromSource
+	volumeMounts   []v1.VolumeMount
+	volumes        []v1.Volume
+	logLevelArgs   []string
+	logFormatArgs  []string
 }
 
-func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veleroNamespace string) (inheritedPodInfo, error) {
+func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veleroNamespace string, osType string) (inheritedPodInfo, error) {
 	podInfo := inheritedPodInfo{}
 
-	podSpec, err := nodeagent.GetPodSpec(ctx, client, veleroNamespace)
+	podSpec, err := nodeagent.GetPodSpec(ctx, client, veleroNamespace, osType)
 	if err != nil {
 		return podInfo, errors.Wrap(err, "error to get node-agent pod template")
 	}
 
 	if len(podSpec.Containers) != 1 {
-		return podInfo, errors.Wrap(err, "unexpected pod template from node-agent")
+		return podInfo, errors.New("unexpected pod template from node-agent")
 	}
 
 	podInfo.image = podSpec.Containers[0].Image
 	podInfo.serviceAccount = podSpec.ServiceAccountName
+
+	podInfo.env = podSpec.Containers[0].Env
+	podInfo.envFrom = podSpec.Containers[0].EnvFrom
+	podInfo.volumeMounts = podSpec.Containers[0].VolumeMounts
+	podInfo.volumes = podSpec.Volumes
+
+	args := podSpec.Containers[0].Args
+	for i, arg := range args {
+		if arg == "--log-format" {
+			podInfo.logFormatArgs = append(podInfo.logFormatArgs, args[i:i+2]...)
+		} else if strings.HasPrefix(arg, "--log-format") {
+			podInfo.logFormatArgs = append(podInfo.logFormatArgs, arg)
+		} else if arg == "--log-level" {
+			podInfo.logLevelArgs = append(podInfo.logLevelArgs, args[i:i+2]...)
+		} else if strings.HasPrefix(arg, "--log-level") {
+			podInfo.logLevelArgs = append(podInfo.logLevelArgs, arg)
+		}
+	}
 
 	return podInfo, nil
 }
