@@ -135,111 +135,85 @@ flowchart TD
 ```
 
 #### Updates to CSI PVC plugin:
-  - This is the plugin which creates VolumeSnapshots for the CSI PVCs if required.
-  - We might encounter the following cases:
-    - PVC has VGS label and VGS does not exist:
-      - We can check if VGS exists by listing the VGS in the namespace using the backup UUID 
-        along with the label used for the VGS (we will be creating VGS with backup UUID and user specified VGS  group label) and see if the PVC is part of any of the existing VGS for the particular backup operation we are currently in.
-      - If not then create the VGS object with the required labels (in this case backup UUID and the user specified VGS group label).
-      - Once VGS is created, we just wait for the related VS/VSC objects to exist and not wait for them to be `readyToUse`.
-      - Add the VGS object to the list of itemToUpdate, so that its BIA plugin runs in finalize backup phase. (we will run all the cleanup tasks in this plugin)
-      - For non-datamover case:
-        - Here, we need to skip the creation of VS as the VS object get created via creation of VGS object.
-        - We will skip the cleanup of VS here in VS BIA plugin as VGS related VS/VSC will get cleaned up in VGS BIA plugin.
-        - We just need to add the VS objects that got created via VGS object as additional items and the rest of the workflow remains the same for non-datamover cases.
-      - For datamover case:
-        - We need to skip creation of VS but need to create DataUploads for the VS instance that got created due to VGS creation.
-        - Fetch the correct VS instances that got created via VGS and is related to the current PVC.
-        - Finally create DataUpload object for this VS/PVC pair.
-        - We will skip the cleanup of VS here as VGS related VS/VSC will get cleaned up in VGS BIA plugin.
-        - Add the DataUpload as an additional item.
-    - PVC has VGS label and VGS already exists:
-      - In this case we do not want to re-create VGS object.
-      - The required VS/DU for the PVC already exists as VGS instance exists for the PVC and backup UUID.
-    - PVC does not possess VGS label:
-      - Create VS and follow the existing legacy workflow.
+- When a PVC has a VGS label and no VS (created via VGS) exists:
+    - Create VGS: 
+      - This triggers creation of the corresponding VGSC, VS, and VSC objects.
+    - Wait for VS Status: 
+      - Wait until each VS (one per PVC in the group) has its volumeGroupSnapshotName set. This confirms that the snapshot controller has done its work.
+    - Update VS Objects:
+      - Remove owner references and VGS-related finalizers from the VS objects (decoupling them to prevent cascading deletion).
+      - Add backup metadata (BackupName, BackupUUID, PVC name) as labels. This metadata is later used to skip re-creating a VGS when another PVC of the same group is processed.
+    - Patch and Cleanup:
+      - Patch the VGSC deletionPolicy to Retain so that when you delete the VGSC, the underlying VSC (and the storage snapshots) remain.
+      - Delete the temporary VGS and VGSC objects.
+    - Branching:
+      - For non‑datamover cases, skip the creation of an individual VS (since it was created via VGS) and add the VS objects as additional items.
+      - For datamover cases, create DataUploads for the VS–PVC pair (using the VS created by the VGS workflow) and add those as additional items.
+    
+- When a PVC has a VGS label and a VS created via an earlier VGS workflow already exists:
+  - List VS objects in the PVC’s namespace using labels (BackupUUID, BackupName, PVCName).
+  - Verify that a VS exists and that its status shows a non‑empty volumeGroupSnapshotName.
+  - If so, skip VGS (and VS) creation and continue with the legacy workflow. 
+  - If a VS is found but it wasn’t created by the VGS workflow (i.e. it lacks the volumeGroupSnapshotName), then the backup for that PVC is failed, resulting in a partially failed backup.
 
-#### Modify the CleanupVolumeSnapshot function to skip deletion of VGS related VS
-- We use a common cleanupVolumeSnapshot function to cleanup VS objects in both datamover and non-datamover cases
-- We are delegating the VGS related cleanup tasks to VGS BIA plugin which will run during the backup finalize phase when all the async actions are complete
-- We need to modify this function skip deletion of VS objects that were created via VGS objects.
+- When a PVC does not have a VGS label:
+  - The legacy workflow is followed, creating an individual VolumeSnapshot as before.
 
-#### Add a new VolumeGroupSnapshot(VGS) BIA plugin
-  - This plugin will run in backup finalize phase.
-  - We will process cleanup of all the VGS related artifacts like VGS, VGSC, VS and VSC that got created during the backup process.
 
 ```mermaid
 flowchart TD
-%% User Input Section
-    subgraph "User Input"
-        U1[User sets VGS label key using default, server arg or Backup API spec]
-        U2[User labels PVCs before backup]
-        U1 --> U2
+%% Section 1: Accept VGS Label from User
+    subgraph Accept_Label
+        A1[User sets VGS label]
+        A2[User labels PVCs before backup]
+        A1 --> A2
     end
 
-%% PVC ItemBlockAction Plugin Section
-    subgraph "PVC IBA Plugin"
-        I1[Check PVC is bound and has VolumeName]
-        I2[Add related PV to relatedItems]
-        I3[Add pods mounting PVC to relatedItems]
-        I4[Check if PVC has user-specified VGS label]
-        I5[List PVCs in namespace matching label criteria]
-        I6[Add matching PVCs to relatedItems]
-        I1 --> I2
-        I2 --> I3
-        I3 --> I4
-        I4 -- Yes --> I5
-        I5 --> I6
+%% Section 2: PVC ItemBlockAction Plugin
+    subgraph PVC_ItemBlockAction
+        B1[Check PVC is bound and has VolumeName]
+        B2[Add related PV to relatedItems]
+        B3[Add pods mounting PVC to relatedItems]
+        B4[Check if PVC has user-specified VGS label]
+        B5[List PVCs in namespace matching label criteria]
+        B6[Add matching PVCs to relatedItems]
+        B1 --> B2 --> B3 --> B4
+        B4 -- Yes --> B5
+        B5 --> B6
     end
 
-%% CSI PVC Plugin Section
-subgraph "CSI PVC Plugin"
+%% Section 3: CSI PVC Plugin Updates
+subgraph CSI_PVC_Plugin
 C1[For each PVC, check for VGS label]
-C2[If VGS label exists then lookup VGS using backup UID and label]
-C3[If VGS not found then create new VGS with backup UID and group label]
-C4[Wait for related VS and VGSC objects to exist]
-C5[Add VGS object to itemToUpdate]
-C6[Non-datamover case: Skip individual VS creation; add VS from VGS as additional item]
-C7[Datamover case: Create DataUpload for VS-PVC pair; add DU as additional item]
-C8[If VGS already exists then do not re-create VGS]
-C9[If no VGS label then follow legacy workflow to create VS]
-C1 --> C2
-C2 -- Not Found --> C3
-C3 --> C4
-C4 --> C5
-C5 --> C6
-C2 -- Found --> C8
-C1 -- No VGS label --> C9
+C1 -- Yes --> C2[Case 1: VGS for volume group not yet created]
+C2 -- True --> C3[Create new VGS triggering VGSC, VS and VSC creation]
+C3 --> C4[Wait for VS objects to show volumeGroupSnapshotName using CSISnapshotTimeout]
+C4 --> C5[Update VS objects: remove VGS owner refs and VGS finalizers; add BackupName, BackupUUID, PVC name as labels]
+C5 --> C6[Patch VGSC deletionPolicy to Retain]
+C6 --> C7[Delete VGS object]
+C7 --> C8[Delete VGSC]
+C8 --> C9[For non-datamover: Skip individual VS creation; add VS from VGS as additional item]
+C8 --> C10[For datamover: Create DataUpload for VS-PVC pair; add DU as additional item]
+
+C1 -- Yes --> C11[Case 2: VGS was created then deleted]
+C11 --> C12[List VS using labels BackupUID, BackupName, PVCName]
+C12 --> C13[Check if VS has non-empty volumeGroupSnapshotName]
+C13 -- Yes --> C14[Skip VGS creation; use existing VS/DU; legacy workflow continues]
+C13 -- No --> C15[Fail backup for PVC]
+
+C1 -- No --> C16[Case 3: PVC lacks VGS label; follow legacy workflow to create VS]
 end
 
-%% Cleanup Modification Section
-subgraph "Cleanup Modification"
-CL1[Modify cleanupVolumeSnapshot to skip deletion of VS created via VGS]
-CL2[Delegate VGS related cleanup to VGS BIA Plugin in finalize phase]
-CL1 --> CL2
-end
-
-%% VGS BackupItemAction Plugin Section
-subgraph "VGS BIA Plugin"
-V1[Run in backup finalize phase]
-V2[Process cleanup of VGS, VGSC, VS and VSC artifacts]
-V1 --> V2
-end
-
-%% Connect Major Sections
-U2 --> I1
-I6 --> C1
-C6 --> CL1
-C7 --> CL1
-CL2 --> V1
+%% Connect Main Sections
+A2 --> B1
+B6 --> C1
 
 ```
 
 
 Restore workflow:
 
-#### Add a new VolumeGroupSnapshot(VGS) RIA plugin
-- This plugin will just skip the restore VGS object
+- No changes required for the restore workflow.
 
 ## Detailed Design
 
@@ -303,148 +277,7 @@ Backup workflow:
 
 - Updates to [CSI PVC plugin](https://github.com/vmware-tanzu/velero/blob/512199723ff95d5016b32e91e3bf06b65f57d608/pkg/backup/actions/csi/pvc_action.go#L200) (Update the Execute method):
 ```go
-// Retrieve the VGS label key from the backup spec.
-	vgsLabelKey := backup.Spec.VolumeGroupSnapshotLabelKey
-	// Check if the PVC has the specified VGS label key.
-	if group, ok := pvc.Labels[vgsLabelKey]; ok && group != "" {
-		// PVC is marked for group snapshot.
-		existingVGS := p.findExistingVGS(backup.UID, vgsLabelKey, group, pvc.Namespace)
-		if existingVGS == nil {
-			// No existing VGS found; list all PVCs in the same group.
-			groupedPVCs, err := p.listGroupedPVCs(backup, pvc.Namespace, vgsLabelKey, group)
-			if err != nil {
-				return nil, nil, "", nil, err
-			}
-			// Extract the names of all grouped PVCs.
-			pvcNames := extractPVCNames(groupedPVCs)
-			// Create a new VGS object with the backup UID and group.
-			newVGS, err := p.createVolumeGroupSnapshot(backup, pvc, pvcNames, vgsLabelKey, group)
-			if err != nil {
-				return nil, nil, "", nil, err
-			}
-			p.log.Infof("Created new VGS %s for PVC group %s", newVGS.Name, group)
-			additionalItems = append(additionalItems, velero.ResourceIdentifier{
-				GroupResource: schema.GroupResource{
-					Group:    "snapshot.storage.k8s.io",
-					Resource: "volumegroupsnapshots",
-				},
-				Namespace: newVGS.Namespace,
-				Name:      newVGS.Name,
-			})
-		} else {
-			// Existing VGS found; skip creating an individual VS.
-			p.log.Infof("PVC %s is part of existing VGS %s, skipping individual VolumeSnapshot creation", pvc.Name, existingVGS.Name)
-		}
-	} else {
-		// PVC is not part of a VGS group; create an individual VolumeSnapshot.
-    
-    //.
-    //.
-    //.
-    }
-
-// helper functions used
-
-// findExistingVGS checks for an existing VolumeGroupSnapshot (VGS) for the given backup UID and group in the namespace.
-func (p *pvcBackupItemAction) findExistingVGS(backupUID types.UID, vgsLabelKey, group, namespace string) *VolumeGroupSnapshot {
-	var vgsList VolumeGroupSnapshotList
-	err := p.crClient.List(
-		context.TODO(),
-		&vgsList,
-		crclient.InNamespace(namespace),
-		crclient.MatchingLabels{
-			"backup-uid": string(backupUID),
-			vgsLabelKey:  group,
-		},
-	)
-	if err != nil {
-		p.log.Errorf("Error listing VGS: %v", err)
-		return nil
-	}
-	if len(vgsList.Items) > 0 {
-		return &vgsList.Items[0]
-	}
-	return nil
-}
-
-// listGroupedPVCs returns all PVCs in the given namespace that have the specified VGS label key and group value.
-func (p *pvcBackupItemAction) listGroupedPVCs(backup *velerov1api.Backup, namespace, vgsLabelKey, group string) ([]corev1api.PersistentVolumeClaim, error) {
-	var pvcList corev1api.PersistentVolumeClaimList
-	err := p.crClient.List(context.TODO(), &pvcList, crclient.InNamespace(namespace), crclient.MatchingLabels{vgsLabelKey: group})
-	if err != nil {
-		return nil, err
-	}
-	return pvcList.Items, nil
-}
-
-func (p *pvcBackupItemAction) createVolumeGroupSnapshot(
-	backup *velerov1api.Backup,
-	pvc corev1api.PersistentVolumeClaim,
-	pvcNames []string,
-	vgsLabelKey, group string,
-) (*VolumeGroupSnapshot, error) {
-	// Generate a name for the new VGS object.
-	name := fmt.Sprintf("vgs-%s-%d", string(backup.UID), time.Now().Unix())
-	
-	// Construct the VGS object
-	vgs := &VolumeGroupSnapshot{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "VolumeGroupSnapshot",
-			APIVersion: "groupsnapshot.storage.k8s.io/v1beta1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: pvc.Namespace,
-			Annotations: map[string]string{
-				"pvcList": strings.Join(pvcNames, ","),
-			},
-			Labels: map[string]string{
-				velerov1api.BackupUIDLabel: string(backup.UID),
-				vgsLabelKey:  group,
-			},
-		},
-		Spec: VolumeGroupSnapshotSpec{
-			// we will use default VGSClass for now
-			Source: VolumeGroupSnapshotSource{
-				Selector: metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						vgsLabelKey: group,
-					},
-				},
-			},
-		},
-	}
-
-	// Create the VGS object
-	if err := p.crClient.Create(context.TODO(), vgs); err != nil {
-		return nil, err
-	}
-	return vgs, nil
-}
-
-// extractPVCNames returns a slice of PVC names from the provided list.
-func extractPVCNames(pvcs []corev1api.PersistentVolumeClaim) []string {
-	names := []string{}
-	for _, pvc := range pvcs {
-		names = append(names, pvc.Name)
-	}
-	return names
-}
-
-```
-
-- Add a new VolumeGroupSnapshot(VGS) BIA plugin
-```go
-// AppliesTo specifies that this plugin applies to VolumeGroupSnapshot objects.
-func (p *vgsBackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
-	return velero.ResourceSelector{
-		IncludedResources: []string{"volumegroupsnapshots"},
-	}, nil
-}
-
-// Execute waits for all related VolumeSnapshot (VS) instances to be ready, then adds them
-// along with the VolumeGroupSnapshotClass as additional backup items.
-func (p *vgsBackupItemAction) Execute(
+func (p *pvcBackupItemAction) Execute(
 	item runtime.Unstructured,
 	backup *velerov1api.Backup,
 ) (
@@ -454,55 +287,230 @@ func (p *vgsBackupItemAction) Execute(
 	[]velero.ResourceIdentifier,
 	error,
 ) {
-	p.log.Infof("Starting VGS backup plugin Execute for item: %s", item.GetName())
+	p.log.Info("Starting PVCBackupItemAction")
 
-	// Convert the unstructured object to a VolumeGroupSnapshot.
-	var vgs VolumeGroupSnapshot
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.UnstructuredContent(), &vgs); err != nil {
-		return nil, nil, "", nil, errors.Wrap(err, "unable to convert item to VolumeGroupSnapshot")
-	}
-
-	// Wait until all related VolumeSnapshots are ready.
-	p.log.Infof("Waiting for all related VolumeSnapshots for VGS %s to be ready", vgs.Name)
-	ready, err := waitForGroupedVolumeSnapshots(&vgs, vgs.Namespace, p.log)
-	if err != nil {
-		return nil, nil, "", nil, errors.Wrap(err, "error waiting for grouped VolumeSnapshots")
-	}
-	if !ready {
-		p.log.Infof("Not all related VolumeSnapshots are ready for VGS %s", vgs.Name)
+	if valid := p.validateBackup(*backup); !valid {
 		return item, nil, "", nil, nil
 	}
 
-	// Retrieve the related VolumeSnapshot instances.
-	groupedVS := getGroupedVolumeSnapshots(&vgs, vgs.Namespace)
-	var additionalItems []velero.ResourceIdentifier
-	for _, vs := range groupedVS {
-		additionalItems = append(additionalItems, velero.ResourceIdentifier{
-			GroupResource: schema.GroupResource{
-				Group:    "snapshot.storage.k8s.io",
-				Resource: "volumesnapshots",
-			},
-			Namespace: vs.Namespace,
-			Name:      vs.Name,
-		})
+	var pvc corev1api.PersistentVolumeClaim
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(
+		item.UnstructuredContent(), &pvc,
+	); err != nil {
+		return nil, nil, "", nil, errors.WithStack(err)
 	}
 
-	// Add the VolumeGroupSnapshotClass as an additional item.
-	// Here we assume that the VGS spec defines the class name.
-    // We will be using the default VGSClass for now
-	vgsClassName := vgs.Spec.VolumeGroupSnapshotClassName
-	additionalItems = append(additionalItems, velero.ResourceIdentifier{
-		GroupResource: schema.GroupResource{
-			Group:    "snapshot.storage.k8s.io",
-			Resource: "volumegroupsnapshotclasses",
-		},
-		Namespace: "",
-		Name:      vgsClassName,
-	})
+	if valid, item, err := p.validatePVCandPV(pvc, item); !valid {
+		if err != nil {
+			return nil, nil, "", nil, err
+		}
+		return item, nil, "", nil, nil
+	}
 
-	p.log.Infof("VGS %s ready; adding %d additional items to backup", vgs.Name, len(additionalItems))
-	return item, additionalItems, "", nil, nil
+	shouldSnapshot, err := volumehelper.ShouldPerformSnapshotWithBackup(
+		item,
+		kuberesource.PersistentVolumeClaims,
+		*backup,
+		p.crClient,
+		p.log,
+	)
+	if err != nil {
+		return nil, nil, "", nil, err
+	}
+	if !shouldSnapshot {
+		p.log.Debugf("CSI plugin skip snapshot for PVC %s according to VolumeHelper setting", pvc.Namespace+"/"+pvc.Name)
+		return nil, nil, "", nil, nil
+	}
+
+	var additionalItems []velero.ResourceIdentifier
+	operationID := ""
+	var itemToUpdate []velero.ResourceIdentifier
+
+	// vsRef will be used to apply common labels/annotations
+	var vsRef *corev1api.ObjectReference
+
+	// VGS branch: check if PVC has the VGS label key set on it.
+	vgsLabelKey := backup.Spec.VolumeGroupSnapshotLabelKey
+	if group, ok := pvc.Labels[vgsLabelKey]; ok && group != "" {
+		p.log.Infof("PVC %s has VGS label with group %s", pvc.Name, group)
+		// First, check if a VS created via a VGS workflow exists for this PVC.
+		existingVS, err := p.findExistingVSForBackup(backup.UID, backup.Name, pvc.Name, pvc.Namespace)
+		if err != nil {
+			return nil, nil, "", nil, err
+		}
+		if existingVS != nil && existingVS.Status.VolumeGroupSnapshotName != "" {
+			p.log.Infof("Existing VS %s found for PVC %s in group %s; skipping VGS creation", existingVS.Name, pvc.Name, group)
+			vsRef = &corev1api.ObjectReference{
+				Namespace: existingVS.Namespace,
+				Name:      existingVS.Name,
+			}
+			additionalItems = append(additionalItems, velero.ResourceIdentifier{
+				GroupResource: schema.GroupResource{
+					Group:    "snapshot.storage.k8s.io",
+					Resource: "volumesnapshots",
+				},
+				Namespace: existingVS.Namespace,
+				Name:      existingVS.Name,
+			})
+		} else {
+			// No existing VS found for the group; execute VGS creation workflow.
+			groupedPVCs, err := p.listGroupedPVCs(backup, pvc.Namespace, vgsLabelKey, group)
+			if err != nil {
+				return nil, nil, "", nil, err
+			}
+			pvcNames := extractPVCNames(groupedPVCs)
+			newVGS, err := p.createVolumeGroupSnapshot(backup, pvc, pvcNames, vgsLabelKey, group)
+			if err != nil {
+				return nil, nil, "", nil, err
+			}
+			p.log.Infof("Created new VGS %s for PVC group %s", newVGS.Name, group)
+			
+			// Wait for the VS objects created via VGS to have VolumeGroupSnapshotName in status.
+			if err := p.waitForVGSAssociatedVS(newVGS, pvc.Namespace, backup.Spec.CSISnapshotTimeout.Duration); err != nil {
+				return nil, nil, "", nil, err
+			}
+			// Update VS objects: remove VGS owner references and finalizers; add BackupName, BackupUUID and PVC name as labels.
+			if err := p.updateVGSCreatedVS(newVGS, backup); err != nil {
+				return nil, nil, "", nil, err
+			}
+			// Patch the VGSC deletionPolicy to Retain.
+			if err := p.patchVGSCDeletionPolicy(newVGS, pvc.Namespace); err != nil {
+				return nil, nil, "", nil, err
+			}
+			// Delete the VGS and VGSC objects to prevent cascading deletion.
+			if err := p.deleteVGSAndVGSC(newVGS, pvc.Namespace); err != nil {
+				return nil, nil, "", nil, err
+			}
+			
+			// Branch based on datamover flag.
+			if !boolptr.IsSetToTrue(backup.Spec.SnapshotMoveData) {
+				// Non-datamover: list VS objects created via VGS and use them.
+				vsList, err := p.listVSForVGSGroup(backup, pvc.Namespace, vgsLabelKey, group)
+				if err != nil {
+					return nil, nil, "", nil, err
+				}
+				if len(vsList) == 0 {
+					return nil, nil, "", nil, errors.New("no VS objects found for VGS group " + group)
+				}
+				vsRef = &corev1api.ObjectReference{
+					Namespace: vsList[0].Namespace,
+					Name:      vsList[0].Name,
+				}
+				additionalItems = append(additionalItems, convertVSToResourceIdentifiers(vsList)...)
+			} else {
+				// Datamover: retrieve the VS for the PVC and create a DataUpload.
+				vs, err := p.getVSForPVC(backup, pvc, vgsLabelKey, group)
+				if err != nil {
+					return nil, nil, "", nil, err
+				}
+				operationID = label.GetValidName(string(velerov1api.AsyncOperationIDPrefixDataUpload) + string(backup.UID) + "." + string(pvc.UID))
+				dataUploadLog := p.log.WithFields(logrus.Fields{
+					"Source PVC":     fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name),
+					"VolumeSnapshot": fmt.Sprintf("%s/%s", vs.Namespace, vs.Name),
+					"Operation ID":   operationID,
+					"Backup":         backup.Name,
+				})
+				// Wait until VS associated VSC snapshot handle is created.
+				_, err = csi.WaitUntilVSCHandleIsReady(
+					vs,
+					p.crClient,
+					p.log,
+					true,
+					backup.Spec.CSISnapshotTimeout.Duration,
+				)
+				if err != nil {
+					dataUploadLog.Errorf("Fail to wait VolumeSnapshot turned to ReadyToUse: %s", err.Error())
+					csi.CleanupVolumeSnapshot(vs, p.crClient, p.log)
+					return nil, nil, "", nil, errors.WithStack(err)
+				}
+				dataUploadLog.Info("Starting data upload of backup")
+				dataUpload, err := createDataUpload(
+					context.Background(),
+					backup,
+					p.crClient,
+					vs,
+					&pvc,
+					operationID,
+				)
+				if err != nil {
+					dataUploadLog.WithError(err).Error("failed to submit DataUpload")
+					if deleteErr := p.crClient.Delete(context.TODO(), vs); deleteErr != nil {
+						if !apierrors.IsNotFound(deleteErr) {
+							dataUploadLog.WithError(deleteErr).Error("fail to delete VolumeSnapshot")
+						}
+					}
+					return item, nil, "", nil, nil
+				} else {
+					itemToUpdate = []velero.ResourceIdentifier{
+						{
+							GroupResource: schema.GroupResource{
+								Group:    "velero.io",
+								Resource: "datauploads",
+							},
+							Namespace: dataUpload.Namespace,
+							Name:      dataUpload.Name,
+						},
+					}
+					annotations[velerov1api.DataUploadNameAnnotation] = dataUpload.Namespace + "/" + dataUpload.Name
+					dataUploadLog.Info("DataUpload is submitted successfully.")
+				}
+				vsRef = &corev1api.ObjectReference{
+					Namespace: dataUpload.Namespace,
+					Name:      dataUpload.Name,
+				}
+				additionalItems = append(additionalItems, velero.ResourceIdentifier{
+					GroupResource: schema.GroupResource{
+						Group:    "velero.io",
+						Resource: "datauploads",
+					},
+					Namespace: dataUpload.Namespace,
+					Name:      dataUpload.Name,
+				})
+			}
+		}
+	} else {
+		// Legacy workflow: PVC does not have a VGS label; create an individual VolumeSnapshot.
+		vs, err := p.createVolumeSnapshot(pvc, backup)
+		if err != nil {
+			return nil, nil, "", nil, err
+		}
+		vsRef = vs
+		additionalItems = []velero.ResourceIdentifier{
+			{
+				GroupResource: kuberesource.VolumeSnapshots,
+				Namespace:     vs.Namespace,
+				Name:          vs.Name,
+			},
+		}
+	}
+
+	labels := map[string]string{
+		velerov1api.VolumeSnapshotLabel: vsRef.Name,
+		velerov1api.BackupNameLabel:     backup.Name,
+	}
+
+	annotations := map[string]string{
+		velerov1api.VolumeSnapshotLabel:                 vsRef.Name,
+		velerov1api.MustIncludeAdditionalItemAnnotation: "true",
+	}
+
+	kubeutil.AddAnnotations(&pvc.ObjectMeta, annotations)
+	kubeutil.AddLabels(&pvc.ObjectMeta, labels)
+
+	p.log.Infof("Returning from PVCBackupItemAction with %d additionalItems to backup", len(additionalItems))
+	for _, ai := range additionalItems {
+		p.log.Debugf("%s: %s", ai.GroupResource.String(), ai.Name)
+	}
+
+	pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pvc)
+	if err != nil {
+		return nil, nil, "", nil, errors.WithStack(err)
+	}
+
+	return &unstructured.Unstructured{Object: pvcMap},
+		additionalItems, operationID, itemToUpdate, nil
 }
+
 ```
 
 ## Implementation
