@@ -36,7 +36,6 @@ import (
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
-	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
@@ -48,6 +47,7 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	pkgUtilKubeMocks "github.com/vmware-tanzu/velero/pkg/util/kube/mocks"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 func TestRestoreFinalizerReconcile(t *testing.T) {
