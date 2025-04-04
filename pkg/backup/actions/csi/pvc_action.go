@@ -321,24 +321,23 @@ func (p *pvcBackupItemAction) Execute(
 			// Return without modification to not fail the backup,
 			// and the above error log makes the backup partially fail.
 			return item, nil, "", nil, nil
-		} else {
-			itemToUpdate = []velero.ResourceIdentifier{
-				{
-					GroupResource: schema.GroupResource{
-						Group:    "velero.io",
-						Resource: "datauploads",
-					},
-					Namespace: dataUpload.Namespace,
-					Name:      dataUpload.Name,
-				},
-			}
-			// Set the DataUploadNameLabel, which is used for restore to
-			// let CSI plugin check whether it should handle the volume.
-			// If volume is CSI migration, PVC doesn't have the annotation.
-			annotations[velerov1api.DataUploadNameAnnotation] = dataUpload.Namespace + "/" + dataUpload.Name
-
-			dataUploadLog.Info("DataUpload is submitted successfully.")
 		}
+		itemToUpdate = []velero.ResourceIdentifier{
+			{
+				GroupResource: schema.GroupResource{
+					Group:    "velero.io",
+					Resource: "datauploads",
+				},
+				Namespace: dataUpload.Namespace,
+				Name:      dataUpload.Name,
+			},
+		}
+		// Set the DataUploadNameLabel, which is used for restore to
+		// let CSI plugin check whether it should handle the volume.
+		// If volume is CSI migration, PVC doesn't have the annotation.
+		annotations[velerov1api.DataUploadNameAnnotation] = dataUpload.Namespace + "/" + dataUpload.Name
+
+		dataUploadLog.Info("DataUpload is submitted successfully.")
 	} else {
 		additionalItems = []velero.ResourceIdentifier{
 			{

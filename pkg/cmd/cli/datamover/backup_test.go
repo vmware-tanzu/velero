@@ -55,9 +55,8 @@ func (fr *fakeRunHelper) Init() error {
 func (fr *fakeRunHelper) RunCancelableDataPath(_ context.Context) (string, error) {
 	if fr.runCancelableDataPathErr != nil {
 		return "", fr.runCancelableDataPathErr
-	} else {
-		return fr.runCancelableDataPathResult, nil
 	}
+	return fr.runCancelableDataPathResult, nil
 }
 
 func (fr *fakeRunHelper) Shutdown() {

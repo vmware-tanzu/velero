@@ -122,9 +122,8 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if err != nil {
 		if err == datapath.ConcurrentLimitExceed {
 			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
-		} else {
-			return c.errorOut(ctx, pvr, err, "error to create data path", log)
 		}
+		return c.errorOut(ctx, pvr, err, "error to create data path", log)
 	}
 
 	original := pvr.DeepCopy()

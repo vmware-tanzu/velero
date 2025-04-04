@@ -77,12 +77,11 @@ var _ = Describe("Server Status Request Reconciler", func() {
 			})
 
 			Expect(actualResult).To(BeEquivalentTo(test.expectedRequeue))
-			if test.expectedErrMsg == "" {
-				Expect(err).ToNot(HaveOccurred())
-			} else {
+			if test.expectedErrMsg != "" {
 				Expect(err.Error()).To(BeEquivalentTo(test.expectedErrMsg))
 				return
 			}
+			Expect(err).ToNot(HaveOccurred())
 
 			instance := &velerov1api.ServerStatusRequest{}
 			err = r.client.Get(ctx, kbclient.ObjectKey{Name: test.req.Name, Namespace: test.req.Namespace}, instance)

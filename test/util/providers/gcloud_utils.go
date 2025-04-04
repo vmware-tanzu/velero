@@ -138,10 +138,9 @@ func (s GCSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObj
 
 	if snapshotCountFound != snapshotCheck.ExpectCount {
 		return errors.New(fmt.Sprintf("Snapshot count %d is not as expected %d\n", snapshotCountFound, len(snapshotCheck.SnapshotIDList)))
-	} else {
-		fmt.Printf("Snapshot count %d is as expected %d\n", snapshotCountFound, len(snapshotCheck.SnapshotIDList))
-		return nil
 	}
+	fmt.Printf("Snapshot count %d is as expected %d\n", snapshotCountFound, len(snapshotCheck.SnapshotIDList))
+	return nil
 }
 
 func (s GCSStorage) GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, objectKey string) (io.ReadCloser, error) {
