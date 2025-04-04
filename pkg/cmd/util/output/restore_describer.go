@@ -27,7 +27,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/volume"
 
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -488,7 +488,7 @@ func describeRestoreResourceList(ctx context.Context, kbClient kbclient.Client, 
 }
 
 // DescribeResourceModifier describes resource policies in human-readable format
-func DescribeResourceModifier(d *Describer, resModifier *v1.TypedLocalObjectReference) {
+func DescribeResourceModifier(d *Describer, resModifier *corev1api.TypedLocalObjectReference) {
 	d.Printf("Resource modifier:\n")
 	d.Printf("\tType:\t%s\n", resModifier.Kind)
 	d.Printf("\tName:\t%s\n", resModifier.Name)

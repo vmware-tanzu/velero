@@ -22,7 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -185,7 +185,7 @@ func GetResourcePoliciesFromBackup(
 ) (resourcePolicies *Policies, err error) {
 	if backup.Spec.ResourcePolicy != nil &&
 		strings.EqualFold(backup.Spec.ResourcePolicy.Kind, ConfigmapRefType) {
-		policiesConfigMap := &v1.ConfigMap{}
+		policiesConfigMap := &corev1api.ConfigMap{}
 		err = client.Get(
 			context.Background(),
 			crclient.ObjectKey{Namespace: backup.Namespace, Name: backup.Spec.ResourcePolicy.Name},
@@ -214,7 +214,7 @@ func GetResourcePoliciesFromBackup(
 	return resourcePolicies, nil
 }
 
-func getResourcePoliciesFromConfig(cm *v1.ConfigMap) (*Policies, error) {
+func getResourcePoliciesFromConfig(cm *corev1api.ConfigMap) (*Policies, error) {
 	if cm == nil {
 		return nil, fmt.Errorf("could not parse config from nil configmap")
 	}

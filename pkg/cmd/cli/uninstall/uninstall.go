@@ -28,7 +28,7 @@ import (
 	"github.com/spf13/pflag"
 
 	appsv1api "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -173,7 +173,7 @@ func Run(ctx context.Context, kbClient kbclient.Client, namespace string) error 
 
 func deleteNamespace(ctx context.Context, kbClient kbclient.Client, namespace string) error {
 	// First check if it's already been deleted
-	ns := &corev1.Namespace{}
+	ns := &corev1api.Namespace{}
 	key := kbclient.ObjectKey{Name: namespace}
 	if err := kbClient.Get(ctx, key, ns); err != nil {
 		if apierrors.IsNotFound(err) {

@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
@@ -193,7 +193,7 @@ func k8sPrioritySort(gvs []metav1.GroupVersionForDiscovery) {
 
 // userResourceGroupVersionPriorities retrieves a user-provided config map and
 // extracts the user priority versions for each resource.
-func userResourceGroupVersionPriorities(ctx *restoreContext, cm *corev1.ConfigMap) map[string]metav1.APIGroup {
+func userResourceGroupVersionPriorities(ctx *restoreContext, cm *corev1api.ConfigMap) map[string]metav1.APIGroup {
 	if cm == nil {
 		ctx.log.Debugf("No enableapigroupversion config map found in velero namespace. Using pre-defined priorities.")
 		return nil
@@ -208,7 +208,7 @@ func userResourceGroupVersionPriorities(ctx *restoreContext, cm *corev1.ConfigMa
 	return priorities
 }
 
-func userPriorityConfigMap() (*corev1.ConfigMap, error) {
+func userPriorityConfigMap() (*corev1api.ConfigMap, error) {
 	cfg, err := client.LoadConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "reading client config file")
