@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -44,7 +44,7 @@ resourceModifierRules:
 `
 
 type ResourceModifiersCase struct {
-	TestCase
+	BRCase
 	cmName, yamlConfig string
 }
 
@@ -52,7 +52,7 @@ var ResourceModifiersTest func() = TestFunc(&ResourceModifiersCase{})
 
 func (r *ResourceModifiersCase) Init() error {
 	// generate random number as UUIDgen and set one default timeout duration
-	r.TestCase.Init()
+	r.BRCase.Init()
 
 	// generate variable names based on CaseBaseName + UUIDgen
 	r.CaseBaseName = "resource-modifiers-" + r.UUIDgen
@@ -138,7 +138,7 @@ func (r *ResourceModifiersCase) Clean() error {
 			return err
 		}
 
-		return r.GetTestCase().Clean() // only clean up resources in test namespace
+		return r.BRCase.Clean() // only clean up resources in test namespace
 	}
 
 	return nil

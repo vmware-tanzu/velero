@@ -10,13 +10,13 @@ import (
 	"github.com/pkg/errors"
 
 	. "github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 type PVBackupFiltering struct {
-	TestCase
+	BRCase
 	annotation  string
 	podsList    [][]string
 	volumesList [][]string
@@ -31,7 +31,7 @@ var OptInPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_IN_AN
 var OptOutPVBackupTest func() = TestFunc(&PVBackupFiltering{annotation: OPT_OUT_ANN, id: "opt-out"})
 
 func (p *PVBackupFiltering) Init() error {
-	p.TestCase.Init()
+	p.BRCase.Init()
 	p.CaseBaseName = "pv-filter-" + p.UUIDgen
 	p.BackupName = "backup-" + p.CaseBaseName + p.id
 	p.RestoreName = "restore-" + p.CaseBaseName + p.id

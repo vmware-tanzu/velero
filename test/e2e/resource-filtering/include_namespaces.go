@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
