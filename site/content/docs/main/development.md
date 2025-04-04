@@ -14,13 +14,11 @@ Run `make update` to regenerate files if you make the following changes:
 
 The following files are automatically generated from the source code:
 
-* The clientset
-* Listers
-* Shared informers
+* CRDs
 * Documentation
 * Protobuf/gRPC types
 
-You can run `make verify` to ensure that all generated files (clientset, listers, shared informers, docs) are up to date.
+You can run `make verify` to ensure that all generated files (CRDs, docs) are up to date.
 
 ## Linting
 
