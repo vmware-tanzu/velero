@@ -54,49 +54,50 @@ func Stream(
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	downloadURL, err := getDownloadURL(ctx, kbClient, namespace, name, kind)
+	downloadURL, caCertByteString, err := getDownloadURL(ctx, kbClient, namespace, name, kind)
 	if err != nil {
 		return err
 	}
 
-	if err := download(ctx, downloadURL, kind, w, insecureSkipTLSVerify, caCertFile); err != nil {
+	if err := download(ctx, downloadURL, kind, w, insecureSkipTLSVerify, caCertFile, caCertByteString); err != nil {
 		return err
 	}
 
 	return nil
 }
 
+// returns downloadURL and caCert
 func getDownloadURL(
 	ctx context.Context,
 	kbClient kbclient.Client,
 	namespace, name string,
 	kind veleroV1api.DownloadTargetKind,
-) (string, error) {
+) (string, string, error) {
 	uuid, err := uuid.NewRandom()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	reqName := fmt.Sprintf("%s-%s", name, uuid.String())
 	created := builder.ForDownloadRequest(namespace, reqName).Target(kind, name).Result()
 
 	if err := kbClient.Create(ctx, created, &kbclient.CreateOptions{}); err != nil {
-		return "", errors.WithStack(err)
+		return "", "", errors.WithStack(err)
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			return "", ErrDownloadRequestDownloadURLTimeout
+			return "", "", ErrDownloadRequestDownloadURLTimeout
 
 		case <-time.After(25 * time.Millisecond):
 			updated := &veleroV1api.DownloadRequest{}
 			if err := kbClient.Get(ctx, kbclient.ObjectKey{Name: created.Name, Namespace: namespace}, updated); err != nil {
-				return "", errors.WithStack(err)
+				return "", "", errors.WithStack(err)
 			}
 
 			if updated.Status.DownloadURL != "" {
-				return updated.Status.DownloadURL, nil
+				return updated.Status.DownloadURL, updated.Status.CaCert, nil
 			}
 		}
 	}
@@ -109,8 +110,10 @@ func download(
 	w io.Writer,
 	insecureSkipTLSVerify bool,
 	caCertFile string,
+	caCertByteString string,
 ) error {
 	var caPool *x509.CertPool
+	var err error
 	if len(caCertFile) > 0 {
 		caCert, err := os.ReadFile(caCertFile)
 		if err != nil {
@@ -124,6 +127,16 @@ func download(
 			caPool = x509.NewCertPool()
 		}
 		caPool.AppendCertsFromPEM(caCert)
+	}
+	if len(caCertByteString) > 0 {
+		// bundle the passed in cert with the system cert pool
+		// if it's available, otherwise create a new pool just
+		// for this.
+		caPool, err = x509.SystemCertPool()
+		if err != nil {
+			caPool = x509.NewCertPool()
+		}
+		caPool.AppendCertsFromPEM([]byte(caCertByteString))
 	}
 
 	defaultTransport := http.DefaultTransport.(*http.Transport)
