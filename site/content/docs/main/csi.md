@@ -45,13 +45,26 @@ This section documents some of the choices made during implementing the CSI snap
  1. VolumeSnapshots created by the Velero CSI plugins are retained only for the lifetime of the backup even if the `DeletionPolicy` on the VolumeSnapshotClass is set to `Retain`. To accomplish this, during deletion of the backup the prior to deleting the VolumeSnapshot, VolumeSnapshotContent object is patched to set its `DeletionPolicy` to `Delete`. Deleting the VolumeSnapshot object will result in cascade delete of the VolumeSnapshotContent and the snapshot in the storage provider.
  2. VolumeSnapshotContent objects created during a `velero backup` that are dangling, unbound to a VolumeSnapshot object, will be discovered, using labels, and deleted on backup deletion.
  3. The Velero CSI plugins, to backup CSI backed PVCs, will choose the VolumeSnapshotClass in the cluster based on the following logic:
-    1. **Default Behavior:**
+    1. **Default Behavior Based On Annotation:**
+    You can specify a default VolumeSnapshotClass for VolumeSnapshots that don't request any particular class to bind to by adding the snapshot.storage.kubernetes.io/is-default-class: "true" annotation.
+    For example, if you want to create a VolumeSnapshotClass for the CSI driver `disk.csi.cloud.com` for taking snapshots of disks created with `disk.csi.cloud.com` based storage classes, you can create a VolumeSnapshotClass like this:
+        ```yaml
+        apiVersion: snapshot.storage.k8s.io/v1
+        kind: VolumeSnapshotClass
+        metadata:
+          name: test-snapclass-by-annotation
+          annotations:
+            snapshot.storage.kubernetes.io/is-default-class: "true"
+        driver: disk.csi.cloud.com
+       ```    
+       Note: If multiple CSI drivers exist, a default VolumeSnapshotClass can be specified for each of them.
+    2. **Default Behavior Based On Label:**
     You can simply create a VolumeSnapshotClass for a particular driver and put a label on it to indicate that it is the default VolumeSnapshotClass for that driver.  For example, if you want to create a VolumeSnapshotClass for the CSI driver `disk.csi.cloud.com` for taking snapshots of disks created with `disk.csi.cloud.com` based storage classes, you can create a VolumeSnapshotClass like this:
         ```yaml
         apiVersion: snapshot.storage.k8s.io/v1
         kind: VolumeSnapshotClass
         metadata:
-          name: test-snapclass
+          name: test-snapclass-by-label
           labels:
             velero.io/csi-volumesnapshot-class: "true"
         driver: disk.csi.cloud.com
