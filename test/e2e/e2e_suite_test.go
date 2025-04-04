@@ -334,14 +334,20 @@ func init() {
 	flag.BoolVar(
 		&test.VeleroCfg.FailFast,
 		"fail-fast",
-		true,
+		test.VeleroCfg.FailFast,
 		"a switch for failing fast on meeting error.",
 	)
 	flag.BoolVar(
 		&test.VeleroCfg.HasVspherePlugin,
 		"has-vsphere-plugin",
-		false,
+		test.VeleroCfg.HasVspherePlugin,
 		"a switch for installing vSphere plugin.",
+	)
+	flag.IntVar(
+		&test.VeleroCfg.ItemBlockWorkerCount,
+		"item-block-worker-count",
+		test.VeleroCfg.ItemBlockWorkerCount,
+		"Velero backup's item block worker count.",
 	)
 }
 
