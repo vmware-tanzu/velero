@@ -56,7 +56,14 @@ func (s *Storage) ConnectionInfo() blob.ConnectionInfo {
 func NewStorage(ctx context.Context, option *Option, isCreate bool) (blob.Storage, error) {
 	cfg := option.Config
 
-	client, _, err := azureutil.NewStorageClient(logrus.New(), cfg)
+	logger := logrus.New()
+	logger.Formatter = &logrus.JSONFormatter{
+		FieldMap: logrus.FieldMap{
+			logrus.FieldKeyMsg: "@message",
+		},
+		DisableTimestamp: false,
+	}
+	client, _, err := azureutil.NewStorageClient(logger, cfg)
 	if err != nil {
 		return nil, err
 	}
