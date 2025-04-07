@@ -377,14 +377,14 @@ func (e *genericRestoreExposer) RebindVolume(ctx context.Context, ownerObject co
 }
 
 func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObject corev1.ObjectReference, targetPVC *corev1.PersistentVolumeClaim,
-	operationTimeout time.Duration, label map[string]string, annotation map[string]string, selectedNode string, resources corev1.ResourceRequirements, nodeType string) (*corev1.Pod, error) {
+	operationTimeout time.Duration, label map[string]string, annotation map[string]string, selectedNode string, resources corev1.ResourceRequirements, nodeOS string) (*corev1.Pod, error) {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
 	containerName := string(ownerObject.UID)
 	volumeName := string(ownerObject.UID)
 
-	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, kube.NodeOSLinux)
+	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, nodeOS)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
 	}
@@ -427,7 +427,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	nodeSelector := map[string]string{}
 	podOS := corev1.PodOS{}
 	toleration := []corev1.Toleration{}
-	if nodeType == kube.NodeOSWindows {
+	if nodeOS == kube.NodeOSWindows {
 		userID := "ContainerAdministrator"
 		securityCtx = &corev1.PodSecurityContext{
 			WindowsOptions: &corev1.WindowsSecurityContextOptions{
