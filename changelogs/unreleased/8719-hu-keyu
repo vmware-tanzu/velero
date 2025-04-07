@@ -1,0 +1,1 @@
+Inherit k8s default volumeSnapshotClass.
