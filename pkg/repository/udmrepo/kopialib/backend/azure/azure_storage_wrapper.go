@@ -18,6 +18,7 @@ package azure
 
 import (
 	"context"
+	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	"github.com/kopia/kopia/repo/blob"
 	"github.com/kopia/kopia/repo/blob/azure"
@@ -56,14 +57,7 @@ func (s *Storage) ConnectionInfo() blob.ConnectionInfo {
 func NewStorage(ctx context.Context, option *Option, isCreate bool) (blob.Storage, error) {
 	cfg := option.Config
 
-	logger := logrus.New()
-	logger.Formatter = &logrus.JSONFormatter{
-		FieldMap: logrus.FieldMap{
-			logrus.FieldKeyMsg: "@message",
-		},
-		DisableTimestamp: false,
-	}
-	client, _, err := azureutil.NewStorageClient(logger, cfg)
+	client, _, err := azureutil.NewStorageClient(logging.DefaultLogger(logrus.InfoLevel, logging.FormatJSON), cfg)
 	if err != nil {
 		return nil, err
 	}
