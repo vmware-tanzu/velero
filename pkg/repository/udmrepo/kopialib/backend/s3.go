@@ -18,9 +18,6 @@ package backend
 
 import (
 	"context"
-	"github.com/sirupsen/logrus"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
-
 	"github.com/kopia/kopia/repo/blob"
 	"github.com/kopia/kopia/repo/blob/s3"
 
@@ -54,6 +51,5 @@ func (c *S3Backend) Setup(ctx context.Context, flags map[string]string) error {
 }
 
 func (c *S3Backend) Connect(ctx context.Context, isCreate bool) (blob.Storage, error) {
-	logging.DefaultLogger(logrus.InfoLevel, logging.FormatJSON).Infof("test log format with s3, options:{%#v}", c.options)
 	return s3.New(ctx, &c.options, false)
 }
