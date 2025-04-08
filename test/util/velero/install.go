@@ -120,22 +120,41 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 		return errors.WithMessagef(err, "Failed to get Velero InstallOptions for plugin provider %s", veleroCfg.ObjectStoreProvider)
 	}
 
+	_, err = k8s.GetNamespace(ctx, *veleroCfg.ClientToInstallVelero, veleroCfg.VeleroNamespace)
+	// We should uninstall Velero for a new installation
+	if !apierrors.IsNotFound(err) {
+		if err := VeleroUninstall(context.Background(), *veleroCfg); err != nil {
+			return errors.Wrapf(err, "Failed to uninstall velero %s", veleroCfg.VeleroNamespace)
+		}
+	}
+
+	// If velero namespace does not exist, we should create it for service account creation
+	if err := k8s.KubectlCreateNamespace(ctx, veleroCfg.VeleroNamespace); err != nil {
+		return errors.Wrapf(err, "Failed to create namespace %s to install Velero", veleroCfg.VeleroNamespace)
+	}
+
+	// Create Backup Repository ConfigurationMap.
+	if _, err := k8s.CreateConfigMap(
+		veleroCfg.ClientToInstallVelero.ClientGo,
+		veleroCfg.VeleroNamespace,
+		test.BackupRepositoryConfigName,
+		nil,
+		map[string]string{
+			test.UploaderTypeKopia: "{\"cacheLimitMB\": 2048, \"fullMaintenanceInterval\": \"normalGC\"}",
+		},
+	); err != nil {
+		return errors.WithMessagef(err,
+			"Failed to create %s ConfigMap in %s namespace",
+			test.BackupRepositoryConfigName,
+			veleroCfg.VeleroNamespace,
+		)
+	}
+
 	// For AWS IRSA credential test, AWS IAM service account is required, so if ServiceAccountName and EKSPolicyARN
 	// are both provided, we assume IRSA test is running, otherwise skip this IAM service account creation part.
 	if veleroCfg.CloudProvider == test.AWS && veleroInstallOptions.ServiceAccountName != "" {
 		if veleroCfg.EKSPolicyARN == "" {
 			return errors.New("Please provide EKSPolicyARN for IRSA test.")
-		}
-		_, err = k8s.GetNamespace(ctx, *veleroCfg.ClientToInstallVelero, veleroCfg.VeleroNamespace)
-		// We should uninstall Velero for a new service account creation.
-		if !apierrors.IsNotFound(err) {
-			if err := VeleroUninstall(context.Background(), *veleroCfg); err != nil {
-				return errors.Wrapf(err, "Failed to uninstall velero %s", veleroCfg.VeleroNamespace)
-			}
-		}
-		// If velero namespace does not exist, we should create it for service account creation
-		if err := k8s.KubectlCreateNamespace(ctx, veleroCfg.VeleroNamespace); err != nil {
-			return errors.Wrapf(err, "Failed to create namespace %s to install Velero", veleroCfg.VeleroNamespace)
 		}
 		if err := k8s.KubectlDeleteClusterRoleBinding(ctx, "velero-cluster-role"); err != nil {
 			return errors.Wrapf(err, "Failed to delete clusterrolebinding %s to %s namespace", "velero-cluster-role", veleroCfg.VeleroNamespace)
@@ -143,6 +162,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 		if err := k8s.KubectlCreateClusterRoleBinding(ctx, "velero-cluster-role", "cluster-admin", veleroCfg.VeleroNamespace, veleroInstallOptions.ServiceAccountName); err != nil {
 			return errors.Wrapf(err, "Failed to create clusterrolebinding %s to %s namespace", "velero-cluster-role", veleroCfg.VeleroNamespace)
 		}
+
 		if err := eksutil.KubectlDeleteIAMServiceAcount(ctx, veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace, veleroCfg.ClusterToInstallVelero); err != nil {
 			return errors.Wrapf(err, "Failed to delete service account %s to %s namespace", veleroInstallOptions.ServiceAccountName, veleroCfg.VeleroNamespace)
 		}
@@ -366,6 +386,11 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 	if len(options.UploaderType) > 0 {
 		args = append(args, fmt.Sprintf("--uploader-type=%v", options.UploaderType))
 	}
+
+	if options.ItemBlockWorkerCount > 1 {
+		args = append(args, fmt.Sprintf("--item-block-worker-count=%d", options.ItemBlockWorkerCount))
+	}
+	args = append(args, fmt.Sprintf("--backup-repository-configmap=%s", test.BackupRepositoryConfigName))
 
 	if err := createVeleroResources(ctx, cli, namespace, args, options); err != nil {
 		return err
