@@ -44,13 +44,17 @@ const CSI = "csi"
 const Velero = "velero"
 const VeleroRestoreHelper = "velero-restore-helper"
 
-const UploaderTypeRestic = "restic"
+const (
+	UploaderTypeRestic = "restic"
+	UploaderTypeKopia  = "kopia"
+)
 
 const (
 	KubeSystemNamespace           = "kube-system"
 	VSphereCSIControllerNamespace = "vmware-system-csi"
 	VeleroVSphereSecretName       = "velero-vsphere-config-secret"
 	VeleroVSphereConfigMapName    = "velero-vsphere-plugin-config"
+	BackupRepositoryConfigName    = "backup-repository-config"
 )
 
 var PublicCloudProviders = []string{AWS, Azure, GCP, Vsphere}
