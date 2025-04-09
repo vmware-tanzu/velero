@@ -343,6 +343,12 @@ func init() {
 		false,
 		"a switch for installing vSphere plugin.",
 	)
+	flag.IntVar(
+		&test.VeleroCfg.ItemBlockWorkerCount,
+		"item-block-worker-count",
+		1,
+		"Velero backup's item block worker count.",
+	)
 }
 
 // Add label [SkipVanillaZfs]:
