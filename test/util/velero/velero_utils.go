@@ -280,6 +280,7 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	io.VeleroPodMemLimit = veleroCfg.VeleroPodMemLimit
 	io.VeleroPodMemRequest = veleroCfg.VeleroPodMemRequest
 	io.DisableInformerCache = veleroCfg.DisableInformerCache
+	io.ItemBlockWorkerCount = veleroCfg.ItemBlockWorkerCount
 
 	return io, nil
 }

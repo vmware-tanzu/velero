@@ -367,6 +367,10 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 		args = append(args, fmt.Sprintf("--uploader-type=%v", options.UploaderType))
 	}
 
+	if options.ItemBlockWorkerCount > 1 {
+		args = append(args, fmt.Sprintf("--item-block-worker-count=%d", options.ItemBlockWorkerCount))
+	}
+
 	if err := createVeleroResources(ctx, cli, namespace, args, options); err != nil {
 		return err
 	}
