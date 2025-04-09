@@ -21,7 +21,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/providers"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -30,7 +30,7 @@ var CSIDataMoverVolumeInfoTest func() = TestFunc(&CSIDataMoverVolumeInfo{
 	BackupVolumeInfo{
 		SnapshotMoveData: true,
 		SnapshotVolumes:  true,
-		TestCase: TestCase{
+		BRCase: BRCase{
 			CaseBaseName: "csi-data-mover-volumeinfo",
 			TestMsg: &TestMSG{
 				Desc: "Test backup's VolumeInfo metadata content for CSI data mover case.",

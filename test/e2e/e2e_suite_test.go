@@ -236,7 +236,7 @@ func init() {
 		"frequency of garbage collection.",
 	)
 	flag.StringVar(
-		&test.VeleroCfg.DefaultClusterContext,
+		&test.VeleroCfg.ActiveClusterContext,
 		"default-cluster-context",
 		"",
 		"default cluster's kube config context, it's for migration test.",
@@ -284,7 +284,7 @@ func init() {
 		"plugins provider for standby cluster.",
 	)
 	flag.StringVar(
-		&test.VeleroCfg.StandbyClusterObjectStoreProvider,
+		&test.VeleroCfg.StandbyObjectStoreProvider,
 		"standby-cluster-object-store-provider",
 		"",
 		"object store provider for standby cluster.",
@@ -302,7 +302,7 @@ func init() {
 		"a switch for disable informer cache.",
 	)
 	flag.StringVar(
-		&test.VeleroCfg.DefaultClusterName,
+		&test.VeleroCfg.ActiveClusterName,
 		"default-cluster-name",
 		"",
 		"default cluster's name in kube config file, it's for EKS IRSA test.",
@@ -320,7 +320,7 @@ func init() {
 		"EKS plicy ARN for creating AWS IAM service account.",
 	)
 	flag.StringVar(
-		&test.VeleroCfg.DefaultCLSServiceAccountName,
+		&test.VeleroCfg.ActiveCLSServiceAccountName,
 		"default-cls-service-account-name",
 		"",
 		"default cluster service account name.",
@@ -637,17 +637,17 @@ var _ = Describe(
 func GetKubeConfigContext() error {
 	var err error
 	var tcDefault, tcStandby k8s.TestClient
-	tcDefault, err = k8s.NewTestClient(test.VeleroCfg.DefaultClusterContext)
-	test.VeleroCfg.DefaultClient = &tcDefault
-	test.VeleroCfg.ClientToInstallVelero = test.VeleroCfg.DefaultClient
-	test.VeleroCfg.ClusterToInstallVelero = test.VeleroCfg.DefaultClusterName
-	test.VeleroCfg.ServiceAccountNameToInstall = test.VeleroCfg.DefaultCLSServiceAccountName
+	tcDefault, err = k8s.NewTestClient(test.VeleroCfg.ActiveClusterContext)
+	test.VeleroCfg.ActiveClient = &tcDefault
+	test.VeleroCfg.ClientToInstallVelero = test.VeleroCfg.ActiveClient
+	test.VeleroCfg.ClusterToInstallVelero = test.VeleroCfg.ActiveClusterName
+	test.VeleroCfg.ServiceAccountNameToInstall = test.VeleroCfg.ActiveCLSServiceAccountName
 	if err != nil {
 		return err
 	}
 
-	if test.VeleroCfg.DefaultClusterContext != "" {
-		err = k8s.KubectlConfigUseContext(context.Background(), test.VeleroCfg.DefaultClusterContext)
+	if test.VeleroCfg.ActiveClusterContext != "" {
+		err = k8s.KubectlConfigUseContext(context.Background(), test.VeleroCfg.ActiveClusterContext)
 		if err != nil {
 			return err
 		}
@@ -665,8 +665,6 @@ func GetKubeConfigContext() error {
 	return nil
 }
 
-var testSuitePassed bool
-
 func TestE2e(t *testing.T) {
 	// Skip running E2E tests when running only "short" tests because:
 	// 1. E2E tests are long running tests involving installation of Velero and performing backup and restore operations.
@@ -675,26 +673,49 @@ func TestE2e(t *testing.T) {
 		t.Skip("Skipping E2E tests")
 	}
 
-	if !slices.Contains(test.LocalCloudProviders, test.VeleroCfg.CloudProvider) {
-		fmt.Println("For cloud platforms, object store plugin provider will be set as cloud provider")
+	var err error
+	test.VeleroCfg.ObjectStoreProvider, err = fillAndValidateObjectStoreProvider(
+		test.VeleroCfg.CloudProvider,
+		test.VeleroCfg.ObjectStoreProvider,
+	)
+	if err != nil {
+		t.Error(err)
+	}
+
+	test.VeleroCfg.StandbyObjectStoreProvider, err = fillAndValidateObjectStoreProvider(
+		test.VeleroCfg.StandbyClusterCloudProvider,
+		test.VeleroCfg.StandbyObjectStoreProvider,
+	)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if slices.Contains(test.CloudProviders, test.VeleroCfg.CloudProvider) {
 		// If ObjectStoreProvider is not provided, then using the value same as CloudProvider
 		if test.VeleroCfg.ObjectStoreProvider == "" {
+			fmt.Println("For cloud platforms, object store plugin provider will be set as cloud provider")
 			test.VeleroCfg.ObjectStoreProvider = test.VeleroCfg.CloudProvider
+		}
+
+		if test.VeleroCfg.CloudProvider == test.Vsphere {
+			test.VeleroCfg.ObjectStoreProvider = test.AWS
 		}
 	} else {
 		if test.VeleroCfg.ObjectStoreProvider == "" {
 			t.Error(errors.New("No object store provider specified - must be specified when using kind as the cloud provider")) // Must have an object store provider
 		}
 	}
+	if slices.Contains(test.CloudProviders, test.VeleroCfg.StandbyClusterCloudProvider) {
 
-	var err error
-	if err = GetKubeConfigContext(); err != nil {
+	}
+
+	if err := GetKubeConfigContext(); err != nil {
 		fmt.Println(err)
 		t.FailNow()
 	}
 
 	RegisterFailHandler(Fail)
-	testSuitePassed = RunSpecs(t, "E2e Suite")
+	RunSpecs(t, "E2e Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -725,40 +746,65 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
+	// If the Velero is installed during test, and the FailFast is not enabled,
+	// uninstall Velero. If not, either Velero is not installed, or kept it for debug.
+	if !test.InstallVelero || test.VeleroCfg.FailFast {
+		return
+	}
+
+	// ctx is used to uninstall Velero on both Active and Standby cluster,
+	// enlarge time to 8 minutes.
+	ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*8)
 	defer ctxCancel()
 
-	By("Delete StorageClasses created by E2E")
-	Expect(
-		k8s.DeleteStorageClass(
+	// Uninstall Velero on Active cluster.
+	if test.VeleroCfg.ActiveClusterContext != "" {
+		By("Uninstall Velero on Active cluster")
+		Expect(veleroutil.DeleteVeleroAndRelatedResources(
 			ctx,
-			*test.VeleroCfg.ClientToInstallVelero,
-			test.StorageClassName,
-		),
-	).To(Succeed())
-	Expect(
-		k8s.DeleteStorageClass(
-			ctx,
-			*test.VeleroCfg.ClientToInstallVelero,
-			test.StorageClassName2,
-		),
-	).To(Succeed())
-
-	if strings.EqualFold(test.VeleroCfg.Features, test.FeatureCSI) &&
-		test.VeleroCfg.UseVolumeSnapshots {
-		By("Delete VolumeSnapshotClass created by E2E")
-		Expect(
-			k8s.KubectlDeleteByFile(
-				ctx,
-				fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml", test.VeleroCfg.CloudProvider),
-			),
-		).To(Succeed())
+			test.VeleroCfg.ActiveClusterContext,
+			test.VeleroCfg.ActiveClient,
+			test.VeleroCfg.ProviderName,
+		)).To(Succeed())
 	}
 
-	// If the Velero is installed during test, and the FailFast is not enabled,
-	// uninstall Velero. If not, either Velero is not installed, or kept it for debug on failure.
-	if test.InstallVelero && (testSuitePassed || !test.VeleroCfg.FailFast) {
-		By("release test resources after testing")
-		Expect(veleroutil.VeleroUninstall(ctx, test.VeleroCfg)).To(Succeed())
+	// Uninstall Velero on Standby cluster.
+	if test.VeleroCfg.StandbyClusterContext != "" {
+		By("Uninstall Velero on Standby cluster")
+		Expect(veleroutil.DeleteVeleroAndRelatedResources(
+			ctx,
+			test.VeleroCfg.StandbyClusterContext,
+			test.VeleroCfg.StandbyClient,
+			test.VeleroCfg.StandbyClusterCloudProvider,
+		)).To(Succeed())
 	}
+
+	// Switch the k8s context back to Active cluster.
+	Expect(k8s.KubectlConfigUseContext(ctx, test.VeleroCfg.ActiveClusterContext)).To(Succeed())
 })
+
+func fillAndValidateObjectStoreProvider(
+	cloudProvider string,
+	objectStoreProvider string,
+) (string, error) {
+	result := objectStoreProvider
+	if slices.Contains(test.CloudProviders, cloudProvider) {
+		// If ObjectStoreProvider is not provided, then using the value same as CloudProvider
+		if objectStoreProvider == "" {
+			fmt.Println("For cloud platforms, object store plugin provider will be set as cloud provider")
+			result = cloudProvider
+		}
+
+		if cloudProvider == test.Vsphere {
+			fmt.Println("For vSphere platform, use AWS plugin as the object store provider.")
+			result = test.AWS
+		}
+	} else {
+		if objectStoreProvider == "" {
+			// Must have an object store provider
+			return result, errors.New("No object store provider specified - must be specified when using kind as the cloud provider")
+		}
+	}
+
+	return result, nil
+}

@@ -11,13 +11,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
 type NodePort struct {
-	TestCase
+	BRCase
 	labels               map[string]string
 	serviceName          string
 	namespaceToCollision []string
@@ -29,7 +30,12 @@ const NodeportBaseName string = "nodeport-"
 var NodePortTest func() = TestFunc(&NodePort{})
 
 func (n *NodePort) Init() error {
-	n.TestCase.Init()
+	n.BRCase.Init()
+
+	if n.VeleroCfg.CloudProvider == test.Azure || n.VeleroCfg.CloudProvider == test.AWS {
+		Skip("Skip due to issue https://github.com/kubernetes/kubernetes/issues/114384 on AKS")
+	}
+
 	n.CaseBaseName = NodeportBaseName + n.UUIDgen
 	n.BackupName = "backup-" + n.CaseBaseName
 	n.RestoreName = "restore-" + n.CaseBaseName
@@ -77,7 +83,7 @@ func (n *NodePort) CreateResources() error {
 	return nil
 }
 
-func (n *NodePort) Destroy() error {
+func (n *NodePort) DeleteResources() error {
 	for i, ns := range *n.NSIncluded {
 		By(fmt.Sprintf("Start to destroy namespace %s......", n.CaseBaseName), func() {
 			Expect(CleanupNamespacesWithPoll(n.Ctx, n.Client, NodeportBaseName)).To(Succeed(),

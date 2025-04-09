@@ -46,9 +46,11 @@ import (
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	"github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test"
 	common "github.com/vmware-tanzu/velero/test/util/common"
 	util "github.com/vmware-tanzu/velero/test/util/csi"
+	"github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -254,10 +256,16 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	io.BucketName = veleroCfg.BSLBucket
 	io.Prefix = veleroCfg.BSLPrefix
 	io.BackupStorageConfig = flag.NewMap()
-	io.BackupStorageConfig.Set(veleroCfg.BSLConfig)
+	if err := io.BackupStorageConfig.Set(veleroCfg.BSLConfig); err != nil {
+		fmt.Printf("Fail to set the BSL %s.\n", err.Error())
+		return nil, err
+	}
 
 	io.VolumeSnapshotConfig = flag.NewMap()
-	io.VolumeSnapshotConfig.Set(veleroCfg.VSLConfig)
+	if err := io.VolumeSnapshotConfig.Set(veleroCfg.VSLConfig); err != nil {
+		fmt.Printf("Fail to set the VSL %s.\n", err.Error())
+		return nil, err
+	}
 
 	io.Plugins = flag.NewStringArray(plugins...)
 	io.Features = veleroCfg.Features
@@ -1826,4 +1834,53 @@ func KubectlGetAllDeleteBackupRequest(ctx context.Context, backupName, veleroNam
 	cmds = append(cmds, cmd)
 
 	return common.GetListByCmdPipes(ctx, cmds)
+}
+
+func DeleteVeleroAndRelatedResources(
+	ctx context.Context,
+	k8sContext string,
+	client *k8s.TestClient,
+	provider string,
+) error {
+	if err := k8s.KubectlConfigUseContext(ctx, k8sContext); err != nil {
+		fmt.Printf("Fail to switch to k8s context %s: %s.\n", k8sContext, err.Error())
+		return err
+	}
+
+	if err := k8s.DeleteStorageClass(
+		ctx,
+		*client,
+		test.StorageClassName,
+	); err != nil {
+		fmt.Printf("Fail to delete StorageClass %s: %s.\n", test.StorageClassName, err.Error())
+		return err
+	}
+
+	if err := k8s.DeleteStorageClass(
+		ctx,
+		*client,
+		test.StorageClassName2,
+	); err != nil {
+		fmt.Printf("Fail to delete StorageClass %s: %s.\n", test.StorageClassName2, err.Error())
+		return err
+	}
+
+	if strings.EqualFold(test.VeleroCfg.Features, test.FeatureCSI) &&
+		test.VeleroCfg.UseVolumeSnapshots {
+		if err := k8s.KubectlDeleteByFile(
+			ctx,
+			fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml",
+				provider),
+		); err != nil {
+			fmt.Printf("Fail to delete VolumeSnapshotClass: %s.\n", err.Error())
+			return err
+		}
+	}
+
+	if err := (VeleroUninstall(ctx, test.VeleroCfg)); err != nil {
+		fmt.Printf("Fail to uninstall Velero: %s.\n", err.Error())
+		return err
+	}
+
+	return nil
 }

@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	. "github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -47,7 +47,7 @@ volumePolicies:
 `
 
 type ResourcePoliciesCase struct {
-	TestCase
+	BRCase
 	cmName, yamlConfig string
 }
 
@@ -55,7 +55,7 @@ var ResourcePoliciesTest func() = TestFunc(&ResourcePoliciesCase{})
 
 func (r *ResourcePoliciesCase) Init() error {
 	// generate random number as UUIDgen and set one default timeout duration
-	r.TestCase.Init()
+	r.BRCase.Init()
 
 	// generate variable names based on CaseBaseName + UUIDgen
 	r.CaseBaseName = "resource-policies-" + r.UUIDgen
@@ -180,7 +180,7 @@ func (r *ResourcePoliciesCase) Clean() error {
 			return err
 		}
 
-		return r.GetTestCase().Clean() // only clean up resources in test namespace
+		return r.BRCase.Clean() // only clean up resources in test namespace
 	}
 
 	return nil

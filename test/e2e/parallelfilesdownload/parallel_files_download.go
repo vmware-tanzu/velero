@@ -23,12 +23,12 @@ import (
 	. "github.com/onsi/gomega"
 
 	. "github.com/vmware-tanzu/velero/test"
-	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	. "github.com/vmware-tanzu/velero/test/e2e/framework"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
 type ParallelFilesDownload struct {
-	TestCase
+	BRCase
 	parallel  string
 	namespace string
 	pod       string
@@ -44,7 +44,11 @@ var ParallelFilesDownloadTest func() = TestFunc(&ParallelFilesDownload{})
 
 func (p *ParallelFilesDownload) Init() error {
 	// generate random number as UUIDgen and set one default timeout duration
-	p.TestCase.Init()
+	p.BRCase.Init()
+
+	if p.VeleroCfg.UploaderType == UploaderTypeRestic {
+		Skip("Skip Parallel Files cases for environments using Restic as uploader.")
+	}
 
 	// generate variable names based on CaseBaseName + UUIDgen
 	p.CaseBaseName = "parallel-files-download" + p.UUIDgen

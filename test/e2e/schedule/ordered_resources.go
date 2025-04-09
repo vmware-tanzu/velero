@@ -31,7 +31,7 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	framework "github.com/vmware-tanzu/velero/test/e2e/test"
+	framework "github.com/vmware-tanzu/velero/test/e2e/framework"
 	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
 	veleroutil "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -43,11 +43,11 @@ type OrderedResources struct {
 	ScheduleName  string
 	OrderResource map[string]string
 	ScheduleArgs  []string
-	framework.TestCase
+	framework.BRCase
 }
 
 func (o *OrderedResources) Init() error {
-	Expect(o.TestCase.Init()).To(Succeed())
+	Expect(o.BRCase.Init()).To(Succeed())
 
 	o.CaseBaseName = "ordered-resources-" + o.UUIDgen
 	o.ScheduleName = "schedule-" + o.CaseBaseName
@@ -224,7 +224,7 @@ func (o *OrderedResources) Clean() error {
 			o.ScheduleName,
 		)).To(Succeed())
 
-		Expect(o.TestCase.Clean()).To(Succeed())
+		Expect(o.BRCase.Clean()).To(Succeed())
 	}
 
 	return nil
