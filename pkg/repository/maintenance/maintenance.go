@@ -28,7 +28,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,7 +39,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
-	appsv1 "k8s.io/api/apps/v1"
+	appsv1api "k8s.io/api/apps/v1"
 
 	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 
@@ -143,7 +143,7 @@ func waitForJobComplete(ctx context.Context, client client.Client, ns string, jo
 
 func getResultFromJob(cli client.Client, job *batchv1.Job) (string, error) {
 	// Get the maintenance job related pod by label selector
-	podList := &v1.PodList{}
+	podList := &corev1api.PodList{}
 	err := cli.List(context.TODO(), podList, client.InNamespace(job.Namespace), client.MatchingLabels(map[string]string{"job-name": job.Name}))
 	if err != nil {
 		return "", err
@@ -202,7 +202,7 @@ func getJobConfig(
 	repoMaintenanceJobConfig string,
 	repo *velerov1api.BackupRepository,
 ) (*JobConfigs, error) {
-	var cm v1.ConfigMap
+	var cm corev1api.ConfigMap
 	if err := client.Get(
 		ctx,
 		types.NamespacedName{
@@ -410,7 +410,7 @@ func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.Backu
 func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, bslName string, config *JobConfigs,
 	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag) (*batchv1.Job, error) {
 	// Get the Velero server deployment
-	deployment := &appsv1.Deployment{}
+	deployment := &appsv1api.Deployment{}
 	err := cli.Get(ctx, types.NamespacedName{Name: "velero", Namespace: repo.Namespace}, deployment)
 	if err != nil {
 		return nil, err
@@ -486,14 +486,14 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: new(int32), // Never retry
-			Template: v1.PodTemplateSpec{
+			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "velero-repo-maintenance-pod",
 					Labels:      podLabels,
 					Annotations: podAnnotations,
 				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
 						{
 							Name:  "velero-repo-maintenance-container",
 							Image: image,
@@ -501,18 +501,18 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 								"/velero",
 							},
 							Args:                     args,
-							ImagePullPolicy:          v1.PullIfNotPresent,
+							ImagePullPolicy:          corev1api.PullIfNotPresent,
 							Env:                      envVars,
 							EnvFrom:                  envFromSources,
 							VolumeMounts:             volumeMounts,
 							Resources:                resources,
-							TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
+							TerminationMessagePolicy: corev1api.TerminationMessageFallbackToLogsOnError,
 						},
 					},
-					RestartPolicy:      v1.RestartPolicyNever,
+					RestartPolicy:      corev1api.RestartPolicyNever,
 					Volumes:            volumes,
 					ServiceAccountName: serviceAccount,
-					Tolerations: []v1.Toleration{
+					Tolerations: []corev1api.Toleration{
 						{
 							Key:      "os",
 							Operator: "Equal",

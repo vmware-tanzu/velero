@@ -19,7 +19,7 @@ package actions
 import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	rbac "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -47,7 +47,7 @@ func (a *ClusterRoleBindingAction) Execute(input *velero.RestoreItemActionExecut
 		return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: input.Item.UnstructuredContent()}), nil
 	}
 
-	clusterRoleBinding := new(rbac.ClusterRoleBinding)
+	clusterRoleBinding := new(rbacv1.ClusterRoleBinding)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), clusterRoleBinding); err != nil {
 		return nil, errors.WithStack(err)
 	}

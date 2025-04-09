@@ -17,7 +17,7 @@ limitations under the License.
 package exposer
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 )
 
 const (
@@ -36,7 +36,7 @@ type ExposeResult struct {
 
 // ExposeByPod defines the result for the expose method that a hosting pod is created
 type ExposeByPod struct {
-	HostingPod       *corev1.Pod
+	HostingPod       *corev1api.Pod
 	HostingContainer string
 	VolumeName       string
 	NodeOS           *string

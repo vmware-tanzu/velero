@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,39 +42,39 @@ func TestSecretActionAppliesTo(t *testing.T) {
 func TestSecretActionExecute(t *testing.T) {
 	tests := []struct {
 		name           string
-		input          *corev1.Secret
-		serviceAccount *corev1.ServiceAccount
+		input          *corev1api.Secret
+		serviceAccount *corev1api.ServiceAccount
 		skipped        bool
-		output         *corev1.Secret
+		output         *corev1api.Secret
 	}{
 		{
 			name: "not service account token secret",
-			input: &corev1.Secret{
+			input: &corev1api.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "default-token-sfafa",
 				},
-				Type: corev1.SecretTypeOpaque,
+				Type: corev1api.SecretTypeOpaque,
 			},
 			skipped: false,
-			output: &corev1.Secret{
+			output: &corev1api.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "default-token-sfafa",
 				},
-				Type: corev1.SecretTypeOpaque,
+				Type: corev1api.SecretTypeOpaque,
 			},
 		},
 		{
 			name: "auto created service account token",
-			input: &corev1.Secret{
+			input: &corev1api.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "default-token-sfafa",
 				},
-				Type: corev1.SecretTypeServiceAccountToken,
+				Type: corev1api.SecretTypeServiceAccountToken,
 			},
-			serviceAccount: &corev1.ServiceAccount{
+			serviceAccount: &corev1api.ServiceAccount{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "default",
@@ -84,7 +84,7 @@ func TestSecretActionExecute(t *testing.T) {
 		},
 		{
 			name: "not auto created service account token",
-			input: &corev1.Secret{
+			input: &corev1api.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "my-token",
@@ -93,7 +93,7 @@ func TestSecretActionExecute(t *testing.T) {
 						"key":                               "value",
 					},
 				},
-				Type: corev1.SecretTypeServiceAccountToken,
+				Type: corev1api.SecretTypeServiceAccountToken,
 				Data: map[string][]byte{
 					"token":  []byte("token"),
 					"ca.crt": []byte("ca"),
@@ -101,7 +101,7 @@ func TestSecretActionExecute(t *testing.T) {
 				},
 			},
 			skipped: false,
-			output: &corev1.Secret{
+			output: &corev1api.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "my-token",
@@ -109,7 +109,7 @@ func TestSecretActionExecute(t *testing.T) {
 						"key": "value",
 					},
 				},
-				Type: corev1.SecretTypeServiceAccountToken,
+				Type: corev1api.SecretTypeServiceAccountToken,
 				Data: map[string][]byte{
 					"key": []byte("value"),
 				},
