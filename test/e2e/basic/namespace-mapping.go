@@ -116,9 +116,7 @@ func (n *NamespaceMapping) Verify() error {
 }
 
 func (n *NamespaceMapping) Clean() error {
-	if CurrentSpecReport().Failed() && n.VeleroCfg.FailFast {
-		fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
-	} else {
+	if !(CurrentSpecReport().Failed() && n.VeleroCfg.FailFast) {
 		if err := DeleteStorageClass(context.Background(), n.Client, KibishiiStorageClassName); err != nil {
 			return err
 		}
@@ -130,6 +128,7 @@ func (n *NamespaceMapping) Clean() error {
 
 		return n.GetTestCase().Clean()
 	}
+	fmt.Println("Test case failed and fail fast is enabled. Skip resource clean up.")
 
 	return nil
 }
