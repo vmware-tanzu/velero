@@ -510,6 +510,8 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 			RestartPolicy:                 corev1.RestartPolicyNever,
 			SecurityContext:               securityCtx,
 			Tolerations:                   toleration,
+			DNSPolicy:                     podInfo.dnsPolicy,
+			DNSConfig:                     podInfo.dnsConfig,
 		},
 	}
 

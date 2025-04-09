@@ -1,0 +1,2 @@
+Inherit the dnsPolicy and dnsConfig from the node agent pod.
+This is done so that the kopia task uses the same configuration.
