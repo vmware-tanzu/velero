@@ -18,13 +18,9 @@ package azure
 
 import (
 	"context"
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
-
 	"github.com/kopia/kopia/repo/blob"
 	"github.com/kopia/kopia/repo/blob/azure"
 	"github.com/kopia/kopia/repo/blob/throttling"
-	"github.com/sirupsen/logrus"
-
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	azureutil "github.com/vmware-tanzu/velero/pkg/util/azure"
 )
@@ -57,7 +53,7 @@ func (s *Storage) ConnectionInfo() blob.ConnectionInfo {
 func NewStorage(ctx context.Context, option *Option, isCreate bool) (blob.Storage, error) {
 	cfg := option.Config
 
-	client, _, err := azureutil.NewStorageClient(logging.DefaultLogger(logrus.InfoLevel, logging.FormatJSON), cfg)
+	client, _, err := azureutil.NewStorageClient(newLogger(), cfg)
 	if err != nil {
 		return nil, err
 	}
