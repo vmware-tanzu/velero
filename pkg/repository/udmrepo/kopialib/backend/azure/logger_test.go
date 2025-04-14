@@ -44,7 +44,4 @@ func TestNewLogger(t *testing.T) {
 	for _, level := range logrus.AllLevels {
 		assert.Equal(t, expectedHooks, l.Hooks[level])
 	}
-
-	kl := "kopia_logger"
-	l.Infof("this is a %s logger", kl)
 }
