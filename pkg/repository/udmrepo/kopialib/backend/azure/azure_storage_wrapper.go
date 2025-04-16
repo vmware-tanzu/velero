@@ -18,6 +18,8 @@ package azure
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
+	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	"github.com/kopia/kopia/repo/blob"
 	"github.com/kopia/kopia/repo/blob/azure"
@@ -55,7 +57,7 @@ func (s *Storage) ConnectionInfo() blob.ConnectionInfo {
 func NewStorage(ctx context.Context, option *Option, isCreate bool) (blob.Storage, error) {
 	cfg := option.Config
 
-	client, _, err := azureutil.NewStorageClient(newLogger(), cfg)
+	client, _, err := azureutil.NewStorageClient(logging.DefaultLogger(logrus.InfoLevel, logging.FormatJSON), cfg)
 	if err != nil {
 		return nil, err
 	}
