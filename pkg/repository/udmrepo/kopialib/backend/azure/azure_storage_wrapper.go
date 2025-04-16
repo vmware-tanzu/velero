@@ -18,7 +18,9 @@ package azure
 
 import (
 	"context"
+
 	"github.com/sirupsen/logrus"
+
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	"github.com/kopia/kopia/repo/blob"
