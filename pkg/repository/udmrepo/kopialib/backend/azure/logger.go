@@ -24,38 +24,5 @@ import (
 
 // newLogger returns a logger that is suitable for use within an kopia backend
 func newLogger() *logrus.Logger {
-	logger := logrus.New()
-	/*
-		!!!DO NOT SET THE OUTPUT TO STDOUT!!!
-
-		go-plugin uses stdout for a communications protocol between client and server.
-
-		stderr is used for log messages from server to client. The velero server makes sure they are logged to stdout.
-	*/
-
-	// we use the JSON formatter because go-plugin will parse incoming
-	// JSON on stderr and use it to create structured log entries.
-	logger.Formatter = &logrus.JSONFormatter{
-		FieldMap: logrus.FieldMap{
-			// this is the hclog-compatible message field
-			logrus.FieldKeyMsg: "@message",
-		},
-		// Velero server already adds timestamps when emitting logs, so
-		// don't do it within the plugin.
-		DisableTimestamp: false,
-	}
-
-	// set a logger name for the location hook which will signal to the Velero
-	// server logger that the location has been set within a hook.
-	logger.Hooks.Add((&logging.LogLocationHook{}).WithLoggerName("kopialib"))
-
-	// make sure we attempt to record the error location
-	logger.Hooks.Add(&logging.ErrorLocationHook{})
-
-	// this hook adjusts the string representation of WarnLevel to "warn"
-	// rather than "warning" to make it parseable by go-plugin within the
-	// Velero server code
-	logger.Hooks.Add(&logging.HcLogLevelHook{})
-
-	return logger
+	return logging.DefaultLogger(logrus.InfoLevel, logging.FormatJSON)
 }

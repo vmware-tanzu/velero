@@ -20,28 +20,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
 func TestNewLogger(t *testing.T) {
 	l := newLogger()
-
-	expectedFormatter := &logrus.JSONFormatter{
-		FieldMap: logrus.FieldMap{
-			logrus.FieldKeyMsg: "@message",
-		},
-		DisableTimestamp: false,
-	}
+	expectedFormatter := &logrus.JSONFormatter{}
 	assert.Equal(t, expectedFormatter, l.Formatter)
-
-	expectedHooks := []logrus.Hook{
-		(&logging.LogLocationHook{}).WithLoggerName("kopialib"),
-		&logging.ErrorLocationHook{},
-		&logging.HcLogLevelHook{},
-	}
-
-	for _, level := range logrus.AllLevels {
-		assert.Equal(t, expectedHooks, l.Hooks[level])
-	}
+	assert.Equal(t, logrus.InfoLevel, l.Level)
 }
