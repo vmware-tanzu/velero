@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
@@ -113,7 +113,7 @@ func (v *BackupVolumeInfo) CreateResources() error {
 		pvcCount := 4
 		Expect(pvcCount).To(BeNumerically(">", 3))
 
-		var vols []*v1.Volume
+		var vols []*corev1api.Volume
 		for i := 0; i <= pvcCount-1; i++ {
 			pvcName := fmt.Sprintf("volume-info-pvc-%d", i)
 			pvc, err := CreatePVC(v.Client, createNSName, pvcName, StorageClassName, nil)

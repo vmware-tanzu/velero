@@ -18,17 +18,17 @@ package kube
 
 import (
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // ParseResourceRequirements takes a set of CPU and memory requests and limit string
 // values and returns a ResourceRequirements struct to be used in a Container.
 // An error is returned if we cannot parse the request/limit.
-func ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit string) (corev1.ResourceRequirements, error) {
-	resources := corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{},
-		Limits:   corev1.ResourceList{},
+func ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit string) (corev1api.ResourceRequirements, error) {
+	resources := corev1api.ResourceRequirements{
+		Requests: corev1api.ResourceList{},
+		Limits:   corev1api.ResourceList{},
 	}
 
 	parsedCPURequest, err := resource.ParseQuantity(cpuRequest)
@@ -64,16 +64,16 @@ func ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit string
 
 	// Only set resources if they are not unbounded
 	if parsedCPURequest != unbounded {
-		resources.Requests[corev1.ResourceCPU] = parsedCPURequest
+		resources.Requests[corev1api.ResourceCPU] = parsedCPURequest
 	}
 	if parsedMemRequest != unbounded {
-		resources.Requests[corev1.ResourceMemory] = parsedMemRequest
+		resources.Requests[corev1api.ResourceMemory] = parsedMemRequest
 	}
 	if parsedCPULimit != unbounded {
-		resources.Limits[corev1.ResourceCPU] = parsedCPULimit
+		resources.Limits[corev1api.ResourceCPU] = parsedCPULimit
 	}
 	if parsedMemLimit != unbounded {
-		resources.Limits[corev1.ResourceMemory] = parsedMemLimit
+		resources.Limits[corev1api.ResourceMemory] = parsedMemLimit
 	}
 
 	return resources, nil
