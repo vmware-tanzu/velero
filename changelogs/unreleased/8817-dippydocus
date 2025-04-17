@@ -1,0 +1,1 @@
+Refactor internal package (internal/volume) to pkg (pkg/volume) allowing its use from BackupStore methods
