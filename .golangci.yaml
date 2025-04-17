@@ -123,6 +123,7 @@ linters:
     gosec:
       excludes:
         - G115
+
     govet:
       # enable or disable analyzers by name
       enable:
