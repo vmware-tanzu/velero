@@ -18,11 +18,15 @@ package archive
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/test"
@@ -75,7 +79,7 @@ func TestUnzipAndExtractBackup(t *testing.T) {
 			file, err := ext.fs.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0644)
 			require.NoError(t, err)
 
-			_, err = ext.UnzipAndExtractBackup(file.(io.Reader))
+			_, _, err = ext.UnzipAndExtractBackup(file.(io.Reader))
 			if tc.wantErr && (err == nil) {
 				t.Errorf("%s: wanted error but got nil", tc.name)
 			}
@@ -148,4 +152,52 @@ func createRegular(fs filesystem.Interface) (string, error) {
 	defer out.Close()
 
 	return outName, nil
+}
+
+func TestReadBackupWithLongFilenames(t *testing.T) {
+	log := logrus.New()
+	fs := test.NewFakeFileSystem()
+	e := NewExtractor(log, fs)
+
+	// Create a tar reader with a file that has a very long name
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+
+	// Create a filename longer than maxPathLength
+	longFilename := strings.Repeat("a", maxPathLength+10) + ".txt"
+	content := []byte("test content")
+
+	hdr := &tar.Header{
+		Name:     longFilename,
+		Mode:     0600,
+		Size:     int64(len(content)),
+		Typeflag: tar.TypeReg,
+	}
+
+	if err := tw.WriteHeader(hdr); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	tw.Close()
+
+	// Read the backup
+	dir, longNames, err := e.readBackup(tar.NewReader(&buf))
+
+	// Verify results
+	require.NoError(t, err)
+	require.NotEmpty(t, dir)
+	require.NotEmpty(t, longNames)
+
+	// Verify that a shortened SHA256 name was created and mapped correctly
+	found := false
+	for shortName, originalName := range longNames {
+		if originalName == longFilename {
+			found = true
+			// Verify the short name length is within limits
+			require.LessOrEqual(t, len(filepath.Join(dir, shortName)), maxPathLength)
+		}
+	}
+	require.True(t, found, "Long filename mapping not found")
 }
