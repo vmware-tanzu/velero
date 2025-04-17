@@ -123,7 +123,6 @@ linters:
     gosec:
       excludes:
         - G115
-
     govet:
       # enable or disable analyzers by name
       enable:
@@ -132,23 +131,23 @@ linters:
       disable:
         - shadow
       disable-all: false
-
-   importas:
-     alias:
-      - alias: appsv1api
-        pkg: k8s.io/api/apps/v1
-      - alias: corev1api
-        pkg: k8s.io/api/core/v1
-      - alias: rbacv1
-        pkg: k8s.io/api/rbac/v1
-      - alias: apierrors
-        pkg: k8s.io/apimachinery/pkg/api/errors
-      - alias: apiextv1
-        pkg: k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
-      - alias: metav1
-        pkg: k8s.io/apimachinery/pkg/apis/meta/v1
-      - alias: storagev1api
-        pkg: k8s.io/api/storage/v1
+  
+    importas:
+       alias:
+        - alias: appsv1api
+          pkg: k8s.io/api/apps/v1
+        - alias: corev1api
+          pkg: k8s.io/api/core/v1
+        - alias: rbacv1
+          pkg: k8s.io/api/rbac/v1
+        - alias: apierrors
+          pkg: k8s.io/apimachinery/pkg/api/errors
+        - alias: apiextv1
+          pkg: k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
+        - alias: metav1
+          pkg: k8s.io/apimachinery/pkg/apis/meta/v1
+        - alias: storagev1api
+          pkg: k8s.io/api/storage/v1
 
     lll:
     # max line length, lines longer will be reported. Default is 120.
