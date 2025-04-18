@@ -18,6 +18,7 @@ package kopialib
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 	"strings"
 
 	"github.com/kopia/kopia/repo"
@@ -44,17 +45,17 @@ var backendStores = []kopiaBackendStore{
 
 // CreateBackupRepo creates a Kopia repository and then connect to it.
 // The storage must be empty, otherwise, it will fail
-func CreateBackupRepo(ctx context.Context, repoOption udmrepo.RepoOptions) error {
+func CreateBackupRepo(ctx context.Context, repoOption udmrepo.RepoOptions, logger logrus.FieldLogger) error {
 	if repoOption.ConfigFilePath == "" {
 		return errors.New("invalid config file path")
 	}
 
-	backendStore, err := setupBackendStore(ctx, repoOption.StorageType, repoOption.StorageOptions)
+	backendStore, err := setupBackendStore(ctx, repoOption.StorageType, repoOption.StorageOptions, logger)
 	if err != nil {
 		return errors.Wrap(err, "error to setup backend storage")
 	}
 
-	st, err := backendStore.store.Connect(ctx, true)
+	st, err := backendStore.store.Connect(ctx, true, logger)
 	if err != nil {
 		return errors.Wrap(err, "error to connect to storage")
 	}
@@ -74,17 +75,17 @@ func CreateBackupRepo(ctx context.Context, repoOption udmrepo.RepoOptions) error
 
 // ConnectBackupRepo connects to an existing Kopia repository.
 // If the repository doesn't exist, it will fail
-func ConnectBackupRepo(ctx context.Context, repoOption udmrepo.RepoOptions) error {
+func ConnectBackupRepo(ctx context.Context, repoOption udmrepo.RepoOptions, logger logrus.FieldLogger) error {
 	if repoOption.ConfigFilePath == "" {
 		return errors.New("invalid config file path")
 	}
 
-	backendStore, err := setupBackendStore(ctx, repoOption.StorageType, repoOption.StorageOptions)
+	backendStore, err := setupBackendStore(ctx, repoOption.StorageType, repoOption.StorageOptions, logger)
 	if err != nil {
 		return errors.Wrap(err, "error to setup backend storage")
 	}
 
-	st, err := backendStore.store.Connect(ctx, false)
+	st, err := backendStore.store.Connect(ctx, false, logger)
 	if err != nil {
 		return errors.Wrap(err, "error to connect to storage")
 	}
@@ -107,13 +108,13 @@ func findBackendStore(storage string) *kopiaBackendStore {
 	return nil
 }
 
-func setupBackendStore(ctx context.Context, storageType string, storageOptions map[string]string) (*kopiaBackendStore, error) {
+func setupBackendStore(ctx context.Context, storageType string, storageOptions map[string]string, logger logrus.FieldLogger) (*kopiaBackendStore, error) {
 	backendStore := findBackendStore(storageType)
 	if backendStore == nil {
 		return nil, errors.New("error to find storage type")
 	}
 
-	err := backendStore.store.Setup(ctx, storageOptions)
+	err := backendStore.store.Setup(ctx, storageOptions, logger)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to setup storage")
 	}

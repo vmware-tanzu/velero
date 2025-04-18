@@ -4,6 +4,7 @@ package mocks
 
 import (
 	context "context"
+	"github.com/sirupsen/logrus"
 
 	blob "github.com/kopia/kopia/repo/blob"
 
@@ -16,7 +17,7 @@ type Store struct {
 }
 
 // Connect provides a mock function with given fields: ctx, isCreate
-func (_m *Store) Connect(ctx context.Context, isCreate bool) (blob.Storage, error) {
+func (_m *Store) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
 	ret := _m.Called(ctx, isCreate)
 
 	var r0 blob.Storage
@@ -39,7 +40,7 @@ func (_m *Store) Connect(ctx context.Context, isCreate bool) (blob.Storage, erro
 }
 
 // Setup provides a mock function with given fields: ctx, flags
-func (_m *Store) Setup(ctx context.Context, flags map[string]string) error {
+func (_m *Store) Setup(ctx context.Context, flags map[string]string, logger logrus.FieldLogger) error {
 	ret := _m.Called(ctx, flags)
 
 	var r0 error
