@@ -18,6 +18,7 @@ package kopialib
 
 import (
 	"context"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -124,6 +125,7 @@ func TestCreateBackupRepo(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			logger := velerotest.NewLogger()
 			backendStores = []kopiaBackendStore{
 				{udmrepo.StorageTypeAzure, "fake store", tc.backendStore},
 				{udmrepo.StorageTypeFs, "fake store", tc.backendStore},
@@ -141,7 +143,7 @@ func TestCreateBackupRepo(t *testing.T) {
 				tc.returnStore.On("GetBlob", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tc.getBlobErr)
 			}
 
-			err := CreateBackupRepo(context.Background(), tc.repoOptions)
+			err := CreateBackupRepo(context.Background(), tc.repoOptions, logger)
 
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)
@@ -207,6 +209,7 @@ func TestConnectBackupRepo(t *testing.T) {
 		},
 	}
 
+	logger := velerotest.NewLogger()
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			backendStores = []kopiaBackendStore{
@@ -225,7 +228,7 @@ func TestConnectBackupRepo(t *testing.T) {
 				tc.returnStore.On("GetBlob", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tc.getBlobErr)
 			}
 
-			err := ConnectBackupRepo(context.Background(), tc.repoOptions)
+			err := ConnectBackupRepo(context.Background(), tc.repoOptions, logger)
 
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)

@@ -96,13 +96,13 @@ func (ks *kopiaRepoService) Init(ctx context.Context, repoOption udmrepo.RepoOpt
 	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
 
 	if createNew {
-		if err := CreateBackupRepo(repoCtx, repoOption); err != nil {
+		if err := CreateBackupRepo(repoCtx, repoOption, ks.logger); err != nil {
 			return err
 		}
 
 		return writeInitParameters(repoCtx, repoOption, ks.logger)
 	}
-	return ConnectBackupRepo(repoCtx, repoOption)
+	return ConnectBackupRepo(repoCtx, repoOption, ks.logger)
 }
 
 func (ks *kopiaRepoService) Open(ctx context.Context, repoOption udmrepo.RepoOptions) (udmrepo.BackupRepo, error) {

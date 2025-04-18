@@ -18,6 +18,7 @@ package backend
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 
 	"github.com/kopia/kopia/repo/blob"
 )
@@ -26,8 +27,8 @@ import (
 // the backend storage
 type Store interface {
 	// Setup setups the variables to a specific backend storage
-	Setup(ctx context.Context, flags map[string]string) error
+	Setup(ctx context.Context, flags map[string]string, logger logrus.FieldLogger) error
 
 	// Connect connects to a specific backend storage with the storage variables
-	Connect(ctx context.Context, isCreate bool) (blob.Storage, error)
+	Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error)
 }

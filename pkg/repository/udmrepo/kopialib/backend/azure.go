@@ -18,6 +18,7 @@ package backend
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 
 	"github.com/kopia/kopia/repo/blob"
 
@@ -29,17 +30,19 @@ type AzureBackend struct {
 	option azure.Option
 }
 
-func (c *AzureBackend) Setup(ctx context.Context, flags map[string]string) error {
+func (c *AzureBackend) Setup(ctx context.Context, flags map[string]string, logger logrus.FieldLogger) error {
 	if flags[udmrepo.StoreOptionCACert] != "" {
 		flags["caCertEncoded"] = "true"
 	}
 	c.option = azure.Option{
 		Config: flags,
 		Limits: setupLimits(ctx, flags),
+		Logger: logger,
 	}
 	return nil
 }
 
-func (c *AzureBackend) Connect(ctx context.Context, isCreate bool) (blob.Storage, error) {
+func (c *AzureBackend) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
+	c.option.Logger = logger
 	return azure.NewStorage(ctx, &c.option, false)
 }
