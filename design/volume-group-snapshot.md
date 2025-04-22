@@ -138,7 +138,30 @@ flowchart TD
 The CSI PVC plugin now supports obtaining a VolumeSnapshot (VS) reference for a PVC in three ways, and then applies common branching for datamover and non‑datamover workflows:
 
 - Scenario 1: PVC has a VGS label and no VS (created via the VGS workflow) exists for its volume group:
-    - Determine VGSClass: The plugin checks for CSI driver of all the grouped PVCs and then uses the corresponding VGSClass in VGS spec. If the grouped PVC has more than one CSI driver, VGS creation is skipped and backup fails. 
+    - Determine VGSClass: The plugin will pick `VolumeGroupSnapshotClass` by following the same tier based precedence as it does for individual `VolumeSnapshotClasses`:
+      - Default by Label: Use the one VGSClass labeled
+      ```yaml
+      metadata:
+        labels:
+        velero.io/csi-volumegroupsnapshot-class: "true"
+
+      ```
+      whose `spec.driver` matches the CSI driver used by the PVCs.
+      - Backup‑level Override: If the Backup CR has an annotation
+      ```yaml
+      metadata:
+        annotations:
+        velero.io/csi-volumegroupsnapshot-class_<driver>: <className>
+      ```
+      (with <driver> equal to the PVCs’ CSI driver), use that class.
+      - PVC‑level Override: Finally, if the PVC itself carries an annotation
+      ```yaml
+      metadata:
+        annotations:
+        velero.io/csi-volume-group-snapshot-class: <className>
+      ```
+      and that class exists, use it.
+      At each step, if the plugin finds zero or multiple matching classes, VGS creation is skipped and backup fails.
     - Create VGS: The plugin creates a new VolumeGroupSnapshot (VGS) for the PVC’s volume group. This action automatically triggers creation of the corresponding VGSC, VS, and VSC objects.
     - Wait for VS Status: The plugin waits until each VS (one per PVC in the group) has its `volumeGroupSnapshotName` populated. This confirms that the snapshot controller has completed its work. `CSISnapshotTimeout` will be used here.
     - Update VS Objects: Once the VS objects are provisioned, the plugin updates them by removing VGS owner references and VGS-related finalizers, and by adding backup metadata labels (including BackupName, BackupUUID, and PVC name). These labels are later used to detect an existing VS when processing another PVC of the same group.
