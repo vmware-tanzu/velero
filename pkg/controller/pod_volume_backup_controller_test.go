@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -61,7 +61,7 @@ func pvbBuilder() *builder.PodVolumeBackupBuilder {
 func podBuilder() *builder.PodBuilder {
 	return builder.
 		ForPod(velerov1api.DefaultNamespace, name).
-		Volumes(&corev1.Volume{Name: "pvb-1-volume"})
+		Volumes(&corev1api.Volume{Name: "pvb-1-volume"})
 }
 
 func bslBuilder() *builder.BackupStorageLocationBuilder {
@@ -126,7 +126,7 @@ func (b *fakeFSBR) Close(ctx context.Context) {
 var _ = Describe("PodVolumeBackup Reconciler", func() {
 	type request struct {
 		pvb               *velerov1api.PodVolumeBackup
-		pod               *corev1.Pod
+		pod               *corev1api.Pod
 		bsl               *velerov1api.BackupStorageLocation
 		backupRepo        *velerov1api.BackupRepository
 		expectedProcessed bool

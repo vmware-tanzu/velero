@@ -32,7 +32,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	appsv1 "k8s.io/api/apps/v1"
+	appsv1api "k8s.io/api/apps/v1"
 	batchv1api "k8s.io/api/batch/v1"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -234,7 +234,7 @@ func newServer(f client.Factory, config *config.Config, logger *logrus.Logger) (
 		cancelFunc()
 		return nil, err
 	}
-	if err := appsv1.AddToScheme(scheme); err != nil {
+	if err := appsv1api.AddToScheme(scheme); err != nil {
 		cancelFunc()
 		return nil, err
 	}

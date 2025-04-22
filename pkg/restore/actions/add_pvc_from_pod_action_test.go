@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,50 +34,50 @@ import (
 func TestAddPVCFromPodActionExecute(t *testing.T) {
 	tests := []struct {
 		name string
-		item *v1.Pod
+		item *corev1api.Pod
 		want []velero.ResourceIdentifier
 	}{
 		{
 			name: "pod with no volumes returns no additional items",
-			item: &v1.Pod{},
+			item: &corev1api.Pod{},
 			want: nil,
 		},
 		{
 			name: "pod with some PVCs returns them as additional items",
-			item: &v1.Pod{
+			item: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns-1",
 					Name:      "foo",
 				},
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
 						{
-							VolumeSource: v1.VolumeSource{
-								EmptyDir: new(v1.EmptyDirVolumeSource),
+							VolumeSource: corev1api.VolumeSource{
+								EmptyDir: new(corev1api.EmptyDirVolumeSource),
 							},
 						},
 						{
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							VolumeSource: corev1api.VolumeSource{
+								PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 									ClaimName: "pvc-1",
 								},
 							},
 						},
 						{
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							VolumeSource: corev1api.VolumeSource{
+								PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 									ClaimName: "pvc-2",
 								},
 							},
 						},
 						{
-							VolumeSource: v1.VolumeSource{
-								HostPath: new(v1.HostPathVolumeSource),
+							VolumeSource: corev1api.VolumeSource{
+								HostPath: new(corev1api.HostPathVolumeSource),
 							},
 						},
 						{
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							VolumeSource: corev1api.VolumeSource{
+								PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 									ClaimName: "pvc-3",
 								},
 							},

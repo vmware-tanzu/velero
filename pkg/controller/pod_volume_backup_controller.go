@@ -24,7 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -145,7 +145,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return r.errorOut(ctx, &pvb, err, "error updating PodVolumeBackup status", log)
 	}
 
-	var pod corev1.Pod
+	var pod corev1api.Pod
 	podNamespacedName := client.ObjectKey{
 		Namespace: pvb.Spec.Pod.Namespace,
 		Name:      pvb.Spec.Pod.Name,

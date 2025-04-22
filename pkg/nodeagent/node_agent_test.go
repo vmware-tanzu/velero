@@ -22,8 +22,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -41,7 +41,7 @@ type reactor struct {
 }
 
 func TestIsRunning(t *testing.T) {
-	ds := &appsv1.DaemonSet{
+	ds := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -106,15 +106,15 @@ func TestIsRunning(t *testing.T) {
 
 func TestIsRunningInNode(t *testing.T) {
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	nonNodeAgentPod := builder.ForPod("fake-ns", "fake-pod").Result()
 	nodeAgentPodNotRunning := builder.ForPod("fake-ns", "fake-pod").Labels(map[string]string{"role": "node-agent"}).Result()
-	nodeAgentPodRunning1 := builder.ForPod("fake-ns", "fake-pod-1").Labels(map[string]string{"role": "node-agent"}).Phase(corev1.PodRunning).Result()
-	nodeAgentPodRunning2 := builder.ForPod("fake-ns", "fake-pod-2").Labels(map[string]string{"role": "node-agent"}).Phase(corev1.PodRunning).Result()
+	nodeAgentPodRunning1 := builder.ForPod("fake-ns", "fake-pod-1").Labels(map[string]string{"role": "node-agent"}).Phase(corev1api.PodRunning).Result()
+	nodeAgentPodRunning2 := builder.ForPod("fake-ns", "fake-pod-2").Labels(map[string]string{"role": "node-agent"}).Phase(corev1api.PodRunning).Result()
 	nodeAgentPodRunning3 := builder.ForPod("fake-ns", "fake-pod-3").
 		Labels(map[string]string{"role": "node-agent"}).
-		Phase(corev1.PodRunning).
+		Phase(corev1api.PodRunning).
 		NodeName("fake-node").
 		Result()
 
@@ -185,11 +185,11 @@ func TestIsRunningInNode(t *testing.T) {
 }
 
 func TestGetPodSpec(t *testing.T) {
-	podSpec := corev1.PodSpec{
+	podSpec := corev1api.PodSpec{
 		NodeName: "fake-node",
 	}
 
-	daemonSet := &appsv1.DaemonSet{
+	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -197,8 +197,8 @@ func TestGetPodSpec(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
 				Spec: podSpec,
 			},
 		},
@@ -209,7 +209,7 @@ func TestGetPodSpec(t *testing.T) {
 		kubeClientObj []runtime.Object
 		namespace     string
 		expectErr     string
-		expectSpec    corev1.PodSpec
+		expectSpec    corev1api.PodSpec
 	}{
 		{
 			name:      "ds is not found",
@@ -334,7 +334,7 @@ func TestGetConfigs(t *testing.T) {
 }
 
 func TestGetLabelValue(t *testing.T) {
-	daemonSet := &appsv1.DaemonSet{
+	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -344,7 +344,7 @@ func TestGetLabelValue(t *testing.T) {
 		},
 	}
 
-	daemonSetWithOtherLabel := &appsv1.DaemonSet{
+	daemonSetWithOtherLabel := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -352,8 +352,8 @@ func TestGetLabelValue(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"fake-other-label": "fake-value-1",
@@ -363,7 +363,7 @@ func TestGetLabelValue(t *testing.T) {
 		},
 	}
 
-	daemonSetWithLabel := &appsv1.DaemonSet{
+	daemonSetWithLabel := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -371,8 +371,8 @@ func TestGetLabelValue(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"fake-label": "fake-value-2",
@@ -382,7 +382,7 @@ func TestGetLabelValue(t *testing.T) {
 		},
 	}
 
-	daemonSetWithEmptyLabel := &appsv1.DaemonSet{
+	daemonSetWithEmptyLabel := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -390,8 +390,8 @@ func TestGetLabelValue(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"fake-label": "",
@@ -463,7 +463,7 @@ func TestGetLabelValue(t *testing.T) {
 }
 
 func TestGetAnnotationValue(t *testing.T) {
-	daemonSet := &appsv1.DaemonSet{
+	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -473,7 +473,7 @@ func TestGetAnnotationValue(t *testing.T) {
 		},
 	}
 
-	daemonSetWithOtherAnnotation := &appsv1.DaemonSet{
+	daemonSetWithOtherAnnotation := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -481,8 +481,8 @@ func TestGetAnnotationValue(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"fake-other-annotation": "fake-value-1",
@@ -492,7 +492,7 @@ func TestGetAnnotationValue(t *testing.T) {
 		},
 	}
 
-	daemonSetWithAnnotation := &appsv1.DaemonSet{
+	daemonSetWithAnnotation := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -500,8 +500,8 @@ func TestGetAnnotationValue(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"fake-annotation": "fake-value-2",
@@ -511,7 +511,7 @@ func TestGetAnnotationValue(t *testing.T) {
 		},
 	}
 
-	daemonSetWithEmptyAnnotation := &appsv1.DaemonSet{
+	daemonSetWithEmptyAnnotation := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -519,8 +519,8 @@ func TestGetAnnotationValue(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"fake-annotation": "",

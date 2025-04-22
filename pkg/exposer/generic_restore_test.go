@@ -30,7 +30,7 @@ import (
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 
-	appsv1 "k8s.io/api/apps/v1"
+	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	clientTesting "k8s.io/client-go/testing"
 )
@@ -65,16 +65,16 @@ func TestRestoreExpose(t *testing.T) {
 		},
 	}
 
-	daemonSet := &appsv1.DaemonSet{
+	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "velero",
 			Name:      "node-agent",
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
-			APIVersion: appsv1.SchemeGroupVersion.String(),
+			APIVersion: appsv1api.SchemeGroupVersion.String(),
 		},
-		Spec: appsv1.DaemonSetSpec{
+		Spec: appsv1api.DaemonSetSpec{
 			Template: corev1api.PodTemplateSpec{
 				Spec: corev1api.PodSpec{
 					Containers: []corev1api.Container{

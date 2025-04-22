@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -35,37 +35,37 @@ func TestParseResourceRequirements(t *testing.T) {
 		name     string
 		args     args
 		wantErr  bool
-		expected *corev1.ResourceRequirements
+		expected *corev1api.ResourceRequirements
 	}{
-		{"unbounded quantities", args{"0", "0", "0", "0"}, false, &corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{},
-			Limits:   corev1.ResourceList{},
+		{"unbounded quantities", args{"0", "0", "0", "0"}, false, &corev1api.ResourceRequirements{
+			Requests: corev1api.ResourceList{},
+			Limits:   corev1api.ResourceList{},
 		}},
 		{"valid quantities", args{"100m", "128Mi", "200m", "256Mi"}, false, nil},
-		{"CPU request with unbounded limit", args{"100m", "128Mi", "0", "256Mi"}, false, &corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("128Mi"),
+		{"CPU request with unbounded limit", args{"100m", "128Mi", "0", "256Mi"}, false, &corev1api.ResourceRequirements{
+			Requests: corev1api.ResourceList{
+				corev1api.ResourceCPU:    resource.MustParse("100m"),
+				corev1api.ResourceMemory: resource.MustParse("128Mi"),
 			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: resource.MustParse("256Mi"),
-			},
-		}},
-		{"Mem request with unbounded limit", args{"100m", "128Mi", "200m", "0"}, false, &corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("128Mi"),
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU: resource.MustParse("200m"),
+			Limits: corev1api.ResourceList{
+				corev1api.ResourceMemory: resource.MustParse("256Mi"),
 			},
 		}},
-		{"CPU/Mem requests with unbounded limits", args{"100m", "128Mi", "0", "0"}, false, &corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("128Mi"),
+		{"Mem request with unbounded limit", args{"100m", "128Mi", "200m", "0"}, false, &corev1api.ResourceRequirements{
+			Requests: corev1api.ResourceList{
+				corev1api.ResourceCPU:    resource.MustParse("100m"),
+				corev1api.ResourceMemory: resource.MustParse("128Mi"),
 			},
-			Limits: corev1.ResourceList{},
+			Limits: corev1api.ResourceList{
+				corev1api.ResourceCPU: resource.MustParse("200m"),
+			},
+		}},
+		{"CPU/Mem requests with unbounded limits", args{"100m", "128Mi", "0", "0"}, false, &corev1api.ResourceRequirements{
+			Requests: corev1api.ResourceList{
+				corev1api.ResourceCPU:    resource.MustParse("100m"),
+				corev1api.ResourceMemory: resource.MustParse("128Mi"),
+			},
+			Limits: corev1api.ResourceList{},
 		}},
 		{"invalid quantity", args{"100m", "invalid", "200m", "256Mi"}, true, nil},
 		{"CPU request greater than limit", args{"300m", "128Mi", "200m", "256Mi"}, true, nil},
@@ -80,16 +80,16 @@ func TestParseResourceRequirements(t *testing.T) {
 			}
 			assert.NoError(t, err)
 
-			var expected corev1.ResourceRequirements
+			var expected corev1api.ResourceRequirements
 			if tt.expected == nil {
-				expected = corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse(tt.args.cpuRequest),
-						corev1.ResourceMemory: resource.MustParse(tt.args.memRequest),
+				expected = corev1api.ResourceRequirements{
+					Requests: corev1api.ResourceList{
+						corev1api.ResourceCPU:    resource.MustParse(tt.args.cpuRequest),
+						corev1api.ResourceMemory: resource.MustParse(tt.args.memRequest),
 					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse(tt.args.cpuLimit),
-						corev1.ResourceMemory: resource.MustParse(tt.args.memLimit),
+					Limits: corev1api.ResourceList{
+						corev1api.ResourceCPU:    resource.MustParse(tt.args.cpuLimit),
+						corev1api.ResourceMemory: resource.MustParse(tt.args.memLimit),
 					},
 				}
 			} else {

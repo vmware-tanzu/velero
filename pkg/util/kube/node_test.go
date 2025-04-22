@@ -22,7 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -40,7 +40,7 @@ func TestIsLinuxNode(t *testing.T) {
 	nodeLinux := builder.ForNode("fake-node").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
 
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	tests := []struct {
 		name          string
@@ -95,7 +95,7 @@ func TestWithLinuxNode(t *testing.T) {
 	nodeLinux := builder.ForNode("fake-node-2").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
 
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	tests := []struct {
 		name          string
@@ -139,7 +139,7 @@ func TestGetNodeOSType(t *testing.T) {
 	nodeWindows := builder.ForNode("fake-node").Labels(map[string]string{"kubernetes.io/os": "windows"}).Result()
 	nodeLinux := builder.ForNode("fake-node").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 	tests := []struct {
 		name           string
 		kubeClientObj  []runtime.Object
@@ -190,7 +190,7 @@ func TestHasNodeWithOS(t *testing.T) {
 	nodeLinux := builder.ForNode("fake-node-3").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
 
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	tests := []struct {
 		name          string

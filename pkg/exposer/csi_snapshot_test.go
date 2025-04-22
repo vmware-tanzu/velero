@@ -26,8 +26,8 @@ import (
 	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/fake"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -128,19 +128,19 @@ func TestExpose(t *testing.T) {
 		},
 	}
 
-	daemonSet := &appsv1.DaemonSet{
+	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "velero",
 			Name:      "node-agent",
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
-			APIVersion: appsv1.SchemeGroupVersion.String(),
+			APIVersion: appsv1api.SchemeGroupVersion.String(),
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
 						{
 							Name: "node-agent",
 						},
@@ -487,9 +487,9 @@ func TestExpose(t *testing.T) {
 				log:               velerotest.NewLogger(),
 			}
 
-			var ownerObject corev1.ObjectReference
+			var ownerObject corev1api.ObjectReference
 			if test.ownerBackup != nil {
-				ownerObject = corev1.ObjectReference{
+				ownerObject = corev1api.ObjectReference{
 					Kind:       test.ownerBackup.Kind,
 					Namespace:  test.ownerBackup.Namespace,
 					Name:       test.ownerBackup.Name,
@@ -524,15 +524,15 @@ func TestExpose(t *testing.T) {
 				assert.Equal(t, *expectedVSC.Spec.VolumeSnapshotClassName, *vscObj.Spec.VolumeSnapshotClassName)
 
 				if test.expectedVolumeSize != nil {
-					assert.Equal(t, *test.expectedVolumeSize, backupPVC.Spec.Resources.Requests[corev1.ResourceStorage])
+					assert.Equal(t, *test.expectedVolumeSize, backupPVC.Spec.Resources.Requests[corev1api.ResourceStorage])
 				} else {
-					assert.Equal(t, *resource.NewQuantity(restoreSize, ""), backupPVC.Spec.Resources.Requests[corev1.ResourceStorage])
+					assert.Equal(t, *resource.NewQuantity(restoreSize, ""), backupPVC.Spec.Resources.Requests[corev1api.ResourceStorage])
 				}
 
 				if test.expectedReadOnlyPVC {
 					gotReadOnlyAccessMode := false
 					for _, accessMode := range backupPVC.Spec.AccessModes {
-						if accessMode == corev1.ReadOnlyMany {
+						if accessMode == corev1api.ReadOnlyMany {
 							gotReadOnlyAccessMode = true
 						}
 					}
@@ -562,13 +562,13 @@ func TestGetExpose(t *testing.T) {
 		},
 	}
 
-	backupPod := &corev1.Pod{
+	backupPod := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: backup.Namespace,
 			Name:      backup.Name,
 		},
-		Spec: corev1.PodSpec{
-			Volumes: []corev1.Volume{
+		Spec: corev1api.PodSpec{
+			Volumes: []corev1api.Volume{
 				{
 					Name: "fake-volume",
 				},
@@ -582,13 +582,13 @@ func TestGetExpose(t *testing.T) {
 		},
 	}
 
-	backupPodWithoutVolume := &corev1.Pod{
+	backupPodWithoutVolume := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: backup.Namespace,
 			Name:      backup.Name,
 		},
-		Spec: corev1.PodSpec{
-			Volumes: []corev1.Volume{
+		Spec: corev1api.PodSpec{
+			Volumes: []corev1api.Volume{
 				{
 					Name: "fake-volume-1",
 				},
@@ -599,24 +599,24 @@ func TestGetExpose(t *testing.T) {
 		},
 	}
 
-	backupPVC := &corev1.PersistentVolumeClaim{
+	backupPVC := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: backup.Namespace,
 			Name:      backup.Name,
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
+		Spec: corev1api.PersistentVolumeClaimSpec{
 			VolumeName: "fake-pv-name",
 		},
 	}
 
-	backupPV := &corev1.PersistentVolume{
+	backupPV := &corev1api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "fake-pv-name",
 		},
 	}
 
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	tests := []struct {
 		name            string
@@ -695,9 +695,9 @@ func TestGetExpose(t *testing.T) {
 				log:        velerotest.NewLogger(),
 			}
 
-			var ownerObject corev1.ObjectReference
+			var ownerObject corev1api.ObjectReference
 			if test.ownerBackup != nil {
-				ownerObject = corev1.ObjectReference{
+				ownerObject = corev1api.ObjectReference{
 					Kind:       test.ownerBackup.Kind,
 					Namespace:  test.ownerBackup.Namespace,
 					Name:       test.ownerBackup.Name,
@@ -739,17 +739,17 @@ func TestPeekExpose(t *testing.T) {
 		},
 	}
 
-	backupPodUrecoverable := &corev1.Pod{
+	backupPodUrecoverable := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: backup.Namespace,
 			Name:      backup.Name,
 		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodFailed,
+		Status: corev1api.PodStatus{
+			Phase: corev1api.PodFailed,
 		},
 	}
 
-	backupPod := &corev1.Pod{
+	backupPod := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: backup.Namespace,
 			Name:      backup.Name,
@@ -757,7 +757,7 @@ func TestPeekExpose(t *testing.T) {
 	}
 
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	tests := []struct {
 		name          string
@@ -795,9 +795,9 @@ func TestPeekExpose(t *testing.T) {
 				log:        velerotest.NewLogger(),
 			}
 
-			var ownerObject corev1.ObjectReference
+			var ownerObject corev1api.ObjectReference
 			if test.ownerBackup != nil {
-				ownerObject = corev1.ObjectReference{
+				ownerObject = corev1api.ObjectReference{
 					Kind:       test.ownerBackup.Kind,
 					Namespace:  test.ownerBackup.Namespace,
 					Name:       test.ownerBackup.Name,
@@ -829,14 +829,14 @@ func Test_csiSnapshotExposer_createBackupPVC(t *testing.T) {
 		},
 	}
 
-	dataSource := &corev1.TypedLocalObjectReference{
+	dataSource := &corev1api.TypedLocalObjectReference{
 		APIGroup: &snapshotv1api.SchemeGroupVersion.Group,
 		Kind:     "VolumeSnapshot",
 		Name:     "fake-snapshot",
 	}
-	volumeMode := corev1.PersistentVolumeFilesystem
+	volumeMode := corev1api.PersistentVolumeFilesystem
 
-	backupPVC := corev1.PersistentVolumeClaim{
+	backupPVC := corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
@@ -850,23 +850,23 @@ func Test_csiSnapshotExposer_createBackupPVC(t *testing.T) {
 				},
 			},
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			AccessModes: []corev1api.PersistentVolumeAccessMode{
+				corev1api.ReadWriteOnce,
 			},
 			VolumeMode:       &volumeMode,
 			DataSource:       dataSource,
 			DataSourceRef:    nil,
 			StorageClassName: pointer.String("fake-storage-class"),
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
+			Resources: corev1api.VolumeResourceRequirements{
+				Requests: corev1api.ResourceList{
+					corev1api.ResourceStorage: resource.MustParse("1Gi"),
 				},
 			},
 		},
 	}
 
-	backupPVCReadOnly := corev1.PersistentVolumeClaim{
+	backupPVCReadOnly := corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
@@ -880,17 +880,17 @@ func Test_csiSnapshotExposer_createBackupPVC(t *testing.T) {
 				},
 			},
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadOnlyMany,
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			AccessModes: []corev1api.PersistentVolumeAccessMode{
+				corev1api.ReadOnlyMany,
 			},
 			VolumeMode:       &volumeMode,
 			DataSource:       dataSource,
 			DataSourceRef:    nil,
 			StorageClassName: pointer.String("fake-storage-class"),
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
+			Resources: corev1api.VolumeResourceRequirements{
+				Requests: corev1api.ResourceList{
+					corev1api.ResourceStorage: resource.MustParse("1Gi"),
 				},
 			},
 		},
@@ -906,7 +906,7 @@ func Test_csiSnapshotExposer_createBackupPVC(t *testing.T) {
 		readOnly          bool
 		kubeClientObj     []runtime.Object
 		snapshotClientObj []runtime.Object
-		want              *corev1.PersistentVolumeClaim
+		want              *corev1api.PersistentVolumeClaim
 		wantErr           assert.ErrorAssertionFunc
 	}{
 		{
@@ -941,9 +941,9 @@ func Test_csiSnapshotExposer_createBackupPVC(t *testing.T) {
 				csiSnapshotClient: fakeSnapshotClient.SnapshotV1(),
 				log:               velerotest.NewLogger(),
 			}
-			var ownerObject corev1.ObjectReference
+			var ownerObject corev1api.ObjectReference
 			if tt.ownerBackup != nil {
-				ownerObject = corev1.ObjectReference{
+				ownerObject = corev1api.ObjectReference{
 					Kind:       tt.ownerBackup.Kind,
 					Namespace:  tt.ownerBackup.Namespace,
 					Name:       tt.ownerBackup.Name,
@@ -973,7 +973,7 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 		},
 	}
 
-	backupPodWithoutNodeName := corev1.Pod{
+	backupPodWithoutNodeName := corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
@@ -986,19 +986,19 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 				},
 			},
 		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodPending,
-			Conditions: []corev1.PodCondition{
+		Status: corev1api.PodStatus{
+			Phase: corev1api.PodPending,
+			Conditions: []corev1api.PodCondition{
 				{
-					Type:    corev1.PodInitialized,
-					Status:  corev1.ConditionTrue,
+					Type:    corev1api.PodInitialized,
+					Status:  corev1api.ConditionTrue,
 					Message: "fake-pod-message",
 				},
 			},
 		},
 	}
 
-	backupPodWithNodeName := corev1.Pod{
+	backupPodWithNodeName := corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
@@ -1011,22 +1011,22 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 				},
 			},
 		},
-		Spec: corev1.PodSpec{
+		Spec: corev1api.PodSpec{
 			NodeName: "fake-node",
 		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodPending,
-			Conditions: []corev1.PodCondition{
+		Status: corev1api.PodStatus{
+			Phase: corev1api.PodPending,
+			Conditions: []corev1api.PodCondition{
 				{
-					Type:    corev1.PodInitialized,
-					Status:  corev1.ConditionTrue,
+					Type:    corev1api.PodInitialized,
+					Status:  corev1api.ConditionTrue,
 					Message: "fake-pod-message",
 				},
 			},
 		},
 	}
 
-	backupPVCWithoutVolumeName := corev1.PersistentVolumeClaim{
+	backupPVCWithoutVolumeName := corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
@@ -1039,12 +1039,12 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 				},
 			},
 		},
-		Status: corev1.PersistentVolumeClaimStatus{
-			Phase: corev1.ClaimPending,
+		Status: corev1api.PersistentVolumeClaimStatus{
+			Phase: corev1api.ClaimPending,
 		},
 	}
 
-	backupPVCWithVolumeName := corev1.PersistentVolumeClaim{
+	backupPVCWithVolumeName := corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
@@ -1057,20 +1057,20 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 				},
 			},
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
+		Spec: corev1api.PersistentVolumeClaimSpec{
 			VolumeName: "fake-pv",
 		},
-		Status: corev1.PersistentVolumeClaimStatus{
-			Phase: corev1.ClaimPending,
+		Status: corev1api.PersistentVolumeClaimStatus{
+			Phase: corev1api.ClaimPending,
 		},
 	}
 
-	backupPV := corev1.PersistentVolume{
+	backupPV := corev1api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "fake-pv",
 		},
-		Status: corev1.PersistentVolumeStatus{
-			Phase:   corev1.VolumePending,
+		Status: corev1api.PersistentVolumeStatus{
+			Phase:   corev1api.VolumePending,
 			Message: "fake-pv-message",
 		},
 	}
@@ -1142,17 +1142,17 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 		},
 	}
 
-	nodeAgentPod := corev1.Pod{
+	nodeAgentPod := corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "node-agent-pod-1",
 			Labels:    map[string]string{"role": "node-agent"},
 		},
-		Spec: corev1.PodSpec{
+		Spec: corev1api.PodSpec{
 			NodeName: "fake-node",
 		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodRunning,
+		Status: corev1api.PodStatus{
+			Phase: corev1api.PodRunning,
 		},
 	}
 
@@ -1334,9 +1334,9 @@ end diagnose CSI exposer`,
 				csiSnapshotClient: fakeSnapshotClient.SnapshotV1(),
 				log:               velerotest.NewLogger(),
 			}
-			var ownerObject corev1.ObjectReference
+			var ownerObject corev1api.ObjectReference
 			if tt.ownerBackup != nil {
-				ownerObject = corev1.ObjectReference{
+				ownerObject = corev1api.ObjectReference{
 					Kind:       tt.ownerBackup.Kind,
 					Namespace:  tt.ownerBackup.Namespace,
 					Name:       tt.ownerBackup.Name,

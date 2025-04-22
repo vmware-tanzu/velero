@@ -26,7 +26,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
@@ -80,8 +80,8 @@ func TestBuildBackupStorageLocationSetsCredential(t *testing.T) {
 
 	bsl, err = o.BuildBackupStorageLocation("velero-test-ns", false, true)
 	assert.NoError(t, err)
-	assert.Equal(t, &v1.SecretKeySelector{
-		LocalObjectReference: v1.LocalObjectReference{Name: "my-secret"},
+	assert.Equal(t, &corev1api.SecretKeySelector{
+		LocalObjectReference: corev1api.LocalObjectReference{Name: "my-secret"},
 		Key:                  "key-from-secret",
 	}, bsl.Spec.Credential)
 }

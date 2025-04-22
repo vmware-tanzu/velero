@@ -28,8 +28,8 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
-	apps "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -478,8 +478,8 @@ func createVeleroResources(ctx context.Context, cli, namespace string, args []st
 func patchResources(resources *unstructured.UnstructuredList, namespace string, options *installOptions) error {
 	i := 0
 	size := 2
-	var deploy apps.Deployment
-	var imagePullSecret corev1.Secret
+	var deploy appsv1api.Deployment
+	var imagePullSecret corev1api.Secret
 
 	for resourceIndex, resource := range resources.Items {
 		// apply the image pull secret to avoid the image pull limit of Docker Hub
@@ -489,16 +489,16 @@ func patchResources(resources *unstructured.UnstructuredList, namespace string, 
 			if err != nil {
 				return errors.Wrapf(err, "failed to read the registry credential file %s", options.RegistryCredentialFile)
 			}
-			imagePullSecret = corev1.Secret{
+			imagePullSecret = corev1api.Secret{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Secret",
-					APIVersion: corev1.SchemeGroupVersion.String(),
+					APIVersion: corev1api.SchemeGroupVersion.String(),
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "image-pull-secret",
 					Namespace: namespace,
 				},
-				Type: corev1.SecretTypeDockerConfigJson,
+				Type: corev1api.SecretTypeDockerConfigJson,
 				Data: map[string][]byte{
 					".dockerconfigjson": credential,
 				},
@@ -555,10 +555,10 @@ func patchResources(resources *unstructured.UnstructuredList, namespace string, 
 
 	// customize the restic restore helper image
 	if len(options.RestoreHelperImage) > 0 {
-		restoreActionConfig := corev1.ConfigMap{
+		restoreActionConfig := corev1api.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "ConfigMap",
-				APIVersion: corev1.SchemeGroupVersion.String(),
+				APIVersion: corev1api.SchemeGroupVersion.String(),
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "restic-restore-action-config",
@@ -612,7 +612,7 @@ func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) e
 			if err != nil {
 				return false, errors.Wrapf(err, "failed to get the node-agent daemonset, stdout=%s, stderr=%s", stdout, stderr)
 			}
-			daemonset := &apps.DaemonSet{}
+			daemonset := &appsv1api.DaemonSet{}
 			if err = json.Unmarshal([]byte(stdout), daemonset); err != nil {
 				return false, errors.Wrapf(err, "failed to unmarshal the node-agent daemonset")
 			}
@@ -639,7 +639,7 @@ func IsVeleroReady(ctx context.Context, veleroCfg *test.VeleroConfig) (bool, err
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to get the node-agent daemonset, stdout=%s, stderr=%s", stdout, stderr)
 		} else {
-			daemonset := &apps.DaemonSet{}
+			daemonset := &appsv1api.DaemonSet{}
 			if err = json.Unmarshal([]byte(stdout), daemonset); err != nil {
 				return false, errors.Wrapf(err, "failed to unmarshal the node-agent daemonset")
 			}
@@ -654,7 +654,7 @@ func IsVeleroReady(ctx context.Context, veleroCfg *test.VeleroConfig) (bool, err
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to get the velero deployment stdout=%s, stderr=%s", stdout, stderr)
 	} else {
-		deployment := &apps.Deployment{}
+		deployment := &appsv1api.Deployment{}
 		if err = json.Unmarshal([]byte(stdout), deployment); err != nil {
 			return false, errors.Wrapf(err, "failed to unmarshal the velero deployment")
 		}
@@ -737,12 +737,12 @@ func createVCCredentialSecret(c clientset.Interface, veleroNamespace string) err
 		return errors.New("failed to retrieve csi-vsphere config")
 	}
 
-	vsphereSecret := &corev1.Secret{
+	vsphereSecret := &corev1api.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "velero-vsphere-config-secret",
 			Namespace: veleroNamespace,
 		},
-		Type: corev1.SecretTypeOpaque,
+		Type: corev1api.SecretTypeOpaque,
 		Data: map[string][]byte{"csi-vsphere.conf": vsphereCfg},
 	}
 	_, err = c.CoreV1().Secrets(veleroNamespace).Create(
@@ -770,7 +770,7 @@ func createVCCredentialSecret(c clientset.Interface, veleroNamespace string) err
 
 // Reference https://github.com/vmware-tanzu/velero-plugin-for-vsphere/blob/main/docs/vanilla.md#create-vc-credential-secret
 // Read secret from kube-system namespace first, if not found, try with vmware-system-csi.
-func getVCCredentialSecret(c clientset.Interface) (secret *corev1.Secret, err error) {
+func getVCCredentialSecret(c clientset.Interface) (secret *corev1api.Secret, err error) {
 	secret, err = k8s.GetSecret(c, test.KubeSystemNamespace, "vsphere-config-secret")
 	if err != nil {
 		if apierrors.IsNotFound(err) {

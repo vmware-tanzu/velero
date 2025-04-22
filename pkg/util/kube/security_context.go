@@ -20,12 +20,12 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 )
 
-func ParseSecurityContext(runAsUser string, runAsGroup string, allowPrivilegeEscalation string, secCtx string) (corev1.SecurityContext, error) {
-	securityContext := corev1.SecurityContext{}
+func ParseSecurityContext(runAsUser string, runAsGroup string, allowPrivilegeEscalation string, secCtx string) (corev1api.SecurityContext, error) {
+	securityContext := corev1api.SecurityContext{}
 
 	if runAsUser != "" {
 		parsedRunAsUser, err := strconv.ParseInt(runAsUser, 10, 64)

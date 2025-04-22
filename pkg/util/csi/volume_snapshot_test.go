@@ -27,7 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -879,29 +879,29 @@ func TestGetVolumeSnapshotClass(t *testing.T) {
 	}
 
 	// pvcs
-	pvcFoo := &v1.PersistentVolumeClaim{
+	pvcFoo := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 			Annotations: map[string]string{
 				"velero.io/csi-volumesnapshot-class": "foowithoutlabel",
 			},
 		},
-		Spec: v1.PersistentVolumeClaimSpec{},
+		Spec: corev1api.PersistentVolumeClaimSpec{},
 	}
-	pvcFoo2 := &v1.PersistentVolumeClaim{
+	pvcFoo2 := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 			Annotations: map[string]string{
 				"velero.io/csi-volumesnapshot-class": "foo2",
 			},
 		},
-		Spec: v1.PersistentVolumeClaimSpec{},
+		Spec: corev1api.PersistentVolumeClaimSpec{},
 	}
-	pvcNone := &v1.PersistentVolumeClaim{
+	pvcNone := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "none",
 		},
-		Spec: v1.PersistentVolumeClaimSpec{},
+		Spec: corev1api.PersistentVolumeClaimSpec{},
 	}
 
 	// vsclasses
@@ -957,7 +957,7 @@ func TestGetVolumeSnapshotClass(t *testing.T) {
 	testCases := []struct {
 		name        string
 		driverName  string
-		pvc         *v1.PersistentVolumeClaim
+		pvc         *corev1api.PersistentVolumeClaim
 		backup      *velerov1api.Backup
 		expectedVSC *snapshotv1api.VolumeSnapshotClass
 		expectError bool
@@ -1535,7 +1535,7 @@ func TestWaitUntilVSCHandleIsReady(t *testing.T) {
 			Name: vscName,
 		},
 		Spec: snapshotv1api.VolumeSnapshotContentSpec{
-			VolumeSnapshotRef: v1.ObjectReference{
+			VolumeSnapshotRef: corev1api.ObjectReference{
 				Name:       "vol-snap-1",
 				APIVersion: snapshotv1api.SchemeGroupVersion.String(),
 			},
@@ -1588,7 +1588,7 @@ func TestWaitUntilVSCHandleIsReady(t *testing.T) {
 			Name: nilStatusVsc,
 		},
 		Spec: snapshotv1api.VolumeSnapshotContentSpec{
-			VolumeSnapshotRef: v1.ObjectReference{
+			VolumeSnapshotRef: corev1api.ObjectReference{
 				Name:       "vol-snap-1",
 				APIVersion: snapshotv1api.SchemeGroupVersion.String(),
 			},
@@ -1611,7 +1611,7 @@ func TestWaitUntilVSCHandleIsReady(t *testing.T) {
 			Name: nilStatusFieldVsc,
 		},
 		Spec: snapshotv1api.VolumeSnapshotContentSpec{
-			VolumeSnapshotRef: v1.ObjectReference{
+			VolumeSnapshotRef: corev1api.ObjectReference{
 				Name:       "vol-snap-1",
 				APIVersion: snapshotv1api.SchemeGroupVersion.String(),
 			},

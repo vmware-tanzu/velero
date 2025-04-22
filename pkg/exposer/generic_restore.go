@@ -23,7 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,7 +50,7 @@ type GenericRestoreExposeParam struct {
 	HostingPodAnnotations map[string]string
 
 	// Resources defines the resource requirements of the hosting pod
-	Resources corev1.ResourceRequirements
+	Resources corev1api.ResourceRequirements
 
 	// ExposeTimeout specifies the timeout for the entire expose process
 	ExposeTimeout time.Duration
@@ -68,27 +68,27 @@ type GenericRestoreExposeParam struct {
 // GenericRestoreExposer is the interfaces for a generic restore exposer
 type GenericRestoreExposer interface {
 	// Expose starts the process to a restore expose, the expose process may take long time
-	Expose(context.Context, corev1.ObjectReference, GenericRestoreExposeParam) error
+	Expose(context.Context, corev1api.ObjectReference, GenericRestoreExposeParam) error
 
 	// GetExposed polls the status of the expose.
 	// If the expose is accessible by the current caller, it waits the expose ready and returns the expose result.
 	// Otherwise, it returns nil as the expose result without an error.
-	GetExposed(context.Context, corev1.ObjectReference, client.Client, string, time.Duration) (*ExposeResult, error)
+	GetExposed(context.Context, corev1api.ObjectReference, client.Client, string, time.Duration) (*ExposeResult, error)
 
 	// PeekExposed tests the status of the expose.
 	// If the expose is incomplete but not recoverable, it returns an error.
 	// Otherwise, it returns nil immediately.
-	PeekExposed(context.Context, corev1.ObjectReference) error
+	PeekExposed(context.Context, corev1api.ObjectReference) error
 
 	// DiagnoseExpose generate the diagnostic info when the expose is not finished for a long time.
 	// If it finds any problem, it returns an string about the problem.
-	DiagnoseExpose(context.Context, corev1.ObjectReference) string
+	DiagnoseExpose(context.Context, corev1api.ObjectReference) string
 
 	// RebindVolume unexposes the restored PV and rebind it to the target PVC
-	RebindVolume(context.Context, corev1.ObjectReference, string, string, time.Duration) error
+	RebindVolume(context.Context, corev1api.ObjectReference, string, string, time.Duration) error
 
 	// CleanUp cleans up any objects generated during the restore expose
-	CleanUp(context.Context, corev1.ObjectReference)
+	CleanUp(context.Context, corev1api.ObjectReference)
 }
 
 // NewGenericRestoreExposer creates a new instance of generic restore exposer
@@ -104,7 +104,7 @@ type genericRestoreExposer struct {
 	log        logrus.FieldLogger
 }
 
-func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1.ObjectReference, param GenericRestoreExposeParam) error {
+func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1api.ObjectReference, param GenericRestoreExposeParam) error {
 	curLog := e.log.WithFields(logrus.Fields{
 		"owner":            ownerObject.Name,
 		"target PVC":       param.TargetPVCName,
@@ -151,7 +151,7 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1.O
 	return nil
 }
 
-func (e *genericRestoreExposer) GetExposed(ctx context.Context, ownerObject corev1.ObjectReference, nodeClient client.Client, nodeName string, timeout time.Duration) (*ExposeResult, error) {
+func (e *genericRestoreExposer) GetExposed(ctx context.Context, ownerObject corev1api.ObjectReference, nodeClient client.Client, nodeName string, timeout time.Duration) (*ExposeResult, error) {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
@@ -163,7 +163,7 @@ func (e *genericRestoreExposer) GetExposed(ctx context.Context, ownerObject core
 		"node":  nodeName,
 	})
 
-	pod := &corev1.Pod{}
+	pod := &corev1api.Pod{}
 	err := nodeClient.Get(ctx, types.NamespacedName{
 		Namespace: ownerObject.Namespace,
 		Name:      restorePodName,
@@ -206,7 +206,7 @@ func (e *genericRestoreExposer) GetExposed(ctx context.Context, ownerObject core
 	}}, nil
 }
 
-func (e *genericRestoreExposer) PeekExposed(ctx context.Context, ownerObject corev1.ObjectReference) error {
+func (e *genericRestoreExposer) PeekExposed(ctx context.Context, ownerObject corev1api.ObjectReference) error {
 	restorePodName := ownerObject.Name
 
 	curLog := e.log.WithFields(logrus.Fields{
@@ -230,7 +230,7 @@ func (e *genericRestoreExposer) PeekExposed(ctx context.Context, ownerObject cor
 	return nil
 }
 
-func (e *genericRestoreExposer) DiagnoseExpose(ctx context.Context, ownerObject corev1.ObjectReference) string {
+func (e *genericRestoreExposer) DiagnoseExpose(ctx context.Context, ownerObject corev1api.ObjectReference) string {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
@@ -275,7 +275,7 @@ func (e *genericRestoreExposer) DiagnoseExpose(ctx context.Context, ownerObject 
 	return diag
 }
 
-func (e *genericRestoreExposer) CleanUp(ctx context.Context, ownerObject corev1.ObjectReference) {
+func (e *genericRestoreExposer) CleanUp(ctx context.Context, ownerObject corev1api.ObjectReference) {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
@@ -283,7 +283,7 @@ func (e *genericRestoreExposer) CleanUp(ctx context.Context, ownerObject corev1.
 	kube.DeletePVAndPVCIfAny(ctx, e.kubeClient.CoreV1(), restorePVCName, ownerObject.Namespace, 0, e.log)
 }
 
-func (e *genericRestoreExposer) RebindVolume(ctx context.Context, ownerObject corev1.ObjectReference, targetPVCName string, targetNamespace string, timeout time.Duration) error {
+func (e *genericRestoreExposer) RebindVolume(ctx context.Context, ownerObject corev1api.ObjectReference, targetPVCName string, targetNamespace string, timeout time.Duration) error {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
@@ -307,7 +307,7 @@ func (e *genericRestoreExposer) RebindVolume(ctx context.Context, ownerObject co
 
 	curLog.WithField("restore PV", restorePV.Name).Info("Restore PV is retrieved")
 
-	retained, err := kube.SetPVReclaimPolicy(ctx, e.kubeClient.CoreV1(), restorePV, corev1.PersistentVolumeReclaimRetain)
+	retained, err := kube.SetPVReclaimPolicy(ctx, e.kubeClient.CoreV1(), restorePV, corev1api.PersistentVolumeReclaimRetain)
 	if err != nil {
 		return errors.Wrapf(err, "error to retain PV %s", restorePV.Name)
 	}
@@ -376,8 +376,8 @@ func (e *genericRestoreExposer) RebindVolume(ctx context.Context, ownerObject co
 	return nil
 }
 
-func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObject corev1.ObjectReference, targetPVC *corev1.PersistentVolumeClaim,
-	operationTimeout time.Duration, label map[string]string, annotation map[string]string, selectedNode string, resources corev1.ResourceRequirements, nodeOS string) (*corev1.Pod, error) {
+func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObject corev1api.ObjectReference, targetPVC *corev1api.PersistentVolumeClaim,
+	operationTimeout time.Duration, label map[string]string, annotation map[string]string, selectedNode string, resources corev1api.ResourceRequirements, nodeOS string) (*corev1api.Pod, error) {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
@@ -393,10 +393,10 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	volumeMounts, volumeDevices, volumePath := kube.MakePodPVCAttachment(volumeName, targetPVC.Spec.VolumeMode, false)
 	volumeMounts = append(volumeMounts, podInfo.volumeMounts...)
 
-	volumes := []corev1.Volume{{
+	volumes := []corev1api.Volume{{
 		Name: volumeName,
-		VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+		VolumeSource: corev1api.VolumeSource{
+			PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 				ClaimName: restorePVCName,
 			},
 		},
@@ -408,7 +408,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	}
 	label[podGroupLabel] = podGroupGenericRestore
 
-	volumeMode := corev1.PersistentVolumeFilesystem
+	volumeMode := corev1api.PersistentVolumeFilesystem
 	if targetPVC.Spec.VolumeMode != nil {
 		volumeMode = *targetPVC.Spec.VolumeMode
 	}
@@ -423,14 +423,14 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	args = append(args, podInfo.logFormatArgs...)
 	args = append(args, podInfo.logLevelArgs...)
 
-	var securityCtx *corev1.PodSecurityContext
+	var securityCtx *corev1api.PodSecurityContext
 	nodeSelector := map[string]string{}
-	podOS := corev1.PodOS{}
-	toleration := []corev1.Toleration{}
+	podOS := corev1api.PodOS{}
+	toleration := []corev1api.Toleration{}
 	if nodeOS == kube.NodeOSWindows {
 		userID := "ContainerAdministrator"
-		securityCtx = &corev1.PodSecurityContext{
-			WindowsOptions: &corev1.WindowsSecurityContextOptions{
+		securityCtx = &corev1api.PodSecurityContext{
+			WindowsOptions: &corev1api.WindowsSecurityContextOptions{
 				RunAsUserName: &userID,
 			},
 		}
@@ -438,7 +438,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 		nodeSelector[kube.NodeOSLabel] = kube.NodeOSWindows
 		podOS.Name = kube.NodeOSWindows
 
-		toleration = append(toleration, corev1.Toleration{
+		toleration = append(toleration, corev1api.Toleration{
 			Key:      "os",
 			Operator: "Equal",
 			Effect:   "NoSchedule",
@@ -446,7 +446,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 		})
 	} else {
 		userID := int64(0)
-		securityCtx = &corev1.PodSecurityContext{
+		securityCtx = &corev1api.PodSecurityContext{
 			RunAsUser: &userID,
 		}
 
@@ -454,7 +454,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 		podOS.Name = kube.NodeOSLinux
 	}
 
-	pod := &corev1.Pod{
+	pod := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      restorePodName,
 			Namespace: ownerObject.Namespace,
@@ -470,12 +470,12 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 			Labels:      label,
 			Annotations: annotation,
 		},
-		Spec: corev1.PodSpec{
-			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+		Spec: corev1api.PodSpec{
+			TopologySpreadConstraints: []corev1api.TopologySpreadConstraint{
 				{
 					MaxSkew:           1,
 					TopologyKey:       "kubernetes.io/hostname",
-					WhenUnsatisfiable: corev1.ScheduleAnyway,
+					WhenUnsatisfiable: corev1api.ScheduleAnyway,
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							podGroupLabel: podGroupGenericRestore,
@@ -485,11 +485,11 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 			},
 			NodeSelector: nodeSelector,
 			OS:           &podOS,
-			Containers: []corev1.Container{
+			Containers: []corev1api.Container{
 				{
 					Name:            containerName,
 					Image:           podInfo.image,
-					ImagePullPolicy: corev1.PullNever,
+					ImagePullPolicy: corev1api.PullNever,
 					Command: []string{
 						"/velero",
 						"data-mover",
@@ -507,7 +507,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes:                       volumes,
 			NodeName:                      selectedNode,
-			RestartPolicy:                 corev1.RestartPolicyNever,
+			RestartPolicy:                 corev1api.RestartPolicyNever,
 			SecurityContext:               securityCtx,
 			Tolerations:                   toleration,
 		},
@@ -516,10 +516,10 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	return e.kubeClient.CoreV1().Pods(ownerObject.Namespace).Create(ctx, pod, metav1.CreateOptions{})
 }
 
-func (e *genericRestoreExposer) createRestorePVC(ctx context.Context, ownerObject corev1.ObjectReference, targetPVC *corev1.PersistentVolumeClaim, selectedNode string) (*corev1.PersistentVolumeClaim, error) {
+func (e *genericRestoreExposer) createRestorePVC(ctx context.Context, ownerObject corev1api.ObjectReference, targetPVC *corev1api.PersistentVolumeClaim, selectedNode string) (*corev1api.PersistentVolumeClaim, error) {
 	restorePVCName := ownerObject.Name
 
-	pvcObj := &corev1.PersistentVolumeClaim{
+	pvcObj := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   ownerObject.Namespace,
 			Name:        restorePVCName,
@@ -535,7 +535,7 @@ func (e *genericRestoreExposer) createRestorePVC(ctx context.Context, ownerObjec
 				},
 			},
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
+		Spec: corev1api.PersistentVolumeClaimSpec{
 			AccessModes:      targetPVC.Spec.AccessModes,
 			StorageClassName: targetPVC.Spec.StorageClassName,
 			VolumeMode:       targetPVC.Spec.VolumeMode,

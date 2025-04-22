@@ -26,7 +26,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	appv1 "k8s.io/api/apps/v1"
+	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -121,8 +121,8 @@ func TestGetVolumesRepositoryType(t *testing.T) {
 	}
 }
 
-func createNodeAgentDaemonset() *appv1.DaemonSet {
-	ds := &appv1.DaemonSet{
+func createNodeAgentDaemonset() *appsv1api.DaemonSet {
+	ds := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "node-agent",
 			Namespace: velerov1api.DefaultNamespace,

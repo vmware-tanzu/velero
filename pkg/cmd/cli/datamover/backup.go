@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -142,7 +142,7 @@ func newdataMoverBackup(logger logrus.FieldLogger, factory client.Factory, confi
 		return nil, errors.Wrap(err, "error to add velero v2alpha1 scheme")
 	}
 
-	if err := v1.AddToScheme(scheme); err != nil {
+	if err := corev1api.AddToScheme(scheme); err != nil {
 		cancelFunc()
 		return nil, errors.Wrap(err, "error to add core v1 scheme")
 	}
@@ -153,7 +153,7 @@ func newdataMoverBackup(logger logrus.FieldLogger, factory client.Factory, confi
 	cacheOption := ctlcache.Options{
 		Scheme: scheme,
 		ByObject: map[ctlclient.Object]ctlcache.ByObject{
-			&v1.Pod{}: {
+			&corev1api.Pod{}: {
 				Field: fields.Set{"spec.nodeName": nodeName}.AsSelector(),
 			},
 			&velerov2alpha1api.DataUpload{}: {
