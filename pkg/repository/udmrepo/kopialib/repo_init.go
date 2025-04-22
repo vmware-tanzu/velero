@@ -18,8 +18,9 @@ package kopialib
 
 import (
 	"context"
-	"github.com/sirupsen/logrus"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/kopia/kopia/repo"
 	"github.com/kopia/kopia/repo/blob"

@@ -18,8 +18,9 @@ package backend
 
 import (
 	"context"
-	"github.com/sirupsen/logrus"
 	"path/filepath"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/kopia/kopia/repo/blob"
 	"github.com/kopia/kopia/repo/blob/filesystem"

@@ -18,8 +18,9 @@ package kopialib
 
 import (
 	"context"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"testing"
+
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
