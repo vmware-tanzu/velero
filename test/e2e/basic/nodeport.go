@@ -7,7 +7,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -167,8 +167,8 @@ func (n *NodePort) Restore() error {
 
 func createServiceWithNodeport(ctx context.Context, client TestClient, namespace string,
 	service string, labels map[string]string, nodePort int32) error {
-	serviceSpec := &v1.ServiceSpec{
-		Ports: []v1.ServicePort{
+	serviceSpec := &corev1api.ServiceSpec{
+		Ports: []corev1api.ServicePort{
 			{
 				Port:       80,
 				TargetPort: intstr.IntOrString{IntVal: 80},
@@ -176,7 +176,7 @@ func createServiceWithNodeport(ctx context.Context, client TestClient, namespace
 			},
 		},
 		Selector: nil,
-		Type:     v1.ServiceTypeLoadBalancer,
+		Type:     corev1api.ServiceTypeLoadBalancer,
 	}
 	return CreateService(ctx, client, namespace, service, labels, serviceSpec)
 }

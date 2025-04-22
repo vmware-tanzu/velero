@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -74,7 +74,7 @@ func NewUploaderProvider(
 	bsl *velerov1api.BackupStorageLocation,
 	backupRepo *velerov1api.BackupRepository,
 	credGetter *credentials.CredentialGetter,
-	repoKeySelector *v1.SecretKeySelector,
+	repoKeySelector *corev1api.SecretKeySelector,
 	log logrus.FieldLogger,
 ) (Provider, error) {
 	if requesterType == "" {
