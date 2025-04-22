@@ -18,8 +18,9 @@ package backend
 
 import (
 	"context"
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"testing"
+
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 
 	"github.com/kopia/kopia/repo/blob/filesystem"
 	"github.com/stretchr/testify/assert"
