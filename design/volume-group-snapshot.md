@@ -2,6 +2,16 @@
 
 This proposal outlines the design and implementation plan for incorporating VolumeGroupSnapshot support into Velero. The enhancement will allow Velero to perform consistent, atomic snapshots of groups of Volumes using the new Kubernetes [VolumeGroupSnapshot API](https://kubernetes.io/blog/2024/12/18/kubernetes-1-32-volume-group-snapshot-beta/). This capability is especially critical for stateful applications that rely on multiple volumes to ensure data consistency, such as databases and analytics workloads.
 
+## Glossary & Abbreviation
+
+Terminology used in this document:
+- VGS: VolumeGroupSnapshot
+- VS: VolumeSnapshot
+- VGSC: VolumeGroupSnapshotContent
+- VSC: VolumeSnapshotContent
+- VGSClass: VolumeGroupSnapshotClass
+- VSClass: VolumeSnapshotClass
+
 ## Background
 
 Velero currently enables snapshot-based backups on an individual Volume basis through CSI drivers. However, modern stateful applications often require multiple volumes for data, logs, and backups. This distributed data architecture increases the risk of inconsistencies when volumes are captured individually. Kubernetes has introduced the VolumeGroupSnapshot(VGS) API [(KEP-3476)](https://github.com/kubernetes/enhancements/pull/1551), which allows for the atomic snapshotting of multiple volumes in a coordinated manner. By integrating this feature, Velero can offer enhanced disaster recovery for multi-volume applications, ensuring consistency across all related data.
@@ -20,16 +30,23 @@ Velero currently enables snapshot-based backups on an individual Volume basis th
 ### Backup workflow:
 #### Accept the label to be used for VGS from the user:
   - Accept the label from the user, we will do this in 3 ways:
-        - Firstly, we will have a hard-coded default label key like `velero.io/volume-group-snapshot` that the users can directly use on their PVCs.
-        - Secondly, we will let the users override this default VGS label via a velero server arg, `--volume-group-nsaphot-label-key`, if needed.
-        - And Finally we will have the option to override the default label via Backup API spec, `backup.spec.volumeGroupSnapshotLabelKey`
-        - In all the instances, the VGS label key will be present on the backup spec, this makes the label key accessible to plugins during the execution of backup operation.
+    - Firstly, we will have a hard-coded default label key like `velero.io/volume-group-snapshot` that the users can directly use on their PVCs.
+    - Secondly, we will let the users override this default VGS label via a velero server arg, `--volume-group-nsaphot-label-key`, if needed.
+    - And Finally we will have the option to override the default label via Backup API spec, `backup.spec.volumeGroupSnapshotLabelKey`
+    - In all the instances, the VGS label key will be present on the backup spec, this makes the label key accessible to plugins during the execution of backup operation.
   - This label will enable velero to filter the PVC to be included in the VGS spec.
   - Users will have to label the PVCs before invoking the backup operation.
   - This label would act as a group identifier for the PVCs to be grouped under a specific VGS.
   - It will be used to collect the PVCs to be used for a particular instance of VGS object.  
-**Note:** Modifying or adding VGS label on PVCs during an active backup operation may lead to unexpected or undesirable backup results. To avoid inconsistencies, ensure PVC labels remain unchanged throughout the backup execution.
 
+**Note:** 
+  - Modifying or adding VGS label on PVCs during an active backup operation may lead to unexpected or undesirable backup results. To avoid inconsistencies, ensure PVC labels remain unchanged throughout the backup execution.
+  - Label Key Precedence: When determining which label key to use for grouping PVCs into a VolumeGroupSnapshot, Velero applies overrides in the following order (highest to lowest):
+    - Backup API spec (`backup.spec.volumeGroupSnapshotLabelKey`)
+    - Server flag (`--volume-group-snapshot-label-key`)
+    - Built-in default (`velero.io/volume-group-snapshot`)
+
+    Whichever key wins this precedence is then injected into the Backup spec so that all Velero plugins can uniformly discover and use it during the backup execution.
 #### Changes to the Existing PVC ItemBlockAction plugin:
   - Currently the PVC IBA plugin is applied to PVCs and adds the RelatedItems for the particular PVC into the ItemBlock.
   - At first it checks whether the PVC is bound and VolumeName is non-empty.
@@ -569,3 +586,26 @@ This design proposal is targeted for velero 1.16.
 
 The implementation of this proposed design is targeted for velero 1.17.
 
+**Note:**
+- VGS support isn't a requirement on restore. The design does not have any VGS related elements/considerations in the restore workflow.
+
+## Requirements and Assumptions
+- Kubernetes Version:
+  - Minimum: v1.32.0 or later, since the VolumeGroupSnapshot API goes beta in 1.32.
+  - Assumption: CRDs for `VolumeGroupSnapshot`, `VolumeGroupSnapshotClass`, and `VolumeGroupSnapshotContent` are already installed.
+
+- VolumeGroupSnapshot API Availability:
+  - If the VGS API group (`groupsnapshot.storage.k8s.io/v1beta1`) is not present, Velero backup will fail.
+
+- CSI Driver Compatibility
+  - Only CSI drivers that implement the VolumeGroupSnapshot admission and controller support this feature.
+  - Upon VGS creation, we assume the driver will atomically snapshot all matching PVCs; if it does not, the plugin may time out.
+
+## Performance Considerations
+- Use VGS if you have many similar volumes that must be snapped together and you want to minimize API/server load.
+- Use individual VS if you have only a few volumes, or want one‐volume failures to be isolated.
+
+## Testing Strategy
+
+- Unit tests: We will add targeted unit tests to cover all new code paths—including existing-VS detection, VGS creation, legacy VS fallback, and error scenarios.
+- E2E tests: For E2E we would need, a Kind cluster with a CSI driver that supports group snapshots, deploy an application with multiple PVCs, execute a Velero backup and restore, and verify that VGS is created, all underlying VS objects reach ReadyToUse, and every PVC is restored successfully.
