@@ -914,6 +914,7 @@ func TestCreateRestorePod(t *testing.T) {
 				corev1api.ResourceRequirements{},
 				test.nodeOS,
 				test.affinity,
+				"", // priority class name
 			)
 
 			require.NoError(t, err)

@@ -691,6 +691,10 @@ spec:
         ......
 ```  
 
+## Priority Class Configuration
+
+For Velero built-in data mover, data mover pods launched during file system backup will use the priority class name configured in the node-agent configmap. The node-agent daemonset itself gets its priority class from the `--node-agent-priority-class-name` flag during Velero installation. This can help ensure proper scheduling behavior in resource-constrained environments. For more details on configuring data mover pod resources, see [Data Movement Pod Resource Configuration][data-movement-config].
+
 ## Resource Consumption
 
 Both the uploader and repository consume remarkable CPU/memory during the backup/restore, especially for massive small files or large backup size cases.  
@@ -762,3 +766,4 @@ Velero still effectively manage restic repository, though you cannot write any n
 [18]: backup-repository-configuration.md
 [19]: node-agent-concurrency.md
 [20]: node-agent-prepare-queue-length.md
+[data-movement-config]: data-movement-pod-resource-configuration.md
