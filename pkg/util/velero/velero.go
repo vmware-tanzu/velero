@@ -17,10 +17,14 @@ limitations under the License.
 package velero
 
 import (
+	"context"
+
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 )
 
 // GetNodeSelectorFromVeleroServer get the node selector from the Velero server deployment
@@ -124,4 +128,16 @@ func GetVeleroServerAnnotationValue(deployment *appsv1api.Deployment, key string
 
 func BSLIsAvailable(bsl velerov1api.BackupStorageLocation) bool {
 	return bsl.Status.Phase == velerov1api.BackupStorageLocationPhaseAvailable
+}
+
+// GetDataMoverPriorityClassName returns the priority class name for data mover pods from the node-agent-configmap
+func GetDataMoverPriorityClassName(ctx context.Context, namespace string, kubeClient kubernetes.Interface, configName string) (string, error) {
+	// Get from node-agent-configmap
+	configs, err := nodeagent.GetConfigs(ctx, namespace, kubeClient, configName)
+	if err == nil && configs != nil && configs.PriorityClassName != "" {
+		return configs.PriorityClassName, nil
+	}
+
+	// Return empty string if not found in configmap
+	return "", nil
 }

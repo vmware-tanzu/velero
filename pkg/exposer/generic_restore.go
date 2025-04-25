@@ -33,6 +33,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 // GenericRestoreExposeParam define the input param for Generic Restore Expose
@@ -69,6 +70,12 @@ type GenericRestoreExposeParam struct {
 
 	// LoadAffinity specifies the node affinity of the backup pod
 	LoadAffinity *kube.LoadAffinity
+
+	// NodeAgentNamespace is the namespace where the node agent is running
+	NodeAgentNamespace string
+
+	// NodeAgentConfigMap is the name of the ConfigMap containing node agent configurations
+	NodeAgentConfigMap string
 }
 
 // GenericRestoreExposer is the interfaces for a generic restore exposer
@@ -148,6 +155,8 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1ap
 		param.Resources,
 		param.NodeOS,
 		param.LoadAffinity,
+		param.NodeAgentNamespace,
+		param.NodeAgentConfigMap,
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error to create restore pod")
@@ -414,6 +423,8 @@ func (e *genericRestoreExposer) createRestorePod(
 	resources corev1api.ResourceRequirements,
 	nodeOS string,
 	affinity *kube.LoadAffinity,
+	nodeAgentNamespace string,
+	nodeAgentConfigMap string,
 ) (*corev1api.Pod, error) {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
@@ -433,6 +444,13 @@ func (e *genericRestoreExposer) createRestorePod(
 	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, nodeOS)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
+	}
+
+	// Get the priority class name from node-agent-configmap if available
+	priorityClassName, err := veleroutil.GetDataMoverPriorityClassName(ctx, nodeAgentNamespace, e.kubeClient, nodeAgentConfigMap)
+	if err != nil {
+		e.log.WithError(err).Warn("Failed to get priority class name from node-agent-configmap, using empty value")
+		priorityClassName = ""
 	}
 
 	var gracePeriod int64
@@ -548,6 +566,7 @@ func (e *genericRestoreExposer) createRestorePod(
 					Resources:     resources,
 				},
 			},
+			PriorityClassName:             priorityClassName,
 			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes:                       volumes,

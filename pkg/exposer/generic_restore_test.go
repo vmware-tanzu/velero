@@ -915,6 +915,8 @@ func TestCreateRestorePod(t *testing.T) {
 				corev1api.ResourceRequirements{},
 				test.nodeOS,
 				test.affinity,
+				"velero",
+				"node-agent-config",
 			)
 
 			require.NoError(t, err)

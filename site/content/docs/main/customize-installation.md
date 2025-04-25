@@ -93,6 +93,16 @@ Note that if you specify `--colorized=true` as a CLI option it will override
 the config file setting.
 
 
+## Set priority class name for Velero components
+
+You can set a priority class name for Velero components (Velero deployment, node agent daemonset, and maintenance jobs) during installation using the `--priority-class-name` flag. This allows you to influence the scheduling and eviction behavior of Velero pods, which can be useful in clusters where resource contention is high.
+
+```bash
+velero install --priority-class-name=<PRIORITY_CLASS_NAME>
+```
+
+Note that you need to create the priority class before installing Velero. For more information on priority classes, see the [Kubernetes documentation on Pod Priority and Preemption](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/).
+
 ## Customize resource requests and limits
 
 At installation, You could set resource requests and limits for the Velero pod, the node-agent pod and the [repository maintenance job][14], if you are using the [File System Backup][3] or [CSI Snapshot Data Movement][12].  
