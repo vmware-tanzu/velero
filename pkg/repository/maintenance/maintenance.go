@@ -58,6 +58,10 @@ type JobConfigs struct {
 
 	// PodResources is the config for the CPU and memory resources setting.
 	PodResources *kube.PodResources `json:"podResources,omitempty"`
+
+	// PriorityClassName is the priority class name for the maintenance job pod
+	// Note: This is only read from the global configuration, not per-repository
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 func GenerateJobName(repo string) string {
@@ -271,6 +275,11 @@ func getJobConfig(
 		if len(result.LoadAffinities) == 0 {
 			result.LoadAffinities = globalResult.LoadAffinities
 		}
+
+		// Priority class is only read from global config, not per-repository
+		if globalResult.PriorityClassName != "" {
+			result.PriorityClassName = globalResult.PriorityClassName
+		}
 	}
 
 	return result, nil
@@ -407,6 +416,15 @@ func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.Backu
 	return maintenanceJob.Name, nil
 }
 
+func getPriorityClassName(config *JobConfigs) string {
+	// Use the priority class name from the global job configuration if available
+	// Note: Priority class is only read from global config, not per-repository
+	if config != nil && config.PriorityClassName != "" {
+		return config.PriorityClassName
+	}
+	return ""
+}
+
 func buildJob(
 	cli client.Client,
 	ctx context.Context,
@@ -526,6 +544,7 @@ func buildJob(
 							TerminationMessagePolicy: corev1api.TerminationMessageFallbackToLogsOnError,
 						},
 					},
+					PriorityClassName:  getPriorityClassName(config),
 					RestartPolicy:      corev1api.RestartPolicyNever,
 					SecurityContext:    podSecurityContext,
 					Volumes:            volumes,

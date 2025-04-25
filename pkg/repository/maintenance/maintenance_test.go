@@ -1162,3 +1162,95 @@ func TestBuildJob(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildJobWithPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		name              string
+		priorityClassName string
+		expectedValue     string
+	}{
+		{
+			name:              "with priority class name",
+			priorityClassName: "high-priority",
+			expectedValue:     "high-priority",
+		},
+		{
+			name:              "without priority class name",
+			priorityClassName: "",
+			expectedValue:     "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a new scheme and add necessary API types
+			localScheme := runtime.NewScheme()
+			err := velerov1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			err = appsv1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			err = batchv1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			// Create a fake client
+			client := fake.NewClientBuilder().WithScheme(localScheme).Build()
+
+			// Create a deployment with the specified priority class name
+			deployment := &appsv1api.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "velero",
+					Namespace: "velero",
+				},
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
+								{
+									Name:  "velero",
+									Image: "velero/velero:latest",
+								},
+							},
+							PriorityClassName: tc.priorityClassName,
+						},
+					},
+				},
+			}
+
+			// Create a backup repository
+			repo := &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-repo",
+					Namespace: "velero",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					VolumeNamespace:       "velero",
+					BackupStorageLocation: "default",
+				},
+			}
+
+			// Create the deployment in the fake client
+			err = client.Create(t.Context(), deployment)
+			require.NoError(t, err)
+
+			// Create minimal job configs and resources
+			jobConfig := &JobConfigs{
+				PriorityClassName: tc.priorityClassName,
+			}
+			podResources := kube.PodResources{
+				CPURequest:    "100m",
+				MemoryRequest: "128Mi",
+				CPULimit:      "200m",
+				MemoryLimit:   "256Mi",
+			}
+			logLevel := logrus.InfoLevel
+			logFormat := logging.NewFormatFlag()
+			logFormat.Set("text")
+
+			// Call buildJob
+			job, err := buildJob(client, t.Context(), repo, "default", jobConfig, podResources, logLevel, logFormat)
+			require.NoError(t, err)
+
+			// Verify the priority class name is set correctly
+			assert.Equal(t, tc.expectedValue, job.Spec.Template.Spec.PriorityClassName)
+		})
+	}
+}

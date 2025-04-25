@@ -71,6 +71,7 @@ type DataDownloadReconciler struct {
 	preparingTimeout      time.Duration
 	metrics               *metrics.ServerMetrics
 	cancelledDataDownload map[string]time.Time
+	dataMovePriorityClass string
 }
 
 func NewDataDownloadReconciler(
@@ -86,12 +87,19 @@ func NewDataDownloadReconciler(
 	preparingTimeout time.Duration,
 	logger logrus.FieldLogger,
 	metrics *metrics.ServerMetrics,
+	dataMovePriorityClass string,
 ) *DataDownloadReconciler {
+	log := logger.WithField("controller", "DataDownload")
+
+	if dataMovePriorityClass != "" {
+		log.Infof("Data mover priority class set to %q", dataMovePriorityClass)
+	}
+
 	return &DataDownloadReconciler{
 		client:                client,
 		kubeClient:            kubeClient,
 		mgr:                   mgr,
-		logger:                logger.WithField("controller", "DataDownload"),
+		logger:                log,
 		Clock:                 &clock.RealClock{},
 		nodeName:              nodeName,
 		restoreExposer:        exposer.NewGenericRestoreExposer(kubeClient, logger),
@@ -103,6 +111,7 @@ func NewDataDownloadReconciler(
 		preparingTimeout:      preparingTimeout,
 		metrics:               metrics,
 		cancelledDataDownload: make(map[string]time.Time),
+		dataMovePriorityClass: dataMovePriorityClass,
 	}
 }
 
@@ -892,6 +901,7 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		NodeOS:                nodeOS,
 		RestorePVCConfig:      r.restorePVCConfig,
 		LoadAffinity:          affinity,
+		PriorityClassName:     r.dataMovePriorityClass,
 	}, nil
 }
 

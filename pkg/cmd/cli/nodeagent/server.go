@@ -280,6 +280,25 @@ func (s *nodeAgentServer) run() {
 
 	s.logger.Info("Starting controllers")
 
+	// Read priority class from ConfigMap if available
+	dataMovePriorityClass := ""
+	if s.config.nodeAgentConfig != "" {
+		ctx, cancel := context.WithTimeout(s.ctx, time.Second*30)
+		defer cancel()
+		priorityClass, err := kube.GetDataMoverPriorityClassName(ctx, s.namespace, s.kubeClient, s.config.nodeAgentConfig)
+		if err != nil {
+			s.logger.WithError(err).Warn("Failed to get priority class name from node-agent-configmap, using empty value")
+		} else if priorityClass != "" {
+			// Validate the priority class exists in the cluster
+			if kube.ValidatePriorityClass(ctx, s.kubeClient, priorityClass, s.logger.WithField("component", "data-mover")) {
+				dataMovePriorityClass = priorityClass
+				s.logger.WithField("priorityClassName", priorityClass).Info("Using priority class for data mover pods")
+			} else {
+				s.logger.WithField("priorityClassName", priorityClass).Warn("Priority class not found in cluster, data mover pods will use default priority")
+			}
+		}
+	}
+
 	var loadAffinity []*kube.LoadAffinity
 	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
 		loadAffinity = s.dataPathConfigs.LoadAffinity
@@ -311,12 +330,12 @@ func (s *nodeAgentServer) run() {
 		}
 	}
 
-	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger)
+	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger, dataMovePriorityClass)
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
 	}
 
-	pvrReconciler := controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.logger)
+	pvrReconciler := controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.logger, dataMovePriorityClass)
 	if err := pvrReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
@@ -340,6 +359,7 @@ func (s *nodeAgentServer) run() {
 		s.config.dataMoverPrepareTimeout,
 		s.logger,
 		s.metrics,
+		dataMovePriorityClass,
 	)
 	if err := dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
@@ -364,6 +384,7 @@ func (s *nodeAgentServer) run() {
 		s.config.dataMoverPrepareTimeout,
 		s.logger,
 		s.metrics,
+		dataMovePriorityClass,
 	)
 
 	if err := dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {

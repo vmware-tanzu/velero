@@ -1,28 +1,34 @@
 # PriorityClass Support Design Proposal
 
 ## Abstract
+
 This design document outlines the implementation of priority class name support for Velero components, including the Velero server deployment, node agent daemonset, and maintenance jobs. This feature allows users to specify a priority class name for Velero components, which can be used to influence the scheduling and eviction behavior of these components.
 
 ## Background
+
 Kubernetes allows users to define priority classes, which can be used to influence the scheduling and eviction behavior of pods. Priority classes are defined as cluster-wide resources, and pods can reference them by name. When a pod is created, the priority admission controller uses the priority class name to populate the priority value for the pod. The scheduler then uses this priority value to determine the order in which pods are scheduled.
 
 Currently, Velero does not provide a way for users to specify a priority class name for its components. This can be problematic in clusters where resource contention is high, as Velero components may be evicted or not scheduled in a timely manner, potentially impacting backup and restore operations.
 
 ## Goals
+
 - Add support for specifying priority class names for Velero components
 - Update the Velero CLI to accept priority class name parameters for different components
 - Update the Velero deployment, node agent daemonset, maintenance jobs, and data mover pods to use the specified priority class names
 
 ## Non Goals
+
 - Creating or managing priority classes
 - Automatically determining the appropriate priority class for Velero components
 
 ## High-Level Design
+
 The implementation will add new fields to the Velero options struct to store the priority class names for the server deployment and node agent daemonset. The Velero CLI will be updated to accept new flags for these components. For data mover pods and maintenance jobs, priority class names will be configured through existing ConfigMap mechanisms (`node-agent-configmap` for data movers and `repo-maintenance-job-configmap` for maintenance jobs). The Velero deployment, node agent daemonset, maintenance jobs, and data mover pods will be updated to use their respective priority class names.
 
 ## Detailed Design
 
 ### CLI Changes
+
 New flags will be added to the `velero install` command to specify priority class names for different components:
 
 ```go
@@ -44,6 +50,7 @@ flags.StringVar(
 Note: Priority class names for data mover pods and maintenance jobs will be configured through their respective ConfigMaps (`--node-agent-configmap` for data movers and `--repo-maintenance-job-configmap` for maintenance jobs).
 
 ### Velero Options Changes
+
 The `VeleroOptions` struct in `pkg/install/resources.go` will be updated to include new fields for priority class names:
 
 ```go
@@ -55,6 +62,7 @@ type VeleroOptions struct {
 ```
 
 ### Deployment Changes
+
 The `podTemplateConfig` struct in `pkg/install/deployment.go` will be updated to include a new field for the priority class name:
 
 ```go
@@ -93,6 +101,7 @@ deployment := &appsv1api.Deployment{
 ```
 
 ### DaemonSet Changes
+
 The `DaemonSet` function will use the priority class name passed via the podTemplateConfig (from the CLI flag):
 
 ```go
@@ -112,6 +121,7 @@ daemonSet := &appsv1api.DaemonSet{
 ```
 
 ### Maintenance Job Changes
+
 The `JobConfigs` struct in `pkg/repository/maintenance/maintenance.go` will be updated to include a field for the priority class name:
 
 ```go
@@ -187,6 +197,7 @@ velero install --provider aws \
 The ConfigMap can be updated after installation to change the priority class for future maintenance jobs. Note that only the "global" configuration is used for priority class - all maintenance jobs will use the same priority class regardless of which repository they are maintaining.
 
 ### Node Agent ConfigMap Changes
+
 We'll update the `Configs` struct in `pkg/nodeagent/node_agent.go` to include a field for the priority class name in the node-agent-configmap:
 
 ```go
@@ -284,14 +295,47 @@ A new function, `GetDataMoverPriorityClassName`, will be added to the `pkg/util/
 
 // GetDataMoverPriorityClassName retrieves the priority class name for data mover pods from the node-agent-configmap
 func GetDataMoverPriorityClassName(ctx context.Context, namespace string, kubeClient kubernetes.Interface, configName string) (string, error) {
-    // Get from node-agent-configmap
-    configs, err := nodeagent.GetConfigs(ctx, namespace, kubeClient, configName)
-    if err == nil && configs != nil && configs.PriorityClassName != "" {
-        return configs.PriorityClassName, nil
+    // configData is a minimal struct to parse only the priority class name from the ConfigMap
+    type configData struct {
+        PriorityClassName string `json:"priorityClassName,omitempty"`
     }
-    
-    // Return empty string if not found in configmap
-    return "", nil
+
+    // Get the ConfigMap
+    cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, configName, metav1.GetOptions{})
+    if err != nil {
+        if apierrors.IsNotFound(err) {
+            // ConfigMap not found is not an error, just return empty string
+            return "", nil
+        }
+        return "", errors.Wrapf(err, "error getting node agent config map %s", configName)
+    }
+
+    if cm.Data == nil {
+        // No data in ConfigMap, return empty string
+        return "", nil
+    }
+
+    // Extract the first value from the ConfigMap data
+    jsonString := ""
+    for _, v := range cm.Data {
+        jsonString = v
+        break // Use the first value found
+    }
+
+    if jsonString == "" {
+        // No data to parse, return empty string
+        return "", nil
+    }
+
+    // Parse the JSON to extract priority class name
+    var config configData
+    if err := json.Unmarshal([]byte(jsonString), &config); err != nil {
+        // Invalid JSON is not a critical error for priority class
+        // Just return empty string to use default behavior
+        return "", nil
+    }
+
+    return config.PriorityClassName, nil
 }
 ```
 
@@ -307,11 +351,12 @@ To improve observability and help with troubleshooting, the implementation will 
 // In pkg/util/kube/priority_class.go
 
 // ValidatePriorityClass checks if the specified priority class exists in the cluster
-// Returns nil if the priority class exists or if priorityClassName is empty
-// Returns a warning (not an error) if the priority class doesn't exist
-func ValidatePriorityClass(ctx context.Context, kubeClient kubernetes.Interface, priorityClassName string, logger logrus.FieldLogger) {
+// Returns true if the priority class exists or if priorityClassName is empty
+// Returns false if the priority class doesn't exist or validation fails
+// Logs warnings when the priority class doesn't exist
+func ValidatePriorityClass(ctx context.Context, kubeClient kubernetes.Interface, priorityClassName string, logger logrus.FieldLogger) bool {
     if priorityClassName == "" {
-        return
+        return true
     }
     
     _, err := kubeClient.SchedulingV1().PriorityClasses().Get(ctx, priorityClassName, metav1.GetOptions{})
@@ -321,9 +366,10 @@ func ValidatePriorityClass(ctx context.Context, kubeClient kubernetes.Interface,
         } else {
             logger.WithError(err).Warnf("Failed to validate priority class %q", priorityClassName)
         }
-    } else {
-        logger.Infof("Validated priority class %q exists in cluster", priorityClassName)
+        return false
     }
+    logger.Infof("Validated priority class %q exists in cluster", priorityClassName)
+    return true
 }
 ```
 
@@ -352,6 +398,7 @@ if priorityClassName != "" {
 ```
 
 These validation and logging features will help administrators:
+
 - Identify configuration issues early (validation warnings)
 - Troubleshoot priority class application issues
 - Verify that priority classes are being applied as expected
@@ -371,20 +418,30 @@ The `ValidatePriorityClass` function should be called at the following points:
    - Before creating maintenance jobs
 
 Example usage:
+
 ```go
 // During velero install
 if o.ServerPriorityClassName != "" {
-    kube.ValidatePriorityClass(ctx, kubeClient, o.ServerPriorityClassName, logger.WithField("component", "server"))
+    _ = kube.ValidatePriorityClass(ctx, kubeClient, o.ServerPriorityClassName, logger.WithField("component", "server"))
+    // For install command, we continue even if validation fails (warnings are logged)
 }
 
-// When reading from ConfigMap
+// When reading from ConfigMap in node-agent server
 priorityClassName, err := kube.GetDataMoverPriorityClassName(ctx, namespace, kubeClient, configMapName)
 if err == nil && priorityClassName != "" {
-    kube.ValidatePriorityClass(ctx, kubeClient, priorityClassName, logger.WithField("component", "data-mover"))
+    // Validate the priority class exists in the cluster
+    if kube.ValidatePriorityClass(ctx, kubeClient, priorityClassName, logger.WithField("component", "data-mover")) {
+        dataMovePriorityClass = priorityClassName
+        logger.WithField("priorityClassName", priorityClassName).Info("Using priority class for data mover pods")
+    } else {
+        logger.WithField("priorityClassName", priorityClassName).Warn("Priority class not found in cluster, data mover pods will use default priority")
+        // Clear the priority class to prevent pod creation failures
+        priorityClassName = ""
+    }
 }
 ```
 
-Note: Since validation only logs warnings (not errors), it won't block operations if a priority class doesn't exist. This allows for scenarios where priority classes might be created after Velero installation.
+Note: The validation function returns a boolean to allow callers to decide how to handle missing priority classes. For the install command, validation failures are ignored (only warnings are logged) to allow for scenarios where priority classes might be created after Velero installation. For runtime components like the node-agent server, the priority class is cleared if validation fails to prevent pod creation failures.
 
 ## Alternatives Considered
 
@@ -401,6 +458,26 @@ There are no security considerations for this feature.
 ## Compatibility
 
 This feature is compatible with all Kubernetes versions that support priority classes. The PodPriority feature became stable in Kubernetes 1.14. For more information, see the [Kubernetes documentation on Pod Priority and Preemption](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/).
+
+## ConfigMap Update Strategy
+
+### Static ConfigMap Reading at Startup
+
+The node-agent server reads and parses the ConfigMap once during initialization and passes configurations (like `podResources`, `loadAffinity`, and `priorityClassName`) directly to controllers as parameters. This approach ensures:
+
+- Single ConfigMap read to minimize API calls
+- Consistent configuration across all controllers
+- Validation of priority classes at startup with fallback behavior
+- No need for complex update mechanisms or watchers
+
+ConfigMap changes require a restart of the node-agent to take effect.
+
+### Implementation Approach
+
+1. **Data Mover Controllers**: Receive priority class as a string parameter from node-agent server at initialization
+2. **Maintenance Job Controller**: Read fresh configuration from repo-maintenance-job-configmap at job creation time
+3. ConfigMap changes require restart of components to take effect
+4. Priority class validation happens at startup with automatic fallback to prevent failures
 
 ## Implementation
 
@@ -519,10 +596,10 @@ velero install \
 
 When configuring priority classes for Velero components, consider the following hierarchy based on component criticality:
 
-1. **Velero Server (Highest Priority)**: 
+1. **Velero Server (Highest Priority)**:
    - Example: `velero-critical` with value 100
    - Rationale: The server must remain running to coordinate backup/restore operations
-   
+
 2. **Node Agent DaemonSet (Medium Priority)**:
    - Example: `velero-standard` with value 50
    - Rationale: Node agents need to be available on nodes but are less critical than the server
@@ -544,43 +621,73 @@ This approach has several advantages:
 
 The priority class name for data mover pods will be determined by checking the node-agent-configmap. This approach provides a centralized way to configure priority class names for all data mover pods. The same approach will be used for PVB (PodVolumeBackup) and PVR (PodVolumeRestore) pods, which will also retrieve their priority class name from the node-agent-configmap.
 
-For PVB and PVR pods specifically, the controllers will need to be updated to retrieve the priority class name from the node-agent-configmap and pass it to the pod creation functions. For example, in the PodVolumeBackup controller:
+For PVB and PVR pods specifically, the implementation follows this approach:
+
+1. **Controller Initialization**: Both PodVolumeBackup and PodVolumeRestore controllers are updated to accept a priority class name as a string parameter. The node-agent server reads the priority class from the node-agent-configmap once at startup:
 
 ```go
-// In pkg/controller/pod_volume_backup_controller.go
-priorityClassName, _ := kube.GetDataMoverPriorityClassName(ctx, namespace, kubeClient, configMapName)
+// In node-agent server startup (pkg/cmd/cli/nodeagent/server.go)
+dataMovePriorityClass := ""
+if s.config.nodeAgentConfig != "" {
+    ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+    defer cancel()
+    priorityClass, err := kube.GetDataMoverPriorityClassName(ctx, s.namespace, s.kubeClient, s.config.nodeAgentConfig)
+    if err != nil {
+        s.logger.WithError(err).Warn("Failed to get priority class name from node-agent-configmap, using empty value")
+    } else if priorityClass != "" {
+        // Validate the priority class exists in the cluster
+        if kube.ValidatePriorityClass(ctx, s.kubeClient, priorityClass, s.logger.WithField("component", "data-mover")) {
+            dataMovePriorityClass = priorityClass
+            s.logger.WithField("priorityClassName", priorityClass).Info("Using priority class for data mover pods")
+        } else {
+            s.logger.WithField("priorityClassName", priorityClass).Warn("Priority class not found in cluster, data mover pods will use default priority")
+        }
+    }
+}
 
-// Add priorityClassName to the pod spec
-pod := &corev1api.Pod{
+// Pass priority class to controllers
+pvbReconciler := controller.NewPodVolumeBackupReconciler(
+    s.mgr.GetClient(), s.mgr, s.kubeClient, ..., dataMovePriorityClass)
+pvrReconciler := controller.NewPodVolumeRestoreReconciler(
+    s.mgr.GetClient(), s.mgr, s.kubeClient, ..., dataMovePriorityClass)
+```
+
+2. **Controller Structure**: Controllers store the priority class name as a field:
+
+```go
+type PodVolumeBackupReconciler struct {
     // ... existing fields ...
-    Spec: corev1api.PodSpec{
-        // ... existing fields ...
-        PriorityClassName: priorityClassName,
-    },
+    dataMovePriorityClass string
 }
 ```
 
-Similarly, in the PodVolumeRestore controller:
-
-```go
-// In pkg/controller/pod_volume_restore_controller.go
-priorityClassName, _ := kube.GetDataMoverPriorityClassName(ctx, namespace, kubeClient, configMapName)
-
-// Add priorityClassName to the pod spec
-pod := &corev1api.Pod{
-    // ... existing fields ...
-    Spec: corev1api.PodSpec{
-        // ... existing fields ...
-        PriorityClassName: priorityClassName,
-    },
-}
-```
+3. **Pod Creation**: The priority class is included in the pod spec when creating data mover pods.
 
 ### VGDP Micro-Service Considerations
 
 With the introduction of VGDP micro-services (as described in the VGDP micro-service design), data mover pods are created as dedicated pods for volume snapshot data movement. These pods will also inherit the priority class configuration from the node-agent-configmap. Since VGDP-MS pods (backupPod/restorePod) inherit their configurations from the node-agent, they will automatically use the priority class name specified in the node-agent-configmap.
 
 This ensures that all pods created by Velero for data movement operations (CSI snapshot data movement, PVB, and PVR) use a consistent approach for priority class name configuration through the node-agent-configmap.
+
+### How Exposers Receive Configuration
+
+CSI Snapshot Exposer and Generic Restore Exposer do not directly watch or read ConfigMaps. Instead, they receive configuration through their parent controllers:
+
+1. **Controller Initialization**: Controllers receive the priority class name as a parameter during initialization from the node-agent server.
+
+2. **Configuration Propagation**: During reconciliation of resources:
+   - The controller calls `setupExposeParam()` which includes the `dataMovePriorityClass` value
+   - For CSI operations: `CSISnapshotExposeParam.PriorityClassName` is set
+   - For generic restore: `GenericRestoreExposeParam.PriorityClassName` is set
+   - The controller passes these parameters to the exposer's `Expose()` method
+
+3. **Pod Creation**: The exposer creates pods with the priority class name provided by the controller.
+
+This design keeps exposers stateless and ensures:
+- Exposers remain simple and focused on pod creation
+- All configuration flows through controllers consistently
+- No complex state synchronization between components
+- Configuration changes require component restart to take effect
 
 ## Open Issues
 
