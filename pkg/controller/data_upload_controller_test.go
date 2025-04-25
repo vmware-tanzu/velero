@@ -248,6 +248,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		time.Minute*5,
 		velerotest.NewLogger(),
 		metrics.NewServerMetrics(),
+		"",
 	), nil
 }
 

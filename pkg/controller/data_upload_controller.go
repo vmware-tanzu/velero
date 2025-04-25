@@ -80,6 +80,7 @@ type DataUploadReconciler struct {
 	preparingTimeout    time.Duration
 	metrics             *metrics.ServerMetrics
 	cancelledDataUpload map[string]time.Time
+	nodeAgentConfigMap  string
 }
 
 func NewDataUploadReconciler(
@@ -96,6 +97,7 @@ func NewDataUploadReconciler(
 	preparingTimeout time.Duration,
 	log logrus.FieldLogger,
 	metrics *metrics.ServerMetrics,
+	nodeAgentConfigMap string,
 ) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:            client,
@@ -119,6 +121,7 @@ func NewDataUploadReconciler(
 		preparingTimeout:    preparingTimeout,
 		metrics:             metrics,
 		cancelledDataUpload: make(map[string]time.Time),
+		nodeAgentConfigMap:  nodeAgentConfigMap,
 	}
 }
 
@@ -931,6 +934,8 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			BackupPVCConfig:       r.backupPVCConfig,
 			Resources:             r.podResources,
 			NodeOS:                nodeOS,
+			NodeAgentNamespace:    du.Namespace,
+			NodeAgentConfigMap:    r.nodeAgentConfigMap,
 		}, nil
 	}
 
