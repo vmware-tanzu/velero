@@ -69,6 +69,9 @@ type GenericRestoreExposeParam struct {
 
 	// LoadAffinity specifies the node affinity of the backup pod
 	LoadAffinity []*kube.LoadAffinity
+
+	// PriorityClassName is the priority class name for the data mover pod
+	PriorityClassName string
 }
 
 // GenericRestoreExposer is the interfaces for a generic restore exposer
@@ -156,6 +159,7 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1ap
 		param.Resources,
 		param.NodeOS,
 		affinity,
+		param.PriorityClassName,
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error to create restore pod")
@@ -422,6 +426,7 @@ func (e *genericRestoreExposer) createRestorePod(
 	resources corev1api.ResourceRequirements,
 	nodeOS string,
 	affinity *kube.LoadAffinity,
+	priorityClassName string,
 ) (*corev1api.Pod, error) {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
@@ -441,6 +446,11 @@ func (e *genericRestoreExposer) createRestorePod(
 	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, nodeOS)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
+	}
+
+	// Log the priority class if it's set
+	if priorityClassName != "" {
+		e.log.Debugf("Setting priority class %q for data mover pod %s", priorityClassName, restorePodName)
 	}
 
 	var gracePeriod int64
@@ -556,6 +566,7 @@ func (e *genericRestoreExposer) createRestorePod(
 					Resources:     resources,
 				},
 			},
+			PriorityClassName:             priorityClassName,
 			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes:                       volumes,

@@ -65,22 +65,23 @@ const (
 
 // DataUploadReconciler reconciles a DataUpload object
 type DataUploadReconciler struct {
-	client              client.Client
-	kubeClient          kubernetes.Interface
-	csiSnapshotClient   snapshotter.SnapshotV1Interface
-	mgr                 manager.Manager
-	Clock               clocks.WithTickerAndDelayedExecution
-	nodeName            string
-	logger              logrus.FieldLogger
-	snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
-	dataPathMgr         *datapath.Manager
-	vgdpCounter         *exposer.VgdpCounter
-	loadAffinity        []*kube.LoadAffinity
-	backupPVCConfig     map[string]nodeagent.BackupPVC
-	podResources        corev1api.ResourceRequirements
-	preparingTimeout    time.Duration
-	metrics             *metrics.ServerMetrics
-	cancelledDataUpload map[string]time.Time
+	client                client.Client
+	kubeClient            kubernetes.Interface
+	csiSnapshotClient     snapshotter.SnapshotV1Interface
+	mgr                   manager.Manager
+	Clock                 clocks.WithTickerAndDelayedExecution
+	nodeName              string
+	logger                logrus.FieldLogger
+	snapshotExposerList   map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
+	dataPathMgr           *datapath.Manager
+	vgdpCounter           *exposer.VgdpCounter
+	loadAffinity          []*kube.LoadAffinity
+	backupPVCConfig       map[string]nodeagent.BackupPVC
+	podResources          corev1api.ResourceRequirements
+	preparingTimeout      time.Duration
+	metrics               *metrics.ServerMetrics
+	cancelledDataUpload   map[string]time.Time
+	dataMovePriorityClass string
 }
 
 func NewDataUploadReconciler(
@@ -98,6 +99,7 @@ func NewDataUploadReconciler(
 	preparingTimeout time.Duration,
 	log logrus.FieldLogger,
 	metrics *metrics.ServerMetrics,
+	dataMovePriorityClass string,
 ) *DataUploadReconciler {
 	return &DataUploadReconciler{
 		client:            client,
@@ -114,14 +116,15 @@ func NewDataUploadReconciler(
 				log,
 			),
 		},
-		dataPathMgr:         dataPathMgr,
-		vgdpCounter:         counter,
-		loadAffinity:        loadAffinity,
-		backupPVCConfig:     backupPVCConfig,
-		podResources:        podResources,
-		preparingTimeout:    preparingTimeout,
-		metrics:             metrics,
-		cancelledDataUpload: make(map[string]time.Time),
+		dataPathMgr:           dataPathMgr,
+		vgdpCounter:           counter,
+		loadAffinity:          loadAffinity,
+		backupPVCConfig:       backupPVCConfig,
+		podResources:          podResources,
+		preparingTimeout:      preparingTimeout,
+		metrics:               metrics,
+		cancelledDataUpload:   make(map[string]time.Time),
+		dataMovePriorityClass: dataMovePriorityClass,
 	}
 }
 
@@ -971,6 +974,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			BackupPVCConfig:       r.backupPVCConfig,
 			Resources:             r.podResources,
 			NodeOS:                nodeOS,
+			PriorityClassName:     r.dataMovePriorityClass,
 		}, nil
 	}
 

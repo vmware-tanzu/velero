@@ -82,6 +82,9 @@ type CSISnapshotExposeParam struct {
 
 	// NodeOS specifies the OS of node that the source volume is attaching
 	NodeOS string
+
+	// PriorityClassName is the priority class name for the data mover pod
+	PriorityClassName string
 }
 
 // CSISnapshotExposeWaitParam define the input param for WaitExposed of CSI snapshots
@@ -226,6 +229,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 		backupPVCReadOnly,
 		spcNoRelabeling,
 		csiExposeParam.NodeOS,
+		csiExposeParam.PriorityClassName,
 	)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
@@ -552,6 +556,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	backupPVCReadOnly bool,
 	spcNoRelabeling bool,
 	nodeOS string,
+	priorityClassName string,
 ) (*corev1api.Pod, error) {
 	podName := ownerObject.Name
 
@@ -561,6 +566,11 @@ func (e *csiSnapshotExposer) createBackupPod(
 	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, nodeOS)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
+	}
+
+	// Log the priority class if it's set
+	if priorityClassName != "" {
+		e.log.Debugf("Setting priority class %q for data mover pod %s", priorityClassName, podName)
 	}
 
 	var gracePeriod int64
@@ -693,6 +703,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 					Resources:     resources,
 				},
 			},
+			PriorityClassName:             priorityClassName,
 			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes:                       volumes,

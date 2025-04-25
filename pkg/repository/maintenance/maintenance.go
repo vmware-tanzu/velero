@@ -61,6 +61,10 @@ type JobConfigs struct {
 
 	// KeepLatestMaintenanceJobs is the number of latest maintenance jobs to keep for the repository.
 	KeepLatestMaintenanceJobs *int `json:"keepLatestMaintenanceJobs,omitempty"`
+
+	// PriorityClassName is the priority class name for the maintenance job pod
+	// Note: This is only read from the global configuration, not per-repository
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 func GenerateJobName(repo string) string {
@@ -278,6 +282,11 @@ func getJobConfig(
 		if result.KeepLatestMaintenanceJobs == nil && globalResult.KeepLatestMaintenanceJobs != nil {
 			result.KeepLatestMaintenanceJobs = globalResult.KeepLatestMaintenanceJobs
 		}
+
+		// Priority class is only read from global config, not per-repository
+		if globalResult.PriorityClassName != "" {
+			result.PriorityClassName = globalResult.PriorityClassName
+		}
 	}
 
 	return result, nil
@@ -424,20 +433,40 @@ func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.Backu
 
 	log.Info("Starting maintenance repo")
 
-	maintenanceJob, err := buildJob(cli, ctx, repo, bsl.Name, jobConfig, podResources, logLevel, logFormat)
+	maintenanceJob, err := buildJob(cli, ctx, repo, bsl.Name, jobConfig, podResources, logLevel, logFormat, log)
 	if err != nil {
 		return "", errors.Wrap(err, "error to build maintenance job")
 	}
 
 	log = log.WithField("job", fmt.Sprintf("%s/%s", maintenanceJob.Namespace, maintenanceJob.Name))
 
-	if err := cli.Create(context.TODO(), maintenanceJob); err != nil {
+	if err := cli.Create(ctx, maintenanceJob); err != nil {
 		return "", errors.Wrap(err, "error to create maintenance job")
 	}
 
 	log.Info("Repo maintenance job started")
 
 	return maintenanceJob.Name, nil
+}
+
+func getPriorityClassName(ctx context.Context, cli client.Client, config *JobConfigs, logger logrus.FieldLogger) string {
+	// Use the priority class name from the global job configuration if available
+	// Note: Priority class is only read from global config, not per-repository
+	if config != nil && config.PriorityClassName != "" {
+		// Validate that the priority class exists in the cluster
+		if err := kube.ValidatePriorityClassWithClient(ctx, cli, config.PriorityClassName); err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Warnf("Priority class %q not found in cluster. Job creation may fail if the priority class doesn't exist when jobs are scheduled.", config.PriorityClassName)
+			} else {
+				logger.WithError(err).Warnf("Failed to validate priority class %q", config.PriorityClassName)
+			}
+			// Still return the priority class name to let Kubernetes handle the error
+			return config.PriorityClassName
+		}
+		logger.Infof("Validated priority class %q exists in cluster", config.PriorityClassName)
+		return config.PriorityClassName
+	}
+	return ""
 }
 
 func buildJob(
@@ -449,6 +478,7 @@ func buildJob(
 	podResources kube.PodResources,
 	logLevel logrus.Level,
 	logFormat *logging.FormatFlag,
+	logger logrus.FieldLogger,
 ) (*batchv1api.Job, error) {
 	// Get the Velero server deployment
 	deployment := &appsv1api.Deployment{}
@@ -559,6 +589,7 @@ func buildJob(
 							TerminationMessagePolicy: corev1api.TerminationMessageFallbackToLogsOnError,
 						},
 					},
+					PriorityClassName:  getPriorityClassName(ctx, cli, config, logger),
 					RestartPolicy:      corev1api.RestartPolicyNever,
 					SecurityContext:    podSecurityContext,
 					Volumes:            volumes,
