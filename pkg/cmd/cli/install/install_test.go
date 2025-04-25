@@ -19,10 +19,22 @@ package install
 import (
 	"testing"
 
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDeploymentWithPriorityClassName(t *testing.T) {
+func TestPriorityClassNameFlag(t *testing.T) {
+	// Test that the flag is properly defined
+	o := NewInstallOptions()
+	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	o.BindFlags(flags)
+
+	// Verify the flag exists
+	flag := flags.Lookup("priority-class-name")
+	assert.NotNil(t, flag, "priority-class-name flag should exist")
+	assert.Equal(t, "Priority class name for the Velero deployment, node agent daemonset, and maintenance jobs. Optional.", flag.Usage)
+
+	// Test with a value
 	testCases := []struct {
 		name              string
 		priorityClassName string
@@ -42,16 +54,12 @@ func TestDeploymentWithPriorityClassName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create a deployment with the priority class name option
-			var opts []podTemplateOption
-			if tc.priorityClassName != "" {
-				opts = append(opts, WithPriorityClassName(tc.priorityClassName))
-			}
+			o := NewInstallOptions()
+			o.PriorityClassName = tc.priorityClassName
 
-			deployment := Deployment("velero", opts...)
-
-			// Verify the priority class name is set correctly
-			assert.Equal(t, tc.expectedValue, deployment.Spec.Template.Spec.PriorityClassName)
+			veleroOptions, err := o.AsVeleroOptions()
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedValue, veleroOptions.PriorityClassName)
 		})
 	}
 }

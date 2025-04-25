@@ -105,3 +105,8 @@ func GetVeleroServerAnnotationValue(deployment *appsv1api.Deployment, key string
 
 	return deployment.Spec.Template.Annotations[key]
 }
+
+// GetPriorityClassNameFromVeleroServer returns the priority class name from the Velero server deployment
+func GetPriorityClassNameFromVeleroServer(deployment *appsv1api.Deployment) string {
+	return deployment.Spec.Template.Spec.PriorityClassName
+}

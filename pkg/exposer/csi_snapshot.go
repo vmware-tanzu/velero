@@ -675,6 +675,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 					Resources:     resources,
 				},
 			},
+			PriorityClassName:             podInfo.priorityClassName,
 			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes:                       volumes,

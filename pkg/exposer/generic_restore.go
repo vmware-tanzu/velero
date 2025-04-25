@@ -503,6 +503,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 					Resources:     resources,
 				},
 			},
+			PriorityClassName:             podInfo.priorityClassName,
 			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes:                       volumes,

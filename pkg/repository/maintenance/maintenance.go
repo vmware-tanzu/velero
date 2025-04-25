@@ -509,6 +509,7 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 							TerminationMessagePolicy: corev1api.TerminationMessageFallbackToLogsOnError,
 						},
 					},
+					PriorityClassName:  veleroutil.GetPriorityClassNameFromVeleroServer(deployment),
 					RestartPolicy:      corev1api.RestartPolicyNever,
 					Volumes:            volumes,
 					ServiceAccountName: serviceAccount,
