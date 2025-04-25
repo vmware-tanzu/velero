@@ -111,16 +111,34 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 	for i := range podVolumeBackupList.Items {
 		podVolumeBackups = append(podVolumeBackups, &podVolumeBackupList.Items[i])
 	}
+	// Remove all existing restore-wait init containers first to prevent duplicates
+	// This ensures that even if the pod was previously restored with file system backup
+	// but now backed up with native datamover or CSI, the unnecessary init container is removed
+	var filteredInitContainers []corev1api.Container
+	removedCount := 0
+	for _, initContainer := range pod.Spec.InitContainers {
+		if initContainer.Name != restorehelper.WaitInitContainer && initContainer.Name != restorehelper.WaitInitContainerLegacy {
+			filteredInitContainers = append(filteredInitContainers, initContainer)
+		} else {
+			removedCount++
+		}
+	}
+	pod.Spec.InitContainers = filteredInitContainers
+	if removedCount > 0 {
+		log.Infof("Removed %d existing restore-wait init container(s)", removedCount)
+	}
+
 	volumeSnapshots := podvolume.GetVolumeBackupsForPod(podVolumeBackups, &pod, podFromBackup.Namespace)
 	if len(volumeSnapshots) == 0 {
 		log.Debug("No pod volume backups found for pod")
-		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
+		res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pod)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to convert pod to runtime.Unstructured")
+		}
+		return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 	}
 
 	log.Info("Pod volume backups for pod found")
-
-	// TODO we might want/need to get plugin config at the top of this method at some point; for now, wait
-	// until we know we're doing a restore before getting config.
 	log.Debugf("Getting plugin config")
 	config, err := common.GetPluginConfig(common.PluginKindRestoreItemAction, "velero.io/pod-volume-restore", a.client)
 	if err != nil {
@@ -190,11 +208,9 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 	initContainerBuilder.Command(getCommand(log, config))
 
 	initContainer := *initContainerBuilder.Result()
-	if len(pod.Spec.InitContainers) == 0 || (pod.Spec.InitContainers[0].Name != restorehelper.WaitInitContainer && pod.Spec.InitContainers[0].Name != restorehelper.WaitInitContainerLegacy) {
-		pod.Spec.InitContainers = append([]corev1api.Container{initContainer}, pod.Spec.InitContainers...)
-	} else {
-		pod.Spec.InitContainers[0] = initContainer
-	}
+	// Since we've already removed all restore-wait init containers above,
+	// we can simply prepend the new init container
+	pod.Spec.InitContainers = append([]corev1api.Container{initContainer}, pod.Spec.InitContainers...)
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pod)
 	if err != nil {
