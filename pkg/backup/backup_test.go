@@ -5341,9 +5341,9 @@ func TestBackupNamespaces(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
-					builder.ForNamespace("ns-1").Result(),
-					builder.ForNamespace("ns-2").Result(),
-					builder.ForNamespace("ns-3").Result(),
+					builder.ForNamespace("ns-1").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-2").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-3").Phase(corev1api.NamespaceActive).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -5364,9 +5364,9 @@ func TestBackupNamespaces(t *testing.T) {
 			}).Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
-					builder.ForNamespace("ns-1").Result(),
-					builder.ForNamespace("ns-2").Result(),
-					builder.ForNamespace("ns-3").Result(),
+					builder.ForNamespace("ns-1").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-2").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-3").Phase(corev1api.NamespaceActive).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -5390,9 +5390,9 @@ func TestBackupNamespaces(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
-					builder.ForNamespace("ns-1").Result(),
-					builder.ForNamespace("ns-2").Result(),
-					builder.ForNamespace("ns-3").Result(),
+					builder.ForNamespace("ns-1").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-2").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-3").Phase(corev1api.NamespaceActive).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -5411,9 +5411,9 @@ func TestBackupNamespaces(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
-					builder.ForNamespace("ns-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
-					builder.ForNamespace("ns-2").Result(),
-					builder.ForNamespace("ns-3").Result(),
+					builder.ForNamespace("ns-1").ObjectMeta(builder.WithLabels("a", "b")).Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-2").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-3").Phase(corev1api.NamespaceActive).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -5431,9 +5431,9 @@ func TestBackupNamespaces(t *testing.T) {
 			backup: defaultBackup().IncludedNamespaces("invalid*").Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
-					builder.ForNamespace("ns-1").Result(),
-					builder.ForNamespace("ns-2").Result(),
-					builder.ForNamespace("ns-3").Result(),
+					builder.ForNamespace("ns-1").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-2").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-3").Phase(corev1api.NamespaceActive).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -5446,9 +5446,9 @@ func TestBackupNamespaces(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
-					builder.ForNamespace("ns-1").Result(),
-					builder.ForNamespace("ns-2").Result(),
-					builder.ForNamespace("ns-3").Result(),
+					builder.ForNamespace("ns-1").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-2").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-3").Phase(corev1api.NamespaceActive).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
