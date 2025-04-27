@@ -26,6 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -104,6 +105,7 @@ func (nt *nsTracker) init(
 	orLabelSelector []labels.Selector,
 	namespaceFilter *collections.IncludesExcludes,
 	logger logrus.FieldLogger,
+	converter runtime.UnstructuredConverter,
 ) {
 	if nt.namespaceMap == nil {
 		nt.namespaceMap = make(map[string]bool)
@@ -114,6 +116,16 @@ func (nt *nsTracker) init(
 	nt.logger = logger
 
 	for _, namespace := range unstructuredNSs {
+		ns := new(corev1api.Namespace)
+		if err := converter.FromUnstructured(namespace.UnstructuredContent(), ns); err != nil {
+			nt.logger.WithError(err).Errorf("Fail to convert unstructured into namespace %s", namespace.GetName())
+			continue
+		}
+		if ns.Status.Phase != corev1api.NamespaceActive {
+			nt.logger.Debugf("Skip namespace %s because it's not in Active phase.", namespace.GetName())
+			continue
+		}
+
 		if nt.singleLabelSelector != nil &&
 			nt.singleLabelSelector.Matches(labels.Set(namespace.GetLabels())) {
 			nt.logger.Debugf("Track namespace %s, because its labels match backup LabelSelector.",
@@ -447,6 +459,7 @@ func (r *itemCollector) getResourceItems(
 			gr,
 			preferredGVR,
 			log,
+			runtime.DefaultUnstructuredConverter,
 		)
 	}
 
@@ -734,6 +747,7 @@ func (r *itemCollector) collectNamespaces(
 	gr schema.GroupResource,
 	preferredGVR schema.GroupVersionResource,
 	log logrus.FieldLogger,
+	converter runtime.UnstructuredConverter,
 ) ([]*kubernetesResource, error) {
 	resourceClient, err := r.dynamicFactory.ClientForGroupVersionResource(gv, resource, "")
 	if err != nil {
@@ -793,6 +807,7 @@ func (r *itemCollector) collectNamespaces(
 		orSelectors,
 		r.backupRequest.NamespaceIncludesExcludes,
 		log,
+		converter,
 	)
 
 	var items []*kubernetesResource
