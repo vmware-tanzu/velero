@@ -1857,6 +1857,40 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 			pvc:            pvcObjBlockMode,
 			expectedNodeOS: NodeOSLinux,
 		},
+		{
+			name: "selected-node non-existent, sc fstype ntfs",
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   "fake-namespace",
+					Name:        "fake-pvc",
+					Annotations: map[string]string{KubeAnnSelectedNode: "non-existent-node"},
+				},
+				Spec: corev1api.PersistentVolumeClaimSpec{
+					StorageClassName: &storageClass,
+				},
+			},
+			kubeClientObj: []runtime.Object{
+				scObjWithFSType,
+			},
+			expectedNodeOS: NodeOSWindows,
+		},
+		{
+			name: "selected-node non-existent, sc no fstype",
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   "fake-namespace",
+					Name:        "fake-pvc",
+					Annotations: map[string]string{KubeAnnSelectedNode: "non-existent-node"},
+				},
+				Spec: corev1api.PersistentVolumeClaimSpec{
+					StorageClassName: &storageClass,
+				},
+			},
+			kubeClientObj: []runtime.Object{
+				scObjWithoutFSType,
+			},
+			expectedNodeOS: NodeOSLinux,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
