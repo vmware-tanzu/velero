@@ -1783,7 +1783,7 @@ func TestGetPVCAttachingNodeOS(t *testing.T) {
 		{
 			name: "node doesn't exist",
 			pvc:  pvcObjWithNode,
-			err:  "error to get os from node fake-node for PVC fake-namespace/fake-pvc: error getting node fake-node: nodes \"fake-node\" not found",
+			expectedNodeOS: NodeOSLinux,
 		},
 		{
 			name: "node without os label",

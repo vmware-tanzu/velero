@@ -484,6 +484,17 @@ func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, nodeClient core
 		log.Warnf("PVC %s/%s is not with storage class", pvc.Namespace, pvc.Name)
 	}
 
+	if pvc.Spec.StorageClassName != nil {
+		sc, err := storageClient.StorageClasses().Get(context.Background(), *pvc.Spec.StorageClassName, metav1.GetOptions{})
+		if err != nil {
+			return "", errors.Wrapf(err, "error to get storage class %s", *pvc.Spec.StorageClassName)
+		}
+
+		if sc.Parameters != nil {
+			scFsType = strings.ToLower(sc.Parameters["csi.storage.k8s.io/fstype"])
+		}
+	}
+
 	nodeName := ""
 	if value := pvc.Annotations[KubeAnnSelectedNode]; value != "" {
 		nodeName = value
@@ -503,20 +514,9 @@ func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, nodeClient core
 	if nodeName != "" {
 		os, err := GetNodeOS(context.Background(), nodeName, nodeClient)
 		if err != nil {
-			return "", errors.Wrapf(err, "error to get os from node %s for PVC %s/%s", nodeName, pvc.Namespace, pvc.Name)
-		}
-
-		nodeOS = os
-	}
-
-	if pvc.Spec.StorageClassName != nil {
-		sc, err := storageClient.StorageClasses().Get(context.Background(), *pvc.Spec.StorageClassName, metav1.GetOptions{})
-		if err != nil {
-			return "", errors.Wrapf(err, "error to get storage class %s", *pvc.Spec.StorageClassName)
-		}
-
-		if sc.Parameters != nil {
-			scFsType = strings.ToLower(sc.Parameters["csi.storage.k8s.io/fstype"])
+			log.Warnf("Failed to get OS from node %s for PVC %s/%s: %v", nodeName, pvc.Namespace, pvc.Name, err)
+		} else {
+			nodeOS = os
 		}
 	}
 
