@@ -269,6 +269,7 @@ type VeleroOptions struct {
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
+	PriorityClassName               string
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -358,6 +359,10 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		WithItemBlockWorkerCount(o.ItemBlockWorkerCount),
 	}
 
+	if o.PriorityClassName != "" {
+		deployOpts = append(deployOpts, WithPriorityClassName(o.PriorityClassName))
+	}
+
 	if len(o.Features) > 0 {
 		deployOpts = append(deployOpts, WithFeatures(o.Features))
 	}
@@ -413,6 +418,10 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		}
 		if len(o.NodeAgentConfigMap) > 0 {
 			dsOpts = append(dsOpts, WithNodeAgentConfigMap(o.NodeAgentConfigMap))
+		}
+
+		if o.PriorityClassName != "" {
+			dsOpts = append(dsOpts, WithPriorityClassName(o.PriorityClassName))
 		}
 
 		if o.UseNodeAgent {

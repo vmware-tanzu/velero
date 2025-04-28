@@ -89,6 +89,7 @@ type Options struct {
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
+	PriorityClassName               string
 }
 
 // BindFlags adds command line values to the options struct.
@@ -188,6 +189,12 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		"item-block-worker-count",
 		o.ItemBlockWorkerCount,
 		"Number of worker threads to process ItemBlocks. Default is one. Optional.",
+	)
+	flags.StringVar(
+		&o.PriorityClassName,
+		"priority-class-name",
+		o.PriorityClassName,
+		"Priority class name for the Velero deployment, node agent daemonset, and maintenance jobs. Optional.",
 	)
 }
 
@@ -292,6 +299,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		RepoMaintenanceJobConfigMap:     o.RepoMaintenanceJobConfigMap,
 		NodeAgentConfigMap:              o.NodeAgentConfigMap,
 		ItemBlockWorkerCount:            o.ItemBlockWorkerCount,
+		PriorityClassName:               o.PriorityClassName,
 	}, nil
 }
 

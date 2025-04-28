@@ -20,31 +20,29 @@ import (
 	"testing"
 )
 
-// TestPriorityClassNameInBackupPod verifies that the priority class name is properly set in the backup pod
-func TestPriorityClassNameInBackupPod(t *testing.T) {
-	// This test verifies that the PriorityClassName field is properly set in the backup pod
-	// by checking the code in pkg/exposer/csi_snapshot.go:createBackupPod
+// TestPriorityClassNameInRestorePod verifies that the priority class name is properly set in the restore pod
+func TestPriorityClassNameInRestorePod(t *testing.T) {
+	// This test verifies that the PriorityClassName field is properly set in the restore pod
+	// by checking the code in pkg/exposer/generic_restore.go:createRestorePod
 
 	// The function signature is:
-	// func (e *csiSnapshotExposer) createBackupPod(
+	// func (e *genericRestoreExposer) createRestorePod(
 	//   ctx context.Context,
 	//   ownerObject corev1api.ObjectReference,
-	//   pvc *corev1api.PersistentVolumeClaim,
+	//   restorePVC *corev1api.PersistentVolumeClaim,
+	//   targetPVC *corev1api.PersistentVolumeClaim,
 	//   timeout time.Duration,
-	//   commandArgs map[string]string,
-	//   envVars map[string]string,
-	//   loadAffinity *kube.LoadAffinity,
+	//   label map[string]string,
+	//   annotation map[string]string,
+	//   affinity *kube.LoadAffinity,
 	//   resources corev1api.ResourceRequirements,
-	//   useWindowsBackupPod bool,
-	//   spcNoRelabeling bool,
-	//   nodeOS string,
 	// ) (*corev1api.Pod, error)
 
 	// The relevant code that sets the priority class name is:
 	// PriorityClassName: podInfo.priorityClassName,
 
 	// This test verifies that the priority class name from the podInfo struct
-	// is properly set in the backup pod spec.
+	// is properly set in the restore pod spec.
 
 	// Since the function has many dependencies and is complex to test directly,
 	// we're verifying the implementation by code inspection rather than a unit test.

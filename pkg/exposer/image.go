@@ -28,16 +28,17 @@ import (
 )
 
 type inheritedPodInfo struct {
-	image          string
-	serviceAccount string
-	env            []corev1api.EnvVar
-	envFrom        []corev1api.EnvFromSource
-	volumeMounts   []corev1api.VolumeMount
-	volumes        []corev1api.Volume
-	logLevelArgs   []string
-	logFormatArgs  []string
-	dnsPolicy      v1.DNSPolicy
-	dnsConfig      *v1.PodDNSConfig
+	image             string
+	serviceAccount    string
+	env               []corev1api.EnvVar
+	envFrom           []corev1api.EnvFromSource
+	volumeMounts      []corev1api.VolumeMount
+	volumes           []corev1api.Volume
+	logLevelArgs      []string
+	logFormatArgs     []string
+	dnsPolicy         corev1api.DNSPolicy
+	dnsConfig         *corev1api.PodDNSConfig
+	priorityClassName string
 }
 
 func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veleroNamespace string, osType string) (inheritedPodInfo, error) {
@@ -62,6 +63,7 @@ func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veler
 
 	podInfo.dnsPolicy = podSpec.DNSPolicy
 	podInfo.dnsConfig = podSpec.DNSConfig
+	podInfo.priorityClassName = podSpec.PriorityClassName
 
 	args := podSpec.Containers[0].Args
 	for i, arg := range args {
