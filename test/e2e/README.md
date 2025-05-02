@@ -79,6 +79,7 @@ These configuration parameters are expected as values to the following command l
 1. `--debug-velero-pod-restart`: A switch for debugging velero pod restart.
 1. `--fail-fast`: A switch for for failing fast on meeting error.
 1. `--has-vsphere-plugin`: A switch to indicate whether the Velero vSphere plugin is installed for vSphere environment.
+1. `--worker-os`: A switch to indicate the workload should be ran on windows or linux OS.
 
 These configurations or parameters are used to generate install options for Velero for each test suite.
 
@@ -131,6 +132,7 @@ Below is a mapping between `make` variables to E2E configuration flags.
 1. `DEBUG_VELERO_POD_RESTART`: `-debug-velero-pod-restart`. Optional.
 1. `FAIL_FAST`: `--fail-fast`. Optional.
 1. `HAS_VSPHERE_PLUGIN`: `--has-vsphere-plugin`. Optional.
+1. `WORKER_OS`: `--worker-os`. Optional.
 
 
 
