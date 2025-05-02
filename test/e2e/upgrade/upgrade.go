@@ -126,15 +126,6 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				tmpCfgForOldVeleroInstall.UpgradeFromVeleroVersion = veleroCLI2Version.VeleroVersion
 				tmpCfgForOldVeleroInstall.VeleroCLI = veleroCLI2Version.VeleroCLI
 
-				// CLI under version v1.14.x
-				if veleroCLI2Version.VeleroVersion < "v1.15" {
-					tmpCfgForOldVeleroInstall.BackupRepoConfigMap = ""
-					fmt.Printf(
-						"CLI version %s is lower than v1.15. Set BackupRepoConfigMap to empty, because it's not supported",
-						veleroCLI2Version.VeleroVersion,
-					)
-				}
-
 				tmpCfgForOldVeleroInstall, err = SetImagesToDefaultValues(
 					tmpCfgForOldVeleroInstall,
 					veleroCLI2Version.VeleroVersion,
@@ -176,6 +167,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 					tmpCfg.KibishiiDirectory,
 					DefaultKibishiiData,
 					tmpCfg.ImageRegistryProxy,
+					veleroCfg.WorkerOS,
 				)).To(Succeed())
 			})
 
@@ -269,8 +261,14 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			})
 
 			By(fmt.Sprintf("Verify workload %s after restore ", upgradeNamespace), func() {
-				Expect(KibishiiVerifyAfterRestore(*veleroCfg.ClientToInstallVelero, upgradeNamespace,
-					oneHourTimeout, DefaultKibishiiData, "")).To(Succeed(), "Fail to verify workload after restore")
+				Expect(KibishiiVerifyAfterRestore(
+					*veleroCfg.ClientToInstallVelero,
+					upgradeNamespace,
+					oneHourTimeout,
+					DefaultKibishiiData,
+					"",
+					veleroCfg.WorkerOS,
+				)).To(Succeed(), "Fail to verify workload after restore")
 			})
 		})
 	})

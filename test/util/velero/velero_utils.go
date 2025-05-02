@@ -1393,7 +1393,7 @@ func VeleroUpgrade(ctx context.Context, veleroCfg VeleroConfig) error {
 			return errors.Wrap(err, "Fail to update node agent")
 		}
 	}
-	return waitVeleroReady(ctx, veleroCfg.VeleroNamespace, veleroCfg.UseNodeAgent)
+	return waitVeleroReady(ctx, veleroCfg.VeleroNamespace, veleroCfg.UseNodeAgent, veleroCfg.UseNodeAgentWindows)
 }
 
 func ApplyCRDs(ctx context.Context, veleroCLI string) ([]string, error) {
