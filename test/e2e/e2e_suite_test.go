@@ -356,6 +356,12 @@ func init() {
 		"",
 		"The image registry proxy, e.g. when the DockerHub access limitation is reached, can use available proxy to replace. Default is nil.",
 	)
+	flag.StringVar(
+		&test.VeleroCfg.WorkerOS,
+		"worker-os",
+		"linux",
+		"test k8s worker node OS version, should be either linux or windows.",
+	)
 }
 
 // Add label [SkipVanillaZfs]:

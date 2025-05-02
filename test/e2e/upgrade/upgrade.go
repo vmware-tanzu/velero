@@ -130,7 +130,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				if veleroCLI2Version.VeleroVersion < "v1.15" {
 					tmpCfgForOldVeleroInstall.BackupRepoConfigMap = ""
 					fmt.Printf(
-						"CLI version %s is lower thant v1.15. Set BackupRepoConfigMap to empty, because it's not supported",
+						"CLI version %s is lower than v1.15. Set BackupRepoConfigMap to empty, because it's not supported",
 						veleroCLI2Version.VeleroVersion,
 					)
 				}
@@ -176,6 +176,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 					tmpCfg.KibishiiDirectory,
 					DefaultKibishiiData,
 					tmpCfg.ImageRegistryProxy,
+					veleroCfg.WorkerOS,
 				)).To(Succeed())
 			})
 

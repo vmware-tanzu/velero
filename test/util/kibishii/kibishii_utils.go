@@ -36,6 +36,7 @@ import (
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	. "github.com/vmware-tanzu/velero/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/providers"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
@@ -117,6 +118,7 @@ func RunKibishiiTests(
 		kibishiiDirectory,
 		DefaultKibishiiData,
 		veleroCfg.ImageRegistryProxy,
+		veleroCfg.WorkerOS,
 	); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", kibishiiNamespace)
 	}
@@ -279,12 +281,13 @@ func RunKibishiiTests(
 
 func installKibishii(
 	ctx context.Context,
-	namespace string,
+	namespace,
 	cloudPlatform,
 	veleroFeatures,
 	kibishiiDirectory string,
 	workerReplicas int,
 	imageRegistryProxy string,
+	workerOS string,
 ) error {
 	if strings.EqualFold(cloudPlatform, Azure) &&
 		strings.EqualFold(veleroFeatures, FeatureCSI) {
@@ -295,15 +298,21 @@ func installKibishii(
 		cloudPlatform = AwsCSI
 	}
 
+	targetKustomizeDir := path.Join(kibishiiDirectory, cloudPlatform)
+
 	if strings.EqualFold(cloudPlatform, Vsphere) {
 		if strings.HasPrefix(kibishiiDirectory, "https://") {
 			return errors.New("vSphere needs to download the Kibishii repository first because it needs to inject some image patch file to work.")
 		}
 
+		if workerOS == common.WorkerOSWindows {
+			targetKustomizeDir += "-windows"
+		}
+
 		kibishiiImage := readBaseKibishiiImage(path.Join(kibishiiDirectory, "base", "kibishii.yaml"))
 		if err := generateKibishiiImagePatch(
 			path.Join(imageRegistryProxy, kibishiiImage),
-			path.Join(kibishiiDirectory, cloudPlatform, "worker-image-patch.yaml"),
+			path.Join(targetKustomizeDir, "worker-image-patch.yaml"),
 		); err != nil {
 			return nil
 		}
@@ -311,15 +320,16 @@ func installKibishii(
 		jumpPadImage := readBaseJumpPadImage(path.Join(kibishiiDirectory, "base", "jump-pad.yaml"))
 		if err := generateJumpPadPatch(
 			path.Join(imageRegistryProxy, jumpPadImage),
-			path.Join(kibishiiDirectory, cloudPlatform, "jump-pad-image-patch.yaml"),
+			path.Join(targetKustomizeDir, "jump-pad-image-patch.yaml"),
 		); err != nil {
 			return nil
 		}
 	}
 
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
+
 	kibishiiInstallCmd := exec.CommandContext(ctx, "kubectl", "apply", "-n", namespace, "-k",
-		path.Join(kibishiiDirectory, cloudPlatform), "--timeout=90s")
+		path.Join(targetKustomizeDir, cloudPlatform), "--timeout=90s")
 	_, stderr, err := veleroexec.RunCommand(kibishiiInstallCmd)
 	fmt.Printf("Install Kibishii cmd: %s\n", kibishiiInstallCmd)
 	if err != nil {
@@ -558,7 +568,7 @@ func waitForKibishiiPods(ctx context.Context, client TestClient, kibishiiNamespa
 	)
 }
 
-func KibishiiGenerateData(oneHourTimeout context.Context, kibishiiNamespace string, kibishiiData *KibishiiData) error {
+func kibishiiGenerateData(oneHourTimeout context.Context, kibishiiNamespace string, kibishiiData *KibishiiData) error {
 	fmt.Printf("generateData %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if err := generateData(oneHourTimeout, kibishiiNamespace, kibishiiData); err != nil {
 		return errors.Wrap(err, "Failed to generate data")
@@ -577,6 +587,7 @@ func KibishiiPrepareBeforeBackup(
 	kibishiiDirectory string,
 	kibishiiData *KibishiiData,
 	imageRegistryProxy string,
+	workerOS string,
 ) error {
 	fmt.Printf("installKibishii %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	serviceAccountName := "default"
@@ -599,6 +610,7 @@ func KibishiiPrepareBeforeBackup(
 		kibishiiDirectory,
 		kibishiiData.ExpectedNodes,
 		imageRegistryProxy,
+		workerOS,
 	); err != nil {
 		return errors.Wrap(err, "Failed to install Kibishii workload")
 	}
@@ -611,7 +623,7 @@ func KibishiiPrepareBeforeBackup(
 	if kibishiiData == nil {
 		kibishiiData = DefaultKibishiiData
 	}
-	KibishiiGenerateData(oneHourTimeout, kibishiiNamespace, kibishiiData)
+	kibishiiGenerateData(oneHourTimeout, kibishiiNamespace, kibishiiData)
 	return nil
 }
 

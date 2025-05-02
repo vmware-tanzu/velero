@@ -119,6 +119,8 @@ VELERO_SERVER_DEBUG_MODE ?= false
 
 ITEM_BLOCK_WORKER_COUNT ?= 1
 
+WORKER_OS ?= linux
+
 # Parameters to run migration tests along with all other E2E tests, and both of them should
 #   be provided or left them all empty to skip migration tests with no influence to other
 #   E2E tests.
@@ -222,6 +224,7 @@ run-e2e: ginkgo
 		--kibishii-directory=$(KIBISHII_DIRECTORY) \
 		--disable-informer-cache=$(DISABLE_INFORMER_CACHE) \
 		--image-registry-proxy=$(IMAGE_REGISTRY_PROXY)
+		--worker-os=$(WORKER_OS)
 
 .PHONY: run-perf
 run-perf: ginkgo

@@ -101,6 +101,7 @@ func (n *NamespaceMapping) CreateResources() error {
 				n.VeleroCfg.KibishiiDirectory,
 				n.kibishiiData,
 				n.VeleroCfg.ImageRegistryProxy,
+				n.VeleroCfg.WorkerOS,
 			)).To(Succeed())
 		})
 	}

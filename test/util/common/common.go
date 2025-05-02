@@ -11,6 +11,11 @@ import (
 	"os/exec"
 )
 
+const (
+	WorkerOSLinux   = "linux"
+	WorkerOSWindows = "windows"
+)
+
 type OsCommandLine struct {
 	Cmd  string
 	Args []string
