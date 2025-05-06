@@ -77,7 +77,7 @@ func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList [
 			Containers: []corev1.Container{
 				{
 					Name:         name,
-					Image:        "gcr.io/velero-gcp/busybox",
+					Image:        "busybox:1.37.0",
 					Command:      []string{"sleep", "3600"},
 					VolumeMounts: vmList,
 					// Make pod obeys the restricted pod security standards.

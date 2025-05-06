@@ -102,6 +102,7 @@ OBJECT_STORE_PROVIDER ?=
 INSTALL_VELERO ?= true
 REGISTRY_CREDENTIAL_FILE ?=
 KIBISHII_DIRECTORY ?= github.com/vmware-tanzu-experiments/distributed-data-generator/kubernetes/yaml/
+IMAGE_REGISTRY_PROXY ?=
 
 
 # Flags to create an additional BSL for multiple credentials tests
@@ -216,7 +217,8 @@ run-e2e: ginkgo
 		--default-cls-service-account-name=$(DEFAULT_CLS_SERVICE_ACCOUNT_NAME) \
 		--standby-cls-service-account-name=$(STANDBY_CLS_SERVICE_ACCOUNT_NAME) \
 		--kibishii-directory=$(KIBISHII_DIRECTORY) \
-		--disable-informer-cache=$(DISABLE_INFORMER_CACHE)
+		--disable-informer-cache=$(DISABLE_INFORMER_CACHE) \
+		--image-registry-proxy=$(IMAGE_REGISTRY_PROXY)
 
 .PHONY: run-perf
 run-perf: ginkgo
