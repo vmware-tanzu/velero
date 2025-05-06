@@ -106,7 +106,9 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			}
 
 			By(fmt.Sprintf("Add an additional plugin for provider %s", veleroCfg.AdditionalBSLProvider), func() {
-				Expect(VeleroAddPluginsForProvider(context.TODO(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, veleroCfg.AdditionalBSLProvider, veleroCfg.AddBSLPlugins)).To(Succeed())
+				plugins, err := GetPlugins(context.TODO(), veleroCfg, false)
+				Expect(err).To(Succeed())
+				Expect(AddPlugins(plugins, veleroCfg)).To(Succeed())
 			})
 
 			additionalBsl := fmt.Sprintf("bsl-%s", UUIDgen)
