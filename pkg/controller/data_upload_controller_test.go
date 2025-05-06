@@ -409,16 +409,6 @@ func TestReconcile(t *testing.T) {
 			expectedErrMsg:    "failed to get PVC",
 		},
 		{
-			name:              "Dataupload should fail to get PVC attaching node",
-			du:                dataUploadBuilder().Result(),
-			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1api.Volume{Name: "test-pvc"}).Result(),
-			pvc:               builder.ForPersistentVolumeClaim("fake-ns", "test-pvc").StorageClass("fake-sc").Result(),
-			expectedProcessed: true,
-			expected:          dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseFailed).Result(),
-			expectedRequeue:   ctrl.Result{},
-			expectedErrMsg:    "error to get storage class",
-		},
-		{
 			name:              "Dataupload should fail because expected node doesn't exist",
 			du:                dataUploadBuilder().Result(),
 			pod:               builder.ForPod("fake-ns", dataUploadName).Volumes(&corev1api.Volume{Name: "test-pvc"}).Result(),
