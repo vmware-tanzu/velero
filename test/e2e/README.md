@@ -41,7 +41,7 @@ These configuration parameters are expected as values to the following command l
 1. `--cloud-provider`: The cloud the tests will be run in.  Appropriate plugins will be installed except for kind which requires the object-store-provider to be specified.
 1. `--object-store-provider`: Object store provider to use. Required when kind is the cloud provider.
 1. `--velerocli`: Path to the velero application to use. Optional, by default uses `velero` in the `$PATH`
-1. `--velero-image`: Image for the velero server to be tested. Optional, by default uses `velero/velero:main`
+1. `--velero-image`: Image for the velero server to be tested. Optional, by default uses `dockerhub.packages.vcfd.broadcom.net/velero/velero:main`
 1. `--restore-helper-image`: Image for the velero restore helper to be tested. Optional, by default it is the built-in image address of velero image.
 1. `--plugins `: Provider plugins to be tested.
 1. `--bsl-config`: Configuration to use for the backup storage location. Format is key1=value1,key2=value2. Optional.
@@ -328,26 +328,26 @@ STANDBY_CLUSTER=wl-antreav1311 \
 DEFAULT_CLUSTER_NAME=192.168.0.4 \
 STANDBY_CLUSTER_NAME=192.168.0.3 \
 FEATURES=EnableCSI \
-PLUGINS=gcr.io/velero-gcp/velero-plugin-for-aws:main \
+PLUGINS=dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:main \
 HAS_VSPHERE_PLUGIN=false \
 OBJECT_STORE_PROVIDER=aws \
 CREDS_FILE=$HOME/aws-credential \
 BSL_CONFIG=region=us-east-1 \
 BSL_BUCKET=nightly-normal-account4-test \
 BSL_PREFIX=nightly \
-ADDITIONAL_BSL_PLUGINS=gcr.io/velero-gcp/velero-plugin-for-aws:main \
+ADDITIONAL_BSL_PLUGINS=dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:main \
 ADDITIONAL_OBJECT_STORE_PROVIDER=aws \
 ADDITIONAL_BSL_CONFIG=region=us-east-1 \
 ADDITIONAL_BSL_BUCKET=nightly-restrict-account-test \
 ADDITIONAL_BSL_PREFIX=nightly \
 ADDITIONAL_CREDS_FILE=$HOME/aws-credential \
-VELERO_IMAGE=gcr.io/velero-gcp/velero:main \
-RESTORE_HELPER_IMAGE=gcr.io/velero-gcp/velero-restore-helper:main \
+VELERO_IMAGE=velero/velero:main \
+RESTORE_HELPER_IMAGE=dockerhub.packages.vcfd.broadcom.net/velero/velero-restore-helper:main \
 VERSION=main \
 SNAPSHOT_MOVE_DATA=true \
 STANDBY_CLUSTER_CLOUD_PROVIDER=vsphere \
 STANDBY_CLUSTER_OBJECT_STORE_PROVIDER=aws \
-STANDBY_CLUSTER_PLUGINS=gcr.io/velero-gcp/velero-plugin-for-aws:main \
+STANDBY_CLUSTER_PLUGINS=dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:main \
 DISABLE_INFORMER_CACHE=true \
 REGISTRY_CREDENTIAL_FILE=$HOME/.docker/config.json \
 GINKGO_LABELS=Migration \

@@ -57,78 +57,51 @@ const RestoreObjectsPrefix = "restores"
 const PluginsObjectsPrefix = "plugins"
 
 var ImagesMatrix = map[string]map[string][]string{
-	"v1.10": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.6.0"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.6.0"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.6.0"},
-		"csi":                   {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.4.0"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.10.2"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.10.2"},
-	},
-	"v1.11": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.7.0"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.7.0"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.7.0"},
-		"csi":                   {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.5.0"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.11.1"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.11.1"},
-	},
-	"v1.12": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.8.0"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.8.0"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.1"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.8.0"},
-		"csi":                   {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.6.0"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.12.4"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.12.4"},
-	},
 	"v1.13": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.9.2"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.9.2"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.9.2"},
-		"csi":                   {"gcr.io/velero-gcp/velero-plugin-for-csi:v0.7.1"},
-		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.9.2"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.13.2"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.13.2"},
+		"aws":                   {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:v1.9.2"},
+		"azure":                 {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-microsoft-azure:v1.9.2"},
+		"vsphere":               {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-gcp:v1.9.2"},
+		"csi":                   {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-csi:v0.7.1"},
+		"datamover":             {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:v1.9.2"},
+		"velero":                {"dockerhub.packages.vcfd.broadcom.net/velero/velero:v1.13.2"},
+		"velero-restore-helper": {"dockerhub.packages.vcfd.broadcom.net/velero/velero-restore-helper:v1.13.2"},
 	},
 	"v1.14": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.10.1"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.10.1"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.10.1"},
-		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.10.1"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.14.1"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.14.1"},
+		"aws":                   {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:v1.10.1"},
+		"azure":                 {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-microsoft-azure:v1.10.1"},
+		"vsphere":               {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-gcp:v1.10.1"},
+		"datamover":             {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:v1.10.1"},
+		"velero":                {"dockerhub.packages.vcfd.broadcom.net/velero/velero:v1.14.1"},
+		"velero-restore-helper": {"dockerhub.packages.vcfd.broadcom.net/velero/velero-restore-helper:v1.14.1"},
 	},
 	"v1.15": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.11.0"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.11.0"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.11.0"},
-		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.11.0"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.15.2"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:v1.15.2"},
+		"aws":                   {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:v1.11.0"},
+		"azure":                 {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-microsoft-azure:v1.11.0"},
+		"vsphere":               {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-gcp:v1.11.0"},
+		"datamover":             {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:v1.11.0"},
+		"velero":                {"dockerhub.packages.vcfd.broadcom.net/velero/velero:v1.15.2"},
+		"velero-restore-helper": {"dockerhub.packages.vcfd.broadcom.net/velero/velero-restore-helper:v1.15.2"},
 	},
 	"v1.16": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.12.0"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:v1.12.0"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:v1.12.0"},
-		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:v1.12.0"},
-		"velero":                {"gcr.io/velero-gcp/velero:v1.15.0"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero:v1.16.0"},
+		"aws":                   {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:v1.12.0"},
+		"azure":                 {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-microsoft-azure:v1.12.0"},
+		"vsphere":               {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-gcp:v1.12.0"},
+		"datamover":             {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:v1.12.0"},
+		"velero":                {"dockerhub.packages.vcfd.broadcom.net/velero/velero:v1.15.0"},
+		"velero-restore-helper": {"dockerhub.packages.vcfd.broadcom.net/velero/velero:v1.16.0"},
 	},
 	"main": {
-		"aws":                   {"gcr.io/velero-gcp/velero-plugin-for-aws:main"},
-		"azure":                 {"gcr.io/velero-gcp/velero-plugin-for-microsoft-azure:main"},
-		"vsphere":               {"gcr.io/velero-gcp/velero-plugin-for-vsphere:v1.5.2"},
-		"gcp":                   {"gcr.io/velero-gcp/velero-plugin-for-gcp:main"},
-		"datamover":             {"gcr.io/velero-gcp/velero-plugin-for-aws:main"},
-		"velero":                {"gcr.io/velero-gcp/velero:main"},
-		"velero-restore-helper": {"gcr.io/velero-gcp/velero-restore-helper:main"},
+		"aws":                   {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:main"},
+		"azure":                 {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-microsoft-azure:main"},
+		"vsphere":               {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-vsphere:v1.5.2"},
+		"gcp":                   {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-gcp:main"},
+		"datamover":             {"dockerhub.packages.vcfd.broadcom.net/velero/velero-plugin-for-aws:main"},
+		"velero":                {"dockerhub.packages.vcfd.broadcom.net/velero/velero:main"},
+		"velero-restore-helper": {"dockerhub.packages.vcfd.broadcom.net/velero/velero-restore-helper:main"},
 	},
 }
 
@@ -1447,14 +1420,6 @@ func UpdateVeleroDeployment(ctx context.Context, veleroCfg VeleroConfig) ([]stri
 	}
 	cmds = append(cmds, cmd)
 
-	args := fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"gcr.io\\/velero-gcp\\/nightly\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
-
-	cmd = &common.OsCommandLine{
-		Cmd:  "sed",
-		Args: []string{args},
-	}
-	cmds = append(cmds, cmd)
-
 	cmd = &common.OsCommandLine{
 		Cmd:  "sed",
 		Args: []string{fmt.Sprintf("s#\\\"server\\\",#\\\"server\\\",\\\"--uploader-type=%s\\\",#g", veleroCfg.UploaderType)},
@@ -1494,14 +1459,6 @@ func UpdateNodeAgent(ctx context.Context, veleroCfg VeleroConfig, dsjson string)
 	cmd := &common.OsCommandLine{
 		Cmd:  "echo",
 		Args: []string{dsjson},
-	}
-	cmds = append(cmds, cmd)
-
-	args := fmt.Sprintf("s#\\\"image\\\"\\: \\\"velero\\/velero\\:v[0-9]*.[0-9]*.[0-9]\\\"#\\\"image\\\"\\: \\\"gcr.io\\/velero-gcp\\/nightly\\/velero\\:%s\\\"#g", veleroCfg.VeleroVersion)
-
-	cmd = &common.OsCommandLine{
-		Cmd:  "sed",
-		Args: []string{args},
 	}
 	cmds = append(cmds, cmd)
 

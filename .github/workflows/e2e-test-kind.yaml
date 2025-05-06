@@ -132,6 +132,7 @@ jobs:
               ADDITIONAL_CREDS_FILE=/tmp/credential \
               ADDITIONAL_BSL_BUCKET=additional-bucket \
               VELERO_IMAGE=velero:pr-test-linux-amd64 \
+              PLUGINS=velero/velero-plugin-for-aws:latest \
               GINKGO_LABELS="${{ matrix.labels }}" \
               make -C test/ run-e2e
         timeout-minutes: 30
