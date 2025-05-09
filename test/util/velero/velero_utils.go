@@ -106,6 +106,17 @@ var ImagesMatrix = map[string]map[string][]string{
 	},
 }
 
+// UpdateImagesMatrixByProxy is used to append the proxy to the image lists.
+func UpdateImagesMatrixByProxy(imageRegistryProxy string) {
+	if imageRegistryProxy != "" {
+		for i := range ImagesMatrix {
+			for j := range ImagesMatrix[i] {
+				ImagesMatrix[i][j][0] = path.Join(imageRegistryProxy, ImagesMatrix[i][j][0])
+			}
+		}
+	}
+}
+
 func SetImagesToDefaultValues(config VeleroConfig, version string) (VeleroConfig, error) {
 	fmt.Printf("Get the images for version %s\n", version)
 
@@ -119,12 +130,6 @@ func SetImagesToDefaultValues(config VeleroConfig, version string) (VeleroConfig
 	if !ok {
 		return config, fmt.Errorf("fail to read the images for version %s from the ImagesMatrix",
 			versionWithoutPatch)
-	}
-
-	if config.ImageRegistryProxy != "" {
-		for index := range images {
-			images[index][0] = path.Join(config.ImageRegistryProxy, images[index][0])
-		}
 	}
 
 	ret.VeleroImage = images[Velero][0]
@@ -157,7 +162,7 @@ func SetImagesToDefaultValues(config VeleroConfig, version string) (VeleroConfig
 	return ret, nil
 }
 
-func getPluginsByVersion(version string, cloudProvider string, needDataMoverPlugin bool, imageRegistryProxy string) ([]string, error) {
+func getPluginsByVersion(version string, cloudProvider string, needDataMoverPlugin bool) ([]string, error) {
 	var cloudMap map[string][]string
 	arr := strings.Split(version, ".")
 	if len(arr) >= 3 {
@@ -171,12 +176,6 @@ func getPluginsByVersion(version string, cloudProvider string, needDataMoverPlug
 	}
 	var plugins []string
 	var ok bool
-
-	if imageRegistryProxy != "" {
-		for index := range cloudMap {
-			cloudMap[index][0] = path.Join(imageRegistryProxy, cloudMap[index][0])
-		}
-	}
 
 	if slices.Contains(LocalCloudProviders, cloudProvider) {
 		plugins, ok = cloudMap[AWS]
@@ -667,7 +666,6 @@ func GetPlugins(ctx context.Context, veleroCfg VeleroConfig, defaultBSL bool) ([
 	cloudProvider := veleroCfg.CloudProvider
 	objectStoreProvider := veleroCfg.ObjectStoreProvider
 	providerPlugins := veleroCfg.Plugins
-	imageRegistryProxy := veleroCfg.ImageRegistryProxy
 	needDataMoverPlugin := false
 	var plugins []string
 
@@ -686,7 +684,7 @@ func GetPlugins(ctx context.Context, veleroCfg VeleroConfig, defaultBSL bool) ([
 				return []string{}, errors.New("AdditionalBSLProvider should be provided.")
 			}
 
-			plugins, err = getPluginsByVersion(version, cloudProvider, false, imageRegistryProxy)
+			plugins, err = getPluginsByVersion(version, cloudProvider, false)
 			if err != nil {
 				return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", cloudProvider, version)
 			}
@@ -716,7 +714,7 @@ func GetPlugins(ctx context.Context, veleroCfg VeleroConfig, defaultBSL bool) ([
 			needDataMoverPlugin = true
 		}
 
-		plugins, err = getPluginsByVersion(version, cloudProvider, needDataMoverPlugin, imageRegistryProxy)
+		plugins, err = getPluginsByVersion(version, cloudProvider, needDataMoverPlugin)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "Fail to get plugin by provider %s and version %s", objectStoreProvider, version)
 		}

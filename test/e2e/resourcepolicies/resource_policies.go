@@ -209,7 +209,7 @@ func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []
 }
 
 func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volList []*corev1api.Volume) error {
-	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"resource-policies": "resource-policies"}, nil).WithVolume(volList).Result()
+	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"resource-policies": "resource-policies"}, r.VeleroCfg.ImageRegistryProxy).WithVolume(volList).Result()
 	deployment, err := CreateDeployment(r.Client.ClientGo, namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create deloyment %s the namespace %q", deployment.Name, namespace))

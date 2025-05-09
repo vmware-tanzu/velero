@@ -19,6 +19,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"path"
 
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
@@ -27,10 +28,22 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
-func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList []string, pvcAnn, ann map[string]string) (*corev1api.Pod, error) {
+func CreatePod(
+	client TestClient,
+	ns, name, sc, pvcName string,
+	volumeNameList []string,
+	pvcAnn, ann map[string]string,
+	imageRegistryProxy string,
+) (*corev1api.Pod, error) {
 	if pvcName != "" && len(volumeNameList) != 1 {
 		return nil, errors.New("Volume name list should contain only 1 since PVC name is not empty")
 	}
+
+	imageAddress := TestImage
+	if imageRegistryProxy != "" {
+		imageAddress = path.Join(imageRegistryProxy, TestImage)
+	}
+
 	volumes := []corev1api.Volume{}
 	for _, volume := range volumeNameList {
 		var _pvcName string
@@ -76,7 +89,7 @@ func CreatePod(client TestClient, ns, name, sc, pvcName string, volumeNameList [
 			Containers: []corev1api.Container{
 				{
 					Name:         name,
-					Image:        "busybox:1.37.0",
+					Image:        imageAddress,
 					Command:      []string{"sleep", "3600"},
 					VolumeMounts: vmList,
 					// Make pod obeys the restricted pod security standards.

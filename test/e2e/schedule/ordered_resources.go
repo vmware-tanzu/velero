@@ -99,7 +99,7 @@ func (o *OrderedResources) CreateResources() error {
 	//Create deployment
 	deploymentName := fmt.Sprintf("deploy-%s", o.CaseBaseName)
 	fmt.Printf("Creating deployment %s in %s namespaces ...\n", deploymentName, o.Namespace)
-	deployment := k8sutil.NewDeployment(deploymentName, o.Namespace, 1, label, nil).Result()
+	deployment := k8sutil.NewDeployment(deploymentName, o.Namespace, 1, label, o.VeleroCfg.ImageRegistryProxy).Result()
 	_, err := k8sutil.CreateDeployment(o.Client.ClientGo, o.Namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create namespace %q with err %v", o.Namespace, err))
