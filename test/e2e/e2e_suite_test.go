@@ -349,6 +349,12 @@ func init() {
 		1,
 		"Velero backup's item block worker count.",
 	)
+	flag.StringVar(
+		&test.VeleroCfg.ImageRegistryProxy,
+		"image-registry-proxy",
+		"",
+		"The image registry proxy, e.g. when the DockerHub access limitation is reached, can use available proxy to replace. Default is nil.",
+	)
 }
 
 // Add label [SkipVanillaZfs]:
