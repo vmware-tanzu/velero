@@ -82,7 +82,7 @@ func BackupsSyncTest() {
 		ctx, ctxCancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer ctxCancel()
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace %s namespace", test.testNS))
-		Expect(CreateNamespace(ctx, *veleroCfg.ClientToInstallVelero, test.testNS)).To(Succeed(),
+		Expect(CreateNamespace(ctx, *veleroCfg.ClientToInstallVelero, test.testNS, false)).To(Succeed(),
 			fmt.Sprintf("Failed to create %s namespace", test.testNS))
 
 		if CurrentSpecReport().Failed() && veleroCfg.FailFast {
@@ -127,7 +127,7 @@ func BackupsSyncTest() {
 		ctx, ctxCancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer ctxCancel()
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace in %s namespace", test.testNS), func() {
-			Expect(CreateNamespace(ctx, *veleroCfg.ClientToInstallVelero, test.testNS)).To(Succeed(),
+			Expect(CreateNamespace(ctx, *veleroCfg.ClientToInstallVelero, test.testNS, false)).To(Succeed(),
 				fmt.Sprintf("Failed to create %s namespace", test.testNS))
 		})
 
