@@ -29,7 +29,7 @@ import (
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 
-	volume "github.com/vmware-tanzu/velero/internal/volume"
+	volume "github.com/vmware-tanzu/velero/pkg/volume"
 
 	volumesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 )
