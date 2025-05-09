@@ -75,7 +75,8 @@ func (p *PVCSelectedNodeChanging) CreateResources() error {
 			p.oldNodeName = nodeName
 			fmt.Printf("Create PVC on node %s\n", p.oldNodeName)
 			pvcAnn := map[string]string{p.ann: nodeName}
-			_, err := CreatePod(p.Client, p.namespace, p.podName, StorageClassName, p.pvcName, []string{p.volume}, pvcAnn, nil)
+			_, err := CreatePod(p.Client, p.namespace, p.podName, StorageClassName, p.pvcName, []string{p.volume},
+				pvcAnn, nil, p.VeleroCfg.ImageRegistryProxy)
 			Expect(err).To(Succeed())
 			err = WaitForPods(p.Ctx, p.Client, p.namespace, []string{p.podName})
 			Expect(err).To(Succeed())
