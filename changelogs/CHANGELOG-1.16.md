@@ -1,3 +1,22 @@
+## v1.16.1
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.16.1
+
+### Container Image
+`velero/velero:v1.16.1`
+
+### Documentation
+https://velero.io/docs/v1.16/
+
+### Upgrading
+https://velero.io/docs/v1.16/upgrade-to-1.16/
+
+### All Changes
+  * Warn for not found error in patching managed fields (#8916, @sseago)
+  * Fix issue 8878, relief node os deduction error checks (#8911, @Lyndon-Li)
+
+
 ## v1.16
 
 ### Download
