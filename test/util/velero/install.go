@@ -84,7 +84,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 		}
 	}
 
-	pluginsTmp, err := getPlugins(ctx, *veleroCfg)
+	pluginsTmp, err := GetPlugins(ctx, *veleroCfg, true)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get provider plugins")
 	}

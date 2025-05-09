@@ -53,7 +53,7 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string, co
 		containers = []v1.Container{
 			{
 				Name:    DefaultContainerName,
-				Image:   "gcr.io/velero-gcp/busybox:latest",
+				Image:   "busybox:1.37.0",
 				Command: []string{"sleep", "1000000"},
 				// Make pod obeys the restricted pod security standards.
 				SecurityContext: &v1.SecurityContext{
