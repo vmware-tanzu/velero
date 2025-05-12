@@ -17,6 +17,8 @@ limitations under the License.
 package csi
 
 import (
+	"fmt"
+
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -26,6 +28,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/util"
@@ -106,12 +109,23 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 		return nil, errors.WithStack(err)
 	}
 
+	if vsFromBackup.Status == nil ||
+		vsFromBackup.Status.BoundVolumeSnapshotContentName == nil {
+		p.log.Errorf("VS %s doesn't have bound VSC", vsFromBackup.Name)
+		return nil, fmt.Errorf("VS %s doesn't have bound VSC", vsFromBackup.Name)
+	}
+
+	vsc := velero.ResourceIdentifier{
+		GroupResource: kuberesource.VolumeSnapshotContents,
+		Name:          *vsFromBackup.Status.BoundVolumeSnapshotContentName,
+	}
+
 	p.log.Infof(`Returning from VolumeSnapshotRestoreItemAction with 
 		no additionalItems`)
 
 	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem:     &unstructured.Unstructured{Object: vsMap},
-		AdditionalItems: []velero.ResourceIdentifier{},
+		AdditionalItems: []velero.ResourceIdentifier{vsc},
 	}, nil
 }
 
