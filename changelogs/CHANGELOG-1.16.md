@@ -13,6 +13,7 @@ https://velero.io/docs/v1.16/
 https://velero.io/docs/v1.16/upgrade-to-1.16/
 
 ### All Changes
+  * Add VolumeSnapshotContent into the RIA and the mustHave resource list. (#8926, @blackpiglet)
   * Warn for not found error in patching managed fields (#8916, @sseago)
   * Fix issue 8878, relief node os deduction error checks (#8911, @Lyndon-Li)
 
