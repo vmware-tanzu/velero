@@ -75,6 +75,7 @@ type backupReconciler struct {
 	defaultBackupLocation       string
 	defaultVolumesToFsBackup    bool
 	defaultBackupTTL            time.Duration
+	defaultVGSLabelKey          string
 	defaultCSISnapshotTimeout   time.Duration
 	resourceTimeout             time.Duration
 	defaultItemOperationTimeout time.Duration
@@ -102,6 +103,7 @@ func NewBackupReconciler(
 	defaultBackupLocation string,
 	defaultVolumesToFsBackup bool,
 	defaultBackupTTL time.Duration,
+	defaultVGSLabelKey string,
 	defaultCSISnapshotTimeout time.Duration,
 	resourceTimeout time.Duration,
 	defaultItemOperationTimeout time.Duration,
@@ -128,6 +130,7 @@ func NewBackupReconciler(
 		defaultBackupLocation:       defaultBackupLocation,
 		defaultVolumesToFsBackup:    defaultVolumesToFsBackup,
 		defaultBackupTTL:            defaultBackupTTL,
+		defaultVGSLabelKey:          defaultVGSLabelKey,
 		defaultCSISnapshotTimeout:   defaultCSISnapshotTimeout,
 		resourceTimeout:             resourceTimeout,
 		defaultItemOperationTimeout: defaultItemOperationTimeout,
@@ -345,6 +348,10 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	if request.Spec.TTL.Duration == 0 {
 		// set default backup TTL
 		request.Spec.TTL.Duration = b.defaultBackupTTL
+	}
+
+	if len(request.Spec.VolumeGroupSnapshotLabelKey) == 0 {
+		request.Spec.VolumeGroupSnapshotLabelKey = b.defaultVGSLabelKey
 	}
 
 	if request.Spec.CSISnapshotTimeout.Duration == 0 {
