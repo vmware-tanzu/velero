@@ -173,11 +173,28 @@ func newBackupper(
 					return
 				}
 
+				statusChangedToFinal := true
+				existObj, exist, err := b.pvbIndexer.Get(pvb)
+				if err == nil && exist {
+					existPVB, ok := existObj.(*velerov1api.PodVolumeBackup)
+					// the PVB in the indexer is already in final status, no need to call WaitGroup.Done()
+					if ok && (existPVB.Status.Phase == velerov1api.PodVolumeBackupPhaseCompleted ||
+						existPVB.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed) {
+						statusChangedToFinal = false
+					}
+				}
+
 				// the Indexer inserts PVB directly if the PVB to be updated doesn't exist
 				if err := b.pvbIndexer.Update(pvb); err != nil {
 					log.WithError(err).Errorf("failed to update PVB %s/%s in indexer", pvb.Namespace, pvb.Name)
 				}
-				b.wg.Done()
+
+				// call WaitGroup.Done() once only when the PVB changes to final status the first time.
+				// This avoid the cases that the handler gets multiple update events whose PVBs are all in final status
+				// which causes panic with "negative WaitGroup counter" error
+				if statusChangedToFinal {
+					b.wg.Done()
+				}
 			},
 		},
 	)
