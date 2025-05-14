@@ -195,8 +195,8 @@ func (m *migrationE2E) Backup() error {
 			OriginVeleroCfg.RegistryCredentialFile,
 			OriginVeleroCfg.Features,
 			OriginVeleroCfg.KibishiiDirectory,
-			OriginVeleroCfg.UseVolumeSnapshots,
 			&m.kibishiiData,
+			OriginVeleroCfg.ImageRegistryProxy,
 		)).To(Succeed())
 	})
 

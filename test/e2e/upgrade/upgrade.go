@@ -126,6 +126,15 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				tmpCfgForOldVeleroInstall.UpgradeFromVeleroVersion = veleroCLI2Version.VeleroVersion
 				tmpCfgForOldVeleroInstall.VeleroCLI = veleroCLI2Version.VeleroCLI
 
+				// CLI under version v1.14.x
+				if veleroCLI2Version.VeleroVersion < "v1.15" {
+					tmpCfgForOldVeleroInstall.BackupRepoConfigMap = ""
+					fmt.Printf(
+						"CLI version %s is lower than v1.15. Set BackupRepoConfigMap to empty, because it's not supported",
+						veleroCLI2Version.VeleroVersion,
+					)
+				}
+
 				tmpCfgForOldVeleroInstall, err = SetImagesToDefaultValues(
 					tmpCfgForOldVeleroInstall,
 					veleroCLI2Version.VeleroVersion,
@@ -157,9 +166,17 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			})
 
 			By("Deploy sample workload of Kibishii", func() {
-				Expect(KibishiiPrepareBeforeBackup(oneHourTimeout, *veleroCfg.ClientToInstallVelero, tmpCfg.CloudProvider,
-					upgradeNamespace, tmpCfg.RegistryCredentialFile, tmpCfg.Features,
-					tmpCfg.KibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData)).To(Succeed())
+				Expect(KibishiiPrepareBeforeBackup(
+					oneHourTimeout,
+					*veleroCfg.ClientToInstallVelero,
+					tmpCfg.CloudProvider,
+					upgradeNamespace,
+					tmpCfg.RegistryCredentialFile,
+					tmpCfg.Features,
+					tmpCfg.KibishiiDirectory,
+					DefaultKibishiiData,
+					tmpCfg.ImageRegistryProxy,
+				)).To(Succeed())
 			})
 
 			By(fmt.Sprintf("Backup namespace %s", upgradeNamespace), func() {
@@ -238,6 +255,9 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 						tmpCfg.VeleroVersion)).To(Succeed())
 				}
 			})
+
+			// Wait for 70s to make sure the backups are synced after Velero reinstall
+			time.Sleep(70 * time.Second)
 
 			By(fmt.Sprintf("Restore %s", upgradeNamespace), func() {
 				Expect(VeleroRestore(oneHourTimeout, tmpCfg.VeleroCLI,
