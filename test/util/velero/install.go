@@ -183,7 +183,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 			WithoutDisableInformerCacheParam: veleroCfg.WithoutDisableInformerCacheParam,
 		},
 	); err != nil {
-		time.Sleep(9 * time.Hour)
+		time.Sleep(1 * time.Minute)
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
@@ -432,6 +432,26 @@ func createVeleroResources(ctx context.Context, cli, namespace string, args []st
 	if err = cmd.Run(); err != nil {
 		return errors.Wrapf(err, "failed to wait the CRDs be ready")
 	}
+
+	// Wait the Velero CRD API endpoint is ready
+	wait.PollUntilContextTimeout(ctx, k8s.PollInterval, time.Minute, true, func(ctx context.Context) (bool, error) {
+		v1VerifyCmd := exec.CommandContext(ctx, "kubectl", "get", "--raw", "/apis/velero.io/v1")
+		v1VerifyCmd.Stdout = os.Stdout
+		v1VerifyCmd.Stderr = os.Stderr
+		if err := v1VerifyCmd.Run(); err != nil {
+			fmt.Printf("/apis/velero.io/v1 is not ready: %s.\n", err.Error())
+			return false, nil
+		}
+
+		v2alpha1VerifyCmd := exec.CommandContext(ctx, "kubectl", "get", "--raw", "/apis/velero.io/v2alpha1")
+		v2alpha1VerifyCmd.Stdout = os.Stdout
+		v2alpha1VerifyCmd.Stderr = os.Stderr
+		if err := v2alpha1VerifyCmd.Run(); err != nil {
+			fmt.Printf("/apis/velero.io/v2alpha1 is not ready: %s.\n", err.Error())
+			return false, nil
+		}
+		return true, nil
+	})
 
 	// remove the "--crds-only" option from the args
 	args = args[:len(args)-1]
