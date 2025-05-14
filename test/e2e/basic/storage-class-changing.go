@@ -82,7 +82,7 @@ func (s *StorageClasssChanging) CreateResources() error {
 		Expect(err).To(Succeed())
 		vols := CreateVolumes(pvc.Name, []string{s.volume})
 
-		deployment := NewDeployment(s.CaseBaseName, s.namespace, 1, label, nil).WithVolume(vols).Result()
+		deployment := NewDeployment(s.CaseBaseName, s.namespace, 1, label, s.VeleroCfg.ImageRegistryProxy).WithVolume(vols).Result()
 		deployment, err = CreateDeployment(s.Client.ClientGo, s.namespace, deployment)
 		Expect(err).To(Succeed())
 		s.deploymentName = deployment.Name

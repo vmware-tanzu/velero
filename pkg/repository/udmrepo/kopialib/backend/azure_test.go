@@ -20,6 +20,8 @@ import (
 	"context"
 	"testing"
 
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+
 	"github.com/kopia/kopia/repo/blob/throttling"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,6 +31,7 @@ import (
 
 func TestAzureSetup(t *testing.T) {
 	backend := AzureBackend{}
+	logger := velerotest.NewLogger()
 
 	flags := map[string]string{
 		"key":                             "value",
@@ -40,7 +43,7 @@ func TestAzureSetup(t *testing.T) {
 		UploadBytesPerSecond: 200,
 	}
 
-	err := backend.Setup(context.Background(), flags)
+	err := backend.Setup(context.Background(), flags, logger)
 	require.NoError(t, err)
 	assert.Equal(t, flags, backend.option.Config)
 	assert.Equal(t, limits, backend.option.Limits)

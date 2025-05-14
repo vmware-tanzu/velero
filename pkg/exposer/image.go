@@ -36,6 +36,8 @@ type inheritedPodInfo struct {
 	volumes        []corev1api.Volume
 	logLevelArgs   []string
 	logFormatArgs  []string
+	dnsPolicy      corev1api.DNSPolicy
+	dnsConfig      *corev1api.PodDNSConfig
 }
 
 func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veleroNamespace string, osType string) (inheritedPodInfo, error) {
@@ -57,6 +59,9 @@ func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veler
 	podInfo.envFrom = podSpec.Containers[0].EnvFrom
 	podInfo.volumeMounts = podSpec.Containers[0].VolumeMounts
 	podInfo.volumes = podSpec.Volumes
+
+	podInfo.dnsPolicy = podSpec.DNSPolicy
+	podInfo.dnsConfig = podSpec.DNSConfig
 
 	args := podSpec.Containers[0].Args
 	for i, arg := range args {

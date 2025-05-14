@@ -84,7 +84,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 		}
 	}
 
-	pluginsTmp, err := getPlugins(ctx, *veleroCfg)
+	pluginsTmp, err := GetPlugins(ctx, *veleroCfg, true)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get provider plugins")
 	}
@@ -389,7 +389,10 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 	if options.ItemBlockWorkerCount > 1 {
 		args = append(args, fmt.Sprintf("--item-block-worker-count=%d", options.ItemBlockWorkerCount))
 	}
-	args = append(args, fmt.Sprintf("--backup-repository-configmap=%s", test.BackupRepositoryConfigName))
+
+	if options.BackupRepoConfigMap != "" {
+		args = append(args, fmt.Sprintf("--backup-repository-configmap=%s", options.BackupRepoConfigMap))
+	}
 
 	if err := createVeleroResources(ctx, cli, namespace, args, options); err != nil {
 		return err
