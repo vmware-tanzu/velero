@@ -84,6 +84,7 @@ func (s *InProgressCase) CreateResources() error {
 			[]string{s.volume},
 			nil,
 			s.podAnn,
+			s.VeleroCfg.ImageRegistryProxy,
 		)
 		Expect(err).To(Succeed())
 

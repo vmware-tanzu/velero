@@ -18,11 +18,12 @@ package k8s
 
 import (
 	"fmt"
+	"path"
 	"time"
 
 	"golang.org/x/net/context"
 	apps "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -36,6 +37,7 @@ const (
 	PollInterval         = 2 * time.Second
 	PollTimeout          = 15 * time.Minute
 	DefaultContainerName = "container-busybox"
+	TestImage            = "busybox:1.37.0"
 )
 
 // DeploymentBuilder builds Deployment objects.
@@ -48,29 +50,33 @@ func (d *DeploymentBuilder) Result() *apps.Deployment {
 }
 
 // newDeployment returns a RollingUpdate Deployment with a fake container image
-func NewDeployment(name, ns string, replicas int32, labels map[string]string, containers []v1.Container) *DeploymentBuilder {
-	if containers == nil {
-		containers = []v1.Container{
-			{
-				Name:    DefaultContainerName,
-				Image:   "busybox:1.37.0",
-				Command: []string{"sleep", "1000000"},
-				// Make pod obeys the restricted pod security standards.
-				SecurityContext: &v1.SecurityContext{
-					AllowPrivilegeEscalation: boolptr.False(),
-					Capabilities: &v1.Capabilities{
-						Drop: []v1.Capability{"ALL"},
-					},
-					RunAsNonRoot: boolptr.True(),
-					RunAsUser:    func(i int64) *int64 { return &i }(65534),
-					RunAsGroup:   func(i int64) *int64 { return &i }(65534),
-					SeccompProfile: &v1.SeccompProfile{
-						Type: v1.SeccompProfileTypeRuntimeDefault,
-					},
+func NewDeployment(name, ns string, replicas int32, labels map[string]string, imageRegistryProxy string) *DeploymentBuilder {
+	imageAddress := TestImage
+	if imageRegistryProxy != "" {
+		imageAddress = path.Join(imageRegistryProxy, TestImage)
+	}
+
+	containers := []corev1api.Container{
+		{
+			Name:    DefaultContainerName,
+			Image:   imageAddress,
+			Command: []string{"sleep", "1000000"},
+			// Make pod obeys the restricted pod security standards.
+			SecurityContext: &corev1api.SecurityContext{
+				AllowPrivilegeEscalation: boolptr.False(),
+				Capabilities: &corev1api.Capabilities{
+					Drop: []corev1api.Capability{"ALL"},
+				},
+				RunAsNonRoot: boolptr.True(),
+				RunAsUser:    func(i int64) *int64 { return &i }(65534),
+				RunAsGroup:   func(i int64) *int64 { return &i }(65534),
+				SeccompProfile: &corev1api.SeccompProfile{
+					Type: corev1api.SeccompProfileTypeRuntimeDefault,
 				},
 			},
-		}
+		},
 	}
+
 	return &DeploymentBuilder{
 		&apps.Deployment{
 			TypeMeta: metav1.TypeMeta{
@@ -89,14 +95,14 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string, co
 					Type:          apps.RollingUpdateDeploymentStrategyType,
 					RollingUpdate: new(apps.RollingUpdateDeployment),
 				},
-				Template: v1.PodTemplateSpec{
+				Template: corev1api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: labels,
 					},
-					Spec: v1.PodSpec{
-						SecurityContext: &v1.PodSecurityContext{
+					Spec: corev1api.PodSpec{
+						SecurityContext: &corev1api.PodSecurityContext{
 							FSGroup:             func(i int64) *int64 { return &i }(65534),
-							FSGroupChangePolicy: func(policy v1.PodFSGroupChangePolicy) *v1.PodFSGroupChangePolicy { return &policy }(v1.FSGroupChangeAlways),
+							FSGroupChangePolicy: func(policy corev1api.PodFSGroupChangePolicy) *corev1api.PodFSGroupChangePolicy { return &policy }(corev1api.FSGroupChangeAlways),
 						},
 						Containers: containers,
 					},
@@ -106,10 +112,10 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string, co
 	}
 }
 
-func (d *DeploymentBuilder) WithVolume(volumes []*v1.Volume) *DeploymentBuilder {
-	vmList := []v1.VolumeMount{}
+func (d *DeploymentBuilder) WithVolume(volumes []*corev1api.Volume) *DeploymentBuilder {
+	vmList := []corev1api.VolumeMount{}
 	for _, v := range volumes {
-		vmList = append(vmList, v1.VolumeMount{
+		vmList = append(vmList, corev1api.VolumeMount{
 			Name:      v.Name,
 			MountPath: "/" + v.Name,
 		})

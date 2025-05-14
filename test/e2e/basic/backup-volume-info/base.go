@@ -121,7 +121,7 @@ func (v *BackupVolumeInfo) CreateResources() error {
 			volumeName := fmt.Sprintf("volume-info-pv-%d", i)
 			vols = append(vols, CreateVolumes(pvc.Name, []string{volumeName})...)
 		}
-		deployment := NewDeployment(v.CaseBaseName, createNSName, 1, labels, nil).WithVolume(vols).Result()
+		deployment := NewDeployment(v.CaseBaseName, createNSName, 1, labels, v.VeleroCfg.ImageRegistryProxy).WithVolume(vols).Result()
 		deployment, err := CreateDeployment(v.Client.ClientGo, createNSName, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", createNSName))

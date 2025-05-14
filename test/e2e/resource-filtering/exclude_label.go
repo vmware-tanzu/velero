@@ -88,7 +88,7 @@ func (e *ExcludeFromBackup) CreateResources() error {
 	}
 	//Create deployment: to be included
 	fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
-	deployment := NewDeployment(e.CaseBaseName, namespace, e.replica, label2, nil).Result()
+	deployment := NewDeployment(e.CaseBaseName, namespace, e.replica, label2, e.VeleroCfg.ImageRegistryProxy).Result()
 	deployment, err := CreateDeployment(e.Client.ClientGo, namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))
