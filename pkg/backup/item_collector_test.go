@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -152,20 +153,24 @@ func TestFilterNamespaces(t *testing.T) {
 }
 
 func TestItemCollectorBackupNamespaces(t *testing.T) {
+	mockConverter := new(test.FakeUnstructuredConverter)
+	mockConverter.On("FromUnstructured", mock.Anything, mock.Anything).Return(fmt.Errorf("conversion error"))
+
 	tests := []struct {
 		name              string
 		ie                *collections.IncludesExcludes
 		namespaces        []*corev1api.Namespace
 		backup            *velerov1api.Backup
 		expectedTrackedNS []string
+		converter         runtime.UnstructuredConverter
 	}{
 		{
 			name:   "ns filter by namespace IE filter",
 			backup: builder.ForBackup("velero", "backup").Result(),
 			ie:     collections.NewIncludesExcludes().Includes("ns1"),
 			namespaces: []*corev1api.Namespace{
-				builder.ForNamespace("ns1").Result(),
-				builder.ForNamespace("ns2").Result(),
+				builder.ForNamespace("ns1").Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1"},
 		},
@@ -176,8 +181,8 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 			}).Result(),
 			ie: collections.NewIncludesExcludes().Includes("*"),
 			namespaces: []*corev1api.Namespace{
-				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
-				builder.ForNamespace("ns2").Result(),
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1"},
 		},
@@ -188,8 +193,8 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 			}).Result(),
 			ie: collections.NewIncludesExcludes().Includes("*"),
 			namespaces: []*corev1api.Namespace{
-				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
-				builder.ForNamespace("ns2").Result(),
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1"},
 		},
@@ -200,8 +205,8 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 			}).Result(),
 			ie: collections.NewIncludesExcludes().Excludes("ns1"),
 			namespaces: []*corev1api.Namespace{
-				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
-				builder.ForNamespace("ns2").Result(),
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1"},
 		},
@@ -212,9 +217,9 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 			}).Result(),
 			ie: collections.NewIncludesExcludes().Excludes("ns1", "ns2"),
 			namespaces: []*corev1api.Namespace{
-				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
-				builder.ForNamespace("ns2").Result(),
-				builder.ForNamespace("ns3").Result(),
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns3").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1", "ns3"},
 		},
@@ -223,8 +228,8 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 			backup: builder.ForBackup("velero", "backup").Result(),
 			ie:     collections.NewIncludesExcludes().Includes("*"),
 			namespaces: []*corev1api.Namespace{
-				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
-				builder.ForNamespace("ns2").Result(),
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1", "ns2"},
 		},
@@ -233,11 +238,32 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 			backup: builder.ForBackup("velero", "backup").IncludedNamespaces("ns1", "invalid", "*").Result(),
 			ie:     collections.NewIncludesExcludes().Includes("ns1", "invalid", "*"),
 			namespaces: []*corev1api.Namespace{
-				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Result(),
-				builder.ForNamespace("ns2").Result(),
-				builder.ForNamespace("ns3").Result(),
+				builder.ForNamespace("ns1").ObjectMeta(builder.WithLabels("name", "ns1")).Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns3").Phase(corev1api.NamespaceActive).Result(),
 			},
 			expectedTrackedNS: []string{"ns1"},
+		},
+		{
+			name:   "terminating ns should not tracked",
+			backup: builder.ForBackup("velero", "backup").Result(),
+			ie:     collections.NewIncludesExcludes().Includes("ns1", "ns2"),
+			namespaces: []*corev1api.Namespace{
+				builder.ForNamespace("ns1").Phase(corev1api.NamespaceTerminating).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
+			},
+			expectedTrackedNS: []string{"ns2"},
+		},
+		{
+			name:   "fail to convert the namespace",
+			backup: builder.ForBackup("velero", "backup").Result(),
+			ie:     collections.NewIncludesExcludes().Includes("ns1", "ns2"),
+			namespaces: []*corev1api.Namespace{
+				builder.ForNamespace("ns1").Phase(corev1api.NamespaceActive).Result(),
+				builder.ForNamespace("ns2").Phase(corev1api.NamespaceActive).Result(),
+			},
+			expectedTrackedNS: []string{},
+			converter:         mockConverter,
 		},
 	}
 
@@ -274,6 +300,10 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 				dir:            tempDir,
 			}
 
+			if tc.converter == nil {
+				tc.converter = runtime.DefaultUnstructuredConverter
+			}
+
 			r.collectNamespaces(
 				metav1.APIResource{
 					Name:       "Namespace",
@@ -284,6 +314,7 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 				kuberesource.Namespaces,
 				kuberesource.Namespaces.WithVersion(""),
 				logrus.StandardLogger(),
+				tc.converter,
 			)
 
 			for _, ns := range tc.expectedTrackedNS {
