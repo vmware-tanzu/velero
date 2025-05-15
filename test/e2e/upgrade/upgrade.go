@@ -161,7 +161,7 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			tmpCfg.UpgradeFromVeleroVersion = veleroCLI2Version.VeleroVersion
 
 			By("Create namespace for sample workload", func() {
-				Expect(CreateNamespace(oneHourTimeout, *veleroCfg.ClientToInstallVelero, upgradeNamespace)).To(Succeed(),
+				Expect(CreateNamespace(oneHourTimeout, *veleroCfg.ClientToInstallVelero, upgradeNamespace, false)).To(Succeed(),
 					fmt.Sprintf("Failed to create namespace %s to install Kibishii workload", upgradeNamespace))
 			})
 

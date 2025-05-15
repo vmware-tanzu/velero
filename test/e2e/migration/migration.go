@@ -181,6 +181,7 @@ func (m *migrationE2E) Backup() error {
 			m.Ctx,
 			*m.VeleroCfg.DefaultClient,
 			m.CaseBaseName,
+			false,
 		)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s to install Kibishii workload",
 				m.CaseBaseName))

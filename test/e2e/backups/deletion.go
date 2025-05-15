@@ -101,7 +101,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupLoc
 	registryCredentialFile := veleroCfg.RegistryCredentialFile
 	veleroFeatures := veleroCfg.Features
 	for _, ns := range workloadNamespaceList {
-		if err := CreateNamespace(oneHourTimeout, client, ns); err != nil {
+		if err := CreateNamespace(oneHourTimeout, client, ns, false); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", ns)
 		}
 

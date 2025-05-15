@@ -96,7 +96,7 @@ func RunKibishiiTests(
 			fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", kibishiiNamespace))
 		}
 	}
-	if err := CreateNamespace(oneHourTimeout, client, kibishiiNamespace); err != nil {
+	if err := CreateNamespace(oneHourTimeout, client, kibishiiNamespace, false); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", kibishiiNamespace)
 	}
 	defer func() {
@@ -326,12 +326,6 @@ func installKibishii(
 		return errors.Wrapf(err, "failed to install kibishii, stderr=%s", stderr)
 	}
 
-	labelNamespaceCmd := exec.CommandContext(ctx, "kubectl", "label", "namespace", namespace, "pod-security.kubernetes.io/enforce=baseline", "pod-security.kubernetes.io/enforce-version=latest", "--overwrite=true")
-	_, stderr, err = veleroexec.RunCommand(labelNamespaceCmd)
-	fmt.Printf("Label namespace with PSA policy: %s\n", labelNamespaceCmd)
-	if err != nil {
-		return errors.Wrapf(err, "failed to label namespace with PSA policy, stderr=%s", stderr)
-	}
 	if workerReplicas != DefaultKibishiiWorkerCounts {
 		err = ScaleStatefulSet(ctx, namespace, "kibishii-deployment", workerReplicas)
 		if err != nil {

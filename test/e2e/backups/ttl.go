@@ -95,7 +95,7 @@ func TTLTest() {
 		ctx, ctxCancel := context.WithTimeout(context.Background(), 1*time.Hour)
 		defer ctxCancel()
 		By(fmt.Sprintf("Prepare workload as target to backup by creating namespace %s namespace", test.testNS), func() {
-			Expect(CreateNamespace(ctx, client, test.testNS)).To(Succeed(),
+			Expect(CreateNamespace(ctx, client, test.testNS, false)).To(Succeed(),
 				fmt.Sprintf("Failed to create %s namespace", test.testNS))
 		})
 

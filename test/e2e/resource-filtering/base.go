@@ -63,7 +63,7 @@ func (f *FilteringCase) CreateResources() error {
 	for nsNum := 0; nsNum < f.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", f.CaseBaseName, nsNum)
 		fmt.Printf("Creating resources in namespace ...%s\n", namespace)
-		if err := CreateNamespace(f.Ctx, f.Client, namespace); err != nil {
+		if err := CreateNamespace(f.Ctx, f.Client, namespace, false); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
 		//Create deployment

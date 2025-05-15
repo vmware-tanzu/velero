@@ -73,7 +73,7 @@ func (s *StorageClasssChanging) CreateResources() error {
 	}
 
 	By(fmt.Sprintf("Create namespace %s", s.namespace), func() {
-		Expect(CreateNamespace(s.Ctx, s.Client, s.namespace)).To(Succeed(),
+		Expect(CreateNamespace(s.Ctx, s.Client, s.namespace, false)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", s.namespace))
 	})
 
