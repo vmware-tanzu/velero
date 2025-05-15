@@ -240,6 +240,12 @@ func (b *BackupBuilder) TTL(ttl time.Duration) *BackupBuilder {
 	return b
 }
 
+// VolumeGroupSnapshotLabelKey sets the label key to group PVCs for VolumeGroupSnapshot.
+func (b *BackupBuilder) VolumeGroupSnapshotLabelKey(labelKey string) *BackupBuilder {
+	b.object.Spec.VolumeGroupSnapshotLabelKey = labelKey
+	return b
+}
+
 // Expiration sets the Backup's expiration.
 func (b *BackupBuilder) Expiration(val time.Time) *BackupBuilder {
 	b.object.Status.Expiration = &metav1.Time{Time: val}
