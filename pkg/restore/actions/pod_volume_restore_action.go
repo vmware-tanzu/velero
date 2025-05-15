@@ -112,88 +112,117 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 		podVolumeBackups = append(podVolumeBackups, &podVolumeBackupList.Items[i])
 	}
 	volumeSnapshots := podvolume.GetVolumeBackupsForPod(podVolumeBackups, &pod, podFromBackup.Namespace)
+	
+	// Default to not needing file system restore
+	needsFileSystemRestore := false
+	
 	if len(volumeSnapshots) == 0 {
 		log.Debug("No pod volume backups found for pod")
-		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
+	} else {
+		log.Info("Pod volume backups for pod found")
+
+		// Check if any of the volumes need file system restores
+		// If the restore is using native datamover or CSI, we don't need the init container
+		for volumeName := range volumeSnapshots {
+			// Check if this volume exists in the backup's PVCs
+			for _, pvb := range podVolumeBackups {
+				if pvb.Spec.Volume == volumeName && pvb.Spec.Pod.Namespace == podFromBackup.Namespace && pvb.Spec.Pod.Name == pod.Name {
+					// If we find a matching PVB for this volume, it means this volume needs file system restore
+					needsFileSystemRestore = true
+					break
+				}
+			}
+			if needsFileSystemRestore {
+				break
+			}
+		}
 	}
 
-	log.Info("Pod volume backups for pod found")
 
-	// TODO we might want/need to get plugin config at the top of this method at some point; for now, wait
-	// until we know we're doing a restore before getting config.
-	log.Debugf("Getting plugin config")
-	config, err := common.GetPluginConfig(common.PluginKindRestoreItemAction, "velero.io/pod-volume-restore", a.client)
-	if err != nil {
-		return nil, err
-	}
-
-	image := getImage(log, config, a.veleroImage)
-	log.Infof("Using image %q", image)
-
-	cpuRequest, memRequest := getResourceRequests(log, config)
-	cpuLimit, memLimit := getResourceLimits(log, config)
-	if cpuRequest == "" {
-		cpuRequest = defaultCPURequestLimit
-	}
-	if cpuLimit == "" {
-		cpuLimit = defaultCPURequestLimit
-	}
-	if memRequest == "" {
-		memRequest = defaultMemRequestLimit
-	}
-	if memLimit == "" {
-		memLimit = defaultMemRequestLimit
-	}
-
-	resourceReqs, err := kube.ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit)
-	if err != nil {
-		log.Errorf("couldn't parse resource requirements: %s.", err)
-		resourceReqs, _ = kube.ParseResourceRequirements(
-			defaultCPURequestLimit, defaultMemRequestLimit, // requests
-			defaultCPURequestLimit, defaultMemRequestLimit, // limits
-		)
-	}
-
-	runAsUser, runAsGroup, allowPrivilegeEscalation, secCtx := getSecurityContext(log, config)
-
-	var securityContext corev1api.SecurityContext
-	securityContextSet := false
-	// Use securityContext settings from configmap if available
-	if runAsUser != "" || runAsGroup != "" || allowPrivilegeEscalation != "" || secCtx != "" {
-		securityContext, err = kube.ParseSecurityContext(runAsUser, runAsGroup, allowPrivilegeEscalation, secCtx)
+	if !needsFileSystemRestore {
+		log.Info("Pod volumes don't need file system restore, removing restore-wait init container if it exists")
+		
+		// Check if the restore-wait init container exists and remove it
+		if len(pod.Spec.InitContainers) > 0 && (pod.Spec.InitContainers[0].Name == restorehelper.WaitInitContainer || pod.Spec.InitContainers[0].Name == restorehelper.WaitInitContainerLegacy) {
+			pod.Spec.InitContainers = pod.Spec.InitContainers[1:]
+			log.Info("Removed restore-wait init container")
+		}
+	} else {
+		// Only get plugin config and add init container if we need file system restore
+		log.Debugf("Getting plugin config")
+		config, err := common.GetPluginConfig(common.PluginKindRestoreItemAction, "velero.io/pod-volume-restore", a.client)
 		if err != nil {
-			log.Errorf("Using default securityContext values, couldn't parse securityContext requirements: %s.", err)
-		} else {
+			return nil, err
+		}
+
+		image := getImage(log, config, a.veleroImage)
+		log.Infof("Using image %q", image)
+
+		cpuRequest, memRequest := getResourceRequests(log, config)
+		cpuLimit, memLimit := getResourceLimits(log, config)
+		if cpuRequest == "" {
+			cpuRequest = defaultCPURequestLimit
+		}
+		if cpuLimit == "" {
+			cpuLimit = defaultCPURequestLimit
+		}
+		if memRequest == "" {
+			memRequest = defaultMemRequestLimit
+		}
+		if memLimit == "" {
+			memLimit = defaultMemRequestLimit
+		}
+
+		resourceReqs, err := kube.ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit)
+		if err != nil {
+			log.Errorf("couldn't parse resource requirements: %s.", err)
+			resourceReqs, _ = kube.ParseResourceRequirements(
+				defaultCPURequestLimit, defaultMemRequestLimit, // requests
+				defaultCPURequestLimit, defaultMemRequestLimit, // limits
+			)
+		}
+
+		runAsUser, runAsGroup, allowPrivilegeEscalation, secCtx := getSecurityContext(log, config)
+
+		var securityContext corev1api.SecurityContext
+		securityContextSet := false
+		// Use securityContext settings from configmap if available
+		if runAsUser != "" || runAsGroup != "" || allowPrivilegeEscalation != "" || secCtx != "" {
+			securityContext, err = kube.ParseSecurityContext(runAsUser, runAsGroup, allowPrivilegeEscalation, secCtx)
+			if err != nil {
+				log.Errorf("Using default securityContext values, couldn't parse securityContext requirements: %s.", err)
+			} else {
+				securityContextSet = true
+			}
+		}
+		// if first container in pod has a SecurityContext set, then copy this security context
+		if len(pod.Spec.Containers) != 0 && pod.Spec.Containers[0].SecurityContext != nil {
+			securityContext = *pod.Spec.Containers[0].SecurityContext.DeepCopy()
 			securityContextSet = true
 		}
-	}
-	// if first container in pod has a SecurityContext set, then copy this security context
-	if len(pod.Spec.Containers) != 0 && pod.Spec.Containers[0].SecurityContext != nil {
-		securityContext = *pod.Spec.Containers[0].SecurityContext.DeepCopy()
-		securityContextSet = true
-	}
-	if !securityContextSet {
-		securityContext = defaultSecurityCtx()
-	}
-
-	initContainerBuilder := newRestoreInitContainerBuilder(image, string(input.Restore.UID))
-	initContainerBuilder.Resources(&resourceReqs)
-	initContainerBuilder.SecurityContext(&securityContext)
-
-	for volumeName := range volumeSnapshots {
-		mount := &corev1api.VolumeMount{
-			Name:      volumeName,
-			MountPath: "/restores/" + volumeName,
+		if !securityContextSet {
+			securityContext = defaultSecurityCtx()
 		}
-		initContainerBuilder.VolumeMounts(mount)
-	}
-	initContainerBuilder.Command(getCommand(log, config))
 
-	initContainer := *initContainerBuilder.Result()
-	if len(pod.Spec.InitContainers) == 0 || (pod.Spec.InitContainers[0].Name != restorehelper.WaitInitContainer && pod.Spec.InitContainers[0].Name != restorehelper.WaitInitContainerLegacy) {
-		pod.Spec.InitContainers = append([]corev1api.Container{initContainer}, pod.Spec.InitContainers...)
-	} else {
-		pod.Spec.InitContainers[0] = initContainer
+		initContainerBuilder := newRestoreInitContainerBuilder(image, string(input.Restore.UID))
+		initContainerBuilder.Resources(&resourceReqs)
+		initContainerBuilder.SecurityContext(&securityContext)
+
+		for volumeName := range volumeSnapshots {
+			mount := &corev1api.VolumeMount{
+				Name:      volumeName,
+				MountPath: "/restores/" + volumeName,
+			}
+			initContainerBuilder.VolumeMounts(mount)
+		}
+		initContainerBuilder.Command(getCommand(log, config))
+
+		initContainer := *initContainerBuilder.Result()
+		if len(pod.Spec.InitContainers) == 0 || (pod.Spec.InitContainers[0].Name != restorehelper.WaitInitContainer && pod.Spec.InitContainers[0].Name != restorehelper.WaitInitContainerLegacy) {
+			pod.Spec.InitContainers = append([]corev1api.Container{initContainer}, pod.Spec.InitContainers...)
+		} else {
+			pod.Spec.InitContainers[0] = initContainer
+		}
 	}
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pod)
