@@ -202,9 +202,8 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				log.Warnf("expose snapshot with err %v but it may caused by clean up resources in cancel action", err)
 				r.restoreExposer.CleanUp(ctx, getDataDownloadOwnerObject(dd))
 				return ctrl.Result{}, nil
-			} else {
-				return r.errorOut(ctx, dd, err, "error to expose snapshot", log)
 			}
+			return r.errorOut(ctx, dd, err, "error to expose snapshot", log)
 		}
 		log.Info("Restore is exposed")
 
@@ -279,9 +278,8 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			if err == datapath.ConcurrentLimitExceed {
 				log.Info("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
-			} else {
-				return r.errorOut(ctx, dd, err, "error to create data path", log)
 			}
+			return r.errorOut(ctx, dd, err, "error to create data path", log)
 		}
 
 		if err := r.initCancelableDataPath(ctx, asyncBR, result, log); err != nil {
@@ -338,20 +336,19 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 
 		return ctrl.Result{}, nil
-	} else {
-		// put the finalizer remove action here for all cr will goes to the final status, we could check finalizer and do remove action in final status
-		// instead of intermediate state
-		// remove finalizer no matter whether the cr is being deleted or not for it is no longer needed when internal resources are all cleaned up
-		// also in final status cr won't block the direct delete of the velero namespace
-		if isDataDownloadInFinalState(dd) && controllerutil.ContainsFinalizer(dd, DataUploadDownloadFinalizer) {
-			original := dd.DeepCopy()
-			controllerutil.RemoveFinalizer(dd, DataUploadDownloadFinalizer)
-			if err := r.client.Patch(ctx, dd, client.MergeFrom(original)); err != nil {
-				log.WithError(err).Error("error to remove finalizer")
-			}
-		}
-		return ctrl.Result{}, nil
 	}
+	// put the finalizer remove action here for all cr will goes to the final status, we could check finalizer and do remove action in final status
+	// instead of intermediate state
+	// remove finalizer no matter whether the cr is being deleted or not for it is no longer needed when internal resources are all cleaned up
+	// also in final status cr won't block the direct delete of the velero namespace
+	if isDataDownloadInFinalState(dd) && controllerutil.ContainsFinalizer(dd, DataUploadDownloadFinalizer) {
+		original := dd.DeepCopy()
+		controllerutil.RemoveFinalizer(dd, DataUploadDownloadFinalizer)
+		if err := r.client.Patch(ctx, dd, client.MergeFrom(original)); err != nil {
+			log.WithError(err).Error("error to remove finalizer")
+		}
+	}
+	return ctrl.Result{}, nil
 }
 
 func (r *DataDownloadReconciler) initCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, res *exposer.ExposeResult, log logrus.FieldLogger) error {
@@ -706,9 +703,8 @@ func (r *DataDownloadReconciler) exclusiveUpdateDataDownload(ctx context.Context
 	// it won't rollback dd in memory when error
 	if apierrors.IsConflict(err) {
 		return false, nil
-	} else {
-		return false, err
 	}
+	return false, err
 }
 
 func (r *DataDownloadReconciler) getTargetPVC(ctx context.Context, dd *velerov2alpha1api.DataDownload) (*corev1api.PersistentVolumeClaim, error) {
@@ -818,9 +814,8 @@ func UpdateDataDownloadWithRetry(ctx context.Context, client client.Client, name
 				if apierrors.IsConflict(err) {
 					log.Warnf("failed to update datadownload for %s/%s and will retry it", dd.Namespace, dd.Name)
 					return false, nil
-				} else {
-					return false, errors.Wrapf(err, "error updating datadownload %s/%s", dd.Namespace, dd.Name)
 				}
+				return false, errors.Wrapf(err, "error updating datadownload %s/%s", dd.Namespace, dd.Name)
 			}
 		}
 
