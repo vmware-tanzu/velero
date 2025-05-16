@@ -431,6 +431,12 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 	// Get the service account from the Velero server deployment
 	serviceAccount := veleroutil.GetServiceAccountFromVeleroServer(deployment)
 
+	// Get the security context from the Velero server deployment
+	securityContext := veleroutil.GetContainerSecurityContextsFromVeleroServer(deployment)
+
+	// Get the pod security context from the Velero server deployment
+	podSecurityContext := veleroutil.GetPodSecurityContextsFromVeleroServer(deployment)
+
 	// Get image
 	image := veleroutil.GetVeleroServerImage(deployment)
 
@@ -506,10 +512,12 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 							EnvFrom:                  envFromSources,
 							VolumeMounts:             volumeMounts,
 							Resources:                resources,
+							SecurityContext:          securityContext,
 							TerminationMessagePolicy: corev1api.TerminationMessageFallbackToLogsOnError,
 						},
 					},
 					RestartPolicy:      corev1api.RestartPolicyNever,
+					SecurityContext:    podSecurityContext,
 					Volumes:            volumes,
 					ServiceAccountName: serviceAccount,
 					Tolerations: []corev1api.Toleration{
