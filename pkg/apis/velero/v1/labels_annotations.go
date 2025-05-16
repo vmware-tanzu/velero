@@ -101,6 +101,9 @@ const (
 	// ExcludeFromBackupLabel is the label to exclude k8s resource from backup,
 	// even if the resource contains a matching selector label.
 	ExcludeFromBackupLabel = "velero.io/exclude-from-backup"
+
+	// defaultVGSLabelKey is the default label key used to group PVCs under a VolumeGroupSnapshot
+	DefaultVGSLabelKey = "velero.io/volume-group"
 )
 
 type AsyncOperationIDPrefix string
