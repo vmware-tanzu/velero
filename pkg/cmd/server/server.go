@@ -634,6 +634,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.DefaultBackupLocation,
 			s.config.DefaultVolumesToFsBackup,
 			s.config.DefaultBackupTTL,
+			s.config.DefaultVGSLabelKey,
 			s.config.DefaultCSISnapshotTimeout,
 			s.config.ResourceTimeout,
 			s.config.DefaultItemOperationTimeout,
