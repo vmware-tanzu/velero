@@ -110,6 +110,7 @@ func TTLTest() {
 				veleroCfg.KibishiiDirectory,
 				DefaultKibishiiData,
 				veleroCfg.ImageRegistryProxy,
+				veleroCfg.WorkerOS,
 			)).To(Succeed())
 		})
 

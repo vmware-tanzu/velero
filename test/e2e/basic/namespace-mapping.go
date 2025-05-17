@@ -101,6 +101,7 @@ func (n *NamespaceMapping) CreateResources() error {
 				n.VeleroCfg.KibishiiDirectory,
 				n.kibishiiData,
 				n.VeleroCfg.ImageRegistryProxy,
+				n.VeleroCfg.WorkerOS,
 			)).To(Succeed())
 		})
 	}
@@ -111,8 +112,14 @@ func (n *NamespaceMapping) Verify() error {
 	for index, ns := range n.MappedNamespaceList {
 		n.kibishiiData.Levels = len(*n.NSIncluded) + index
 		By(fmt.Sprintf("Verify workload %s after restore ", ns), func() {
-			Expect(KibishiiVerifyAfterRestore(n.Client, ns,
-				n.Ctx, n.kibishiiData, "")).To(Succeed(), "Fail to verify workload after restore")
+			Expect(KibishiiVerifyAfterRestore(
+				n.Client,
+				ns,
+				n.Ctx,
+				n.kibishiiData,
+				"",
+				n.VeleroCfg.WorkerOS,
+			)).To(Succeed(), "Fail to verify workload after restore")
 		})
 	}
 	for _, ns := range *n.NSIncluded {

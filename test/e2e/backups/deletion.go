@@ -125,6 +125,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupLoc
 			kibishiiDirectory,
 			DefaultKibishiiData,
 			veleroCfg.ImageRegistryProxy,
+			veleroCfg.WorkerOS,
 		); err != nil {
 			return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", ns)
 		}
