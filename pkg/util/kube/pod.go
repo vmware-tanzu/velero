@@ -34,6 +34,9 @@ import (
 type LoadAffinity struct {
 	// NodeSelector specifies the label selector to match nodes
 	NodeSelector metav1.LabelSelector `json:"nodeSelector"`
+
+	// StorageClass specifies the VGDPs the LoadAffinity applied to. If the StorageClass doesn't have value, it applies to all. If not, it applies to only the VGDPs that use this StorageClass.
+	StorageClass string `json:"storageClass"`
 }
 
 type PodResources struct {
