@@ -74,7 +74,7 @@ type DataUploadReconciler struct {
 	logger              logrus.FieldLogger
 	snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
 	dataPathMgr         *datapath.Manager
-	loadAffinity        *kube.LoadAffinity
+	loadAffinity        []*kube.LoadAffinity
 	backupPVCConfig     map[string]nodeagent.BackupPVC
 	podResources        corev1api.ResourceRequirements
 	preparingTimeout    time.Duration
@@ -88,7 +88,7 @@ func NewDataUploadReconciler(
 	kubeClient kubernetes.Interface,
 	csiSnapshotClient snapshotter.SnapshotV1Interface,
 	dataPathMgr *datapath.Manager,
-	loadAffinity *kube.LoadAffinity,
+	loadAffinity []*kube.LoadAffinity,
 	backupPVCConfig map[string]nodeagent.BackupPVC,
 	podResources corev1api.ResourceRequirements,
 	clock clocks.WithTickerAndDelayedExecution,
