@@ -65,7 +65,7 @@ endif
 BUILDER_IMAGE := $(REGISTRY)/build-image:$(BUILDER_IMAGE_TAG)
 BUILDER_IMAGE_CACHED := $(shell docker images -q ${BUILDER_IMAGE} 2>/dev/null )
 
-HUGO_IMAGE := hugo-builder
+HUGO_IMAGE := ghcr.io/gohugoio/hugo
 
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
@@ -451,7 +451,7 @@ release:
 serve-docs: build-image-hugo
 	docker run \
 	--rm \
-	-v "$$(pwd)/site:/srv/hugo" \
+	-v "$$(pwd)/site:/project" \
 	-it -p 1313:1313 \
 	$(HUGO_IMAGE) \
 	server --bind=0.0.0.0 --enableGitInfo=false

@@ -278,9 +278,9 @@ func (s *nodeAgentServer) run() {
 
 	s.logger.Info("Starting controllers")
 
-	var loadAffinity *kube.LoadAffinity
+	var loadAffinity []*kube.LoadAffinity
 	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
-		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
+		loadAffinity = s.dataPathConfigs.LoadAffinity
 		s.logger.Infof("Using customized loadAffinity %v", loadAffinity)
 	}
 
@@ -339,7 +339,20 @@ func (s *nodeAgentServer) run() {
 		s.logger.Infof("Using customized restorePVC config %v", restorePVCConfig)
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, restorePVCConfig, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(
+		s.mgr.GetClient(),
+		s.mgr,
+		s.kubeClient,
+		s.dataPathMgr,
+		loadAffinity,
+		restorePVCConfig,
+		podResources,
+		s.nodeName,
+		s.config.dataMoverPrepareTimeout,
+		s.logger,
+		s.metrics,
+	)
+
 	if err := dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}

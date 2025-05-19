@@ -64,6 +64,7 @@ type DataDownloadReconciler struct {
 	restoreExposer        exposer.GenericRestoreExposer
 	nodeName              string
 	dataPathMgr           *datapath.Manager
+	loadAffinity          []*kube.LoadAffinity
 	restorePVCConfig      nodeagent.RestorePVC
 	podResources          corev1api.ResourceRequirements
 	preparingTimeout      time.Duration
@@ -71,9 +72,19 @@ type DataDownloadReconciler struct {
 	cancelledDataDownload map[string]time.Time
 }
 
-func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
-	restorePVCConfig nodeagent.RestorePVC, podResources corev1api.ResourceRequirements, nodeName string, preparingTimeout time.Duration,
-	logger logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataDownloadReconciler {
+func NewDataDownloadReconciler(
+	client client.Client,
+	mgr manager.Manager,
+	kubeClient kubernetes.Interface,
+	dataPathMgr *datapath.Manager,
+	loadAffinity []*kube.LoadAffinity,
+	restorePVCConfig nodeagent.RestorePVC,
+	podResources corev1api.ResourceRequirements,
+	nodeName string,
+	preparingTimeout time.Duration,
+	logger logrus.FieldLogger,
+	metrics *metrics.ServerMetrics,
+) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:                client,
 		kubeClient:            kubeClient,
@@ -84,6 +95,7 @@ func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeCl
 		restoreExposer:        exposer.NewGenericRestoreExposer(kubeClient, logger),
 		restorePVCConfig:      restorePVCConfig,
 		dataPathMgr:           dataPathMgr,
+		loadAffinity:          loadAffinity,
 		podResources:          podResources,
 		preparingTimeout:      preparingTimeout,
 		metrics:               metrics,
@@ -828,6 +840,8 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		}
 	}
 
+	affinity := kube.GetLoadAffinityByStorageClass(r.loadAffinity, dd.Spec.BackupStorageLocation, log)
+
 	return exposer.GenericRestoreExposeParam{
 		TargetPVCName:         dd.Spec.TargetVolume.PVC,
 		TargetNamespace:       dd.Spec.TargetVolume.Namespace,
@@ -838,6 +852,7 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		ExposeTimeout:         r.preparingTimeout,
 		NodeOS:                nodeOS,
 		RestorePVCConfig:      r.restorePVCConfig,
+		LoadAffinity:          affinity,
 	}, nil
 }
 
