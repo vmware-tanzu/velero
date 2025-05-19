@@ -103,6 +103,9 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 	// DeletionPolicy to Retain.
 	resetVolumeSnapshotAnnotation(&vs)
 
+	// Set VolumeSnapshotClassName to nil to avoid dependent on VolumeSnapshotClass.
+	vs.Spec.VolumeSnapshotClassName = nil
+
 	vsMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&vs)
 	if err != nil {
 		p.log.Errorf("Fail to convert VS %s to unstructured", vs.Namespace+"/"+vs.Name)

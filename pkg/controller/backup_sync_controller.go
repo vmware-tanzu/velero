@@ -238,31 +238,6 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				log.Debug("Synced pod volume backup into cluster")
 			}
 		}
-
-		if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-			// we are syncing these objects only to ensure that the storage snapshots are cleaned up
-			// on backup deletion or expiry.
-			log.Info("Syncing CSI VolumeSnapshotClasses in backup")
-			vsClasses, err := backupStore.GetCSIVolumeSnapshotClasses(backupName)
-			if err != nil {
-				log.WithError(errors.WithStack(err)).Error("Error getting CSI VolumeSnapClasses for this backup from backup store")
-				continue
-			}
-			for _, vsClass := range vsClasses {
-				vsClass.ResourceVersion = ""
-				err := b.client.Create(ctx, vsClass, &client.CreateOptions{})
-				switch {
-				case err != nil && apierrors.IsAlreadyExists(err):
-					log.Debugf("VolumeSnapshotClass %s already exists in cluster", vsClass.Name)
-					continue
-				case err != nil && !apierrors.IsAlreadyExists(err):
-					log.WithError(errors.WithStack(err)).Errorf("Error syncing VolumeSnapshotClass %s into cluster", vsClass.Name)
-					continue
-				default:
-					log.Infof("Created CSI VolumeSnapshotClass %s", vsClass.Name)
-				}
-			}
-		}
 	}
 
 	b.deleteOrphanedBackups(ctx, location.Name, backupStoreBackups, log)
