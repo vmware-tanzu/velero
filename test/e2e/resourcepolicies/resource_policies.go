@@ -111,7 +111,7 @@ func (r *ResourcePoliciesCase) CreateResources() error {
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
 		By(fmt.Sprintf("Create namespaces %s for workload\n", namespace), func() {
-			Expect(CreateNamespace(r.Ctx, r.Client, namespace)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespace))
+			Expect(CreateNamespace(r.Ctx, r.Client, namespace, false)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespace))
 		})
 
 		volName := fmt.Sprintf("vol-%s-%00000d", r.CaseBaseName, nsNum)

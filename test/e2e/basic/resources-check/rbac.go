@@ -81,7 +81,7 @@ func (r *RBACCase) CreateResources() error {
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
 		fmt.Printf("Creating namespaces ...%s\n", createNSName)
-		if err := CreateNamespace(r.Ctx, r.Client, createNSName); err != nil {
+		if err := CreateNamespace(r.Ctx, r.Client, createNSName, false); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", createNSName)
 		}
 		serviceAccountName := fmt.Sprintf("service-account-%s-%00000d", r.CaseBaseName, nsNum)

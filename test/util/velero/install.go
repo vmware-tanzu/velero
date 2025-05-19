@@ -200,6 +200,7 @@ func generateVSpherePlugin(veleroCfg *test.VeleroConfig) error {
 		context.Background(),
 		*cli,
 		veleroCfg.VeleroNamespace,
+		true, // need to add PSA labels to Velero namespace.
 	); err != nil {
 		return errors.WithMessagef(
 			err,

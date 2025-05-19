@@ -148,7 +148,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			//label2 := "for!=1"
 			label2 := "for=2"
 			By("Create namespace for sample workload", func() {
-				Expect(CreateNamespace(oneHourTimeout, *veleroCfg.ClientToInstallVelero, bslDeletionTestNs)).To(Succeed())
+				Expect(CreateNamespace(oneHourTimeout, *veleroCfg.ClientToInstallVelero, bslDeletionTestNs, false)).To(Succeed())
 			})
 
 			By("Deploy sample workload of Kibishii", func() {

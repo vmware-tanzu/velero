@@ -64,7 +64,7 @@ func (n *NodePort) Init() error {
 func (n *NodePort) CreateResources() error {
 	for _, ns := range *n.NSIncluded {
 		By(fmt.Sprintf("Creating service %s in namespaces %s ......\n", n.serviceName, ns), func() {
-			Expect(CreateNamespace(n.Ctx, n.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
+			Expect(CreateNamespace(n.Ctx, n.Client, ns, false)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
 			Expect(createServiceWithNodeport(n.Ctx, n.Client, ns, n.serviceName, n.labels, 0)).To(Succeed(), fmt.Sprintf("Failed to create service %s", n.serviceName))
 			service, err := GetService(n.Ctx, n.Client, ns, n.serviceName)
 			Expect(err).To(Succeed())
@@ -88,7 +88,7 @@ func (n *NodePort) Destroy() error {
 		})
 
 		By(fmt.Sprintf("Creating a new service which has the same nodeport as backed up service has in a new namespaces for nodeport collision ...%s\n", n.namespaceToCollision[i]), func() {
-			Expect(CreateNamespace(n.Ctx, n.Client, n.namespaceToCollision[i])).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", n.namespaceToCollision[i]))
+			Expect(CreateNamespace(n.Ctx, n.Client, n.namespaceToCollision[i], false)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", n.namespaceToCollision[i]))
 			Expect(createServiceWithNodeport(n.Ctx, n.Client, n.namespaceToCollision[i], n.serviceName, n.labels, n.nodePort)).To(Succeed(), fmt.Sprintf("Failed to create service %s", n.serviceName))
 			_, err := GetAllService(n.Ctx)
 			Expect(err).To(Succeed(), "fail to get service")

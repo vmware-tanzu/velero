@@ -69,6 +69,7 @@ func (s *InProgressCase) CreateResources() error {
 				s.Ctx,
 				s.Client,
 				s.namespace,
+				false,
 			),
 		).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", s.namespace))

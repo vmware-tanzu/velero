@@ -81,7 +81,7 @@ func (p *ParallelFilesUpload) Init() error {
 
 func (p *ParallelFilesUpload) CreateResources() error {
 	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
-		Expect(CreateNamespace(p.Ctx, p.Client, p.namespace)).To(Succeed(),
+		Expect(CreateNamespace(p.Ctx, p.Client, p.namespace, false)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", p.namespace))
 	})
 
