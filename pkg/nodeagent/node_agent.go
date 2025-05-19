@@ -94,6 +94,10 @@ type Configs struct {
 	// LoadAffinity is the config for data path load affinity.
 	LoadAffinity []*kube.LoadAffinity `json:"loadAffinity,omitempty"`
 
+	// LoadAffinityPerStorageClass is the config for data path load affinity per StorageClass.
+	// Because this one is more specific for a data mover pod, it has higher priority than LoadAffinity.
+	LoadAffinityPerStorageClass map[string][]*kube.LoadAffinity `json:"loadAffinityPerStorageClass,omitempty"`
+
 	// BackupPVCConfig is the config for backupPVC (intermediate PVC) of snapshot data movement
 	BackupPVCConfig map[string]BackupPVC `json:"backupPVC,omitempty"`
 

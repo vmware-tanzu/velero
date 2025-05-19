@@ -56,36 +56,51 @@ import (
 
 // DataDownloadReconciler reconciles a DataDownload object
 type DataDownloadReconciler struct {
-	client           client.Client
-	kubeClient       kubernetes.Interface
-	mgr              manager.Manager
-	logger           logrus.FieldLogger
-	Clock            clock.WithTickerAndDelayedExecution
-	restoreExposer   exposer.GenericRestoreExposer
-	nodeName         string
-	dataPathMgr      *datapath.Manager
-	restorePVCConfig nodeagent.RestorePVC
-	podResources     corev1api.ResourceRequirements
-	preparingTimeout time.Duration
-	metrics          *metrics.ServerMetrics
+	client                      client.Client
+	kubeClient                  kubernetes.Interface
+	mgr                         manager.Manager
+	logger                      logrus.FieldLogger
+	Clock                       clock.WithTickerAndDelayedExecution
+	restoreExposer              exposer.GenericRestoreExposer
+	nodeName                    string
+	dataPathMgr                 *datapath.Manager
+	loadAffinity                []*kube.LoadAffinity
+	loadAffinityPerStorageClass map[string][]*kube.LoadAffinity
+	restorePVCConfig            nodeagent.RestorePVC
+	podResources                corev1api.ResourceRequirements
+	preparingTimeout            time.Duration
+	metrics                     *metrics.ServerMetrics
 }
 
-func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
-	restorePVCConfig nodeagent.RestorePVC, podResources corev1api.ResourceRequirements, nodeName string, preparingTimeout time.Duration,
-	logger logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataDownloadReconciler {
+func NewDataDownloadReconciler(
+	client client.Client,
+	mgr manager.Manager,
+	kubeClient kubernetes.Interface,
+	dataPathMgr *datapath.Manager,
+	loadAffinity []*kube.LoadAffinity,
+	loadAffinityPerStorageClass map[string][]*kube.LoadAffinity,
+	restorePVCConfig nodeagent.RestorePVC,
+	podResources corev1api.ResourceRequirements,
+	nodeName string,
+	preparingTimeout time.Duration,
+	logger logrus.FieldLogger,
+	metrics *metrics.ServerMetrics,
+) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
-		client:           client,
-		kubeClient:       kubeClient,
-		mgr:              mgr,
-		logger:           logger.WithField("controller", "DataDownload"),
-		Clock:            &clock.RealClock{},
-		nodeName:         nodeName,
-		restoreExposer:   exposer.NewGenericRestoreExposer(kubeClient, logger),
-		restorePVCConfig: restorePVCConfig,
-		dataPathMgr:      dataPathMgr,
-		podResources:     podResources,
-		preparingTimeout: preparingTimeout,
-		metrics:          metrics,
+		client:                      client,
+		kubeClient:                  kubeClient,
+		mgr:                         mgr,
+		logger:                      logger.WithField("controller", "DataDownload"),
+		Clock:                       &clock.RealClock{},
+		nodeName:                    nodeName,
+		restoreExposer:              exposer.NewGenericRestoreExposer(kubeClient, logger),
+		loadAffinity:                loadAffinity,
+		loadAffinityPerStorageClass: loadAffinityPerStorageClass,
+		restorePVCConfig:            restorePVCConfig,
+		dataPathMgr:                 dataPathMgr,
+		podResources:                podResources,
+		preparingTimeout:            preparingTimeout,
+		metrics:                     metrics,
 	}
 }
 
@@ -760,15 +775,17 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 	}
 
 	return exposer.GenericRestoreExposeParam{
-		TargetPVCName:         dd.Spec.TargetVolume.PVC,
-		TargetNamespace:       dd.Spec.TargetVolume.Namespace,
-		HostingPodLabels:      hostingPodLabels,
-		HostingPodAnnotations: hostingPodAnnotation,
-		Resources:             r.podResources,
-		OperationTimeout:      dd.Spec.OperationTimeout.Duration,
-		ExposeTimeout:         r.preparingTimeout,
-		NodeOS:                nodeOS,
-		RestorePVCConfig:      r.restorePVCConfig,
+		TargetPVCName:               dd.Spec.TargetVolume.PVC,
+		TargetNamespace:             dd.Spec.TargetVolume.Namespace,
+		HostingPodLabels:            hostingPodLabels,
+		HostingPodAnnotations:       hostingPodAnnotation,
+		Resources:                   r.podResources,
+		OperationTimeout:            dd.Spec.OperationTimeout.Duration,
+		ExposeTimeout:               r.preparingTimeout,
+		NodeOS:                      nodeOS,
+		RestorePVCConfig:            r.restorePVCConfig,
+		LoadAffinity:                r.loadAffinity,
+		LoadAffinityPerStorageClass: r.loadAffinityPerStorageClass,
 	}, nil
 }
 
