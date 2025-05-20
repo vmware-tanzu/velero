@@ -118,7 +118,7 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *BackupRepoReconciler) invalidateBackupReposForBSL(ctx context.Context, bslObj client.Object) []reconcile.Request {
 	bsl := bslObj.(*velerov1api.BackupStorageLocation)
-
+	r.logger.WithField("BSL", bsl.Name).Info("start invalidateBackupReposForBSL")
 	list := &velerov1api.BackupRepositoryList{}
 	options := &client.ListOptions{
 		LabelSelector: labels.Set(map[string]string{
@@ -129,7 +129,7 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(ctx context.Context, 
 		r.logger.WithField("BSL", bsl.Name).WithError(err).Error("unable to list BackupRepositories")
 		return []reconcile.Request{}
 	}
-
+	r.logger.WithField("BSL", bsl.Name).Infof("start invalidateBackupReposForBSL, repo list size: %d", len(list.Items))
 	for i := range list.Items {
 		r.logger.WithField("BSL", bsl.Name).Infof("Invalidating Backup Repository %s", list.Items[i].Name)
 		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change or create")); err != nil {
@@ -165,7 +165,7 @@ func (r *BackupRepoReconciler) needInvalidBackupRepo(oldObj client.Object, newOb
 			"old bucket": oldStorage.Bucket,
 			"new bucket": newStorage.Bucket,
 		}).Info("BSL's bucket has changed, invalid backup repositories")
-
+		r.invalidateBackupReposForBSL(context.TODO(), oldObj)
 		return true
 	}
 
@@ -174,18 +174,19 @@ func (r *BackupRepoReconciler) needInvalidBackupRepo(oldObj client.Object, newOb
 			"old prefix": oldStorage.Prefix,
 			"new prefix": newStorage.Prefix,
 		}).Info("BSL's prefix has changed, invalid backup repositories")
-
+		r.invalidateBackupReposForBSL(context.TODO(), oldObj)
 		return true
 	}
 
 	if !bytes.Equal(oldStorage.CACert, newStorage.CACert) {
 		logger.Info("BSL's CACert has changed, invalid backup repositories")
+		r.invalidateBackupReposForBSL(context.TODO(), oldObj)
 		return true
 	}
 
 	if !reflect.DeepEqual(oldConfig, newConfig) {
 		logger.Info("BSL's storage config has changed, invalid backup repositories")
-
+		r.invalidateBackupReposForBSL(context.TODO(), oldObj)
 		return true
 	}
 
