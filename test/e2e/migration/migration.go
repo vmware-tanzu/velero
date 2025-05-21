@@ -23,9 +23,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"golang.org/x/mod/semver"
 
 	"github.com/vmware-tanzu/velero/test"
 	framework "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	util "github.com/vmware-tanzu/velero/test/util/csi"
 	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
 	"github.com/vmware-tanzu/velero/test/util/kibishii"
@@ -160,6 +162,10 @@ func (m *migrationE2E) Backup() error {
 			version, err := veleroutil.GetVeleroVersion(m.Ctx, OriginVeleroCfg.VeleroCLI, true)
 			Expect(err).To(Succeed(), "Fail to get Velero version")
 			OriginVeleroCfg.VeleroVersion = version
+			if OriginVeleroCfg.WorkerOS == common.WorkerOSWindows &&
+				(version != "main" && semver.Compare(version, "v1.16") < 0) {
+				Skip(fmt.Sprintf("Velero CLI version %s doesn't support Windows migration test.", version))
+			}
 
 			if OriginVeleroCfg.SnapshotMoveData {
 				OriginVeleroCfg.UseNodeAgent = true
@@ -197,6 +203,7 @@ func (m *migrationE2E) Backup() error {
 			OriginVeleroCfg.KibishiiDirectory,
 			&m.kibishiiData,
 			OriginVeleroCfg.ImageRegistryProxy,
+			OriginVeleroCfg.WorkerOS,
 		)).To(Succeed())
 	})
 
@@ -401,6 +408,7 @@ func (m *migrationE2E) Verify() error {
 			m.Ctx,
 			&m.kibishiiData,
 			"",
+			m.VeleroCfg.WorkerOS,
 		)).To(Succeed(), "Fail to verify workload after restore")
 	})
 
@@ -413,56 +421,66 @@ func (m *migrationE2E) Clean() error {
 	})
 
 	By("Clean resource on standby cluster.", func() {
+		defer func() {
+			By("Switch to default KubeConfig context", func() {
+				k8sutil.KubectlConfigUseContext(
+					m.Ctx,
+					m.VeleroCfg.DefaultClusterContext,
+				)
+			})
+		}()
+
 		Expect(k8sutil.KubectlConfigUseContext(
 			m.Ctx, m.VeleroCfg.StandbyClusterContext)).To(Succeed())
 		m.VeleroCfg.ClientToInstallVelero = m.VeleroCfg.StandbyClient
 		m.VeleroCfg.ClusterToInstallVelero = m.VeleroCfg.StandbyClusterName
 
 		By("Delete StorageClasses created by E2E")
-		Expect(
-			k8sutil.DeleteStorageClass(
-				m.Ctx,
-				*m.VeleroCfg.ClientToInstallVelero,
-				test.StorageClassName,
-			),
-		).To(Succeed())
-		Expect(
-			k8sutil.DeleteStorageClass(
-				m.Ctx,
-				*m.VeleroCfg.ClientToInstallVelero,
-				test.StorageClassName2,
-			),
-		).To(Succeed())
+		if err := k8sutil.DeleteStorageClass(
+			m.Ctx,
+			*m.VeleroCfg.ClientToInstallVelero,
+			test.StorageClassName,
+		); err != nil {
+			fmt.Println("Fail to delete StorageClass1: ", err)
+			return
+		}
+
+		if err := k8sutil.DeleteStorageClass(
+			m.Ctx,
+			*m.VeleroCfg.ClientToInstallVelero,
+			test.StorageClassName2,
+		); err != nil {
+			fmt.Println("Fail to delete StorageClass2: ", err)
+			return
+		}
 
 		if strings.EqualFold(m.VeleroCfg.Features, test.FeatureCSI) &&
 			m.VeleroCfg.UseVolumeSnapshots {
 			By("Delete VolumeSnapshotClass created by E2E")
-			Expect(
-				k8sutil.KubectlDeleteByFile(
-					m.Ctx,
-					fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml",
-						m.VeleroCfg.StandbyClusterCloudProvider),
-				),
-			).To(Succeed())
+			if err := k8sutil.KubectlDeleteByFile(
+				m.Ctx,
+				fmt.Sprintf("../testdata/volume-snapshot-class/%s.yaml",
+					m.VeleroCfg.StandbyClusterCloudProvider),
+			); err != nil {
+				fmt.Println("Fail to delete VolumeSnapshotClass: ", err)
+				return
+			}
 		}
 
-		Expect(veleroutil.VeleroUninstall(m.Ctx, m.VeleroCfg)).To(Succeed())
+		if err := veleroutil.VeleroUninstall(m.Ctx, m.VeleroCfg); err != nil {
+			fmt.Println("Fail to uninstall Velero: ", err)
+			return
+		}
 
-		Expect(
-			k8sutil.DeleteNamespace(
-				m.Ctx,
-				*m.VeleroCfg.StandbyClient,
-				m.CaseBaseName,
-				true,
-			),
-		).To(Succeed())
-	})
-
-	By("Switch to default KubeConfig context", func() {
-		Expect(k8sutil.KubectlConfigUseContext(
+		if err := k8sutil.DeleteNamespace(
 			m.Ctx,
-			m.VeleroCfg.DefaultClusterContext,
-		)).To(Succeed())
+			*m.VeleroCfg.StandbyClient,
+			m.CaseBaseName,
+			true,
+		); err != nil {
+			fmt.Println("Fail to delete the workload namespace: ", err)
+			return
+		}
 	})
 
 	return nil

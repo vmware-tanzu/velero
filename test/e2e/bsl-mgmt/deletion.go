@@ -162,6 +162,7 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 					veleroCfg.KibishiiDirectory,
 					DefaultKibishiiData,
 					veleroCfg.ImageRegistryProxy,
+					veleroCfg.WorkerOS,
 				)).To(Succeed())
 			})
 
