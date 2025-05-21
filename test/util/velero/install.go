@@ -455,6 +455,26 @@ func createVeleroResources(ctx context.Context, cli, namespace string, args []st
 		return errors.Wrapf(err, "failed to wait the CRDs be ready")
 	}
 
+	// Wait the Velero CRD API endpoint is ready
+	wait.PollUntilContextTimeout(ctx, k8s.PollInterval, time.Minute, true, func(ctx context.Context) (bool, error) {
+		v1VerifyCmd := exec.CommandContext(ctx, "kubectl", "get", "--raw", "/apis/velero.io/v1")
+		v1VerifyCmd.Stdout = os.Stdout
+		v1VerifyCmd.Stderr = os.Stderr
+		if err := v1VerifyCmd.Run(); err != nil {
+			fmt.Printf("/apis/velero.io/v1 is not ready: %s.\n", err.Error())
+			return false, nil
+		}
+
+		v2alpha1VerifyCmd := exec.CommandContext(ctx, "kubectl", "get", "--raw", "/apis/velero.io/v2alpha1")
+		v2alpha1VerifyCmd.Stdout = os.Stdout
+		v2alpha1VerifyCmd.Stderr = os.Stderr
+		if err := v2alpha1VerifyCmd.Run(); err != nil {
+			fmt.Printf("/apis/velero.io/v2alpha1 is not ready: %s.\n", err.Error())
+			return false, nil
+		}
+		return true, nil
+	})
+
 	// remove the "--crds-only" option from the args
 	args = args[:len(args)-1]
 	cmd = exec.CommandContext(ctx, cli, args...)
