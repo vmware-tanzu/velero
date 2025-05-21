@@ -322,32 +322,80 @@ func WriteRandomDataToFileInPod(ctx context.Context, namespace, podName, contain
 	return cmd.Run()
 }
 
-func CreateFileToPod(ctx context.Context, namespace, podName, containerName, volume, filename, content string) error {
+func CreateFileToPod(
+	ctx context.Context,
+	namespace string,
+	podName string,
+	containerName string,
+	volume string,
+	filename string,
+	content string,
+	workerOS string,
+) error {
+	filePath := fmt.Sprintf("/%s/%s", volume, filename)
+	shell := "/bin/sh"
+	shellParameter := "-c"
+
+	if workerOS == common.WorkerOSWindows {
+		filePath = fmt.Sprintf("C:\\%s\\%s", volume, filename)
+		shell = "cmd"
+		shellParameter = "/c"
+	}
+
 	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
-		"--", "/bin/sh", "-c", fmt.Sprintf("echo ns-%s pod-%s volume-%s  > /%s/%s", namespace, podName, volume, volume, filename)}
+		"--", shell, shellParameter, fmt.Sprintf("echo ns-%s pod-%s volume-%s  > %s", namespace, podName, volume, filePath)}
+
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	return cmd.Run()
 }
 
-func FileExistInPV(ctx context.Context, namespace, podName, containerName, volume, filename string) (bool, error) {
-	stdout, stderr, err := ReadFileFromPodVolume(ctx, namespace, podName, containerName, volume, filename)
+func FileExistInPV(
+	ctx context.Context,
+	namespace string,
+	podName string,
+	containerName string,
+	volume string,
+	filename string,
+	workerOS string,
+) (bool, error) {
+	stdout, stderr, err := ReadFileFromPodVolume(ctx, namespace, podName, containerName, volume, filename, workerOS)
 
 	output := fmt.Sprintf("%s:%s", stdout, stderr)
-	if strings.Contains(output, fmt.Sprintf("/%s/%s: No such file or directory", volume, filename)) {
-		return false, nil
-	} else {
-		if err == nil {
-			return true, nil
-		} else {
-			return false, errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s",
-				filename, volume, podName, namespace))
+
+	if workerOS == common.WorkerOSWindows {
+		if strings.Contains(output, "The system cannot find the file specified") {
+			return false, nil
 		}
 	}
+
+	if strings.Contains(output, fmt.Sprintf("/%s/%s: No such file or directory", volume, filename)) {
+		return false, nil
+	}
+
+	if err == nil {
+		return true, nil
+	} else {
+		return false, errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s",
+			filename, volume, podName, namespace))
+	}
 }
-func ReadFileFromPodVolume(ctx context.Context, namespace, podName, containerName, volume, filename string) (string, string, error) {
+func ReadFileFromPodVolume(
+	ctx context.Context,
+	namespace string,
+	podName string,
+	containerName string,
+	volume string,
+	filename string,
+	workerOS string,
+) (string, string, error) {
 	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", "cat", fmt.Sprintf("/%s/%s", volume, filename)}
+	if workerOS == common.WorkerOSWindows {
+		arg = []string{"exec", "-n", namespace, "-c", containerName, podName,
+			"--", "cmd", "/c", fmt.Sprintf("type C:\\%s\\%s", volume, filename)}
+	}
+
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	stdout, stderr, err := veleroexec.RunCommand(cmd)

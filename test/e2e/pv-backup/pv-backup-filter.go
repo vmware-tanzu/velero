@@ -115,8 +115,16 @@ func (p *PVBackupFiltering) CreateResources() error {
 				Expect(WaitForPods(p.Ctx, p.Client, ns, p.podsList[index])).To(Succeed())
 				for i, pod := range p.podsList[index] {
 					for j := range p.volumesList[i] {
-						Expect(CreateFileToPod(p.Ctx, ns, pod, pod, p.volumesList[i][j],
-							FILE_NAME, CreateFileContent(ns, pod, p.volumesList[i][j]))).To(Succeed())
+						Expect(CreateFileToPod(
+							p.Ctx,
+							ns,
+							pod,
+							pod,
+							p.volumesList[i][j],
+							FILE_NAME,
+							CreateFileContent(ns, pod, p.volumesList[i][j]),
+							WorkerOSLinux,
+						)).To(Succeed())
 					}
 				}
 			})
@@ -142,21 +150,45 @@ func (p *PVBackupFiltering) Verify() error {
 					if j%2 == 0 {
 						if p.annotation == OPT_IN_ANN {
 							By(fmt.Sprintf("File should exists in PV %s of pod %s under namespace %s\n", p.volumesList[i][j], p.podsList[k][i], ns), func() {
-								Expect(fileExist(p.Ctx, ns, p.podsList[k][i], p.volumesList[i][j])).To(Succeed(), "File not exist as expect")
+								Expect(fileExist(
+									p.Ctx,
+									ns,
+									p.podsList[k][i],
+									p.volumesList[i][j],
+									p.VeleroCfg.WorkerOS,
+								)).To(Succeed(), "File not exist as expect")
 							})
 						} else {
 							By(fmt.Sprintf("File should not exist in PV %s of pod %s under namespace %s\n", p.volumesList[i][j], p.podsList[k][i], ns), func() {
-								Expect(fileNotExist(p.Ctx, ns, p.podsList[k][i], p.volumesList[i][j])).To(Succeed(), "File exists, not as expect")
+								Expect(fileNotExist(
+									p.Ctx,
+									ns,
+									p.podsList[k][i],
+									p.volumesList[i][j],
+									p.VeleroCfg.WorkerOS,
+								)).To(Succeed(), "File exists, not as expect")
 							})
 						}
 					} else {
 						if p.annotation == OPT_OUT_ANN {
 							By(fmt.Sprintf("File should exists in PV %s of pod %s under namespace %s\n", p.volumesList[i][j], p.podsList[k][i], ns), func() {
-								Expect(fileExist(p.Ctx, ns, p.podsList[k][i], p.volumesList[i][j])).To(Succeed(), "File not exist as expect")
+								Expect(fileExist(
+									p.Ctx,
+									ns,
+									p.podsList[k][i],
+									p.volumesList[i][j],
+									p.VeleroCfg.WorkerOS,
+								)).To(Succeed(), "File not exist as expect")
 							})
 						} else {
 							By(fmt.Sprintf("File should not exist in PV %s of pod %s under namespace %s\n", p.volumesList[i][j], p.podsList[k][i], ns), func() {
-								Expect(fileNotExist(p.Ctx, ns, p.podsList[k][i], p.volumesList[i][j])).To(Succeed(), "File exists, not as expect")
+								Expect(fileNotExist(
+									p.Ctx,
+									ns,
+									p.podsList[k][i],
+									p.volumesList[i][j],
+									p.VeleroCfg.WorkerOS,
+								)).To(Succeed(), "File exists, not as expect")
 							})
 						}
 					}
@@ -168,8 +200,14 @@ func (p *PVBackupFiltering) Verify() error {
 	return nil
 }
 
-func fileExist(ctx context.Context, namespace, podName, volume string) error {
-	c, _, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME)
+func fileExist(
+	ctx context.Context,
+	namespace string,
+	podName string,
+	volume string,
+	workerOS string,
+) error {
+	c, _, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME, workerOS)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s ",
 			FILE_NAME, volume, podName, namespace))
@@ -183,8 +221,14 @@ func fileExist(ctx context.Context, namespace, podName, volume string) error {
 			FILE_NAME, volume, podName, namespace))
 	}
 }
-func fileNotExist(ctx context.Context, namespace, podName, volume string) error {
-	_, _, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME)
+func fileNotExist(
+	ctx context.Context,
+	namespace string,
+	podName string,
+	volume string,
+	workerOS string,
+) error {
+	_, _, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME, workerOS)
 	if err != nil {
 		return nil
 	} else {

@@ -129,6 +129,7 @@ type VeleroConfig struct {
 	FailFast                          bool
 	HasVspherePlugin                  bool
 	ImageRegistryProxy                string
+	WorkerOS                          string
 }
 
 type VeleroCfgInPerf struct {
