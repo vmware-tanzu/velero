@@ -31,7 +31,7 @@ import (
 
 type MultiNSBackup struct {
 	TestCase
-	IsScalTest      bool
+	IsScaleTest     bool
 	NSExcluded      *[]string
 	TimeoutDuration time.Duration
 }
@@ -43,7 +43,7 @@ func (m *MultiNSBackup) Init() error {
 	m.RestoreName = "restore-" + m.CaseBaseName
 	m.NSExcluded = &[]string{}
 
-	if m.IsScalTest {
+	if m.IsScaleTest {
 		m.NamespacesTotal = 2500
 		m.TimeoutDuration = time.Hour * 2
 		m.TestMsg = &TestMSG{

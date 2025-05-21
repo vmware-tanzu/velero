@@ -138,8 +138,16 @@ func (v *BackupVolumeInfo) CreateResources() error {
 				// Hitting issue https://github.com/vmware-tanzu/velero/issues/7388
 				// So populate data only to some of pods, leave other pods empty to verify empty PV datamover
 				if i%2 == 0 {
-					Expect(CreateFileToPod(v.Ctx, createNSName, pod.Name, DefaultContainerName, vols[i].Name,
-						fmt.Sprintf("file-%s", pod.Name), CreateFileContent(createNSName, pod.Name, vols[i].Name))).To(Succeed())
+					Expect(CreateFileToPod(
+						v.Ctx,
+						createNSName,
+						pod.Name,
+						DefaultContainerName,
+						vols[i].Name,
+						fmt.Sprintf("file-%s", pod.Name),
+						CreateFileContent(createNSName, pod.Name, vols[i].Name),
+						WorkerOSLinux,
+					)).To(Succeed())
 				}
 			}
 		}
