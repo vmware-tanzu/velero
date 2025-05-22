@@ -434,10 +434,16 @@ func (r *DataDownloadReconciler) OnDataDownloadCompleted(ctx context.Context, na
 	log.Info("Cleaning up exposed environment")
 	r.restoreExposer.CleanUp(ctx, objRef)
 
-	original := dd.DeepCopy()
-	dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseCompleted
-	dd.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
-	if err := r.client.Patch(ctx, &dd, client.MergeFrom(original)); err != nil {
+	if err := UpdateDataDownloadWithRetry(ctx, r.client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, log, func(dd *velerov2alpha1api.DataDownload) bool {
+		if isDataDownloadInFinalState(dd) {
+			return false
+		}
+
+		dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseCompleted
+		dd.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
+
+		return true
+	}); err != nil {
 		log.WithError(err).Error("error updating data download status")
 	} else {
 		log.Infof("Data download is marked as %s", dd.Status.Phase)
@@ -470,22 +476,28 @@ func (r *DataDownloadReconciler) OnDataDownloadCancelled(ctx context.Context, na
 	var dd velerov2alpha1api.DataDownload
 	if getErr := r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, &dd); getErr != nil {
 		log.WithError(getErr).Warn("Failed to get datadownload on cancel")
-	} else {
-		// cleans up any objects generated during the snapshot expose
-		r.restoreExposer.CleanUp(ctx, getDataDownloadOwnerObject(&dd))
+		return
+	}
+	// cleans up any objects generated during the snapshot expose
+	r.restoreExposer.CleanUp(ctx, getDataDownloadOwnerObject(&dd))
 
-		original := dd.DeepCopy()
+	if err := UpdateDataDownloadWithRetry(ctx, r.client, types.NamespacedName{Namespace: dd.Namespace, Name: dd.Name}, log, func(dd *velerov2alpha1api.DataDownload) bool {
+		if isDataDownloadInFinalState(dd) {
+			return false
+		}
+
 		dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseCanceled
 		if dd.Status.StartTimestamp.IsZero() {
 			dd.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		}
 		dd.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
-		if err := r.client.Patch(ctx, &dd, client.MergeFrom(original)); err != nil {
-			log.WithError(err).Error("error updating data download status")
-		} else {
-			r.metrics.RegisterDataDownloadCancel(r.nodeName)
-			delete(r.cancelledDataDownload, dd.Name)
-		}
+
+		return true
+	}); err != nil {
+		log.WithError(err).Error("error updating data download status")
+	} else {
+		r.metrics.RegisterDataDownloadCancel(r.nodeName)
+		delete(r.cancelledDataDownload, dd.Name)
 	}
 }
 

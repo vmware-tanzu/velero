@@ -468,16 +468,21 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 	}
 
 	// Update status to Completed with path & snapshot ID.
-	original := du.DeepCopy()
-	du.Status.Path = result.Backup.Source.ByPath
-	du.Status.Phase = velerov2alpha1api.DataUploadPhaseCompleted
-	du.Status.SnapshotID = result.Backup.SnapshotID
-	du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
-	if result.Backup.EmptySnapshot {
-		du.Status.Message = "volume was empty so no data was upload"
-	}
+	if err := UpdateDataUploadWithRetry(ctx, r.client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, log, func(du *velerov2alpha1api.DataUpload) bool {
+		if isDataUploadInFinalState(du) {
+			return false
+		}
 
-	if err := r.client.Patch(ctx, &du, client.MergeFrom(original)); err != nil {
+		du.Status.Path = result.Backup.Source.ByPath
+		du.Status.Phase = velerov2alpha1api.DataUploadPhaseCompleted
+		du.Status.SnapshotID = result.Backup.SnapshotID
+		du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
+		if result.Backup.EmptySnapshot {
+			du.Status.Message = "volume was empty so no data was upload"
+		}
+
+		return true
+	}); err != nil {
 		log.WithError(err).Error("error updating DataUpload status")
 	} else {
 		log.Info("Data upload completed")
@@ -510,21 +515,28 @@ func (r *DataUploadReconciler) OnDataUploadCancelled(ctx context.Context, namesp
 	du := &velerov2alpha1api.DataUpload{}
 	if getErr := r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, du); getErr != nil {
 		log.WithError(getErr).Warn("Failed to get dataupload on cancel")
-	} else {
-		// cleans up any objects generated during the snapshot expose
-		r.cleanUp(ctx, du, log)
-		original := du.DeepCopy()
+		return
+	}
+	// cleans up any objects generated during the snapshot expose
+	r.cleanUp(ctx, du, log)
+
+	if err := UpdateDataUploadWithRetry(ctx, r.client, types.NamespacedName{Namespace: du.Namespace, Name: du.Name}, log, func(du *velerov2alpha1api.DataUpload) bool {
+		if isDataUploadInFinalState(du) {
+			return false
+		}
+
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseCanceled
 		if du.Status.StartTimestamp.IsZero() {
 			du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		}
 		du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
-		if err := r.client.Patch(ctx, du, client.MergeFrom(original)); err != nil {
-			log.WithError(err).Error("error updating DataUpload status")
-		} else {
-			r.metrics.RegisterDataUploadCancel(r.nodeName)
-			delete(r.cancelledDataUpload, du.Name)
-		}
+
+		return true
+	}); err != nil {
+		log.WithError(err).Error("error updating DataUpload status")
+	} else {
+		r.metrics.RegisterDataUploadCancel(r.nodeName)
+		delete(r.cancelledDataUpload, du.Name)
 	}
 }
 
