@@ -69,7 +69,10 @@ type CSISnapshotExposeParam struct {
 	VolumeSize resource.Quantity
 
 	// Affinity specifies the node affinity of the backup pod
-	Affinity *kube.LoadAffinity
+	Affinity []*kube.LoadAffinity
+
+	// AffinityPerStorageClass specifies the node affinity of the backup pod per StorageClass
+	AffinityPerStorageClass map[string][]*kube.LoadAffinity
 
 	// BackupPVCConfig is the config for backupPVC (intermediate PVC) of snapshot data movement
 	BackupPVCConfig map[string]nodeagent.BackupPVC
@@ -208,6 +211,12 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 		}
 	}()
 
+	affinity := csiExposeParam.Affinity
+	if affinityPerStorageClass, ok := csiExposeParam.AffinityPerStorageClass[backupPVCStorageClass]; ok {
+		curLog.WithField("StorageClass", backupPVCStorageClass).Info("Found backup pod's affinity setting per StorageClass.")
+		affinity = affinityPerStorageClass
+	}
+
 	backupPod, err := e.createBackupPod(
 		ctx,
 		ownerObject,
@@ -215,7 +224,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 		csiExposeParam.OperationTimeout,
 		csiExposeParam.HostingPodLabels,
 		csiExposeParam.HostingPodAnnotations,
-		csiExposeParam.Affinity,
+		affinity,
 		csiExposeParam.Resources,
 		backupPVCReadOnly,
 		spcNoRelabeling,
@@ -528,7 +537,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	operationTimeout time.Duration,
 	label map[string]string,
 	annotation map[string]string,
-	affinity *kube.LoadAffinity,
+	affinity []*kube.LoadAffinity,
 	resources corev1api.ResourceRequirements,
 	backupPVCReadOnly bool,
 	spcNoRelabeling bool,
@@ -582,11 +591,6 @@ func (e *csiSnapshotExposer) createBackupPod(
 
 	args = append(args, podInfo.logFormatArgs...)
 	args = append(args, podInfo.logLevelArgs...)
-
-	affinityList := make([]*kube.LoadAffinity, 0)
-	if affinity != nil {
-		affinityList = append(affinityList, affinity)
-	}
 
 	var securityCtx *corev1api.PodSecurityContext
 	nodeSelector := map[string]string{}
@@ -656,7 +660,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 			},
 			NodeSelector: nodeSelector,
 			OS:           &podOS,
-			Affinity:     kube.ToSystemAffinity(affinityList),
+			Affinity:     kube.ToSystemAffinity(affinity),
 			Containers: []corev1api.Container{
 				{
 					Name:            containerName,

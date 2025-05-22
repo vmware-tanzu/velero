@@ -316,10 +316,16 @@ func (s *nodeAgentServer) run() {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
 
-	var loadAffinity *kube.LoadAffinity
+	var loadAffinity []*kube.LoadAffinity
 	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
-		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
+		loadAffinity = s.dataPathConfigs.LoadAffinity
 		s.logger.Infof("Using customized loadAffinity %v", loadAffinity)
+	}
+
+	var loadAffinityPerStorageClass map[string][]*kube.LoadAffinity
+	if s.dataPathConfigs != nil && s.dataPathConfigs.LoadAffinityPerStorageClass != nil {
+		loadAffinityPerStorageClass = s.dataPathConfigs.LoadAffinityPerStorageClass
+		s.logger.Infof("LoadAffinityPerStorageClass %sv", loadAffinityPerStorageClass)
 	}
 
 	var backupPVCConfig map[string]nodeagent.BackupPVC
@@ -345,6 +351,7 @@ func (s *nodeAgentServer) run() {
 		s.csiSnapshotClient.SnapshotV1(),
 		s.dataPathMgr,
 		loadAffinity,
+		loadAffinityPerStorageClass,
 		backupPVCConfig,
 		podResources,
 		clock.RealClock{},
@@ -363,7 +370,20 @@ func (s *nodeAgentServer) run() {
 		s.logger.Infof("Using customized restorePVC config %v", restorePVCConfig)
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, restorePVCConfig, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(
+		s.mgr.GetClient(),
+		s.mgr,
+		s.kubeClient,
+		s.dataPathMgr,
+		loadAffinity,
+		loadAffinityPerStorageClass,
+		restorePVCConfig,
+		podResources,
+		s.nodeName,
+		s.config.dataMoverPrepareTimeout,
+		s.logger,
+		s.metrics,
+	)
 	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}

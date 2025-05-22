@@ -63,6 +63,12 @@ type GenericRestoreExposeParam struct {
 
 	// RestorePVCConfig is the config for restorePVC (intermediate PVC) of generic restore
 	RestorePVCConfig nodeagent.RestorePVC
+
+	// LoadAffinity specifies the node affinity of the backup pod
+	LoadAffinity []*kube.LoadAffinity
+
+	// LoadAffinityPerStorageClass specifies the node affinity of the backup pod per StorageClass
+	LoadAffinityPerStorageClass map[string][]*kube.LoadAffinity
 }
 
 // GenericRestoreExposer is the interfaces for a generic restore exposer
@@ -122,7 +128,19 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1ap
 		return errors.Errorf("Target PVC %s/%s has already been bound, abort", param.TargetNamespace, param.TargetPVCName)
 	}
 
-	restorePod, err := e.createRestorePod(ctx, ownerObject, targetPVC, param.OperationTimeout, param.HostingPodLabels, param.HostingPodAnnotations, selectedNode, param.Resources, param.NodeOS)
+	restorePod, err := e.createRestorePod(
+		ctx,
+		ownerObject,
+		targetPVC,
+		param.OperationTimeout,
+		param.HostingPodLabels,
+		param.HostingPodAnnotations,
+		selectedNode,
+		param.Resources,
+		param.NodeOS,
+		param.LoadAffinity,
+		param.LoadAffinityPerStorageClass,
+	)
 	if err != nil {
 		return errors.Wrapf(err, "error to create restore pod")
 	}
@@ -376,13 +394,39 @@ func (e *genericRestoreExposer) RebindVolume(ctx context.Context, ownerObject co
 	return nil
 }
 
-func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObject corev1api.ObjectReference, targetPVC *corev1api.PersistentVolumeClaim,
-	operationTimeout time.Duration, label map[string]string, annotation map[string]string, selectedNode string, resources corev1api.ResourceRequirements, nodeOS string) (*corev1api.Pod, error) {
+func (e *genericRestoreExposer) createRestorePod(
+	ctx context.Context,
+	ownerObject corev1api.ObjectReference,
+	targetPVC *corev1api.PersistentVolumeClaim,
+	operationTimeout time.Duration,
+	label map[string]string,
+	annotation map[string]string,
+	selectedNode string,
+	resources corev1api.ResourceRequirements,
+	nodeOS string,
+	affinity []*kube.LoadAffinity,
+	affinityPerStorageClass map[string][]*kube.LoadAffinity,
+) (*corev1api.Pod, error) {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
 	containerName := string(ownerObject.UID)
 	volumeName := string(ownerObject.UID)
+
+	var podAffinity *corev1api.Affinity
+	if selectedNode == "" {
+		e.log.Infof("No selected node for restore pod. Try to get affinity from the node-agent config.")
+
+		if targetPVC != nil && targetPVC.Spec.StorageClassName != nil {
+			if tmpAffinity, ok := affinityPerStorageClass[*targetPVC.Spec.StorageClassName]; ok {
+				podAffinity = kube.ToSystemAffinity(tmpAffinity)
+			}
+		}
+
+		if podAffinity == nil && len(affinity) > 0 {
+			podAffinity = kube.ToSystemAffinity(affinity)
+		}
+	}
 
 	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, nodeOS)
 	if err != nil {
@@ -512,6 +556,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 			Tolerations:                   toleration,
 			DNSPolicy:                     podInfo.dnsPolicy,
 			DNSConfig:                     podInfo.dnsConfig,
+			Affinity:                      podAffinity,
 		},
 	}
 

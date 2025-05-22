@@ -242,6 +242,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		fakeSnapshotClient.SnapshotV1(),
 		dataPathMgr,
 		nil,
+		nil,
 		map[string]nodeagent.BackupPVC{},
 		corev1api.ResourceRequirements{},
 		testclocks.NewFakeClock(now),

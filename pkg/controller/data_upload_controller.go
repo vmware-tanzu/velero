@@ -63,20 +63,21 @@ const (
 
 // DataUploadReconciler reconciles a DataUpload object
 type DataUploadReconciler struct {
-	client              client.Client
-	kubeClient          kubernetes.Interface
-	csiSnapshotClient   snapshotter.SnapshotV1Interface
-	mgr                 manager.Manager
-	Clock               clocks.WithTickerAndDelayedExecution
-	nodeName            string
-	logger              logrus.FieldLogger
-	snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
-	dataPathMgr         *datapath.Manager
-	loadAffinity        *kube.LoadAffinity
-	backupPVCConfig     map[string]nodeagent.BackupPVC
-	podResources        corev1api.ResourceRequirements
-	preparingTimeout    time.Duration
-	metrics             *metrics.ServerMetrics
+	client                      client.Client
+	kubeClient                  kubernetes.Interface
+	csiSnapshotClient           snapshotter.SnapshotV1Interface
+	mgr                         manager.Manager
+	Clock                       clocks.WithTickerAndDelayedExecution
+	nodeName                    string
+	logger                      logrus.FieldLogger
+	snapshotExposerList         map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
+	dataPathMgr                 *datapath.Manager
+	loadAffinity                []*kube.LoadAffinity
+	loadAffinityPerStorageClass map[string][]*kube.LoadAffinity
+	backupPVCConfig             map[string]nodeagent.BackupPVC
+	podResources                corev1api.ResourceRequirements
+	preparingTimeout            time.Duration
+	metrics                     *metrics.ServerMetrics
 }
 
 func NewDataUploadReconciler(
@@ -85,7 +86,8 @@ func NewDataUploadReconciler(
 	kubeClient kubernetes.Interface,
 	csiSnapshotClient snapshotter.SnapshotV1Interface,
 	dataPathMgr *datapath.Manager,
-	loadAffinity *kube.LoadAffinity,
+	loadAffinity []*kube.LoadAffinity,
+	loadAffinityPerStorageClass map[string][]*kube.LoadAffinity,
 	backupPVCConfig map[string]nodeagent.BackupPVC,
 	podResources corev1api.ResourceRequirements,
 	clock clocks.WithTickerAndDelayedExecution,
@@ -109,12 +111,13 @@ func NewDataUploadReconciler(
 				log,
 			),
 		},
-		dataPathMgr:      dataPathMgr,
-		loadAffinity:     loadAffinity,
-		backupPVCConfig:  backupPVCConfig,
-		podResources:     podResources,
-		preparingTimeout: preparingTimeout,
-		metrics:          metrics,
+		dataPathMgr:                 dataPathMgr,
+		loadAffinity:                loadAffinity,
+		loadAffinityPerStorageClass: loadAffinityPerStorageClass,
+		backupPVCConfig:             backupPVCConfig,
+		podResources:                podResources,
+		preparingTimeout:            preparingTimeout,
+		metrics:                     metrics,
 	}
 }
 
@@ -844,19 +847,20 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 		}
 
 		return &exposer.CSISnapshotExposeParam{
-			SnapshotName:          du.Spec.CSISnapshot.VolumeSnapshot,
-			SourceNamespace:       du.Spec.SourceNamespace,
-			StorageClass:          du.Spec.CSISnapshot.StorageClass,
-			HostingPodLabels:      hostingPodLabels,
-			HostingPodAnnotations: hostingPodAnnotation,
-			AccessMode:            accessMode,
-			OperationTimeout:      du.Spec.OperationTimeout.Duration,
-			ExposeTimeout:         r.preparingTimeout,
-			VolumeSize:            pvc.Spec.Resources.Requests[corev1api.ResourceStorage],
-			Affinity:              r.loadAffinity,
-			BackupPVCConfig:       r.backupPVCConfig,
-			Resources:             r.podResources,
-			NodeOS:                nodeOS,
+			SnapshotName:            du.Spec.CSISnapshot.VolumeSnapshot,
+			SourceNamespace:         du.Spec.SourceNamespace,
+			StorageClass:            du.Spec.CSISnapshot.StorageClass,
+			HostingPodLabels:        hostingPodLabels,
+			HostingPodAnnotations:   hostingPodAnnotation,
+			AccessMode:              accessMode,
+			OperationTimeout:        du.Spec.OperationTimeout.Duration,
+			ExposeTimeout:           r.preparingTimeout,
+			VolumeSize:              pvc.Spec.Resources.Requests[corev1api.ResourceStorage],
+			Affinity:                r.loadAffinity,
+			AffinityPerStorageClass: r.loadAffinityPerStorageClass,
+			BackupPVCConfig:         r.backupPVCConfig,
+			Resources:               r.podResources,
+			NodeOS:                  nodeOS,
 		}, nil
 	}
 
