@@ -4,7 +4,7 @@
 Add this design to make the repository maintenance job can read configuration from a dedicate ConfigMap and make the Job's necessary parts configurable, e.g. `PodSpec.Affinity` and `PodSpec.Resources`.
 
 ## Background
-Repository maintenance is split from the Velero server to a k8s Job in v1.14 by design [repository maintenance job](Implemented/repository-maintenance.md).
+Repository maintenance is split from the Velero server to a k8s Job in v1.14 by design [repository maintenance job](repository-maintenance.md).
 The repository maintenance Job configuration was read from the Velero server CLI parameter, and it inherits the most of Velero server's Deployment's PodSpec to fill un-configured fields.
 
 This design introduces a new way to let the user to customize the repository maintenance behavior instead of inheriting from the Velero server Deployment or reading from `velero server` CLI parameters.
@@ -13,7 +13,7 @@ It's possible new configurations are introduced in future releases based on this
 
 For the node selection, the repository maintenance Job also inherits from the Velero server deployment before, but the Job may last for a while and cost noneligible resources, especially memory.
 The users have the need to choose which k8s node to run the maintenance Job.
-This design reuses the data structure introduced by design [node-agent affinity configuration](Implemented/node-agent-affinity.md) to make the repository maintenance job can choose which node running on.
+This design reuses the data structure introduced by design [Velero Generic Data Path affinity configuration](node-agent-affinity.md) to make the repository maintenance job can choose which node running on.
 
 ## Goals
 - Unify the repository maintenance Job configuration at one place.
@@ -118,7 +118,7 @@ For example, the following BackupRepository's key should be `test-default-kopia`
     volumeNamespace: test
 ```
 
-The `LoadAffinity` structure is reused from design [node-agent affinity configuration](Implemented/node-agent-affinity.md).
+The `LoadAffinity` structure is reused from design [Velero Generic Data Path affinity configuration](node-agent-affinity.md).
 It's possible that the users want to choose nodes that match condition A or condition B to run the job.
 For example, the user want to let the nodes is in a specified machine type or the nodes locate in the us-central1-x zones to run the job.
 This can be done by adding multiple entries in the `LoadAffinity` array.
