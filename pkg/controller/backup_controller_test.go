@@ -479,6 +479,69 @@ func TestDefaultBackupTTL(t *testing.T) {
 	}
 }
 
+func TestPrepareBackupRequest_SetsVGSLabelKey(t *testing.T) {
+	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
+	require.NoError(t, err)
+	now = now.Local()
+
+	defaultVGSLabelKey := "velero.io/volume-group-snapshot"
+
+	tests := []struct {
+		name             string
+		backup           *velerov1api.Backup
+		serverFlagKey    string
+		expectedLabelKey string
+	}{
+		{
+			name: "backup with spec label key set",
+			backup: builder.ForBackup("velero", "backup-1").
+				VolumeGroupSnapshotLabelKey("spec-key").
+				Result(),
+			serverFlagKey:    "server-key",
+			expectedLabelKey: "spec-key",
+		},
+		{
+			name:             "backup with no spec key, uses server flag",
+			backup:           builder.ForBackup("velero", "backup-2").Result(),
+			serverFlagKey:    "server-key",
+			expectedLabelKey: "server-key",
+		},
+		{
+			name:             "backup with no spec or server flag, uses default",
+			backup:           builder.ForBackup("velero", "backup-3").Result(),
+			serverFlagKey:    defaultVGSLabelKey,
+			expectedLabelKey: defaultVGSLabelKey,
+		},
+	}
+
+	for _, test := range tests {
+		formatFlag := logging.FormatText
+		logger := logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, test.backup)
+			apiServer := velerotest.NewAPIServer(t)
+			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+			require.NoError(t, err)
+
+			c := &backupReconciler{
+				logger:             logger,
+				kbClient:           fakeClient,
+				defaultVGSLabelKey: test.serverFlagKey,
+				discoveryHelper:    discoveryHelper,
+				clock:              testclocks.NewFakeClock(now),
+				workerPool:         pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
+			}
+			defer c.workerPool.Stop()
+
+			res := c.prepareBackupRequest(test.backup, logger)
+			assert.NotNil(t, res)
+
+			assert.Equal(t, test.expectedLabelKey, res.Spec.VolumeGroupSnapshotLabelKey)
+		})
+	}
+}
+
 func TestDefaultVolumesToResticDeprecation(t *testing.T) {
 	tests := []struct {
 		name         string
