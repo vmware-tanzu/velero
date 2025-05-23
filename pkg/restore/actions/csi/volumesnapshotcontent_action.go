@@ -100,6 +100,9 @@ func (p *volumeSnapshotContentRestoreItemAction) Execute(
 	// Set the DeletionPolicy to Retain to avoid VS deletion will not trigger snapshot deletion
 	vsc.Spec.DeletionPolicy = snapshotv1api.VolumeSnapshotContentRetain
 
+	// Set VolumeSnapshotClassName to nil to avoid dependent on VolumeSnapshotClass.
+	vsc.Spec.VolumeSnapshotClassName = nil
+
 	if vscFromBackup.Status != nil && vscFromBackup.Status.SnapshotHandle != nil {
 		vsc.Spec.Source.VolumeHandle = nil
 		vsc.Spec.Source.SnapshotHandle = vscFromBackup.Status.SnapshotHandle

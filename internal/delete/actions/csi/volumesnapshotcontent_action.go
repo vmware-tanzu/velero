@@ -102,6 +102,8 @@ func (p *volumeSnapshotContentDeleteItemAction) Execute(
 	}
 
 	snapCont.ResourceVersion = ""
+	// Set VolumeSnapshotClassName to nil to avoid dependent on VolumeSnapshotClass.
+	snapCont.Spec.VolumeSnapshotClassName = nil
 
 	if err := p.crClient.Create(context.TODO(), &snapCont); err != nil {
 		return errors.Wrapf(err, "fail to create VolumeSnapshotContent %s", snapCont.Name)
