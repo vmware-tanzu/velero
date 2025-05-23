@@ -69,6 +69,8 @@ func (m *MultiNSBackup) Init() error {
 	for _, excludeNamespace := range namespaces.Items {
 		*m.NSExcluded = append(*m.NSExcluded, excludeNamespace.Name)
 	}
+	// Add Velero installed namespace into the exclude list.
+	*m.NSExcluded = append(*m.NSExcluded, m.VeleroCfg.VeleroNamespace)
 
 	m.BackupArgs = []string{
 		"create", "--namespace", m.VeleroCfg.VeleroNamespace, "backup", m.BackupName,
