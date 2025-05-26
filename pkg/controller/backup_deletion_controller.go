@@ -22,9 +22,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/vmware-tanzu/velero/pkg/util/csi"
-
 	jsonpatch "github.com/evanphx/json-patch/v5"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -36,8 +35,6 @@ import (
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/delete"
@@ -56,8 +53,10 @@ import (
 	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/csi"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 const (
@@ -199,6 +198,11 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if location.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
 		err := r.patchDeleteBackupRequestWithError(ctx, dbr, fmt.Errorf("cannot delete backup because backup storage location %s is currently in read-only mode", location.Name))
+		return ctrl.Result{}, err
+	}
+
+	if !veleroutil.BSLIsAvailable(*location) {
+		err := r.patchDeleteBackupRequestWithError(ctx, dbr, fmt.Errorf("cannot delete backup because backup storage location %s is currently in Unavailable state", location.Name))
 		return ctrl.Result{}, err
 	}
 
