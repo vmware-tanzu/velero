@@ -155,9 +155,13 @@ Status:
 - `Recent Maintenance` keeps the status of the recent 3 maintenance jobs, including its start time, result (succeeded/failed), completion time (if the maintenance job succeeded), or error message (if the maintenance failed)
 
 ### Others
-Maintenance jobs will inherit the labels, annotations, toleration, nodeSelector, service account, image, environment variables, cloud-credentials etc. from Velero deployment.  
-Maintenance jobs will not run for backup repositories whose backup storage location is set as readOnly.  
+Maintenance jobs will inherit the service account, image, environment variables, cloud-credentials, volumes, etc. from Velero deployment.  
+Maintenance jobs will not run for backup repositories whose backup storage location is set as readOnly.
+
+Please notice the Maintenance job's labels and annotations are not inherited from the Velero deployment.
+Velero keeps [allowlists][4] for the labels and annotations now. Please submit PRs to add the ones you need.
 
 [1]: velero-install.md#usage
 [2]: node-agent-concurrency.md
 [3]: backup-repository-configuration.md#full-maintenance-interval-customization
+[4]: https://github.com/vmware-tanzu/velero/blob/v1.16.1/pkg/util/third_party.go
