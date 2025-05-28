@@ -121,7 +121,7 @@ func (v *BackupVolumeInfo) CreateResources() error {
 			volumeName := fmt.Sprintf("volume-info-pv-%d", i)
 			vols = append(vols, CreateVolumes(pvc.Name, []string{volumeName})...)
 		}
-		deployment := NewDeployment(v.CaseBaseName, createNSName, 1, labels, nil).WithVolume(vols).Result()
+		deployment := NewDeployment(v.CaseBaseName, createNSName, 1, labels, v.VeleroCfg.ImageRegistryProxy).WithVolume(vols).Result()
 		deployment, err := CreateDeployment(v.Client.ClientGo, createNSName, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", createNSName))
@@ -138,8 +138,16 @@ func (v *BackupVolumeInfo) CreateResources() error {
 				// Hitting issue https://github.com/vmware-tanzu/velero/issues/7388
 				// So populate data only to some of pods, leave other pods empty to verify empty PV datamover
 				if i%2 == 0 {
-					Expect(CreateFileToPod(v.Ctx, createNSName, pod.Name, DefaultContainerName, vols[i].Name,
-						fmt.Sprintf("file-%s", pod.Name), CreateFileContent(createNSName, pod.Name, vols[i].Name))).To(Succeed())
+					Expect(CreateFileToPod(
+						v.Ctx,
+						createNSName,
+						pod.Name,
+						DefaultContainerName,
+						vols[i].Name,
+						fmt.Sprintf("file-%s", pod.Name),
+						CreateFileContent(createNSName, pod.Name, vols[i].Name),
+						WorkerOSLinux,
+					)).To(Succeed())
 				}
 			}
 		}

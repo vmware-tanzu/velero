@@ -34,7 +34,7 @@ RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.5
 
 # get goimports (the revision is pinned so we don't indiscriminately update, but the particular commit
 # is not important)
-RUN go install golang.org/x/tools/cmd/goimports@11e9d9cc0042e6bd10337d4d2c3e5d9295508e7d
+RUN go install golang.org/x/tools/cmd/goimports@v0.33.0
 
 # get protoc compiler and golang plugin
 WORKDIR /root

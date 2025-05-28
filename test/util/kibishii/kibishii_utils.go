@@ -18,6 +18,8 @@ package kibishii
 
 import (
 	"fmt"
+	"html/template"
+	"os"
 	"os/exec"
 	"path"
 	"strconv"
@@ -27,10 +29,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"sigs.k8s.io/yaml"
 
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	. "github.com/vmware-tanzu/velero/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/providers"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
@@ -102,9 +108,18 @@ func RunKibishiiTests(
 		}
 	}()
 	fmt.Printf("KibishiiPrepareBeforeBackup %s\n", time.Now().Format("2006-01-02 15:04:05"))
-	if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName,
-		kibishiiNamespace, registryCredentialFile, veleroFeatures,
-		kibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData); err != nil {
+	if err := KibishiiPrepareBeforeBackup(
+		oneHourTimeout,
+		client,
+		providerName,
+		kibishiiNamespace,
+		registryCredentialFile,
+		veleroFeatures,
+		kibishiiDirectory,
+		DefaultKibishiiData,
+		veleroCfg.ImageRegistryProxy,
+		veleroCfg.WorkerOS,
+	); err != nil {
 		return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", kibishiiNamespace)
 	}
 	fmt.Printf("KibishiiPrepareBeforeBackup done %s\n", time.Now().Format("2006-01-02 15:04:05"))
@@ -193,14 +208,22 @@ func RunKibishiiTests(
 	// Modify PV data right after backup. If PV's reclaim policy is retain, PV will be restored with the origin resource config
 	fileName := "file-" + kibishiiNamespace
 	fileBaseContent := fileName
-	fmt.Printf("Re-poulate volume  %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Printf("Re-populate volume  %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	for _, pod := range KibishiiPodNameList {
 		// To ensure Kibishii verification result is accurate
 		ClearKibishiiData(oneHourTimeout, kibishiiNamespace, pod, "kibishii", "data")
 
 		CreateFileContent := fileBaseContent + pod
-		err := CreateFileToPod(oneHourTimeout, kibishiiNamespace, pod, "kibishii", "data",
-			fileName, CreateFileContent)
+		err := CreateFileToPod(
+			oneHourTimeout,
+			kibishiiNamespace,
+			pod,
+			"kibishii",
+			"data",
+			fileName,
+			CreateFileContent,
+			veleroCfg.WorkerOS,
+		)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create file %s", fileName)
 		}
@@ -256,7 +279,7 @@ func RunKibishiiTests(
 	}
 
 	fmt.Printf("KibishiiVerifyAfterRestore %s\n", time.Now().Format("2006-01-02 15:04:05"))
-	if err := KibishiiVerifyAfterRestore(client, kibishiiNamespace, oneHourTimeout, DefaultKibishiiData, fileName); err != nil {
+	if err := KibishiiVerifyAfterRestore(client, kibishiiNamespace, oneHourTimeout, DefaultKibishiiData, fileName, veleroCfg.WorkerOS); err != nil {
 		return errors.Wrapf(err, "Error verifying kibishii after restore")
 	}
 
@@ -264,8 +287,16 @@ func RunKibishiiTests(
 	return nil
 }
 
-func installKibishii(ctx context.Context, namespace string, cloudPlatform, veleroFeatures,
-	kibishiiDirectory string, useVolumeSnapshots bool, workerReplicas int) error {
+func installKibishii(
+	ctx context.Context,
+	namespace,
+	cloudPlatform,
+	veleroFeatures,
+	kibishiiDirectory string,
+	workerReplicas int,
+	imageRegistryProxy string,
+	workerOS string,
+) error {
 	if strings.EqualFold(cloudPlatform, Azure) &&
 		strings.EqualFold(veleroFeatures, FeatureCSI) {
 		cloudPlatform = AzureCSI
@@ -274,16 +305,69 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 		strings.EqualFold(veleroFeatures, FeatureCSI) {
 		cloudPlatform = AwsCSI
 	}
+
+	targetKustomizeDir := path.Join(kibishiiDirectory, cloudPlatform)
+
+	if strings.EqualFold(cloudPlatform, Vsphere) {
+		if strings.HasPrefix(kibishiiDirectory, "https://") {
+			return errors.New("vSphere needs to download the Kibishii repository first because it needs to inject some image patch file to work.")
+		}
+
+		// TODO: blackpiglet debug
+		fmt.Printf("targetKustomizeDir %s, workerOS: %s, WorkerOSWindows: %s.\n", targetKustomizeDir, workerOS, common.WorkerOSWindows)
+
+		if workerOS == common.WorkerOSWindows {
+			targetKustomizeDir += "-windows"
+
+			// TODO: blackpiglet debug
+			fmt.Printf("targetKustomizeDir for windows %s\n", targetKustomizeDir)
+		}
+		fmt.Printf("The installed Kibishii Kustomize package directory is %s.\n", targetKustomizeDir)
+
+		kibishiiImage := readBaseKibishiiImage(path.Join(kibishiiDirectory, "base", "kibishii.yaml"))
+		if err := generateKibishiiImagePatch(
+			path.Join(imageRegistryProxy, kibishiiImage),
+			path.Join(targetKustomizeDir, "worker-image-patch.yaml"),
+		); err != nil {
+			return nil
+		}
+
+		jumpPadImage := readBaseJumpPadImage(path.Join(kibishiiDirectory, "base", "jump-pad.yaml"))
+		if err := generateJumpPadPatch(
+			path.Join(imageRegistryProxy, jumpPadImage),
+			path.Join(targetKustomizeDir, "jump-pad-image-patch.yaml"),
+		); err != nil {
+			return nil
+		}
+	}
+
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
+
 	kibishiiInstallCmd := exec.CommandContext(ctx, "kubectl", "apply", "-n", namespace, "-k",
-		path.Join(kibishiiDirectory, cloudPlatform), "--timeout=90s")
+		targetKustomizeDir, "--timeout=90s")
 	_, stderr, err := veleroexec.RunCommand(kibishiiInstallCmd)
 	fmt.Printf("Install Kibishii cmd: %s\n", kibishiiInstallCmd)
 	if err != nil {
 		return errors.Wrapf(err, "failed to install kibishii, stderr=%s", stderr)
 	}
 
-	labelNamespaceCmd := exec.CommandContext(ctx, "kubectl", "label", "namespace", namespace, "pod-security.kubernetes.io/enforce=baseline", "pod-security.kubernetes.io/enforce-version=latest", "--overwrite=true")
+	psa_enforce_policy := "baseline"
+	if workerOS == common.WorkerOSWindows {
+		// Windows container volume mount root directory's permission only allow privileged user write.
+		// https://github.com/kubernetes/kubernetes/issues/131341
+		psa_enforce_policy = "privileged"
+	}
+
+	labelNamespaceCmd := exec.CommandContext(
+		ctx,
+		"kubectl",
+		"label",
+		"namespace",
+		namespace,
+		fmt.Sprintf("pod-security.kubernetes.io/enforce=%s", psa_enforce_policy),
+		"pod-security.kubernetes.io/enforce-version=latest",
+		"--overwrite=true",
+	)
 	_, stderr, err = veleroexec.RunCommand(labelNamespaceCmd)
 	fmt.Printf("Label namespace with PSA policy: %s\n", labelNamespaceCmd)
 	if err != nil {
@@ -313,16 +397,134 @@ func installKibishii(ctx context.Context, namespace string, cloudPlatform, veler
 	return err
 }
 
+func readBaseKibishiiImage(kibishiiFilePath string) string {
+	bytes, err := os.ReadFile(kibishiiFilePath)
+	if err != nil {
+		return ""
+	}
+
+	sts := &appsv1api.StatefulSet{}
+	if err := yaml.UnmarshalStrict(bytes, sts); err != nil {
+		return ""
+	}
+
+	kibishiiImage := ""
+	if len(sts.Spec.Template.Spec.Containers) > 0 {
+		kibishiiImage = sts.Spec.Template.Spec.Containers[0].Image
+	}
+
+	return kibishiiImage
+}
+
+func readBaseJumpPadImage(jumpPadFilePath string) string {
+	bytes, err := os.ReadFile(jumpPadFilePath)
+	if err != nil {
+		return ""
+	}
+
+	pod := &corev1api.Pod{}
+	if err := yaml.UnmarshalStrict(bytes, pod); err != nil {
+		return ""
+	}
+
+	jumpPadImage := ""
+	if len(pod.Spec.Containers) > 0 {
+		jumpPadImage = pod.Spec.Containers[0].Image
+	}
+
+	return jumpPadImage
+}
+
+type patchImageData struct {
+	Image string
+}
+
+func generateKibishiiImagePatch(kibishiiImage string, patchDirectory string) error {
+	patchString := `
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: StatefulSet
+metadata:
+  name: kibishii-deployment
+spec:
+  template:
+    spec:
+      containers:
+      - name: kibishii
+        image: {{.Image}}
+`
+
+	file, err := os.OpenFile(patchDirectory, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	defer file.Close()
+
+	if err != nil {
+		return err
+	}
+
+	patchTemplate, err := template.New("imagePatch").Parse(patchString)
+	if err != nil {
+		return err
+	}
+
+	if err := patchTemplate.Execute(file, patchImageData{Image: kibishiiImage}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func generateJumpPadPatch(jumpPadImage string, patchDirectory string) error {
+	patchString := `
+apiVersion: v1
+kind: Pod
+metadata:
+  name: jump-pad
+spec:
+  containers:
+    - name: jump-pad
+      image: {{.Image}}
+`
+	file, err := os.OpenFile(patchDirectory, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	defer file.Close()
+
+	if err != nil {
+		return err
+	}
+
+	patchTemplate, err := template.New("imagePatch").Parse(patchString)
+	if err != nil {
+		return err
+	}
+
+	if err := patchTemplate.Execute(file, patchImageData{Image: jumpPadImage}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiData) error {
 	timeout := 30 * time.Minute
 	interval := 1 * time.Second
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		timeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*20)
 		defer ctxCancel()
-		kibishiiGenerateCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
-			"/usr/local/bin/generate.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
-			strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),
-			strconv.Itoa(kibishiiData.BlockSize), strconv.Itoa(kibishiiData.PassNum), strconv.Itoa(kibishiiData.ExpectedNodes))
+		kibishiiGenerateCmd := exec.CommandContext(
+			timeout,
+			"kubectl",
+			"exec",
+			"-n",
+			namespace,
+			"jump-pad",
+			"--",
+			"/usr/local/bin/generate.sh",
+			strconv.Itoa(kibishiiData.Levels),
+			strconv.Itoa(kibishiiData.DirsPerLevel),
+			strconv.Itoa(kibishiiData.FilesPerLevel),
+			strconv.Itoa(kibishiiData.FileLength),
+			strconv.Itoa(kibishiiData.BlockSize),
+			strconv.Itoa(kibishiiData.PassNum),
+			strconv.Itoa(kibishiiData.ExpectedNodes),
+		)
 		fmt.Printf("kibishiiGenerateCmd cmd =%v\n", kibishiiGenerateCmd)
 
 		stdout, stderr, err := veleroexec.RunCommand(kibishiiGenerateCmd)
@@ -342,26 +544,44 @@ func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiD
 func verifyData(ctx context.Context, namespace string, kibishiiData *KibishiiData) error {
 	timeout := 10 * time.Minute
 	interval := 5 * time.Second
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		timeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*20)
-		defer ctxCancel()
-		kibishiiVerifyCmd := exec.CommandContext(timeout, "kubectl", "exec", "-n", namespace, "jump-pad", "--",
-			"/usr/local/bin/verify.sh", strconv.Itoa(kibishiiData.Levels), strconv.Itoa(kibishiiData.DirsPerLevel),
-			strconv.Itoa(kibishiiData.FilesPerLevel), strconv.Itoa(kibishiiData.FileLength),
-			strconv.Itoa(kibishiiData.BlockSize), strconv.Itoa(kibishiiData.PassNum),
-			strconv.Itoa(kibishiiData.ExpectedNodes))
-		fmt.Printf("kibishiiVerifyCmd cmd =%v\n", kibishiiVerifyCmd)
+	err := wait.PollUntilContextTimeout(
+		ctx,
+		interval,
+		timeout,
+		true,
+		func(ctx context.Context) (bool, error) {
+			timeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*20)
+			defer ctxCancel()
+			kibishiiVerifyCmd := exec.CommandContext(
+				timeout,
+				"kubectl",
+				"exec",
+				"-n",
+				namespace,
+				"jump-pad",
+				"--",
+				"/usr/local/bin/verify.sh",
+				strconv.Itoa(kibishiiData.Levels),
+				strconv.Itoa(kibishiiData.DirsPerLevel),
+				strconv.Itoa(kibishiiData.FilesPerLevel),
+				strconv.Itoa(kibishiiData.FileLength),
+				strconv.Itoa(kibishiiData.BlockSize),
+				strconv.Itoa(kibishiiData.PassNum),
+				strconv.Itoa(kibishiiData.ExpectedNodes),
+			)
+			fmt.Printf("kibishiiVerifyCmd cmd =%v\n", kibishiiVerifyCmd)
 
-		stdout, stderr, err := veleroexec.RunCommand(kibishiiVerifyCmd)
-		if strings.Contains(stderr, "Timeout occurred") {
-			return false, nil
-		}
-		if err != nil {
-			fmt.Printf("Kibishi verify stdout Timeout occurred: %s stderr: %s err: %s\n", stdout, stderr, err)
-			return false, nil
-		}
-		return true, nil
-	})
+			stdout, stderr, err := veleroexec.RunCommand(kibishiiVerifyCmd)
+			if strings.Contains(stderr, "Timeout occurred") {
+				return false, nil
+			}
+			if err != nil {
+				fmt.Printf("Kibishi verify stdout Timeout occurred: %s stderr: %s err: %s\n", stdout, stderr, err)
+				return false, nil
+			}
+			return true, nil
+		},
+	)
 
 	if err != nil {
 		return errors.Wrapf(err, "Failed to verify kibishii data in namespace %s\n", namespace)
@@ -371,10 +591,15 @@ func verifyData(ctx context.Context, namespace string, kibishiiData *KibishiiDat
 }
 
 func waitForKibishiiPods(ctx context.Context, client TestClient, kibishiiNamespace string) error {
-	return WaitForPods(ctx, client, kibishiiNamespace, []string{"jump-pad", "etcd0", "etcd1", "etcd2", "kibishii-deployment-0", "kibishii-deployment-1"})
+	return WaitForPods(
+		ctx,
+		client,
+		kibishiiNamespace,
+		[]string{"jump-pad", "etcd0", "etcd1", "etcd2", "kibishii-deployment-0", "kibishii-deployment-1"},
+	)
 }
 
-func KibishiiGenerateData(oneHourTimeout context.Context, kibishiiNamespace string, kibishiiData *KibishiiData) error {
+func kibishiiGenerateData(oneHourTimeout context.Context, kibishiiNamespace string, kibishiiData *KibishiiData) error {
 	fmt.Printf("generateData %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if err := generateData(oneHourTimeout, kibishiiNamespace, kibishiiData); err != nil {
 		return errors.Wrap(err, "Failed to generate data")
@@ -383,9 +608,18 @@ func KibishiiGenerateData(oneHourTimeout context.Context, kibishiiNamespace stri
 	return nil
 }
 
-func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClient,
-	providerName, kibishiiNamespace, registryCredentialFile, veleroFeatures,
-	kibishiiDirectory string, useVolumeSnapshots bool, kibishiiData *KibishiiData) error {
+func KibishiiPrepareBeforeBackup(
+	oneHourTimeout context.Context,
+	client TestClient,
+	providerName,
+	kibishiiNamespace,
+	registryCredentialFile,
+	veleroFeatures,
+	kibishiiDirectory string,
+	kibishiiData *KibishiiData,
+	imageRegistryProxy string,
+	workerOS string,
+) error {
 	fmt.Printf("installKibishii %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	serviceAccountName := "default"
 
@@ -399,8 +633,16 @@ func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClie
 		return errors.Wrapf(err, "failed to patch the service account %q under the namespace %q", serviceAccountName, kibishiiNamespace)
 	}
 
-	if err := installKibishii(oneHourTimeout, kibishiiNamespace, providerName, veleroFeatures,
-		kibishiiDirectory, useVolumeSnapshots, kibishiiData.ExpectedNodes); err != nil {
+	if err := installKibishii(
+		oneHourTimeout,
+		kibishiiNamespace,
+		providerName,
+		veleroFeatures,
+		kibishiiDirectory,
+		kibishiiData.ExpectedNodes,
+		imageRegistryProxy,
+		workerOS,
+	); err != nil {
 		return errors.Wrap(err, "Failed to install Kibishii workload")
 	}
 	// wait for kibishii pod startup
@@ -412,12 +654,18 @@ func KibishiiPrepareBeforeBackup(oneHourTimeout context.Context, client TestClie
 	if kibishiiData == nil {
 		kibishiiData = DefaultKibishiiData
 	}
-	KibishiiGenerateData(oneHourTimeout, kibishiiNamespace, kibishiiData)
+	kibishiiGenerateData(oneHourTimeout, kibishiiNamespace, kibishiiData)
 	return nil
 }
 
-func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, oneHourTimeout context.Context,
-	kibishiiData *KibishiiData, incrementalFileName string) error {
+func KibishiiVerifyAfterRestore(
+	client TestClient,
+	kibishiiNamespace string,
+	oneHourTimeout context.Context,
+	kibishiiData *KibishiiData,
+	incrementalFileName string,
+	workerOS string,
+) error {
 	if kibishiiData == nil {
 		kibishiiData = DefaultKibishiiData
 	}
@@ -429,7 +677,7 @@ func KibishiiVerifyAfterRestore(client TestClient, kibishiiNamespace string, one
 	}
 	if incrementalFileName != "" {
 		for _, pod := range KibishiiPodNameList {
-			exist, err := FileExistInPV(oneHourTimeout, kibishiiNamespace, pod, "kibishii", "data", incrementalFileName)
+			exist, err := FileExistInPV(oneHourTimeout, kibishiiNamespace, pod, "kibishii", "data", incrementalFileName, workerOS)
 			if err != nil {
 				return errors.Wrapf(err, "fail to get file %s", incrementalFileName)
 			}

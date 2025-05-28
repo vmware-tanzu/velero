@@ -18,6 +18,7 @@ package k8s
 
 import (
 	"fmt"
+	"path"
 	"time"
 
 	"golang.org/x/net/context"
@@ -36,6 +37,7 @@ const (
 	PollInterval         = 2 * time.Second
 	PollTimeout          = 15 * time.Minute
 	DefaultContainerName = "container-busybox"
+	TestImage            = "busybox:1.37.0"
 )
 
 // DeploymentBuilder builds Deployment objects.
@@ -48,29 +50,33 @@ func (d *DeploymentBuilder) Result() *appsv1api.Deployment {
 }
 
 // newDeployment returns a RollingUpdate Deployment with a fake container image
-func NewDeployment(name, ns string, replicas int32, labels map[string]string, containers []corev1api.Container) *DeploymentBuilder {
-	if containers == nil {
-		containers = []corev1api.Container{
-			{
-				Name:    DefaultContainerName,
-				Image:   "busybox:1.37.0",
-				Command: []string{"sleep", "1000000"},
-				// Make pod obeys the restricted pod security standards.
-				SecurityContext: &corev1api.SecurityContext{
-					AllowPrivilegeEscalation: boolptr.False(),
-					Capabilities: &corev1api.Capabilities{
-						Drop: []corev1api.Capability{"ALL"},
-					},
-					RunAsNonRoot: boolptr.True(),
-					RunAsUser:    func(i int64) *int64 { return &i }(65534),
-					RunAsGroup:   func(i int64) *int64 { return &i }(65534),
-					SeccompProfile: &corev1api.SeccompProfile{
-						Type: corev1api.SeccompProfileTypeRuntimeDefault,
-					},
+func NewDeployment(name, ns string, replicas int32, labels map[string]string, imageRegistryProxy string) *DeploymentBuilder {
+	imageAddress := TestImage
+	if imageRegistryProxy != "" {
+		imageAddress = path.Join(imageRegistryProxy, TestImage)
+	}
+
+	containers := []corev1api.Container{
+		{
+			Name:    DefaultContainerName,
+			Image:   imageAddress,
+			Command: []string{"sleep", "1000000"},
+			// Make pod obeys the restricted pod security standards.
+			SecurityContext: &corev1api.SecurityContext{
+				AllowPrivilegeEscalation: boolptr.False(),
+				Capabilities: &corev1api.Capabilities{
+					Drop: []corev1api.Capability{"ALL"},
+				},
+				RunAsNonRoot: boolptr.True(),
+				RunAsUser:    func(i int64) *int64 { return &i }(65534),
+				RunAsGroup:   func(i int64) *int64 { return &i }(65534),
+				SeccompProfile: &corev1api.SeccompProfile{
+					Type: corev1api.SeccompProfileTypeRuntimeDefault,
 				},
 			},
-		}
+		},
 	}
+
 	return &DeploymentBuilder{
 		&appsv1api.Deployment{
 			TypeMeta: metav1.TypeMeta{

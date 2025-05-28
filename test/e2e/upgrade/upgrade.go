@@ -157,9 +157,18 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			})
 
 			By("Deploy sample workload of Kibishii", func() {
-				Expect(KibishiiPrepareBeforeBackup(oneHourTimeout, *veleroCfg.ClientToInstallVelero, tmpCfg.CloudProvider,
-					upgradeNamespace, tmpCfg.RegistryCredentialFile, tmpCfg.Features,
-					tmpCfg.KibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData)).To(Succeed())
+				Expect(KibishiiPrepareBeforeBackup(
+					oneHourTimeout,
+					*veleroCfg.ClientToInstallVelero,
+					tmpCfg.CloudProvider,
+					upgradeNamespace,
+					tmpCfg.RegistryCredentialFile,
+					tmpCfg.Features,
+					tmpCfg.KibishiiDirectory,
+					DefaultKibishiiData,
+					tmpCfg.ImageRegistryProxy,
+					veleroCfg.WorkerOS,
+				)).To(Succeed())
 			})
 
 			By(fmt.Sprintf("Backup namespace %s", upgradeNamespace), func() {
@@ -239,6 +248,9 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				}
 			})
 
+			// Wait for 70s to make sure the backups are synced after Velero reinstall
+			time.Sleep(70 * time.Second)
+
 			By(fmt.Sprintf("Restore %s", upgradeNamespace), func() {
 				Expect(VeleroRestore(oneHourTimeout, tmpCfg.VeleroCLI,
 					tmpCfg.VeleroNamespace, restoreName, backupName, "")).To(Succeed(), func() string {
@@ -249,8 +261,14 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 			})
 
 			By(fmt.Sprintf("Verify workload %s after restore ", upgradeNamespace), func() {
-				Expect(KibishiiVerifyAfterRestore(*veleroCfg.ClientToInstallVelero, upgradeNamespace,
-					oneHourTimeout, DefaultKibishiiData, "")).To(Succeed(), "Fail to verify workload after restore")
+				Expect(KibishiiVerifyAfterRestore(
+					*veleroCfg.ClientToInstallVelero,
+					upgradeNamespace,
+					oneHourTimeout,
+					DefaultKibishiiData,
+					"",
+					veleroCfg.WorkerOS,
+				)).To(Succeed(), "Fail to verify workload after restore")
 			})
 		})
 	})

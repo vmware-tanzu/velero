@@ -13,8 +13,8 @@ toc:
         url: /basic-install
       - page: Customize Installation
         url: /customize-installation
-      - page: Upgrade to 1.15
-        url: /upgrade-to-1.15
+      - page: Upgrade to 1.16
+        url: /upgrade-to-1.16
       - page: Supported providers
         url: /supported-providers
       - page: Evaluation install

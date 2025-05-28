@@ -28,6 +28,7 @@ import (
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -151,7 +152,15 @@ func (r *ResourcePoliciesCase) Verify() error {
 					if vol.Name != volName {
 						continue
 					}
-					content, _, err := ReadFileFromPodVolume(r.Ctx, ns, pod.Name, "container-busybox", vol.Name, FileName)
+					content, _, err := ReadFileFromPodVolume(
+						r.Ctx,
+						ns,
+						pod.Name,
+						"container-busybox",
+						vol.Name,
+						FileName,
+						r.VeleroCfg.WorkerOS,
+					)
 					if i%2 == 0 {
 						Expect(err).To(HaveOccurred(), "Expected file not found") // File should not exist
 					} else {
@@ -209,7 +218,7 @@ func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []
 }
 
 func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volList []*corev1api.Volume) error {
-	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"resource-policies": "resource-policies"}, nil).WithVolume(volList).Result()
+	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"resource-policies": "resource-policies"}, r.VeleroCfg.ImageRegistryProxy).WithVolume(volList).Result()
 	deployment, err := CreateDeployment(r.Client.ClientGo, namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create deloyment %s the namespace %q", deployment.Name, namespace))
@@ -231,7 +240,16 @@ func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) erro
 			if vol.Name != volName {
 				continue
 			}
-			err := CreateFileToPod(r.Ctx, namespace, pod.Name, "container-busybox", vol.Name, FileName, fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, pod.Name, vol.Name))
+			err := CreateFileToPod(
+				r.Ctx,
+				namespace,
+				pod.Name,
+				"container-busybox",
+				vol.Name,
+				FileName,
+				fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, pod.Name, vol.Name),
+				common.WorkerOSLinux,
+			)
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("failed to create file into pod %s in namespace: %q", pod.Name, namespace))
 			}

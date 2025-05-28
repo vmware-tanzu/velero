@@ -28,6 +28,7 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
+	"golang.org/x/mod/semver"
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +41,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	velerexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	"github.com/vmware-tanzu/velero/test"
+	common "github.com/vmware-tanzu/velero/test/util/common"
 	eksutil "github.com/vmware-tanzu/velero/test/util/eks"
 	"github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -51,6 +53,7 @@ type installOptions struct {
 	RestoreHelperImage               string
 	VeleroServerDebugMode            bool
 	WithoutDisableInformerCacheParam bool
+	WorkerOS                         string
 }
 
 func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyCluster bool) error {
@@ -174,16 +177,17 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 	if err := installVeleroServer(
 		ctx,
 		veleroCfg.VeleroCLI,
-		veleroCfg.CloudProvider,
+		veleroCfg.VeleroVersion,
 		&installOptions{
 			Options:                          veleroInstallOptions,
 			RegistryCredentialFile:           veleroCfg.RegistryCredentialFile,
 			RestoreHelperImage:               veleroCfg.RestoreHelperImage,
 			VeleroServerDebugMode:            veleroCfg.VeleroServerDebugMode,
 			WithoutDisableInformerCacheParam: veleroCfg.WithoutDisableInformerCacheParam,
+			WorkerOS:                         veleroCfg.WorkerOS,
 		},
 	); err != nil {
-		time.Sleep(9 * time.Hour)
+		time.Sleep(1 * time.Minute)
 		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
@@ -282,7 +286,12 @@ func cleanVSpherePluginConfig(c clientset.Interface, ns, secretName, configMapNa
 	return nil
 }
 
-func installVeleroServer(ctx context.Context, cli, cloudProvider string, options *installOptions) error {
+func installVeleroServer(
+	ctx context.Context,
+	cli string,
+	version string,
+	options *installOptions,
+) error {
 	args := []string{"install"}
 	namespace := "velero"
 	if len(options.Namespace) > 0 {
@@ -295,6 +304,16 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 	if options.UseNodeAgent {
 		args = append(args, "--use-node-agent")
 	}
+
+	// TODO: need to consider align options.UseNodeAgentWindows usage
+	// with options.UseNodeAgent
+	// Only version after v1.16.0 support windows node agent.
+	if options.WorkerOS == common.WorkerOSWindows &&
+		(semver.Compare(version, "v1.16") >= 0 || version == "main") {
+		fmt.Println("Install node-agent-windows. The Velero version is ", version)
+		args = append(args, "--use-node-agent-windows")
+	}
+
 	if options.DefaultVolumesToFsBackup {
 		args = append(args, "--default-volumes-to-fs-backup")
 	}
@@ -390,13 +409,19 @@ func installVeleroServer(ctx context.Context, cli, cloudProvider string, options
 	if options.ItemBlockWorkerCount > 1 {
 		args = append(args, fmt.Sprintf("--item-block-worker-count=%d", options.ItemBlockWorkerCount))
 	}
-	args = append(args, fmt.Sprintf("--backup-repository-configmap=%s", test.BackupRepositoryConfigName))
+
+	// Only version no older than v1.15 support --backup-repository-configmap.
+	if options.BackupRepoConfigMap != "" &&
+		(semver.Compare(version, "v1.15") >= 0 || version == "main") {
+		fmt.Println("Associate backup repository ConfigMap. The Velero version is ", version)
+		args = append(args, fmt.Sprintf("--backup-repository-configmap=%s", options.BackupRepoConfigMap))
+	}
 
 	if err := createVeleroResources(ctx, cli, namespace, args, options); err != nil {
 		return err
 	}
 
-	return waitVeleroReady(ctx, namespace, options.UseNodeAgent)
+	return waitVeleroReady(ctx, namespace, options.UseNodeAgent, options.UseNodeAgentWindows)
 }
 
 func createVeleroResources(ctx context.Context, cli, namespace string, args []string, options *installOptions) error {
@@ -429,6 +454,26 @@ func createVeleroResources(ctx context.Context, cli, namespace string, args []st
 	if err = cmd.Run(); err != nil {
 		return errors.Wrapf(err, "failed to wait the CRDs be ready")
 	}
+
+	// Wait the Velero CRD API endpoint is ready
+	wait.PollUntilContextTimeout(ctx, k8s.PollInterval, time.Minute, true, func(ctx context.Context) (bool, error) {
+		v1VerifyCmd := exec.CommandContext(ctx, "kubectl", "get", "--raw", "/apis/velero.io/v1")
+		v1VerifyCmd.Stdout = os.Stdout
+		v1VerifyCmd.Stderr = os.Stderr
+		if err := v1VerifyCmd.Run(); err != nil {
+			fmt.Printf("/apis/velero.io/v1 is not ready: %s.\n", err.Error())
+			return false, nil
+		}
+
+		v2alpha1VerifyCmd := exec.CommandContext(ctx, "kubectl", "get", "--raw", "/apis/velero.io/v2alpha1")
+		v2alpha1VerifyCmd.Stdout = os.Stdout
+		v2alpha1VerifyCmd.Stderr = os.Stderr
+		if err := v2alpha1VerifyCmd.Run(); err != nil {
+			fmt.Printf("/apis/velero.io/v2alpha1 is not ready: %s.\n", err.Error())
+			return false, nil
+		}
+		return true, nil
+	})
 
 	// remove the "--crds-only" option from the args
 	args = args[:len(args)-1]
@@ -594,7 +639,7 @@ func toUnstructured(res any) (unstructured.Unstructured, error) {
 	return un, err
 }
 
-func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) error {
+func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool, useNodeAgentWindows bool) error {
 	fmt.Println("Waiting for Velero deployment to be ready.")
 	// when doing upgrade by the "kubectl apply" the command "kubectl wait --for=condition=available deployment/velero -n velero --timeout=600s" returns directly
 	// use "rollout status" instead to avoid this. For more detail information, refer to https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#complete-deployment
@@ -623,6 +668,28 @@ func waitVeleroReady(ctx context.Context, namespace string, useNodeAgent bool) e
 		})
 		if err != nil {
 			return errors.Wrap(err, "fail to wait for the node-agent ready")
+		}
+	}
+
+	if useNodeAgentWindows {
+		fmt.Println("Waiting for node-agent-windows DaemonSet to be ready.")
+		err := wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
+			stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "DaemonSet/node-agent-windows",
+				"-o", "json", "-n", namespace))
+			if err != nil {
+				return false, errors.Wrapf(err, "failed to get the node-agent-windows DaemonSet, stdout=%s, stderr=%s", stdout, stderr)
+			}
+			ds := &appsv1api.DaemonSet{}
+			if err = json.Unmarshal([]byte(stdout), ds); err != nil {
+				return false, errors.Wrapf(err, "failed to unmarshal the node-agent-windows DaemonSet")
+			}
+			if ds.Status.DesiredNumberScheduled == ds.Status.NumberAvailable {
+				return true, nil
+			}
+			return false, nil
+		})
+		if err != nil {
+			return errors.Wrap(err, "fail to wait for the node-agent-windows ready")
 		}
 	}
 
