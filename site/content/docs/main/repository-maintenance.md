@@ -155,18 +155,22 @@ Status:
 - `Recent Maintenance` keeps the status of the recent 3 maintenance jobs, including its start time, result (succeeded/failed), completion time (if the maintenance job succeeded), or error message (if the maintenance failed)
 
 ### Others
-Maintenance jobs will inherit specific labels, annotations, toleration, nodeSelector, service account, image, environment variables, cloud-credentials etc. from Velero deployment.
+Maintenance jobs will inherit toleration, nodeSelector, service account, image, environment variables, cloud-credentials etc. from Velero deployment.
 
-For labels, maintenance jobs include:
-- `velero.io/repo-name: <repository-name>` to identify which repository they are maintaining
-- Only [third-party labels][4] from the Velero server deployment that are in the predefined list, currently including:
-  - `azure.workload.identity/use`
+For labels and annotations, maintenance jobs do NOT inherit all labels and annotations from the Velero deployment. Instead, they include:
 
-For annotations, maintenance jobs include:
-- Only [third-party annotations][5] from the Velero server deployment that are in the predefined list, currently including:
-  - `iam.amazonaws.com/role`
+**Labels:**
 
-These specific labels and annotations ensure proper integration with cloud provider identity systems.
+* `velero.io/repo-name: <repository-name>` - automatically added to identify which repository they are maintaining
+* Only specific [third-party labels][4] from the Velero server deployment that are in the predefined list, currently limited to:
+  * `azure.workload.identity/use`
+
+**Annotations:**
+
+* Only specific [third-party annotations][5] from the Velero server deployment that are in the predefined list, currently limited to:
+  * `iam.amazonaws.com/role`
+
+**Important:** Other labels and annotations from the Velero deployment are NOT inherited by maintenance jobs. This is by design to ensure only specific labels and annotations required for cloud provider identity systems are propagated.
 Maintenance jobs will not run for backup repositories whose backup storage location is set as readOnly.  
 
 [1]: velero-install.md#usage
