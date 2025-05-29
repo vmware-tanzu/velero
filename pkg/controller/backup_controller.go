@@ -833,15 +833,6 @@ func persistBackup(backup *pkgbackup.Request,
 		persistErrs = append(persistErrs, errs...)
 	}
 
-	csiSnapshotJSON, errs := encode.ToJSONGzip(csiVolumeSnapshots, "csi volume snapshots list")
-	if errs != nil {
-		persistErrs = append(persistErrs, errs...)
-	}
-
-	csiSnapshotContentsJSON, errs := encode.ToJSONGzip(csiVolumeSnapshotContents, "csi volume snapshot contents list")
-	if errs != nil {
-		persistErrs = append(persistErrs, errs...)
-	}
 	csiSnapshotClassesJSON, errs := encode.ToJSONGzip(csiVolumeSnapshotClasses, "csi volume snapshot classes list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
@@ -877,27 +868,23 @@ func persistBackup(backup *pkgbackup.Request,
 		nativeVolumeSnapshots = nil
 		backupItemOperations = nil
 		backupResourceList = nil
-		csiSnapshotJSON = nil
-		csiSnapshotContentsJSON = nil
 		csiSnapshotClassesJSON = nil
 		backupResult = nil
 		volumeInfoJSON = nil
 	}
 
 	backupInfo := persistence.BackupInfo{
-		Name:                      backup.Name,
-		Metadata:                  backupJSON,
-		Contents:                  backupContents,
-		Log:                       backupLog,
-		BackupResults:             backupResult,
-		PodVolumeBackups:          podVolumeBackups,
-		VolumeSnapshots:           nativeVolumeSnapshots,
-		BackupItemOperations:      backupItemOperations,
-		BackupResourceList:        backupResourceList,
-		CSIVolumeSnapshots:        csiSnapshotJSON,
-		CSIVolumeSnapshotContents: csiSnapshotContentsJSON,
-		CSIVolumeSnapshotClasses:  csiSnapshotClassesJSON,
-		BackupVolumeInfo:          volumeInfoJSON,
+		Name:                     backup.Name,
+		Metadata:                 backupJSON,
+		Contents:                 backupContents,
+		Log:                      backupLog,
+		BackupResults:            backupResult,
+		PodVolumeBackups:         podVolumeBackups,
+		VolumeSnapshots:          nativeVolumeSnapshots,
+		BackupItemOperations:     backupItemOperations,
+		BackupResourceList:       backupResourceList,
+		CSIVolumeSnapshotClasses: csiSnapshotClassesJSON,
+		BackupVolumeInfo:         volumeInfoJSON,
 	}
 	if err := backupStore.PutBackup(backupInfo); err != nil {
 		persistErrs = append(persistErrs, err)
