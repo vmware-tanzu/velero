@@ -41,6 +41,12 @@ const (
 
 	// nodeAgentRole marks pods with node-agent role on all nodes.
 	nodeAgentRole = "node-agent"
+
+	// hostPodVolume is the name of the volume in node-agent for host-pod mount
+	hostPodVolume = "host-pods"
+
+	// HostPodVolumeMountPoint is the mount point of the volume in node-agent for host-pod mount
+	HostPodVolumeMountPoint = "host_pods"
 )
 
 var (
@@ -248,4 +254,38 @@ func GetAnnotationValue(ctx context.Context, kubeClient kubernetes.Interface, na
 	}
 
 	return val, nil
+}
+
+func GetHostPodPath(ctx context.Context, kubeClient kubernetes.Interface, namespace string, osType string) (string, error) {
+	dsName := daemonSet
+	if osType == kube.NodeOSWindows {
+		dsName = daemonsetWindows
+	}
+
+	ds, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, dsName, metav1.GetOptions{})
+	if err != nil {
+		return "", errors.Wrapf(err, "error getting daemonset %s", dsName)
+	}
+
+	var volume *corev1api.Volume
+	for _, v := range ds.Spec.Template.Spec.Volumes {
+		if v.Name == hostPodVolume {
+			volume = &v
+			break
+		}
+	}
+
+	if volume == nil {
+		return "", errors.New("host pod volume is not found")
+	}
+
+	if volume.HostPath == nil {
+		return "", errors.New("host pod volume is not a host path volume")
+	}
+
+	if volume.HostPath.Path == "" {
+		return "", errors.New("host pod volume path is empty")
+	}
+
+	return volume.HostPath.Path, nil
 }
