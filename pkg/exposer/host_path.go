@@ -59,7 +59,7 @@ func GetPodVolumeHostPath(ctx context.Context, pod *corev1api.Pod, volumeName st
 		volSubDir = "volumeDevices"
 	}
 
-	pathGlob := fmt.Sprintf("/%s/%s/%s/*/%s", nodeagent.HostPodVolumeMountPoint, string(pod.GetUID()), volSubDir, volDir)
+	pathGlob := fmt.Sprintf("%s/%s/%s/*/%s", nodeagent.HostPodVolumeMountPath(), string(pod.GetUID()), volSubDir, volDir)
 	logger.WithField("pathGlob", pathGlob).Debug("Looking for path matching glob")
 
 	path, err := singlePathMatch(pathGlob, fs, logger)
@@ -88,8 +88,8 @@ func ExtractPodVolumeHostPath(ctx context.Context, path string, kubeClient kuber
 	}
 
 	if osType == kube.NodeOSWindows {
-		return strings.Replace(path, "\\"+nodeagent.HostPodVolumeMountPoint, podPath, 1), nil
+		return strings.Replace(path, nodeagent.HostPodVolumeMountPathWin(), podPath, 1), nil
 	} else {
-		return strings.Replace(path, "/"+nodeagent.HostPodVolumeMountPoint, podPath, 1), nil
+		return strings.Replace(path, nodeagent.HostPodVolumeMountPath(), podPath, 1), nil
 	}
 }

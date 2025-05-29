@@ -615,7 +615,7 @@ func TestGetHostPodPath(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
 						{
-							Name: hostPodVolume,
+							Name: HostPodVolumeMount,
 						},
 					},
 				},
@@ -636,7 +636,7 @@ func TestGetHostPodPath(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
 						{
-							Name: hostPodVolume,
+							Name: HostPodVolumeMount,
 							VolumeSource: corev1api.VolumeSource{
 								HostPath: &corev1api.HostPathVolumeSource{},
 							},
@@ -660,7 +660,7 @@ func TestGetHostPodPath(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
 						{
-							Name: hostPodVolume,
+							Name: HostPodVolumeMount,
 							VolumeSource: corev1api.VolumeSource{
 								HostPath: &corev1api.HostPathVolumeSource{
 									Path: "/var/lib/kubelet/pods",

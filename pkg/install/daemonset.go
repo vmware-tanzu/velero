@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/vmware-tanzu/velero/internal/velero"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 )
 
 func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet {
@@ -126,8 +127,8 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 							},
 							VolumeMounts: []corev1api.VolumeMount{
 								{
-									Name:             "host-pods",
-									MountPath:        "/host_pods",
+									Name:             nodeagent.HostPodVolumeMount,
+									MountPath:        nodeagent.HostPodVolumeMountPath(),
 									MountPropagation: &mountPropagationMode,
 								},
 								{

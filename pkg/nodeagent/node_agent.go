@@ -42,8 +42,8 @@ const (
 	// nodeAgentRole marks pods with node-agent role on all nodes.
 	nodeAgentRole = "node-agent"
 
-	// hostPodVolume is the name of the volume in node-agent for host-pod mount
-	hostPodVolume = "host-pods"
+	// HostPodVolumeMount is the name of the volume in node-agent for host-pod mount
+	HostPodVolumeMount = "host-pods"
 
 	// HostPodVolumeMountPoint is the mount point of the volume in node-agent for host-pod mount
 	HostPodVolumeMountPoint = "host_pods"
@@ -269,7 +269,7 @@ func GetHostPodPath(ctx context.Context, kubeClient kubernetes.Interface, namesp
 
 	var volume *corev1api.Volume
 	for _, v := range ds.Spec.Template.Spec.Volumes {
-		if v.Name == hostPodVolume {
+		if v.Name == HostPodVolumeMount {
 			volume = &v
 			break
 		}
@@ -288,4 +288,12 @@ func GetHostPodPath(ctx context.Context, kubeClient kubernetes.Interface, namesp
 	}
 
 	return volume.HostPath.Path, nil
+}
+
+func HostPodVolumeMountPath() string {
+	return "/" + HostPodVolumeMountPoint
+}
+
+func HostPodVolumeMountPathWin() string {
+	return "\\" + HostPodVolumeMountPoint
 }
