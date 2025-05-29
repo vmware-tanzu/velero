@@ -26,6 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -114,6 +115,16 @@ func (nt *nsTracker) init(
 	nt.logger = logger
 
 	for _, namespace := range unstructuredNSs {
+		ns := new(corev1api.Namespace)
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(namespace.UnstructuredContent(), ns); err != nil {
+			nt.logger.WithError(err).Errorf("Fail to convert unstructured into namespace %s", namespace.GetName())
+			continue
+		}
+		if ns.Status.Phase != corev1api.NamespaceActive {
+			nt.logger.Infof("Skip namespace %s because it's not in Active phase.", namespace.GetName())
+			continue
+		}
+
 		if nt.singleLabelSelector != nil &&
 			nt.singleLabelSelector.Matches(labels.Set(namespace.GetLabels())) {
 			nt.logger.Debugf("Track namespace %s, because its labels match backup LabelSelector.",
