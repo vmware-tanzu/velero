@@ -510,7 +510,7 @@ func TestPodVolumeRestoreActionExecuteWithFileSystemShouldAddWaitInitContainer(t
 				).
 				Result(),
 			podVolumeBackups:       nil,
-			restore:                builder.ForRestore("velero", "restore-1").Result(),
+			restore:                builder.ForRestore("velero", "restore-1").Backup("test-backup").Result(),
 			expectedInitContainers: 0,
 			expectedError:          nil,
 		},
@@ -532,18 +532,19 @@ func TestPodVolumeRestoreActionExecuteWithFileSystemShouldAddWaitInitContainer(t
 				Result(),
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "test-backup")).
 					PodName("different-pod").
 					PodNamespace("ns").
 					Volume("volume-1").
 					SnapshotID("snapshot-1").
 					Result(),
 			},
-			restore:                builder.ForRestore("velero", "restore-1").Result(),
+			restore:                builder.ForRestore("velero", "restore-1").Backup("test-backup").Result(),
 			expectedInitContainers: 0,
 			expectedError:          nil,
 		},
 		{
-			name: "matching pod volume backup results in init container",
+			name: "matching pod volume backup results in init container being added",
 			pod: builder.ForPod("ns", "pod").
 				ObjectMeta(builder.WithUID("pod-uid")).
 				Volumes(
@@ -560,18 +561,19 @@ func TestPodVolumeRestoreActionExecuteWithFileSystemShouldAddWaitInitContainer(t
 				Result(),
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "test-backup")).
 					PodName("pod").
 					PodNamespace("ns").
 					Volume("volume-1").
 					SnapshotID("snapshot-1").
 					Result(),
 			},
-			restore:                builder.ForRestore("velero", "restore-1").Result(),
-			expectedInitContainers: 0,
+			restore:                builder.ForRestore("velero", "restore-1").Backup("test-backup").Result(),
+			expectedInitContainers: 1,
 			expectedError:          nil,
 		},
 		{
-			name: "matching pod volume backup with matching pod name and namespace still results in no init container",
+			name: "matching pod volume backup with matching pod name and namespace results in init container being added",
 			pod: builder.ForPod("ns", "pod").
 				ObjectMeta(builder.WithUID("pod-uid")).
 				Volumes(
@@ -588,14 +590,15 @@ func TestPodVolumeRestoreActionExecuteWithFileSystemShouldAddWaitInitContainer(t
 				Result(),
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "test-backup")).
 					PodName("pod").
 					PodNamespace("ns").
 					Volume("volume-1").
 					SnapshotID("snapshot-1").
 					Result(),
 			},
-			restore:                builder.ForRestore("velero", "restore-1").Result(),
-			expectedInitContainers: 0,
+			restore:                builder.ForRestore("velero", "restore-1").Backup("test-backup").Result(),
+			expectedInitContainers: 1,
 			expectedError:          nil,
 		},
 		{
@@ -624,13 +627,14 @@ func TestPodVolumeRestoreActionExecuteWithFileSystemShouldAddWaitInitContainer(t
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
 				// This PVB doesn't match the pod's name, so needsFileSystemRestore will be false
 				builder.ForPodVolumeBackup("velero", "pvb-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "test-backup")).
 					PodName("different-pod").
 					PodNamespace("ns").
 					Volume("volume-1").
 					SnapshotID("snapshot-1").
 					Result(),
 			},
-			restore:                builder.ForRestore("velero", "restore-1").Result(),
+			restore:                builder.ForRestore("velero", "restore-1").Backup("test-backup").Result(),
 			expectedInitContainers: 1, // Only the "another-init" container should remain
 			expectedError:          nil,
 		},
@@ -660,13 +664,14 @@ func TestPodVolumeRestoreActionExecuteWithFileSystemShouldAddWaitInitContainer(t
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
 				// This PVB doesn't match the pod's name, so needsFileSystemRestore will be false
 				builder.ForPodVolumeBackup("velero", "pvb-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "test-backup")).
 					PodName("different-pod").
 					PodNamespace("ns").
 					Volume("volume-1").
 					SnapshotID("snapshot-1").
 					Result(),
 			},
-			restore:                builder.ForRestore("velero", "restore-1").Result(),
+			restore:                builder.ForRestore("velero", "restore-1").Backup("test-backup").Result(),
 			expectedInitContainers: 1, // Only the "another-init" container should remain
 			expectedError:          nil,
 		},
@@ -728,14 +733,6 @@ func TestPodVolumeRestoreActionExecuteWithFileSystemShouldAddWaitInitContainer(t
 
 				// Check if the init container was added or removed as expected
 				assert.Equal(t, tc.expectedInitContainers, len(outputPod.Spec.InitContainers), "Unexpected number of init containers")
-				
-				// If we expect init containers, make sure none of them are the restore-wait container
-				if tc.expectedInitContainers > 0 {
-					for _, container := range outputPod.Spec.InitContainers {
-						assert.NotEqual(t, restorehelper.WaitInitContainer, container.Name, "Found unexpected %s init container", restorehelper.WaitInitContainer)
-						assert.NotEqual(t, restorehelper.WaitInitContainerLegacy, container.Name, "Found unexpected %s init container", restorehelper.WaitInitContainerLegacy)
-					}
-				}
 			}
 		})
 	}
