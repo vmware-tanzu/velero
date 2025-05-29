@@ -112,17 +112,18 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 		podVolumeBackups = append(podVolumeBackups, &podVolumeBackupList.Items[i])
 	}
 	volumeSnapshots := podvolume.GetVolumeBackupsForPod(podVolumeBackups, &pod, podFromBackup.Namespace)
-	
+
 	// Default to not needing file system restore
 	needsFileSystemRestore := false
-	
+
 	if len(volumeSnapshots) == 0 {
 		log.Debug("No pod volume backups found for pod")
 	} else {
 		log.Info("Pod volume backups for pod found")
 
 		// Check if any of the volumes need file system restores
-		// If the restore is using native datamover or CSI, we don't need the init container
+		// Volumes that have PodVolumeBackups were backed up using file system backup and need the init container
+		// Volumes backed up using native datamover or CSI won't have PodVolumeBackups and don't need the init container
 		for volumeName := range volumeSnapshots {
 			// Check if this volume exists in the backup's PVCs
 			for _, pvb := range podVolumeBackups {
@@ -138,10 +139,9 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 		}
 	}
 
-
 	if !needsFileSystemRestore {
-		log.Info("Pod volumes don't need file system restore, removing restore-wait init container if it exists")
-		
+		log.Info("No pod volumes need file system restore (backed up using native datamover or CSI), removing restore-wait init container if it exists")
+
 		// Check if the restore-wait init container exists and remove it
 		if len(pod.Spec.InitContainers) > 0 && (pod.Spec.InitContainers[0].Name == restorehelper.WaitInitContainer || pod.Spec.InitContainers[0].Name == restorehelper.WaitInitContainerLegacy) {
 			pod.Spec.InitContainers = pod.Spec.InitContainers[1:]
