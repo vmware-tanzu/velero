@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
+	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	podvolumeconfigs "github.com/vmware-tanzu/velero/pkg/podvolume/configs"
@@ -43,10 +44,6 @@ const (
 
 	defaultMaxConcurrentK8SConnections = 30
 	defaultDisableInformerCache        = false
-
-	// defaultCredentialsDirectory is the path on disk where credential
-	// files will be written to
-	defaultCredentialsDirectory = "/tmp/credentials"
 
 	DefaultKeepLatestMaintenanceJobs = 3
 	DefaultMaintenanceJobCPURequest  = "0"
@@ -211,7 +208,7 @@ func GetDefaultConfig() *Config {
 		DefaultSnapshotMoveData:        false,
 		DisableInformerCache:           defaultDisableInformerCache,
 		ScheduleSkipImmediately:        false,
-		CredentialsDirectory:           defaultCredentialsDirectory,
+		CredentialsDirectory:           credentials.DefaultStoreDirectory(),
 		PodResources: kube.PodResources{
 			CPURequest:    DefaultMaintenanceJobCPULimit,
 			CPULimit:      DefaultMaintenanceJobCPURequest,
