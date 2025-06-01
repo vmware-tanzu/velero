@@ -34,7 +34,7 @@ func TestClearOutputFlagDefault(t *testing.T) {
 	BindFlags(cmd.Flags())
 	cmd.Flags().Set("output", "json")
 	ClearOutputFlagDefault(cmd)
-	assert.Equal(t, "", cmd.Flags().Lookup("output").Value.String())
+	assert.Empty(t, cmd.Flags().Lookup("output").Value.String())
 }
 
 func cmdWithFormat(use string, format string) *cobra.Command {

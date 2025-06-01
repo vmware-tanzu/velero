@@ -938,7 +938,7 @@ func TestUpdateProgress(t *testing.T) {
 			if len(tc.logMessage) > 0 {
 				assert.Contains(t, logMessage, tc.logMessage)
 			} else {
-				assert.Equal(t, "", logMessage)
+				assert.Empty(t, logMessage)
 			}
 		})
 	}
@@ -1340,7 +1340,7 @@ func TestMaintainProgress(t *testing.T) {
 			if len(tc.logMessage) > 0 {
 				assert.Contains(t, logMessage, tc.logMessage)
 			} else {
-				assert.Equal(t, "", logMessage)
+				assert.Empty(t, logMessage)
 			}
 		})
 	}
