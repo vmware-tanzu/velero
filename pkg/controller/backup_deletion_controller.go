@@ -333,7 +333,7 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 		duList := &velerov2alpha1.DataUploadList{}
 		log.Info("Removing local datauploads")
-		if err := r.Client.List(ctx, duList, &client.ListOptions{
+		if err := r.List(ctx, duList, &client.ListOptions{
 			Namespace: backup.Namespace,
 			LabelSelector: labels.SelectorFromSet(map[string]string{
 				velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
@@ -456,7 +456,7 @@ func (r *backupDeletionReconciler) volumeSnapshottersForVSL(
 	pluginManager clientmgmt.Manager,
 ) (vsv1.VolumeSnapshotter, error) {
 	vsl := &velerov1api.VolumeSnapshotLocation{}
-	if err := r.Client.Get(ctx, types.NamespacedName{
+	if err := r.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      vslName,
 	}, vsl); err != nil {
@@ -509,7 +509,7 @@ func (r *backupDeletionReconciler) deleteExistingDeletionRequests(ctx context.Co
 // when it's running, e.g. due to velero pod restart, and the backup.tar is failed to be downloaded from storage.
 func (r *backupDeletionReconciler) deleteCSIVolumeSnapshotsIfAny(ctx context.Context, backup *velerov1api.Backup, log logrus.FieldLogger) {
 	vsList := snapshotv1api.VolumeSnapshotList{}
-	if err := r.Client.List(ctx, &vsList, &client.ListOptions{
+	if err := r.List(ctx, &vsList, &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
 		}),
@@ -543,7 +543,7 @@ func (r *backupDeletionReconciler) deleteMovedSnapshots(ctx context.Context, bac
 		return nil
 	}
 	list := &corev1api.ConfigMapList{}
-	if err := r.Client.List(ctx, list, &client.ListOptions{
+	if err := r.List(ctx, list, &client.ListOptions{
 		Namespace: backup.Namespace,
 		LabelSelector: labels.SelectorFromSet(
 			map[string]string{
@@ -590,7 +590,7 @@ func (r *backupDeletionReconciler) deleteMovedSnapshots(ctx context.Context, bac
 
 	for i := range list.Items {
 		cm := list.Items[i]
-		if err := r.Client.Delete(ctx, &cm); err != nil {
+		if err := r.Delete(ctx, &cm); err != nil {
 			r.logger.Warnf("Failed to delete snapshot info configmap %s/%s: %v", cm.Namespace, cm.Name, err)
 		}
 	}
@@ -640,7 +640,7 @@ func (r *backupDeletionReconciler) patchBackup(ctx context.Context, backup *vele
 		return nil, errors.Wrap(err, "error creating json merge patch for Backup")
 	}
 
-	if err := r.Client.Patch(ctx, backup, client.RawPatch(types.MergePatchType, patchBytes)); err != nil {
+	if err := r.Patch(ctx, backup, client.RawPatch(types.MergePatchType, patchBytes)); err != nil {
 		return nil, errors.Wrap(err, "error patching Backup")
 	}
 	return backup, nil

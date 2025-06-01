@@ -99,7 +99,7 @@ type PodVolumeRestoreReconciler struct {
 // +kubebuilder:rbac:groups="",resources=persistentvolumerclaims,verbs=get
 
 func (r *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.logger.WithField("PodVolumeRestore", req.NamespacedName.String())
+	log := r.logger.WithField("PodVolumeRestore", req.String())
 	log.Info("Reconciling PVR by advanced controller")
 
 	pvr := &velerov1api.PodVolumeRestore{}

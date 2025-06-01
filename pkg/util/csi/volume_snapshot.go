@@ -355,16 +355,16 @@ func GetVolumeSnapshotClassFromPVCAnnotationsForDriver(
 	snapshotClasses *snapshotv1api.VolumeSnapshotClassList,
 ) (*snapshotv1api.VolumeSnapshotClass, error) {
 	annotationKey := velerov1api.VolumeSnapshotClassDriverPVCAnnotation
-	snapshotClassName, ok := pvc.ObjectMeta.Annotations[annotationKey]
+	snapshotClassName, ok := pvc.Annotations[annotationKey]
 	if !ok {
 		return nil, nil
 	}
 	for _, sc := range snapshotClasses.Items {
-		if strings.EqualFold(snapshotClassName, sc.ObjectMeta.Name) {
+		if strings.EqualFold(snapshotClassName, sc.Name) {
 			if !strings.EqualFold(sc.Driver, provisioner) {
 				return nil, errors.Errorf(
 					"Incorrect VolumeSnapshotClass %s is not for driver %s",
-					sc.ObjectMeta.Name, provisioner,
+					sc.Name, provisioner,
 				)
 			}
 			return &sc, nil
@@ -389,16 +389,16 @@ func GetVolumeSnapshotClassFromBackupAnnotationsForDriver(
 		velerov1api.VolumeSnapshotClassDriverBackupAnnotationPrefix,
 		strings.ToLower(provisioner),
 	)
-	snapshotClassName, ok := backup.ObjectMeta.Annotations[annotationKey]
+	snapshotClassName, ok := backup.Annotations[annotationKey]
 	if !ok {
 		return nil, nil
 	}
 	for _, sc := range snapshotClasses.Items {
-		if strings.EqualFold(snapshotClassName, sc.ObjectMeta.Name) {
+		if strings.EqualFold(snapshotClassName, sc.Name) {
 			if !strings.EqualFold(sc.Driver, provisioner) {
 				return nil, errors.Errorf(
 					"Incorrect VolumeSnapshotClass %s is not for driver %s for backup %s",
-					sc.ObjectMeta.Name, provisioner, backup.Name,
+					sc.Name, provisioner, backup.Name,
 				)
 			}
 			return &sc, nil

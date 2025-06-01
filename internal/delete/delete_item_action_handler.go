@@ -120,7 +120,7 @@ func InvokeDeleteActions(ctx *Context) error {
 						continue
 					}
 
-					err = action.DeleteItemAction.Execute(&velero.DeleteItemActionExecuteInput{
+					err = action.Execute(&velero.DeleteItemActionExecuteInput{
 						Item:   obj,
 						Backup: ctx.Backup,
 					})

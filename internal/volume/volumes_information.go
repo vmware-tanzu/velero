@@ -434,7 +434,7 @@ func (v *BackupVolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 
 		var operation itemoperation.BackupOperation
 		for _, op := range v.BackupOperations {
-			if op.Spec.ResourceIdentifier.GroupResource.String() == kuberesource.VolumeSnapshots.String() &&
+			if op.Spec.ResourceIdentifier.String() == kuberesource.VolumeSnapshots.String() &&
 				op.Spec.ResourceIdentifier.Name == volumeSnapshot.Name &&
 				op.Spec.ResourceIdentifier.Namespace == volumeSnapshot.Namespace {
 				operation = *op
@@ -555,9 +555,9 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 	// Retrieve the operations containing DataUpload.
 	duOperationMap := make(map[kbclient.ObjectKey]*itemoperation.BackupOperation)
 	for _, operation := range v.BackupOperations {
-		if operation.Spec.ResourceIdentifier.GroupResource.String() == kuberesource.PersistentVolumeClaims.String() {
+		if operation.Spec.ResourceIdentifier.String() == kuberesource.PersistentVolumeClaims.String() {
 			for _, identifier := range operation.Spec.PostOperationItems {
-				if identifier.GroupResource.String() == "datauploads.velero.io" {
+				if identifier.String() == "datauploads.velero.io" {
 					duOperationMap[kbclient.ObjectKey{
 						Namespace: identifier.Namespace,
 						Name:      identifier.Name,

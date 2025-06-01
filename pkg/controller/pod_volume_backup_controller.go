@@ -535,7 +535,7 @@ func (r *PodVolumeBackupReconciler) OnDataPathCompleted(ctx context.Context, nam
 	}); err != nil {
 		log.WithError(err).Error("error updating PVB status")
 	} else {
-		latencyDuration := completionTime.Time.Sub(pvb.Status.StartTimestamp.Time)
+		latencyDuration := completionTime.Sub(pvb.Status.StartTimestamp.Time)
 		latencySeconds := float64(latencyDuration / time.Second)
 		backupName := fmt.Sprintf("%s/%s", pvb.Namespace, pvb.OwnerReferences[0].Name)
 		generateOpName := fmt.Sprintf("%s-%s-%s-%s-backup", pvb.Name, pvb.Spec.BackupStorageLocation, pvb.Spec.Pod.Namespace, pvb.Spec.UploaderType)

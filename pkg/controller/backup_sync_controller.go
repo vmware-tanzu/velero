@@ -190,7 +190,7 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		backup.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(backup.Spec.StorageLocation)
 
 		//check for the ownership references. If they do not exist, remove them.
-		backup.ObjectMeta.OwnerReferences = b.filterBackupOwnerReferences(ctx, backup, log)
+		backup.OwnerReferences = b.filterBackupOwnerReferences(ctx, backup, log)
 
 		// attempt to create backup custom resource via API
 		err = b.client.Create(ctx, backup, &client.CreateOptions{})
@@ -284,7 +284,7 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 func (b *backupSyncReconciler) filterBackupOwnerReferences(ctx context.Context, backup *velerov1api.Backup, log logrus.FieldLogger) []metav1.OwnerReference {
-	listedReferences := backup.ObjectMeta.OwnerReferences
+	listedReferences := backup.OwnerReferences
 	foundReferences := make([]metav1.OwnerReference, 0)
 	for _, v := range listedReferences {
 		switch v.Kind {

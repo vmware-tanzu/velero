@@ -127,7 +127,7 @@ func (p *pvcBackupItemAction) validatePVCandPV(
 		return false, updateItem, errors.WithStack(err)
 	}
 
-	if pv.Spec.PersistentVolumeSource.CSI == nil {
+	if pv.Spec.CSI == nil {
 		p.log.Infof(
 			"Skipping PVC %s/%s, associated PV %s is not a CSI volume",
 			pvc.Namespace, pvc.Name, pv.Name)
@@ -178,7 +178,7 @@ func (p *pvcBackupItemAction) createVolumeSnapshot(
 	p.log.Infof("VolumeSnapshotClass=%s", vsClass.Name)
 
 	vsLabels := map[string]string{}
-	for k, v := range pvc.ObjectMeta.Labels {
+	for k, v := range pvc.Labels {
 		vsLabels[k] = v
 	}
 	vsLabels[velerov1api.BackupNameLabel] = label.GetValidName(backup.Name)
@@ -372,7 +372,7 @@ func (p *pvcBackupItemAction) Execute(
 	p.log.Infof("Returning from PVCBackupItemAction with %d additionalItems to backup",
 		len(additionalItems))
 	for _, ai := range additionalItems {
-		p.log.Debugf("%s: %s", ai.GroupResource.String(), ai.Name)
+		p.log.Debugf("%s: %s", ai.String(), ai.Name)
 	}
 
 	pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pvc)
