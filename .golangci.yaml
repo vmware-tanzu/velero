@@ -264,7 +264,6 @@ linters:
         - equal-values # FIXME
         - float-compare
         - go-require
-        - len # FIXME
         - require-error
       enable-all: true
 

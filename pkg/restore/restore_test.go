@@ -1028,15 +1028,15 @@ func TestInvalidTarballContents(t *testing.T) {
 func assertWantErrsOrWarnings(t *testing.T, wantRes Result, res Result) {
 	t.Helper()
 	if wantRes.Velero != nil {
-		assert.Equal(t, len(wantRes.Velero), len(res.Velero))
+		assert.Len(t, res.Velero, len(wantRes.Velero))
 		for i := range res.Velero {
 			assert.Contains(t, res.Velero[i], wantRes.Velero[i])
 		}
 	}
 	if wantRes.Namespaces != nil {
-		assert.Equal(t, len(wantRes.Namespaces), len(res.Namespaces))
+		assert.Len(t, res.Namespaces, len(wantRes.Namespaces))
 		for ns := range res.Namespaces {
-			assert.Equal(t, len(wantRes.Namespaces[ns]), len(res.Namespaces[ns]))
+			assert.Len(t, res.Namespaces[ns], len(wantRes.Namespaces[ns]))
 			for i := range res.Namespaces[ns] {
 				assert.Contains(t, res.Namespaces[ns][i], wantRes.Namespaces[ns][i])
 			}
