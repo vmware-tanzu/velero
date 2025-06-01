@@ -148,7 +148,7 @@ func (v volumeHelperImpl) ShouldPerformFSBackup(volume corev1api.Volume, pod cor
 		var err error
 		resource = &volume
 		var pvc = &corev1api.PersistentVolumeClaim{}
-		if volume.VolumeSource.PersistentVolumeClaim != nil {
+		if volume.PersistentVolumeClaim != nil {
 			pvc, err = kubeutil.GetPVCForPodVolume(&volume, &pod, v.client)
 			if err != nil {
 				v.logger.WithError(err).Errorf("fail to get PVC for pod %s", pod.Namespace+"/"+pod.Name)
