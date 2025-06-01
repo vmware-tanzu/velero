@@ -1019,9 +1019,9 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 			})
 
 			if test.expectedErr != "" {
-				assert.EqualError(t, err, test.expectedErr)
+				require.EqualError(t, err, test.expectedErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if test.expectedResult != nil {
@@ -1074,15 +1074,15 @@ func TestOnPodVolumeRestoreFailed(t *testing.T) {
 		namespace := pvr.Namespace
 		pvrName := pvr.Name
 
-		assert.NoError(t, r.client.Create(ctx, pvr))
+		require.NoError(t, r.client.Create(ctx, pvr))
 		r.OnDataPathFailed(ctx, namespace, pvrName, fmt.Errorf("Failed to handle %v", pvrName))
 		updatedPVR := &velerov1api.PodVolumeRestore{}
 		if getErr {
-			assert.Error(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
+			require.Error(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
 			assert.NotEqual(t, velerov1api.PodVolumeRestorePhaseFailed, updatedPVR.Status.Phase)
 			assert.True(t, updatedPVR.Status.StartTimestamp.IsZero())
 		} else {
-			assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
+			require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
 			assert.Equal(t, velerov1api.PodVolumeRestorePhaseFailed, updatedPVR.Status.Phase)
 			assert.True(t, updatedPVR.Status.StartTimestamp.IsZero())
 		}
@@ -1100,15 +1100,15 @@ func TestOnPodVolumeRestoreCancelled(t *testing.T) {
 		namespace := pvr.Namespace
 		pvrName := pvr.Name
 
-		assert.NoError(t, r.client.Create(ctx, pvr))
+		require.NoError(t, r.client.Create(ctx, pvr))
 		r.OnDataPathCancelled(ctx, namespace, pvrName)
 		updatedPVR := &velerov1api.PodVolumeRestore{}
 		if getErr {
-			assert.Error(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
+			require.Error(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
 			assert.NotEqual(t, velerov1api.PodVolumeRestorePhaseFailed, updatedPVR.Status.Phase)
 			assert.True(t, updatedPVR.Status.StartTimestamp.IsZero())
 		} else {
-			assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
+			require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
 			assert.Equal(t, velerov1api.PodVolumeRestorePhaseCanceled, updatedPVR.Status.Phase)
 			assert.False(t, updatedPVR.Status.StartTimestamp.IsZero())
 			assert.False(t, updatedPVR.Status.CompletionTimestamp.IsZero())
@@ -1147,15 +1147,15 @@ func TestOnPodVolumeRestoreCompleted(t *testing.T) {
 			namespace := pvr.Namespace
 			ddName := pvr.Name
 
-			assert.NoError(t, r.client.Create(ctx, pvr))
+			require.NoError(t, r.client.Create(ctx, pvr))
 			r.OnDataPathCompleted(ctx, namespace, ddName, datapath.Result{})
 			updatedDD := &velerov1api.PodVolumeRestore{}
 			if test.isGetErr {
-				assert.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+				require.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 				assert.Equal(t, velerov1api.PodVolumeRestorePhase(""), updatedDD.Status.Phase)
 				assert.True(t, updatedDD.Status.CompletionTimestamp.IsZero())
 			} else {
-				assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+				require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 				assert.Equal(t, velerov1api.PodVolumeRestorePhaseCompleted, updatedDD.Status.Phase)
 				assert.False(t, updatedDD.Status.CompletionTimestamp.IsZero())
 			}
@@ -1205,7 +1205,7 @@ func TestOnPodVolumeRestoreProgress(t *testing.T) {
 			namespace := pvr.Namespace
 			pvrName := pvr.Name
 
-			assert.NoError(t, r.client.Create(context.Background(), pvr))
+			require.NoError(t, r.client.Create(context.Background(), pvr))
 
 			// Create a Progress object
 			progress := &uploader.Progress{
@@ -1216,7 +1216,7 @@ func TestOnPodVolumeRestoreProgress(t *testing.T) {
 			r.OnDataPathProgress(ctx, namespace, pvrName, progress)
 			if len(test.needErrs) != 0 && !test.needErrs[0] {
 				updatedPVR := &velerov1api.PodVolumeRestore{}
-				assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
+				require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvrName, Namespace: namespace}, updatedPVR))
 				assert.Equal(t, test.progress.TotalBytes, updatedPVR.Status.Progress.TotalBytes)
 				assert.Equal(t, test.progress.BytesDone, updatedPVR.Status.Progress.BytesDone)
 			}

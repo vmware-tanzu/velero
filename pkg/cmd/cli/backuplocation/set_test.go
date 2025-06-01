@@ -26,6 +26,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
 	cmdtest "github.com/vmware-tanzu/velero/pkg/cmd/test"
@@ -66,10 +67,10 @@ func TestNewSetCommand(t *testing.T) {
 	args := []string{backupName}
 	o.Complete(args, f)
 	e := o.Validate(c, args, f)
-	assert.NoError(t, e)
+	require.NoError(t, e)
 
 	e = o.Run(c, f)
-	assert.ErrorContains(t, e, fmt.Sprintf("%s: no such file or directory", cacert))
+	require.ErrorContains(t, e, fmt.Sprintf("%s: no such file or directory", cacert))
 
 	// verify all options are set as expected
 	assert.Equal(t, backupName, o.Name)
