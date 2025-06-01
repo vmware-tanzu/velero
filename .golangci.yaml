@@ -252,7 +252,6 @@ linters:
       checks:
         - all
         - -QF1008 # Omit embedded fields from selector expression
-        - -QF1009 # Use time.Time.Equal instead of == operator
         - -QF1012 # Use fmt.Fprintf(x, ...) instead of x.Write(fmt.Sprintf(...))
 
     testifylint:
