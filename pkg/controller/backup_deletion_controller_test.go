@@ -195,7 +195,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Create(context.TODO(), existing2)
 		require.NoError(t, err)
 		_, err = td.controller.Reconcile(context.TODO(), td.req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// verify "existing" is deleted
 		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
 			Namespace: existing.Namespace,
@@ -392,7 +392,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		td.backupStore.AssertCalled(t, "DeleteBackup", input.Spec.BackupName)
 
@@ -516,7 +516,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())
@@ -900,7 +900,7 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			})
 
 			res, err := getSnapshotsInBackup(context.TODO(), veleroBackup, clientBuilder.Build())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.True(t, reflect.DeepEqual(res, test.expected))
 		})

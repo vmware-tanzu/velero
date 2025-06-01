@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
@@ -260,7 +261,7 @@ allowPrivilegeEscalation: false`},
 				assert.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if tt.expected == nil {
 				tt.expected = &corev1api.SecurityContext{}

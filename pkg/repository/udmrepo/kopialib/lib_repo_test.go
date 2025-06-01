@@ -422,9 +422,9 @@ func TestWriteInitParameters(t *testing.T) {
 			err := writeInitParameters(ctx, tc.repoOptions, logger)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
 			}
 			if tc.expectedReplaceManifestsParams != nil {
 				actualReplaceManifestsParams, converted := tc.returnRepoWriter.Calls[0].Arguments.Get(2).(*maintenance.Params)
@@ -1026,7 +1026,7 @@ func TestReaderSeek(t *testing.T) {
 			ret, err := kr.Seek(0, 0)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedRet, ret)
 			} else {
 				assert.EqualError(t, err, tc.expectedErr)
@@ -1157,7 +1157,7 @@ func TestWriterWrite(t *testing.T) {
 			ret, err := kr.Write(nil)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedRet, ret)
 			} else {
 				assert.EqualError(t, err, tc.expectedErr)
@@ -1205,7 +1205,7 @@ func TestWriterCheckpoint(t *testing.T) {
 			ret, err := kr.Checkpoint()
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedRet, ret)
 			} else {
 				assert.EqualError(t, err, tc.expectedErr)
@@ -1253,7 +1253,7 @@ func TestWriterResult(t *testing.T) {
 			ret, err := kr.Result()
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedRet, ret)
 			} else {
 				assert.EqualError(t, err, tc.expectedErr)

@@ -166,7 +166,7 @@ func TestGetInnermostTrace(t *testing.T) {
 			res := getInnermostTrace(test.err)
 
 			if test.expectedRes == nil {
-				assert.NoError(t, res)
+				require.NoError(t, res)
 				return
 			}
 

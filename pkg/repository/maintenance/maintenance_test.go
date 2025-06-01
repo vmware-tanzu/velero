@@ -117,12 +117,12 @@ func TestDeleteOldJobs(t *testing.T) {
 
 	// Call the function
 	err := DeleteOldJobs(cli, repo, keep)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Get the remaining jobs
 	jobList := &batchv1.JobList{}
 	err = cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// We expect the number of jobs to be equal to 'keep'
 	assert.Len(t, jobList.Items, keep)
@@ -255,9 +255,9 @@ func TestWaitForJobComplete(t *testing.T) {
 
 			// Check if the error matches the expectation
 			if tc.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.LessOrEqual(t, len(buffer), tc.expectedLogs)
@@ -288,14 +288,14 @@ func TestGetResultFromJob(t *testing.T) {
 
 	// test an error should be returned
 	result, err := getResultFromJob(cli, job)
-	assert.EqualError(t, err, "no pod found for job test-job")
+	require.EqualError(t, err, "no pod found for job test-job")
 	assert.Empty(t, result)
 
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 
 	// test an error should be returned
 	result, err = getResultFromJob(cli, job)
-	assert.EqualError(t, err, "no container statuses found for job test-job")
+	require.EqualError(t, err, "no container statuses found for job test-job")
 	assert.Empty(t, result)
 
 	// Set a non-terminated container status to the pod
@@ -310,7 +310,7 @@ func TestGetResultFromJob(t *testing.T) {
 	// Test an error should be returned
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.EqualError(t, err, "container for job test-job is not terminated")
+	require.EqualError(t, err, "container for job test-job is not terminated")
 	assert.Empty(t, result)
 
 	// Set a terminated container status to the pod
@@ -327,7 +327,7 @@ func TestGetResultFromJob(t *testing.T) {
 	// This call should return the termination message with no error
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, result)
 
 	// Set a terminated container status with invalidate message to the pod
@@ -345,7 +345,7 @@ func TestGetResultFromJob(t *testing.T) {
 
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.EqualError(t, err, "error to locate repo maintenance error indicator from termination message")
+	require.EqualError(t, err, "error to locate repo maintenance error indicator from termination message")
 	assert.Empty(t, result)
 
 	// Set a terminated container status with empty maintenance error to the pod
@@ -363,7 +363,7 @@ func TestGetResultFromJob(t *testing.T) {
 
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.EqualError(t, err, "nothing after repo maintenance error indicator in termination message")
+	require.EqualError(t, err, "nothing after repo maintenance error indicator in termination message")
 	assert.Empty(t, result)
 
 	// Set a terminated container status with maintenance error to the pod
@@ -381,7 +381,7 @@ func TestGetResultFromJob(t *testing.T) {
 
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "fake-error", result)
 }
 
@@ -843,7 +843,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 			history, err := WaitAllJobsComplete(test.ctx, fakeClient, repo, 3, velerotest.NewLogger())
 
 			if test.expectedError != "" {
-				assert.EqualError(t, err, test.expectedError)
+				require.EqualError(t, err, test.expectedError)
 			} else {
 				require.NoError(t, err)
 			}
@@ -1061,10 +1061,10 @@ func TestBuildJob(t *testing.T) {
 
 			// Check the error
 			if tc.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, job)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, job)
 				assert.Contains(t, job.Name, tc.expectedJobName)
 				assert.Equal(t, param.BackupRepo.Namespace, job.Namespace)

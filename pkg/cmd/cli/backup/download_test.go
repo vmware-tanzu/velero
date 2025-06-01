@@ -74,10 +74,10 @@ func TestNewDownloadCommand(t *testing.T) {
 	args := []string{backupName, "arg2"}
 
 	e := o.Complete(args)
-	assert.NoError(t, e)
+	require.NoError(t, e)
 
 	e = o.Validate(c, args, f)
-	assert.NoError(t, e)
+	require.NoError(t, e)
 
 	// verify all options are set as expected
 	assert.Equal(t, output, o.Output)

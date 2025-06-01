@@ -21,16 +21,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCreateFileSystemBR(t *testing.T) {
 	m := NewManager(2)
 
 	async_job_1, err := m.CreateFileSystemBR("job-1", "test", context.TODO(), nil, "velero", Callbacks{}, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = m.CreateFileSystemBR("job-2", "test", context.TODO(), nil, "velero", Callbacks{}, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = m.CreateFileSystemBR("job-3", "test", context.TODO(), nil, "velero", Callbacks{}, nil)
 	assert.Equal(t, ConcurrentLimitExceed, err)
@@ -55,16 +56,16 @@ func TestCreateMicroServiceBRWatcher(t *testing.T) {
 	m := NewManager(2)
 
 	async_job_1, err := m.CreateMicroServiceBRWatcher(context.TODO(), nil, nil, nil, "test", "job-1", "velero", "pod-1", "container", "du-1", Callbacks{}, false, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = m.CreateMicroServiceBRWatcher(context.TODO(), nil, nil, nil, "test", "job-2", "velero", "pod-2", "container", "du-2", Callbacks{}, false, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = m.CreateMicroServiceBRWatcher(context.TODO(), nil, nil, nil, "test", "job-3", "velero", "pod-3", "container", "du-3", Callbacks{}, false, nil)
 	assert.Equal(t, ConcurrentLimitExceed, err)
 
 	async_job_4, err := m.CreateMicroServiceBRWatcher(context.TODO(), nil, nil, nil, "test", "job-4", "velero", "pod-4", "container", "du-4", Callbacks{}, true, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ret := m.GetAsyncBR("job-0")
 	assert.Nil(t, ret)
