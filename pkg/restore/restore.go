@@ -1606,12 +1606,13 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 					restoreLogger.Infof("restore API has resource policy defined %s, executing restore workflow accordingly for changed resource %s %s", resourcePolicy, fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
 
 					// existingResourcePolicy is set as none, add warning
-					if resourcePolicy == velerov1api.PolicyTypeNone {
+					switch resourcePolicy {
+					case velerov1api.PolicyTypeNone:
 						e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version",
 							obj.GetKind(), obj.GetName())
 						warnings.Add(namespace, e)
 						// existingResourcePolicy is set as update, attempt patch on the resource and add warning if it fails
-					} else if resourcePolicy == velerov1api.PolicyTypeUpdate {
+					case velerov1api.PolicyTypeUpdate:
 						// processing update as existingResourcePolicy
 						warningsFromUpdateRP, errsFromUpdateRP := ctx.processUpdateResourcePolicy(fromCluster, fromClusterWithLabels, obj, namespace, resourceClient)
 						if warningsFromUpdateRP.IsEmpty() && errsFromUpdateRP.IsEmpty() {
