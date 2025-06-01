@@ -94,7 +94,7 @@ func (fw *fakeWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestMergeHook_Write(t *testing.T) {
-	sourceFile, err := os.CreateTemp("", "")
+	sourceFile, err := os.CreateTemp(t.TempDir(), "")
 	require.NoError(t, err)
 
 	logMessage := "fake-message-1\nfake-message-2"

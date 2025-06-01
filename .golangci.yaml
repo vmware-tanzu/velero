@@ -278,6 +278,9 @@ linters:
       # with golangci-lint call it on a directory with the changed file.
       check-exported: false
 
+    usetesting:
+      os-setenv: false
+
     whitespace:
       multi-if: false # Enforces newlines (or comments) after every multi-line if statement
       multi-func: false # Enforces newlines (or comments) after every multi-line function signature
@@ -337,6 +340,7 @@ linters:
     - unparam
     - unused
     - usestdlibvars
+    - usetesting
     - whitespace
 
   exclusions:
