@@ -262,7 +262,6 @@ linters:
       disable:
         - float-compare
         - go-require
-        - require-error
       enable-all: true
 
     testpackage:

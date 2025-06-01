@@ -8,6 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -221,7 +222,7 @@ func TestPodVolumeExpose(t *testing.T) {
 
 			err := exposer.Expose(context.Background(), ownerObject, test.exposeParam)
 			if err == nil {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				_, err = exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
 				assert.NoError(t, err)
@@ -319,12 +320,12 @@ func TestGetPodVolumeExpose(t *testing.T) {
 
 			result, err := exposer.GetExposed(context.Background(), ownerObject, fakeClient, test.nodeName, test.Timeout)
 			if test.err == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				if test.expectedResult == nil {
 					assert.Nil(t, result)
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, test.expectedResult.ByPod.VolumeName, result.ByPod.VolumeName)
 					assert.Equal(t, test.expectedResult.ByPod.HostingPod.Name, result.ByPod.HostingPod.Name)
 				}

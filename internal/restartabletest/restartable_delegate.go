@@ -115,7 +115,7 @@ func RunRestartableDelegateTests(
 					expectedErr, expectedErrOk := expected[i].(error)
 					// If both are errors, use EqualError
 					if actualErrOk && expectedErrOk {
-						assert.EqualError(t, actualErr, expectedErr.Error())
+						require.EqualError(t, actualErr, expectedErr.Error())
 						continue
 					}
 

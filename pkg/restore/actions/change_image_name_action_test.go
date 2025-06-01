@@ -167,9 +167,9 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 			// validate for both error and non-error cases
 			switch {
 			case tc.wantErr != nil:
-				assert.EqualError(t, err, tc.wantErr.Error())
+				require.EqualError(t, err, tc.wantErr.Error())
 			default:
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				pod := new(corev1api.Pod)
 				err = runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), pod)
 				require.NoError(t, err)

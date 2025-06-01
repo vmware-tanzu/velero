@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -360,7 +361,7 @@ volumePolicies:
 
 	// Call the function and check for errors
 	resPolicies, err := getResourcePoliciesFromConfig(cm)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check that the returned resourcePolicies object contains the expected data
 	assert.Equal(t, "v1", resPolicies.version)
@@ -964,10 +965,10 @@ volumePolicies:
 			if err != nil {
 				t.Fatalf("got error when get match action %v", err)
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			policies := &Policies{}
 			err = policies.BuildPolicy(resPolicies)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			vfd := VolumeFilterData{}
 			if tc.pvc != nil {
 				vfd.PVC = tc.pvc
@@ -982,7 +983,7 @@ volumePolicies:
 			}
 
 			action, err := policies.GetMatchAction(vfd)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if tc.skip {
 				if action.Type != Skip {
@@ -1022,8 +1023,7 @@ func TestGetMatchAction_Errors(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			action, err := p.GetMatchAction(tc.input)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), tc.expectedErr)
+			require.ErrorContains(t, err, tc.expectedErr)
 			assert.Nil(t, action)
 		})
 	}

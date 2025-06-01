@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVeleroConfig(t *testing.T) {
@@ -62,13 +63,13 @@ func TestConfigOperations(t *testing.T) {
 
 	// Remove config file if it exists
 	err := removeConfigfileName()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test LoadConfig: expect an empty velero config
 	expectedConfig := VeleroConfig{}
 	config, err := LoadConfig()
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, reflect.DeepEqual(expectedConfig, config))
 
 	// Test savedConfig
@@ -84,9 +85,9 @@ func TestConfigOperations(t *testing.T) {
 
 	err = SaveConfig(config)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	savedConfig, err := LoadConfig()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Features
 	feature := savedConfig.Features()
@@ -107,7 +108,7 @@ func TestConfigOperations(t *testing.T) {
 
 	t.Cleanup(func() {
 		err = removeConfigfileName()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		os.Unsetenv("HOME")
 		os.Setenv("HOME", preHomeEnv)
 	})
