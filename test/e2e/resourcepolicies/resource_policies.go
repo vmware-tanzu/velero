@@ -167,8 +167,8 @@ func (r *ResourcePoliciesCase) Verify() error {
 						Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Fail to read file %s from volume %s of pod %s in namespace %s",
 							FileName, vol.Name, pod.Name, ns))
 
-						content = strings.Replace(content, "\n", "", -1)
-						originContent := strings.Replace(fmt.Sprintf("ns-%s pod-%s volume-%s", ns, pod.Name, vol.Name), "\n", "", -1)
+						content = strings.ReplaceAll(content, "\n", "")
+						originContent := strings.ReplaceAll(fmt.Sprintf("ns-%s pod-%s volume-%s", ns, pod.Name, vol.Name), "\n", "")
 
 						Expect(content).To(Equal(originContent), fmt.Sprintf("File %s does not exist in volume %s of pod %s in namespace %s",
 							FileName, vol.Name, pod.Name, ns))
