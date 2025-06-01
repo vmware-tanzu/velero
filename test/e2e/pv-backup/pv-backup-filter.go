@@ -212,8 +212,8 @@ func fileExist(
 		return errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s ",
 			FILE_NAME, volume, podName, namespace))
 	}
-	c = strings.Replace(c, "\n", "", -1)
-	origin_content := strings.Replace(CreateFileContent(namespace, podName, volume), "\n", "", -1)
+	c = strings.ReplaceAll(c, "\n", "")
+	origin_content := strings.ReplaceAll(CreateFileContent(namespace, podName, volume), "\n", "")
 	if c == origin_content {
 		return nil
 	} else {

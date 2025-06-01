@@ -84,7 +84,7 @@ func ExtractPodVolumeHostPath(ctx context.Context, path string, kubeClient kuber
 	}
 
 	if osType == kube.NodeOSWindows {
-		podPath = strings.Replace(podPath, "/", "\\", -1)
+		podPath = strings.ReplaceAll(podPath, "/", "\\")
 	}
 
 	if osType == kube.NodeOSWindows {
