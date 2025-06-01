@@ -198,7 +198,8 @@ func (r *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	}
 
-	if pvr.Status.Phase == "" || pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseNew {
+	switch pvr.Status.Phase {
+	case "", velerov1api.PodVolumeRestorePhaseNew:
 		if pvr.Spec.Cancel {
 			log.Infof("PVR %s is canceled in Phase %s", pvr.GetName(), pvr.Status.Phase)
 			_ = r.tryCancelPodVolumeRestore(ctx, pvr, "")
@@ -241,7 +242,7 @@ func (r *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		log.Info("PVR is exposed")
 
 		return ctrl.Result{}, nil
-	} else if pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseAccepted {
+	case velerov1api.PodVolumeRestorePhaseAccepted:
 		if peekErr := r.exposer.PeekExposed(ctx, getPVROwnerObject(pvr)); peekErr != nil {
 			log.Errorf("Cancel PVR %s/%s because of expose error %s", pvr.Namespace, pvr.Name, peekErr)
 			_ = r.tryCancelPodVolumeRestore(ctx, pvr, fmt.Sprintf("found a PVR %s/%s with expose error: %s. mark it as cancel", pvr.Namespace, pvr.Name, peekErr))
@@ -252,7 +253,7 @@ func (r *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 
 		return ctrl.Result{}, nil
-	} else if pvr.Status.Phase == velerov1api.PodVolumeRestorePhasePrepared {
+	case velerov1api.PodVolumeRestorePhasePrepared:
 		log.Infof("PVR is prepared and should be processed by %s (%s)", pvr.Status.Node, r.nodeName)
 
 		if pvr.Status.Node != r.nodeName {
@@ -341,7 +342,7 @@ func (r *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 
 		return ctrl.Result{}, nil
-	} else if pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseInProgress {
+	case velerov1api.PodVolumeRestorePhaseInProgress:
 		if pvr.Spec.Cancel {
 			if pvr.Status.Node != r.nodeName {
 				return ctrl.Result{}, nil

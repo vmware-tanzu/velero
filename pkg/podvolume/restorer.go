@@ -228,9 +228,10 @@ ForEachVolume:
 			errs = append(errs, errors.New("timed out waiting for all PodVolumeRestores to complete"))
 			break ForEachVolume
 		case res := <-resultsChan:
-			if res.Status.Phase == velerov1api.PodVolumeRestorePhaseFailed {
+			switch res.Status.Phase {
+			case velerov1api.PodVolumeRestorePhaseFailed:
 				errs = append(errs, errors.Errorf("pod volume restore failed: %s", res.Status.Message))
-			} else if res.Status.Phase == velerov1api.PodVolumeRestorePhaseCanceled {
+			case velerov1api.PodVolumeRestorePhaseCanceled:
 				errs = append(errs, errors.Errorf("pod volume restore canceled: %s", res.Status.Message))
 			}
 			tracker.TrackPodVolume(res)

@@ -253,12 +253,13 @@ func (p *pvcRestoreItemAction) Progress(
 		progress.Updated = dataDownload.Status.CompletionTimestamp.Time
 	}
 
-	if dataDownload.Status.Phase == velerov2alpha1.DataDownloadPhaseCompleted {
+	switch dataDownload.Status.Phase {
+	case velerov2alpha1.DataDownloadPhaseCompleted:
 		progress.Completed = true
-	} else if dataDownload.Status.Phase == velerov2alpha1.DataDownloadPhaseCanceled {
+	case velerov2alpha1.DataDownloadPhaseCanceled:
 		progress.Completed = true
 		progress.Err = "DataDownload is canceled"
-	} else if dataDownload.Status.Phase == velerov2alpha1.DataDownloadPhaseFailed {
+	case velerov2alpha1.DataDownloadPhaseFailed:
 		progress.Completed = true
 		progress.Err = dataDownload.Status.Message
 	}

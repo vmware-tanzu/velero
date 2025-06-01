@@ -423,12 +423,13 @@ func (p *pvcBackupItemAction) Progress(
 		progress.Updated = dataUpload.Status.CompletionTimestamp.Time
 	}
 
-	if dataUpload.Status.Phase == velerov2alpha1.DataUploadPhaseCompleted {
+	switch dataUpload.Status.Phase {
+	case velerov2alpha1.DataUploadPhaseCompleted:
 		progress.Completed = true
-	} else if dataUpload.Status.Phase == velerov2alpha1.DataUploadPhaseFailed {
+	case velerov2alpha1.DataUploadPhaseFailed:
 		progress.Completed = true
 		progress.Err = dataUpload.Status.Message
-	} else if dataUpload.Status.Phase == velerov2alpha1.DataUploadPhaseCanceled {
+	case velerov2alpha1.DataUploadPhaseCanceled:
 		progress.Completed = true
 		progress.Err = "DataUpload is canceled"
 	}

@@ -246,7 +246,8 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return r.errorOut(ctx, du, errors.Errorf("%s type of snapshot exposer is not exist", du.Spec.SnapshotType), "not exist type of exposer", log)
 	}
 
-	if du.Status.Phase == "" || du.Status.Phase == velerov2alpha1api.DataUploadPhaseNew {
+	switch du.Status.Phase {
+	case "", velerov2alpha1api.DataUploadPhaseNew:
 		if du.Spec.Cancel {
 			log.Debugf("Data upload is canceled in Phase %s", du.Status.Phase)
 
@@ -289,7 +290,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		log.Info("Snapshot is exposed")
 
 		return ctrl.Result{}, nil
-	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted {
+	case velerov2alpha1api.DataUploadPhaseAccepted:
 		if peekErr := ep.PeekExposed(ctx, getOwnerObject(du)); peekErr != nil {
 			r.tryCancelDataUpload(ctx, du, fmt.Sprintf("found a du %s/%s with expose error: %s. mark it as cancel", du.Namespace, du.Name, peekErr))
 			log.Errorf("Cancel du %s/%s because of expose error %s", du.Namespace, du.Name, peekErr)
@@ -300,7 +301,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		return ctrl.Result{}, nil
-	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared {
+	case velerov2alpha1api.DataUploadPhasePrepared:
 		log.Infof("Data upload is prepared and should be processed by %s (%s)", du.Status.Node, r.nodeName)
 
 		if du.Status.Node != r.nodeName {
@@ -396,7 +397,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		return ctrl.Result{}, nil
-	} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
+	case velerov2alpha1api.DataUploadPhaseInProgress:
 		if du.Spec.Cancel {
 			if du.Status.Node != r.nodeName {
 				return ctrl.Result{}, nil
