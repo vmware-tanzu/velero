@@ -759,7 +759,7 @@ func (ctx *restoreContext) processSelectedResource(
 					selectedItem.targetNamespace,
 					fmt.Errorf(
 						"error decoding %q: %v",
-						strings.Replace(selectedItem.path, ctx.restoreDir+"/", "", -1),
+						strings.ReplaceAll(selectedItem.path, ctx.restoreDir+"/", ""),
 						err,
 					),
 				)
@@ -2328,7 +2328,7 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource string, original
 				targetNamespace,
 				fmt.Errorf(
 					"error decoding %q: %v",
-					strings.Replace(itemPath, ctx.restoreDir+"/", "", -1),
+					strings.ReplaceAll(itemPath, ctx.restoreDir+"/", ""),
 					err,
 				),
 			)
