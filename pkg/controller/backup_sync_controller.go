@@ -358,7 +358,7 @@ func (b *backupSyncReconciler) deleteOrphanedBackups(ctx context.Context, locati
 
 	for i, backup := range backupList.Items {
 		log = log.WithField("backup", backup.Name)
-		if !(backup.Status.Phase == velerov1api.BackupPhaseCompleted || backup.Status.Phase == velerov1api.BackupPhasePartiallyFailed) || backupStoreBackups.Has(backup.Name) {
+		if (backup.Status.Phase != velerov1api.BackupPhaseCompleted && backup.Status.Phase != velerov1api.BackupPhasePartiallyFailed) || backupStoreBackups.Has(backup.Name) {
 			continue
 		}
 
