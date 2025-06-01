@@ -90,7 +90,7 @@ func TestSetOfOrLabelSelector(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require.NoError(t, selector.Set(test.inputStr))
-			assert.Equal(t, len(test.expectedSelector.OrLabelSelectors), len(selector.OrLabelSelectors))
+			assert.Len(t, selector.OrLabelSelectors, len(test.expectedSelector.OrLabelSelectors))
 			assert.Equal(t, test.expectedSelector.String(), selector.String())
 		})
 	}
