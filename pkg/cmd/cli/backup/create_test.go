@@ -59,10 +59,10 @@ func TestCreateOptions_BuildBackup(t *testing.T) {
 		},
 	}
 	o.OrSelector.OrLabelSelectors = orLabelSelectors
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	backup, err := o.BuildBackup(cmdtest.VeleroNameSpace)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, velerov1api.BackupSpec{
 		TTL:                     metav1.Duration{Duration: o.TTL},
@@ -159,7 +159,7 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 		o.Labels.Set("velero.io/test=yes,custom-label=true")
 		o.Annotations.Set("velero.io/test=yes,custom-annotation=true")
 		backup, err := o.BuildBackup(cmdtest.VeleroNameSpace)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, expectedBackupSpec, backup.Spec)
 		assert.Equal(t, map[string]string{
@@ -176,10 +176,10 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 
 func TestCreateOptions_OrderedResources(t *testing.T) {
 	_, err := ParseOrderedResources("pods= ns1/p1; ns1/p2; persistentvolumeclaims=ns2/pvc1, ns2/pvc2")
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	orderedResources, err := ParseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumeclaims=ns2/pvc1,ns2/pvc2")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	expectedResources := map[string]string{
 		"pods":                   "ns1/p1,ns1/p2",
@@ -188,7 +188,7 @@ func TestCreateOptions_OrderedResources(t *testing.T) {
 	assert.Equal(t, expectedResources, orderedResources)
 
 	orderedResources, err = ParseOrderedResources("pods= ns1/p1,ns1/p2 ; persistentvolumes=pv1,pv2")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	expectedMixedResources := map[string]string{
 		"pods":              "ns1/p1,ns1/p2",
@@ -338,7 +338,7 @@ func TestCreateCommand(t *testing.T) {
 
 		// Complete
 		e := o.Complete(args, f)
-		assert.NoError(t, e)
+		require.NoError(t, e)
 
 		// Validate
 		e = o.Validate(cmd, args, f)
@@ -369,7 +369,7 @@ func TestCreateCommand(t *testing.T) {
 
 		// Complete
 		e := o.Complete(args, f)
-		assert.NoError(t, e)
+		require.NoError(t, e)
 
 		// Validate
 		e = o.Validate(cmd, args, f)
@@ -397,10 +397,10 @@ func TestCreateCommand(t *testing.T) {
 		f.On("KubebuilderWatchClient").Return(kbclient, nil)
 
 		e := o.Complete(args, f)
-		assert.NoError(t, e)
+		require.NoError(t, e)
 
 		e = o.Run(c, f)
-		assert.NoError(t, e)
+		require.NoError(t, e)
 
 		c.SetArgs([]string{"bk-1"})
 		e = c.Execute()

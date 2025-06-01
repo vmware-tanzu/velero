@@ -200,9 +200,9 @@ func TestWaitVolumeSnapshotReady(t *testing.T) {
 
 			vs, err := WaitVolumeSnapshotReady(context.Background(), fakeClient.SnapshotV1(), test.vsName, test.namespace, time.Millisecond, velerotest.NewLogger())
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.expect, vs)
@@ -286,9 +286,9 @@ func TestGetVolumeSnapshotContentForVolumeSnapshot(t *testing.T) {
 
 			vs, err := GetVolumeSnapshotContentForVolumeSnapshot(test.snapshotObj, fakeClient.SnapshotV1())
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.expect, vs)
@@ -723,9 +723,9 @@ func TestRetainVSC(t *testing.T) {
 			returned, err := RetainVSC(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vsc)
 
 			if len(test.err) == 0 {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			}
 
 			if test.updated != nil {
@@ -817,14 +817,14 @@ func TestRemoveVSCProtect(t *testing.T) {
 			err := RemoveVSCProtect(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vsc, test.timeout)
 
 			if len(test.err) == 0 {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			}
 
 			if test.updated != nil {
 				updated, err := fakeSnapshotClient.SnapshotV1().VolumeSnapshotContents().Get(context.Background(), test.vsc, metav1.GetOptions{})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				assert.Equal(t, test.updated.Finalizers, updated.Finalizers)
 			}
@@ -1032,7 +1032,7 @@ func TestGetVolumeSnapshotClass(t *testing.T) {
 			actualSnapshotClass, actualError := GetVolumeSnapshotClass(
 				tc.driverName, tc.backup, tc.pvc, logrus.New(), fakeClient)
 			if tc.expectError {
-				assert.Error(t, actualError)
+				require.Error(t, actualError)
 				assert.Nil(t, actualSnapshotClass)
 				return
 			}
@@ -1147,7 +1147,7 @@ func TestGetVolumeSnapshotClassForStorageClass(t *testing.T) {
 			actualVSC, actualError := GetVolumeSnapshotClassForStorageClass(tc.driverName, snapshotClasses)
 
 			if tc.expectError {
-				assert.Error(t, actualError)
+				require.Error(t, actualError)
 				assert.Nil(t, actualVSC)
 				return
 			}
@@ -1444,14 +1444,14 @@ func TestSetVolumeSnapshotContentDeletionPolicy(t *testing.T) {
 			if tc.expectError {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				actual := new(snapshotv1api.VolumeSnapshotContent)
 				err := fakeClient.Get(
 					context.TODO(),
 					crclient.ObjectKey{Name: tc.inputVSCName},
 					actual,
 				)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(
 					t,
 					tc.policy,
@@ -1680,7 +1680,7 @@ func TestWaitUntilVSCHandleIsReady(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actualVSC, actualError := WaitUntilVSCHandleIsReady(tc.volSnap, fakeClient, logrus.New().WithField("fake", "test"), 0)
 			if tc.expectError && actualError == nil {
-				assert.Error(t, actualError)
+				require.Error(t, actualError)
 				assert.Nil(t, actualVSC)
 				return
 			}
