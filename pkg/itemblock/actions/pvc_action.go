@@ -86,7 +86,7 @@ func (a *PVCAction) GetRelatedItems(item runtime.Unstructured, backup *v1.Backup
 
 	for i := range pods.Items {
 		for _, volume := range pods.Items[i].Spec.Volumes {
-			if volume.VolumeSource.PersistentVolumeClaim == nil {
+			if volume.PersistentVolumeClaim == nil {
 				continue
 			}
 			if volume.PersistentVolumeClaim.ClaimName == pvc.Name {
