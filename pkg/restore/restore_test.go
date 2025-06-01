@@ -1411,7 +1411,7 @@ func TestRestoreItems(t *testing.T) {
 			assertEmptyResults(t, warnings, errs)
 			assertRestoredItems(t, h, tc.want)
 			if len(tc.expectedRestoreItems) > 0 {
-				assert.EqualValues(t, tc.expectedRestoreItems, data.RestoredItems)
+				assert.Equal(t, tc.expectedRestoreItems, data.RestoredItems)
 			}
 		})
 	}

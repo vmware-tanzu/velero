@@ -260,7 +260,6 @@ linters:
     testifylint:
       # TODO: enable them all
       disable:
-        - equal-values # FIXME
         - float-compare
         - go-require
         - require-error
