@@ -225,36 +225,35 @@ func (v volumeHelperImpl) shouldPerformFSBackupLegacy(
 }
 
 func (v *volumeHelperImpl) shouldIncludeVolumeInBackup(vol corev1api.Volume) bool {
-	includeVolumeInBackup := true
 	// cannot backup hostpath volumes as they are not mounted into /var/lib/kubelet/pods
 	// and therefore not accessible to the node agent daemon set.
 	if vol.HostPath != nil {
-		includeVolumeInBackup = false
+		return false
 	}
 	// don't backup volumes mounting secrets. Secrets will be backed up separately.
 	if vol.Secret != nil {
-		includeVolumeInBackup = false
+		return false
 	}
 	// don't backup volumes mounting ConfigMaps. ConfigMaps will be backed up separately.
 	if vol.ConfigMap != nil {
-		includeVolumeInBackup = false
+		return false
 	}
 	// don't backup volumes mounted as projected volumes, all data in those come from kube state.
 	if vol.Projected != nil {
-		includeVolumeInBackup = false
+		return false
 	}
 	// don't backup DownwardAPI volumes, all data in those come from kube state.
 	if vol.DownwardAPI != nil {
-		includeVolumeInBackup = false
+		return false
 	}
 	if vol.PersistentVolumeClaim != nil && v.backupExcludePVC {
-		includeVolumeInBackup = false
+		return false
 	}
 	// don't include volumes that mount the default service account token.
 	if strings.HasPrefix(vol.Name, "default-token") {
-		includeVolumeInBackup = false
+		return false
 	}
-	return includeVolumeInBackup
+	return true
 }
 
 func (v *volumeHelperImpl) getVolumeFromResource(resource any) (*corev1api.PersistentVolume, *corev1api.Volume, error) {
