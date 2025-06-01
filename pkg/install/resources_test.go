@@ -54,13 +54,13 @@ func TestResources(t *testing.T) {
 
 	crb := ClusterRoleBinding(DefaultVeleroNamespace)
 	// The CRB is a cluster-scoped resource
-	assert.Equal(t, "", crb.ObjectMeta.Namespace)
+	assert.Empty(t, crb.ObjectMeta.Namespace)
 	assert.Equal(t, "velero", crb.ObjectMeta.Name)
 	assert.Equal(t, "velero", crb.Subjects[0].Namespace)
 
 	customNamespaceCRB := ClusterRoleBinding("foo")
 	// The CRB is a cluster-scoped resource
-	assert.Equal(t, "", customNamespaceCRB.ObjectMeta.Namespace)
+	assert.Empty(t, customNamespaceCRB.ObjectMeta.Namespace)
 	assert.Equal(t, "velero-foo", customNamespaceCRB.ObjectMeta.Name)
 	assert.Equal(t, "foo", customNamespaceCRB.Subjects[0].Namespace)
 

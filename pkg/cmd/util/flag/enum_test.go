@@ -22,7 +22,7 @@ func TestSetOfEnum(t *testing.T) {
 
 func TestTypeOfEnum(t *testing.T) {
 	enum := NewEnum("a", "a", "b", "c")
-	assert.Equal(t, "", enum.Type())
+	assert.Empty(t, enum.Type())
 }
 
 func TestAllowedValuesOfEnum(t *testing.T) {
