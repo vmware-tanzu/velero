@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 )
@@ -26,7 +27,7 @@ import (
 // no-op.
 func CheckError(err error) {
 	if err != nil {
-		if err != context.Canceled {
+		if !errors.Is(err, context.Canceled) {
 			fmt.Fprintf(os.Stderr, "An error occurred: %v\n", err)
 		}
 		os.Exit(1)
