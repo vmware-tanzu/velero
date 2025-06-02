@@ -144,11 +144,11 @@ func WaitForReadyDeployment(c clientset.Interface, ns, name string) error {
 	if err := wait.PollImmediate(PollInterval, PollTimeout, func() (bool, error) {
 		deployment, err := c.AppsV1().Deployments(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
-			return false, fmt.Errorf("failed to get deployment %q: %v", name, err)
+			return false, fmt.Errorf("failed to get deployment %q: %w", name, err)
 		}
 		return deployment.Status.ReadyReplicas == *deployment.Spec.Replicas, nil
 	}); err != nil {
-		return fmt.Errorf("failed to wait for .readyReplicas to equal .replicas: %v", err)
+		return fmt.Errorf("failed to wait for .readyReplicas to equal .replicas: %w", err)
 	}
 	return nil
 }
