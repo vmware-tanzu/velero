@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"errors"
 	"io"
 )
 
@@ -57,7 +58,7 @@ func (s *StreamReadCloser) Read(p []byte) (n int, err error) {
 		// buffer; else, write the new data to the buffer and
 		// try another read.
 		data, err := s.receive()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return s.buf.Read(p)
 		}
 		if err != nil {
