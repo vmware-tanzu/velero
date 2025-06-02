@@ -184,7 +184,7 @@ func (fs *fileSystemBR) StartBackup(source AccessPoint, uploaderConfig map[strin
 		snapshotID, emptySnapshot, totalBytes, err := fs.uploaderProv.RunBackup(fs.ctx, source.ByPath, backupParam.RealSource, backupParam.Tags, backupParam.ForceFull,
 			backupParam.ParentSnapshot, source.VolMode, uploaderConfig, fs)
 
-		if err == provider.ErrorCanceled {
+		if errors.Is(err, provider.ErrorCanceled) {
 			fs.callbacks.OnCancelled(context.Background(), fs.namespace, fs.jobName)
 		} else if err != nil {
 			dataPathErr := DataPathError{
@@ -217,7 +217,7 @@ func (fs *fileSystemBR) StartRestore(snapshotID string, target AccessPoint, uplo
 
 		totalBytes, err := fs.uploaderProv.RunRestore(fs.ctx, snapshotID, target.ByPath, target.VolMode, uploaderConfigs, fs)
 
-		if err == provider.ErrorCanceled {
+		if errors.Is(err, provider.ErrorCanceled) {
 			fs.callbacks.OnCancelled(context.Background(), fs.namespace, fs.jobName)
 		} else if err != nil {
 			dataPathErr := DataPathError{

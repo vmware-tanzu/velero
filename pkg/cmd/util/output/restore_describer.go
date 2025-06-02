@@ -465,7 +465,7 @@ func groupRestoresByPhase(restores []velerov1api.PodVolumeRestore) map[string][]
 func describeRestoreResourceList(ctx context.Context, kbClient kbclient.Client, d *Describer, restore *velerov1api.Restore, insecureSkipTLSVerify bool, caCertPath string) {
 	buf := new(bytes.Buffer)
 	if err := downloadrequest.Stream(ctx, kbClient, restore.Namespace, restore.Name, velerov1api.DownloadTargetKindRestoreResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
-		if err == downloadrequest.ErrNotFound {
+		if errors.Is(err, downloadrequest.ErrNotFound) {
 			d.Println("Resource List:\t<restore resource list not found>")
 		} else {
 			d.Printf("Resource List:\t<error getting restore resource list: %v>\n", err)
