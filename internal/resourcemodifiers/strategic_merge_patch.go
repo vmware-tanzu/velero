@@ -1,6 +1,7 @@
 package resourcemodifiers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -37,7 +38,7 @@ func (p *StrategicMergePatcher) Patch(u *unstructured.Unstructured, _ logrus.Fie
 	for _, patch := range p.patches {
 		patchBytes, err := yaml.YAMLToJSON([]byte(patch.PatchData))
 		if err != nil {
-			return nil, fmt.Errorf("error in converting YAML to JSON %s", err)
+			return nil, fmt.Errorf("error in converting YAML to JSON %w", err)
 		}
 
 		err = strategicPatchObject(origin, patchBytes, updated, schemaReferenceObj)
@@ -127,10 +128,15 @@ func applyPatchToObject(
 
 // interpretStrategicMergePatchError interprets the error type and returns an error with appropriate HTTP code.
 func interpretStrategicMergePatchError(err error) error {
-	switch err {
-	case mergepatch.ErrBadJSONDoc, mergepatch.ErrBadPatchFormatForPrimitiveList, mergepatch.ErrBadPatchFormatForRetainKeys, mergepatch.ErrBadPatchFormatForSetElementOrderList, mergepatch.ErrUnsupportedStrategicMergePatchFormat:
+	switch {
+	case errors.Is(err, mergepatch.ErrBadJSONDoc),
+		errors.Is(err, mergepatch.ErrBadPatchFormatForPrimitiveList),
+		errors.Is(err, mergepatch.ErrBadPatchFormatForRetainKeys),
+		errors.Is(err, mergepatch.ErrBadPatchFormatForSetElementOrderList),
+		errors.Is(err, mergepatch.ErrUnsupportedStrategicMergePatchFormat):
 		return apierrors.NewBadRequest(err.Error())
-	case mergepatch.ErrNoListOfLists, mergepatch.ErrPatchContentNotMatchRetainKeys:
+	case errors.Is(err, mergepatch.ErrNoListOfLists),
+		errors.Is(err, mergepatch.ErrPatchContentNotMatchRetainKeys):
 		return apierrors.NewGenericServerResponse(http.StatusUnprocessableEntity, "", schema.GroupResource{}, "", err.Error(), 0, false)
 	default:
 		return err

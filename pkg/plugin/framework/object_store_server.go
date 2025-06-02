@@ -102,7 +102,7 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 		}
 
 		data, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			// we need to return io.EOF errors unwrapped so that
 			// calling code sees them as io.EOF and knows to stop
 			// reading.

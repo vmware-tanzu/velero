@@ -425,7 +425,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 				})
 
 				if err != nil {
-					err = fmt.Errorf("fail to patch dynamic PV, err: %s, PVC: %s, PV: %s", err, volInfo.PVCName, volInfo.PVName)
+					err = fmt.Errorf("fail to patch dynamic PV, err: %w, PVC: %s, PV: %s", err, volInfo.PVCName, volInfo.PVName)
 					ctx.logger.WithError(errors.WithStack((err))).Error("err patching dynamic PV using volume info")
 					resultLock.Lock()
 					defer resultLock.Unlock()

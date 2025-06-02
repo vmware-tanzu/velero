@@ -230,7 +230,7 @@ func parseCapacity(cap string) (*capacity, error) {
 		} else {
 			quantity, err := resource.ParseQuantity(strings.TrimSpace(v))
 			if err != nil {
-				return nil, fmt.Errorf("wrong format of Capacity %v with err %v", v, err)
+				return nil, fmt.Errorf("wrong format of Capacity %v with err %w", v, err)
 			}
 			quantities = append(quantities, quantity)
 		}

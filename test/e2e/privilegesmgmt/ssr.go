@@ -70,7 +70,7 @@ func SSRTest() {
 		err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second, time.Minute, true,
 			func(context.Context) (bool, error) {
 				if err = veleroCfg.ClientToInstallVelero.Kubebuilder.List(ctx, ssrListResp, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
-					return false, fmt.Errorf("failed to list ssr object in %s namespace with err %v", veleroCfg.VeleroNamespace, err)
+					return false, fmt.Errorf("failed to list ssr object in %s namespace with err %w", veleroCfg.VeleroNamespace, err)
 				}
 				if len(ssrListResp.Items) != 1 {
 					return false, fmt.Errorf("count of ssr object in %s namespace is not 1", veleroCfg.VeleroNamespace)

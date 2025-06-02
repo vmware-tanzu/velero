@@ -18,6 +18,7 @@ package logging
 
 import (
 	"compress/gzip"
+	"errors"
 	"io"
 	"os"
 	"testing"
@@ -66,7 +67,7 @@ func readLogString(file *os.File) (string, error) {
 
 	buffer := make([]byte, 1024)
 	_, err = gzr.Read(buffer)
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		return "", err
 	}
 

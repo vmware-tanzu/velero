@@ -133,7 +133,7 @@ func (r *Ensurer) waitBackupRepository(ctx context.Context, namespace string, ba
 
 	err := wait.PollUntilContextTimeout(ctx, time.Millisecond*500, r.resourceTimeout, true, checkFunc)
 	if err != nil {
-		if err == context.DeadlineExceeded {
+		if errors.Is(err, context.DeadlineExceeded) {
 			// if deadline is exceeded, return the error from the last check instead of the wait error
 			return nil, errors.Wrap(checkErr, "failed to wait BackupRepository, timeout exceeded")
 		}

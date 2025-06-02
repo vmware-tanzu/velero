@@ -67,7 +67,7 @@ func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
 	if apierrors.IsNotFound(err) {
 		return fmt.Errorf("backup %q does not exist", l.BackupName)
 	} else if err != nil {
-		return fmt.Errorf("error checking for backup %q: %v", l.BackupName, err)
+		return fmt.Errorf("error checking for backup %q: %w", l.BackupName, err)
 	}
 
 	switch backup.Status.Phase {

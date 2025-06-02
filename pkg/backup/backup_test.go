@@ -4402,7 +4402,7 @@ func assertTarballFileContents(t *testing.T, backupFile io.Reader, want map[stri
 
 	for {
 		hdr, err := r.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		require.NoError(t, err)

@@ -465,7 +465,7 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 	backupResources, err := archive.NewParser(ctx.log, ctx.fileSystem).Parse(ctx.restoreDir)
 	// If ErrNotExist occurs, it implies that the backup to be restored includes zero items.
 	// Need to add a warning about it and jump out of the function.
-	if errors.Cause(err) == archive.ErrNotExist {
+	if errors.Is(err, archive.ErrNotExist) {
 		warnings.AddVeleroError(errors.Wrap(err, "zero items to be restored"))
 		return warnings, errs
 	}
@@ -758,7 +758,7 @@ func (ctx *restoreContext) processSelectedResource(
 				errs.Add(
 					selectedItem.targetNamespace,
 					fmt.Errorf(
-						"error decoding %q: %v",
+						"error decoding %q: %w",
 						strings.Replace(selectedItem.path, ctx.restoreDir+"/", "", -1),
 						err,
 					),
@@ -1157,7 +1157,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	complete, err := isCompleted(obj, groupResource)
 	if err != nil {
-		errs.Add(namespace, fmt.Errorf("error checking completion of %q: %v", resourceID, err))
+		errs.Add(namespace, fmt.Errorf("error checking completion of %q: %w", resourceID, err))
 		return warnings, errs, itemExists
 	}
 	if complete {
@@ -1204,7 +1204,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	if groupResource == kuberesource.PersistentVolumes {
 		resourceClient, err := ctx.getResourceClient(groupResource, obj, namespace)
 		if err != nil {
-			errs.AddVeleroError(fmt.Errorf("error getting resource client for namespace %q, resource %q: %v", namespace, &groupResource, err))
+			errs.AddVeleroError(fmt.Errorf("error getting resource client for namespace %q, resource %q: %w", namespace, &groupResource, err))
 			return warnings, errs, itemExists
 		}
 
@@ -1330,7 +1330,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			Restore:        ctx.restore,
 		})
 		if err != nil {
-			errs.Add(namespace, fmt.Errorf("error preparing %s: %v", resourceID, err))
+			errs.Add(namespace, fmt.Errorf("error preparing %s: %w", resourceID, err))
 			return warnings, errs, itemExists
 		}
 
@@ -1481,7 +1481,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		restoreLogger.Infof("Resource kind changed from %s to %s", resourceKind, obj.GetKind())
 		gvr, _, err := ctx.discoveryHelper.KindFor(obj.GroupVersionKind())
 		if err != nil {
-			errs.Add(namespace, fmt.Errorf("error getting GVR for %s: %v", obj.GroupVersionKind(), err))
+			errs.Add(namespace, fmt.Errorf("error getting GVR for %s: %w", obj.GroupVersionKind(), err))
 			return warnings, errs, itemExists
 		}
 		newGR.Resource = gvr.Resource
@@ -1491,7 +1491,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	}
 	resourceClient, err := ctx.getResourceClient(newGR, obj, obj.GetNamespace())
 	if err != nil {
-		warnings.Add(namespace, fmt.Errorf("error getting updated resource client for namespace %q, resource %q: %v", namespace, &newGR, err))
+		warnings.Add(namespace, fmt.Errorf("error getting updated resource client for namespace %q, resource %q: %w", namespace, &newGR, err))
 		return warnings, errs, itemExists
 	}
 
@@ -1650,7 +1650,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	// Error was something other than an AlreadyExists.
 	if restoreErr != nil {
 		restoreLogger.Errorf("error restoring %s: %s", obj.GetName(), restoreErr.Error())
-		errs.Add(namespace, fmt.Errorf("error restoring %s: %v", resourceID, restoreErr))
+		errs.Add(namespace, fmt.Errorf("error restoring %s: %w", resourceID, restoreErr))
 		return warnings, errs, itemExists
 	}
 
@@ -1658,7 +1658,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	shouldRestoreStatus := determineRestoreStatus(obj, ctx.resourceStatusIncludesExcludes, groupResource.String(), restoreLogger)
 
 	if shouldRestoreStatus && statusFieldErr != nil {
-		err := fmt.Errorf("could not get status to be restored %s: %v", kube.NamespaceAndName(obj), statusFieldErr)
+		err := fmt.Errorf("could not get status to be restored %s: %w", kube.NamespaceAndName(obj), statusFieldErr)
 		restoreLogger.Error(err.Error())
 		errs.Add(namespace, err)
 		return warnings, errs, itemExists
@@ -1781,8 +1781,8 @@ func isAlreadyExistsError(ctx *restoreContext, obj *unstructured.Unstructured, e
 	if obj.GetKind() != "Service" {
 		return false, nil
 	}
-	statusErr, ok := err.(*apierrors.StatusError)
-	if !ok || statusErr.Status().Details == nil || len(statusErr.Status().Details.Causes) == 0 {
+	var statusErr *apierrors.StatusError
+	if !errors.As(err, &statusErr) || statusErr.Status().Details == nil || len(statusErr.Status().Details.Causes) == 0 {
 		return false, nil
 	}
 	// make sure all the causes are "port allocated" error
@@ -2326,7 +2326,7 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource string, original
 			errs.Add(
 				targetNamespace,
 				fmt.Errorf(
-					"error decoding %q: %v",
+					"error decoding %q: %w",
 					strings.Replace(itemPath, ctx.restoreDir+"/", "", -1),
 					err,
 				),
@@ -2492,7 +2492,7 @@ func (ctx *restoreContext) handlePVHasNativeSnapshot(obj *unstructured.Unstructu
 		ctx.log.Infof("Restoring persistent volume from snapshot.")
 		retObj, err = ctx.pvRestorer.executePVAction(retObj)
 		if err != nil {
-			return nil, fmt.Errorf("error executing PVAction for %s: %v", getResourceID(kuberesource.PersistentVolumes, "", oldName), err)
+			return nil, fmt.Errorf("error executing PVAction for %s: %w", getResourceID(kuberesource.PersistentVolumes, "", oldName), err)
 		}
 
 		// VolumeSnapshotter has modified the PV name, we should rename the PV.

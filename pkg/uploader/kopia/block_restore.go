@@ -60,7 +60,7 @@ func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remote
 	for readData {
 		bytesToWrite, err := remoteReader.Read(buffer)
 		if err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				return errors.Wrapf(err, "failed to read data from remote file %s", o.targetFileName)
 			}
 			readData = false

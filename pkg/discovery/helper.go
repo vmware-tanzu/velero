@@ -220,7 +220,8 @@ func (h *helper) Refresh() error {
 func refreshServerPreferredResources(discoveryClient serverResourcesInterface, logger logrus.FieldLogger) ([]*metav1.APIResourceList, error) {
 	preferredResources, err := discoveryClient.ServerPreferredResources()
 	if err != nil {
-		if discoveryErr, ok := err.(*discovery.ErrGroupDiscoveryFailed); ok {
+		var discoveryErr *discovery.ErrGroupDiscoveryFailed
+		if errors.As(err, &discoveryErr) {
 			for groupVersion, err := range discoveryErr.Groups {
 				logger.WithError(err).Warnf("Failed to discover group: %v", groupVersion)
 			}
@@ -233,7 +234,8 @@ func refreshServerPreferredResources(discoveryClient serverResourcesInterface, l
 func refreshServerGroupsAndResources(discoveryClient serverResourcesInterface, logger logrus.FieldLogger) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	serverGroups, serverResources, err := discoveryClient.ServerGroupsAndResources()
 	if err != nil {
-		if discoveryErr, ok := err.(*discovery.ErrGroupDiscoveryFailed); ok {
+		var discoveryErr *discovery.ErrGroupDiscoveryFailed
+		if errors.As(err, &discoveryErr) {
 			for groupVersion, err := range discoveryErr.Groups {
 				logger.WithError(err).Warnf("Failed to discover group: %v", groupVersion)
 			}

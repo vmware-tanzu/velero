@@ -324,7 +324,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		asyncBR, err = r.dataPathMgr.CreateMicroServiceBRWatcher(ctx, r.client, r.kubeClient, r.mgr, datapath.TaskTypeRestore,
 			dd.Name, dd.Namespace, result.ByPod.HostingPod.Name, result.ByPod.HostingContainer, dd.Name, callbacks, false, log)
 		if err != nil {
-			if err == datapath.ConcurrentLimitExceed {
+			if errors.Is(err, datapath.ConcurrentLimitExceed) {
 				log.Debug("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 			} else {
@@ -851,7 +851,7 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 	hostingPodLabels := map[string]string{velerov1api.DataDownloadLabel: dd.Name}
 	for _, k := range util.ThirdPartyLabels {
 		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, dd.Namespace, k, nodeOS); err != nil {
-			if err != nodeagent.ErrNodeAgentLabelNotFound {
+			if !errors.Is(err, nodeagent.ErrNodeAgentLabelNotFound) {
 				log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
 			}
 		} else {
@@ -862,7 +862,7 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 	hostingPodAnnotation := map[string]string{}
 	for _, k := range util.ThirdPartyAnnotations {
 		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, dd.Namespace, k, nodeOS); err != nil {
-			if err != nodeagent.ErrNodeAgentAnnotationNotFound {
+			if !errors.Is(err, nodeagent.ErrNodeAgentAnnotationNotFound) {
 				log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
 			}
 		} else {
@@ -873,7 +873,7 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 	hostingPodTolerations := []corev1api.Toleration{}
 	for _, k := range util.ThirdPartyTolerations {
 		if v, err := nodeagent.GetToleration(context.Background(), r.kubeClient, dd.Namespace, k, nodeOS); err != nil {
-			if err != nodeagent.ErrNodeAgentTolerationNotFound {
+			if !errors.Is(err, nodeagent.ErrNodeAgentTolerationNotFound) {
 				log.WithError(err).Warnf("Failed to check node-agent toleration, skip adding host pod toleration %s", k)
 			}
 		} else {

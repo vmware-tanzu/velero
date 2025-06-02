@@ -194,7 +194,7 @@ func unmarshalResourceModifiers(yamlData []byte) (*ResourceModifiers, error) {
 	resModifiers := &ResourceModifiers{}
 	err := yaml.UnmarshalStrict(yamlData, resModifiers)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode yaml data into resource modifiers, err: %s", err)
+		return nil, fmt.Errorf("failed to decode yaml data into resource modifiers, err: %w", err)
 	}
 	return resModifiers, nil
 }
@@ -217,7 +217,7 @@ func (r *ResourceModifierRule) applyPatch(u *unstructured.Unstructured, scheme *
 
 	updated, err := p.Patch(u, logger)
 	if err != nil {
-		return fmt.Errorf("error in applying patch %s", err)
+		return fmt.Errorf("error in applying patch %w", err)
 	}
 
 	u.SetUnstructuredContent(updated.Object)

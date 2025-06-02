@@ -1349,7 +1349,7 @@ func DeleteAllBackups(ctx context.Context, veleroCfg *VeleroConfig) error {
 	client := veleroCfg.ClientToInstallVelero
 	backupList := new(velerov1api.BackupList)
 	if err := client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
-		return fmt.Errorf("failed to list backup object in %s namespace with err %v", veleroCfg.VeleroNamespace, err)
+		return fmt.Errorf("failed to list backup object in %s namespace with err %w", veleroCfg.VeleroNamespace, err)
 	}
 	for _, backup := range backupList.Items {
 		fmt.Printf("Backup %s is going to be deleted...\n", backup.Name)
@@ -1364,7 +1364,7 @@ func DeleteBackups(ctx context.Context, backupNames []string, veleroCfg *VeleroC
 	client := veleroCfg.ClientToInstallVelero
 	backupList := new(velerov1api.BackupList)
 	if err := client.Kubebuilder.List(ctx, backupList, &kbclient.ListOptions{Namespace: veleroCfg.VeleroNamespace}); err != nil {
-		return fmt.Errorf("failed to list backup object in %s namespace with err %v", veleroCfg.VeleroNamespace, err)
+		return fmt.Errorf("failed to list backup object in %s namespace with err %w", veleroCfg.VeleroNamespace, err)
 	}
 	for _, backup := range backupList.Items {
 		for _, bn := range backupNames {

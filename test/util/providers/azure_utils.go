@@ -88,7 +88,7 @@ func newAzureCredential(cloudCfg cloud.Configuration) (azcore.TokenCredential, e
 		ClientOptions: azcore.ClientOptions{Cloud: cloudCfg},
 	})
 	if defErr != nil {
-		return nil, fmt.Errorf("EnvironmentCredential failed: %v; DefaultAzureCredential failed: %v", envErr, defErr)
+		return nil, fmt.Errorf("EnvironmentCredential failed: %w; DefaultAzureCredential failed: %w", envErr, defErr)
 	}
 	return defaultCred, nil
 }

@@ -110,10 +110,10 @@ func GetS3Credentials(config map[string]string) (*aws.Credentials, error) {
 			o.CredentialsFiles = []string{credentialsFile}
 		})
 		if err != nil {
-			return nil, fmt.Errorf("error loading config profile '%s': %v", profile, err)
+			return nil, fmt.Errorf("error loading config profile '%s': %w", profile, err)
 		}
 		if err := resolveCredsFromProfile(&cfg, &sfp); err != nil {
-			return nil, fmt.Errorf("error resolving creds from profile '%s': %v", profile, err)
+			return nil, fmt.Errorf("error resolving creds from profile '%s': %w", profile, err)
 		}
 	}
 

@@ -103,7 +103,7 @@ func CMDExecWithOutput(checkCMD *exec.Cmd) (*[]byte, error) {
 
 	bytesRead, err := io.ReadFull(stdoutPipe, jsonBuf)
 
-	if err != nil && err != io.ErrUnexpectedEOF {
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return nil, err
 	}
 	if bytesRead == len(jsonBuf) {

@@ -190,7 +190,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 				var hookErr error
 				if hookErr = e.PodCommandExecutor.ExecutePodCommand(hookLog, podMap, pod.Namespace, pod.Name, hook.HookName, eh); hookErr != nil {
 					hookLog.WithError(hookErr).Error("Error executing hook")
-					hookErr = fmt.Errorf("hook %s in container %s failed to execute, err: %v", hook.HookName, hook.Hook.Container, hookErr)
+					hookErr = fmt.Errorf("hook %s in container %s failed to execute, err: %w", hook.HookName, hook.Hook.Container, hookErr)
 					errors = append(errors, hookErr)
 					hookFailed = true
 				}
@@ -243,7 +243,7 @@ func (e *DefaultWaitExecHookHandler) HandleHooks(
 			if hook.executed {
 				continue
 			}
-			err := fmt.Errorf("hook %s in container %s in pod %s not executed: %v", hook.HookName, hook.Hook.Container, kube.NamespaceAndName(pod), ctx.Err())
+			err := fmt.Errorf("hook %s in container %s in pod %s not executed: %w", hook.HookName, hook.Hook.Container, kube.NamespaceAndName(pod), ctx.Err())
 			hookLog := log.WithFields(
 				logrus.Fields{
 					"hookSource": hook.HookSource,

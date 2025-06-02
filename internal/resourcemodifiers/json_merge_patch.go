@@ -20,13 +20,13 @@ type JSONMergePatcher struct {
 func (p *JSONMergePatcher) Patch(u *unstructured.Unstructured, _ logrus.FieldLogger) (*unstructured.Unstructured, error) {
 	objBytes, err := u.MarshalJSON()
 	if err != nil {
-		return nil, fmt.Errorf("error in marshaling object %s", err)
+		return nil, fmt.Errorf("error in marshaling object %w", err)
 	}
 
 	for _, patch := range p.patches {
 		patchBytes, err := yaml.YAMLToJSON([]byte(patch.PatchData))
 		if err != nil {
-			return nil, fmt.Errorf("error in converting YAML to JSON %s", err)
+			return nil, fmt.Errorf("error in converting YAML to JSON %w", err)
 		}
 
 		objBytes, err = jsonpatch.MergePatch(objBytes, patchBytes)

@@ -62,7 +62,8 @@ func RunCommandWithLog(cmd *exec.Cmd, log logrus.FieldLogger) (string, string, e
 
 func LogErrorAsExitCode(err error, log logrus.FieldLogger) {
 	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
 			log.Errorf("Restic command fail with ExitCode: %d. Process ID is %d, Exit error is: %s", exitError.ExitCode(), exitError.Pid(), exitError.String())
 			// Golang's os.exec -1 ExitCode means signal kill. Usually this is caused
 			// by CGroup's OOM. Log a warning to notice user.

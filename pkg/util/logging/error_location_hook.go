@@ -134,8 +134,8 @@ func getInnermostTrace(err error) stackTracer {
 	var tracer stackTracer
 
 	for {
-		t, isTracer := err.(stackTracer)
-		if isTracer {
+		var t stackTracer
+		if errors.As(err, &t) {
 			tracer = t
 		}
 

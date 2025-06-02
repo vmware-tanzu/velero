@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -286,7 +287,7 @@ func describeBackupResourceListInSF(ctx context.Context, kbClient kbclient.Clien
 	// the field of 'resourceList' lists the rearranged resources
 	buf := new(bytes.Buffer)
 	if err := downloadrequest.StreamWithBSLCACert(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath, bslCACert); err != nil {
-		if err == downloadrequest.ErrNotFound {
+		if errors.Is(err, downloadrequest.ErrNotFound) {
 			// the backup resource list could be missing if (other reasons may exist as well):
 			//	- the backup was taken prior to v1.1; or
 			//	- the backup hasn't completed yet; or
@@ -325,7 +326,7 @@ func describeBackupVolumesInSF(ctx context.Context, kbClient kbclient.Client, ba
 
 	buf := new(bytes.Buffer)
 	err = downloadrequest.StreamWithBSLCACert(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeInfos, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath, bslCACert)
-	if err == downloadrequest.ErrNotFound {
+	if errors.Is(err, downloadrequest.ErrNotFound) {
 		nativeSnapshots, err = retrieveNativeSnapshotLegacy(ctx, kbClient, backup, insecureSkipTLSVerify, caCertPath, bslCACert)
 		if err != nil {
 			backupVolumes["errorConcludeNativeSnapshot"] = fmt.Sprintf("error concluding native snapshot info: %v", err)
@@ -568,28 +569,28 @@ func DescribeBackupResultsInSF(ctx context.Context, kbClient kbclient.Client, d 
 	var buf bytes.Buffer
 	var resultMap map[string]results.Result
 
-	errors, warnings := make(map[string]any), make(map[string]any)
+	errs, warnings := make(map[string]any), make(map[string]any)
 	defer func() {
-		d.Describe("errors", errors)
+		d.Describe("errors", errs)
 		d.Describe("warnings", warnings)
 	}()
 
 	// If 'ErrNotFound' occurs, it means the backup bundle in the bucket has already been there before the backup-result file is introduced.
 	// We only display the count of errors and warnings in this case.
 	err = downloadrequest.StreamWithBSLCACert(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResults, &buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath, bslCACert)
-	if err == downloadrequest.ErrNotFound {
-		errors["count"] = backup.Status.Errors
+	if errors.Is(err, downloadrequest.ErrNotFound) {
+		errs["count"] = backup.Status.Errors
 		warnings["count"] = backup.Status.Warnings
 		return
 	} else if err != nil {
-		errors["errorGettingErrors"] = fmt.Errorf("<error getting errors: %v>", err)
-		warnings["errorGettingWarnings"] = fmt.Errorf("<error getting warnings: %v>", err)
+		errs["errorGettingErrors"] = fmt.Errorf("<error getting errors: %w>", err)
+		warnings["errorGettingWarnings"] = fmt.Errorf("<error getting warnings: %w>", err)
 		return
 	}
 
 	if err := json.NewDecoder(&buf).Decode(&resultMap); err != nil {
-		errors["errorGettingErrors"] = fmt.Errorf("<error decoding errors: %v>", err)
-		warnings["errorGettingWarnings"] = fmt.Errorf("<error decoding warnings: %v>", err)
+		errs["errorGettingErrors"] = fmt.Errorf("<error decoding errors: %w>", err)
+		warnings["errorGettingWarnings"] = fmt.Errorf("<error decoding warnings: %w>", err)
 		return
 	}
 
@@ -597,7 +598,7 @@ func DescribeBackupResultsInSF(ctx context.Context, kbClient kbclient.Client, d 
 		describeResultInSF(warnings, resultMap["warnings"])
 	}
 	if backup.Status.Errors > 0 {
-		describeResultInSF(errors, resultMap["errors"])
+		describeResultInSF(errs, resultMap["errors"])
 	}
 }
 
