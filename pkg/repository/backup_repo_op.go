@@ -107,9 +107,9 @@ func NewBackupRepository(namespace string, key BackupRepositoryKey) *velerov1api
 }
 
 func isBackupRepositoryNotFoundError(err error) bool {
-	return err == errBackupRepoNotFound
+	return errors.Is(err, errBackupRepoNotFound)
 }
 
 func isBackupRepositoryNotProvisionedError(err error) bool {
-	return err == errBackupRepoNotProvisioned
+	return errors.Is(err, errBackupRepoNotProvisioned)
 }
