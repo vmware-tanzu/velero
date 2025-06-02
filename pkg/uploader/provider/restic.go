@@ -173,7 +173,7 @@ func (rp *resticProvider) RunBackup(
 			log.Debugf("Restic backup got empty dir with %s path", path)
 			return "", true, 0, nil
 		}
-		return "", false, 0, errors.WithStack(fmt.Errorf("error running restic backup command %s with error: %v stderr: %v", backupCmd.String(), err, stderrBuf))
+		return "", false, 0, errors.WithStack(fmt.Errorf("error running restic backup command %s with error: %w stderr: %v", backupCmd.String(), err, stderrBuf))
 	}
 	// GetSnapshotID
 	snapshotIDCmd := resticGetSnapshotFunc(rp.repoIdentifier, rp.credentialsFile, tags)
@@ -184,7 +184,7 @@ func (rp *resticProvider) RunBackup(
 	}
 	snapshotID, err := resticGetSnapshotIDFunc(snapshotIDCmd)
 	if err != nil {
-		return "", false, 0, errors.WithStack(fmt.Errorf("error getting snapshot id with error: %v", err))
+		return "", false, 0, errors.WithStack(fmt.Errorf("error getting snapshot id with error: %w", err))
 	}
 	log.Infof("Run command=%s, stdout=%s, stderr=%s", backupCmd.String(), summary, stderrBuf)
 	return snapshotID, false, 0, nil
