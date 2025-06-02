@@ -49,7 +49,7 @@ func (s GCSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix
 	iter := client.Bucket(bslBucket).Objects(context.Background(), q)
 	for {
 		obj, err := iter.Next()
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			//return false, errors.Wrapf(err, fmt.Sprintf("Backup %s was not found under prefix %s \n", backupObject, bslPrefix))
 			return false, nil
 		}
@@ -83,7 +83,7 @@ func (s GCSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPr
 		obj, err := iter.Next()
 		if err != nil {
 			fmt.Printf("GCP bucket iterator exists due to %s\n", err)
-			if err == iterator.Done {
+			if errors.Is(err, iterator.Done) {
 				return nil
 			}
 			return errors.WithStack(err)
