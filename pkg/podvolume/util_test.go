@@ -300,3 +300,34 @@ func TestVolumeHasNonRestorableSource(t *testing.T) {
 		})
 	}
 }
+
+func TestGetRealSource(t *testing.T) {
+	testCases := []struct {
+		name     string
+		pvb      *velerov1api.PodVolumeBackup
+		expected string
+	}{
+		{
+			name:     "pvb with empty annotation",
+			pvb:      builder.ForPodVolumeBackup("fake-ns", "fake-name").PodNamespace("fake-pod-ns").PodName("fake-pod-name").Volume("fake-volume").Result(),
+			expected: "fake-pod-ns/fake-pod-name/fake-volume",
+		},
+		{
+			name:     "pvb without pvc name annotation",
+			pvb:      builder.ForPodVolumeBackup("fake-ns", "fake-name").PodNamespace("fake-pod-ns").PodName("fake-pod-name").Volume("fake-volume").Annotations(map[string]string{}).Result(),
+			expected: "fake-pod-ns/fake-pod-name/fake-volume",
+		},
+		{
+			name:     "pvb with pvc name annotation",
+			pvb:      builder.ForPodVolumeBackup("fake-ns", "fake-name").PodNamespace("fake-pod-ns").PodName("fake-pod-name").Volume("fake-volume").Annotations(map[string]string{"velero.io/pvc-name": "fake-pvc-name"}).Result(),
+			expected: "fake-pod-ns/fake-pod-name/fake-pvc-name",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := GetRealSource(tc.pvb)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}

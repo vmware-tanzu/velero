@@ -300,7 +300,7 @@ func (r *BackupMicroService) closeDataPath(ctx context.Context, duName string) {
 }
 
 func (r *BackupMicroService) cancelPodVolumeBackup(pvb *velerov1api.PodVolumeBackup) {
-	r.logger.WithField("pvb", pvb.Name).Info("PVB is being canceled")
+	r.logger.WithField("PVB", pvb.Name).Info("PVB is being canceled")
 
 	r.eventRecorder.Event(pvb, false, datapath.EventReasonCancelling, "Canceling for PVB %s", pvb.Name)
 
