@@ -113,6 +113,10 @@ type BackupSpec struct {
 	// +optional
 	TTL metav1.Duration `json:"ttl,omitempty"`
 
+	// VolumeGroupSnapshotLabelKey specifies the label key to group PVCs under a VGS.
+	// +optional
+	VolumeGroupSnapshotLabelKey string `json:"volumeGroupSnapshotLabelKey,omitempty"`
+
 	// IncludeClusterResources specifies whether cluster-scoped resources
 	// should be included for consideration in the backup.
 	// +optional
