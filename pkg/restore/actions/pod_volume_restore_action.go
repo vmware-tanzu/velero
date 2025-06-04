@@ -139,14 +139,24 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 		}
 	}
 
-	if !needsFileSystemRestore {
-		log.Info("No pod volumes need file system restore (backed up using native datamover or CSI), removing restore-wait init container if it exists")
-
-		// Check if the restore-wait init container exists and remove it
-		if len(pod.Spec.InitContainers) > 0 && (pod.Spec.InitContainers[0].Name == restorehelper.WaitInitContainer || pod.Spec.InitContainers[0].Name == restorehelper.WaitInitContainerLegacy) {
-			pod.Spec.InitContainers = pod.Spec.InitContainers[1:]
-			log.Info("Removed restore-wait init container")
+	// Remove all existing restore-wait init containers to prevent duplicates
+	// This covers both scenarios: when we don't need them and when we need to add a single new one
+	var filteredInitContainers []corev1api.Container
+	removedCount := 0
+	for _, initContainer := range pod.Spec.InitContainers {
+		if initContainer.Name != restorehelper.WaitInitContainer && initContainer.Name != restorehelper.WaitInitContainerLegacy {
+			filteredInitContainers = append(filteredInitContainers, initContainer)
+		} else {
+			removedCount++
 		}
+	}
+	pod.Spec.InitContainers = filteredInitContainers
+	if removedCount > 0 {
+		log.Infof("Removed %d existing restore-wait init container(s)", removedCount)
+	}
+
+	if !needsFileSystemRestore {
+		log.Info("No pod volumes need file system restore (backed up using native datamover or CSI)")
 	} else {
 		// Only get plugin config and add init container if we need file system restore
 		log.Debugf("Getting plugin config")
@@ -218,11 +228,9 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 		initContainerBuilder.Command(getCommand(log, config))
 
 		initContainer := *initContainerBuilder.Result()
-		if len(pod.Spec.InitContainers) == 0 || (pod.Spec.InitContainers[0].Name != restorehelper.WaitInitContainer && pod.Spec.InitContainers[0].Name != restorehelper.WaitInitContainerLegacy) {
-			pod.Spec.InitContainers = append([]corev1api.Container{initContainer}, pod.Spec.InitContainers...)
-		} else {
-			pod.Spec.InitContainers[0] = initContainer
-		}
+		// Since we've already removed all restore-wait init containers above,
+		// we can simply prepend the new init container
+		pod.Spec.InitContainers = append([]corev1api.Container{initContainer}, pod.Spec.InitContainers...)
 	}
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pod)
