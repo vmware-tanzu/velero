@@ -86,7 +86,6 @@ func NewUploaderProvider(
 	}
 	if uploaderType == uploader.KopiaType {
 		return NewKopiaUploaderProvider(requesterType, ctx, credGetter, backupRepo, log)
-	} else {
-		return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
 	}
+	return NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
 }
