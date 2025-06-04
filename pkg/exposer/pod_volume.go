@@ -152,12 +152,6 @@ func (e *podVolumeExposer) Expose(ctx context.Context, ownerObject corev1api.Obj
 		return errors.Wrapf(err, "error to create hosting pod")
 	}
 
-	defer func() {
-		if err != nil {
-			kube.DeletePodIfAny(ctx, e.kubeClient.CoreV1(), hostingPod.Name, hostingPod.Namespace, curLog)
-		}
-	}()
-
 	curLog.WithField("pod name", hostingPod.Name).Info("Hosting pod is created")
 
 	return nil
