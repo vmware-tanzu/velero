@@ -39,7 +39,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 
-	"github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )

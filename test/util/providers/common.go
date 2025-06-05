@@ -27,7 +27,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/vmware-tanzu/velero/internal/volume"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 	velerotest "github.com/vmware-tanzu/velero/test"
 	velero "github.com/vmware-tanzu/velero/test/util/velero"
 )
