@@ -11,7 +11,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package datamover
+package podvolume
 
 import (
 	"context"
@@ -23,15 +23,14 @@ import (
 
 func NewCommand(f client.Factory) *cobra.Command {
 	command := &cobra.Command{
-		Use:    "data-mover",
-		Short:  "Run the velero data-mover",
-		Long:   "Run the velero data-mover",
+		Use:    "pod-volume",
+		Short:  "Run the velero pod volume backup/restore",
+		Long:   "Run the velero pod volume backup/restore",
 		Hidden: true,
 	}
 
 	command.AddCommand(
 		NewBackupCommand(f),
-		NewRestoreCommand(f),
 	)
 
 	return command

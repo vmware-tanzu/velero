@@ -42,6 +42,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	ctlcache "sigs.k8s.io/controller-runtime/pkg/cache"
@@ -76,7 +77,7 @@ func NewRestoreCommand(f client.Factory) *cobra.Command {
 			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
 			s, err := newdataMoverRestore(logger, f, config)
 			if err != nil {
-				exitWithMessage(logger, false, "Failed to create data mover restore, %v", err)
+				kube.ExitPodWithMessage(logger, false, "Failed to create data mover restore, %v", err)
 			}
 
 			s.run()
@@ -263,7 +264,7 @@ func (s *dataMoverRestore) createDataPathService() (dataPathService, error) {
 	credentialFileStore, err := funcNewCredentialFileStore(
 		s.client,
 		s.namespace,
-		defaultCredentialsDirectory,
+		credentials.DefaultStoreDirectory(),
 		filesystem.NewFileSystem(),
 	)
 	if err != nil {
