@@ -69,11 +69,12 @@ type DataDownloadReconciler struct {
 	preparingTimeout      time.Duration
 	metrics               *metrics.ServerMetrics
 	cancelledDataDownload map[string]time.Time
+	nodeAgentConfigMap    string
 }
 
 func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
 	restorePVCConfig nodeagent.RestorePVC, podResources corev1api.ResourceRequirements, nodeName string, preparingTimeout time.Duration,
-	logger logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataDownloadReconciler {
+	logger logrus.FieldLogger, metrics *metrics.ServerMetrics, nodeAgentConfigMap string) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:                client,
 		kubeClient:            kubeClient,
@@ -88,6 +89,7 @@ func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeCl
 		preparingTimeout:      preparingTimeout,
 		metrics:               metrics,
 		cancelledDataDownload: make(map[string]time.Time),
+		nodeAgentConfigMap:    nodeAgentConfigMap,
 	}
 }
 
@@ -838,6 +840,8 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		ExposeTimeout:         r.preparingTimeout,
 		NodeOS:                nodeOS,
 		RestorePVCConfig:      r.restorePVCConfig,
+		NodeAgentNamespace:    dd.Namespace,
+		NodeAgentConfigMap:    r.nodeAgentConfigMap,
 	}, nil
 }
 

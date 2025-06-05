@@ -348,6 +348,7 @@ func (s *nodeAgentServer) run() {
 		s.config.dataMoverPrepareTimeout,
 		s.logger,
 		s.metrics,
+		s.config.nodeAgentConfig,
 	)
 	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
@@ -359,7 +360,7 @@ func (s *nodeAgentServer) run() {
 		s.logger.Infof("Using customized restorePVC config %v", restorePVCConfig)
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, restorePVCConfig, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, restorePVCConfig, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics, s.config.nodeAgentConfig)
 	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}

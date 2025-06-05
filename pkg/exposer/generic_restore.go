@@ -33,6 +33,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 // GenericRestoreExposeParam define the input param for Generic Restore Expose
@@ -63,6 +64,12 @@ type GenericRestoreExposeParam struct {
 
 	// RestorePVCConfig is the config for restorePVC (intermediate PVC) of generic restore
 	RestorePVCConfig nodeagent.RestorePVC
+
+	// NodeAgentNamespace is the namespace where the node agent is running
+	NodeAgentNamespace string
+
+	// NodeAgentConfigMap is the name of the ConfigMap containing node agent configurations
+	NodeAgentConfigMap string
 }
 
 // GenericRestoreExposer is the interfaces for a generic restore exposer
@@ -122,7 +129,7 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1ap
 		return errors.Errorf("Target PVC %s/%s has already been bound, abort", param.TargetNamespace, param.TargetPVCName)
 	}
 
-	restorePod, err := e.createRestorePod(ctx, ownerObject, targetPVC, param.OperationTimeout, param.HostingPodLabels, param.HostingPodAnnotations, selectedNode, param.Resources, param.NodeOS)
+	restorePod, err := e.createRestorePod(ctx, ownerObject, targetPVC, param.OperationTimeout, param.HostingPodLabels, param.HostingPodAnnotations, selectedNode, param.Resources, param.NodeOS, param.NodeAgentNamespace, param.NodeAgentConfigMap)
 	if err != nil {
 		return errors.Wrapf(err, "error to create restore pod")
 	}
@@ -377,7 +384,7 @@ func (e *genericRestoreExposer) RebindVolume(ctx context.Context, ownerObject co
 }
 
 func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObject corev1api.ObjectReference, targetPVC *corev1api.PersistentVolumeClaim,
-	operationTimeout time.Duration, label map[string]string, annotation map[string]string, selectedNode string, resources corev1api.ResourceRequirements, nodeOS string) (*corev1api.Pod, error) {
+	operationTimeout time.Duration, label map[string]string, annotation map[string]string, selectedNode string, resources corev1api.ResourceRequirements, nodeOS string, nodeAgentNamespace string, nodeAgentConfigMap string) (*corev1api.Pod, error) {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
 
@@ -387,6 +394,13 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, nodeOS)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
+	}
+
+	// Get the priority class name from node-agent-configmap if available
+	priorityClassName, err := veleroutil.GetDataMoverPriorityClassName(ctx, nodeAgentNamespace, e.kubeClient, nodeAgentConfigMap)
+	if err != nil {
+		e.log.WithError(err).Warn("Failed to get priority class name from node-agent-configmap, using empty value")
+		priorityClassName = ""
 	}
 
 	var gracePeriod int64
@@ -503,6 +517,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 					Resources:     resources,
 				},
 			},
+			PriorityClassName:             priorityClassName,
 			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes:                       volumes,

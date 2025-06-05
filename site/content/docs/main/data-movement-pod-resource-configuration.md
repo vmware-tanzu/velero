@@ -51,6 +51,10 @@ spec:
         - --node-agent-config=<configMap name>
 ```
 
+### Priority Class
+
+Data mover pods will inherit the priorityClassName from the node-agent daemonset. The priorityClassName can be set during Velero installation using the `--priority-class-name` flag, which applies to all Velero components including the data mover pods launched by the node-agent.
+
 [1]: csi-snapshot-data-movement.md
 [2]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
 [3]: performance-guidance.md
