@@ -63,6 +63,20 @@ func GetVolumeMountsFromVeleroServer(deployment *appsv1api.Deployment) []corev1a
 	return nil
 }
 
+// GetPodSecurityContextsFromVeleroServer get the pod security context from the Velero server deployment
+func GetPodSecurityContextsFromVeleroServer(deployment *appsv1api.Deployment) *corev1api.PodSecurityContext {
+	return deployment.Spec.Template.Spec.SecurityContext
+}
+
+// GetSecurityContextsFromVeleroServer get the security context from the Velero server deployment
+func GetSecurityContextsFromVeleroServer(deployment *appsv1api.Deployment) *corev1api.SecurityContext {
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		// We only have one container in the Velero server deployment
+		return container.SecurityContext
+	}
+	return nil
+}
+
 // GetVolumesFromVeleroServer get the volumes from the Velero server deployment
 func GetVolumesFromVeleroServer(deployment *appsv1api.Deployment) []corev1api.Volume {
 	return deployment.Spec.Template.Spec.Volumes

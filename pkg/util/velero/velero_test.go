@@ -24,6 +24,8 @@ import (
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 func TestGetNodeSelectorFromVeleroServer(t *testing.T) {
@@ -531,6 +533,119 @@ func TestGetVolumesFromVeleroServer(t *testing.T) {
 					t.Errorf("expected volume at index %d to be %v, got %v", i, want, got[i])
 				}
 			}
+		})
+	}
+}
+
+func TestGetPodSecurityContextsFromVeleroServer(t *testing.T) {
+	tests := []struct {
+		name   string
+		deploy *appsv1api.Deployment
+		want   *corev1api.PodSecurityContext
+	}{
+		{
+			name: "no security context",
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							SecurityContext: nil,
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "security context",
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							SecurityContext: &corev1api.PodSecurityContext{
+								RunAsNonRoot: boolptr.True(),
+							},
+						},
+					},
+				},
+			},
+			want: &corev1api.PodSecurityContext{
+				RunAsNonRoot: boolptr.True(),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := GetPodSecurityContextsFromVeleroServer(test.deploy)
+			assert.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestGetSecurityContextsFromVeleroServer(t *testing.T) {
+	tests := []struct {
+		name   string
+		deploy *appsv1api.Deployment
+		want   *corev1api.SecurityContext
+	}{
+		{
+			name: "no container",
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "no security context",
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
+								{
+									SecurityContext: nil,
+								},
+							},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "security context",
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
+								{
+									SecurityContext: &corev1api.SecurityContext{
+										RunAsNonRoot: boolptr.True(),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &corev1api.SecurityContext{
+				RunAsNonRoot: boolptr.True(),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := GetSecurityContextsFromVeleroServer(test.deploy)
+			assert.Equal(t, test.want, got)
 		})
 	}
 }
