@@ -76,8 +76,6 @@ const (
 	// the port where prometheus metrics are exposed
 	defaultMetricsAddress = ":8085"
 
-	defaultHostPodsPath = "/host_pods"
-
 	defaultResourceTimeout         = 10 * time.Minute
 	defaultDataMoverPrepareTimeout = 30 * time.Minute
 	defaultDataPathConcurrentNum   = 1
@@ -301,14 +299,14 @@ func (s *nodeAgentServer) run() {
 
 	credentialGetter := &credentials.CredentialGetter{FromFile: credentialFileStore, FromSecret: credSecretStore}
 	repoEnsurer := repository.NewEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
-	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.dataPathMgr, repoEnsurer,
+	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.kubeClient, s.dataPathMgr, repoEnsurer,
 		credentialGetter, s.nodeName, s.mgr.GetScheme(), s.metrics, s.logger)
 
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
 	}
 
-	if err = controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.dataPathMgr, repoEnsurer, credentialGetter, s.logger).SetupWithManager(s.mgr); err != nil {
+	if err = controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.kubeClient, s.dataPathMgr, repoEnsurer, credentialGetter, s.logger).SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
 
@@ -412,10 +410,10 @@ func (s *nodeAgentServer) waitCacheForResume() error {
 // validatePodVolumesHostPath validates that the pod volumes path contains a
 // directory for each Pod running on this node
 func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface) error {
-	files, err := s.fileSystem.ReadDir(defaultHostPodsPath)
+	files, err := s.fileSystem.ReadDir(nodeagent.HostPodVolumeMountPath())
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			s.logger.Warnf("Pod volumes host path [%s] doesn't exist, fs-backup is disabled", defaultHostPodsPath)
+			s.logger.Warnf("Pod volumes host path [%s] doesn't exist, fs-backup is disabled", nodeagent.HostPodVolumeMountPath())
 			return nil
 		}
 		return errors.Wrap(err, "could not read pod volumes host path")
@@ -448,7 +446,7 @@ func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface
 			valid = false
 			s.logger.WithFields(logrus.Fields{
 				"pod":  fmt.Sprintf("%s/%s", pod.GetNamespace(), pod.GetName()),
-				"path": defaultHostPodsPath + "/" + dirName,
+				"path": nodeagent.HostPodVolumeMountPath() + "/" + dirName,
 			}).Debug("could not find volumes for pod in host path")
 		}
 	}

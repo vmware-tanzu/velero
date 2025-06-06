@@ -99,7 +99,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 
 			for _, dir := range tt.dirs {
 				if tt.createDir {
-					err := fs.MkdirAll(filepath.Join(defaultHostPodsPath, dir), os.ModePerm)
+					err := fs.MkdirAll(filepath.Join(nodeagent.HostPodVolumeMountPath(), dir), os.ModePerm)
 					if err != nil {
 						t.Error(err)
 					}

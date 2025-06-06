@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,10 +50,11 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
-func NewPodVolumeRestoreReconciler(client client.Client, dataPathMgr *datapath.Manager, ensurer *repository.Ensurer,
+func NewPodVolumeRestoreReconciler(client client.Client, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager, ensurer *repository.Ensurer,
 	credentialGetter *credentials.CredentialGetter, logger logrus.FieldLogger) *PodVolumeRestoreReconciler {
 	return &PodVolumeRestoreReconciler{
 		Client:            client,
+		kubeClient:        kubeClient,
 		logger:            logger.WithField("controller", "PodVolumeRestore"),
 		repositoryEnsurer: ensurer,
 		credentialGetter:  credentialGetter,
@@ -64,6 +66,7 @@ func NewPodVolumeRestoreReconciler(client client.Client, dataPathMgr *datapath.M
 
 type PodVolumeRestoreReconciler struct {
 	client.Client
+	kubeClient        kubernetes.Interface
 	logger            logrus.FieldLogger
 	repositoryEnsurer *repository.Ensurer
 	credentialGetter  *credentials.CredentialGetter
@@ -135,7 +138,7 @@ func (c *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return c.errorOut(ctx, pvr, err, "error to update status to in progress", log)
 	}
 
-	volumePath, err := exposer.GetPodVolumeHostPath(ctx, pod, pvr.Spec.Volume, c.Client, c.fileSystem, log)
+	volumePath, err := exposer.GetPodVolumeHostPath(ctx, pod, pvr.Spec.Volume, c.kubeClient, c.fileSystem, log)
 	if err != nil {
 		c.closeDataPath(ctx, pvr.Name)
 		return c.errorOut(ctx, pvr, err, "error exposing host path for pod volume", log)
