@@ -198,9 +198,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 			if time.Since(spotted) > delay {
 				log.Infof("Data download %s is canceled in Phase %s but not handled in rasonable time", dd.GetName(), dd.Status.Phase)
-				if r.tryCancelDataDownload(ctx, dd, "") {
-					delete(r.cancelledDataDownload, dd.Name)
-				}
+				r.tryCancelDataDownload(ctx, dd, "")
 
 				return ctrl.Result{}, nil
 			}
@@ -526,6 +524,7 @@ func (r *DataDownloadReconciler) tryCancelDataDownload(ctx context.Context, dd *
 	// success update
 	r.metrics.RegisterDataDownloadCancel(r.nodeName)
 	r.restoreExposer.CleanUp(ctx, getDataDownloadOwnerObject(dd))
+	delete(r.cancelledDataDownload, dd.Name)
 
 	log.Warn("data download is canceled")
 

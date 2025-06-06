@@ -97,3 +97,33 @@ func (b *PodVolumeRestoreBuilder) UploaderType(uploaderType string) *PodVolumeRe
 	b.object.Spec.UploaderType = uploaderType
 	return b
 }
+
+// Cancel sets the DataDownload's Cancel.
+func (d *PodVolumeRestoreBuilder) Cancel(cancel bool) *PodVolumeRestoreBuilder {
+	d.object.Spec.Cancel = cancel
+	return d
+}
+
+// AcceptedTimestamp sets the PodVolumeRestore's AcceptedTimestamp.
+func (d *PodVolumeRestoreBuilder) AcceptedTimestamp(acceptedTimestamp *metav1.Time) *PodVolumeRestoreBuilder {
+	d.object.Status.AcceptedTimestamp = acceptedTimestamp
+	return d
+}
+
+// Finalizers sets the PodVolumeRestore's Finalizers.
+func (d *PodVolumeRestoreBuilder) Finalizers(finalizers []string) *PodVolumeRestoreBuilder {
+	d.object.Finalizers = finalizers
+	return d
+}
+
+// Message sets the PodVolumeRestore's Message.
+func (d *PodVolumeRestoreBuilder) Message(msg string) *PodVolumeRestoreBuilder {
+	d.object.Status.Message = msg
+	return d
+}
+
+// Message sets the PodVolumeRestore's Node.
+func (d *PodVolumeRestoreBuilder) Node(node string) *PodVolumeRestoreBuilder {
+	d.object.Status.Node = node
+	return d
+}
