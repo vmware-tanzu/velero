@@ -304,6 +304,10 @@ func (r *RestoreMicroService) cancelPodVolumeRestore(pvr *velerov1api.PodVolumeR
 	}
 }
 
+var funcRemoveAll = os.RemoveAll
+var funcMkdirAll = os.MkdirAll
+var funcWriteFile = os.WriteFile
+
 func writeCompletionMark(pvr *velerov1api.PodVolumeRestore, result datapath.RestoreResult, log logrus.FieldLogger) error {
 	volumePath := result.Target.ByPath
 	if volumePath == "" {
@@ -314,7 +318,7 @@ func writeCompletionMark(pvr *velerov1api.PodVolumeRestore, result datapath.Rest
 	// of this volume, which we don't want to carry over). If this fails for any reason, log and continue, since
 	// this is non-essential cleanup (the done files are named based on restore UID and the init container looks
 	// for the one specific to the restore being executed).
-	if err := os.RemoveAll(filepath.Join(volumePath, ".velero")); err != nil {
+	if err := funcRemoveAll(filepath.Join(volumePath, ".velero")); err != nil {
 		log.WithError(err).Warnf("Failed to remove .velero directory from directory %s", volumePath)
 	}
 
@@ -326,14 +330,14 @@ func writeCompletionMark(pvr *velerov1api.PodVolumeRestore, result datapath.Rest
 
 	// Create the .velero directory within the volume dir so we can write a done file
 	// for this restore.
-	if err := os.MkdirAll(filepath.Join(volumePath, ".velero"), 0755); err != nil {
+	if err := funcMkdirAll(filepath.Join(volumePath, ".velero"), 0755); err != nil {
 		return errors.Wrapf(err, "error creating .velero directory for done file")
 	}
 
 	// Write a done file with name=<restore-uid> into the just-created .velero dir
 	// within the volume. The velero init container on the pod is waiting
 	// for this file to exist in each restored volume before completing.
-	if err := os.WriteFile(filepath.Join(volumePath, ".velero", string(restoreUID)), nil, 0644); err != nil { //nolint:gosec // Internal usage. No need to check.
+	if err := funcWriteFile(filepath.Join(volumePath, ".velero", string(restoreUID)), nil, 0644); err != nil {
 		return errors.Wrapf(err, "error writing done file")
 	}
 
