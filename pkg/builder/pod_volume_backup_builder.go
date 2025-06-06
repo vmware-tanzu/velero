@@ -113,3 +113,9 @@ func (b *PodVolumeBackupBuilder) UploaderType(uploaderType string) *PodVolumeBac
 	b.object.Spec.UploaderType = uploaderType
 	return b
 }
+
+// Annotations sets the PodVolumeBackup's Annotations.
+func (b *PodVolumeBackupBuilder) Annotations(annotations map[string]string) *PodVolumeBackupBuilder {
+	b.object.Annotations = annotations
+	return b
+}

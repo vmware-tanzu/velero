@@ -76,10 +76,6 @@ const (
 	// the port where prometheus metrics are exposed
 	defaultMetricsAddress = ":8085"
 
-	// defaultCredentialsDirectory is the path on disk where credential
-	// files will be written to
-	defaultCredentialsDirectory = "/tmp/credentials"
-
 	defaultResourceTimeout         = 10 * time.Minute
 	defaultDataMoverPrepareTimeout = 30 * time.Minute
 	defaultDataPathConcurrentNum   = 1
@@ -289,7 +285,7 @@ func (s *nodeAgentServer) run() {
 	credentialFileStore, err := credentials.NewNamespacedFileStore(
 		s.mgr.GetClient(),
 		s.namespace,
-		defaultCredentialsDirectory,
+		credentials.DefaultStoreDirectory(),
 		filesystem.NewFileSystem(),
 	)
 	if err != nil {
