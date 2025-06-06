@@ -155,9 +155,26 @@ Status:
 - `Recent Maintenance` keeps the status of the recent 3 maintenance jobs, including its start time, result (succeeded/failed), completion time (if the maintenance job succeeded), or error message (if the maintenance failed)
 
 ### Others
-Maintenance jobs will inherit the labels, annotations, toleration, nodeSelector, service account, image, environment variables, cloud-credentials etc. from Velero deployment.  
+Maintenance jobs will inherit toleration, nodeSelector, service account, image, environment variables, cloud-credentials etc. from Velero deployment.
+
+For labels and annotations, maintenance jobs do NOT inherit all labels and annotations from the Velero deployment. Instead, they include:
+
+**Labels:**
+
+* `velero.io/repo-name: <repository-name>` - automatically added to identify which repository they are maintaining
+* Only specific [third-party labels][4] from the Velero server deployment that are in the predefined list, currently limited to:
+  * `azure.workload.identity/use`
+
+**Annotations:**
+
+* Only specific [third-party annotations][5] from the Velero server deployment that are in the predefined list, currently limited to:
+  * `iam.amazonaws.com/role`
+
+**Important:** Other labels and annotations from the Velero deployment are NOT inherited by maintenance jobs. This is by design to ensure only specific labels and annotations required for cloud provider identity systems are propagated.
 Maintenance jobs will not run for backup repositories whose backup storage location is set as readOnly.  
 
 [1]: velero-install.md#usage
 [2]: node-agent-concurrency.md
 [3]: backup-repository-configuration.md#full-maintenance-interval-customization
+[4]: https://github.com/vmware-tanzu/velero/blob/d5a2e7e6b9512e8ba52ec269ed5ce9a0fa23548c/pkg/util/third_party.go#L19-L21
+[5]: https://github.com/vmware-tanzu/velero/blob/d5a2e7e6b9512e8ba52ec269ed5ce9a0fa23548c/pkg/util/third_party.go#L23-L25
