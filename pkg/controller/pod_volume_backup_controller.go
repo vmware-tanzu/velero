@@ -130,7 +130,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	fsBackup, err := r.dataPathMgr.CreateFileSystemBR(pvb.Name, pVBRRequestor, ctx, r.Client, pvb.Namespace, callbacks, log)
 
 	if err != nil {
-		if err == datapath.ConcurrentLimitExceed {
+		if errors.Is(err, datapath.ConcurrentLimitExceed) {
 			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 		} else {
 			return r.errorOut(ctx, &pvb, err, "error to create data path", log)
@@ -378,7 +378,8 @@ func UpdatePVBStatusToFailed(ctx context.Context, c client.Client, pvb *velerov1
 	original := pvb.DeepCopy()
 	pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
 	pvb.Status.CompletionTimestamp = &metav1.Time{Time: time}
-	if dataPathError, ok := errOut.(datapath.DataPathError); ok {
+	var dataPathError datapath.DataPathError
+	if errors.As(errOut, &dataPathError) {
 		pvb.Status.SnapshotID = dataPathError.GetSnapshotID()
 	}
 	if len(strings.TrimSpace(msg)) == 0 {
