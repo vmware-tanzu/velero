@@ -31,6 +31,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 	command.AddCommand(
 		NewBackupCommand(f),
+		NewRestoreCommand(f),
 	)
 
 	return command
