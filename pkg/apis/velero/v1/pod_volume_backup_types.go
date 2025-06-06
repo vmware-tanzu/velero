@@ -57,6 +57,10 @@ type PodVolumeBackupSpec struct {
 	// +optional
 	// +nullable
 	UploaderSettings map[string]string `json:"uploaderSettings,omitempty"`
+
+	// Cancel indicates request to cancel the ongoing PodVolumeBackup. It can be set
+	// when the PodVolumeBackup is in InProgress phase
+	Cancel bool `json:"cancel,omitempty"`
 }
 
 // PodVolumeBackupPhase represents the lifecycle phase of a PodVolumeBackup.
