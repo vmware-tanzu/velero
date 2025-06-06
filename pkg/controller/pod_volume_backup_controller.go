@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -48,10 +49,11 @@ import (
 const pVBRRequestor string = "pod-volume-backup-restore"
 
 // NewPodVolumeBackupReconciler creates the PodVolumeBackupReconciler instance
-func NewPodVolumeBackupReconciler(client client.Client, dataPathMgr *datapath.Manager, ensurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter,
+func NewPodVolumeBackupReconciler(client client.Client, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager, ensurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter,
 	nodeName string, scheme *runtime.Scheme, metrics *metrics.ServerMetrics, logger logrus.FieldLogger) *PodVolumeBackupReconciler {
 	return &PodVolumeBackupReconciler{
 		Client:            client,
+		kubeClient:        kubeClient,
 		logger:            logger.WithField("controller", "PodVolumeBackup"),
 		repositoryEnsurer: ensurer,
 		credentialGetter:  credentialGetter,
@@ -67,6 +69,7 @@ func NewPodVolumeBackupReconciler(client client.Client, dataPathMgr *datapath.Ma
 // PodVolumeBackupReconciler reconciles a PodVolumeBackup object
 type PodVolumeBackupReconciler struct {
 	client.Client
+	kubeClient        kubernetes.Interface
 	scheme            *runtime.Scheme
 	clock             clocks.WithTickerAndDelayedExecution
 	metrics           *metrics.ServerMetrics
@@ -155,7 +158,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return r.errorOut(ctx, &pvb, err, fmt.Sprintf("getting pod %s/%s", pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name), log)
 	}
 
-	path, err := exposer.GetPodVolumeHostPath(ctx, &pod, pvb.Spec.Volume, r.Client, r.fileSystem, log)
+	path, err := exposer.GetPodVolumeHostPath(ctx, &pod, pvb.Spec.Volume, r.kubeClient, r.fileSystem, log)
 	if err != nil {
 		r.closeDataPath(ctx, pvb.Name)
 		return r.errorOut(ctx, &pvb, err, "error exposing host path for pod volume", log)
