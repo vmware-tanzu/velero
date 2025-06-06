@@ -33,7 +33,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
@@ -42,24 +41,24 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	ctlcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	ctlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type pvrConfig struct {
+type podVolumeRestoreConfig struct {
 	volumePath      string
 	pvrName         string
 	resourceTimeout time.Duration
-	winHPC          bool
 }
 
 func NewRestoreCommand(f client.Factory) *cobra.Command {
 	logLevelFlag := logging.LogLevelFlag(logrus.InfoLevel)
 	formatFlag := logging.NewFormatFlag()
 
-	config := pvrConfig{}
+	config := podVolumeRestoreConfig{}
 
 	command := &cobra.Command{
 		Use:    "restore",
@@ -76,7 +75,7 @@ func NewRestoreCommand(f client.Factory) *cobra.Command {
 			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
 			s, err := newPodVolumeRestore(logger, f, config)
 			if err != nil {
-				exitWithMessage(logger, false, "Failed to create pod volume restore, %v", err)
+				kube.ExitPodWithMessage(logger, false, "Failed to create pod volume restore, %v", err)
 			}
 
 			s.run()
@@ -104,12 +103,12 @@ type podVolumeRestore struct {
 	cache       ctlcache.Cache
 	namespace   string
 	nodeName    string
-	config      pvrConfig
+	config      podVolumeRestoreConfig
 	kubeClient  kubernetes.Interface
 	dataPathMgr *datapath.Manager
 }
 
-func newPodVolumeRestore(logger logrus.FieldLogger, factory client.Factory, config pvrConfig) (*podVolumeRestore, error) {
+func newPodVolumeRestore(logger logrus.FieldLogger, factory client.Factory, config podVolumeRestoreConfig) (*podVolumeRestore, error) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	clientConfig, err := factory.ClientConfig()
@@ -233,6 +232,8 @@ func (s *podVolumeRestore) runDataPath() {
 		return
 	}
 
+	s.logger.Infof("Running data path service %s", s.config.pvrName)
+
 	result, err := dpService.RunCancelableDataPath(s.ctx)
 	if err != nil {
 		dpService.Shutdown()
@@ -270,7 +271,7 @@ func (s *podVolumeRestore) createDataPathService() (dataPathService, error) {
 
 	credGetter := &credentials.CredentialGetter{FromFile: credentialFileStore, FromSecret: credSecretStore}
 
-	pvrInformer, err := s.cache.GetInformer(s.ctx, &velerov2alpha1api.DataDownload{})
+	pvrInformer, err := s.cache.GetInformer(s.ctx, &velerov1api.PodVolumeRestore{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get controller-runtime informer from manager")
 	}
