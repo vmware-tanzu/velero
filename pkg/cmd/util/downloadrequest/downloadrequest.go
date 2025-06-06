@@ -51,6 +51,22 @@ func Stream(
 	insecureSkipTLSVerify bool,
 	caCertFile string,
 ) error {
+	return StreamWithBSLCACert(ctx, kbClient, namespace, name, kind, w, timeout, insecureSkipTLSVerify, caCertFile, "")
+}
+
+// StreamWithBSLCACert is like Stream but accepts an additional bslCACert parameter
+// that contains the cacert from the BackupStorageLocation config
+func StreamWithBSLCACert(
+	ctx context.Context,
+	kbClient kbclient.Client,
+	namespace, name string,
+	kind veleroV1api.DownloadTargetKind,
+	w io.Writer,
+	timeout time.Duration,
+	insecureSkipTLSVerify bool,
+	caCertFile string,
+	bslCACert string,
+) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -59,7 +75,7 @@ func Stream(
 		return err
 	}
 
-	if err := download(ctx, downloadURL, kind, w, insecureSkipTLSVerify, caCertFile); err != nil {
+	if err := download(ctx, downloadURL, kind, w, insecureSkipTLSVerify, caCertFile, bslCACert); err != nil {
 		return err
 	}
 
@@ -109,8 +125,10 @@ func download(
 	w io.Writer,
 	insecureSkipTLSVerify bool,
 	caCertFile string,
+	caCertByteString string,
 ) error {
 	var caPool *x509.CertPool
+	var err error
 	if len(caCertFile) > 0 {
 		caCert, err := os.ReadFile(caCertFile)
 		if err != nil {
@@ -124,6 +142,16 @@ func download(
 			caPool = x509.NewCertPool()
 		}
 		caPool.AppendCertsFromPEM(caCert)
+	}
+	if len(caCertByteString) > 0 {
+		// bundle the passed in cert with the system cert pool
+		// if it's available, otherwise create a new pool just
+		// for this.
+		caPool, err = x509.SystemCertPool()
+		if err != nil {
+			caPool = x509.NewCertPool()
+		}
+		caPool.AppendCertsFromPEM([]byte(caCertByteString))
 	}
 
 	defaultTransport := http.DefaultTransport.(*http.Transport)
