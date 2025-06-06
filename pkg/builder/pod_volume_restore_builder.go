@@ -97,3 +97,9 @@ func (b *PodVolumeRestoreBuilder) UploaderType(uploaderType string) *PodVolumeRe
 	b.object.Spec.UploaderType = uploaderType
 	return b
 }
+
+// OwnerReference sets the OwnerReference for this PodVolumeRestore.
+func (b *PodVolumeRestoreBuilder) OwnerReference(ownerRef []metav1.OwnerReference) *PodVolumeRestoreBuilder {
+	b.object.OwnerReferences = ownerRef
+	return b
+}

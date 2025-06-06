@@ -19,6 +19,7 @@ package podvolume
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -42,6 +43,8 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	datapathmockes "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type restoreMsTestHelper struct {
@@ -467,4 +470,153 @@ func TestRunCancelableDataPathRestore(t *testing.T) {
 	}
 
 	cancel()
+}
+
+func TestWriteCompletionMark(t *testing.T) {
+	tests := []struct {
+		name          string
+		pvr           *velerov1api.PodVolumeRestore
+		result        datapath.RestoreResult
+		funcRemoveAll func(string) error
+		funcMkdirAll  func(string, os.FileMode) error
+		funcWriteFile func(string, []byte, os.FileMode) error
+		expectedErr   string
+		expectedLog   string
+	}{
+		{
+			name:        "no volume path",
+			result:      datapath.RestoreResult{},
+			expectedErr: "target volume is empty in restore result",
+		},
+		{
+			name: "no owner reference",
+			result: datapath.RestoreResult{
+				Target: datapath.AccessPoint{
+					ByPath: "fake-volume-path",
+				},
+			},
+			pvr: builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, "fake-pvr").Result(),
+			funcRemoveAll: func(string) error {
+				return nil
+			},
+			expectedErr: "error finding restore UID",
+		},
+		{
+			name: "mkdir fail",
+			result: datapath.RestoreResult{
+				Target: datapath.AccessPoint{
+					ByPath: "fake-volume-path",
+				},
+			},
+			pvr: builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, "fake-pvr").OwnerReference([]metav1.OwnerReference{
+				{
+					UID: "fake-uid",
+				},
+			}).Result(),
+			funcRemoveAll: func(string) error {
+				return nil
+			},
+			funcMkdirAll: func(string, os.FileMode) error {
+				return errors.New("fake-mk-dir-error")
+			},
+			expectedErr: "error creating .velero directory for done file: fake-mk-dir-error",
+		},
+		{
+			name: "write file fail",
+			result: datapath.RestoreResult{
+				Target: datapath.AccessPoint{
+					ByPath: "fake-volume-path",
+				},
+			},
+			pvr: builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, "fake-pvr").OwnerReference([]metav1.OwnerReference{
+				{
+					UID: "fake-uid",
+				},
+			}).Result(),
+			funcRemoveAll: func(string) error {
+				return nil
+			},
+			funcMkdirAll: func(string, os.FileMode) error {
+				return nil
+			},
+			funcWriteFile: func(string, []byte, os.FileMode) error {
+				return errors.New("fake-write-file-error")
+			},
+			expectedErr: "error writing done file: fake-write-file-error",
+		},
+		{
+			name: "succeed",
+			result: datapath.RestoreResult{
+				Target: datapath.AccessPoint{
+					ByPath: "fake-volume-path",
+				},
+			},
+			pvr: builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, "fake-pvr").OwnerReference([]metav1.OwnerReference{
+				{
+					UID: "fake-uid",
+				},
+			}).Result(),
+			funcRemoveAll: func(string) error {
+				return nil
+			},
+			funcMkdirAll: func(string, os.FileMode) error {
+				return nil
+			},
+			funcWriteFile: func(string, []byte, os.FileMode) error {
+				return nil
+			},
+		},
+		{
+			name: "succeed but previous dir is not removed",
+			result: datapath.RestoreResult{
+				Target: datapath.AccessPoint{
+					ByPath: "fake-volume-path",
+				},
+			},
+			pvr: builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, "fake-pvr").OwnerReference([]metav1.OwnerReference{
+				{
+					UID: "fake-uid",
+				},
+			}).Result(),
+			funcRemoveAll: func(string) error {
+				return errors.New("fake-remove-dir-error")
+			},
+			funcMkdirAll: func(string, os.FileMode) error {
+				return nil
+			},
+			funcWriteFile: func(string, []byte, os.FileMode) error {
+				return nil
+			},
+			expectedLog: "Failed to remove .velero directory from directory fake-volume-path",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.funcRemoveAll != nil {
+				funcRemoveAll = test.funcRemoveAll
+			}
+
+			if test.funcMkdirAll != nil {
+				funcMkdirAll = test.funcMkdirAll
+			}
+
+			if test.funcWriteFile != nil {
+				funcWriteFile = test.funcWriteFile
+			}
+
+			logBuffer := ""
+			err := writeCompletionMark(test.pvr, test.result, velerotest.NewSingleLogger(&logBuffer))
+
+			if test.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, test.expectedErr)
+			}
+
+			if test.expectedLog != "" {
+				assert.Contains(t, logBuffer, test.expectedLog)
+			}
+		})
+	}
 }

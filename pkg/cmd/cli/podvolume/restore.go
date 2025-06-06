@@ -92,6 +92,19 @@ func NewRestoreCommand(f client.Factory) *cobra.Command {
 	_ = command.MarkFlagRequired("pod-volume-restore")
 	_ = command.MarkFlagRequired("resource-timeout")
 
+	command.PreRunE = func(cmd *cobra.Command, args []string) error {
+		if config.resourceTimeout <= 0 {
+			return errors.New("resource-timeout must be greater than 0")
+		}
+		if config.volumePath == "" {
+			return errors.New("volume-path cannot be empty")
+		}
+		if config.pvrName == "" {
+			return errors.New("pod-volume-restore name cannot be empty")
+		}
+		return nil
+	}
+
 	return command
 }
 
