@@ -1,2 +1,16 @@
+# Git configuration for containerized builds
+# 
+# This file fixes VCS stamping errors in Podman container environments.
+# When Docker/Podman mounts the repository, the mount point directory
+# (/github.com/vmware-tanzu/velero) is owned by root:root but the files
+# inside are owned by the mapped user. This ownership mismatch triggers
+# Git's "dubious ownership" security feature (introduced in Git 2.35.2+)
+# which causes git operations to fail with exit code 128.
+#
+# The safe.directory configuration tells Git to trust this specific
+# directory path, allowing VCS stamping and other git operations to
+# work properly in containerized builds.
+#
+# See: https://github.com/vmware-tanzu/velero/issues/9004
 [safe]
 	directory = /github.com/vmware-tanzu/velero
