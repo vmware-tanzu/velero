@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -238,7 +239,7 @@ func TestEnsureSingleDefaultBSL(t *testing.T) {
 
 	for _, test := range tests {
 		// Setup reconciler
-		assert.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
+		require.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
 		t.Run(test.name, func(t *testing.T) {
 			r := &backupStorageLocationReconciler{
 				ctx:                       context.Background(),
@@ -282,7 +283,7 @@ func TestBSLReconcile(t *testing.T) {
 	pluginManager.On("CleanupClients").Return(nil)
 	for _, test := range tests {
 		// Setup reconciler
-		assert.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
+		require.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
 		t.Run(test.name, func(t *testing.T) {
 			r := &backupStorageLocationReconciler{
 				ctx:              context.Background(),

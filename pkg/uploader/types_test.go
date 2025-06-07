@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateUploaderType(t *testing.T) {
@@ -36,9 +37,9 @@ func TestValidateUploaderType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			msg, err := ValidateUploaderType(tt.input)
 			if tt.wantErr != "" {
-				assert.EqualError(t, err, tt.wantErr)
+				require.EqualError(t, err, tt.wantErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, tt.wantMsg, msg)

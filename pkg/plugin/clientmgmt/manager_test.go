@@ -108,7 +108,7 @@ func TestGetRestartableProcess(t *testing.T) {
 	registry.On("Get", pluginKind, pluginName).Return(nil, errors.Errorf("registry")).Once()
 	rp, err := m.getRestartableProcess(pluginKind, pluginName)
 	assert.Nil(t, rp)
-	assert.EqualError(t, err, "registry")
+	require.EqualError(t, err, "registry")
 
 	// Test 2: registry ok, factory error
 	podID := framework.PluginIdentifier{
@@ -120,7 +120,7 @@ func TestGetRestartableProcess(t *testing.T) {
 	factory.On("NewRestartableProcess", podID.Command, logger, logLevel).Return(nil, errors.Errorf("factory")).Once()
 	rp, err = m.getRestartableProcess(pluginKind, pluginName)
 	assert.Nil(t, rp)
-	assert.EqualError(t, err, "factory")
+	require.EqualError(t, err, "factory")
 
 	// Test 3: registry ok, factory ok
 	restartableProcess := &restartabletest.MockRestartableProcess{}
@@ -310,7 +310,7 @@ func getPluginTest(
 	factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(nil, errors.Errorf("NewRestartableProcess")).Once()
 	actual, err := getPluginFunc(m, pluginName)
 	assert.Nil(t, actual)
-	assert.EqualError(t, err, "NewRestartableProcess")
+	require.EqualError(t, err, "NewRestartableProcess")
 
 	// Test 2: happy path
 	factory.On("NewRestartableProcess", pluginID.Command, logger, logLevel).Return(restartableProcess, nil).Once()

@@ -12,7 +12,7 @@ func TestGetOptionalStringFlag(t *testing.T) {
 
 	// not specified
 	cmd := &cobra.Command{}
-	assert.Equal(t, "", GetOptionalStringFlag(cmd, flagName))
+	assert.Empty(t, GetOptionalStringFlag(cmd, flagName))
 
 	// specified
 	cmd.Flags().String(flagName, "value", "")
