@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -210,39 +211,21 @@ func TestGetAffinityFromVeleroServer(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			got := GetAffinityFromVeleroServer(test.deploy)
-
-			if got == nil {
-				if test.want != nil {
-					t.Errorf("expected affinity to be %v, got nil", test.want)
+			if test.want != nil {
+				require.NotNilf(t, got, "expected affinity to be %v, got nil", test.want)
+				if test.want.NodeAffinity != nil {
+					require.NotNilf(t, got.NodeAffinity, "expected node affinity to be %v, got nil", test.want.NodeAffinity)
+					if test.want.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+						require.NotNilf(t, got.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, "expected required during scheduling ignored during execution to be %v, got nil", test.want.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+						assert.Truef(t, reflect.DeepEqual(got.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, test.want.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution), "expected required during scheduling ignored during execution to be %v, got %v", test.want.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, got.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+					} else {
+						assert.Nilf(t, got.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, "expected required during scheduling ignored during execution to be nil, got %v", got.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+					}
+				} else {
+					assert.Nilf(t, got.NodeAffinity, "expected node affinity to be nil, got %v", got.NodeAffinity)
 				}
 			} else {
-				if test.want == nil {
-					t.Errorf("expected affinity to be nil, got %v", got)
-				} else {
-					if got.NodeAffinity == nil {
-						if test.want.NodeAffinity != nil {
-							t.Errorf("expected node affinity to be %v, got nil", test.want.NodeAffinity)
-						}
-					} else {
-						if test.want.NodeAffinity == nil {
-							t.Errorf("expected node affinity to be nil, got %v", got.NodeAffinity)
-						} else {
-							if got.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-								if test.want.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-									t.Errorf("expected required during scheduling ignored during execution to be %v, got nil", test.want.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
-								}
-							} else {
-								if test.want.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-									t.Errorf("expected required during scheduling ignored during execution to be nil, got %v", got.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
-								} else {
-									if !reflect.DeepEqual(got.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, test.want.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution) {
-										t.Errorf("expected required during scheduling ignored during execution to be %v, got %v", test.want.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, got.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
-									}
-								}
-							}
-						}
-					}
-				}
+				assert.Nilf(t, got, "expected affinity to be nil, got %v", got)
 			}
 		})
 	}
