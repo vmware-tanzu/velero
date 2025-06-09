@@ -1,6 +1,6 @@
 # Git configuration for containerized builds
 # 
-# This file is mounted as /root/.gitconfig in the container by the 'shell'
+# This file is mounted as ~/.gitconfig in the container by the 'shell'
 # target in the Makefile to fix VCS stamping errors in Podman environments.
 #
 # When Docker/Podman mounts the repository, the mount point directory
