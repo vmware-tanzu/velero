@@ -1,7 +1,7 @@
 # Git configuration for containerized builds
 # 
-# This file is mounted as ~/.gitconfig in the container by the 'shell'
-# target in the Makefile to fix VCS stamping errors in Podman environments.
+# This file is available in the container working directory through the main
+# repository mount to fix VCS stamping errors in Podman environments.
 #
 # When Docker/Podman mounts the repository, the mount point directory
 # (/github.com/vmware-tanzu/velero) is owned by root:root but the files

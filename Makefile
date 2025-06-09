@@ -213,7 +213,6 @@ shell: build-dirs build-env
 		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static:delegated" \
 		-v "$$(pwd)/.go/go-build:/.cache/go-build:delegated" \
 		-v "$$(pwd)/.go/golangci-lint:/.cache/golangci-lint:delegated" \
-		-v "$$(pwd)/.gitconfig:$$HOME/.gitconfig:ro" \
 		-w /github.com/vmware-tanzu/velero \
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
