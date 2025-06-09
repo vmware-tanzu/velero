@@ -24,6 +24,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 )
 
 func TestGetNodeSelectorFromVeleroServer(t *testing.T) {
@@ -758,4 +761,12 @@ func TestGetVeleroServerLabelValue(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestBSLIsAvailable(t *testing.T) {
+	availableBSL := builder.ForBackupStorageLocation("velero", "available").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
+	unavailableBSL := builder.ForBackupStorageLocation("velero", "unavailable").Phase(velerov1api.BackupStorageLocationPhaseUnavailable).Result()
+
+	assert.True(t, BSLIsAvailable(*availableBSL))
+	assert.False(t, BSLIsAvailable(*unavailableBSL))
 }

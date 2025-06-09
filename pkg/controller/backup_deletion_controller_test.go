@@ -126,6 +126,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 					},
 				},
 			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
+			},
 		}
 		dbr := defaultTestDbr()
 		td := setupBackupDeletionControllerTest(t, dbr, location, backup)
@@ -254,7 +257,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 	t.Run("backup storage location is in read-only mode", func(t *testing.T) {
 		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").StorageLocation("default").Result()
-		location := builder.ForBackupStorageLocation("velero", "default").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result()
+		location := builder.ForBackupStorageLocation("velero", "default").Phase(velerov1api.BackupStorageLocationPhaseAvailable).AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result()
 
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
 
@@ -268,6 +271,24 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "cannot delete backup because backup storage location default is currently in read-only mode", res.Status.Errors[0])
 	})
+
+	t.Run("backup storage location is in unavailable state", func(t *testing.T) {
+		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").StorageLocation("default").Result()
+		location := builder.ForBackupStorageLocation("velero", "default").Phase(velerov1api.BackupStorageLocationPhaseUnavailable).Result()
+
+		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
+
+		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		require.NoError(t, err)
+
+		res := &velerov1api.DeleteBackupRequest{}
+		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
+		require.NoError(t, err)
+		assert.Equal(t, "Processed", string(res.Status.Phase))
+		assert.Len(t, res.Status.Errors, 1)
+		assert.Equal(t, "cannot delete backup because backup storage location default is currently in Unavailable state", res.Status.Errors[0])
+	})
+
 	t.Run("full delete, no errors", func(t *testing.T) {
 		input := defaultTestDbr()
 
@@ -296,6 +317,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 						Bucket: "bucket",
 					},
 				},
+			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 		}
 
@@ -416,6 +440,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 					},
 				},
 			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
+			},
 		}
 
 		snapshotLocation := &velerov1api.VolumeSnapshotLocation{
@@ -518,6 +545,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 					},
 				},
 			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
+			},
 		}
 
 		snapshotLocation := &velerov1api.VolumeSnapshotLocation{
@@ -599,6 +629,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 						Bucket: "bucket",
 					},
 				},
+			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 		}
 
