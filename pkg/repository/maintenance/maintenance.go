@@ -27,7 +27,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	batchv1 "k8s.io/api/batch/v1"
+	batchv1api "k8s.io/api/batch/v1"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,7 +74,7 @@ func GenerateJobName(repo string) string {
 // DeleteOldJobs deletes old maintenance jobs and keeps the latest N jobs
 func DeleteOldJobs(cli client.Client, repo string, keep int) error {
 	// Get the maintenance job list by label
-	jobList := &batchv1.JobList{}
+	jobList := &batchv1api.JobList{}
 	err := cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
 	if err != nil {
 		return err
@@ -104,8 +104,8 @@ var waitCompletionBackOff = wait.Backoff{
 }
 
 // waitForJobComplete wait for completion of the specified job and update the latest job object
-func waitForJobComplete(ctx context.Context, client client.Client, ns string, job string, logger logrus.FieldLogger) (*batchv1.Job, error) {
-	var ret *batchv1.Job
+func waitForJobComplete(ctx context.Context, client client.Client, ns string, job string, logger logrus.FieldLogger) (*batchv1api.Job, error) {
+	var ret *batchv1api.Job
 
 	backOff := waitCompletionBackOff
 
@@ -113,7 +113,7 @@ func waitForJobComplete(ctx context.Context, client client.Client, ns string, jo
 	nextCheckpoint := startTime.Add(backOff.Step())
 
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
-		updated := &batchv1.Job{}
+		updated := &batchv1api.Job{}
 		err := client.Get(ctx, types.NamespacedName{Namespace: ns, Name: job}, updated)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
@@ -141,7 +141,7 @@ func waitForJobComplete(ctx context.Context, client client.Client, ns string, jo
 	return ret, err
 }
 
-func getResultFromJob(cli client.Client, job *batchv1.Job) (string, error) {
+func getResultFromJob(cli client.Client, job *batchv1api.Job) (string, error) {
 	// Get the maintenance job related pod by label selector
 	podList := &corev1api.PodList{}
 	err := cli.List(context.TODO(), podList, client.InNamespace(job.Namespace), client.MatchingLabels(map[string]string{"job-name": job.Name}))
@@ -303,7 +303,7 @@ func WaitJobComplete(cli client.Client, ctx context.Context, jobName, ns string,
 // WaitAllJobsComplete checks all the incomplete maintenance jobs of the specified repo and wait for them to complete,
 // and then return the maintenance jobs' status in the range of limit
 func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1api.BackupRepository, limit int, log logrus.FieldLogger) ([]velerov1api.BackupRepositoryMaintenanceStatus, error) {
-	jobList := &batchv1.JobList{}
+	jobList := &batchv1api.JobList{}
 	err := cli.List(context.TODO(), jobList, &client.ListOptions{
 		Namespace: repo.Namespace,
 	},
@@ -408,7 +408,7 @@ func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.Backu
 }
 
 func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, bslName string, config *JobConfigs,
-	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag) (*batchv1.Job, error) {
+	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag) (*batchv1api.Job, error) {
 	// Get the Velero server deployment
 	deployment := &appsv1api.Deployment{}
 	err := cli.Get(ctx, types.NamespacedName{Name: "velero", Namespace: repo.Namespace}, deployment)
@@ -482,7 +482,7 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 	args = append(args, fmt.Sprintf("--log-format=%s", logFormat.String()))
 
 	// build the maintenance job
-	job := &batchv1.Job{
+	job := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      GenerateJobName(repo.Name),
 			Namespace: repo.Namespace,
@@ -490,7 +490,7 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 				RepositoryNameLabel: repo.Name,
 			},
 		},
-		Spec: batchv1.JobSpec{
+		Spec: batchv1api.JobSpec{
 			BackoffLimit: new(int32), // Never retry
 			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -541,7 +541,7 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 	return job, nil
 }
 
-func composeStatusFromJob(job *batchv1.Job, message string) velerov1api.BackupRepositoryMaintenanceStatus {
+func composeStatusFromJob(job *batchv1api.Job, message string) velerov1api.BackupRepositoryMaintenanceStatus {
 	result := velerov1api.BackupRepositoryMaintenanceSucceeded
 	if job.Status.Failed > 0 {
 		result = velerov1api.BackupRepositoryMaintenanceFailed
