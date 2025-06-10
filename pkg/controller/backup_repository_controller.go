@@ -71,9 +71,19 @@ type BackupRepoReconciler struct {
 	logFormat                 *logging.FormatFlag
 }
 
-func NewBackupRepoReconciler(namespace string, logger logrus.FieldLogger, client client.Client, repositoryManager repomanager.Manager,
-	maintenanceFrequency time.Duration, backupRepoConfig string, keepLatestMaintenanceJobs int, repoMaintenanceConfig string, maintenanceJobResources kube.PodResources,
-	logLevel logrus.Level, logFormat *logging.FormatFlag) *BackupRepoReconciler {
+func NewBackupRepoReconciler(
+	namespace string,
+	logger logrus.FieldLogger,
+	client client.Client,
+	repositoryManager repomanager.Manager,
+	maintenanceFrequency time.Duration,
+	backupRepoConfig string,
+	keepLatestMaintenanceJobs int,
+	repoMaintenanceConfig string,
+	maintenanceJobResources kube.PodResources,
+	logLevel logrus.Level,
+	logFormat *logging.FormatFlag,
+) *BackupRepoReconciler {
 	c := &BackupRepoReconciler{
 		client,
 		namespace,
@@ -238,6 +248,12 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 		fallthrough
 	case velerov1api.BackupRepositoryPhaseReady:
+		defer func() {
+			if err := maintenance.DeleteOldJobs(r.Client, req.Name, r.keepLatestMaintenanceJobs); err != nil {
+				log.WithError(err).Warn("Failed to delete old maintenance jobs")
+			}
+		}()
+
 		if bsl.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
 			log.Debugf("Skip running maintenance for BackupRepository, because its BSL is in the ReadOnly mode.")
 			return ctrl.Result{}, nil
@@ -249,10 +265,6 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 		if err := r.runMaintenanceIfDue(ctx, backupRepo, log); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "error check and run repo maintenance jobs")
-		}
-
-		if err := maintenance.DeleteOldJobs(r.Client, req.Name, r.keepLatestMaintenanceJobs); err != nil {
-			log.WithError(err).Warn("Failed to delete old maintenance jobs")
 		}
 	}
 
