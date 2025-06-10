@@ -149,6 +149,8 @@ linters:
           pkg: k8s.io/apimachinery/pkg/apis/meta/v1
         - alias: storagev1api
           pkg: k8s.io/api/storage/v1
+        - alias: batchv1api
+          pkg: k8s.io/api/batch/v1
 
     lll:
     # max line length, lines longer will be reported. Default is 120.
