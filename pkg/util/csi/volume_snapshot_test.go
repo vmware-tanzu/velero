@@ -1646,26 +1646,22 @@ func TestWaitUntilVSCHandleIsReady(t *testing.T) {
 		name        string
 		volSnap     *snapshotv1api.VolumeSnapshot
 		exepctedVSC *snapshotv1api.VolumeSnapshotContent
-		wait        bool
 		expectError bool
 	}{
 		{
 			name:        "waitEnabled should find volumesnapshotcontent for volumesnapshot",
 			volSnap:     validVS,
 			exepctedVSC: vscObj,
-			wait:        true,
 			expectError: false,
 		},
 		{
 			name:        "waitEnabled should not find volumesnapshotcontent for volumesnapshot with non-existing snapshotcontent name in status.BoundVolumeSnapshotContentName",
 			volSnap:     vsWithVSCNotFound,
 			exepctedVSC: nil,
-			wait:        true,
 			expectError: true,
 		},
 		{
 			name:        "waitEnabled should not find volumesnapshotcontent for a non-existent volumesnapshot",
-			wait:        true,
 			exepctedVSC: nil,
 			expectError: true,
 			volSnap: &snapshotv1api.VolumeSnapshot{
@@ -1678,46 +1674,11 @@ func TestWaitUntilVSCHandleIsReady(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:        "waitDisabled should not find volumesnapshotcontent when volumesnapshot status is nil",
-			wait:        false,
-			expectError: false,
-			exepctedVSC: nil,
-			volSnap:     vsWithNilStatus,
-		},
-		{
-			name:        "waitDisabled should not find volumesnapshotcontent when volumesnapshot status.BoundVolumeSnapshotContentName is nil",
-			wait:        false,
-			expectError: false,
-			exepctedVSC: nil,
-			volSnap:     vsWithNilStatusField,
-		},
-		{
-			name:        "waitDisabled should find volumesnapshotcontent when volumesnapshotcontent status is nil",
-			wait:        false,
-			expectError: false,
-			exepctedVSC: vscWithNilStatus,
-			volSnap:     vsForNilStatusVsc,
-		},
-		{
-			name:        "waitDisabled should find volumesnapshotcontent when volumesnapshotcontent status.SnapshotHandle is nil",
-			wait:        false,
-			expectError: false,
-			exepctedVSC: vscWithNilStatusField,
-			volSnap:     vsForNilStatusFieldVsc,
-		},
-		{
-			name:        "waitDisabled should not find a non-existent volumesnapshotcontent",
-			wait:        false,
-			exepctedVSC: nil,
-			expectError: true,
-			volSnap:     vsWithVSCNotFound,
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualVSC, actualError := WaitUntilVSCHandleIsReady(tc.volSnap, fakeClient, logrus.New().WithField("fake", "test"), tc.wait, 0)
+			actualVSC, actualError := WaitUntilVSCHandleIsReady(tc.volSnap, fakeClient, logrus.New().WithField("fake", "test"), 0)
 			if tc.expectError && actualError == nil {
 				assert.Error(t, actualError)
 				assert.Nil(t, actualVSC)
