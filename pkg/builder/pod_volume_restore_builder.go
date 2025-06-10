@@ -99,31 +99,31 @@ func (b *PodVolumeRestoreBuilder) UploaderType(uploaderType string) *PodVolumeRe
 }
 
 // Cancel sets the DataDownload's Cancel.
-func (d *PodVolumeRestoreBuilder) Cancel(cancel bool) *PodVolumeRestoreBuilder {
-	d.object.Spec.Cancel = cancel
-	return d
+func (b *PodVolumeRestoreBuilder) Cancel(cancel bool) *PodVolumeRestoreBuilder {
+	b.object.Spec.Cancel = cancel
+	return b
 }
 
 // AcceptedTimestamp sets the PodVolumeRestore's AcceptedTimestamp.
-func (d *PodVolumeRestoreBuilder) AcceptedTimestamp(acceptedTimestamp *metav1.Time) *PodVolumeRestoreBuilder {
-	d.object.Status.AcceptedTimestamp = acceptedTimestamp
-	return d
+func (b *PodVolumeRestoreBuilder) AcceptedTimestamp(acceptedTimestamp *metav1.Time) *PodVolumeRestoreBuilder {
+	b.object.Status.AcceptedTimestamp = acceptedTimestamp
+	return b
 }
 
 // Finalizers sets the PodVolumeRestore's Finalizers.
-func (d *PodVolumeRestoreBuilder) Finalizers(finalizers []string) *PodVolumeRestoreBuilder {
-	d.object.Finalizers = finalizers
-	return d
+func (b *PodVolumeRestoreBuilder) Finalizers(finalizers []string) *PodVolumeRestoreBuilder {
+	b.object.Finalizers = finalizers
+	return b
 }
 
 // Message sets the PodVolumeRestore's Message.
-func (d *PodVolumeRestoreBuilder) Message(msg string) *PodVolumeRestoreBuilder {
-	d.object.Status.Message = msg
-	return d
+func (b *PodVolumeRestoreBuilder) Message(msg string) *PodVolumeRestoreBuilder {
+	b.object.Status.Message = msg
+	return b
 }
 
 // Message sets the PodVolumeRestore's Node.
-func (d *PodVolumeRestoreBuilder) Node(node string) *PodVolumeRestoreBuilder {
-	d.object.Status.Node = node
-	return d
+func (b *PodVolumeRestoreBuilder) Node(node string) *PodVolumeRestoreBuilder {
+	b.object.Status.Node = node
+	return b
 }

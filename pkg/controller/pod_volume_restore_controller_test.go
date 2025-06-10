@@ -774,9 +774,10 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 			expectedErr: "error accepting PVR pvr-1: error updating PVR velero/pvr-1: Update error",
 		},
 		{
-			name:     "pvr is cancel on accepted",
-			pvr:      builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, pvrName).Finalizers([]string{PodVolumeFinalizer}).Cancel(true).Result(),
-			expected: builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, pvrName).Finalizers([]string{PodVolumeFinalizer}).Cancel(true).Phase(velerov1api.PodVolumeRestorePhaseCanceled).Result(),
+			name:               "pvr is cancel on accepted",
+			pvr:                builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, pvrName).Finalizers([]string{PodVolumeFinalizer}).Cancel(true).Result(),
+			expectCancelRecord: true,
+			expected:           builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, pvrName).Finalizers([]string{PodVolumeFinalizer}).Cancel(true).Phase(velerov1api.PodVolumeRestorePhaseCanceled).Result(),
 		},
 		{
 			name:          "pvr expose failed",

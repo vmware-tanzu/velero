@@ -226,7 +226,9 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 			if time.Since(spotted) > delay {
 				log.Infof("Data upload %s is canceled in Phase %s but not handled in reasonable time", du.GetName(), du.Status.Phase)
-				r.tryCancelDataUpload(ctx, du, "")
+				if r.tryCancelDataUpload(ctx, du, "") {
+					delete(r.cancelledDataUpload, du.Name)
+				}
 
 				return ctrl.Result{}, nil
 			}
@@ -564,7 +566,6 @@ func (r *DataUploadReconciler) tryCancelDataUpload(ctx context.Context, du *vele
 	r.metrics.RegisterDataUploadCancel(r.nodeName)
 	// cleans up any objects generated during the snapshot expose
 	r.cleanUp(ctx, du, log)
-	delete(r.cancelledDataUpload, du.Name)
 
 	log.Warn("data upload is canceled")
 
