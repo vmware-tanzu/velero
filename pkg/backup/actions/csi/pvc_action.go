@@ -285,7 +285,6 @@ func (p *pvcBackupItemAction) Execute(
 			vs,
 			p.crClient,
 			p.log,
-			true,
 			backup.Spec.CSISnapshotTimeout.Duration,
 		)
 		if err != nil {
