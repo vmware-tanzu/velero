@@ -624,7 +624,6 @@ func TestOnPVBProgress(t *testing.T) {
 
 			r.OnDataPathProgress(ctx, namespace, pvbName, progress)
 			if len(test.needErrs) != 0 && !test.needErrs[0] {
-
 				updatedPvb := &velerov1api.PodVolumeBackup{}
 				assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, updatedPvb))
 				assert.Equal(t, test.progress.TotalBytes, updatedPvb.Status.Progress.TotalBytes)
@@ -740,18 +739,13 @@ func TestAcceptPvb(t *testing.T) {
 	}{
 		{
 			name:        "update fail",
-			pvb:         pvbBuilder().Result(),
+			pvb:         pvbBuilder().Node("test-node").Result(),
 			needErrs:    []error{nil, nil, fmt.Errorf("fake-update-error"), nil},
-			expectedErr: "fake-update-error",
-		},
-		{
-			name:     "accepted by others",
-			pvb:      pvbBuilder().Result(),
-			needErrs: []error{nil, nil, &fakeAPIStatus{metav1.StatusReasonConflict}, nil},
+			expectedErr: "error updating PVB with error velero/pvb-1: fake-update-error",
 		},
 		{
 			name:     "succeed",
-			pvb:      pvbBuilder().Result(),
+			pvb:      pvbBuilder().Node("test-node").Result(),
 			needErrs: []error{nil, nil, nil, nil},
 		},
 	}

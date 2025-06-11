@@ -247,7 +247,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 
 		if pvb.Spec.Cancel {
-			log.Info("Prepared PVB is being cancelled")
+			log.Info("Prepared PVB is being canceled")
 			r.OnDataPathCancelled(ctx, pvb.GetNamespace(), pvb.GetName())
 			return ctrl.Result{}, nil
 		}
@@ -345,7 +345,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			// Update status to Canceling
 			if err := UpdatePVBWithRetry(ctx, r.client, types.NamespacedName{Namespace: pvb.Namespace, Name: pvb.Name}, log, func(pvb *velerov1api.PodVolumeBackup) bool {
 				if isPVBInFinalState(pvb) {
-					log.Warnf("PVB %s is terminated, abort setting it to cancelling", pvb.Name)
+					log.Warnf("PVB %s is terminated, abort setting it to canceling", pvb.Name)
 					return false
 				}
 
