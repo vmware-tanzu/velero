@@ -101,6 +101,9 @@ const (
 	// ExcludeFromBackupLabel is the label to exclude k8s resource from backup,
 	// even if the resource contains a matching selector label.
 	ExcludeFromBackupLabel = "velero.io/exclude-from-backup"
+
+	// PVBLabel is the label key used to identify the pvb for pvb pod
+	PVBLabel = "velero.io/pod-volume-backup"
 )
 
 type AsyncOperationIDPrefix string

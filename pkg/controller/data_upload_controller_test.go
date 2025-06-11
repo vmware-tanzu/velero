@@ -312,30 +312,29 @@ func (f *fakeSnapshotExposer) DiagnoseExpose(context.Context, corev1api.ObjectRe
 func (f *fakeSnapshotExposer) CleanUp(context.Context, corev1api.ObjectReference, string, string) {
 }
 
-type fakeDataUploadFSBR struct {
-	du         *velerov2alpha1api.DataUpload
+type fakeFSBR struct {
 	kubeClient kbclient.Client
 	clock      clock.WithTickerAndDelayedExecution
 	initErr    error
 	startErr   error
 }
 
-func (f *fakeDataUploadFSBR) Init(ctx context.Context, param any) error {
+func (f *fakeFSBR) Init(ctx context.Context, param any) error {
 	return f.initErr
 }
 
-func (f *fakeDataUploadFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param any) error {
+func (f *fakeFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param any) error {
 	return f.startErr
 }
 
-func (f *fakeDataUploadFSBR) StartRestore(snapshotID string, target datapath.AccessPoint, uploaderConfigs map[string]string) error {
+func (f *fakeFSBR) StartRestore(snapshotID string, target datapath.AccessPoint, uploaderConfigs map[string]string) error {
 	return nil
 }
 
-func (b *fakeDataUploadFSBR) Cancel() {
+func (b *fakeFSBR) Cancel() {
 }
 
-func (b *fakeDataUploadFSBR) Close(ctx context.Context) {
+func (b *fakeFSBR) Close(ctx context.Context) {
 }
 
 func TestReconcile(t *testing.T) {
@@ -651,8 +650,7 @@ func TestReconcile(t *testing.T) {
 			}
 
 			datapath.MicroServiceBRWatcherCreator = func(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string, datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
-				return &fakeDataUploadFSBR{
-					du:         test.du,
+				return &fakeFSBR{
 					kubeClient: r.client,
 					clock:      r.Clock,
 					initErr:    test.fsBRInitErr,

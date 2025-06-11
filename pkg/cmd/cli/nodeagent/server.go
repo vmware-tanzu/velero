@@ -299,12 +299,6 @@ func (s *nodeAgentServer) run() {
 
 	credentialGetter := &credentials.CredentialGetter{FromFile: credentialFileStore, FromSecret: credSecretStore}
 	repoEnsurer := repository.NewEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
-	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.kubeClient, s.dataPathMgr, repoEnsurer,
-		credentialGetter, s.nodeName, s.mgr.GetScheme(), s.metrics, s.logger)
-
-	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
-	}
 
 	if err = controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.kubeClient, s.dataPathMgr, repoEnsurer, credentialGetter, s.logger).SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
@@ -330,6 +324,12 @@ func (s *nodeAgentServer) run() {
 			podResources = res
 			s.logger.Infof("Using customized pod resource requirements %v", s.dataPathConfigs.PodResources)
 		}
+	}
+
+	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger)
+
+	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
 	}
 
 	dataUploadReconciler := controller.NewDataUploadReconciler(
