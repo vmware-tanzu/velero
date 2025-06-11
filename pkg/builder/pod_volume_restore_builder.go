@@ -98,6 +98,12 @@ func (b *PodVolumeRestoreBuilder) UploaderType(uploaderType string) *PodVolumeRe
 	return b
 }
 
+// OwnerReference sets the OwnerReference for this PodVolumeRestore.
+func (b *PodVolumeRestoreBuilder) OwnerReference(ownerRef []metav1.OwnerReference) *PodVolumeRestoreBuilder {
+	b.object.OwnerReferences = ownerRef
+	return b
+}
+
 // Cancel sets the DataDownload's Cancel.
 func (b *PodVolumeRestoreBuilder) Cancel(cancel bool) *PodVolumeRestoreBuilder {
 	b.object.Spec.Cancel = cancel
