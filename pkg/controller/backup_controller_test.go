@@ -490,8 +490,6 @@ func TestPrepareBackupRequest_SetsVGSLabelKey(t *testing.T) {
 	require.NoError(t, err)
 	now = now.Local()
 
-	defaultVGSLabelKey := "velero.io/volume-group-snapshot"
-
 	tests := []struct {
 		name             string
 		backup           *velerov1api.Backup
@@ -515,8 +513,8 @@ func TestPrepareBackupRequest_SetsVGSLabelKey(t *testing.T) {
 		{
 			name:             "backup with no spec or server flag, uses default",
 			backup:           builder.ForBackup("velero", "backup-3").Result(),
-			serverFlagKey:    defaultVGSLabelKey,
-			expectedLabelKey: defaultVGSLabelKey,
+			serverFlagKey:    velerov1api.DefaultVGSLabelKey,
+			expectedLabelKey: velerov1api.DefaultVGSLabelKey,
 		},
 	}
 
