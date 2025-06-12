@@ -169,7 +169,8 @@ func newBackupper(
 				}
 
 				if pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseCompleted &&
-					pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseFailed {
+					pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseFailed &&
+					pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseCanceled {
 					return
 				}
 
@@ -179,7 +180,8 @@ func newBackupper(
 					existPVB, ok := existObj.(*velerov1api.PodVolumeBackup)
 					// the PVB in the indexer is already in final status, no need to call WaitGroup.Done()
 					if ok && (existPVB.Status.Phase == velerov1api.PodVolumeBackupPhaseCompleted ||
-						existPVB.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed) {
+						existPVB.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed ||
+						pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseCanceled) {
 						statusChangedToFinal = false
 					}
 				}
@@ -428,7 +430,7 @@ func (b *backupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velero
 				continue
 			}
 			podVolumeBackups = append(podVolumeBackups, pvb)
-			if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed {
+			if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed || pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseCanceled {
 				log.Errorf("pod volume backup failed: %s", pvb.Status.Message)
 			}
 		}
