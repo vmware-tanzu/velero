@@ -160,4 +160,13 @@ const (
 
 	// DataUploadNameAnnotation is the label key for the DataUpload name
 	DataUploadNameAnnotation = "velero.io/data-upload-name"
+
+	// Label used on VolumeGroupSnapshotClass to mark it as Velero's default for a CSI driver
+	VolumeGroupSnapshotClassDefaultLabel = "velero.io/csi-volumegroupsnapshot-class"
+
+	// Annotation on PVC to override the VGS class to use
+	VolumeGroupSnapshotClassAnnotationPVC = "velero.io/csi-volume-group-snapshot-class"
+
+	// Annotation prefix on Backup to override VGS class per CSI driver
+	VolumeGroupSnapshotClassAnnotationBackupPrefix = "velero.io/csi-volumegroupsnapshot-class_"
 )
