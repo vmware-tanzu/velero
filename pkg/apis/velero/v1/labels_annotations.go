@@ -102,6 +102,9 @@ const (
 	// even if the resource contains a matching selector label.
 	ExcludeFromBackupLabel = "velero.io/exclude-from-backup"
 
+	// defaultVGSLabelKey is the default label key used to group PVCs under a VolumeGroupSnapshot
+	DefaultVGSLabelKey = "velero.io/volume-group"
+
 	// PVBLabel is the label key used to identify the pvb for pvb pod
 	PVBLabel = "velero.io/pod-volume-backup"
 )
