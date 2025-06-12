@@ -98,7 +98,7 @@ func newRestorer(
 					return
 				}
 
-				if pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseCompleted || pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseFailed {
+				if pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseCompleted || pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseFailed || pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseCanceled {
 					r.resultsLock.Lock()
 					defer r.resultsLock.Unlock()
 
@@ -234,7 +234,7 @@ ForEachVolume:
 			errs = append(errs, errors.New("timed out waiting for all PodVolumeRestores to complete"))
 			break ForEachVolume
 		case res := <-resultsChan:
-			if res.Status.Phase == velerov1api.PodVolumeRestorePhaseFailed {
+			if res.Status.Phase == velerov1api.PodVolumeRestorePhaseFailed || res.Status.Phase == velerov1api.PodVolumeRestorePhaseCanceled {
 				errs = append(errs, errors.Errorf("pod volume restore failed: %s", res.Status.Message))
 			}
 			tracker.TrackPodVolume(res)
