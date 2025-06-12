@@ -48,7 +48,6 @@ import (
 
 	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
@@ -60,7 +59,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
-	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -282,28 +280,6 @@ func (s *nodeAgentServer) run() {
 
 	s.logger.Info("Starting controllers")
 
-	credentialFileStore, err := credentials.NewNamespacedFileStore(
-		s.mgr.GetClient(),
-		s.namespace,
-		credentials.DefaultStoreDirectory(),
-		filesystem.NewFileSystem(),
-	)
-	if err != nil {
-		s.logger.Fatalf("Failed to create credentials file store: %v", err)
-	}
-
-	credSecretStore, err := credentials.NewNamespacedSecretStore(s.mgr.GetClient(), s.namespace)
-	if err != nil {
-		s.logger.Fatalf("Failed to create secret file store: %v", err)
-	}
-
-	credentialGetter := &credentials.CredentialGetter{FromFile: credentialFileStore, FromSecret: credSecretStore}
-	repoEnsurer := repository.NewEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
-
-	if err = controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.kubeClient, s.dataPathMgr, repoEnsurer, credentialGetter, s.logger).SetupWithManager(s.mgr); err != nil {
-		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
-	}
-
 	var loadAffinity *kube.LoadAffinity
 	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
 		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
@@ -330,6 +306,10 @@ func (s *nodeAgentServer) run() {
 
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
+	}
+
+	if err = controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.logger).SetupWithManager(s.mgr); err != nil {
+		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
 
 	dataUploadReconciler := controller.NewDataUploadReconciler(
@@ -525,7 +505,7 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 			continue
 		}
 
-		if err := controller.UpdatePVRStatusToFailed(s.ctx, client, &pvrs.Items[i],
+		if err := controller.UpdatePVRStatusToFailed(s.ctx, client, &pvrs.Items[i], errors.New("cannot survive from node-agent restart"),
 			fmt.Sprintf("get a podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, velerov1api.PodVolumeRestorePhaseFailed),
 			time.Now(), s.logger); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumerestore %q", pvr.GetName())

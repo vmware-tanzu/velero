@@ -107,6 +107,9 @@ const (
 
 	// PVBLabel is the label key used to identify the pvb for pvb pod
 	PVBLabel = "velero.io/pod-volume-backup"
+
+	// PVRLabel is the label key used to identify the pvb for pvr pod
+	PVRLabel = "velero.io/pod-volume-restore"
 )
 
 type AsyncOperationIDPrefix string
