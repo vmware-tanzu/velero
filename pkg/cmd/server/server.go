@@ -26,8 +26,10 @@ import (
 	"strings"
 	"time"
 
+	volumegroupsnapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumegroupsnapshot/v1beta1"
+
 	logrusr "github.com/bombsimon/logrusr/v3"
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -227,6 +229,10 @@ func newServer(f client.Factory, config *config.Config, logger *logrus.Logger) (
 		return nil, err
 	}
 	if err := snapshotv1api.AddToScheme(scheme); err != nil {
+		cancelFunc()
+		return nil, err
+	}
+	if err := volumegroupsnapshotv1beta1.AddToScheme(scheme); err != nil {
 		cancelFunc()
 		return nil, err
 	}
