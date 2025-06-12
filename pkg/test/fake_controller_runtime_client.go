@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	volumegroupsnapshotv1alpha1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumegroupsnapshot/v1alpha1"
+
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/stretchr/testify/require"
 	appsv1api "k8s.io/api/apps/v1"
@@ -56,6 +58,7 @@ func NewFakeControllerRuntimeClient(t *testing.T, initObjs ...runtime.Object) cl
 	require.NoError(t, appsv1api.AddToScheme(scheme))
 	require.NoError(t, snapshotv1api.AddToScheme(scheme))
 	require.NoError(t, storagev1api.AddToScheme(scheme))
+	require.NoError(t, volumegroupsnapshotv1alpha1.AddToScheme(scheme))
 
 	return k8sfake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(initObjs...).Build()
 }
