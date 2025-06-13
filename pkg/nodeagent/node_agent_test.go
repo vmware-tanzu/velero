@@ -134,7 +134,7 @@ func TestIsRunningInNode(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				nonNodeAgentPod,
 			},
-			expectErr: "daemonset pod not found in running state in node fake-node",
+			expectErr: "daemonset pod not found in running state in node fake-node, err: <nil>",
 		},
 		{
 			name:     "ds po are not all running",
@@ -143,7 +143,7 @@ func TestIsRunningInNode(t *testing.T) {
 				nodeAgentPodNotRunning,
 				nodeAgentPodRunning1,
 			},
-			expectErr: "daemonset pod not found in running state in node fake-node",
+			expectErr: "daemonset pod not found in running state in node fake-node, err: <nil>",
 		},
 		{
 			name:     "ds pods wrong node name",
@@ -153,7 +153,7 @@ func TestIsRunningInNode(t *testing.T) {
 				nodeAgentPodRunning1,
 				nodeAgentPodRunning2,
 			},
-			expectErr: "daemonset pod not found in running state in node fake-node",
+			expectErr: "daemonset pod not found in running state in node fake-node, err: <nil>",
 		},
 		{
 			name:     "succeed",
