@@ -17,7 +17,6 @@ limitations under the License.
 package backup
 
 import (
-	"os"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -254,8 +253,7 @@ func TestItemCollectorBackupNamespaces(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(*testing.T) {
-			tempDir, err := os.MkdirTemp("", "")
-			require.NoError(t, err)
+			tempDir := t.TempDir()
 
 			var unstructuredNSList unstructured.UnstructuredList
 			for _, ns := range tc.namespaces {

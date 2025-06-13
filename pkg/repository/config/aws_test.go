@@ -149,7 +149,7 @@ func TestGetS3CredentialsCorrectlyUseProfile(t *testing.T) {
 			t.Setenv("AWS_SECRET_ACCESS_KEY", "")
 			t.Setenv("AWS_SHARED_CREDENTIALS_FILE", "")
 
-			tmpFile, err := os.CreateTemp("", "velero-test-aws-credentials")
+			tmpFile, err := os.CreateTemp(t.TempDir(), "velero-test-aws-credentials")
 			defer os.Remove(tmpFile.Name())
 			if err != nil {
 				t.Errorf("GetS3Credentials() error = %v", err)
