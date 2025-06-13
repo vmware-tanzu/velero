@@ -304,15 +304,16 @@ func TestNewResticUploaderProvider(t *testing.T) {
 		mockCredFunc             func(*MockCredentialGetter, *corev1api.SecretKeySelector)
 		resticCmdEnvFunc         func(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error)
 		resticTempCACertFileFunc func(caCert []byte, bsl string, fs filesystem.Interface) (string, error)
-		checkFunc                func(provider Provider, err error)
+		checkFunc                func(t *testing.T, provider Provider, err error)
 	}{
 		{
 			name: "No error in creating temp credentials file",
 			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
-			checkFunc: func(provider Provider, err error) {
-				assert.NoError(t, err)
+			checkFunc: func(t *testing.T, provider Provider, err error) {
+				t.Helper()
+				require.NoError(t, err)
 				assert.NotNil(t, provider)
 			},
 		}, {
@@ -320,8 +321,9 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("", errors.New("error creating temp credentials file"))
 			},
-			checkFunc: func(provider Provider, err error) {
-				assert.Error(t, err)
+			checkFunc: func(t *testing.T, provider Provider, err error) {
+				t.Helper()
+				require.Error(t, err)
 				assert.Nil(t, provider)
 			},
 		}, {
@@ -332,8 +334,9 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
 				return "", errors.New("error writing CACert file")
 			},
-			checkFunc: func(provider Provider, err error) {
-				assert.Error(t, err)
+			checkFunc: func(t *testing.T, provider Provider, err error) {
+				t.Helper()
+				require.Error(t, err)
 				assert.Nil(t, provider)
 			},
 		}, {
@@ -347,8 +350,9 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			resticCmdEnvFunc: func(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error) {
 				return nil, errors.New("error generating repository cmnd env")
 			},
-			checkFunc: func(provider Provider, err error) {
-				assert.Error(t, err)
+			checkFunc: func(t *testing.T, provider Provider, err error) {
+				t.Helper()
+				require.Error(t, err)
 				assert.Nil(t, provider)
 			},
 		}, {
@@ -362,8 +366,9 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			resticCmdEnvFunc: func(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error) {
 				return nil, nil
 			},
-			checkFunc: func(provider Provider, err error) {
-				assert.NoError(t, err)
+			checkFunc: func(t *testing.T, provider Provider, err error) {
+				t.Helper()
+				require.NoError(t, err)
 				assert.NotNil(t, provider)
 			},
 		},
@@ -379,8 +384,9 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			resticCmdEnvFunc: func(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error) {
 				return nil, nil
 			},
-			checkFunc: func(provider Provider, err error) {
-				assert.NoError(t, err)
+			checkFunc: func(t *testing.T, provider Provider, err error) {
+				t.Helper()
+				require.NoError(t, err)
 				assert.NotNil(t, provider)
 			},
 		},
@@ -406,7 +412,8 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			if tc.resticTempCACertFileFunc != nil {
 				resticTempCACertFileFunc = tc.resticTempCACertFileFunc
 			}
-			tc.checkFunc(NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log))
+			provider, err := NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
+			tc.checkFunc(t, provider, err)
 		})
 	}
 }

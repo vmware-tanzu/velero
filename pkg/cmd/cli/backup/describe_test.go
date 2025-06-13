@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/rest"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -58,7 +59,7 @@ func TestNewDescribeCommand(t *testing.T) {
 
 	c.SetArgs([]string{backupName})
 	e := c.Execute()
-	assert.NoError(t, e)
+	require.NoError(t, e)
 
 	if os.Getenv(cmdtest.CaptureFlag) == "1" {
 		return
