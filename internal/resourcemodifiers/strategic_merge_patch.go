@@ -74,10 +74,7 @@ func strategicPatchObject(
 		return apierrors.NewBadRequest(err.Error())
 	}
 
-	if err := applyPatchToObject(originalObjMap, patchMap, objToUpdate, schemaReferenceObj, strictErrs); err != nil {
-		return err
-	}
-	return nil
+	return applyPatchToObject(originalObjMap, patchMap, objToUpdate, schemaReferenceObj, strictErrs)
 }
 
 // applyPatchToObject applies a strategic merge patch of <patchMap> to

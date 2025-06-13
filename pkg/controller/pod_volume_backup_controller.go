@@ -135,9 +135,8 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err != nil {
 		if err == datapath.ConcurrentLimitExceed {
 			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
-		} else {
-			return r.errorOut(ctx, &pvb, err, "error to create data path", log)
 		}
+		return r.errorOut(ctx, &pvb, err, "error to create data path", log)
 	}
 
 	r.metrics.RegisterPodVolumeBackupEnqueue(r.nodeName)
