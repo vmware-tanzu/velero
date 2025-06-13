@@ -209,7 +209,7 @@ func getStorageAccountURI(log logrus.FieldLogger, bslCfg map[string]string, cred
 		return uri, nil
 	}
 
-	uri = *properties.Account.Properties.PrimaryEndpoints.Blob
+	uri = *properties.Properties.PrimaryEndpoints.Blob
 	log.Infof("use the storage account URI retrieved from the storage account properties %q", uri)
 	return uri, nil
 }

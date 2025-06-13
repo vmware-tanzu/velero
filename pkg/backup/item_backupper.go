@@ -432,8 +432,8 @@ func (ib *itemBackupper) executeActions(
 			now := metav1.Now()
 			newOperation := itemoperation.BackupOperation{
 				Spec: itemoperation.BackupOperationSpec{
-					BackupName:         ib.backupRequest.Backup.Name,
-					BackupUID:          string(ib.backupRequest.Backup.UID),
+					BackupName:         ib.backupRequest.Name,
+					BackupUID:          string(ib.backupRequest.UID),
 					BackupItemAction:   action.Name(),
 					ResourceIdentifier: resourceIdentifier,
 					OperationID:        operationID,
@@ -460,7 +460,7 @@ func (ib *itemBackupper) executeActions(
 			if len(itemList) == 0 {
 				log.Infof("Additional Item %s %s/%s not found in ItemBlock, getting from cluster", additionalItem.GroupResource, additionalItem.Namespace, additionalItem.Name)
 
-				gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
+				gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.WithVersion(""))
 				if err != nil {
 					return nil, itemFiles, err
 				}

@@ -369,7 +369,7 @@ func (r *itemCollector) getResourceItems(
 	)
 
 	orders := getOrderedResourcesForType(
-		r.backupRequest.Backup.Spec.OrderedResources,
+		r.backupRequest.Spec.OrderedResources,
 		resource.Name,
 	)
 	// Getting the preferred group version of this resource
@@ -758,7 +758,7 @@ func (r *itemCollector) collectNamespaces(
 		return nil, errors.WithStack(err)
 	}
 
-	for _, includedNSName := range r.backupRequest.Backup.Spec.IncludedNamespaces {
+	for _, includedNSName := range r.backupRequest.Spec.IncludedNamespaces {
 		nsExists := false
 		// Skip checking the namespace existing when it's "*".
 		if includedNSName == "*" {
@@ -778,17 +778,17 @@ func (r *itemCollector) collectNamespaces(
 	var singleSelector labels.Selector
 	var orSelectors []labels.Selector
 
-	if r.backupRequest.Backup.Spec.LabelSelector != nil {
+	if r.backupRequest.Spec.LabelSelector != nil {
 		var err error
 		singleSelector, err = metav1.LabelSelectorAsSelector(
-			r.backupRequest.Backup.Spec.LabelSelector)
+			r.backupRequest.Spec.LabelSelector)
 		if err != nil {
 			log.WithError(err).Errorf("Fail to convert backup LabelSelector %s into selector.",
-				metav1.FormatLabelSelector(r.backupRequest.Backup.Spec.LabelSelector))
+				metav1.FormatLabelSelector(r.backupRequest.Spec.LabelSelector))
 		}
 	}
-	if r.backupRequest.Backup.Spec.OrLabelSelectors != nil {
-		for _, ls := range r.backupRequest.Backup.Spec.OrLabelSelectors {
+	if r.backupRequest.Spec.OrLabelSelectors != nil {
+		for _, ls := range r.backupRequest.Spec.OrLabelSelectors {
 			orSelector, err := metav1.LabelSelectorAsSelector(ls)
 			if err != nil {
 				log.WithError(err).Errorf("Fail to convert backup OrLabelSelector %s into selector.",
