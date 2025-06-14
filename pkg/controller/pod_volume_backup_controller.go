@@ -46,7 +46,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
-const pVBRRequestor string = "pod-volume-backup-restore"
+const (
+	pVBRRequestor      = "pod-volume-backup-restore"
+	PodVolumeFinalizer = "velero.io/pod-volume-finalizer"
+)
 
 // NewPodVolumeBackupReconciler creates the PodVolumeBackupReconciler instance
 func NewPodVolumeBackupReconciler(client client.Client, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager, ensurer *repository.Ensurer, credentialGetter *credentials.CredentialGetter,

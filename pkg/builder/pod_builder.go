@@ -88,6 +88,11 @@ func (b *PodBuilder) InitContainers(containers ...*corev1api.Container) *PodBuil
 	return b
 }
 
+func (b *PodBuilder) InitContainerState(state corev1api.ContainerState) *PodBuilder {
+	b.object.Status.InitContainerStatuses = append(b.object.Status.InitContainerStatuses, corev1api.ContainerStatus{State: state})
+	return b
+}
+
 func (b *PodBuilder) Containers(containers ...*corev1api.Container) *PodBuilder {
 	for _, c := range containers {
 		b.object.Spec.Containers = append(b.object.Spec.Containers, *c)
