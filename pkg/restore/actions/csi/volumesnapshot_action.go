@@ -121,7 +121,7 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 	}
 
 	p.log.Infof(`Returning from VolumeSnapshotRestoreItemAction with 
-		no additionalItems`)
+		VolumeSnapshotContent in additionalItems`)
 
 	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem:     &unstructured.Unstructured{Object: vsMap},
