@@ -37,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
@@ -44,7 +46,6 @@ import (
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 func TestExecute(t *testing.T) {
@@ -130,7 +131,7 @@ func TestExecute(t *testing.T) {
 		},
 		{
 			name:           "Test ResourcePolicy",
-			backup:         builder.ForBackup("velero", "test").ResourcePolicies("resourcePolicy").SnapshotVolumes(false).Result(),
+			backup:         builder.ForBackup("velero", "test").ResourcePolicies("resourcePolicy").SnapshotVolumes(false).CSISnapshotTimeout(time.Duration(3600) * time.Second).Result(),
 			resourcePolicy: builder.ForConfigMap("velero", "resourcePolicy").Data("policy", "{\"version\":\"v1\", \"volumePolicies\":[{\"conditions\":{\"csi\": {}},\"action\":{\"type\":\"snapshot\"}}]}").Result(),
 			pvc:            builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
 			pv:             builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
@@ -170,7 +171,7 @@ func TestExecute(t *testing.T) {
 			pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&tc.pvc)
 			require.NoError(t, err)
 
-			if boolptr.IsSetToTrue(tc.backup.Spec.SnapshotMoveData) == true {
+			if tc.pvc != nil {
 				go func() {
 					var vsList v1.VolumeSnapshotList
 					err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
@@ -411,4 +412,73 @@ func TestNewPVCBackupItemAction(t *testing.T) {
 	plugin1 := NewPvcBackupItemAction(f1)
 	_, err1 := plugin1(logger)
 	require.NoError(t, err1)
+}
+
+func TestPVCRequestSize(t *testing.T) {
+	logger := logrus.New()
+
+	tests := []struct {
+		name         string
+		pvcInitial   string // initial storage request on the PVC (e.g. "1Gi" or "3Gi")
+		restoreSize  string // restore size set in VSC.Status.RestoreSize (e.g. "2Gi")
+		expectedSize string // expected storage request on the PVC after update
+	}{
+		{
+			name:         "UpdateRequired: PVC request is lower than restore size",
+			pvcInitial:   "1Gi",
+			restoreSize:  "2Gi",
+			expectedSize: "2Gi",
+		},
+		{
+			name:         "NoUpdateRequired: PVC request is larger than restore size",
+			pvcInitial:   "3Gi",
+			restoreSize:  "2Gi",
+			expectedSize: "3Gi",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			crClient := velerotest.NewFakeControllerRuntimeClient(t)
+
+			// Create a PVC with the initial storage request.
+			pvc := builder.ForPersistentVolumeClaim("velero", "testPVC").
+				VolumeName("testPV").
+				StorageClass("testSC").
+				Result()
+			pvc.Spec.Resources.Requests = corev1api.ResourceList{
+				corev1api.ResourceStorage: resource.MustParse(tc.pvcInitial),
+			}
+
+			// Create a VolumeSnapshot required for the lookup
+			vs := &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "testVS",
+					Namespace: "velero",
+				},
+			}
+			require.NoError(t, crClient.Create(context.Background(), vs))
+
+			// Create a VolumeSnapshotContent with restore size
+			rsQty := resource.MustParse(tc.restoreSize)
+			rsValue := rsQty.Value()
+			vsc := &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "testVSC",
+				},
+				Status: &snapshotv1api.VolumeSnapshotContentStatus{
+					RestoreSize: &rsValue,
+				},
+			}
+
+			// Call the function under test
+			err := setPVCRequestSizeToVSRestoreSize(pvc, crClient, "testVS", vsc, logger)
+			require.NoError(t, err)
+
+			// Verify that the PVC storage request is updated as expected.
+			updatedSize := pvc.Spec.Resources.Requests[corev1api.ResourceStorage]
+			expected := resource.MustParse(tc.expectedSize)
+			require.Equal(t, 0, updatedSize.Cmp(expected), "PVC storage request should be %s", tc.expectedSize)
+		})
+	}
 }
