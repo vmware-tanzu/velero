@@ -34,11 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestNamespaceAndName(t *testing.T) {
@@ -216,17 +217,18 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "csi.test.com"},
 	}
 	for _, tc := range tests {
-		clientBuilder := fake.NewClientBuilder().WithLists(&storagev1api.CSIDriverList{Items: []storagev1api.CSIDriver{csiDriver}})
-
+		objs := []runtime.Object{&csiDriver}
 		if tc.pvc != nil {
-			clientBuilder = clientBuilder.WithObjects(tc.pvc)
+			objs = append(objs, tc.pvc)
 		}
 		if tc.pv != nil {
-			clientBuilder = clientBuilder.WithObjects(tc.pv)
+			objs = append(objs, tc.pv)
 		}
 
+		fakeKubeClient := fake.NewSimpleClientset(objs...)
+
 		// Function under test
-		dir, err := GetVolumeDirectory(context.Background(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, clientBuilder.Build())
+		dir, err := GetVolumeDirectory(context.Background(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, fakeKubeClient)
 
 		require.NoError(t, err)
 		assert.Equal(t, tc.want, dir)
@@ -264,17 +266,18 @@ func TestGetVolumeModeSuccess(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		clientBuilder := fake.NewClientBuilder()
-
+		objs := []runtime.Object{}
 		if tc.pvc != nil {
-			clientBuilder = clientBuilder.WithObjects(tc.pvc)
+			objs = append(objs, tc.pvc)
 		}
 		if tc.pv != nil {
-			clientBuilder = clientBuilder.WithObjects(tc.pv)
+			objs = append(objs, tc.pv)
 		}
 
+		fakeKubeClient := fake.NewSimpleClientset(objs...)
+
 		// Function under test
-		mode, err := GetVolumeMode(context.Background(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, clientBuilder.Build())
+		mode, err := GetVolumeMode(context.Background(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, fakeKubeClient)
 
 		require.NoError(t, err)
 		assert.Equal(t, tc.want, mode)

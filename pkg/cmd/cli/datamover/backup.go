@@ -39,6 +39,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -78,7 +79,7 @@ func NewBackupCommand(f client.Factory) *cobra.Command {
 			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
 			s, err := newdataMoverBackup(logger, f, config)
 			if err != nil {
-				exitWithMessage(logger, false, "Failed to create data mover backup, %v", err)
+				kube.ExitPodWithMessage(logger, false, "Failed to create data mover backup, %v", err)
 			}
 
 			s.run()
@@ -99,12 +100,6 @@ func NewBackupCommand(f client.Factory) *cobra.Command {
 
 	return command
 }
-
-const (
-	// defaultCredentialsDirectory is the path on disk where credential
-	// files will be written to
-	defaultCredentialsDirectory = "/tmp/credentials"
-)
 
 type dataMoverBackup struct {
 	logger      logrus.FieldLogger
@@ -215,7 +210,7 @@ func newdataMoverBackup(logger logrus.FieldLogger, factory client.Factory, confi
 	return s, nil
 }
 
-var funcExitWithMessage = exitWithMessage
+var funcExitWithMessage = kube.ExitPodWithMessage
 var funcCreateDataPathService = (*dataMoverBackup).createDataPathService
 
 func (s *dataMoverBackup) run() {
@@ -277,7 +272,7 @@ func (s *dataMoverBackup) createDataPathService() (dataPathService, error) {
 	credentialFileStore, err := funcNewCredentialFileStore(
 		s.client,
 		s.namespace,
-		defaultCredentialsDirectory,
+		credentials.DefaultStoreDirectory(),
 		filesystem.NewFileSystem(),
 	)
 	if err != nil {

@@ -588,32 +588,8 @@ func WaitUntilVSCHandleIsReady(
 	volSnap *snapshotv1api.VolumeSnapshot,
 	crClient crclient.Client,
 	log logrus.FieldLogger,
-	shouldWait bool,
 	csiSnapshotTimeout time.Duration,
 ) (*snapshotv1api.VolumeSnapshotContent, error) {
-	if !shouldWait {
-		if volSnap.Status == nil ||
-			volSnap.Status.BoundVolumeSnapshotContentName == nil {
-			// volumesnapshot hasn't been reconciled and we're
-			// not waiting for it.
-			return nil, nil
-		}
-		vsc := new(snapshotv1api.VolumeSnapshotContent)
-		err := crClient.Get(
-			context.TODO(),
-			crclient.ObjectKey{
-				Name: *volSnap.Status.BoundVolumeSnapshotContentName,
-			},
-			vsc,
-		)
-		if err != nil {
-			return nil,
-				errors.Wrap(err,
-					"error getting volume snapshot content from API")
-		}
-		return vsc, nil
-	}
-
 	// We'll wait 10m for the VSC to be reconciled polling
 	// every 5s unless backup's csiSnapshotTimeout is set
 	interval := 5 * time.Second

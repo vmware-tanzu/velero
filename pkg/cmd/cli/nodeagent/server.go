@@ -48,7 +48,6 @@ import (
 
 	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
@@ -60,7 +59,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
-	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -75,12 +73,6 @@ var (
 const (
 	// the port where prometheus metrics are exposed
 	defaultMetricsAddress = ":8085"
-
-	// defaultCredentialsDirectory is the path on disk where credential
-	// files will be written to
-	defaultCredentialsDirectory = "/tmp/credentials"
-
-	defaultHostPodsPath = "/host_pods"
 
 	defaultResourceTimeout         = 10 * time.Minute
 	defaultDataMoverPrepareTimeout = 30 * time.Minute
@@ -288,34 +280,6 @@ func (s *nodeAgentServer) run() {
 
 	s.logger.Info("Starting controllers")
 
-	credentialFileStore, err := credentials.NewNamespacedFileStore(
-		s.mgr.GetClient(),
-		s.namespace,
-		defaultCredentialsDirectory,
-		filesystem.NewFileSystem(),
-	)
-	if err != nil {
-		s.logger.Fatalf("Failed to create credentials file store: %v", err)
-	}
-
-	credSecretStore, err := credentials.NewNamespacedSecretStore(s.mgr.GetClient(), s.namespace)
-	if err != nil {
-		s.logger.Fatalf("Failed to create secret file store: %v", err)
-	}
-
-	credentialGetter := &credentials.CredentialGetter{FromFile: credentialFileStore, FromSecret: credSecretStore}
-	repoEnsurer := repository.NewEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
-	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.dataPathMgr, repoEnsurer,
-		credentialGetter, s.nodeName, s.mgr.GetScheme(), s.metrics, s.logger)
-
-	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
-	}
-
-	if err = controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.dataPathMgr, repoEnsurer, credentialGetter, s.logger).SetupWithManager(s.mgr); err != nil {
-		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
-	}
-
 	var loadAffinity *kube.LoadAffinity
 	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
 		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
@@ -338,6 +302,15 @@ func (s *nodeAgentServer) run() {
 		}
 	}
 
+	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger)
+	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
+	}
+
+	if err := controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.logger).SetupWithManager(s.mgr); err != nil {
+		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
+	}
+
 	dataUploadReconciler := controller.NewDataUploadReconciler(
 		s.mgr.GetClient(),
 		s.mgr,
@@ -353,7 +326,7 @@ func (s *nodeAgentServer) run() {
 		s.logger,
 		s.metrics,
 	)
-	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
+	if err := dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
@@ -364,7 +337,7 @@ func (s *nodeAgentServer) run() {
 	}
 
 	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, restorePVCConfig, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
-	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
+	if err := dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}
 
@@ -416,10 +389,10 @@ func (s *nodeAgentServer) waitCacheForResume() error {
 // validatePodVolumesHostPath validates that the pod volumes path contains a
 // directory for each Pod running on this node
 func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface) error {
-	files, err := s.fileSystem.ReadDir(defaultHostPodsPath)
+	files, err := s.fileSystem.ReadDir(nodeagent.HostPodVolumeMountPath())
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			s.logger.Warnf("Pod volumes host path [%s] doesn't exist, fs-backup is disabled", defaultHostPodsPath)
+			s.logger.Warnf("Pod volumes host path [%s] doesn't exist, fs-backup is disabled", nodeagent.HostPodVolumeMountPath())
 			return nil
 		}
 		return errors.Wrap(err, "could not read pod volumes host path")
@@ -452,7 +425,7 @@ func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface
 			valid = false
 			s.logger.WithFields(logrus.Fields{
 				"pod":  fmt.Sprintf("%s/%s", pod.GetNamespace(), pod.GetName()),
-				"path": defaultHostPodsPath + "/" + dirName,
+				"path": nodeagent.HostPodVolumeMountPath() + "/" + dirName,
 			}).Debug("could not find volumes for pod in host path")
 		}
 	}
@@ -531,7 +504,7 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 			continue
 		}
 
-		if err := controller.UpdatePVRStatusToFailed(s.ctx, client, &pvrs.Items[i],
+		if err := controller.UpdatePVRStatusToFailed(s.ctx, client, &pvrs.Items[i], errors.New("cannot survive from node-agent restart"),
 			fmt.Sprintf("get a podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, velerov1api.PodVolumeRestorePhaseFailed),
 			time.Now(), s.logger); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumerestore %q", pvr.GetName())
