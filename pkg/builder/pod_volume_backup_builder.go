@@ -119,3 +119,33 @@ func (b *PodVolumeBackupBuilder) Annotations(annotations map[string]string) *Pod
 	b.object.Annotations = annotations
 	return b
 }
+
+// Cancel sets the PodVolumeBackup's Cancel.
+func (b *PodVolumeBackupBuilder) Cancel(cancel bool) *PodVolumeBackupBuilder {
+	b.object.Spec.Cancel = cancel
+	return b
+}
+
+// AcceptedTimestamp sets the PodVolumeBackup's AcceptedTimestamp.
+func (b *PodVolumeBackupBuilder) AcceptedTimestamp(acceptedTimestamp *metav1.Time) *PodVolumeBackupBuilder {
+	b.object.Status.AcceptedTimestamp = acceptedTimestamp
+	return b
+}
+
+// Finalizers sets the PodVolumeBackup's Finalizers.
+func (b *PodVolumeBackupBuilder) Finalizers(finalizers []string) *PodVolumeBackupBuilder {
+	b.object.Finalizers = finalizers
+	return b
+}
+
+// Message sets the PodVolumeBackup's Message.
+func (b *PodVolumeBackupBuilder) Message(msg string) *PodVolumeBackupBuilder {
+	b.object.Status.Message = msg
+	return b
+}
+
+// OwnerReference sets the PodVolumeBackup's OwnerReference.
+func (b *PodVolumeBackupBuilder) OwnerReference(ref metav1.OwnerReference) *PodVolumeBackupBuilder {
+	b.object.OwnerReferences = append(b.object.OwnerReferences, ref)
+	return b
+}

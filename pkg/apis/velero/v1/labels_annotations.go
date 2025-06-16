@@ -105,6 +105,9 @@ const (
 	// defaultVGSLabelKey is the default label key used to group PVCs under a VolumeGroupSnapshot
 	DefaultVGSLabelKey = "velero.io/volume-group"
 
+	// PVBLabel is the label key used to identify the pvb for pvb pod
+	PVBLabel = "velero.io/pod-volume-backup"
+
 	// PVRLabel is the label key used to identify the pvb for pvr pod
 	PVRLabel = "velero.io/pod-volume-restore"
 )
