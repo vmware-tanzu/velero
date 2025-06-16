@@ -311,6 +311,10 @@ func (s *nodeAgentServer) run() {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
 
+	if err := controller.InitLegacyPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.namespace, s.config.resourceTimeout, s.logger); err != nil {
+		s.logger.WithError(err).Fatal("Unable to create the legacy pod volume restore controller")
+	}
+
 	dataUploadReconciler := controller.NewDataUploadReconciler(
 		s.mgr.GetClient(),
 		s.mgr,

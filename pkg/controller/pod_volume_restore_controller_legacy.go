@@ -41,7 +41,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	veleroapishared "github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
@@ -205,7 +204,7 @@ func (c *PodVolumeRestoreReconcilerLegacy) SetupWithManager(mgr ctrl.Manager) er
 	// The pod may not being scheduled at the point when its PVRs are initially reconciled.
 	// By watching the pods, we can trigger the PVR reconciliation again once the pod is finally scheduled on the node.
 	pred := kube.NewAllEventPredicate(func(obj client.Object) bool {
-		pvr := obj.(*velerov1.PodVolumeRestore)
+		pvr := obj.(*velerov1api.PodVolumeRestore)
 		return isLegacyPVR(pvr)
 	})
 

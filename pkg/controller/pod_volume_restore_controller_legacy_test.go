@@ -65,6 +65,28 @@ func TestFindVolumeRestoresForPodLegacy(t *testing.T) {
 					},
 				},
 			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pvr3",
+					Labels: map[string]string{
+						velerov1api.PodUIDLabel: string(pod.GetUID()),
+					},
+				},
+				Spec: velerov1api.PodVolumeRestoreSpec{
+					UploaderType: "kopia",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pvr4",
+					Labels: map[string]string{
+						velerov1api.PodUIDLabel: string(pod.GetUID()),
+					},
+				},
+				Spec: velerov1api.PodVolumeRestoreSpec{
+					UploaderType: "restic",
+				},
+			},
 		},
 	}).Build()
 	requests = reconciler.findVolumeRestoresForPod(context.Background(), pod)
