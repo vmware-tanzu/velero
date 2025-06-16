@@ -268,12 +268,6 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		return nil, pvcSummary, nil
 	}
 
-	if err := kube.IsLinuxNode(b.ctx, pod.Spec.NodeName, b.crClient); err != nil {
-		err := errors.Wrapf(err, "Pod %s/%s is not running in linux node(%s), skip", pod.Namespace, pod.Name, pod.Spec.NodeName)
-		skipAllPodVolumes(pod, volumesToBackup, err, pvcSummary, log)
-		return nil, pvcSummary, []error{err}
-	}
-
 	err := nodeagent.IsRunningInNode(b.ctx, backup.Namespace, pod.Spec.NodeName, b.crClient)
 	if err != nil {
 		skipAllPodVolumes(pod, volumesToBackup, err, pvcSummary, log)
@@ -405,6 +399,8 @@ func (b *backupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velero
 			log.Debugf("failed to remove the event handler for PVB: %v", err)
 		}
 	}()
+
+	log.Info("Waiting for completion of PVB")
 
 	var podVolumeBackups []*velerov1api.PodVolumeBackup
 	// if no pod volume backups are tracked, return directly to avoid issue mentioned in

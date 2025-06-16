@@ -213,12 +213,6 @@ func (r *restorer) RestorePodVolumes(data RestoreData, tracker *volume.RestoreVo
 		} else if err != nil {
 			r.log.WithError(err).Error("Failed to check node-agent pod status, disengage")
 		} else {
-			if err := kube.IsLinuxNode(checkCtx, nodeName, r.crClient); err != nil {
-				r.log.WithField("node", nodeName).WithError(err).Error("Restored pod is not running in linux node")
-				r.nodeAgentCheck <- errors.Wrapf(err, "restored pod %s/%s is not running in linux node(%s)", data.Pod.Namespace, data.Pod.Name, nodeName)
-				return
-			}
-
 			err = nodeagent.IsRunningInNode(checkCtx, data.Restore.Namespace, nodeName, r.crClient)
 			if err != nil {
 				r.log.WithField("node", nodeName).WithError(err).Error("node-agent pod is not running in node, abort the restore")
