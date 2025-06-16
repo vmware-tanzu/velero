@@ -28,6 +28,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 func NewRemoveCommand(f client.Factory) *cobra.Command {
@@ -41,7 +42,12 @@ func NewRemoveCommand(f client.Factory) *cobra.Command {
 				cmd.CheckError(err)
 			}
 
-			veleroDeploy, err := veleroDeployment(context.TODO(), kubeClient, f.Namespace())
+			crClient, err := f.KubebuilderClient()
+			if err != nil {
+				cmd.CheckError(err)
+			}
+
+			veleroDeploy, err := kube.GetVeleroDeployment(context.TODO(), crClient, f.Namespace())
 			if err != nil {
 				cmd.CheckError(err)
 			}

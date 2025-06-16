@@ -1,0 +1,1 @@
+Fixed hardcoded deployment name (#9023) for the default image in the PodVolumeRestoreAction and Maintenance job. Added unified function to determine Velero server Deployment by either name or labels along with checking the name of the server image

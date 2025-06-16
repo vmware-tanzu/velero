@@ -78,6 +78,7 @@ func TestGenerateJobName1(t *testing.T) {
 		})
 	}
 }
+
 func TestDeleteOldJobs(t *testing.T) {
 	// Set up test repo and keep value
 	repo := "test-repo"
@@ -877,7 +878,7 @@ func TestBuildJob(t *testing.T) {
 				Spec: corev1api.PodSpec{
 					Containers: []corev1api.Container{
 						{
-							Name:  "velero-repo-maintenance-container",
+							Name:  "velero",
 							Image: "velero-image",
 							Env: []corev1api.EnvVar{
 								{

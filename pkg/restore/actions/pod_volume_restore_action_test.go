@@ -306,8 +306,9 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 			Kind:       "Deployment",
 		},
 		ObjectMeta: metav1.ObjectMeta{
+			Labels:    map[string]string{"component": "velero"},
 			Namespace: "velero",
-			Name:      "velero",
+			Name:      "foobar-velero",
 		},
 		Spec: appsv1api.DeploymentSpec{
 			Template: corev1api.PodTemplateSpec{
@@ -315,6 +316,7 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 					Containers: []corev1api.Container{
 						{
 							Image: "velero/velero:v1.0",
+							Name:  "velero",
 						},
 					},
 				},

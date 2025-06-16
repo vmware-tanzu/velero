@@ -38,12 +38,8 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	appsv1api "k8s.io/api/apps/v1"
-
-	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
-
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 const (
@@ -309,7 +305,6 @@ func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1a
 	},
 		client.MatchingLabels(map[string]string{RepositoryNameLabel: repo.Name}),
 	)
-
 	if err != nil {
 		return nil, errors.Wrapf(err, "error listing maintenance job for repo %s", repo.Name)
 	}
@@ -361,7 +356,8 @@ func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1a
 
 // StartNewJob creates a new maintenance job
 func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, repoMaintenanceJobConfig string,
-	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag, logger logrus.FieldLogger) (string, error) {
+	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag, logger logrus.FieldLogger,
+) (string, error) {
 	bsl := &velerov1api.BackupStorageLocation{}
 	if err := cli.Get(ctx, client.ObjectKey{Namespace: repo.Namespace, Name: repo.Spec.BackupStorageLocation}, bsl); err != nil {
 		return "", errors.WithStack(err)
@@ -408,10 +404,10 @@ func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.Backu
 }
 
 func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, bslName string, config *JobConfigs,
-	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag) (*batchv1.Job, error) {
+	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag,
+) (*batchv1.Job, error) {
 	// Get the Velero server deployment
-	deployment := &appsv1api.Deployment{}
-	err := cli.Get(ctx, types.NamespacedName{Name: "velero", Namespace: repo.Namespace}, deployment)
+	deployment, err := kube.GetVeleroDeployment(ctx, cli, repo.Namespace)
 	if err != nil {
 		return nil, err
 	}

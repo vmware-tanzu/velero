@@ -21,15 +21,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -41,6 +37,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/restorehelper"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
@@ -60,10 +57,11 @@ type PodVolumeRestoreAction struct {
 }
 
 func NewPodVolumeRestoreAction(logger logrus.FieldLogger, client corev1client.ConfigMapInterface, crClient ctrlclient.Client, namespace string) (*PodVolumeRestoreAction, error) {
-	deployment := &appsv1api.Deployment{}
-	if err := crClient.Get(context.TODO(), types.NamespacedName{Name: "velero", Namespace: namespace}, deployment); err != nil {
+	deployment, err := kube.GetVeleroDeployment(context.TODO(), crClient, namespace)
+	if err != nil {
 		return nil, err
 	}
+
 	image := veleroutil.GetVeleroServerImage(deployment)
 	return &PodVolumeRestoreAction{
 		logger:      logger,

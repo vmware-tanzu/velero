@@ -49,6 +49,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	"github.com/vmware-tanzu/velero/pkg/install"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 var gracefulDeletionMaximumDuration = 1 * time.Minute
@@ -130,7 +131,7 @@ func Run(ctx context.Context, kbClient kbclient.Client, namespace string) error 
 	}
 
 	// CRDs
-	veleroLabelSelector := labels.SelectorFromSet(install.Labels())
+	veleroLabelSelector := labels.SelectorFromSet(velero.Labels())
 	opts := []kbclient.DeleteAllOfOption{
 		kbclient.InNamespace(namespace),
 		kbclient.MatchingLabelsSelector{

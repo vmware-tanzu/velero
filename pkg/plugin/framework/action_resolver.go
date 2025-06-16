@@ -17,6 +17,8 @@ limitations under the License.
 package framework
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,7 +59,8 @@ type resolvedAction struct {
 }
 
 func (recv resolvedAction) ShouldUse(groupResource schema.GroupResource, namespace string, metadata metav1.Object,
-	log logrus.FieldLogger) bool {
+	log logrus.FieldLogger,
+) bool {
 	if !recv.ResourceIncludesExcludes.ShouldInclude(groupResource.String()) {
 		log.Debug("Skipping action because it does not apply to this resource")
 		return false
@@ -82,10 +85,11 @@ func (recv resolvedAction) ShouldUse(groupResource schema.GroupResource, namespa
 
 // resolveAction resolves the resources, namespaces and selector into fully-qualified versions
 func resolveAction(helper discovery.Helper, action velero.Applicable) (resources *collections.IncludesExcludes,
-	namespaces *collections.IncludesExcludes, selector labels.Selector, err error) {
+	namespaces *collections.IncludesExcludes, selector labels.Selector, err error,
+) {
 	resourceSelector, err := action.AppliesTo()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("failed to retrieve resources selector from action: %w", err)
 	}
 
 	resources = collections.GetResourceIncludesExcludes(helper, resourceSelector.IncludedResources, resourceSelector.ExcludedResources)
@@ -94,7 +98,7 @@ func resolveAction(helper discovery.Helper, action velero.Applicable) (resources
 	selector = labels.Everything()
 	if resourceSelector.LabelSelector != "" {
 		if selector, err = labels.Parse(resourceSelector.LabelSelector); err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, fmt.Errorf("failed to parse label selector %q: %w", resourceSelector.LabelSelector, err)
 		}
 	}
 
@@ -238,7 +242,7 @@ func (recv RestoreItemActionResolverV2) ResolveActions(helper discovery.Helper, 
 	for _, action := range recv.actions {
 		resources, namespaces, selector, err := resolveAction(helper, action)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to resolve action %q: %w", action.Name(), err)
 		}
 		res := RestoreItemResolvedActionV2{
 			RestoreItemAction: action,
