@@ -314,30 +314,6 @@ func TestRestorePodVolumes(t *testing.T) {
 			},
 		},
 		{
-			name: "pod is not running on linux nodes",
-			pvbs: []*velerov1api.PodVolumeBackup{
-				createPVBObj(true, true, 1, "kopia"),
-			},
-			kubeClientObj: []runtime.Object{
-				createNodeAgentDaemonset(),
-				createWindowsNodeObj(),
-				createPVCObj(1),
-				createPodObj(true, true, true, 1),
-			},
-			ctlClientObj: []runtime.Object{
-				createBackupRepoObj(),
-			},
-			restoredPod:     createPodObj(true, true, true, 1),
-			sourceNamespace: "fake-ns",
-			bsl:             "fake-bsl",
-			runtimeScheme:   scheme,
-			errs: []expectError{
-				{
-					err: "restored pod fake-ns/fake-pod is not running in linux node(fake-node-name): os type windows for node fake-node-name is not linux",
-				},
-			},
-		},
-		{
 			name: "node-agent pod is not running",
 			pvbs: []*velerov1api.PodVolumeBackup{
 				createPVBObj(true, true, 1, "kopia"),

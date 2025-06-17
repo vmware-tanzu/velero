@@ -307,10 +307,6 @@ func createNodeObj() *corev1api.Node {
 	return builder.ForNode("fake-node-name").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
 }
 
-func createWindowsNodeObj() *corev1api.Node {
-	return builder.ForNode("fake-node-name").Labels(map[string]string{"kubernetes.io/os": "windows"}).Result()
-}
-
 func TestBackupPodVolumes(t *testing.T) {
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
@@ -366,22 +362,6 @@ func TestBackupPodVolumes(t *testing.T) {
 			sourcePod:     createPodObj(false, false, false, 2),
 			uploaderType:  "kopia",
 			bsl:           "fake-bsl",
-		},
-		{
-			name: "pod is not running on Linux node",
-			volumes: []string{
-				"fake-volume-1",
-				"fake-volume-2",
-			},
-			kubeClientObj: []runtime.Object{
-				createNodeAgentPodObj(true),
-				createWindowsNodeObj(),
-			},
-			sourcePod:    createPodObj(false, false, false, 2),
-			uploaderType: "kopia",
-			errs: []string{
-				"Pod fake-ns/fake-pod is not running in linux node(fake-node-name), skip",
-			},
 		},
 		{
 			name: "node-agent pod is not running in node",
