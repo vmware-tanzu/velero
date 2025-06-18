@@ -1437,3 +1437,212 @@ func TestUpdatePVRWithRetry(t *testing.T) {
 		})
 	}
 }
+
+func TestAttemptPVRResume(t *testing.T) {
+	tests := []struct {
+		name           string
+		pvrs           []velerov1api.PodVolumeRestore
+		pvr            *velerov1api.PodVolumeRestore
+		needErrs       []bool
+		resumeErr      error
+		acceptedPvrs   []string
+		preparedPvrs   []string
+		cancelledPvrs  []string
+		inProgressPvrs []string
+		expectedError  string
+	}{
+		{
+			name: "Other pvr",
+			pvr:  pvrBuilder().Phase(velerov1api.PodVolumeRestorePhasePrepared).Result(),
+		},
+		{
+			name: "Other pvr",
+			pvr:  pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseAccepted).Result(),
+		},
+		{
+			name:           "InProgress pvr, not the current node",
+			pvr:            pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseInProgress).Result(),
+			inProgressPvrs: []string{pvrName},
+		},
+		{
+			name:           "InProgress pvr, no resume error",
+			pvr:            pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseInProgress).Node("node-1").Result(),
+			inProgressPvrs: []string{pvrName},
+		},
+		{
+			name:           "InProgress pvr, resume error, cancel error",
+			pvr:            pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseInProgress).Node("node-1").Result(),
+			resumeErr:      errors.New("fake-resume-error"),
+			needErrs:       []bool{false, false, true, false, false, false},
+			inProgressPvrs: []string{pvrName},
+		},
+		{
+			name:           "InProgress pvr, resume error, cancel succeed",
+			pvr:            pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseInProgress).Node("node-1").Result(),
+			resumeErr:      errors.New("fake-resume-error"),
+			cancelledPvrs:  []string{pvrName},
+			inProgressPvrs: []string{pvrName},
+		},
+		{
+			name:          "Error",
+			needErrs:      []bool{false, false, false, false, false, true},
+			pvr:           pvrBuilder().Phase(velerov1api.PodVolumeRestorePhasePrepared).Result(),
+			expectedError: "error to list PVRs: List error",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.TODO()
+			r, err := initPodVolumeRestoreReconciler(nil, []client.Object{}, test.needErrs...)
+			r.nodeName = "node-1"
+			require.NoError(t, err)
+			defer func() {
+				r.client.Delete(ctx, test.pvr, &kbclient.DeleteOptions{})
+			}()
+
+			assert.NoError(t, r.client.Create(ctx, test.pvr))
+
+			dt := &pvbResumeTestHelper{
+				resumeErr: test.resumeErr,
+			}
+
+			funcResumeCancellableDataBackup = dt.resumeCancellableDataPath
+
+			// Run the test
+			err = r.AttemptPVRResume(ctx, r.logger.WithField("name", test.name), test.pvr.Namespace)
+
+			if test.expectedError != "" {
+				assert.EqualError(t, err, test.expectedError)
+			} else {
+				assert.NoError(t, err)
+
+				for _, pvrName := range test.cancelledPvrs {
+					pvr := &velerov1api.PodVolumeRestore{}
+					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvrName}, pvr)
+					require.NoError(t, err)
+					assert.True(t, pvr.Spec.Cancel)
+				}
+
+				for _, pvrName := range test.acceptedPvrs {
+					pvr := &velerov1api.PodVolumeRestore{}
+					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvrName}, pvr)
+					require.NoError(t, err)
+					assert.Equal(t, velerov1api.PodVolumeRestorePhaseAccepted, pvr.Status.Phase)
+				}
+
+				for _, pvrName := range test.preparedPvrs {
+					pvr := &velerov1api.PodVolumeRestore{}
+					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvrName}, pvr)
+					require.NoError(t, err)
+					assert.Equal(t, velerov1api.PodVolumeRestorePhasePrepared, pvr.Status.Phase)
+				}
+			}
+		})
+	}
+}
+
+func TestResumeCancellablePodVolumeRestore(t *testing.T) {
+	tests := []struct {
+		name             string
+		pvrs             []velerov1api.PodVolumeRestore
+		pvr              *velerov1api.PodVolumeRestore
+		getExposeErr     error
+		exposeResult     *exposer.ExposeResult
+		createWatcherErr error
+		initWatcherErr   error
+		startWatcherErr  error
+		mockInit         bool
+		mockStart        bool
+		mockClose        bool
+		expectedError    string
+	}{
+		{
+			name:          "get expose failed",
+			pvr:           pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseInProgress).Result(),
+			getExposeErr:  errors.New("fake-expose-error"),
+			expectedError: fmt.Sprintf("error to get exposed PVR %s: fake-expose-error", pvrName),
+		},
+		{
+			name:          "no expose",
+			pvr:           pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseAccepted).Node("node-1").Result(),
+			expectedError: fmt.Sprintf("expose info missed for PVR %s", pvrName),
+		},
+		{
+			name: "watcher init error",
+			pvr:  pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseAccepted).Node("node-1").Result(),
+			exposeResult: &exposer.ExposeResult{
+				ByPod: exposer.ExposeByPod{
+					HostingPod: &corev1api.Pod{},
+				},
+			},
+			mockInit:       true,
+			mockClose:      true,
+			initWatcherErr: errors.New("fake-init-watcher-error"),
+			expectedError:  fmt.Sprintf("error to init asyncBR watcher for PVR %s: fake-init-watcher-error", pvrName),
+		},
+		{
+			name: "start watcher error",
+			pvr:  pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseAccepted).Node("node-1").Result(),
+			exposeResult: &exposer.ExposeResult{
+				ByPod: exposer.ExposeByPod{
+					HostingPod: &corev1api.Pod{},
+				},
+			},
+			mockInit:        true,
+			mockStart:       true,
+			mockClose:       true,
+			startWatcherErr: errors.New("fake-start-watcher-error"),
+			expectedError:   fmt.Sprintf("error to resume asyncBR watcher for PVR %s: fake-start-watcher-error", pvrName),
+		},
+		{
+			name: "succeed",
+			pvr:  pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseAccepted).Node("node-1").Result(),
+			exposeResult: &exposer.ExposeResult{
+				ByPod: exposer.ExposeByPod{
+					HostingPod: &corev1api.Pod{},
+				},
+			},
+			mockInit:  true,
+			mockStart: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.TODO()
+			r, err := initPodVolumeRestoreReconciler(nil, []client.Object{})
+			r.nodeName = "node-1"
+			require.NoError(t, err)
+
+			mockAsyncBR := datapathmockes.NewAsyncBR(t)
+
+			if test.mockInit {
+				mockAsyncBR.On("Init", mock.Anything, mock.Anything).Return(test.initWatcherErr)
+			}
+
+			if test.mockStart {
+				mockAsyncBR.On("StartRestore", mock.Anything, mock.Anything, mock.Anything).Return(test.startWatcherErr)
+			}
+
+			if test.mockClose {
+				mockAsyncBR.On("Close", mock.Anything).Return()
+			}
+
+			dt := &pvbResumeTestHelper{
+				getExposeErr: test.getExposeErr,
+				exposeResult: test.exposeResult,
+				asyncBR:      mockAsyncBR,
+			}
+
+			r.exposer = dt
+
+			datapath.MicroServiceBRWatcherCreator = dt.newMicroServiceBRWatcher
+
+			err = r.resumeCancellableDataPath(ctx, test.pvr, velerotest.NewLogger())
+			if test.expectedError != "" {
+				assert.EqualError(t, err, test.expectedError)
+			}
+		})
+	}
+}
