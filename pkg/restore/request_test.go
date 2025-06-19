@@ -63,5 +63,5 @@ func TestRestoredResourceList(t *testing.T) {
 		"v1/Namespace": {"default(created)"},
 	}
 
-	assert.EqualValues(t, expected, request.RestoredResourceList())
+	assert.Equal(t, expected, request.RestoredResourceList())
 }

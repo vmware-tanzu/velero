@@ -24,6 +24,7 @@ import (
 
 	"github.com/kopia/kopia/repo/blob/gcs"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 )
@@ -95,7 +96,7 @@ func TestGcsSetup(t *testing.T) {
 			err := gcsFlags.Setup(context.Background(), tc.flags, logger)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedOptions, gcsFlags.options)
 			} else {
 				assert.EqualError(t, err, tc.expectedErr)

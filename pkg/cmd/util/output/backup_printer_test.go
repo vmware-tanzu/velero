@@ -78,7 +78,7 @@ func TestSortBackups(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			sortBackupsByPrefixAndTimestamp(test.backupList)
 
-			if assert.Equal(t, len(test.backupList.Items), len(test.expected)) {
+			if assert.Len(t, test.backupList.Items, len(test.expected)) {
 				for i := range test.expected {
 					assert.Equal(t, test.expected[i].Name, test.backupList.Items[i].Name)
 				}

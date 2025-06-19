@@ -23,6 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -125,9 +126,9 @@ func TestWaitPVCBound(t *testing.T) {
 			pv, err := WaitPVCBound(context.Background(), kubeClient.CoreV1(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, time.Millisecond)
 
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.expected, pv)
@@ -289,9 +290,9 @@ func TestWaitPVCConsumed(t *testing.T) {
 			selectedNode, pvc, err := WaitPVCConsumed(context.Background(), kubeClient.CoreV1(), test.pvcName, test.pvcNamespace, kubeClient.StorageV1(), time.Millisecond, test.ignoreWaitForFirstConsumer)
 
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.expectedPVC, pvc)
@@ -861,9 +862,9 @@ func TestRebindPVC(t *testing.T) {
 
 			result, err := RebindPVC(context.Background(), kubeClient.CoreV1(), test.pvc, test.pv)
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.result, result)
@@ -968,9 +969,9 @@ func TestResetPVBinding(t *testing.T) {
 
 			result, err := ResetPVBinding(context.Background(), kubeClient.CoreV1(), test.pv, test.labels, test.pvc)
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.result, result)
@@ -1046,9 +1047,9 @@ func TestSetPVReclaimPolicy(t *testing.T) {
 
 			result, err := SetPVReclaimPolicy(context.Background(), kubeClient.CoreV1(), test.pv, test.policy)
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.result, result)
@@ -1197,9 +1198,9 @@ func TestWaitPVBound(t *testing.T) {
 			pv, err := WaitPVBound(context.Background(), kubeClient.CoreV1(), test.pvName, test.pvcName, test.pvcNamespace, time.Millisecond)
 
 			if err != nil {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, test.expectedPV, pv)
@@ -1372,12 +1373,12 @@ func TestGetPVForPVC(t *testing.T) {
 			actualPV, actualError := GetPVForPVC(tc.inPVC, fakeClient)
 
 			if tc.expectError {
-				assert.Error(t, actualError, "Want error; Got nil error")
+				require.Error(t, actualError, "Want error; Got nil error")
 				assert.Nilf(t, actualPV, "Want PV: nil; Got PV: %q", actualPV)
 				return
 			}
 
-			assert.NoErrorf(t, actualError, "Want: nil error; Got: %v", actualError)
+			require.NoErrorf(t, actualError, "Want: nil error; Got: %v", actualError)
 			assert.Equalf(t, actualPV.Name, tc.expectedPV.Name, "Want PV with name %q; Got PV with name %q", tc.expectedPV.Name, actualPV.Name)
 		})
 	}
@@ -1495,11 +1496,11 @@ func TestGetPVCForPodVolume(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actualPVC, actualError := GetPVCForPodVolume(tc.vol, samplePod, fakeClient)
 			if tc.expectedError {
-				assert.Error(t, actualError, "Want error; Got nil error")
+				require.Error(t, actualError, "Want error; Got nil error")
 				assert.Nilf(t, actualPVC, "Want PV: nil; Got PV: %q", actualPVC)
 				return
 			}
-			assert.NoErrorf(t, actualError, "Want: nil error; Got: %v", actualError)
+			require.NoErrorf(t, actualError, "Want: nil error; Got: %v", actualError)
 			assert.Equalf(t, actualPVC.Name, tc.expectedPVC.Name, "Want PVC with name %q; Got PVC with name %q", tc.expectedPVC.Name, actualPVC)
 		})
 	}
