@@ -205,7 +205,7 @@ func (c *PodVolumeRestoreReconcilerLegacy) SetupWithManager(mgr ctrl.Manager) er
 	// By watching the pods, we can trigger the PVR reconciliation again once the pod is finally scheduled on the node.
 	pred := kube.NewAllEventPredicate(func(obj client.Object) bool {
 		pvr := obj.(*velerov1api.PodVolumeRestore)
-		return isLegacyPVR(pvr)
+		return IsLegacyPVR(pvr)
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).Named("podvolumerestorelegacy").
@@ -229,7 +229,7 @@ func (c *PodVolumeRestoreReconcilerLegacy) findVolumeRestoresForPod(ctx context.
 
 	requests := []reconcile.Request{}
 	for _, item := range list.Items {
-		if !isLegacyPVR(&item) {
+		if !IsLegacyPVR(&item) {
 			continue
 		}
 
@@ -359,6 +359,6 @@ func (c *PodVolumeRestoreReconcilerLegacy) closeDataPath(ctx context.Context, pv
 	c.dataPathMgr.RemoveAsyncBR(pvbName)
 }
 
-func isLegacyPVR(pvr *velerov1api.PodVolumeRestore) bool {
+func IsLegacyPVR(pvr *velerov1api.PodVolumeRestore) bool {
 	return pvr.Spec.UploaderType == uploader.ResticType
 }

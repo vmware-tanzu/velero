@@ -185,6 +185,8 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	log.Debugf("restore: %s, phase %s", restore.Name, restore.Status.Phase)
+
 	// deal with finalizer
 	if !restore.DeletionTimestamp.IsZero() {
 		// check the finalizer and run clean-up
