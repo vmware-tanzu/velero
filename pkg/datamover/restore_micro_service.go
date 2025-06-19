@@ -137,9 +137,8 @@ func (r *RestoreMicroService) RunCancelableDataPath(ctx context.Context) (string
 
 		if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
 			return true, nil
-		} else {
-			return false, nil
 		}
+		return false, nil
 	})
 	if err != nil {
 		log.WithError(err).Error("Failed to wait dd")
