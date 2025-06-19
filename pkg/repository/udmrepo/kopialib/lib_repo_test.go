@@ -250,6 +250,7 @@ func TestMaintain(t *testing.T) {
 				tc.returnRepoWriter.On("AlsoLogToContentLog", mock.Anything).Return(nil)
 				tc.returnRepoWriter.On("Close", mock.Anything).Return(nil)
 				tc.returnRepoWriter.On("FindManifests", mock.Anything, mock.Anything).Return(nil, tc.findManifestError)
+				tc.returnRepoWriter.On("ClientOptions").Return(repo.ClientOptions{})
 			}
 
 			err := service.Maintain(ctx, tc.repoOptions)

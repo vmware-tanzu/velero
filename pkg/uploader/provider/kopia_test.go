@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/kopia/kopia/repo"
-	"github.com/kopia/kopia/snapshot/snapshotfs"
+	"github.com/kopia/kopia/snapshot/upload"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -172,7 +172,7 @@ func TestCheckContext(t *testing.T) {
 		name          string
 		finishChan    chan struct{}
 		restoreChan   chan struct{}
-		uploader      *snapshotfs.Uploader
+		uploader      *upload.Uploader
 		expectCancel  bool
 		expectBackup  bool
 		expectRestore bool
@@ -181,7 +181,7 @@ func TestCheckContext(t *testing.T) {
 			name:          "FinishChan",
 			finishChan:    make(chan struct{}),
 			restoreChan:   make(chan struct{}),
-			uploader:      &snapshotfs.Uploader{},
+			uploader:      &upload.Uploader{},
 			expectCancel:  false,
 			expectBackup:  false,
 			expectRestore: false,
