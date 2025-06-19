@@ -79,7 +79,7 @@ func (o *Options) Run(f velerocli.Factory) {
 	}()
 
 	if pruneError != nil {
-		os.Stdout.WriteString(fmt.Sprintf("%s%v", maintenance.TerminationLogIndicator, pruneError))
+		fmt.Fprintf(os.Stdout, "%s%v", maintenance.TerminationLogIndicator, pruneError)
 	}
 }
 
