@@ -545,7 +545,7 @@ func (r *PodVolumeRestoreReconciler) closeDataPath(ctx context.Context, pvrName 
 func (r *PodVolumeRestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
 		pvr := object.(*velerov1api.PodVolumeRestore)
-		if isLegacyPVR(pvr) {
+		if IsLegacyPVR(pvr) {
 			return false
 		}
 
@@ -570,7 +570,7 @@ func (r *PodVolumeRestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	pred := kube.NewAllEventPredicate(func(obj client.Object) bool {
 		pvr := obj.(*velerov1api.PodVolumeRestore)
-		return !isLegacyPVR(pvr)
+		return !IsLegacyPVR(pvr)
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -620,7 +620,7 @@ func (r *PodVolumeRestoreReconciler) findPVRForTargetPod(ctx context.Context, po
 
 	requests := []reconcile.Request{}
 	for _, item := range list.Items {
-		if isLegacyPVR(&item) {
+		if IsLegacyPVR(&item) {
 			continue
 		}
 
@@ -897,7 +897,7 @@ func UpdatePVRWithRetry(ctx context.Context, client client.Client, namespacedNam
 			err := client.Update(ctx, pvr)
 			if err != nil {
 				if apierrors.IsConflict(err) {
-					log.Warnf("failed to update PVR for %s/%s and will retry it", pvr.Namespace, pvr.Name)
+					log.Debugf("failed to update PVR for %s/%s and will retry it", pvr.Namespace, pvr.Name)
 					return false, nil
 				} else {
 					return false, errors.Wrapf(err, "error updating PVR %s/%s", pvr.Namespace, pvr.Name)

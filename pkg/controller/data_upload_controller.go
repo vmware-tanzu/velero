@@ -990,7 +990,7 @@ func UpdateDataUploadWithRetry(ctx context.Context, client client.Client, namesp
 			err := client.Update(ctx, du)
 			if err != nil {
 				if apierrors.IsConflict(err) {
-					log.Warnf("failed to update dataupload for %s/%s and will retry it", du.Namespace, du.Name)
+					log.Debugf("failed to update dataupload for %s/%s and will retry it", du.Namespace, du.Name)
 					return false, nil
 				} else {
 					return false, errors.Wrapf(err, "error updating dataupload with error %s/%s", du.Namespace, du.Name)
