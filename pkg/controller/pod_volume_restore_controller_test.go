@@ -1501,7 +1501,7 @@ func TestAttemptPVRResume(t *testing.T) {
 				r.client.Delete(ctx, test.pvr, &kbclient.DeleteOptions{})
 			}()
 
-			assert.NoError(t, r.client.Create(ctx, test.pvr))
+			require.NoError(t, r.client.Create(ctx, test.pvr))
 
 			dt := &pvbResumeTestHelper{
 				resumeErr: test.resumeErr,
