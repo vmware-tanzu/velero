@@ -40,6 +40,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 type reactor struct {
@@ -162,6 +163,7 @@ func TestExpose(t *testing.T) {
 		expectedVolumeSize            *resource.Quantity
 		expectedReadOnlyPVC           bool
 		expectedBackupPVCStorageClass string
+		expectedAffinity              *corev1api.Affinity
 	}{
 		{
 			name:        "wait vs ready fail",
@@ -466,6 +468,205 @@ func TestExpose(t *testing.T) {
 			},
 			expectedBackupPVCStorageClass: "fake-sc-read-only",
 		},
+		{
+			name:        "Multiple global affinity",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				StorageClass:     "fake-sc",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				Affinity: []*kube.LoadAffinity{
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "kubernetes.io/os",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"Linux", "Windows"},
+								},
+							},
+						},
+					},
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "kubernetes.io/arch",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"amd64"},
+								},
+							},
+						},
+					},
+				},
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpIn,
+										Values:   []string{"Linux", "Windows"},
+									},
+								},
+							},
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/arch",
+										Operator: corev1api.NodeSelectorOpIn,
+										Values:   []string{"amd64"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "Affinity per StorageClass",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				StorageClass:     "fake-sc",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				Affinity: []*kube.LoadAffinity{
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "kubernetes.io/os",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"Linux"},
+								},
+							},
+						},
+						StorageClass: "fake-sc",
+					},
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "kubernetes.io/arch",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"amd64"},
+								},
+							},
+						},
+						StorageClass: "invalid-sc",
+					},
+				},
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpIn,
+										Values:   []string{"Linux"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "Affinity per StorageClass with expectedBackupPVCStorageClass",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				StorageClass:     "fake-sc",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				BackupPVCConfig: map[string]nodeagent.BackupPVC{
+					"fake-sc": {
+						StorageClass: "fake-sc-read-only",
+					},
+				},
+				Affinity: []*kube.LoadAffinity{
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "kubernetes.io/os",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"Linux"},
+								},
+							},
+						},
+						StorageClass: "fake-sc",
+					},
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "kubernetes.io/arch",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"amd64"},
+								},
+							},
+						},
+						StorageClass: "fake-sc-read-only",
+					},
+				},
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectedBackupPVCStorageClass: "fake-sc-read-only",
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/arch",
+										Operator: corev1api.NodeSelectorOpIn,
+										Values:   []string{"amd64"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -502,7 +703,7 @@ func TestExpose(t *testing.T) {
 			if err == nil {
 				assert.NoError(t, err)
 
-				_, err = exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
+				backupPod, err := exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
 				assert.NoError(t, err)
 
 				backupPVC, err := exposer.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
@@ -541,6 +742,10 @@ func TestExpose(t *testing.T) {
 
 				if test.expectedBackupPVCStorageClass != "" {
 					assert.Equal(t, test.expectedBackupPVCStorageClass, *backupPVC.Spec.StorageClassName)
+				}
+
+				if test.expectedAffinity != nil {
+					assert.Equal(t, test.expectedAffinity, backupPod.Spec.Affinity)
 				}
 			} else {
 				assert.EqualError(t, err, test.err)
@@ -1347,6 +1552,173 @@ end diagnose CSI exposer`,
 
 			diag := e.DiagnoseExpose(context.Background(), ownerObject)
 			assert.Equal(t, tt.expected, diag)
+		})
+	}
+}
+
+func TestGetLoadAffinityByStorageClass(t *testing.T) {
+	tests := []struct {
+		name                 string
+		affinityList         []*kube.LoadAffinity
+		scName               string
+		expectedAffinityList []*kube.LoadAffinity
+	}{
+		{
+			name: "get global affinity",
+			affinityList: []*kube.LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+					StorageClass: "storage-class-01",
+				},
+			},
+			scName: "",
+			expectedAffinityList: []*kube.LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "get affinity for StorageClass but only global affinity exists",
+			affinityList: []*kube.LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+				},
+			},
+			scName: "storage-class-01",
+			expectedAffinityList: []*kube.LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "get affinity for StorageClass",
+			affinityList: []*kube.LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/control-plane=",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{""},
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+					StorageClass: "storage-class-01",
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+					StorageClass: "invalid-storage-class",
+				},
+			},
+			scName: "storage-class-01",
+			expectedAffinityList: []*kube.LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+					StorageClass: "storage-class-01",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := getLoadAffinityByStorageClass(test.affinityList, test.scName, velerotest.NewLogger())
+
+			assert.Equal(t, test.expectedAffinityList, result)
 		})
 	}
 }
