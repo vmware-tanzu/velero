@@ -31,6 +31,7 @@ import (
 	v2alpha1crds "github.com/vmware-tanzu/velero/config/crd/v2alpha1/crds"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 const (
@@ -56,15 +57,9 @@ var (
 	DefaultVeleroNamespace = "velero"
 )
 
-func Labels() map[string]string {
-	return map[string]string{
-		"component": "velero",
-	}
-}
-
 func podLabels(userLabels ...map[string]string) map[string]string {
 	// Use the default labels as a starting point
-	base := Labels()
+	base := velero.Labels()
 
 	// Merge base labels with user labels to enforce CLI precedence
 	for _, labels := range userLabels {
@@ -105,7 +100,7 @@ func objectMeta(namespace, name string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      name,
 		Namespace: namespace,
-		Labels:    Labels(),
+		Labels:    velero.Labels(),
 	}
 }
 
@@ -277,14 +272,14 @@ func AllCRDs() *unstructured.UnstructuredList {
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
 
 	for _, crd := range v1crds.CRDs {
-		crd.SetLabels(Labels())
+		crd.SetLabels(velero.Labels())
 		if err := appendUnstructured(resources, crd); err != nil {
 			fmt.Printf("error appending v1 CRD %s: %s\n", crd.GetName(), err.Error())
 		}
 	}
 
 	for _, crd := range v2alpha1crds.CRDs {
-		crd.SetLabels(Labels())
+		crd.SetLabels(velero.Labels())
 		if err := appendUnstructured(resources, crd); err != nil {
 			fmt.Printf("error appending v2alpha1 CRD %s: %s\n", crd.GetName(), err.Error())
 		}

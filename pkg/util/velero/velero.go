@@ -111,3 +111,10 @@ func GetVeleroServerAnnotationValue(deployment *appsv1api.Deployment, key string
 func BSLIsAvailable(bsl velerov1api.BackupStorageLocation) bool {
 	return bsl.Status.Phase == velerov1api.BackupStorageLocationPhaseAvailable
 }
+
+// Labels returns default Velero installation labels used across components.
+func Labels() map[string]string {
+	return map[string]string{
+		"component": "velero",
+	}
+}
