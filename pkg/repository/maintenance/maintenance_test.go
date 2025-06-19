@@ -27,7 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	batchv1 "k8s.io/api/batch/v1"
+	batchv1api "k8s.io/api/batch/v1"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,18 +86,18 @@ func TestDeleteOldJobs(t *testing.T) {
 	// Create some maintenance jobs for testing
 	var objs []client.Object
 	// Create a newer job
-	newerJob := &batchv1.Job{
+	newerJob := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "job1",
 			Namespace: "default",
 			Labels:    map[string]string{RepositoryNameLabel: repo},
 		},
-		Spec: batchv1.JobSpec{},
+		Spec: batchv1api.JobSpec{},
 	}
 	objs = append(objs, newerJob)
 	// Create older jobs
 	for i := 2; i <= 3; i++ {
-		olderJob := &batchv1.Job{
+		olderJob := &batchv1api.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("job%d", i),
 				Namespace: "default",
@@ -106,13 +106,13 @@ func TestDeleteOldJobs(t *testing.T) {
 					Time: metav1.Now().Add(time.Duration(-24*i) * time.Hour),
 				},
 			},
-			Spec: batchv1.JobSpec{},
+			Spec: batchv1api.JobSpec{},
 		}
 		objs = append(objs, olderJob)
 	}
 	// Create a fake Kubernetes client
 	scheme := runtime.NewScheme()
-	_ = batchv1.AddToScheme(scheme)
+	_ = batchv1api.AddToScheme(scheme)
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	// Call the function
@@ -120,7 +120,7 @@ func TestDeleteOldJobs(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Get the remaining jobs
-	jobList := &batchv1.JobList{}
+	jobList := &batchv1api.JobList{}
 	err = cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
 	assert.NoError(t, err)
 
@@ -137,18 +137,18 @@ func TestDeleteOldJobs(t *testing.T) {
 
 func TestWaitForJobComplete(t *testing.T) {
 	// Set up test job
-	job := &batchv1.Job{
+	job := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-job",
 			Namespace: "default",
 		},
-		Status: batchv1.JobStatus{},
+		Status: batchv1api.JobStatus{},
 	}
 
 	schemeFail := runtime.NewScheme()
 
 	scheme := runtime.NewScheme()
-	batchv1.AddToScheme(scheme)
+	batchv1api.AddToScheme(scheme)
 
 	waitCompletionBackOff1 := wait.Backoff{
 		Duration: time.Second,
@@ -169,7 +169,7 @@ func TestWaitForJobComplete(t *testing.T) {
 		description   string // Test case description
 		kubeClientObj []runtime.Object
 		runtimeScheme *runtime.Scheme
-		jobStatus     batchv1.JobStatus // Job status to set for the test
+		jobStatus     batchv1api.JobStatus // Job status to set for the test
 		logBackOff    wait.Backoff
 		updateAfter   time.Duration
 		expectedLogs  int
@@ -186,7 +186,7 @@ func TestWaitForJobComplete(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				job,
 			},
-			jobStatus: batchv1.JobStatus{
+			jobStatus: batchv1api.JobStatus{
 				Succeeded: 1,
 			},
 			expectError: false,
@@ -197,7 +197,7 @@ func TestWaitForJobComplete(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				job,
 			},
-			jobStatus: batchv1.JobStatus{
+			jobStatus: batchv1api.JobStatus{
 				Failed: 1,
 			},
 			expectError: false,
@@ -267,7 +267,7 @@ func TestWaitForJobComplete(t *testing.T) {
 
 func TestGetResultFromJob(t *testing.T) {
 	// Set up test job
-	job := &batchv1.Job{
+	job := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-job",
 			Namespace: "default",
@@ -578,7 +578,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 
 	now := time.Now().Round(time.Second)
 
-	jobOtherLabel := &batchv1.Job{
+	jobOtherLabel := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job1",
 			Namespace:         veleroNamespace,
@@ -587,7 +587,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 	}
 
-	jobIncomplete := &batchv1.Job{
+	jobIncomplete := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job1",
 			Namespace:         veleroNamespace,
@@ -596,14 +596,14 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 	}
 
-	jobSucceeded1 := &batchv1.Job{
+	jobSucceeded1 := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job1",
 			Namespace:         veleroNamespace,
 			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
 			CreationTimestamp: metav1.Time{Time: now},
 		},
-		Status: batchv1.JobStatus{
+		Status: batchv1api.JobStatus{
 			StartTime:      &metav1.Time{Time: now},
 			CompletionTime: &metav1.Time{Time: now.Add(time.Hour)},
 			Succeeded:      1,
@@ -616,14 +616,14 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 	}).Result()
 
-	jobFailed1 := &batchv1.Job{
+	jobFailed1 := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job2",
 			Namespace:         veleroNamespace,
 			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
 			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour)},
 		},
-		Status: batchv1.JobStatus{
+		Status: batchv1api.JobStatus{
 			StartTime: &metav1.Time{Time: now.Add(time.Hour)},
 			Failed:    1,
 		},
@@ -637,14 +637,14 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 	}).Result()
 
-	jobSucceeded2 := &batchv1.Job{
+	jobSucceeded2 := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job3",
 			Namespace:         veleroNamespace,
 			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
 			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour * 2)},
 		},
-		Status: batchv1.JobStatus{
+		Status: batchv1api.JobStatus{
 			StartTime:      &metav1.Time{Time: now.Add(time.Hour * 2)},
 			CompletionTime: &metav1.Time{Time: now.Add(time.Hour * 3)},
 			Succeeded:      1,
@@ -657,14 +657,14 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 	}).Result()
 
-	jobSucceeded3 := &batchv1.Job{
+	jobSucceeded3 := &batchv1api.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job4",
 			Namespace:         veleroNamespace,
 			Labels:            map[string]string{RepositoryNameLabel: "fake-repo"},
 			CreationTimestamp: metav1.Time{Time: now.Add(time.Hour * 3)},
 		},
-		Status: batchv1.JobStatus{
+		Status: batchv1api.JobStatus{
 			StartTime:      &metav1.Time{Time: now.Add(time.Hour * 3)},
 			CompletionTime: &metav1.Time{Time: now.Add(time.Hour * 4)},
 			Succeeded:      1,
@@ -680,7 +680,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 	schemeFail := runtime.NewScheme()
 
 	scheme := runtime.NewScheme()
-	batchv1.AddToScheme(scheme)
+	batchv1api.AddToScheme(scheme)
 	corev1api.AddToScheme(scheme)
 
 	testCases := []struct {
