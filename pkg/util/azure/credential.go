@@ -117,7 +117,7 @@ func newConfigCredential(creds map[string]string, options configCredentialOption
 	if username := creds[CredentialKeyUsername]; username != "" {
 		if password := creds[CredentialKeyPassword]; password != "" {
 			return azidentity.NewUsernamePasswordCredential(tenantID, clientID, username, password,
-				&azidentity.UsernamePasswordCredentialOptions{
+				&azidentity.UsernamePasswordCredentialOptions{ //nolint:staticcheck // will be solved by https://github.com/vmware-tanzu/velero/issues/9028
 					AdditionallyAllowedTenants: options.AdditionallyAllowedTenants,
 					ClientOptions:              options.ClientOptions,
 				})
