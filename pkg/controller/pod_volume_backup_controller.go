@@ -833,7 +833,7 @@ func UpdatePVBWithRetry(ctx context.Context, client client.Client, namespacedNam
 			err := client.Update(ctx, pvb)
 			if err != nil {
 				if apierrors.IsConflict(err) {
-					log.Warnf("failed to update PVB for %s/%s and will retry it", pvb.Namespace, pvb.Name)
+					log.Debugf("failed to update PVB for %s/%s and will retry it", pvb.Namespace, pvb.Name)
 					return false, nil
 				} else {
 					return false, errors.Wrapf(err, "error updating PVB with error %s/%s", pvb.Namespace, pvb.Name)

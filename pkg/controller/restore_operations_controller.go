@@ -116,7 +116,7 @@ func (r *restoreOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, errors.Wrapf(err, "error getting restore %s", req.String())
 	}
 	restore := original.DeepCopy()
-	log.Debugf("restore: %s", restore.Name)
+	log.Debugf("restore: %s, phase %s", restore.Name, restore.Status.Phase)
 
 	log = r.logger.WithFields(
 		logrus.Fields{
