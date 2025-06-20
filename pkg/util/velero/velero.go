@@ -19,6 +19,8 @@ package velero
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 // GetNodeSelectorFromVeleroServer get the node selector from the Velero server deployment
@@ -104,4 +106,8 @@ func GetVeleroServerAnnotationValue(deployment *appsv1.Deployment, key string) s
 	}
 
 	return deployment.Spec.Template.Annotations[key]
+}
+
+func BSLIsAvailable(bsl velerov1api.BackupStorageLocation) bool {
+	return bsl.Status.Phase == velerov1api.BackupStorageLocationPhaseAvailable
 }
