@@ -30,6 +30,27 @@ spec:
     profile: "default"
 ```
 
+### Example with self-signed certificate
+
+When using object storage with self-signed certificates, you can specify the CA certificate:
+
+```yaml
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+spec:
+  provider: aws
+  objectStorage:
+    bucket: velero-backups
+    # Base64 encoded CA certificate
+    caCert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUR1VENDQXFHZ0F3SUJBZ0lVTWRiWkNaYnBhcE9lYThDR0NMQnhhY3dVa213d0RRWUpLb1pJaHZjTkFRRUwKQlFBd2JERUxNQWtHQTFVRUJoTUNWVk14RXpBUkJnTlZCQWdNQ2tOaGJHbG1iM0p1YVdFeEZqQVVCZ05WQkFjTQpEVk5oYmlCR2NtRnVZMmx6WTI4eEdEQVdCZ05WQkFvTUQwVjRZVzF3YkdVZ1EyOXRjR0Z1ZVRFV01CUUdBMVVFCkF3d05aWGhoYlhCc1pTNXNiMk5oYkRBZUZ3MHlNekEzTVRBeE9UVXlNVGhhRncweU5EQTNNRGt4T1RVeU1UaGEKTUd3eEN6QUpCZ05WQkFZVEFsVlRNUk13RVFZRFZRUUNEQXBEWEJ4cG1iM0p1YVdFeEZqQVVCZ05WQkFjTURWTmgKYmlCR2NtRnVZMmx6WTI4eEdEQVdCZ05WQkFvTUQwVjRZVzF3YkdVZ1EyOXRjR0Z1ZVRFV01CUUdBMVVFQXd3TgpaWGhoYlhCc1pTNXNiMk5oYkRDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBS1dqCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+  config:
+    region: us-east-1
+    s3Url: https://minio.example.com
+```
+
 ### Parameter Reference
 
 The configurable parameters are as follows:
