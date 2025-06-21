@@ -519,3 +519,25 @@ type BackupList struct {
 
 	Items []Backup `json:"items"`
 }
+
+func (b BackupSpec) GetIncludeClusterResources() *bool {
+	return b.IncludeClusterResources
+}
+func (b BackupSpec) GetIncludedResources() []string {
+	return b.IncludedResources
+}
+func (b BackupSpec) GetExcludedResources() []string {
+	return b.ExcludedResources
+}
+func (b BackupSpec) GetIncludedClusterScopedResources() []string {
+	return b.IncludedClusterScopedResources
+}
+func (b BackupSpec) GetExcludedClusterScopedResources() []string {
+	return b.ExcludedClusterScopedResources
+}
+func (b BackupSpec) GetIncludedNamespaceScopedResources() []string {
+	return b.IncludedNamespaceScopedResources
+}
+func (b BackupSpec) GetExcludedNamespaceScopedResources() []string {
+	return b.ExcludedNamespaceScopedResources
+}
