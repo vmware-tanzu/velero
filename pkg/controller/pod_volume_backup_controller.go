@@ -885,7 +885,7 @@ func (r *PodVolumeBackupReconciler) AttemptPVBResume(ctx context.Context, logger
 			if err != nil {
 				logger.WithField("PVB", pvb.GetName()).WithError(errors.WithStack(err)).Error("Failed to trigger PVB cancel")
 			}
-		} else {
+		} else if !isPVBInFinalState(pvb) {
 			logger.WithField("PVB", pvb.GetName()).Infof("find a PVB with status %s", pvb.Status.Phase)
 		}
 	}
@@ -902,7 +902,7 @@ func (r *PodVolumeBackupReconciler) resumeCancellableDataPath(ctx context.Contex
 	}
 
 	if res == nil {
-		return errors.Errorf("expose info missed for PVB %s", pvb.Name)
+		return errors.Errorf("no expose result is available for the current node for PVB %s", pvb.Name)
 	}
 
 	callbacks := datapath.Callbacks{

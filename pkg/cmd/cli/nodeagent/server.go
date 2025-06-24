@@ -392,7 +392,17 @@ func (s *nodeAgentServer) waitCacheForResume() error {
 		return errors.Wrap(err, "error getting dd informer")
 	}
 
-	if !cacheutil.WaitForCacheSync(s.ctx.Done(), podInformer.HasSynced, duInformer.HasSynced, ddInformer.HasSynced) {
+	pvbInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov1api.PodVolumeBackup{})
+	if err != nil {
+		return errors.Wrap(err, "error getting PVB informer")
+	}
+
+	pvrInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov1api.PodVolumeRestore{})
+	if err != nil {
+		return errors.Wrap(err, "error getting PVR informer")
+	}
+
+	if !cacheutil.WaitForCacheSync(s.ctx.Done(), podInformer.HasSynced, duInformer.HasSynced, ddInformer.HasSynced, pvbInformer.HasSynced, pvrInformer.HasSynced) {
 		return errors.New("error waiting informer synced")
 	}
 

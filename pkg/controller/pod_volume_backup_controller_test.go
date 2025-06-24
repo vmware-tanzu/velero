@@ -1086,7 +1086,7 @@ func TestResumeCancellablePodVolumeBackup(t *testing.T) {
 		{
 			name:          "no expose",
 			pvb:           pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseAccepted).Node("node-1").Result(),
-			expectedError: fmt.Sprintf("expose info missed for PVB %s", pvbName),
+			expectedError: fmt.Sprintf("no expose result is available for the current node for PVB %s", pvbName),
 		},
 		{
 			name: "watcher init error",

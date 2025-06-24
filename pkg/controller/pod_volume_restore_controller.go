@@ -953,7 +953,7 @@ func (r *PodVolumeRestoreReconciler) AttemptPVRResume(ctx context.Context, logge
 			if err != nil {
 				logger.WithField("PVR", pvr.GetName()).WithError(errors.WithStack(err)).Error("Failed to trigger PVR cancel")
 			}
-		} else {
+		} else if !isPVRInFinalState(pvr) {
 			logger.WithField("PVR", pvr.GetName()).Infof("find a PVR with status %s", pvr.Status.Phase)
 		}
 	}
@@ -970,7 +970,7 @@ func (r *PodVolumeRestoreReconciler) resumeCancellableDataPath(ctx context.Conte
 	}
 
 	if res == nil {
-		return errors.Errorf("expose info missed for PVR %s", pvr.Name)
+		return errors.Errorf("no expose result is available for the current node for PVR %s", pvr.Name)
 	}
 
 	callbacks := datapath.Callbacks{
