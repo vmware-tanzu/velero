@@ -885,7 +885,7 @@ func UpdateDataDownloadWithRetry(ctx context.Context, client client.Client, name
 			err := client.Update(ctx, dd)
 			if err != nil {
 				if apierrors.IsConflict(err) {
-					log.Warnf("failed to update datadownload for %s/%s and will retry it", dd.Namespace, dd.Name)
+					log.Debugf("failed to update datadownload for %s/%s and will retry it", dd.Namespace, dd.Name)
 					return false, nil
 				} else {
 					return false, errors.Wrapf(err, "error updating datadownload %s/%s", dd.Namespace, dd.Name)
