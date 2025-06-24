@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -186,26 +187,26 @@ func TestNewAdmissionWebhookConfigurationActionExecute(t *testing.T) {
 			}
 			output, err := action.Execute(input)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 			if tt.NoneSideEffectsIndex != nil {
 				wb, _, err := unstructured.NestedSlice(output.UpdatedItem.UnstructuredContent(), "webhooks")
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				for _, i := range tt.NoneSideEffectsIndex {
 					it, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&wb[i])
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					s := it["sideEffects"].(string)
 					assert.Equal(t, "None", s)
 				}
 			}
 			if tt.NotNoneSideEffectsIndex != nil {
 				wb, _, err := unstructured.NestedSlice(output.UpdatedItem.UnstructuredContent(), "webhooks")
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				for _, i := range tt.NotNoneSideEffectsIndex {
 					it, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&wb[i])
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					s := it["sideEffects"].(string)
 					assert.NotEqual(t, "None", s)
 				}

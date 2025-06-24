@@ -190,7 +190,7 @@ func Test_getDataPathConfigs(t *testing.T) {
 			s.getDataPathConfigs()
 			assert.Equal(t, test.expectConfigs, s.dataPathConfigs)
 			if test.expectLog == "" {
-				assert.Equal(t, "", logBuffer)
+				assert.Empty(t, logBuffer)
 			} else {
 				assert.Contains(t, logBuffer, test.expectLog)
 			}
@@ -408,7 +408,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 			num := s.getDataPathConcurrentNum(defaultNum)
 			assert.Equal(t, test.expectNum, num)
 			if test.expectLog == "" {
-				assert.Equal(t, "", logBuffer)
+				assert.Empty(t, logBuffer)
 			} else {
 				assert.Contains(t, logBuffer, test.expectLog)
 			}

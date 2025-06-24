@@ -151,7 +151,7 @@ func TestRestoreFinalizerReconcile(t *testing.T) {
 				backupStore.On("GetRestoreItemOperations", test.restore.Name).Return([]*itemoperation.RestoreOperation{}, nil)
 			}
 			if test.backup != nil {
-				assert.NoError(t, r.Client.Create(context.Background(), test.backup))
+				require.NoError(t, r.Client.Create(context.Background(), test.backup))
 				backupStore.On("GetBackupVolumeInfos", test.backup.Name).Return(nil, nil)
 				pluginManager.On("GetRestoreItemActionsV2").Return(nil, nil)
 				pluginManager.On("CleanupClients")
@@ -457,7 +457,7 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 		for pvName, expectedPVInfo := range tc.expectedPatch {
 			pv := &corev1api.PersistentVolume{}
 			err := ctx.crClient.Get(context.Background(), crclient.ObjectKey{Name: pvName}, pv)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t, expectedPVInfo.ReclaimPolicy, string(pv.Spec.PersistentVolumeReclaimPolicy))
 			assert.Equal(t, expectedPVInfo.Labels, pv.Labels)
@@ -555,7 +555,7 @@ func TestWaitRestoreExecHook(t *testing.T) {
 
 		updated := &velerov1api.Restore{}
 		err := ctx.crClient.Get(context.Background(), crclient.ObjectKey{Namespace: velerov1api.DefaultNamespace, Name: tc.restore.Name}, updated)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, tc.expectedHooksAttempted, updated.Status.HookStatus.HooksAttempted)
 		assert.Equal(t, tc.expectedHooksFailed, updated.Status.HookStatus.HooksFailed)
 	}

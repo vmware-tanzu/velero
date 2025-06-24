@@ -177,10 +177,10 @@ func TestPVCActionExecute(t *testing.T) {
 			// validate for both error and non-error cases
 			switch {
 			case tc.wantErr != nil:
-				assert.EqualError(t, err, tc.wantErr.Error())
+				require.EqualError(t, err, tc.wantErr.Error())
 			default:
 				fmt.Printf("got +%v\n", res.UpdatedItem)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				wantUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.want)
 				fmt.Printf("expected +%v\n", wantUnstructured)

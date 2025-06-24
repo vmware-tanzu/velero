@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -56,7 +57,7 @@ func Test_getSummaryLine(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, summaryLine, string(summary))
 			}
 		})
@@ -105,6 +106,6 @@ func Test_getVolumeSize(t *testing.T) {
 
 	actualSize, err := getVolumeSize("/")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedSize, actualSize)
 }

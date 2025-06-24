@@ -673,9 +673,9 @@ func TestReconcile(t *testing.T) {
 			})
 
 			if test.expectedErr != "" {
-				assert.EqualError(t, err, test.expectedErr)
+				require.EqualError(t, err, test.expectedErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if test.expectedResult != nil {
@@ -726,11 +726,11 @@ func TestOnDataUploadCancelled(t *testing.T) {
 	namespace := du.Namespace
 	duName := du.Name
 	// Add the DataUpload object to the fake client
-	assert.NoError(t, r.client.Create(ctx, du))
+	require.NoError(t, r.client.Create(ctx, du))
 
 	r.OnDataUploadCancelled(ctx, namespace, duName)
 	updatedDu := &velerov2alpha1api.DataUpload{}
-	assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
+	require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 	assert.Equal(t, velerov2alpha1api.DataUploadPhaseCanceled, updatedDu.Status.Phase)
 	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
 	assert.False(t, updatedDu.Status.StartTimestamp.IsZero())
@@ -778,7 +778,7 @@ func TestOnDataUploadProgress(t *testing.T) {
 			namespace := du.Namespace
 			duName := du.Name
 			// Add the DataUpload object to the fake client
-			assert.NoError(t, r.client.Create(context.Background(), du))
+			require.NoError(t, r.client.Create(context.Background(), du))
 
 			// Create a Progress object
 			progress := &uploader.Progress{
@@ -791,7 +791,7 @@ func TestOnDataUploadProgress(t *testing.T) {
 			if len(test.needErrs) != 0 && !test.needErrs[0] {
 				// Get the updated DataUpload object from the fake client
 				updatedDu := &velerov2alpha1api.DataUpload{}
-				assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
+				require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 				// Assert that the DataUpload object has been updated with the progress
 				assert.Equal(t, test.progress.TotalBytes, updatedDu.Status.Progress.TotalBytes)
 				assert.Equal(t, test.progress.BytesDone, updatedDu.Status.Progress.BytesDone)
@@ -810,11 +810,11 @@ func TestOnDataUploadFailed(t *testing.T) {
 	namespace := du.Namespace
 	duName := du.Name
 	// Add the DataUpload object to the fake client
-	assert.NoError(t, r.client.Create(ctx, du))
+	require.NoError(t, r.client.Create(ctx, du))
 	r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
 	r.OnDataUploadFailed(ctx, namespace, duName, fmt.Errorf("Failed to handle %v", duName))
 	updatedDu := &velerov2alpha1api.DataUpload{}
-	assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
+	require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 	assert.Equal(t, velerov2alpha1api.DataUploadPhaseFailed, updatedDu.Status.Phase)
 	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
 	assert.False(t, updatedDu.Status.StartTimestamp.IsZero())
@@ -829,11 +829,11 @@ func TestOnDataUploadCompleted(t *testing.T) {
 	namespace := du.Namespace
 	duName := du.Name
 	// Add the DataUpload object to the fake client
-	assert.NoError(t, r.client.Create(ctx, du))
+	require.NoError(t, r.client.Create(ctx, du))
 	r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{velerov2alpha1api.SnapshotTypeCSI: exposer.NewCSISnapshotExposer(r.kubeClient, r.csiSnapshotClient, velerotest.NewLogger())}
 	r.OnDataUploadCompleted(ctx, namespace, duName, datapath.Result{})
 	updatedDu := &velerov2alpha1api.DataUpload{}
-	assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
+	require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 	assert.Equal(t, velerov2alpha1api.DataUploadPhaseCompleted, updatedDu.Status.Phase)
 	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
 }
