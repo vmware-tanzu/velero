@@ -281,7 +281,7 @@ func (p *pvcBackupItemAction) Execute(
 
 		// Wait until VS associated VSC snapshot handle created before
 		// returning with the Async operation for data mover.
-		_, err := csi.WaitUntilVSCHandleIsReady(
+		vsc, err := csi.WaitUntilVSCHandleIsReady(
 			vs,
 			p.crClient,
 			p.log,
@@ -305,6 +305,7 @@ func (p *pvcBackupItemAction) Execute(
 			vs,
 			&pvc,
 			operationID,
+			vsc,
 		)
 		if err != nil {
 			dataUploadLog.WithError(err).Error("failed to submit DataUpload")
@@ -441,6 +442,7 @@ func newDataUpload(
 	vs *snapshotv1api.VolumeSnapshot,
 	pvc *corev1api.PersistentVolumeClaim,
 	operationID string,
+	vsc *snapshotv1api.VolumeSnapshotContent,
 ) *velerov2alpha1.DataUpload {
 	dataUpload := &velerov2alpha1.DataUpload{
 		TypeMeta: metav1.TypeMeta{
@@ -471,7 +473,7 @@ func newDataUpload(
 			CSISnapshot: &velerov2alpha1.CSISnapshotSpec{
 				VolumeSnapshot: vs.Name,
 				StorageClass:   *pvc.Spec.StorageClassName,
-				SnapshotClass:  *vs.Spec.VolumeSnapshotClassName,
+				Driver:         vsc.Spec.Driver,
 			},
 			SourcePVC:             pvc.Name,
 			DataMover:             backup.Spec.DataMover,
@@ -479,6 +481,10 @@ func newDataUpload(
 			SourceNamespace:       pvc.Namespace,
 			OperationTimeout:      backup.Spec.CSISnapshotTimeout,
 		},
+	}
+
+	if vs.Spec.VolumeSnapshotClassName != nil {
+		dataUpload.Spec.CSISnapshot.SnapshotClass = *vs.Spec.VolumeSnapshotClassName
 	}
 
 	if backup.Spec.UploaderConfig != nil &&
@@ -497,8 +503,9 @@ func createDataUpload(
 	vs *snapshotv1api.VolumeSnapshot,
 	pvc *corev1api.PersistentVolumeClaim,
 	operationID string,
+	vsc *snapshotv1api.VolumeSnapshotContent,
 ) (*velerov2alpha1.DataUpload, error) {
-	dataUpload := newDataUpload(backup, vs, pvc, operationID)
+	dataUpload := newDataUpload(backup, vs, pvc, operationID, vsc)
 
 	err := crClient.Create(ctx, dataUpload)
 	if err != nil {

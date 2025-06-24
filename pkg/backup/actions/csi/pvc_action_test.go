@@ -142,25 +142,26 @@ func TestExecute(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(*testing.T) {
-			crClient := velerotest.NewFakeControllerRuntimeClient(t)
 			logger := logrus.New()
 			logger.Level = logrus.DebugLevel
-
+			objects := make([]runtime.Object, 0)
 			if tc.pvc != nil {
-				require.NoError(t, crClient.Create(context.Background(), tc.pvc))
+				objects = append(objects, tc.pvc)
 			}
 			if tc.pv != nil {
-				require.NoError(t, crClient.Create(context.Background(), tc.pv))
+				objects = append(objects, tc.pv)
 			}
 			if tc.sc != nil {
-				require.NoError(t, crClient.Create(context.Background(), tc.sc))
+				objects = append(objects, tc.sc)
 			}
 			if tc.vsClass != nil {
-				require.NoError(t, crClient.Create(context.Background(), tc.vsClass))
+				objects = append(objects, tc.vsClass)
 			}
 			if tc.resourcePolicy != nil {
-				require.NoError(t, crClient.Create(context.Background(), tc.resourcePolicy))
+				objects = append(objects, tc.resourcePolicy)
 			}
+
+			crClient := velerotest.NewFakeControllerRuntimeClient(t, objects...)
 
 			pvcBIA := pvcBackupItemAction{
 				log:      logger,
