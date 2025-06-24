@@ -717,7 +717,7 @@ func TestGetVolumeFromResource(t *testing.T) {
 			},
 		}
 		outPV, outPod, err := helper.getVolumeFromResource(pv)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, outPV)
 		assert.Nil(t, outPod)
 		assert.Equal(t, "test-pv", outPV.Name)
@@ -728,7 +728,7 @@ func TestGetVolumeFromResource(t *testing.T) {
 			Name: "test-volume",
 		}
 		outPV, outPod, err := helper.getVolumeFromResource(vol)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, outPV)
 		assert.NotNil(t, outPod)
 		assert.Equal(t, "test-volume", outPod.Name)
@@ -736,7 +736,6 @@ func TestGetVolumeFromResource(t *testing.T) {
 
 	t.Run("Invalid input", func(t *testing.T) {
 		_, _, err := helper.getVolumeFromResource("invalid")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "resource is not a PersistentVolume or Volume")
+		assert.ErrorContains(t, err, "resource is not a PersistentVolume or Volume")
 	})
 }

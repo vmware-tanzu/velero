@@ -364,7 +364,7 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 
 			// method under test
 			res, err := a.Execute(input)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			updatedPod := new(corev1api.Pod)
 			require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), updatedPod))

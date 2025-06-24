@@ -28,6 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -121,7 +122,7 @@ func TestOnPvrFailed(t *testing.T) {
 	go rs.OnPvrFailed(context.TODO(), velerov1api.DefaultNamespace, pvrName, errors.New("fake-error"))
 
 	result := <-rs.resultSignal
-	assert.EqualError(t, result.err, expectedErr)
+	require.EqualError(t, result.err, expectedErr)
 	assert.Equal(t, expectedEventReason, rt.EventReason())
 	assert.Equal(t, expectedEventMsg, rt.EventMessage())
 }
@@ -145,7 +146,7 @@ func TestPvrCancelled(t *testing.T) {
 	go rs.OnPvrCancelled(context.TODO(), velerov1api.DefaultNamespace, pvrName)
 
 	result := <-rs.resultSignal
-	assert.EqualError(t, result.err, expectedErr)
+	require.EqualError(t, result.err, expectedErr)
 	assert.Equal(t, expectedEventReason, rt.EventReason())
 	assert.Equal(t, expectedEventMsg, rt.EventMessage())
 }
@@ -210,7 +211,7 @@ func TestOnPvrCompleted(t *testing.T) {
 			if test.marshalErr != nil {
 				assert.EqualError(t, result.err, test.expectedErr)
 			} else {
-				assert.NoError(t, result.err)
+				require.NoError(t, result.err)
 				assert.Equal(t, test.expectedEventReason, rt.EventReason())
 				assert.Equal(t, test.expectedEventMsg, rt.EventMessage())
 
@@ -307,7 +308,7 @@ func TestCancelPodVolumeRestore(t *testing.T) {
 
 			result := <-rs.resultSignal
 
-			assert.EqualError(t, result.err, test.expectedErr)
+			require.EqualError(t, result.err, test.expectedErr)
 			assert.True(t, rt.withEvent)
 			assert.Equal(t, test.expectedEventReason, rt.EventReason())
 			assert.Equal(t, test.expectedEventMsg, rt.EventMessage())
@@ -456,9 +457,9 @@ func TestRunCancelableDataPathRestore(t *testing.T) {
 			result, err := rs.RunCancelableDataPath(test.ctx)
 
 			if test.expectedErr != "" {
-				assert.EqualError(t, err, test.expectedErr)
+				require.EqualError(t, err, test.expectedErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, test.result.result, result)
 			}
 
@@ -609,9 +610,9 @@ func TestWriteCompletionMark(t *testing.T) {
 			err := writeCompletionMark(test.pvr, test.result, velerotest.NewSingleLogger(&logBuffer))
 
 			if test.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, test.expectedErr)
+				require.EqualError(t, err, test.expectedErr)
 			}
 
 			if test.expectedLog != "" {

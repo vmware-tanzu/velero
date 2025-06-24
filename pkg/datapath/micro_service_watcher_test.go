@@ -619,7 +619,7 @@ func TestRedirectDataMoverLogs(t *testing.T) {
 			if test.expectErr != "" {
 				assert.EqualError(t, err, test.expectErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				assert.Contains(t, buffer, test.logMessage)
 			}

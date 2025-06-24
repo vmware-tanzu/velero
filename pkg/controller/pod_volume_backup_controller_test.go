@@ -515,9 +515,9 @@ func TestPVBReconcile(t *testing.T) {
 			})
 
 			if test.expectedErr != "" {
-				assert.EqualError(t, err, test.expectedErr)
+				require.EqualError(t, err, test.expectedErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if test.expectedResult != nil {
@@ -567,11 +567,11 @@ func TestOnPVBCancelled(t *testing.T) {
 	namespace := pvb.Namespace
 	pvbName := pvb.Name
 
-	assert.NoError(t, r.client.Create(ctx, pvb))
+	require.NoError(t, r.client.Create(ctx, pvb))
 
 	r.OnDataPathCancelled(ctx, namespace, pvbName)
 	updatedPvb := &velerov1api.PodVolumeBackup{}
-	assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, updatedPvb))
+	require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, updatedPvb))
 	assert.Equal(t, velerov1api.PodVolumeBackupPhaseCanceled, updatedPvb.Status.Phase)
 	assert.False(t, updatedPvb.Status.CompletionTimestamp.IsZero())
 	assert.False(t, updatedPvb.Status.StartTimestamp.IsZero())
@@ -619,7 +619,7 @@ func TestOnPVBProgress(t *testing.T) {
 			namespace := pvb.Namespace
 			pvbName := pvb.Name
 
-			assert.NoError(t, r.client.Create(context.Background(), pvb))
+			require.NoError(t, r.client.Create(context.Background(), pvb))
 
 			// Create a Progress object
 			progress := &uploader.Progress{
@@ -630,7 +630,7 @@ func TestOnPVBProgress(t *testing.T) {
 			r.OnDataPathProgress(ctx, namespace, pvbName, progress)
 			if len(test.needErrs) != 0 && !test.needErrs[0] {
 				updatedPvb := &velerov1api.PodVolumeBackup{}
-				assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, updatedPvb))
+				require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, updatedPvb))
 				assert.Equal(t, test.progress.TotalBytes, updatedPvb.Status.Progress.TotalBytes)
 				assert.Equal(t, test.progress.BytesDone, updatedPvb.Status.Progress.BytesDone)
 			}
@@ -647,11 +647,11 @@ func TestOnPvbFailed(t *testing.T) {
 	namespace := pvb.Namespace
 	pvbName := pvb.Name
 
-	assert.NoError(t, r.client.Create(ctx, pvb))
+	require.NoError(t, r.client.Create(ctx, pvb))
 
 	r.OnDataPathFailed(ctx, namespace, pvbName, fmt.Errorf("Failed to handle %v", pvbName))
 	updatedPvb := &velerov1api.PodVolumeBackup{}
-	assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, updatedPvb))
+	require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, updatedPvb))
 	assert.Equal(t, velerov1api.PodVolumeBackupPhaseFailed, updatedPvb.Status.Phase)
 	assert.False(t, updatedPvb.Status.CompletionTimestamp.IsZero())
 	assert.False(t, updatedPvb.Status.StartTimestamp.IsZero())
@@ -667,11 +667,11 @@ func TestOnPvbCompleted(t *testing.T) {
 	namespace := pvb.Namespace
 	pvbName := pvb.Name
 
-	assert.NoError(t, r.client.Create(ctx, pvb))
+	require.NoError(t, r.client.Create(ctx, pvb))
 
 	r.OnDataPathCompleted(ctx, namespace, pvbName, datapath.Result{})
 	updatedPvb := &velerov1api.PodVolumeBackup{}
-	assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, updatedPvb))
+	require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: pvbName, Namespace: namespace}, updatedPvb))
 	assert.Equal(t, velerov1api.PodVolumeBackupPhaseCompleted, updatedPvb.Status.Phase)
 	assert.False(t, updatedPvb.Status.CompletionTimestamp.IsZero())
 }

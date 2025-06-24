@@ -26,7 +26,7 @@ import (
 
 func TestRepoName(t *testing.T) {
 	c := &Command{RepoIdentifier: ""}
-	assert.Equal(t, "", c.RepoName())
+	assert.Empty(t, c.RepoName())
 
 	c.RepoIdentifier = "s3:s3.amazonaws.com/bucket/prefix/repo"
 	assert.Equal(t, "repo", c.RepoName())
