@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildUserAgent(t *testing.T) {
@@ -79,7 +80,7 @@ func TestConfig(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client, err := Config(test.kubeconfig, test.kubecontext, "velero", test.QPS, test.burst)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, test.expectedHost, client.Host)
 			assert.Equal(t, test.QPS, client.QPS)
 			assert.Equal(t, test.burst, client.Burst)

@@ -103,7 +103,7 @@ func RunRestartableDelegateTests(
 
 			// This Function asserts that the actual outputs match the expected outputs
 			checkOutputs := func(expected []any, actual []reflect.Value) {
-				require.Equal(t, len(expected), len(actual))
+				require.Len(t, actual, len(expected))
 
 				for i := range actual {
 					// Get the underlying value from the reflect.Value
@@ -115,7 +115,7 @@ func RunRestartableDelegateTests(
 					expectedErr, expectedErrOk := expected[i].(error)
 					// If both are errors, use EqualError
 					if actualErrOk && expectedErrOk {
-						assert.EqualError(t, actualErr, expectedErr.Error())
+						require.EqualError(t, actualErr, expectedErr.Error())
 						continue
 					}
 

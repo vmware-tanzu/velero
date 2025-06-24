@@ -130,7 +130,7 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 			err := e.ExecutePodCommand(velerotest.NewLogger(), test.item, test.podNamespace, test.podName, test.hookName, test.hook)
 
 			if hookPodContainerNotSame && test.hook.Container == pod.Spec.Containers[0].Name {
-				assert.Error(t, fmt.Errorf("hook exec container is overwritten"))
+				require.Error(t, fmt.Errorf("hook exec container is overwritten"))
 			}
 			assert.Error(t, err)
 		})
@@ -257,7 +257,7 @@ func TestEnsureContainerExists(t *testing.T) {
 	}
 
 	err := ensureContainerExists(pod, "bar")
-	assert.EqualError(t, err, `no such container: "bar"`)
+	require.EqualError(t, err, `no such container: "bar"`)
 
 	err = ensureContainerExists(pod, "foo")
 	assert.NoError(t, err)

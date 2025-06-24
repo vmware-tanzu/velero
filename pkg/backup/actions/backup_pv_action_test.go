@@ -48,14 +48,14 @@ func TestBackupPVAction(t *testing.T) {
 	// no spec.volumeName should result in no error
 	// and no additional items
 	_, additional, err := a.Execute(pvc, backup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, additional)
 
 	// empty spec.volumeName should result in no error
 	// and no additional items
 	pvc.Object["spec"].(map[string]any)["volumeName"] = ""
 	_, additional, err = a.Execute(pvc, backup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, additional)
 
 	// Action should clean the spec.Selector when the StorageClassName is not set.
@@ -146,6 +146,6 @@ func TestBackupPVAction(t *testing.T) {
 	// result in no error and no additional items
 	pvc.Object["spec"].(map[string]any)["volumeName"] = ""
 	_, additional, err = a.Execute(pvc, backup)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, additional)
 }

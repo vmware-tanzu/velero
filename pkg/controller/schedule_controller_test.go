@@ -193,7 +193,7 @@ func TestReconcileOfSchedule(t *testing.T) {
 			}
 			if len(test.expectedValidationErrors) > 0 {
 				require.NoError(t, err)
-				assert.EqualValues(t, test.expectedValidationErrors, schedule.Status.ValidationErrors)
+				assert.Equal(t, test.expectedValidationErrors, schedule.Status.ValidationErrors)
 			}
 			if len(test.expectedLastBackup) > 0 {
 				require.NoError(t, err)
