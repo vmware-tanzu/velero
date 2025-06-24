@@ -897,7 +897,7 @@ func UpdatePVRWithRetry(ctx context.Context, client client.Client, namespacedNam
 			err := client.Update(ctx, pvr)
 			if err != nil {
 				if apierrors.IsConflict(err) {
-					log.Warnf("failed to update PVR for %s/%s and will retry it", pvr.Namespace, pvr.Name)
+					log.Debugf("failed to update PVR for %s/%s and will retry it", pvr.Namespace, pvr.Name)
 					return false, nil
 				} else {
 					return false, errors.Wrapf(err, "error updating PVR %s/%s", pvr.Namespace, pvr.Name)
