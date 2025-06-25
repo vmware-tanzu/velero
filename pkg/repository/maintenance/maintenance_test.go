@@ -40,6 +40,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/repository/provider"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
@@ -117,12 +118,12 @@ func TestDeleteOldJobs(t *testing.T) {
 
 	// Call the function
 	err := DeleteOldJobs(cli, repo, keep)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Get the remaining jobs
 	jobList := &batchv1.JobList{}
 	err = cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// We expect the number of jobs to be equal to 'keep'
 	assert.Len(t, jobList.Items, keep)
@@ -255,9 +256,9 @@ func TestWaitForJobComplete(t *testing.T) {
 
 			// Check if the error matches the expectation
 			if tc.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.LessOrEqual(t, len(buffer), tc.expectedLogs)
@@ -288,15 +289,15 @@ func TestGetResultFromJob(t *testing.T) {
 
 	// test an error should be returned
 	result, err := getResultFromJob(cli, job)
-	assert.EqualError(t, err, "no pod found for job test-job")
-	assert.Equal(t, "", result)
+	require.EqualError(t, err, "no pod found for job test-job")
+	assert.Empty(t, result)
 
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 
 	// test an error should be returned
 	result, err = getResultFromJob(cli, job)
-	assert.EqualError(t, err, "no container statuses found for job test-job")
-	assert.Equal(t, "", result)
+	require.EqualError(t, err, "no container statuses found for job test-job")
+	assert.Empty(t, result)
 
 	// Set a non-terminated container status to the pod
 	pod.Status = corev1api.PodStatus{
@@ -310,8 +311,8 @@ func TestGetResultFromJob(t *testing.T) {
 	// Test an error should be returned
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.EqualError(t, err, "container for job test-job is not terminated")
-	assert.Equal(t, "", result)
+	require.EqualError(t, err, "container for job test-job is not terminated")
+	assert.Empty(t, result)
 
 	// Set a terminated container status to the pod
 	pod.Status = corev1api.PodStatus{
@@ -327,8 +328,8 @@ func TestGetResultFromJob(t *testing.T) {
 	// This call should return the termination message with no error
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.NoError(t, err)
-	assert.Equal(t, "", result)
+	require.NoError(t, err)
+	assert.Empty(t, result)
 
 	// Set a terminated container status with invalidate message to the pod
 	pod.Status = corev1api.PodStatus{
@@ -345,8 +346,8 @@ func TestGetResultFromJob(t *testing.T) {
 
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.EqualError(t, err, "error to locate repo maintenance error indicator from termination message")
-	assert.Equal(t, "", result)
+	require.EqualError(t, err, "error to locate repo maintenance error indicator from termination message")
+	assert.Empty(t, result)
 
 	// Set a terminated container status with empty maintenance error to the pod
 	pod.Status = corev1api.PodStatus{
@@ -363,8 +364,8 @@ func TestGetResultFromJob(t *testing.T) {
 
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.EqualError(t, err, "nothing after repo maintenance error indicator in termination message")
-	assert.Equal(t, "", result)
+	require.EqualError(t, err, "nothing after repo maintenance error indicator in termination message")
+	assert.Empty(t, result)
 
 	// Set a terminated container status with maintenance error to the pod
 	pod.Status = corev1api.PodStatus{
@@ -381,7 +382,7 @@ func TestGetResultFromJob(t *testing.T) {
 
 	cli = fake.NewClientBuilder().WithObjects(job, pod).Build()
 	result, err = getResultFromJob(cli, job)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "fake-error", result)
 }
 
@@ -843,7 +844,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 			history, err := WaitAllJobsComplete(test.ctx, fakeClient, repo, 3, velerotest.NewLogger())
 
 			if test.expectedError != "" {
-				assert.EqualError(t, err, test.expectedError)
+				require.EqualError(t, err, test.expectedError)
 			} else {
 				require.NoError(t, err)
 			}
@@ -875,10 +876,16 @@ func TestBuildJob(t *testing.T) {
 		Spec: appsv1api.DeploymentSpec{
 			Template: corev1api.PodTemplateSpec{
 				Spec: corev1api.PodSpec{
+					SecurityContext: &corev1api.PodSecurityContext{
+						RunAsNonRoot: boolptr.True(),
+					},
 					Containers: []corev1api.Container{
 						{
 							Name:  "velero-repo-maintenance-container",
 							Image: "velero-image",
+							SecurityContext: &corev1api.SecurityContext{
+								RunAsNonRoot: boolptr.True(),
+							},
 							Env: []corev1api.EnvVar{
 								{
 									Name:  "test-name",
@@ -908,21 +915,25 @@ func TestBuildJob(t *testing.T) {
 		},
 	}
 
-	deploy2 := deploy
+	deploy2 := deploy.DeepCopy()
 	deploy2.Spec.Template.Labels = map[string]string{"azure.workload.identity/use": "fake-label-value"}
+	deploy2.Spec.Template.Spec.SecurityContext = nil
+	deploy2.Spec.Template.Spec.Containers[0].SecurityContext = nil
 
 	testCases := []struct {
-		name             string
-		m                *JobConfigs
-		deploy           *appsv1api.Deployment
-		logLevel         logrus.Level
-		logFormat        *logging.FormatFlag
-		thirdPartyLabel  map[string]string
-		expectedJobName  string
-		expectedError    bool
-		expectedEnv      []corev1api.EnvVar
-		expectedEnvFrom  []corev1api.EnvFromSource
-		expectedPodLabel map[string]string
+		name                       string
+		m                          *JobConfigs
+		deploy                     *appsv1api.Deployment
+		logLevel                   logrus.Level
+		logFormat                  *logging.FormatFlag
+		thirdPartyLabel            map[string]string
+		expectedJobName            string
+		expectedError              bool
+		expectedEnv                []corev1api.EnvVar
+		expectedEnvFrom            []corev1api.EnvFromSource
+		expectedPodLabel           map[string]string
+		expectedSecurityContext    *corev1api.SecurityContext
+		expectedPodSecurityContext *corev1api.PodSecurityContext
 	}{
 		{
 			name: "Valid maintenance job without third party labels",
@@ -964,6 +975,12 @@ func TestBuildJob(t *testing.T) {
 			expectedPodLabel: map[string]string{
 				RepositoryNameLabel: "test-123",
 			},
+			expectedSecurityContext: &corev1api.SecurityContext{
+				RunAsNonRoot: boolptr.True(),
+			},
+			expectedPodSecurityContext: &corev1api.PodSecurityContext{
+				RunAsNonRoot: boolptr.True(),
+			},
 		},
 		{
 			name: "Valid maintenance job with third party labels",
@@ -975,7 +992,7 @@ func TestBuildJob(t *testing.T) {
 					MemoryLimit:   "256Mi",
 				},
 			},
-			deploy:          &deploy2,
+			deploy:          deploy2,
 			logLevel:        logrus.InfoLevel,
 			logFormat:       logging.NewFormatFlag(),
 			expectedJobName: "test-123-maintain-job",
@@ -1006,6 +1023,8 @@ func TestBuildJob(t *testing.T) {
 				RepositoryNameLabel:           "test-123",
 				"azure.workload.identity/use": "fake-label-value",
 			},
+			expectedSecurityContext:    nil,
+			expectedPodSecurityContext: nil,
 		},
 		{
 			name: "Error getting Velero server deployment",
@@ -1061,10 +1080,10 @@ func TestBuildJob(t *testing.T) {
 
 			// Check the error
 			if tc.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, job)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, job)
 				assert.Contains(t, job.Name, tc.expectedJobName)
 				assert.Equal(t, param.BackupRepo.Namespace, job.Namespace)
@@ -1082,6 +1101,10 @@ func TestBuildJob(t *testing.T) {
 				// Check container env
 				assert.Equal(t, tc.expectedEnv, container.Env)
 				assert.Equal(t, tc.expectedEnvFrom, container.EnvFrom)
+
+				// Check security context
+				assert.Equal(t, tc.expectedPodSecurityContext, job.Spec.Template.Spec.SecurityContext)
+				assert.Equal(t, tc.expectedSecurityContext, container.SecurityContext)
 
 				// Check resources
 				expectedResources := corev1api.ResourceRequirements{

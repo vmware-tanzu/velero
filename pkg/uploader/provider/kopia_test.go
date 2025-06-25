@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/kopia/kopia/repo"
-	"github.com/kopia/kopia/snapshot/snapshotfs"
+	"github.com/kopia/kopia/snapshot/upload"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -172,7 +172,7 @@ func TestCheckContext(t *testing.T) {
 		name          string
 		finishChan    chan struct{}
 		restoreChan   chan struct{}
-		uploader      *snapshotfs.Uploader
+		uploader      *upload.Uploader
 		expectCancel  bool
 		expectBackup  bool
 		expectRestore bool
@@ -181,7 +181,7 @@ func TestCheckContext(t *testing.T) {
 			name:          "FinishChan",
 			finishChan:    make(chan struct{}),
 			restoreChan:   make(chan struct{}),
-			uploader:      &snapshotfs.Uploader{},
+			uploader:      &upload.Uploader{},
 			expectCancel:  false,
 			expectBackup:  false,
 			expectRestore: false,
@@ -284,9 +284,9 @@ func TestGetPassword(t *testing.T) {
 
 			password, err := kp.GetPassword(nil)
 			if tc.expectError {
-				assert.Error(t, err, "Expected an error")
+				require.Error(t, err, "Expected an error")
 			} else {
-				assert.NoError(t, err, "Expected no error")
+				require.NoError(t, err, "Expected no error")
 			}
 
 			assert.Equal(t, tc.expectedPass, password, "Expected password to match")
@@ -383,7 +383,7 @@ func TestNewKopiaUploaderProvider(t *testing.T) {
 			if tc.expectedError != "" {
 				require.ErrorContains(t, err, tc.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			// Verify that the expected methods were called on the mocks.

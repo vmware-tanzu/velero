@@ -70,7 +70,7 @@ func TestNewCredential(t *testing.T) {
 	os.Clearenv()
 
 	// managed identity credential
-	creds = map[string]string{}
+	creds = map[string]string{CredentialKeyClientID: "clientid"}
 	tokenCredential, err = NewCredential(creds, options)
 	require.NoError(t, err)
 	assert.IsType(t, &azidentity.ManagedIdentityCredential{}, tokenCredential)

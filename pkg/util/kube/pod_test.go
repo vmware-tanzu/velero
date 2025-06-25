@@ -737,7 +737,7 @@ func TestCollectPodLogs(t *testing.T) {
 			if test.expectErr != "" {
 				assert.EqualError(t, err, test.expectErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, fp.outputMessage, test.message)
 			}
 		})

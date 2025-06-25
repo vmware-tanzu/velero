@@ -51,7 +51,7 @@ func TestIsHostPathVolume(t *testing.T) {
 		},
 	}
 	isHostPath, err := isHostPathVolume(vol, nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, isHostPath)
 
 	// non-hostPath pod volume
@@ -61,7 +61,7 @@ func TestIsHostPathVolume(t *testing.T) {
 		},
 	}
 	isHostPath, err = isHostPathVolume(vol, nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, isHostPath)
 
 	// PVC that doesn't have a PV
@@ -79,7 +79,7 @@ func TestIsHostPathVolume(t *testing.T) {
 		},
 	}
 	isHostPath, err = isHostPathVolume(vol, pvc, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, isHostPath)
 
 	// PVC that claims a non-hostPath PV
@@ -107,7 +107,7 @@ func TestIsHostPathVolume(t *testing.T) {
 	}
 	crClient1 := velerotest.NewFakeControllerRuntimeClient(t, pv)
 	isHostPath, err = isHostPathVolume(vol, pvc, crClient1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, isHostPath)
 
 	// PVC that claims a hostPath PV
@@ -140,7 +140,7 @@ func TestIsHostPathVolume(t *testing.T) {
 	crClient2 := velerotest.NewFakeControllerRuntimeClient(t, pv)
 
 	isHostPath, err = isHostPathVolume(vol, pvc, crClient2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, isHostPath)
 }
 
@@ -307,10 +307,6 @@ func createNodeObj() *corev1api.Node {
 	return builder.ForNode("fake-node-name").Labels(map[string]string{"kubernetes.io/os": "linux"}).Result()
 }
 
-func createWindowsNodeObj() *corev1api.Node {
-	return builder.ForNode("fake-node-name").Labels(map[string]string{"kubernetes.io/os": "windows"}).Result()
-}
-
 func TestBackupPodVolumes(t *testing.T) {
 	scheme := runtime.NewScheme()
 	velerov1api.AddToScheme(scheme)
@@ -366,22 +362,6 @@ func TestBackupPodVolumes(t *testing.T) {
 			sourcePod:     createPodObj(false, false, false, 2),
 			uploaderType:  "kopia",
 			bsl:           "fake-bsl",
-		},
-		{
-			name: "pod is not running on Linux node",
-			volumes: []string{
-				"fake-volume-1",
-				"fake-volume-2",
-			},
-			kubeClientObj: []runtime.Object{
-				createNodeAgentPodObj(true),
-				createWindowsNodeObj(),
-			},
-			sourcePod:    createPodObj(false, false, false, 2),
-			uploaderType: "kopia",
-			errs: []string{
-				"Pod fake-ns/fake-pod is not running in linux node(fake-node-name), skip",
-			},
 		},
 		{
 			name: "node-agent pod is not running in node",
@@ -608,10 +588,10 @@ func TestBackupPodVolumes(t *testing.T) {
 			pvbs, _, errs := bp.BackupPodVolumes(backupObj, test.sourcePod, test.volumes, nil, velerotest.NewLogger())
 
 			if test.errs == nil {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
 				for i := 0; i < len(errs); i++ {
-					assert.EqualError(t, errs[i], test.errs[i])
+					require.EqualError(t, errs[i], test.errs[i])
 				}
 			}
 

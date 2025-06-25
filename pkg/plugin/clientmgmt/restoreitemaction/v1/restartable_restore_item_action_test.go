@@ -87,7 +87,7 @@ func TestRestartableRestoreItemActionGetDelegate(t *testing.T) {
 	r := NewRestartableRestoreItemAction(name, p)
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
-	assert.EqualError(t, err, "reset error")
+	require.EqualError(t, err, "reset error")
 
 	// Happy path
 	p.On("ResetIfNeeded").Return(nil)
@@ -96,7 +96,7 @@ func TestRestartableRestoreItemActionGetDelegate(t *testing.T) {
 	p.On("GetByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, a)
 }
 

@@ -26,6 +26,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -38,7 +39,7 @@ func TestBuildBackupStorageLocationSetsNamespace(t *testing.T) {
 	o := NewCreateOptions()
 
 	bsl, err := o.BuildBackupStorageLocation("velero-test-ns", false, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "velero-test-ns", bsl.Namespace)
 }
 
@@ -47,11 +48,11 @@ func TestBuildBackupStorageLocationSetsSyncPeriod(t *testing.T) {
 	o.BackupSyncPeriod = 2 * time.Minute
 
 	bsl, err := o.BuildBackupStorageLocation("velero-test-ns", false, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, bsl.Spec.BackupSyncPeriod)
 
 	bsl, err = o.BuildBackupStorageLocation("velero-test-ns", true, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, &metav1.Duration{Duration: 2 * time.Minute}, bsl.Spec.BackupSyncPeriod)
 }
 
@@ -60,11 +61,11 @@ func TestBuildBackupStorageLocationSetsValidationFrequency(t *testing.T) {
 	o.ValidationFrequency = 2 * time.Minute
 
 	bsl, err := o.BuildBackupStorageLocation("velero-test-ns", false, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, bsl.Spec.ValidationFrequency)
 
 	bsl, err = o.BuildBackupStorageLocation("velero-test-ns", false, true)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, &metav1.Duration{Duration: 2 * time.Minute}, bsl.Spec.ValidationFrequency)
 }
 
@@ -72,14 +73,14 @@ func TestBuildBackupStorageLocationSetsCredential(t *testing.T) {
 	o := NewCreateOptions()
 
 	bsl, err := o.BuildBackupStorageLocation("velero-test-ns", false, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, bsl.Spec.Credential)
 
 	setErr := o.Credential.Set("my-secret=key-from-secret")
-	assert.NoError(t, setErr)
+	require.NoError(t, setErr)
 
 	bsl, err = o.BuildBackupStorageLocation("velero-test-ns", false, true)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, &corev1api.SecretKeySelector{
 		LocalObjectReference: corev1api.LocalObjectReference{Name: "my-secret"},
 		Key:                  "key-from-secret",
@@ -90,10 +91,10 @@ func TestBuildBackupStorageLocationSetsLabels(t *testing.T) {
 	o := NewCreateOptions()
 
 	err := o.Labels.Set("key=value")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	bsl, err := o.BuildBackupStorageLocation("velero-test-ns", false, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"key": "value"}, bsl.Labels)
 }
 
@@ -148,10 +149,10 @@ func TestCreateCommand_Run(t *testing.T) {
 
 	o.Complete(args, f)
 	e := o.Validate(c, args, f)
-	assert.NoError(t, e)
+	require.NoError(t, e)
 
 	e = o.Run(c, f)
-	assert.ErrorContains(t, e, fmt.Sprintf("%s: no such file or directory", caCertFile))
+	require.ErrorContains(t, e, fmt.Sprintf("%s: no such file or directory", caCertFile))
 
 	// verify all options are set as expected
 	assert.Equal(t, name, o.Name)
@@ -178,7 +179,7 @@ func TestCreateCommand_Run(t *testing.T) {
 	o.Complete(args, f)
 
 	e = o.Run(c, f)
-	assert.NoError(t, e)
+	require.NoError(t, e)
 	c.SetArgs([]string{"bsl-1", "--provider=aws", "--bucket=bk1", "--default"})
 	e = c.Execute()
 	assert.NoError(t, e)

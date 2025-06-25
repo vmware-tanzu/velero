@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
@@ -26,7 +27,7 @@ func TestLogHook_Fire(t *testing.T) {
 	}
 
 	err := hook.Fire(entry)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify the counts
 	assert.Equal(t, 1, hook.counts[logrus.ErrorLevel])
@@ -47,7 +48,7 @@ func TestLogHook_Fire(t *testing.T) {
 	}
 
 	err = hook.Fire(entry1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify the counts
 	assert.Equal(t, 2, hook.counts[logrus.ErrorLevel])
