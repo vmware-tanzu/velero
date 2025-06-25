@@ -1042,7 +1042,7 @@ func (r *DataUploadReconciler) AttemptDataUploadResume(ctx context.Context, logg
 			if err != nil {
 				logger.WithField("dataupload", du.GetName()).WithError(errors.WithStack(err)).Error("Failed to trigger dataupload cancel")
 			}
-		} else {
+		} else if !isDataUploadInFinalState(du) {
 			// the Prepared CR could be still handled by dataupload controller after node-agent restart
 			// the accepted CR may also suvived from node-agent restart as long as the intermediate objects are all done
 			logger.WithField("dataupload", du.GetName()).Infof("find a dataupload with status %s", du.Status.Phase)
