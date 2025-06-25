@@ -22,6 +22,30 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// +kubebuilder:validation:Enum=none;age
+// EncryptionType specifies which encryption strategy to use.
+type EncryptionType string
+
+const (
+	// No encryption.
+	EncryptionTypeNone EncryptionType = "none"
+	// age encryption.
+	EncryptionTypeAge EncryptionType = "age"
+)
+
+// EncryptionSpec holds configuration for a chosen encryption strategy.
+type EncryptionSpec struct {
+	// Type is the kind of encryption to apply.
+	// +kubebuilder:default=none
+	Type EncryptionType `json:"type,omitempty"`
+
+	// Options contains strategy-specific key/value pairs.
+	//   recipient: age1j...
+	//   privateKey: AGE-SECRET-KEY...
+	// +optional
+	Options map[string]string `json:"options,omitempty"`
+}
+
 // BackupStorageLocationSpec defines the desired state of a Velero BackupStorageLocation
 type BackupStorageLocationSpec struct {
 	// Provider is the provider of the backup storage.
@@ -54,6 +78,14 @@ type BackupStorageLocationSpec struct {
 	// +optional
 	// +nullable
 	ValidationFrequency *metav1.Duration `json:"validationFrequency,omitempty"`
+
+	// Encryption defines which algorithm and options to use for encryption.
+	// Warning: Encryption support is experimental and NOT recommended for production.
+	// Future plans:
+	//   - Migrate to secure, versioned key‑vault solutions (e.g. Kubernetes Secrets, HashiCorp Vault).
+	//   - Automate key generation and rotation without human intervention.
+	// +optional
+	Encryption *EncryptionSpec `json:"encryption,omitempty"`
 }
 
 // BackupStorageLocationStatus defines the observed state of BackupStorageLocation

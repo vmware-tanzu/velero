@@ -105,6 +105,26 @@ spec:
                 description: Default indicates this location is the default backup
                   storage location.
                 type: boolean
+              encryption:
+                description: Encryption defines which algorithm and options to use
+                  for encryption.
+                properties:
+                  options:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      Options contains strategy-specific key/value pairs.
+                        recipient: age1j...
+                        privateKey: AGE-SECRET-KEY...
+                    type: object
+                  type:
+                    default: none
+                    description: Type is the kind of encryption to apply.
+                    enum:
+                    - none
+                    - age
+                    type: string
+                type: object
               objectStorage:
                 description: ObjectStorageLocation specifies the settings necessary
                   to connect to a provider's object storage.

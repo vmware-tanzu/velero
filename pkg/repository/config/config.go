@@ -50,7 +50,7 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) 
 	var bucket, prefix string
 
 	if location.Spec.ObjectStorage != nil {
-		layout := persistence.NewObjectStoreLayout(location.Spec.ObjectStorage.Prefix)
+		layout := persistence.NewObjectStoreLayout(location.Spec.ObjectStorage.Prefix, "")
 
 		bucket = location.Spec.ObjectStorage.Bucket
 		prefix = layout.GetResticDir()
