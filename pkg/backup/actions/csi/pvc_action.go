@@ -587,7 +587,7 @@ func setPVCRequestSizeToVSRestoreSize(
 		// to the larger of the PVC's storage request and the size of the
 		// VolumeSnapshot
 		setPVCStorageResourceRequest(pvc, restoreSize, logger)
-	}git 
+	}
 }
 
 func setPVCStorageResourceRequest(
