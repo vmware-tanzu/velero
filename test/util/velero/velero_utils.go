@@ -244,6 +244,9 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	io.VolumeSnapshotConfig = flag.NewMap()
 	io.VolumeSnapshotConfig.Set(veleroCfg.VSLConfig)
 
+	io.PodLabels = veleroCfg.PodLabels
+	io.ServiceAccountAnnotations = veleroCfg.ServiceAccountAnnotations
+
 	io.Plugins = flag.NewStringArray(plugins...)
 	io.Features = veleroCfg.Features
 	io.DefaultVolumesToFsBackup = veleroCfg.DefaultVolumesToFsBackup

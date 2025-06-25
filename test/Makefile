@@ -104,6 +104,9 @@ REGISTRY_CREDENTIAL_FILE ?=
 KIBISHII_DIRECTORY ?= github.com/vmware-tanzu-experiments/distributed-data-generator/kubernetes/yaml/
 IMAGE_REGISTRY_PROXY ?=
 
+# Parameters for labels and annotations for Velero pods and service accounts.
+POD_LABELS ?=
+SA_ANNOTATIONS ?=
 
 # Flags to create an additional BSL for multiple credentials tests
 ADDITIONAL_BSL_PLUGINS ?=
@@ -224,7 +227,9 @@ run-e2e: ginkgo
 		--kibishii-directory=$(KIBISHII_DIRECTORY) \
 		--disable-informer-cache=$(DISABLE_INFORMER_CACHE) \
 		--image-registry-proxy=$(IMAGE_REGISTRY_PROXY) \
-		--worker-os=$(WORKER_OS)
+		--worker-os=$(WORKER_OS) \
+		--pod-labels="$(POD_LABELS) \
+		--sa-annotations="$(SA_ANNOTATIONS)"
 
 .PHONY: run-perf
 run-perf: ginkgo
