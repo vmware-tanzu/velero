@@ -28,6 +28,7 @@ import (
 	"github.com/petar/GoLLRB/llrb"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -37,8 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	corev1api "k8s.io/api/core/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/constant"
@@ -119,7 +118,22 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			// BSL may be recreated after deleting, so also include the create event
 			&velerov1api.BackupStorageLocation{},
 			kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
-			builder.WithPredicates(kube.NewUpdateEventPredicate(r.needInvalidBackupRepo)),
+			builder.WithPredicates(
+				// Combine three predicates together to guarantee
+				// only BSL's Delete Event and Update Event can enqueue.
+				// We don't care about BSL's Generic Event and Create Event,
+				// because BSL's periodical enqueue triggers Generic Event,
+				// and the BackupRepository controller restart will triggers BSL create event.
+				kube.NewUpdateEventPredicate(
+					r.needInvalidBackupRepo,
+				),
+				kube.NewGenericEventPredicate(
+					func(client.Object) bool { return false },
+				),
+				kube.NewCreateEventPredicate(
+					func(client.Object) bool { return false },
+				),
+			),
 		).
 		Complete(r)
 }
