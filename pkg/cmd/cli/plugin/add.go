@@ -34,6 +34,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/confirm"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
@@ -62,7 +63,12 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 				cmd.CheckError(err)
 			}
 
-			veleroDeploy, err := veleroDeployment(context.TODO(), kubeClient, f.Namespace())
+			crClient, err := f.KubebuilderClient()
+			if err != nil {
+				cmd.CheckError(err)
+			}
+
+			veleroDeploy, err := kube.GetVeleroDeployment(context.TODO(), crClient, f.Namespace())
 			if err != nil {
 				cmd.CheckError(err)
 			}

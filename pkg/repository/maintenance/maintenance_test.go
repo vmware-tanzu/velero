@@ -79,6 +79,7 @@ func TestGenerateJobName1(t *testing.T) {
 		})
 	}
 }
+
 func TestDeleteOldJobs(t *testing.T) {
 	// Set up test repo and keep value
 	repo := "test-repo"
@@ -881,7 +882,7 @@ func TestBuildJob(t *testing.T) {
 					},
 					Containers: []corev1api.Container{
 						{
-							Name:  "velero-repo-maintenance-container",
+							Name:  "velero",
 							Image: "velero-image",
 							SecurityContext: &corev1api.SecurityContext{
 								RunAsNonRoot: boolptr.True(),
