@@ -844,3 +844,99 @@ func UpdatePVBWithRetry(ctx context.Context, client client.Client, namespacedNam
 		return true, nil
 	})
 }
+
+var funcResumeCancellablePVB = (*PodVolumeBackupReconciler).resumeCancellableDataPath
+
+func (r *PodVolumeBackupReconciler) AttemptPVBResume(ctx context.Context, logger *logrus.Entry, ns string) error {
+	pvbs := &velerov1api.PodVolumeBackupList{}
+	if err := r.client.List(ctx, pvbs, &client.ListOptions{Namespace: ns}); err != nil {
+		r.logger.WithError(errors.WithStack(err)).Error("failed to list PVBs")
+		return errors.Wrapf(err, "error to list PVBs")
+	}
+
+	for i := range pvbs.Items {
+		pvb := &pvbs.Items[i]
+		if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseInProgress {
+			if pvb.Spec.Node != r.nodeName {
+				logger.WithField("PVB", pvb.Name).WithField("current node", r.nodeName).Infof("PVB should be resumed by another node %s", pvb.Spec.Node)
+				continue
+			}
+
+			err := funcResumeCancellablePVB(r, ctx, pvb, logger)
+			if err == nil {
+				logger.WithField("PVB", pvb.Name).WithField("current node", r.nodeName).Info("Completed to resume in progress PVB")
+				continue
+			}
+
+			logger.WithField("PVB", pvb.GetName()).WithError(err).Warn("Failed to resume data path for PVB, have to cancel it")
+
+			resumeErr := err
+			err = UpdatePVBWithRetry(ctx, r.client, types.NamespacedName{Namespace: pvb.Namespace, Name: pvb.Name}, logger.WithField("PVB", pvb.Name),
+				func(pvb *velerov1api.PodVolumeBackup) bool {
+					if pvb.Spec.Cancel {
+						return false
+					}
+
+					pvb.Spec.Cancel = true
+					pvb.Status.Message = fmt.Sprintf("Resume InProgress PVB failed with error %v, mark it as cancel", resumeErr)
+
+					return true
+				})
+			if err != nil {
+				logger.WithField("PVB", pvb.GetName()).WithError(errors.WithStack(err)).Error("Failed to trigger PVB cancel")
+			}
+		} else if !isPVBInFinalState(pvb) {
+			logger.WithField("PVB", pvb.GetName()).Infof("find a PVB with status %s", pvb.Status.Phase)
+		}
+	}
+
+	return nil
+}
+
+func (r *PodVolumeBackupReconciler) resumeCancellableDataPath(ctx context.Context, pvb *velerov1api.PodVolumeBackup, log logrus.FieldLogger) error {
+	log.Info("Resume cancelable PVB")
+
+	res, err := r.exposer.GetExposed(ctx, getPVBOwnerObject(pvb), r.client, r.nodeName, r.resourceTimeout)
+	if err != nil {
+		return errors.Wrapf(err, "error to get exposed PVB %s", pvb.Name)
+	}
+
+	if res == nil {
+		return errors.Errorf("no expose result is available for the current node for PVB %s", pvb.Name)
+	}
+
+	callbacks := datapath.Callbacks{
+		OnCompleted: r.OnDataPathCompleted,
+		OnFailed:    r.OnDataPathFailed,
+		OnCancelled: r.OnDataPathCancelled,
+		OnProgress:  r.OnDataPathProgress,
+	}
+
+	asyncBR, err := r.dataPathMgr.CreateMicroServiceBRWatcher(ctx, r.client, r.kubeClient, r.mgr, datapath.TaskTypeBackup, pvb.Name, pvb.Namespace, res.ByPod.HostingPod.Name, res.ByPod.HostingContainer, pvb.Name, callbacks, true, log)
+	if err != nil {
+		return errors.Wrapf(err, "error to create asyncBR watcher for PVB %s", pvb.Name)
+	}
+
+	resumeComplete := false
+	defer func() {
+		if !resumeComplete {
+			r.closeDataPath(ctx, pvb.Name)
+		}
+	}()
+
+	if err := asyncBR.Init(ctx, nil); err != nil {
+		return errors.Wrapf(err, "error to init asyncBR watcher for PVB %s", pvb.Name)
+	}
+
+	if err := asyncBR.StartBackup(datapath.AccessPoint{
+		ByPath: res.ByPod.VolumeName,
+	}, pvb.Spec.UploaderSettings, nil); err != nil {
+		return errors.Wrapf(err, "error to resume asyncBR watcher for PVB %s", pvb.Name)
+	}
+
+	resumeComplete = true
+
+	log.Infof("asyncBR is resumed for PVB %s", pvb.Name)
+
+	return nil
+}

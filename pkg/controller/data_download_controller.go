@@ -937,7 +937,7 @@ func (r *DataDownloadReconciler) AttemptDataDownloadResume(ctx context.Context, 
 			if err != nil {
 				logger.WithError(errors.WithStack(err)).WithError(errors.WithStack(err)).Error("Failed to trigger datadownload cancel")
 			}
-		} else {
+		} else if !isDataDownloadInFinalState(dd) {
 			// the Prepared CR could be still handled by datadownload controller after node-agent restart
 			// the accepted CR may also suvived from node-agent restart as long as the intermediate objects are all done
 			logger.WithField("datadownload", dd.GetName()).Infof("find a datadownload with status %s", dd.Status.Phase)
