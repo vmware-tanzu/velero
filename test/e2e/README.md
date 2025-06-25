@@ -134,7 +134,7 @@ Below is a mapping between `make` variables to E2E configuration flags.
 1. `FAIL_FAST`: `--fail-fast`. Optional.
 1. `HAS_VSPHERE_PLUGIN`: `--has-vsphere-plugin`. Optional.
 1. `WORKER_OS`: `--worker-os`. Optional.
-1. `IMAGE_REGISTRY_PROXY`: `-image-registry-proxy.` Optional.
+1. `IMAGE_REGISTRY_PROXY`: `--image-registry-proxy.` Optional.
 
 ### Examples
 
