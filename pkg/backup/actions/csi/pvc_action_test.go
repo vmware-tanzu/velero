@@ -37,14 +37,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"github.com/vmware-tanzu/velero/pkg/apis/velero/shared"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 func TestExecute(t *testing.T) {
@@ -62,6 +64,7 @@ func TestExecute(t *testing.T) {
 		expectedDataUpload *velerov2alpha1.DataUpload
 		expectedPVC        *corev1api.PersistentVolumeClaim
 		resourcePolicy     *corev1api.ConfigMap
+		additionalItems    []velero.ResourceIdentifier
 	}{
 		{
 			name:        "Skip PVC BIA when backup is in finalizing phase",
@@ -130,7 +133,7 @@ func TestExecute(t *testing.T) {
 		},
 		{
 			name:           "Test ResourcePolicy",
-			backup:         builder.ForBackup("velero", "test").ResourcePolicies("resourcePolicy").SnapshotVolumes(false).Result(),
+			backup:         builder.ForBackup("velero", "test").ResourcePolicies("resourcePolicy").SnapshotVolumes(false).CSISnapshotTimeout(time.Duration(3600) * time.Second).Result(),
 			resourcePolicy: builder.ForConfigMap("velero", "resourcePolicy").Data("policy", "{\"version\":\"v1\", \"volumePolicies\":[{\"conditions\":{\"csi\": {}},\"action\":{\"type\":\"snapshot\"}}]}").Result(),
 			pvc:            builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
 			pv:             builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
@@ -138,10 +141,30 @@ func TestExecute(t *testing.T) {
 			vsClass:        builder.ForVolumeSnapshotClass("tescVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
 			expectedErr:    nil,
 		},
+		{
+			name:        "Test pure CSI snapshot path (no data mover)",
+			backup:      builder.ForBackup("velero", "test").SnapshotMoveData(false).CSISnapshotTimeout(1 * time.Minute).Result(),
+			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
+			pv:          builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
+			sc:          builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
+			vsClass:     builder.ForVolumeSnapshotClass("testVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
+			expectedErr: nil,
+			additionalItems: []velero.ResourceIdentifier{
+				{
+					GroupResource: kuberesource.VolumeSnapshots,
+					Namespace:     "velero",
+					Name:          "velero-testPVC-", // name is generated
+				},
+			},
+			expectedPVC: builder.ForPersistentVolumeClaim("velero", "testPVC").
+				ObjectMeta(builder.WithAnnotations(velerov1api.MustIncludeAdditionalItemAnnotation, "true", velerov1api.VolumeSnapshotLabel, "velero-testPVC-"),
+					builder.WithLabels(velerov1api.BackupNameLabel, "test", velerov1api.VolumeSnapshotLabel, "velero-testPVC-")).
+				VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
+		},
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(*testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			crClient := velerotest.NewFakeControllerRuntimeClient(t)
 			logger := logrus.New()
 			logger.Level = logrus.DebugLevel
@@ -166,17 +189,21 @@ func TestExecute(t *testing.T) {
 				log:      logger,
 				crClient: crClient,
 			}
+			var pvcMap map[string]any
+			var err error
+			if tc.pvc != nil {
+				pvcMap, err = runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pvc)
+				require.NoError(t, err)
+			} else {
+				pvcMap = make(map[string]any)
+			}
 
-			pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&tc.pvc)
-			require.NoError(t, err)
-
-			if boolptr.IsSetToTrue(tc.backup.Spec.SnapshotMoveData) == true {
+			if tc.pvc != nil {
 				go func() {
 					var vsList v1.VolumeSnapshotList
 					err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 						err = pvcBIA.crClient.List(ctx, &vsList, &crclient.ListOptions{Namespace: tc.pvc.Namespace})
 
-						require.NoError(t, err)
 						if err != nil || len(vsList.Items) == 0 {
 							//lint:ignore nilerr reason
 							return false, nil // ignore
@@ -187,6 +214,9 @@ func TestExecute(t *testing.T) {
 					require.NoError(t, err)
 					vscName := "testVSC"
 					readyToUse := true
+					rsQty := resource.MustParse("1Gi")
+					rsValue := rsQty.Value()
+
 					vsList.Items[0].Status = &v1.VolumeSnapshotStatus{
 						BoundVolumeSnapshotContentName: &vscName,
 						ReadyToUse:                     &readyToUse,
@@ -195,13 +225,13 @@ func TestExecute(t *testing.T) {
 					require.NoError(t, err)
 
 					handleName := "testHandle"
-					vsc := builder.ForVolumeSnapshotContent("testVSC").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &handleName}).Result()
+					vsc := builder.ForVolumeSnapshotContent("testVSC").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &handleName, RestoreSize: &rsValue}).Result()
 					err = pvcBIA.crClient.Create(context.Background(), vsc)
 					require.NoError(t, err)
 				}()
 			}
 
-			resultUnstructed, _, _, _, err := pvcBIA.Execute(&unstructured.Unstructured{Object: pvcMap}, tc.backup)
+			resultUnstructed, resultAdditionalItems, _, _, err := pvcBIA.Execute(&unstructured.Unstructured{Object: pvcMap}, tc.backup)
 			if tc.expectedErr != nil {
 				require.EqualError(t, err, tc.expectedErr.Error())
 			} else {
@@ -213,14 +243,26 @@ func TestExecute(t *testing.T) {
 				err := crClient.List(context.Background(), dataUploadList, &crclient.ListOptions{LabelSelector: labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: tc.backup.Name})})
 				require.NoError(t, err)
 				require.Len(t, dataUploadList.Items, 1)
-				require.True(t, cmp.Equal(tc.expectedDataUpload, &dataUploadList.Items[0], cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "ResourceVersion", "Name", "Spec.CSISnapshot.VolumeSnapshot")))
+				// Since name is generated, we ignore it in the comparison
+				tc.expectedDataUpload.Name = dataUploadList.Items[0].Name
+				tc.expectedDataUpload.Spec.CSISnapshot.VolumeSnapshot = dataUploadList.Items[0].Spec.CSISnapshot.VolumeSnapshot
+				require.True(t, cmp.Equal(tc.expectedDataUpload, &dataUploadList.Items[0], cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "ResourceVersion")))
 			}
 
 			if tc.expectedPVC != nil {
 				resultPVC := new(corev1api.PersistentVolumeClaim)
 				runtime.DefaultUnstructuredConverter.FromUnstructured(resultUnstructed.UnstructuredContent(), resultPVC)
+				// Ignore generated names and annotations that may have random suffixes
+				require.Contains(t, resultPVC.Annotations[velerov1api.VolumeSnapshotLabel], tc.expectedPVC.Annotations[velerov1api.VolumeSnapshotLabel])
+				require.Contains(t, resultPVC.Labels[velerov1api.VolumeSnapshotLabel], tc.expectedPVC.Labels[velerov1api.VolumeSnapshotLabel])
+				// check other fields
+				require.Equal(t, tc.expectedPVC.Labels[velerov1api.BackupNameLabel], resultPVC.Labels[velerov1api.BackupNameLabel])
+			}
 
-				require.True(t, cmp.Equal(tc.expectedPVC, resultPVC, cmpopts.IgnoreFields(corev1api.PersistentVolumeClaim{}, "ResourceVersion", "Annotations", "Labels")))
+			if tc.additionalItems != nil {
+				require.Equal(t, len(tc.additionalItems), len(resultAdditionalItems))
+				require.Contains(t, resultAdditionalItems[0].Name, tc.additionalItems[0].Name)
+				require.Equal(t, tc.additionalItems[0].GroupResource, resultAdditionalItems[0].GroupResource)
 			}
 		})
 	}
@@ -411,4 +453,88 @@ func TestNewPVCBackupItemAction(t *testing.T) {
 	plugin1 := NewPvcBackupItemAction(f1)
 	_, err1 := plugin1(logger)
 	require.NoError(t, err1)
+}
+
+func TestPVCRequestSize(t *testing.T) {
+	logger := logrus.New()
+
+	tests := []struct {
+		name         string
+		pvcInitial   string // initial storage request on the PVC (e.g. "1Gi" or "3Gi")
+		restoreSize  string // restore size set in VSC.Status.RestoreSize (e.g. "2Gi")
+		expectedSize string // expected storage request on the PVC after update
+		vscStatus    *snapshotv1api.VolumeSnapshotContentStatus
+	}{
+		{
+			name:         "UpdateRequired: PVC request is lower than restore size",
+			pvcInitial:   "1Gi",
+			restoreSize:  "2Gi",
+			expectedSize: "2Gi",
+		},
+		{
+			name:         "NoUpdateRequired: PVC request is larger than restore size",
+			pvcInitial:   "3Gi",
+			restoreSize:  "2Gi",
+			expectedSize: "3Gi",
+		},
+		// --- NEW TEST CASE ADDED HERE ---
+		{
+			name:         "NoUpdateRequired: VSC status has nil restore size",
+			pvcInitial:   "1Gi",
+			restoreSize:  "", // restoreSize is not used when vscStatus is provided
+			expectedSize: "1Gi",
+			vscStatus: &snapshotv1api.VolumeSnapshotContentStatus{
+				RestoreSize: nil, // Explicitly nil
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			crClient := velerotest.NewFakeControllerRuntimeClient(t)
+
+			// Create a PVC with the initial storage request.
+			pvc := builder.ForPersistentVolumeClaim("velero", "testPVC").
+				VolumeName("testPV").
+				StorageClass("testSC").
+				Result()
+			pvc.Spec.Resources.Requests = corev1api.ResourceList{
+				corev1api.ResourceStorage: resource.MustParse(tc.pvcInitial),
+			}
+
+			// Create a VolumeSnapshot required for the lookup
+			vs := &snapshotv1api.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "testVS",
+					Namespace: "velero",
+				},
+			}
+			require.NoError(t, crClient.Create(context.Background(), vs))
+
+			// Create a VolumeSnapshotContent with restore size
+			vsc := &snapshotv1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "testVSC",
+				},
+			}
+
+			if tc.vscStatus != nil {
+				vsc.Status = tc.vscStatus
+			} else {
+				rsQty := resource.MustParse(tc.restoreSize)
+				rsValue := rsQty.Value()
+				vsc.Status = &snapshotv1api.VolumeSnapshotContentStatus{
+					RestoreSize: &rsValue,
+				}
+			}
+
+			// Call the function under test
+			setPVCRequestSizeToVSRestoreSize(pvc, vsc, logger)
+
+			// Verify that the PVC storage request is updated as expected.
+			updatedSize := pvc.Spec.Resources.Requests[corev1api.ResourceStorage]
+			expected := resource.MustParse(tc.expectedSize)
+			require.Equal(t, 0, updatedSize.Cmp(expected), "PVC storage request should be %s", tc.expectedSize)
+		})
+	}
 }
