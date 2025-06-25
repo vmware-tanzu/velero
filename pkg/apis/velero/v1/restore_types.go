@@ -59,6 +59,38 @@ type RestoreSpec struct {
 	// +nullable
 	ExcludedResources []string `json:"excludedResources,omitempty"`
 
+	// IncludedClusterScopedResources is a slice of cluster-scoped
+	// resource type names to include in the restore.
+	// If set to "*", all cluster-scoped resource types are included.
+	// The default value is empty, which means only related
+	// cluster-scoped resources are included.
+	// +optional
+	// +nullable
+	IncludedClusterScopedResources []string `json:"includedClusterScopedResources,omitempty"`
+
+	// ExcludedClusterScopedResources is a slice of cluster-scoped
+	// resource type names to exclude from the restore.
+	// If set to "*", all cluster-scoped resource types are excluded.
+	// The default value is empty.
+	// +optional
+	// +nullable
+	ExcludedClusterScopedResources []string `json:"excludedClusterScopedResources,omitempty"`
+
+	// IncludedNamespaceScopedResources is a slice of namespace-scoped
+	// resource type names to include in the restore.
+	// The default value is "*".
+	// +optional
+	// +nullable
+	IncludedNamespaceScopedResources []string `json:"includedNamespaceScopedResources,omitempty"`
+
+	// ExcludedNamespaceScopedResources is a slice of namespace-scoped
+	// resource type names to exclude from the restore.
+	// If set to "*", all namespace-scoped resource types are excluded.
+	// The default value is empty.
+	// +optional
+	// +nullable
+	ExcludedNamespaceScopedResources []string `json:"excludedNamespaceScopedResources,omitempty"`
+
 	// NamespaceMapping is a map of source namespace names
 	// to target namespace names to restore into. Any source
 	// namespaces not included in the map will be restored into
@@ -431,3 +463,25 @@ type RestoreList struct {
 
 // PolicyType helps specify the ExistingResourcePolicy
 type PolicyType string
+
+func (r RestoreSpec) GetIncludeClusterResources() *bool {
+	return r.IncludeClusterResources
+}
+func (r RestoreSpec) GetIncludedResources() []string {
+	return r.IncludedResources
+}
+func (r RestoreSpec) GetExcludedResources() []string {
+	return r.ExcludedResources
+}
+func (r RestoreSpec) GetIncludedClusterScopedResources() []string {
+	return r.IncludedClusterScopedResources
+}
+func (r RestoreSpec) GetExcludedClusterScopedResources() []string {
+	return r.ExcludedClusterScopedResources
+}
+func (r RestoreSpec) GetIncludedNamespaceScopedResources() []string {
+	return r.IncludedNamespaceScopedResources
+}
+func (r RestoreSpec) GetExcludedNamespaceScopedResources() []string {
+	return r.ExcludedNamespaceScopedResources
+}
