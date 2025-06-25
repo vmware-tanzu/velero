@@ -155,7 +155,7 @@ func (o *Options) runRepoPrune(f velerocli.Factory, namespace string, logger log
 	}
 
 	var repo *velerov1api.BackupRepository
-	retry := 10
+	retry := 100
 	for {
 		repo, err = repository.GetBackupRepository(context.Background(), cli, namespace,
 			repository.BackupRepositoryKey{
