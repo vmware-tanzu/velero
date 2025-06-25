@@ -402,17 +402,11 @@ func (v *BackupVolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 	tmpVolumeInfos := make([]*BackupVolumeInfo, 0)
 
 	for _, volumeSnapshot := range v.volumeSnapshots {
-		var volumeSnapshotClass *snapshotv1api.VolumeSnapshotClass
 		var volumeSnapshotContent *snapshotv1api.VolumeSnapshotContent
 
 		// This is protective logic. The passed-in VS should be all related
 		// to this backup.
 		if volumeSnapshot.Labels[velerov1api.BackupNameLabel] != v.BackupName {
-			continue
-		}
-
-		if volumeSnapshot.Spec.VolumeSnapshotClassName == nil {
-			v.logger.Warnf("Cannot find VolumeSnapshotClass for VolumeSnapshot %s/%s", volumeSnapshot.Namespace, volumeSnapshot.Name)
 			continue
 		}
 
@@ -426,20 +420,14 @@ func (v *BackupVolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 			continue
 		}
 
-		for index := range v.volumeSnapshotClasses {
-			if *volumeSnapshot.Spec.VolumeSnapshotClassName == v.volumeSnapshotClasses[index].Name {
-				volumeSnapshotClass = &v.volumeSnapshotClasses[index]
-			}
-		}
-
 		for index := range v.volumeSnapshotContents {
 			if *volumeSnapshot.Status.BoundVolumeSnapshotContentName == v.volumeSnapshotContents[index].Name {
 				volumeSnapshotContent = &v.volumeSnapshotContents[index]
 			}
 		}
 
-		if volumeSnapshotClass == nil || volumeSnapshotContent == nil {
-			v.logger.Warnf("fail to get VolumeSnapshotContent or VolumeSnapshotClass for VolumeSnapshot: %s/%s",
+		if volumeSnapshotContent == nil {
+			v.logger.Warnf("fail to get VolumeSnapshotContent for VolumeSnapshot: %s/%s",
 				volumeSnapshot.Namespace, volumeSnapshot.Name)
 			continue
 		}
@@ -473,7 +461,7 @@ func (v *BackupVolumesInformation) generateVolumeInfoForCSIVolumeSnapshot() {
 				CSISnapshotInfo: &CSISnapshotInfo{
 					VSCName:        *volumeSnapshot.Status.BoundVolumeSnapshotContentName,
 					Size:           size,
-					Driver:         volumeSnapshotClass.Driver,
+					Driver:         volumeSnapshotContent.Spec.Driver,
 					SnapshotHandle: snapshotHandle,
 					OperationID:    operation.Spec.OperationID,
 					ReadyToUse:     volumeSnapshot.Status.ReadyToUse,
@@ -581,14 +569,7 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 		}
 	}
 
-	var vsClassList []snapshotv1api.VolumeSnapshotClass
-	if len(duOperationMap) > 0 {
-		var err error
-		vsClassList, err = v.getVolumeSnapshotClasses()
-		if err != nil {
-			return
-		}
-	} else {
+	if len(duOperationMap) <= 0 {
 		// No DataUpload is found. Return early.
 		return
 	}
@@ -607,13 +588,6 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 				err.Error(),
 			)
 			continue
-		}
-
-		driverUsedByVSClass := ""
-		for index := range vsClassList {
-			if vsClassList[index].Name == dataUpload.Spec.CSISnapshot.SnapshotClass {
-				driverUsedByVSClass = vsClassList[index].Driver
-			}
 		}
 
 		if pvcPVInfo := v.pvMap.retrieve(
@@ -637,7 +611,7 @@ func (v *BackupVolumesInformation) generateVolumeInfoFromDataUpload() {
 					SnapshotHandle: FieldValueIsUnknown,
 					VSCName:        FieldValueIsUnknown,
 					OperationID:    FieldValueIsUnknown,
-					Driver:         driverUsedByVSClass,
+					Driver:         dataUpload.Spec.CSISnapshot.Driver,
 				},
 				SnapshotDataMovementInfo: &SnapshotDataMovementInfo{
 					DataMover:    dataMover,
