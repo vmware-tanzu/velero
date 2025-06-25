@@ -50,23 +50,6 @@ func TestVSExecute(t *testing.T) {
 		expectedItemToUpdate    []velero.ResourceIdentifier
 	}{
 		{
-			name: "VS not created by backup, has no status. Backup is finalizing",
-			backup: builder.ForBackup("velero", "backup").
-				Phase(velerov1api.BackupPhaseFinalizing).Result(),
-			vs: builder.ForVolumeSnapshot("velero", "vs").
-				VolumeSnapshotClass("class").Result(),
-			expectedErr: "",
-		},
-		{
-			name: "VS is not created by the backup, associated VSC not exists",
-			backup: builder.ForBackup("velero", "backup").
-				Phase(velerov1api.BackupPhaseInProgress).Result(),
-			vs: builder.ForVolumeSnapshot("velero", "vs").
-				VolumeSnapshotClass("class").Status().
-				BoundVolumeSnapshotContentName("vsc").Result(),
-			expectedErr: `error getting volume snapshot content from API: volumesnapshotcontents.snapshot.storage.k8s.io "vsc" not found`,
-		},
-		{
 			name: "Normal case",
 			backup: builder.ForBackup("velero", "backup").
 				Phase(velerov1api.BackupPhaseInProgress).Result(),

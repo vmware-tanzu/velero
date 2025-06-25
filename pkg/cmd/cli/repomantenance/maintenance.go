@@ -121,7 +121,7 @@ func initRepoManager(namespace string, cli client.Client, kubeClient kubernetes.
 	credentialFileStore, err := credentials.NewNamespacedFileStore(
 		cli,
 		namespace,
-		"/tmp/credentials",
+		credentials.DefaultStoreDirectory(),
 		filesystem.NewFileSystem(),
 	)
 	if err != nil {

@@ -68,7 +68,7 @@ func (f *FilteringCase) CreateResources() error {
 		}
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
-		deployment := NewDeployment(f.CaseBaseName, namespace, f.replica, f.labels, nil).Result()
+		deployment := NewDeployment(f.CaseBaseName, namespace, f.replica, f.labels, f.VeleroCfg.ImageRegistryProxy).Result()
 		deployment, err := CreateDeployment(f.Client.ClientGo, namespace, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))

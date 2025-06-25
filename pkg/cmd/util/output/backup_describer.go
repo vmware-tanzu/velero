@@ -786,7 +786,11 @@ func describePodVolumeBackups(d *Describer, details bool, podVolumeBackups []vel
 	for _, phase := range []string{
 		string(velerov1api.PodVolumeBackupPhaseCompleted),
 		string(velerov1api.PodVolumeBackupPhaseFailed),
+		string(velerov1api.PodVolumeBackupPhaseCanceled),
 		"In Progress",
+		string(velerov1api.PodVolumeBackupPhaseCanceling),
+		string(velerov1api.PodVolumeBackupPhasePrepared),
+		string(velerov1api.PodVolumeBackupPhaseAccepted),
 		string(velerov1api.PodVolumeBackupPhaseNew),
 	} {
 		if len(backupsByPhase[phase]) == 0 {
@@ -822,7 +826,11 @@ func groupByPhase(backups []velerov1api.PodVolumeBackup) map[string][]velerov1ap
 	phaseToGroup := map[velerov1api.PodVolumeBackupPhase]string{
 		velerov1api.PodVolumeBackupPhaseCompleted:  string(velerov1api.PodVolumeBackupPhaseCompleted),
 		velerov1api.PodVolumeBackupPhaseFailed:     string(velerov1api.PodVolumeBackupPhaseFailed),
+		velerov1api.PodVolumeBackupPhaseCanceled:   string(velerov1api.PodVolumeBackupPhaseCanceled),
 		velerov1api.PodVolumeBackupPhaseInProgress: "In Progress",
+		velerov1api.PodVolumeBackupPhaseCanceling:  string(velerov1api.PodVolumeBackupPhaseCanceling),
+		velerov1api.PodVolumeBackupPhasePrepared:   string(velerov1api.PodVolumeBackupPhasePrepared),
+		velerov1api.PodVolumeBackupPhaseAccepted:   string(velerov1api.PodVolumeBackupPhaseAccepted),
 		velerov1api.PodVolumeBackupPhaseNew:        string(velerov1api.PodVolumeBackupPhaseNew),
 		"":                                         string(velerov1api.PodVolumeBackupPhaseNew),
 	}

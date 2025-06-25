@@ -128,6 +128,8 @@ type VeleroConfig struct {
 	EKSPolicyARN                      string
 	FailFast                          bool
 	HasVspherePlugin                  bool
+	ImageRegistryProxy                string
+	WorkerOS                          string
 }
 
 type VeleroCfgInPerf struct {

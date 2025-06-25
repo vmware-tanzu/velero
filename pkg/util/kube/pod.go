@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -272,4 +273,31 @@ func DiagnosePod(pod *corev1api.Pod) string {
 	}
 
 	return diag
+}
+
+var funcExit = os.Exit
+var funcCreateFile = os.Create
+
+func ExitPodWithMessage(logger logrus.FieldLogger, succeed bool, message string, a ...any) {
+	exitCode := 0
+	if !succeed {
+		exitCode = 1
+	}
+
+	toWrite := fmt.Sprintf(message, a...)
+
+	podFile, err := funcCreateFile("/dev/termination-log")
+	if err != nil {
+		logger.WithError(err).Error("Failed to create termination log file")
+		exitCode = 1
+	} else {
+		if _, err := podFile.WriteString(toWrite); err != nil {
+			logger.WithError(err).Error("Failed to write error to termination log file")
+			exitCode = 1
+		}
+
+		podFile.Close()
+	}
+
+	funcExit(exitCode)
 }

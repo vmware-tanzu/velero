@@ -126,6 +126,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 					},
 				},
 			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
+			},
 		}
 		dbr := defaultTestDbr()
 		td := setupBackupDeletionControllerTest(t, dbr, location, backup)
@@ -192,7 +195,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Create(context.TODO(), existing2)
 		require.NoError(t, err)
 		_, err = td.controller.Reconcile(context.TODO(), td.req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// verify "existing" is deleted
 		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
 			Namespace: existing.Namespace,
@@ -254,7 +257,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 	t.Run("backup storage location is in read-only mode", func(t *testing.T) {
 		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").StorageLocation("default").Result()
-		location := builder.ForBackupStorageLocation("velero", "default").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result()
+		location := builder.ForBackupStorageLocation("velero", "default").Phase(velerov1api.BackupStorageLocationPhaseAvailable).AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result()
 
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
 
@@ -268,6 +271,24 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "cannot delete backup because backup storage location default is currently in read-only mode", res.Status.Errors[0])
 	})
+
+	t.Run("backup storage location is in unavailable state", func(t *testing.T) {
+		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").StorageLocation("default").Result()
+		location := builder.ForBackupStorageLocation("velero", "default").Phase(velerov1api.BackupStorageLocationPhaseUnavailable).Result()
+
+		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
+
+		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		require.NoError(t, err)
+
+		res := &velerov1api.DeleteBackupRequest{}
+		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
+		require.NoError(t, err)
+		assert.Equal(t, "Processed", string(res.Status.Phase))
+		assert.Len(t, res.Status.Errors, 1)
+		assert.Equal(t, "cannot delete backup because backup storage location default is currently in Unavailable state", res.Status.Errors[0])
+	})
+
 	t.Run("full delete, no errors", func(t *testing.T) {
 		input := defaultTestDbr()
 
@@ -296,6 +317,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 						Bucket: "bucket",
 					},
 				},
+			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 		}
 
@@ -368,7 +392,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		td.backupStore.AssertCalled(t, "DeleteBackup", input.Spec.BackupName)
 
@@ -415,6 +439,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 						Bucket: "bucket",
 					},
 				},
+			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 		}
 
@@ -489,7 +516,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())
@@ -517,6 +544,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 						Bucket: "bucket",
 					},
 				},
+			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 		}
 
@@ -599,6 +629,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 						Bucket: "bucket",
 					},
 				},
+			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 		}
 
@@ -867,7 +900,7 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			})
 
 			res, err := getSnapshotsInBackup(context.TODO(), veleroBackup, clientBuilder.Build())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.True(t, reflect.DeepEqual(res, test.expected))
 		})
@@ -1037,7 +1070,7 @@ func TestDeleteMovedSnapshots(t *testing.T) {
 			if test.expected == nil {
 				assert.Nil(t, errs)
 			} else {
-				assert.Equal(t, len(test.expected), len(errs))
+				assert.Len(t, errs, len(test.expected))
 				for i := range test.expected {
 					assert.EqualError(t, errs[i], test.expected[i])
 				}

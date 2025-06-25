@@ -15,38 +15,41 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: Pod Volume Backup status such as New/InProgress
+    - description: PodVolumeBackup status such as New/InProgress
       jsonPath: .status.phase
       name: Status
       type: string
-    - description: Time when this backup was started
+    - description: Time duration since this PodVolumeBackup was started
       jsonPath: .status.startTimestamp
-      name: Created
+      name: Started
       type: date
-    - description: Namespace of the pod containing the volume to be backed up
-      jsonPath: .spec.pod.namespace
-      name: Namespace
-      type: string
-    - description: Name of the pod containing the volume to be backed up
-      jsonPath: .spec.pod.name
-      name: Pod
-      type: string
-    - description: Name of the volume to be backed up
-      jsonPath: .spec.volume
-      name: Volume
-      type: string
-    - description: The type of the uploader to handle data transfer
-      jsonPath: .spec.uploaderType
-      name: Uploader Type
-      type: string
+    - description: Completed bytes
+      format: int64
+      jsonPath: .status.progress.bytesDone
+      name: Bytes Done
+      type: integer
+    - description: Total bytes
+      format: int64
+      jsonPath: .status.progress.totalBytes
+      name: Total Bytes
+      type: integer
     - description: Name of the Backup Storage Location where this backup should be
         stored
       jsonPath: .spec.backupStorageLocation
       name: Storage Location
       type: string
-    - jsonPath: .metadata.creationTimestamp
+    - description: Time duration since this PodVolumeBackup was created
+      jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    - description: Name of the node where the PodVolumeBackup is processed
+      jsonPath: .status.node
+      name: Node
+      type: string
+    - description: The type of the uploader to handle data transfer
+      jsonPath: .spec.uploaderType
+      name: Uploader
+      type: string
     name: v1
     schema:
       openAPIV3Schema:
@@ -76,6 +79,11 @@ spec:
                   BackupStorageLocation is the name of the backup storage location
                   where the backup repository is stored.
                 type: string
+              cancel:
+                description: |-
+                  Cancel indicates request to cancel the ongoing PodVolumeBackup. It can be set
+                  when the PodVolumeBackup is in InProgress phase
+                type: boolean
               node:
                 description: Node is the name of the node that the Pod is running
                   on.
@@ -165,6 +173,13 @@ spec:
           status:
             description: PodVolumeBackupStatus is the current status of a PodVolumeBackup.
             properties:
+              acceptedTimestamp:
+                description: |-
+                  AcceptedTimestamp records the time the pod volume backup is to be prepared.
+                  The server's time is used for AcceptedTimestamp
+                format: date-time
+                nullable: true
+                type: string
               completionTimestamp:
                 description: |-
                   CompletionTimestamp records the time a backup was completed.
@@ -185,7 +200,11 @@ spec:
                 description: Phase is the current state of the PodVolumeBackup.
                 enum:
                 - New
+                - Accepted
+                - Prepared
                 - InProgress
+                - Canceling
+                - Canceled
                 - Completed
                 - Failed
                 type: string

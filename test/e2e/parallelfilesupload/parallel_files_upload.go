@@ -86,7 +86,8 @@ func (p *ParallelFilesUpload) CreateResources() error {
 	})
 
 	By(fmt.Sprintf("Create pod %s in namespace %s", p.pod, p.namespace), func() {
-		_, err := CreatePod(p.Client, p.namespace, p.pod, StorageClassName, p.pvc, []string{p.volume}, nil, nil)
+		_, err := CreatePod(p.Client, p.namespace, p.pod, StorageClassName, p.pvc,
+			[]string{p.volume}, nil, nil, p.VeleroCfg.ImageRegistryProxy)
 		Expect(err).To(Succeed())
 		err = WaitForPods(p.Ctx, p.Client, p.namespace, []string{p.pod})
 		Expect(err).To(Succeed())

@@ -155,7 +155,7 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 }
 
 func TestProcessBackupValidationFailures(t *testing.T) {
-	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Result()
+	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
 
 	tests := []struct {
 		name           string
@@ -183,7 +183,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		{
 			name:           "backup for read-only backup location fails validation",
 			backup:         defaultBackup().StorageLocation("read-only").Result(),
-			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result(),
 			expectedErrs:   []string{"backup can't be created because backup storage location read-only is currently in read-only mode"},
 		},
 		{
@@ -202,6 +202,12 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 			backup:         defaultBackup().IncludeClusterResources(true).IncludedNamespaceScopedResources("Deployment").IncludedNamespaces("default").Result(),
 			backupLocation: defaultBackupLocation,
 			expectedErrs:   []string{"include-resources, exclude-resources and include-cluster-resources are old filter parameters.\ninclude-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources are new filter parameters.\nThey cannot be used together"},
+		},
+		{
+			name:           "BSL in unavailable state",
+			backup:         defaultBackup().StorageLocation("unavailable").Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "unavailable").Phase(velerov1api.BackupStorageLocationPhaseUnavailable).Result(),
+			expectedErrs:   []string{"backup can't be created because BackupStorageLocation unavailable is in Unavailable status."},
 		},
 	}
 
@@ -238,7 +244,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 
 			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			assert.Equal(t, ctrl.Result{}, actualResult)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			res := &velerov1api.Backup{}
 			err = c.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: test.backup.Namespace, Name: test.backup.Name}, res)
 			require.NoError(t, err)
@@ -479,6 +485,67 @@ func TestDefaultBackupTTL(t *testing.T) {
 	}
 }
 
+func TestPrepareBackupRequest_SetsVGSLabelKey(t *testing.T) {
+	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
+	require.NoError(t, err)
+	now = now.Local()
+
+	tests := []struct {
+		name             string
+		backup           *velerov1api.Backup
+		serverFlagKey    string
+		expectedLabelKey string
+	}{
+		{
+			name: "backup with spec label key set",
+			backup: builder.ForBackup("velero", "backup-1").
+				VolumeGroupSnapshotLabelKey("spec-key").
+				Result(),
+			serverFlagKey:    "server-key",
+			expectedLabelKey: "spec-key",
+		},
+		{
+			name:             "backup with no spec key, uses server flag",
+			backup:           builder.ForBackup("velero", "backup-2").Result(),
+			serverFlagKey:    "server-key",
+			expectedLabelKey: "server-key",
+		},
+		{
+			name:             "backup with no spec or server flag, uses default",
+			backup:           builder.ForBackup("velero", "backup-3").Result(),
+			serverFlagKey:    velerov1api.DefaultVGSLabelKey,
+			expectedLabelKey: velerov1api.DefaultVGSLabelKey,
+		},
+	}
+
+	for _, test := range tests {
+		formatFlag := logging.FormatText
+		logger := logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, test.backup)
+			apiServer := velerotest.NewAPIServer(t)
+			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+			require.NoError(t, err)
+
+			c := &backupReconciler{
+				logger:             logger,
+				kbClient:           fakeClient,
+				defaultVGSLabelKey: test.serverFlagKey,
+				discoveryHelper:    discoveryHelper,
+				clock:              testclocks.NewFakeClock(now),
+				workerPool:         pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
+			}
+			defer c.workerPool.Stop()
+
+			res := c.prepareBackupRequest(test.backup, logger)
+			assert.NotNil(t, res)
+
+			assert.Equal(t, test.expectedLabelKey, res.Spec.VolumeGroupSnapshotLabelKey)
+		})
+	}
+}
+
 func TestDefaultVolumesToResticDeprecation(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -592,7 +659,7 @@ func TestDefaultVolumesToResticDeprecation(t *testing.T) {
 }
 
 func TestProcessBackupCompletions(t *testing.T) {
-	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Default(true).Bucket("store-1").Result()
+	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Default(true).Bucket("store-1").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
 
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
 	require.NoError(t, err)
@@ -639,6 +706,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.True(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:          velerov1api.BackupPhaseFinalizing,
@@ -652,7 +720,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		{
 			name:                     "backup with a specific backup location keeps it",
 			backup:                   defaultBackup().StorageLocation("alt-loc").Result(),
-			backupLocation:           builder.ForBackupStorageLocation("velero", "alt-loc").Bucket("store-1").Result(),
+			backupLocation:           builder.ForBackupStorageLocation("velero", "alt-loc").Bucket("store-1").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result(),
 			defaultVolumesToFsBackup: false,
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
@@ -676,6 +744,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          "alt-loc",
 					DefaultVolumesToFsBackup: boolptr.False(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:          velerov1api.BackupPhaseFinalizing,
@@ -692,6 +761,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").
 				Bucket("store-1").
 				AccessMode(velerov1api.BackupStorageLocationAccessModeReadWrite).
+				Phase(velerov1api.BackupStorageLocationPhaseAvailable).
 				Result(),
 			defaultVolumesToFsBackup: true,
 			expectedResult: &velerov1api.Backup{
@@ -716,6 +786,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          "read-write",
 					DefaultVolumesToFsBackup: boolptr.True(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:          velerov1api.BackupPhaseFinalizing,
@@ -754,6 +825,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.False(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:          velerov1api.BackupPhaseFinalizing,
@@ -792,6 +864,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.True(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:          velerov1api.BackupPhaseFinalizing,
@@ -831,6 +904,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.False(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:          velerov1api.BackupPhaseFinalizing,
@@ -870,6 +944,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.True(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:          velerov1api.BackupPhaseFinalizing,
@@ -909,6 +984,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.True(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:          velerov1api.BackupPhaseFinalizing,
@@ -948,6 +1024,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.False(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:          velerov1api.BackupPhaseFinalizing,
@@ -988,6 +1065,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.True(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseFailed,
@@ -1028,6 +1106,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.True(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseFailed,
@@ -1068,6 +1147,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.False(),
 					SnapshotMoveData:         boolptr.True(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:                       velerov1api.BackupPhaseFinalizing,
@@ -1109,6 +1189,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.False(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:                       velerov1api.BackupPhaseFinalizing,
@@ -1150,6 +1231,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.False(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:                       velerov1api.BackupPhaseFinalizing,
@@ -1191,6 +1273,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.False(),
 					SnapshotMoveData:         boolptr.True(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:                       velerov1api.BackupPhaseFinalizing,
@@ -1233,6 +1316,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.False(),
 					SnapshotMoveData:         boolptr.False(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:                       velerov1api.BackupPhaseFinalizing,
@@ -1274,6 +1358,105 @@ func TestProcessBackupCompletions(t *testing.T) {
 					StorageLocation:          defaultBackupLocation.Name,
 					DefaultVolumesToFsBackup: boolptr.False(),
 					SnapshotMoveData:         boolptr.True(),
+					ExcludedResources:        append(autoExcludeNamespaceScopedResources, autoExcludeClusterScopedResources...),
+				},
+				Status: velerov1api.BackupStatus{
+					Phase:                       velerov1api.BackupPhaseFinalizing,
+					Version:                     1,
+					FormatVersion:               "1.1.0",
+					StartTimestamp:              &timestamp,
+					Expiration:                  &timestamp,
+					CSIVolumeSnapshotsAttempted: 0,
+					CSIVolumeSnapshotsCompleted: 0,
+				},
+			},
+			volumeSnapshot: builder.ForVolumeSnapshot("velero", "testVS").VolumeSnapshotClass("testClass").Status().BoundVolumeSnapshotContentName("testVSC").RestoreSize("10G").SourcePVC("testPVC").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).Result(),
+		},
+		{
+			name: "backup with namespace-scoped and cluster-scoped resource filters",
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").
+				ExcludedClusterScopedResources("clusterroles").
+				IncludedClusterScopedResources("storageclasses").
+				ExcludedNamespaceScopedResources("secrets").
+				IncludedNamespaceScopedResources("pods").Result(),
+			backupLocation:           defaultBackupLocation,
+			defaultVolumesToFsBackup: false,
+			defaultSnapshotMoveData:  true,
+			expectedResult: &velerov1api.Backup{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Backup",
+					APIVersion: "velero.io/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "backup-1",
+					Annotations: map[string]string{
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
+					},
+				},
+				Spec: velerov1api.BackupSpec{
+					StorageLocation:                  defaultBackupLocation.Name,
+					DefaultVolumesToFsBackup:         boolptr.False(),
+					SnapshotMoveData:                 boolptr.True(),
+					IncludedClusterScopedResources:   []string{"storageclasses"},
+					ExcludedClusterScopedResources:   append([]string{"clusterroles"}, autoExcludeClusterScopedResources...),
+					IncludedNamespaceScopedResources: []string{"pods"},
+					ExcludedNamespaceScopedResources: append([]string{"secrets"}, autoExcludeNamespaceScopedResources...),
+				},
+				Status: velerov1api.BackupStatus{
+					Phase:                       velerov1api.BackupPhaseFinalizing,
+					Version:                     1,
+					FormatVersion:               "1.1.0",
+					StartTimestamp:              &timestamp,
+					Expiration:                  &timestamp,
+					CSIVolumeSnapshotsAttempted: 0,
+					CSIVolumeSnapshotsCompleted: 0,
+				},
+			},
+			volumeSnapshot: builder.ForVolumeSnapshot("velero", "testVS").VolumeSnapshotClass("testClass").Status().BoundVolumeSnapshotContentName("testVSC").RestoreSize("10G").SourcePVC("testPVC").ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "backup-1")).Result(),
+		},
+		{
+			name: "backup's include filter overlap with default exclude resources",
+			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").
+				ExcludedClusterScopedResources("clusterroles").
+				IncludedClusterScopedResources("storageclasses", "volumesnapshotcontents.snapshot.storage.k8s.io").
+				ExcludedNamespaceScopedResources("secrets").
+				IncludedNamespaceScopedResources("pods", "volumesnapshots.snapshot.storage.k8s.io").Result(),
+			backupLocation:           defaultBackupLocation,
+			defaultVolumesToFsBackup: false,
+			defaultSnapshotMoveData:  true,
+			expectedResult: &velerov1api.Backup{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Backup",
+					APIVersion: "velero.io/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "backup-1",
+					Annotations: map[string]string{
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/resource-timeout":                 "0s",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
+					},
+				},
+				Spec: velerov1api.BackupSpec{
+					StorageLocation:                  defaultBackupLocation.Name,
+					DefaultVolumesToFsBackup:         boolptr.False(),
+					SnapshotMoveData:                 boolptr.True(),
+					IncludedClusterScopedResources:   []string{"storageclasses"},
+					ExcludedClusterScopedResources:   append([]string{"clusterroles"}, autoExcludeClusterScopedResources...),
+					IncludedNamespaceScopedResources: []string{"pods"},
+					ExcludedNamespaceScopedResources: append([]string{"secrets"}, autoExcludeNamespaceScopedResources...),
 				},
 				Status: velerov1api.BackupStatus{
 					Phase:                       velerov1api.BackupPhaseFinalizing,
@@ -1395,7 +1578,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			assert.Equal(t, ctrl.Result{}, actualResult)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// Disable CSI feature to not impact other test cases.
 			if test.enableCSI {
@@ -1414,11 +1597,13 @@ func TestProcessBackupCompletions(t *testing.T) {
 }
 
 func TestValidateAndGetSnapshotLocations(t *testing.T) {
+	defaultBSL := builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "bsl").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
 	tests := []struct {
 		name                                string
 		backup                              *velerov1api.Backup
 		locations                           []*velerov1api.VolumeSnapshotLocation
 		defaultLocations                    map[string]string
+		bsl                                 velerov1api.BackupStorageLocation
 		expectedVolumeSnapshotLocationNames []string // adding these in the expected order will allow to test with better msgs in case of a test failure
 		expectedErrors                      string
 		expectedSuccess                     bool
@@ -1432,6 +1617,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "some-name").Provider("fake-provider").Result(),
 			},
 			expectedErrors: "a VolumeSnapshotLocation CRD for the location random-name with the name specified in the backup spec needs to be created before this snapshot can be executed. Error: volumesnapshotlocations.velero.io \"random-name\" not found", expectedSuccess: false,
+			bsl: *defaultBSL,
 		},
 		{
 			name:   "duplicate locationName per provider: should filter out dups",
@@ -1442,6 +1628,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-west-1"},
 			expectedSuccess:                     true,
+			bsl:                                 *defaultBSL,
 		},
 		{
 			name:   "multiple non-dupe location names per provider should error",
@@ -1453,6 +1640,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			},
 			expectedErrors:  "more than one VolumeSnapshotLocation name specified for provider aws: aws-us-west-1; unexpected name was aws-us-east-1",
 			expectedSuccess: false,
+			bsl:             *defaultBSL,
 		},
 		{
 			name:   "no location name for the provider exists, only one VSL for the provider: use it",
@@ -1462,6 +1650,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-east-1"},
 			expectedSuccess:                     true,
+			bsl:                                 *defaultBSL,
 		},
 		{
 			name:   "no location name for the provider exists, no default, more than one VSL for the provider: error",
@@ -1471,6 +1660,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-west-1").Provider("aws").Result(),
 			},
 			expectedErrors: "provider aws has more than one possible volume snapshot location, and none were specified explicitly or as a default",
+			bsl:            *defaultBSL,
 		},
 		{
 			name:             "no location name for the provider exists, more than one VSL for the provider: the provider's default should be added",
@@ -1482,11 +1672,13 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-east-1"},
 			expectedSuccess:                     true,
+			bsl:                                 *defaultBSL,
 		},
 		{
 			name:            "no existing location name and no default location name given",
 			backup:          defaultBackup().Phase(velerov1api.BackupPhaseNew).Result(),
 			expectedSuccess: true,
+			bsl:             *defaultBSL,
 		},
 		{
 			name:             "multiple location names for a provider, default location name for another provider",
@@ -1498,6 +1690,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-west-1", "some-name"},
 			expectedSuccess:                     true,
+			bsl:                                 *defaultBSL,
 		},
 		{
 			name:   "location name does not correspond to any existing location and snapshotvolume disabled; should return error",
@@ -1509,6 +1702,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			},
 			expectedVolumeSnapshotLocationNames: nil,
 			expectedErrors:                      "a VolumeSnapshotLocation CRD for the location random-name with the name specified in the backup spec needs to be created before this snapshot can be executed. Error: volumesnapshotlocations.velero.io \"random-name\" not found", expectedSuccess: false,
+			bsl: *defaultBSL,
 		},
 		{
 			name:   "duplicate locationName per provider and snapshotvolume disabled; should return only one BSL",
@@ -1519,6 +1713,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-west-1"},
 			expectedSuccess:                     true,
+			bsl:                                 *defaultBSL,
 		},
 		{
 			name:   "no location name for the provider exists, only one VSL created and snapshotvolume disabled; should return the VSL",
@@ -1528,6 +1723,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-east-1"},
 			expectedSuccess:                     true,
+			bsl:                                 *defaultBSL,
 		},
 		{
 			name:   "multiple location names for a provider, no default location and backup has no location defined, but snapshotvolume disabled, should return error",
@@ -1538,6 +1734,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			},
 			expectedVolumeSnapshotLocationNames: nil,
 			expectedErrors:                      "provider aws has more than one possible volume snapshot location, and none were specified explicitly or as a default",
+			bsl:                                 *defaultBSL,
 		},
 	}
 

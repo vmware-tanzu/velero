@@ -115,8 +115,18 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupLoc
 			}()
 		}
 
-		if err := KibishiiPrepareBeforeBackup(oneHourTimeout, client, providerName, ns,
-			registryCredentialFile, veleroFeatures, kibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData); err != nil {
+		if err := KibishiiPrepareBeforeBackup(
+			oneHourTimeout,
+			client,
+			providerName,
+			ns,
+			registryCredentialFile,
+			veleroFeatures,
+			kibishiiDirectory,
+			DefaultKibishiiData,
+			veleroCfg.ImageRegistryProxy,
+			veleroCfg.WorkerOS,
+		); err != nil {
 			return errors.Wrapf(err, "Failed to install and prepare data for kibishii %s", ns)
 		}
 		err := ObjectsShouldNotBeInBucket(veleroCfg.ObjectStoreProvider, veleroCfg.CloudCredentialsFile, veleroCfg.BSLBucket, veleroCfg.BSLPrefix, veleroCfg.BSLConfig, backupName, BackupObjectsPrefix, 1)

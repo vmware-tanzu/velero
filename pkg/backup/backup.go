@@ -823,7 +823,8 @@ func (kb *kubernetesBackupper) waitUntilPVBsProcessed(ctx context.Context, log l
 		}
 		for _, pvb := range pvbs {
 			pvbMap[pvb] = pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseCompleted ||
-				pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed
+				pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed ||
+				pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseCanceled
 		}
 	}
 
@@ -840,7 +841,8 @@ func (kb *kubernetesBackupper) waitUntilPVBsProcessed(ctx context.Context, log l
 				continue
 			}
 			if updatedPVB.Status.Phase == velerov1api.PodVolumeBackupPhaseCompleted ||
-				updatedPVB.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed {
+				updatedPVB.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed ||
+				updatedPVB.Status.Phase == velerov1api.PodVolumeBackupPhaseCanceled {
 				pvbMap[pvb] = true
 				continue
 			}

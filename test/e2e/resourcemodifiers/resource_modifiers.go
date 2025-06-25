@@ -145,7 +145,7 @@ func (r *ResourceModifiersCase) Clean() error {
 }
 
 func (r *ResourceModifiersCase) createDeployment(namespace string) error {
-	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"app": "test"}, nil).Result()
+	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"app": "test"}, r.VeleroCfg.ImageRegistryProxy).Result()
 	deployment, err := CreateDeployment(r.Client.ClientGo, namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create deloyment %s the namespace %q", deployment.Name, namespace))

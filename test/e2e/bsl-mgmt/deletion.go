@@ -106,7 +106,9 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			}
 
 			By(fmt.Sprintf("Add an additional plugin for provider %s", veleroCfg.AdditionalBSLProvider), func() {
-				Expect(VeleroAddPluginsForProvider(context.TODO(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, veleroCfg.AdditionalBSLProvider, veleroCfg.AddBSLPlugins)).To(Succeed())
+				plugins, err := GetPlugins(context.TODO(), veleroCfg, false)
+				Expect(err).To(Succeed())
+				Expect(AddPlugins(plugins, veleroCfg)).To(Succeed())
 			})
 
 			additionalBsl := fmt.Sprintf("bsl-%s", UUIDgen)
@@ -150,9 +152,18 @@ func BslDeletionTest(useVolumeSnapshots bool) {
 			})
 
 			By("Deploy sample workload of Kibishii", func() {
-				Expect(KibishiiPrepareBeforeBackup(oneHourTimeout, *veleroCfg.ClientToInstallVelero, veleroCfg.CloudProvider,
-					bslDeletionTestNs, veleroCfg.RegistryCredentialFile, veleroCfg.Features,
-					veleroCfg.KibishiiDirectory, useVolumeSnapshots, DefaultKibishiiData)).To(Succeed())
+				Expect(KibishiiPrepareBeforeBackup(
+					oneHourTimeout,
+					*veleroCfg.ClientToInstallVelero,
+					veleroCfg.CloudProvider,
+					bslDeletionTestNs,
+					veleroCfg.RegistryCredentialFile,
+					veleroCfg.Features,
+					veleroCfg.KibishiiDirectory,
+					DefaultKibishiiData,
+					veleroCfg.ImageRegistryProxy,
+					veleroCfg.WorkerOS,
+				)).To(Succeed())
 			})
 
 			// Restic can not backup PV only, so pod need to be labeled also

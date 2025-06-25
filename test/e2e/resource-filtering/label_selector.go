@@ -88,7 +88,7 @@ func (l *LabelSelector) CreateResources() error {
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
 
-		deployment := NewDeployment(l.CaseBaseName, namespace, l.replica, labels, nil).Result()
+		deployment := NewDeployment(l.CaseBaseName, namespace, l.replica, labels, l.VeleroCfg.ImageRegistryProxy).Result()
 		deployment, err := CreateDeployment(l.Client.ClientGo, namespace, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))

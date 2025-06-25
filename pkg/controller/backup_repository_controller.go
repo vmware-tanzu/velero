@@ -31,6 +31,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	clocks "k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -104,14 +105,11 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&velerov1api.BackupRepository{}, builder.WithPredicates(kube.SpecChangePredicate{})).
 		WatchesRawSource(s).
 		Watches(
+			// mark BackupRepository as invalid when BSL is created, updated or deleted.
+			// BSL may be recreated after deleting, so also include the create event
 			&velerov1api.BackupStorageLocation{},
 			kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
-			builder.WithPredicates(
-				// When BSL updates, check if the backup repositories need to be invalidated
-				kube.NewUpdateEventPredicate(r.needInvalidBackupRepo),
-				// When BSL is created, invalidate any backup repositories that reference it
-				kube.NewCreateEventPredicate(func(client.Object) bool { return true }),
-			),
+			builder.WithPredicates(kube.NewUpdateEventPredicate(r.needInvalidBackupRepo)),
 		).
 		Complete(r)
 }
@@ -130,14 +128,17 @@ func (r *BackupRepoReconciler) invalidateBackupReposForBSL(ctx context.Context, 
 		return []reconcile.Request{}
 	}
 
+	requests := []reconcile.Request{}
 	for i := range list.Items {
 		r.logger.WithField("BSL", bsl.Name).Infof("Invalidating Backup Repository %s", list.Items[i].Name)
-		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change or create")); err != nil {
+		if err := r.patchBackupRepository(context.Background(), &list.Items[i], repoNotReady("re-establish on BSL change, create or delete")); err != nil {
 			r.logger.WithField("BSL", bsl.Name).WithError(err).Errorf("fail to patch BackupRepository %s", list.Items[i].Name)
+			continue
 		}
+		requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{Namespace: list.Items[i].Namespace, Name: list.Items[i].Name}})
 	}
 
-	return []reconcile.Request{}
+	return requests
 }
 
 // needInvalidBackupRepo returns true if the BSL's storage type, bucket, prefix, CACert, or config has changed
