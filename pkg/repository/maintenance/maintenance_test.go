@@ -40,6 +40,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/repository/provider"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
@@ -875,10 +876,16 @@ func TestBuildJob(t *testing.T) {
 		Spec: appsv1api.DeploymentSpec{
 			Template: corev1api.PodTemplateSpec{
 				Spec: corev1api.PodSpec{
+					SecurityContext: &corev1api.PodSecurityContext{
+						RunAsNonRoot: boolptr.True(),
+					},
 					Containers: []corev1api.Container{
 						{
 							Name:  "velero-repo-maintenance-container",
 							Image: "velero-image",
+							SecurityContext: &corev1api.SecurityContext{
+								RunAsNonRoot: boolptr.True(),
+							},
 							Env: []corev1api.EnvVar{
 								{
 									Name:  "test-name",
@@ -908,21 +915,25 @@ func TestBuildJob(t *testing.T) {
 		},
 	}
 
-	deploy2 := deploy
+	deploy2 := deploy.DeepCopy()
 	deploy2.Spec.Template.Labels = map[string]string{"azure.workload.identity/use": "fake-label-value"}
+	deploy2.Spec.Template.Spec.SecurityContext = nil
+	deploy2.Spec.Template.Spec.Containers[0].SecurityContext = nil
 
 	testCases := []struct {
-		name             string
-		m                *JobConfigs
-		deploy           *appsv1api.Deployment
-		logLevel         logrus.Level
-		logFormat        *logging.FormatFlag
-		thirdPartyLabel  map[string]string
-		expectedJobName  string
-		expectedError    bool
-		expectedEnv      []corev1api.EnvVar
-		expectedEnvFrom  []corev1api.EnvFromSource
-		expectedPodLabel map[string]string
+		name                       string
+		m                          *JobConfigs
+		deploy                     *appsv1api.Deployment
+		logLevel                   logrus.Level
+		logFormat                  *logging.FormatFlag
+		thirdPartyLabel            map[string]string
+		expectedJobName            string
+		expectedError              bool
+		expectedEnv                []corev1api.EnvVar
+		expectedEnvFrom            []corev1api.EnvFromSource
+		expectedPodLabel           map[string]string
+		expectedSecurityContext    *corev1api.SecurityContext
+		expectedPodSecurityContext *corev1api.PodSecurityContext
 	}{
 		{
 			name: "Valid maintenance job without third party labels",
@@ -964,6 +975,12 @@ func TestBuildJob(t *testing.T) {
 			expectedPodLabel: map[string]string{
 				RepositoryNameLabel: "test-123",
 			},
+			expectedSecurityContext: &corev1api.SecurityContext{
+				RunAsNonRoot: boolptr.True(),
+			},
+			expectedPodSecurityContext: &corev1api.PodSecurityContext{
+				RunAsNonRoot: boolptr.True(),
+			},
 		},
 		{
 			name: "Valid maintenance job with third party labels",
@@ -975,7 +992,7 @@ func TestBuildJob(t *testing.T) {
 					MemoryLimit:   "256Mi",
 				},
 			},
-			deploy:          &deploy2,
+			deploy:          deploy2,
 			logLevel:        logrus.InfoLevel,
 			logFormat:       logging.NewFormatFlag(),
 			expectedJobName: "test-123-maintain-job",
@@ -1006,6 +1023,8 @@ func TestBuildJob(t *testing.T) {
 				RepositoryNameLabel:           "test-123",
 				"azure.workload.identity/use": "fake-label-value",
 			},
+			expectedSecurityContext:    nil,
+			expectedPodSecurityContext: nil,
 		},
 		{
 			name: "Error getting Velero server deployment",
@@ -1082,6 +1101,10 @@ func TestBuildJob(t *testing.T) {
 				// Check container env
 				assert.Equal(t, tc.expectedEnv, container.Env)
 				assert.Equal(t, tc.expectedEnvFrom, container.EnvFrom)
+
+				// Check security context
+				assert.Equal(t, tc.expectedPodSecurityContext, job.Spec.Template.Spec.SecurityContext)
+				assert.Equal(t, tc.expectedSecurityContext, container.SecurityContext)
 
 				// Check resources
 				expectedResources := corev1api.ResourceRequirements{
