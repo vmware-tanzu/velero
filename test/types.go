@@ -22,7 +22,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
-	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -88,8 +87,8 @@ type VeleroConfig struct {
 	CloudProvider                     string
 	ObjectStoreProvider               string
 	VeleroNamespace                   string
-	PodLabels                         flag.Map
-	ServiceAccountAnnotations         flag.Map
+	PodLabels                         string
+	ServiceAccountAnnotations         string
 	AdditionalBSLProvider             string
 	AdditionalBSLBucket               string
 	AdditionalBSLPrefix               string

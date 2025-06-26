@@ -410,6 +410,14 @@ func installVeleroServer(
 		args = append(args, fmt.Sprintf("--item-block-worker-count=%d", options.ItemBlockWorkerCount))
 	}
 
+	if len(options.PodLabels.Data()) > 0 {
+		args = append(args, "--pod-labels", options.PodLabels.String())
+	}
+
+	if len(options.ServiceAccountAnnotations.Data()) > 0 {
+		args = append(args, "--sa-annotations", options.ServiceAccountAnnotations.String())
+	}
+
 	// Only version no older than v1.15 support --backup-repository-configmap.
 	if options.BackupRepoConfigMap != "" &&
 		(semver.Compare(version, "v1.15") >= 0 || version == "main") {

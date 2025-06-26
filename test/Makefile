@@ -228,8 +228,8 @@ run-e2e: ginkgo
 		--disable-informer-cache=$(DISABLE_INFORMER_CACHE) \
 		--image-registry-proxy=$(IMAGE_REGISTRY_PROXY) \
 		--worker-os=$(WORKER_OS) \
-		--pod-labels="$(POD_LABELS) \
-		--sa-annotations="$(SA_ANNOTATIONS)"
+		--pod-labels=$(POD_LABELS) \
+		--sa-annotations=$(SA_ANNOTATIONS)
 
 .PHONY: run-perf
 run-perf: ginkgo
