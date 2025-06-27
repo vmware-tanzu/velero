@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestSpecChangePredicate(t *testing.T) {
@@ -202,12 +203,45 @@ func TestNewGenericEventPredicate(t *testing.T) {
 }
 
 func TestNewUpdateEventPredicate(t *testing.T) {
-	predicate := NewUpdateEventPredicate(func(client.Object, client.Object) bool {
-		return false
-	})
+	predicate := NewUpdateEventPredicate(
+		func(client.Object, client.Object) bool {
+			return false
+		},
+		velerotest.NewLogger(),
+	)
 
 	assert.False(t, predicate.Update(event.UpdateEvent{}))
-	assert.True(t, predicate.Create(event.CreateEvent{}))
-	assert.True(t, predicate.Delete(event.DeleteEvent{}))
-	assert.True(t, predicate.Generic(event.GenericEvent{}))
+	assert.True(t, predicate.Create(event.CreateEvent{
+		Object: &corev1api.Event{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: corev1api.SchemeGroupVersion.String(),
+				Kind:       "Event",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "create",
+			},
+		},
+	}))
+	assert.True(t, predicate.Delete(event.DeleteEvent{
+		Object: &corev1api.Event{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: corev1api.SchemeGroupVersion.String(),
+				Kind:       "Event",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update",
+			},
+		},
+	}))
+	assert.False(t, predicate.Generic(event.GenericEvent{
+		Object: &corev1api.Event{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: corev1api.SchemeGroupVersion.String(),
+				Kind:       "Event",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "generic",
+			},
+		},
+	}))
 }

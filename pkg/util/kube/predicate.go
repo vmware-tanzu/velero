@@ -19,6 +19,8 @@ package kube
 import (
 	"reflect"
 
+	"github.com/sirupsen/logrus"
+	corev1api "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -98,10 +100,27 @@ func NewGenericEventPredicate(f func(object client.Object) bool) predicate.Predi
 }
 
 // NewUpdateEventPredicate creates a new Predicate that checks the Update event with the provided func
-func NewUpdateEventPredicate(f func(objectOld client.Object, objectNew client.Object) bool) predicate.Predicate {
+func NewUpdateEventPredicate(
+	f func(objectOld client.Object, objectNew client.Object) bool,
+	logger logrus.FieldLogger,
+) predicate.Predicate {
 	return predicate.Funcs{
 		UpdateFunc: func(event event.UpdateEvent) bool {
 			return f(event.ObjectOld, event.ObjectNew)
+		},
+		CreateFunc: func(event event.CreateEvent) bool {
+			logger.Infof("Enqueue BSL %s because create event.", event.Object.GetName())
+			createEvent := event.Object.(*corev1api.Event)
+			logger.Infof("The Create Event content is %+v", createEvent)
+			return true
+		},
+		DeleteFunc: func(event event.DeleteEvent) bool {
+			logger.Infof("Enqueue BSL %s because delete event.", event.Object.GetName())
+			return true
+		},
+		GenericFunc: func(event event.GenericEvent) bool {
+			logger.Infof("Ignore BSL %s because generic event.", event.Object.GetName())
+			return false
 		},
 	}
 }

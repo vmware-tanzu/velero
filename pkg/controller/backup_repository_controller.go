@@ -119,7 +119,10 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			// BSL may be recreated after deleting, so also include the create event
 			&velerov1api.BackupStorageLocation{},
 			kube.EnqueueRequestsFromMapUpdateFunc(r.invalidateBackupReposForBSL),
-			builder.WithPredicates(kube.NewUpdateEventPredicate(r.needInvalidBackupRepo)),
+			builder.WithPredicates(kube.NewUpdateEventPredicate(
+				r.needInvalidBackupRepo,
+				r.logger,
+			)),
 		).
 		Complete(r)
 }
