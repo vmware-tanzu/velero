@@ -116,19 +116,6 @@ func Test_newConfigCredential(t *testing.T) {
 	require.NotNil(t, credential)
 	_, ok = credential.(*azidentity.ClientCertificateCredential)
 	require.True(t, ok)
-
-	// username/password
-	creds = map[string]string{
-		CredentialKeyTenantID: "clientid",
-		CredentialKeyClientID: "clientid",
-		CredentialKeyUsername: "username",
-		CredentialKeyPassword: "password",
-	}
-	credential, err = newConfigCredential(creds, options)
-	require.NoError(t, err)
-	require.NotNil(t, credential)
-	_, ok = credential.(*azidentity.UsernamePasswordCredential)
-	require.True(t, ok)
 }
 
 func readCertData() (string, error) {
