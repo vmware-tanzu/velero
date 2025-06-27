@@ -362,6 +362,19 @@ func init() {
 		"linux",
 		"test k8s worker node OS version, should be either linux or windows.",
 	)
+
+	flag.StringVar(
+		&test.VeleroCfg.PodLabels,
+		"pod-labels",
+		"",
+		"comma-separated list of key=value labels to add to the Velero pod",
+	)
+	flag.StringVar(
+		&test.VeleroCfg.ServiceAccountAnnotations,
+		"sa-annotations",
+		"",
+		"comma-separated list of key=value annotations to add to Velero service account",
+	)
 }
 
 // Add label [SkipVanillaZfs]:
