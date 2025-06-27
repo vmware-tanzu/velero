@@ -251,13 +251,6 @@ linters:
     staticcheck:
       checks:
         - all
-        - -QF1001 # FIXME
-        - -QF1003 # FIXME
-        - -QF1004 # FIXME
-        - -QF1007 # FIXME
-        - -QF1008 # FIXME
-        - -QF1009 # FIXME
-        - -QF1012 # FIXME
 
     testifylint:
       # TODO: enable them all
