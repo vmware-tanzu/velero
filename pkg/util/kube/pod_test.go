@@ -837,51 +837,6 @@ func TestToSystemAffinity(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "multiple load affinities",
-			loadAffinities: []*LoadAffinity{
-				{
-					NodeSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"key-1": "value-1",
-						},
-					},
-				},
-				{
-					NodeSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"key-2": "value-2",
-						},
-					},
-				},
-			},
-			expected: &corev1api.Affinity{
-				NodeAffinity: &corev1api.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
-						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
-							{
-								MatchExpressions: []corev1api.NodeSelectorRequirement{
-									{
-										Key:      "key-1",
-										Values:   []string{"value-1"},
-										Operator: corev1api.NodeSelectorOpIn,
-									},
-								},
-							},
-							{
-								MatchExpressions: []corev1api.NodeSelectorRequirement{
-									{
-										Key:      "key-2",
-										Values:   []string{"value-2"},
-										Operator: corev1api.NodeSelectorOpIn,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
 	}
 
 	for _, test := range tests {
@@ -1036,6 +991,173 @@ func TestExitPodWithMessage(t *testing.T) {
 
 				assert.Equal(t, test.expectedMessage, string(message))
 			}
+		})
+	}
+}
+
+func TestGetLoadAffinityByStorageClass(t *testing.T) {
+	tests := []struct {
+		name                 string
+		affinityList         []*LoadAffinity
+		scName               string
+		expectedAffinityList []*LoadAffinity
+	}{
+		{
+			name: "get global affinity",
+			affinityList: []*LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+					StorageClass: "storage-class-01",
+				},
+			},
+			scName: "",
+			expectedAffinityList: []*LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "get affinity for StorageClass but only global affinity exists",
+			affinityList: []*LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+				},
+			},
+			scName: "storage-class-01",
+			expectedAffinityList: []*LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "get affinity for StorageClass",
+			affinityList: []*LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/control-plane=",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{""},
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+					StorageClass: "storage-class-01",
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+					StorageClass: "invalid-storage-class",
+				},
+			},
+			scName: "storage-class-01",
+			expectedAffinityList: []*LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+					StorageClass: "storage-class-01",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := GetLoadAffinityByStorageClass(test.affinityList, test.scName, velerotest.NewLogger())
+
+			assert.Equal(t, test.expectedAffinityList, result)
 		})
 	}
 }

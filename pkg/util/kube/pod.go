@@ -34,6 +34,9 @@ import (
 type LoadAffinity struct {
 	// NodeSelector specifies the label selector to match nodes
 	NodeSelector metav1.LabelSelector `json:"nodeSelector"`
+
+	// StorageClass specifies the VGDPs the LoadAffinity applied to. If the StorageClass doesn't have value, it applies to all. If not, it applies to only the VGDPs that use this StorageClass.
+	StorageClass string `json:"storageClass"`
 }
 
 type PodResources struct {
@@ -227,31 +230,29 @@ func ToSystemAffinity(loadAffinities []*LoadAffinity) *corev1api.Affinity {
 	}
 	nodeSelectorTermList := make([]corev1api.NodeSelectorTerm, 0)
 
-	for _, loadAffinity := range loadAffinities {
-		requirements := []corev1api.NodeSelectorRequirement{}
-		for k, v := range loadAffinity.NodeSelector.MatchLabels {
-			requirements = append(requirements, corev1api.NodeSelectorRequirement{
-				Key:      k,
-				Values:   []string{v},
-				Operator: corev1api.NodeSelectorOpIn,
-			})
-		}
-
-		for _, exp := range loadAffinity.NodeSelector.MatchExpressions {
-			requirements = append(requirements, corev1api.NodeSelectorRequirement{
-				Key:      exp.Key,
-				Values:   exp.Values,
-				Operator: corev1api.NodeSelectorOperator(exp.Operator),
-			})
-		}
-
-		nodeSelectorTermList = append(
-			nodeSelectorTermList,
-			corev1api.NodeSelectorTerm{
-				MatchExpressions: requirements,
-			},
-		)
+	requirements := []corev1api.NodeSelectorRequirement{}
+	for k, v := range loadAffinities[0].NodeSelector.MatchLabels {
+		requirements = append(requirements, corev1api.NodeSelectorRequirement{
+			Key:      k,
+			Values:   []string{v},
+			Operator: corev1api.NodeSelectorOpIn,
+		})
 	}
+
+	for _, exp := range loadAffinities[0].NodeSelector.MatchExpressions {
+		requirements = append(requirements, corev1api.NodeSelectorRequirement{
+			Key:      exp.Key,
+			Values:   exp.Values,
+			Operator: corev1api.NodeSelectorOperator(exp.Operator),
+		})
+	}
+
+	nodeSelectorTermList = append(
+		nodeSelectorTermList,
+		corev1api.NodeSelectorTerm{
+			MatchExpressions: requirements,
+		},
+	)
 
 	if len(nodeSelectorTermList) > 0 {
 		result := new(corev1api.Affinity)
@@ -300,4 +301,31 @@ func ExitPodWithMessage(logger logrus.FieldLogger, succeed bool, message string,
 	}
 
 	funcExit(exitCode)
+}
+
+// GetLoadAffinityByStorageClass retrieves the LoadAffinity from the parameter affinityList.
+// The function first try to find by the scName. If there is no such LoadAffinity,
+// it will try to get the LoadAffinity's StorageClass has no value.
+func GetLoadAffinityByStorageClass(
+	affinityList []*LoadAffinity,
+	scName string,
+	logger logrus.FieldLogger,
+) []*LoadAffinity {
+	globalAffinity := make([]*LoadAffinity, 0)
+	scAffinity := make([]*LoadAffinity, 0)
+
+	for _, affinity := range affinityList {
+		if affinity.StorageClass == "" {
+			globalAffinity = append(globalAffinity, affinity)
+		} else if affinity.StorageClass == scName {
+			scAffinity = append(scAffinity, affinity)
+		}
+	}
+
+	if len(scAffinity) > 0 {
+		logger.WithField("StorageClass", scName).Info("Found backup pod's affinity setting per StorageClass.")
+		return scAffinity
+	}
+
+	return globalAffinity
 }
