@@ -1,5 +1,5 @@
 diff --git a/go.mod b/go.mod
-index 5f939c481..5c5db077f 100644
+index 5f939c481..97ef53433 100644
 --- a/go.mod
 +++ b/go.mod
 @@ -24,32 +24,32 @@ require (
@@ -66,7 +66,7 @@ index 5f939c481..5c5db077f 100644
 -go 1.18
 +go 1.23.0
 +
-+toolchain go1.23.7
++toolchain go1.23.10
 diff --git a/go.sum b/go.sum
 index 026e1d2fa..836a9b274 100644
 --- a/go.sum

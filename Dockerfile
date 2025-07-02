@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Velero binary build section
-FROM --platform=$BUILDPLATFORM golang:1.23.8-bookworm AS velero-builder
+FROM --platform=$BUILDPLATFORM golang:1.23.10-bookworm AS velero-builder
 
 ARG GOPROXY
 ARG BIN
@@ -49,7 +49,7 @@ RUN mkdir -p /output/usr/bin && \
     go clean -modcache -cache
 
 # Restic binary build section
-FROM --platform=$BUILDPLATFORM golang:1.23.8-bookworm AS restic-builder
+FROM --platform=$BUILDPLATFORM golang:1.23.10-bookworm AS restic-builder
 
 ARG GOPROXY
 ARG BIN
@@ -82,4 +82,3 @@ COPY --from=velero-builder /output /
 COPY --from=restic-builder /output /
 
 USER cnb:cnb
-
