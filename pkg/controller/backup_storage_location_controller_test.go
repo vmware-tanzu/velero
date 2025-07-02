@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/metrics"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
@@ -92,6 +94,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			},
 			newPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			backupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
+			metrics:           metrics.NewServerMetrics(),
 			log:               velerotest.NewLogger(),
 		}
 
@@ -157,6 +160,7 @@ var _ = Describe("Backup Storage Location Reconciler", func() {
 			},
 			newPluginManager:  func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			backupStoreGetter: NewFakeObjectBackupStoreGetter(backupStores),
+			metrics:           metrics.NewServerMetrics(),
 			log:               velerotest.NewLogger(),
 		}
 
@@ -245,6 +249,7 @@ func TestEnsureSingleDefaultBSL(t *testing.T) {
 				ctx:                       context.Background(),
 				client:                    fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(&test.locations).Build(),
 				defaultBackupLocationInfo: test.defaultBackupInfo,
+				metrics:                   metrics.NewServerMetrics(),
 				log:                       velerotest.NewLogger(),
 			}
 			defaultFound, err := r.ensureSingleDefaultBSL(test.locations)
@@ -289,6 +294,7 @@ func TestBSLReconcile(t *testing.T) {
 				ctx:              context.Background(),
 				client:           fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(&test.locationList).Build(),
 				newPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+				metrics:          metrics.NewServerMetrics(),
 				log:              velerotest.NewLogger(),
 			}
 
