@@ -400,7 +400,7 @@ Sometimes, `RestorePVC` needs to be configured to increase the performance of re
 [12]: performance-guidance.md
 [13]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
 [14]: node-agent-concurrency.md
-[15]: data-movement-backup-node-selection.md
+[15]: data-movement-node-selection.md
 [16]: data-movement-backup-pvc-configuration.md
 [17]: backup-repository-configuration.md
 [18]: https://github.com/vmware-tanzu/velero/pull/7576

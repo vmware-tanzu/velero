@@ -583,11 +583,6 @@ func (e *csiSnapshotExposer) createBackupPod(
 	args = append(args, podInfo.logFormatArgs...)
 	args = append(args, podInfo.logLevelArgs...)
 
-	affinityList := make([]*kube.LoadAffinity, 0)
-	if affinity != nil {
-		affinityList = append(affinityList, affinity)
-	}
-
 	var securityCtx *corev1api.PodSecurityContext
 	nodeSelector := map[string]string{}
 	podOS := corev1api.PodOS{}
@@ -625,6 +620,11 @@ func (e *csiSnapshotExposer) createBackupPod(
 		podOS.Name = kube.NodeOSLinux
 	}
 
+	var podAffinity *corev1api.Affinity
+	if affinity != nil {
+		podAffinity = kube.ToSystemAffinity([]*kube.LoadAffinity{affinity})
+	}
+
 	pod := &corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -656,7 +656,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 			},
 			NodeSelector: nodeSelector,
 			OS:           &podOS,
-			Affinity:     kube.ToSystemAffinity(affinityList),
+			Affinity:     podAffinity,
 			Containers: []corev1api.Container{
 				{
 					Name:            containerName,

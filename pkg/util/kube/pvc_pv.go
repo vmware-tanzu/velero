@@ -305,8 +305,14 @@ func SetPVReclaimPolicy(ctx context.Context, pvGetter corev1client.CoreV1Interfa
 // WaitPVCConsumed waits for a PVC to be consumed by a pod so that the selected node is set by the pod scheduling; or does
 // nothing if the consuming doesn't affect the PV provision.
 // The latest PVC and the selected node will be returned.
-func WaitPVCConsumed(ctx context.Context, pvcGetter corev1client.CoreV1Interface, pvc string, namespace string,
-	storageClient storagev1.StorageV1Interface, timeout time.Duration, ignoreConsume bool) (string, *corev1api.PersistentVolumeClaim, error) {
+func WaitPVCConsumed(
+	ctx context.Context,
+	pvcGetter corev1client.CoreV1Interface,
+	pvc string, namespace string,
+	storageClient storagev1.StorageV1Interface,
+	timeout time.Duration,
+	ignoreConsume bool,
+) (string, *corev1api.PersistentVolumeClaim, error) {
 	selectedNode := ""
 	var updated *corev1api.PersistentVolumeClaim
 	var storageClass *storagev1api.StorageClass
