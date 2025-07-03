@@ -326,34 +326,28 @@ func installKibishii(
 	}
 
 	// update kibishi images with image registry proxy if it is set
-	if imageRegistryProxy != "" {
-		fmt.Printf("Using image registry proxy %s to patch Kibishii images.\n", imageRegistryProxy)
-		kibishiiImage := readBaseKibishiiImage(path.Join(kibishiiDirectory, "base", "kibishii.yaml"))
-		if err := generateKibishiiImagePatch(
-			path.Join(imageRegistryProxy, kibishiiImage),
-			path.Join(targetKustomizeDir, "worker-image-patch.yaml"),
-		); err != nil {
-			return nil
-		}
+	kibishiiImage := readBaseKibishiiImage(path.Join(kibishiiDirectory, "base", "kibishii.yaml"))
+	if err := generateKibishiiImagePatch(
+		path.Join(imageRegistryProxy, kibishiiImage),
+		path.Join(targetKustomizeDir, "worker-image-patch.yaml"),
+	); err != nil {
+		return nil
+	}
 
-		jumpPadImage := readBaseJumpPadImage(path.Join(kibishiiDirectory, "base", "jump-pad.yaml"))
-		if err := generateJumpPadPatch(
-			path.Join(imageRegistryProxy, jumpPadImage),
-			path.Join(targetKustomizeDir, "jump-pad-image-patch.yaml"),
-		); err != nil {
-			return nil
-		}
+	jumpPadImage := readBaseJumpPadImage(path.Join(kibishiiDirectory, "base", "jump-pad.yaml"))
+	if err := generateJumpPadPatch(
+		path.Join(imageRegistryProxy, jumpPadImage),
+		path.Join(targetKustomizeDir, "jump-pad-image-patch.yaml"),
+	); err != nil {
+		return nil
+	}
 
-		etcdImage := readBaseEtcdImage(path.Join(kibishiiDirectory, "base", "etcd.yaml"))
-		if err := generateEtcdImagePatch(
-			path.Join(imageRegistryProxy, etcdImage),
-			path.Join(targetKustomizeDir, "etcd-image-patch.yaml"),
-		); err != nil {
-			return nil
-		}
-
-	} else {
-		fmt.Printf("No image registry proxy is set, Kibishii images will not be patched.\n")
+	etcdImage := readBaseEtcdImage(path.Join(kibishiiDirectory, "base", "etcd.yaml"))
+	if err := generateEtcdImagePatch(
+		path.Join(imageRegistryProxy, etcdImage),
+		path.Join(targetKustomizeDir, "etcd-image-patch.yaml"),
+	); err != nil {
+		return nil
 	}
 
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
