@@ -59,7 +59,7 @@ const (
 
 // NewPodVolumeBackupReconciler creates the PodVolumeBackupReconciler instance
 func NewPodVolumeBackupReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
-	nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, podResources corev1api.ResourceRequirements,
+	counter *exposer.VgdpCounter, nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, podResources corev1api.ResourceRequirements,
 	metrics *metrics.ServerMetrics, logger logrus.FieldLogger) *PodVolumeBackupReconciler {
 	return &PodVolumeBackupReconciler{
 		client:           client,
@@ -71,6 +71,7 @@ func NewPodVolumeBackupReconciler(client client.Client, mgr manager.Manager, kub
 		metrics:          metrics,
 		podResources:     podResources,
 		dataPathMgr:      dataPathMgr,
+		vgdpCounter:      counter,
 		preparingTimeout: preparingTimeout,
 		resourceTimeout:  resourceTimeout,
 		exposer:          exposer.NewPodVolumeExposer(kubeClient, logger),
@@ -90,6 +91,7 @@ type PodVolumeBackupReconciler struct {
 	logger           logrus.FieldLogger
 	podResources     corev1api.ResourceRequirements
 	dataPathMgr      *datapath.Manager
+	vgdpCounter      *exposer.VgdpCounter
 	preparingTimeout time.Duration
 	resourceTimeout  time.Duration
 	cancelledPVB     map[string]time.Time
@@ -212,6 +214,11 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, nil
 		}
 
+		if r.vgdpCounter != nil && r.vgdpCounter.IsConstrained(ctx, r.logger) {
+			log.Debug("Data path initiation is constrained, requeue later")
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
+		}
+
 		log.Info("Accepting PVB")
 
 		if err := r.acceptPodVolumeBackup(ctx, pvb); err != nil {
@@ -278,7 +285,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			pvb.Name, pvb.Namespace, res.ByPod.HostingPod.Name, res.ByPod.HostingContainer, pvb.Name, callbacks, false, log)
 		if err != nil {
 			if err == datapath.ConcurrentLimitExceed {
-				log.Info("Data path instance is concurrent limited requeue later")
+				log.Debug("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 			} else {
 				return r.errorOut(ctx, pvb, err, "error to create data path", log)
@@ -303,6 +310,8 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 			pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseInProgress
 			pvb.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
+
+			delete(pvb.Labels, exposer.ExposeOnGoingLabel)
 
 			return true
 		}); err != nil {
@@ -370,6 +379,11 @@ func (r *PodVolumeBackupReconciler) acceptPodVolumeBackup(ctx context.Context, p
 		pvb.Status.AcceptedTimestamp = &metav1.Time{Time: r.clock.Now()}
 		pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseAccepted
 
+		if pvb.Labels == nil {
+			pvb.Labels = make(map[string]string)
+		}
+		pvb.Labels[exposer.ExposeOnGoingLabel] = "true"
+
 		return true
 	})
 }
@@ -386,6 +400,8 @@ func (r *PodVolumeBackupReconciler) tryCancelPodVolumeBackup(ctx context.Context
 		if message != "" {
 			pvb.Status.Message = message
 		}
+
+		delete(pvb.Labels, exposer.ExposeOnGoingLabel)
 	})
 
 	if err != nil {
@@ -428,6 +444,8 @@ func (r *PodVolumeBackupReconciler) onPrepareTimeout(ctx context.Context, pvb *v
 	succeeded, err := funcExclusiveUpdatePodVolumeBackup(ctx, r.client, pvb, func(pvb *velerov1api.PodVolumeBackup) {
 		pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
 		pvb.Status.Message = "timeout on preparing PVB"
+
+		delete(pvb.Labels, exposer.ExposeOnGoingLabel)
 	})
 
 	if err != nil {
@@ -508,6 +526,8 @@ func (r *PodVolumeBackupReconciler) OnDataPathCompleted(ctx context.Context, nam
 			pvb.Status.Message = "volume was empty so no snapshot was taken"
 		}
 
+		delete(pvb.Labels, exposer.ExposeOnGoingLabel)
+
 		return true
 	}); err != nil {
 		log.WithError(err).Error("error updating PVB status")
@@ -564,6 +584,8 @@ func (r *PodVolumeBackupReconciler) OnDataPathCancelled(ctx context.Context, nam
 			pvb.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
 		}
 		pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
+
+		delete(pvb.Labels, exposer.ExposeOnGoingLabel)
 
 		return true
 	}); err != nil {
@@ -735,6 +757,8 @@ func UpdatePVBStatusToFailed(ctx context.Context, c client.Client, pvb *velerov1
 			if pvb.Status.StartTimestamp.IsZero() {
 				pvb.Status.StartTimestamp = &metav1.Time{Time: time}
 			}
+
+			delete(pvb.Labels, exposer.ExposeOnGoingLabel)
 
 			return true
 		}); patchErr != nil {

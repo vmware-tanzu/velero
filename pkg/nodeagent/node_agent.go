@@ -61,6 +61,9 @@ type LoadConcurrency struct {
 
 	// PerNodeConfig specifies the concurrency number to nodes matched by rules
 	PerNodeConfig []RuledConfigs `json:"perNodeConfig,omitempty"`
+
+	// WaitQueueLength specifies the max number of loads that are waiting for process
+	WaitQueueLength int `json:"waitQueueLength,omitempty"`
 }
 
 type LoadAffinity struct {

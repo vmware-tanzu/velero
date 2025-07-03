@@ -26,6 +26,7 @@ const (
 	podGroupLabel          = "velero.io/exposer-pod-group"
 	podGroupSnapshot       = "snapshot-exposer"
 	podGroupGenericRestore = "generic-restore-exposer"
+	ExposeOnGoingLabel     = "velero.io/expose-on-going"
 )
 
 // ExposeResult defines the result of expose.
