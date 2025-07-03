@@ -323,7 +323,11 @@ func installKibishii(
 			fmt.Printf("targetKustomizeDir for windows %s\n", targetKustomizeDir)
 		}
 		fmt.Printf("The installed Kibishii Kustomize package directory is %s.\n", targetKustomizeDir)
+	}
 
+	// update kibishi images with image registry proxy if it is set
+	if imageRegistryProxy != "" {
+		fmt.Printf("Using image registry proxy %s to patch Kibishii images.\n", imageRegistryProxy)
 		kibishiiImage := readBaseKibishiiImage(path.Join(kibishiiDirectory, "base", "kibishii.yaml"))
 		if err := generateKibishiiImagePatch(
 			path.Join(imageRegistryProxy, kibishiiImage),
@@ -339,6 +343,17 @@ func installKibishii(
 		); err != nil {
 			return nil
 		}
+
+		etcdImage := readBaseEtcdImage(path.Join(kibishiiDirectory, "base", "etcd.yaml"))
+		if err := generateEtcdImagePatch(
+			path.Join(imageRegistryProxy, etcdImage),
+			path.Join(targetKustomizeDir, "etcd-image-patch.yaml"),
+		); err != nil {
+			return nil
+		}
+
+	} else {
+		fmt.Printf("No image registry proxy is set, Kibishii images will not be patched.\n")
 	}
 
 	// We use kustomize to generate YAML for Kibishii from the checked-in yaml directories
@@ -397,6 +412,14 @@ func installKibishii(
 	return err
 }
 
+func stripRegistry(image string) string {
+	// If the image includes a registry (quay.io, docker.io, etc.), strip it
+	if parts := strings.SplitN(image, "/", 2); len(parts) == 2 && strings.Contains(parts[0], ".") {
+		return parts[1] // remove the registry
+	}
+	return image // already no registry
+}
+
 func readBaseKibishiiImage(kibishiiFilePath string) string {
 	bytes, err := os.ReadFile(kibishiiFilePath)
 	if err != nil {
@@ -433,6 +456,51 @@ func readBaseJumpPadImage(jumpPadFilePath string) string {
 	}
 
 	return jumpPadImage
+}
+
+func readBaseEtcdImage(etcdFilePath string) string {
+	bytes, err := os.ReadFile(etcdFilePath)
+	if err != nil {
+		fmt.Printf("Failed to read etcd pod yaml file: %v\n", err)
+		return ""
+	}
+
+	// Split on document marker
+	docs := strings.Split(string(bytes), "---")
+
+	for _, doc := range docs {
+		doc = strings.TrimSpace(doc)
+		if doc == "" {
+			continue
+		}
+
+		var typeMeta corev1api.TypedLocalObjectReference
+		if err := yaml.Unmarshal([]byte(doc), &typeMeta); err != nil {
+			continue
+		}
+
+		if typeMeta.Kind != "Pod" {
+			continue
+		}
+
+		var pod corev1api.Pod
+		if err := yaml.Unmarshal([]byte(doc), &pod); err != nil {
+			fmt.Printf("Failed to unmarshal pod: %v\n", err)
+			continue
+		}
+
+		if len(pod.Spec.Containers) > 0 {
+			fullImage := pod.Spec.Containers[0].Image
+			fmt.Printf("Full etcd image: %s\n", fullImage)
+
+			imageWithoutRegistry := stripRegistry(fullImage)
+			fmt.Printf("Stripped etcd image: %s\n", imageWithoutRegistry)
+			return imageWithoutRegistry
+		}
+	}
+
+	fmt.Println("No etcd pod with container image found.")
+	return ""
 }
 
 type patchImageData struct {
@@ -496,6 +564,55 @@ spec:
 	}
 
 	if err := patchTemplate.Execute(file, patchImageData{Image: jumpPadImage}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func generateEtcdImagePatch(etcdImage string, patchPath string) error {
+	patchString := `
+apiVersion: v1
+kind: Pod
+metadata:
+  name: etcd0
+spec:
+  containers:
+  - name: etcd0
+    image: {{.Image}}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: etcd1
+spec:
+  containers:
+  - name: etcd1
+    image: {{.Image}}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: etcd2
+spec:
+  containers:
+  - name: etcd2
+    image: {{.Image}}
+`
+
+	file, err := os.OpenFile(patchPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	defer file.Close()
+
+	if err != nil {
+		return err
+	}
+
+	patchTemplate, err := template.New("imagePatch").Parse(patchString)
+	if err != nil {
+		return err
+	}
+
+	if err := patchTemplate.Execute(file, patchImageData{Image: etcdImage}); err != nil {
 		return err
 	}
 
