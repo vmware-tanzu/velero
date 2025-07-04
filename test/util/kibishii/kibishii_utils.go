@@ -326,7 +326,10 @@ func installKibishii(
 	}
 
 	// update kibishi images with image registry proxy if it is set
-	kibishiiImage := readBaseKibishiiImage(path.Join(kibishiiDirectory, "base", "kibishii.yaml"))
+	baseDir := resolveBasePath(kibishiiDirectory)
+	fmt.Printf("Using image registry proxy %s to patch Kibishii images. Base Dir: %s\n", imageRegistryProxy, baseDir)
+
+	kibishiiImage := readBaseKibishiiImage(path.Join(baseDir, "base", "kibishii.yaml"))
 	if err := generateKibishiiImagePatch(
 		path.Join(imageRegistryProxy, kibishiiImage),
 		path.Join(targetKustomizeDir, "worker-image-patch.yaml"),
@@ -334,7 +337,7 @@ func installKibishii(
 		return nil
 	}
 
-	jumpPadImage := readBaseJumpPadImage(path.Join(kibishiiDirectory, "base", "jump-pad.yaml"))
+	jumpPadImage := readBaseJumpPadImage(path.Join(baseDir, "base", "jump-pad.yaml"))
 	if err := generateJumpPadPatch(
 		path.Join(imageRegistryProxy, jumpPadImage),
 		path.Join(targetKustomizeDir, "jump-pad-image-patch.yaml"),
@@ -342,7 +345,7 @@ func installKibishii(
 		return nil
 	}
 
-	etcdImage := readBaseEtcdImage(path.Join(kibishiiDirectory, "base", "etcd.yaml"))
+	etcdImage := readBaseEtcdImage(path.Join(baseDir, "base", "etcd.yaml"))
 	if err := generateEtcdImagePatch(
 		path.Join(imageRegistryProxy, etcdImage),
 		path.Join(targetKustomizeDir, "etcd-image-patch.yaml"),
@@ -404,6 +407,16 @@ func installKibishii(
 	}
 
 	return err
+}
+
+func resolveBasePath(dir string) string {
+	// If the path includes "overlays", strip everything up to "overlays/"
+	parts := strings.Split(dir, "overlays")
+	if len(parts) > 1 {
+		// Assume root of repo is before "overlays", add "/base"
+		return parts[0]
+	}
+	return dir // no "overlays" found, return original path
 }
 
 func stripRegistry(image string) string {
