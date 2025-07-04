@@ -302,12 +302,12 @@ func (s *nodeAgentServer) run() {
 		}
 	}
 
-	if s.dataPathConfigs != nil && s.dataPathConfigs.LoadConcurrency != nil && s.dataPathConfigs.LoadConcurrency.WaitQueueLength > 0 {
-		if counter, err := exposer.StartVgdpCounter(s.ctx, s.mgr, s.dataPathConfigs.LoadConcurrency.WaitQueueLength); err != nil {
+	if s.dataPathConfigs != nil && s.dataPathConfigs.LoadConcurrency != nil && s.dataPathConfigs.LoadConcurrency.PrepareQueueLength > 0 {
+		if counter, err := exposer.StartVgdpCounter(s.ctx, s.mgr, s.dataPathConfigs.LoadConcurrency.PrepareQueueLength); err != nil {
 			s.logger.WithError(err).Warnf("Failed to start VGDP counter, VDGP loads are not constrained")
 		} else {
 			s.vgdpCounter = counter
-			s.logger.Infof("VGDP loads are constrained with %d", s.dataPathConfigs.LoadConcurrency.WaitQueueLength)
+			s.logger.Infof("VGDP loads are constrained with %d", s.dataPathConfigs.LoadConcurrency.PrepareQueueLength)
 		}
 	}
 

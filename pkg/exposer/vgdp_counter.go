@@ -19,7 +19,7 @@ import (
 
 type dynamicQueueLength struct {
 	queueLength int
-	changeId    uint64
+	changeID    uint64
 }
 
 type VgdpCounter struct {
@@ -43,10 +43,10 @@ func StartVgdpCounter(ctx context.Context, mgr manager.Manager, queueLength int)
 		allowedQueueLength: queueLength,
 	}
 
-	atomic.StoreUint64(&counter.duState.changeId, 1)
-	atomic.StoreUint64(&counter.ddState.changeId, 1)
-	atomic.StoreUint64(&counter.pvbState.changeId, 1)
-	atomic.StoreUint64(&counter.pvrState.changeId, 1)
+	atomic.StoreUint64(&counter.duState.changeID, 1)
+	atomic.StoreUint64(&counter.ddState.changeID, 1)
+	atomic.StoreUint64(&counter.pvbState.changeID, 1)
+	atomic.StoreUint64(&counter.pvrState.changeID, 1)
 
 	if err := counter.initListeners(ctx, mgr); err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func (w *VgdpCounter) initListeners(ctx context.Context, mgr manager.Manager) er
 				if newDu.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted ||
 					oldDu.Status.Phase == velerov2alpha1api.DataUploadPhasePrepared ||
 					oldDu.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted && newDu.Status.Phase != velerov2alpha1api.DataUploadPhasePrepared {
-					atomic.AddUint64(&w.duState.changeId, 1)
+					atomic.AddUint64(&w.duState.changeID, 1)
 				}
 			},
 		},
@@ -100,7 +100,7 @@ func (w *VgdpCounter) initListeners(ctx context.Context, mgr manager.Manager) er
 				if newDd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted ||
 					oldDd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared ||
 					oldDd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted && newDd.Status.Phase != velerov2alpha1api.DataDownloadPhasePrepared {
-					atomic.AddUint64(&w.ddState.changeId, 1)
+					atomic.AddUint64(&w.ddState.changeID, 1)
 				}
 			},
 		},
@@ -126,7 +126,7 @@ func (w *VgdpCounter) initListeners(ctx context.Context, mgr manager.Manager) er
 				if newPvb.Status.Phase == velerov1api.PodVolumeBackupPhaseAccepted ||
 					oldPvb.Status.Phase == velerov1api.PodVolumeBackupPhasePrepared ||
 					oldPvb.Status.Phase == velerov1api.PodVolumeBackupPhaseAccepted && newPvb.Status.Phase != velerov1api.PodVolumeBackupPhasePrepared {
-					atomic.AddUint64(&w.pvbState.changeId, 1)
+					atomic.AddUint64(&w.pvbState.changeID, 1)
 				}
 			},
 		},
@@ -152,7 +152,7 @@ func (w *VgdpCounter) initListeners(ctx context.Context, mgr manager.Manager) er
 				if newPvr.Status.Phase == velerov1api.PodVolumeRestorePhaseAccepted ||
 					oldPvr.Status.Phase == velerov1api.PodVolumeRestorePhasePrepared ||
 					oldPvr.Status.Phase == velerov1api.PodVolumeRestorePhaseAccepted && newPvr.Status.Phase != velerov1api.PodVolumeRestorePhasePrepared {
-					atomic.AddUint64(&w.pvrState.changeId, 1)
+					atomic.AddUint64(&w.pvrState.changeID, 1)
 				}
 			},
 		},
@@ -164,53 +164,53 @@ func (w *VgdpCounter) initListeners(ctx context.Context, mgr manager.Manager) er
 }
 
 func (w *VgdpCounter) IsConstrained(ctx context.Context, log logrus.FieldLogger) bool {
-	id := atomic.LoadUint64(&w.duState.changeId)
-	if id != w.duCacheState.changeId {
+	id := atomic.LoadUint64(&w.duState.changeID)
+	if id != w.duCacheState.changeID {
 		duList := &velerov2alpha1api.DataUploadList{}
 		if err := w.client.List(ctx, duList, &ctlclient.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(map[string]string{ExposeOnGoingLabel: "true"}))}); err != nil {
 			log.WithError(err).Warn("Failed to list data uploads, skip counting")
 		} else {
 			w.duCacheState.queueLength = len(duList.Items)
-			w.duCacheState.changeId = id
+			w.duCacheState.changeID = id
 
 			log.Infof("Query queue length for du %d", w.duCacheState.queueLength)
 		}
 	}
 
-	id = atomic.LoadUint64(&w.ddState.changeId)
-	if id != w.ddCacheState.changeId {
+	id = atomic.LoadUint64(&w.ddState.changeID)
+	if id != w.ddCacheState.changeID {
 		ddList := &velerov2alpha1api.DataDownloadList{}
 		if err := w.client.List(ctx, ddList, &ctlclient.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(map[string]string{ExposeOnGoingLabel: "true"}))}); err != nil {
 			log.WithError(err).Warn("Failed to list data downloads, skip counting")
 		} else {
 			w.ddCacheState.queueLength = len(ddList.Items)
-			w.ddCacheState.changeId = id
+			w.ddCacheState.changeID = id
 
 			log.Infof("Query queue length for dd %d", w.ddCacheState.queueLength)
 		}
 	}
 
-	id = atomic.LoadUint64(&w.pvbState.changeId)
-	if id != w.pvbCacheState.changeId {
+	id = atomic.LoadUint64(&w.pvbState.changeID)
+	if id != w.pvbCacheState.changeID {
 		pvbList := &velerov1api.PodVolumeBackupList{}
 		if err := w.client.List(ctx, pvbList, &ctlclient.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(map[string]string{ExposeOnGoingLabel: "true"}))}); err != nil {
 			log.WithError(err).Warn("Failed to list PVB, skip counting")
 		} else {
 			w.pvbCacheState.queueLength = len(pvbList.Items)
-			w.pvbCacheState.changeId = id
+			w.pvbCacheState.changeID = id
 
 			log.Infof("Query queue length for pvb %d", w.pvbCacheState.queueLength)
 		}
 	}
 
-	id = atomic.LoadUint64(&w.pvrState.changeId)
-	if id != w.pvrCacheState.changeId {
+	id = atomic.LoadUint64(&w.pvrState.changeID)
+	if id != w.pvrCacheState.changeID {
 		pvrList := &velerov1api.PodVolumeRestoreList{}
 		if err := w.client.List(ctx, pvrList, &ctlclient.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(map[string]string{ExposeOnGoingLabel: "true"}))}); err != nil {
 			log.WithError(err).Warn("Failed to list PVR, skip counting")
 		} else {
 			w.pvrCacheState.queueLength = len(pvrList.Items)
-			w.pvrCacheState.changeId = id
+			w.pvrCacheState.changeID = id
 
 			log.Infof("Query queue length for pvr %d", w.pvrCacheState.queueLength)
 		}
