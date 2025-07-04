@@ -156,22 +156,22 @@ func TestIsConstrained(t *testing.T) {
 			assert.Equal(t, test.expected, result)
 
 			if !test.getErr {
-				assert.Equal(t, test.counter.duState.changeId, test.counter.duCacheState.changeId)
-				assert.Equal(t, test.counter.ddState.changeId, test.counter.ddCacheState.changeId)
-				assert.Equal(t, test.counter.pvbState.changeId, test.counter.pvbCacheState.changeId)
-				assert.Equal(t, test.counter.pvrState.changeId, test.counter.pvrCacheState.changeId)
+				assert.Equal(t, test.counter.duState.changeID, test.counter.duCacheState.changeID)
+				assert.Equal(t, test.counter.ddState.changeID, test.counter.ddCacheState.changeID)
+				assert.Equal(t, test.counter.pvbState.changeID, test.counter.pvbCacheState.changeID)
+				assert.Equal(t, test.counter.pvrState.changeID, test.counter.pvrCacheState.changeID)
 			} else {
-				or := test.counter.duState.changeId != test.counter.duCacheState.changeId
+				or := test.counter.duState.changeID != test.counter.duCacheState.changeID
 				if !or {
-					or = test.counter.ddState.changeId != test.counter.ddCacheState.changeId
+					or = test.counter.ddState.changeID != test.counter.ddCacheState.changeID
 				}
 
 				if !or {
-					or = test.counter.pvbState.changeId != test.counter.pvbCacheState.changeId
+					or = test.counter.pvbState.changeID != test.counter.pvbCacheState.changeID
 				}
 
 				if !or {
-					or = test.counter.pvrState.changeId != test.counter.pvrCacheState.changeId
+					or = test.counter.pvrState.changeID != test.counter.pvrCacheState.changeID
 				}
 
 				assert.True(t, or)
