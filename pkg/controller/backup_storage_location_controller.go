@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/metrics"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,8 +55,8 @@ type backupStorageLocationReconciler struct {
 	// replaced with fakes for testing.
 	newPluginManager  func(logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
-
-	log logrus.FieldLogger
+	metrics           *metrics.ServerMetrics
+	log               logrus.FieldLogger
 }
 
 // NewBackupStorageLocationReconciler initialize and return a backupStorageLocationReconciler struct
@@ -64,6 +66,7 @@ func NewBackupStorageLocationReconciler(
 	defaultBackupLocationInfo storage.DefaultBackupLocationInfo,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
+	metrics *metrics.ServerMetrics,
 	log logrus.FieldLogger) *backupStorageLocationReconciler {
 	return &backupStorageLocationReconciler{
 		ctx:                       ctx,
@@ -71,6 +74,7 @@ func NewBackupStorageLocationReconciler(
 		defaultBackupLocationInfo: defaultBackupLocationInfo,
 		newPluginManager:          newPluginManager,
 		backupStoreGetter:         backupStoreGetter,
+		metrics:                   metrics,
 		log:                       log,
 	}
 }
@@ -164,8 +168,10 @@ func (r *backupStorageLocationReconciler) logReconciledPhase(defaultFound bool, 
 		switch phase {
 		case velerov1api.BackupStorageLocationPhaseAvailable:
 			availableBSLs = append(availableBSLs, &locationList.Items[i])
+			r.metrics.RegisterBackupLocationAvailable(locationList.Items[i].Name)
 		case velerov1api.BackupStorageLocationPhaseUnavailable:
 			unAvailableBSLs = append(unAvailableBSLs, &locationList.Items[i])
+			r.metrics.RegisterBackupLocationUnavailable(locationList.Items[i].Name)
 		default:
 			unknownBSLs = append(unknownBSLs, &locationList.Items[i])
 		}
