@@ -312,6 +312,7 @@ linters:
     - durationcheck
     - errcheck
     - errchkjson
+    - errorlint
     - ginkgolinter
     - goconst
     - goheader
