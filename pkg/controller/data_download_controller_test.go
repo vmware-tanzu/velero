@@ -136,6 +136,7 @@ func initDataDownloadReconcilerWithError(t *testing.T, objects []any, needError 
 		fakeKubeClient,
 		dataPathMgr,
 		nil,
+		nil,
 		nodeagent.RestorePVC{},
 		corev1api.ResourceRequirements{},
 		"test-node",
@@ -195,6 +196,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 		mockCancel               bool
 		mockClose                bool
 		needExclusiveUpdateError error
+		constrained              bool
 		expected                 *velerov2alpha1api.DataDownload
 		expectDeleted            bool
 		expectCancelRecord       bool
@@ -296,6 +298,20 @@ func TestDataDownloadReconcile(t *testing.T) {
 			dd:   dataDownloadBuilder().Phase("Unknown").Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
 		},
 		{
+			name:               "dd is cancel on new",
+			dd:                 dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Result(),
+			targetPVC:          builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			expectCancelRecord: true,
+			expected:           dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Result(),
+		},
+		{
+			name:           "new dd but constrained",
+			dd:             dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			constrained:    true,
+			expected:       dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
+		},
+		{
 			name:           "new dd but no target PVC",
 			dd:             dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
 			expectedResult: &ctrl.Result{Requeue: true},
@@ -307,12 +323,6 @@ func TestDataDownloadReconcile(t *testing.T) {
 			needExclusiveUpdateError: errors.New("exclusive-update-error"),
 			expected:                 dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
 			expectedErr:              "error accepting the data download datadownload-1: exclusive-update-error",
-		},
-		{
-			name:      "dd is cancel on accepted",
-			dd:        dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Result(),
-			targetPVC: builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			expected:  dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Result(),
 		},
 		{
 			name:        "dd is accepted but setup expose param failed",
@@ -488,6 +498,10 @@ func TestDataDownloadReconcile(t *testing.T) {
 				r.cancelledDataDownload[test.dd.Name] = test.sportTime.Time
 			}
 
+			if test.constrained {
+				r.vgdpCounter = &exposer.VgdpCounter{}
+			}
+
 			funcExclusiveUpdateDataDownload = exclusiveUpdateDataDownload
 			if test.needExclusiveUpdateError != nil {
 				funcExclusiveUpdateDataDownload = func(context.Context, kbclient.Client, *velerov2alpha1api.DataDownload, func(*velerov2alpha1api.DataDownload)) (bool, error) {
@@ -571,13 +585,13 @@ func TestDataDownloadReconcile(t *testing.T) {
 				assert.Equal(t, test.expectedResult.RequeueAfter, actualResult.RequeueAfter)
 			}
 
-			if test.expected != nil || test.expectDeleted {
-				dd := velerov2alpha1api.DataDownload{}
-				err = r.client.Get(ctx, kbclient.ObjectKey{
-					Name:      test.dd.Name,
-					Namespace: test.dd.Namespace,
-				}, &dd)
+			dd := velerov2alpha1api.DataDownload{}
+			err = r.client.Get(ctx, kbclient.ObjectKey{
+				Name:      test.dd.Name,
+				Namespace: test.dd.Namespace,
+			}, &dd)
 
+			if test.expected != nil || test.expectDeleted {
 				if test.expectDeleted {
 					assert.True(t, apierrors.IsNotFound(err))
 				} else {
@@ -600,6 +614,12 @@ func TestDataDownloadReconcile(t *testing.T) {
 				assert.Contains(t, r.cancelledDataDownload, test.dd.Name)
 			} else {
 				assert.Empty(t, r.cancelledDataDownload)
+			}
+
+			if isDataDownloadInFinalState(&dd) || dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
+				assert.NotContains(t, dd.Labels, exposer.ExposeOnGoingLabel)
+			} else if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted {
+				assert.Contains(t, dd.Labels, exposer.ExposeOnGoingLabel)
 			}
 		})
 	}
