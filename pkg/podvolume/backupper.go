@@ -426,9 +426,10 @@ func (b *backupper) WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velero
 				continue
 			}
 			podVolumeBackups = append(podVolumeBackups, pvb)
-			if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed {
+			switch pvb.Status.Phase {
+			case velerov1api.PodVolumeBackupPhaseFailed:
 				log.Errorf("pod volume backup failed: %s", pvb.Status.Message)
-			} else if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseCanceled {
+			case velerov1api.PodVolumeBackupPhaseCanceled:
 				log.Errorf("pod volume backup canceled: %s", pvb.Status.Message)
 			}
 		}
