@@ -87,6 +87,9 @@ spec:
                   of the CSI snapshot.
                 nullable: true
                 properties:
+                  driver:
+                    description: Driver is the driver used by the VolumeSnapshotContent
+                    type: string
                   snapshotClass:
                     description: SnapshotClass is the name of the snapshot class that
                       the volume snapshot is created with

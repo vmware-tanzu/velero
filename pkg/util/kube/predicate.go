@@ -98,10 +98,22 @@ func NewGenericEventPredicate(f func(object client.Object) bool) predicate.Predi
 }
 
 // NewUpdateEventPredicate creates a new Predicate that checks the Update event with the provided func
-func NewUpdateEventPredicate(f func(objectOld client.Object, objectNew client.Object) bool) predicate.Predicate {
+func NewUpdateEventPredicate(
+	f func(objectOld client.Object, objectNew client.Object) bool,
+) predicate.Predicate {
 	return predicate.Funcs{
 		UpdateFunc: func(event event.UpdateEvent) bool {
 			return f(event.ObjectOld, event.ObjectNew)
+		},
+	}
+}
+
+func NewCreateEventPredicate(
+	f func(object client.Object) bool,
+) predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc: func(event event.CreateEvent) bool {
+			return f(event.Object)
 		},
 	}
 }

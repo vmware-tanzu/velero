@@ -79,6 +79,10 @@ type CSISnapshotSpec struct {
 	// SnapshotClass is the name of the snapshot class that the volume snapshot is created with
 	// +optional
 	SnapshotClass string `json:"snapshotClass"`
+
+	// Driver is the driver used by the VolumeSnapshotContent
+	// +optional
+	Driver string `json:"driver,omitempty"`
 }
 
 // DataUploadPhase represents the lifecycle phase of a DataUpload.

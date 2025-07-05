@@ -84,16 +84,15 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 		return nil, nil, "", nil, errors.WithStack(err)
 	}
 
-	volumeSnapshotClassName := ""
+	additionalItems := make([]velero.ResourceIdentifier, 0)
 	if vs.Spec.VolumeSnapshotClassName != nil {
-		volumeSnapshotClassName = *vs.Spec.VolumeSnapshotClassName
-	}
-
-	additionalItems := []velero.ResourceIdentifier{
-		{
-			GroupResource: kuberesource.VolumeSnapshotClasses,
-			Name:          volumeSnapshotClassName,
-		},
+		additionalItems = append(
+			additionalItems,
+			velero.ResourceIdentifier{
+				GroupResource: kuberesource.VolumeSnapshotClasses,
+				Name:          *vs.Spec.VolumeSnapshotClassName,
+			},
+		)
 	}
 
 	p.log.Infof("Getting VolumesnapshotContent for Volumesnapshot %s/%s",

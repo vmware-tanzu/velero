@@ -74,7 +74,7 @@ type DataUploadReconciler struct {
 	logger              logrus.FieldLogger
 	snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
 	dataPathMgr         *datapath.Manager
-	loadAffinity        *kube.LoadAffinity
+	loadAffinity        []*kube.LoadAffinity
 	backupPVCConfig     map[string]nodeagent.BackupPVC
 	podResources        corev1api.ResourceRequirements
 	preparingTimeout    time.Duration
@@ -88,7 +88,7 @@ func NewDataUploadReconciler(
 	kubeClient kubernetes.Interface,
 	csiSnapshotClient snapshotter.SnapshotV1Interface,
 	dataPathMgr *datapath.Manager,
-	loadAffinity *kube.LoadAffinity,
+	loadAffinity []*kube.LoadAffinity,
 	backupPVCConfig map[string]nodeagent.BackupPVC,
 	podResources corev1api.ResourceRequirements,
 	clock clocks.WithTickerAndDelayedExecution,
@@ -917,6 +917,8 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			}
 		}
 
+		affinity := kube.GetLoadAffinityByStorageClass(r.loadAffinity, du.Spec.CSISnapshot.SnapshotClass, log)
+
 		return &exposer.CSISnapshotExposeParam{
 			SnapshotName:          du.Spec.CSISnapshot.VolumeSnapshot,
 			SourceNamespace:       du.Spec.SourceNamespace,
@@ -927,7 +929,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			OperationTimeout:      du.Spec.OperationTimeout.Duration,
 			ExposeTimeout:         r.preparingTimeout,
 			VolumeSize:            pvc.Spec.Resources.Requests[corev1api.ResourceStorage],
-			Affinity:              r.loadAffinity,
+			Affinity:              affinity,
 			BackupPVCConfig:       r.backupPVCConfig,
 			Resources:             r.podResources,
 			NodeOS:                nodeOS,
@@ -1042,7 +1044,7 @@ func (r *DataUploadReconciler) AttemptDataUploadResume(ctx context.Context, logg
 			if err != nil {
 				logger.WithField("dataupload", du.GetName()).WithError(errors.WithStack(err)).Error("Failed to trigger dataupload cancel")
 			}
-		} else {
+		} else if !isDataUploadInFinalState(du) {
 			// the Prepared CR could be still handled by dataupload controller after node-agent restart
 			// the accepted CR may also suvived from node-agent restart as long as the intermediate objects are all done
 			logger.WithField("dataupload", du.GetName()).Infof("find a dataupload with status %s", du.Status.Phase)

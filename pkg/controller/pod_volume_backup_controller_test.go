@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
@@ -37,11 +38,13 @@ import (
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
@@ -49,6 +52,8 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+
+	datapathmocks "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
 )
 
 const pvbName = "pvb-1"
@@ -914,6 +919,249 @@ func TestUpdatePvbWithRetry(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+type pvbResumeTestHelper struct {
+	resumeErr    error
+	getExposeErr error
+	exposeResult *exposer.ExposeResult
+	asyncBR      datapath.AsyncBR
+}
+
+func (dt *pvbResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler, _ context.Context, _ *velerov2alpha1api.DataUpload, _ logrus.FieldLogger) error {
+	return dt.resumeErr
+}
+
+func (dt *pvbResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, exposer.PodVolumeExposeParam) error {
+	return nil
+}
+
+func (dt *pvbResumeTestHelper) GetExposed(context.Context, corev1api.ObjectReference, kbclient.Client, string, time.Duration) (*exposer.ExposeResult, error) {
+	return dt.exposeResult, dt.getExposeErr
+}
+
+func (dt *pvbResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
+	return nil
+}
+
+func (dt *pvbResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
+	return ""
+}
+
+func (dt *pvbResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference) {}
+
+func (dt *pvbResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
+	datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
+	return dt.asyncBR
+}
+
+func TestAttemptPVBResume(t *testing.T) {
+	tests := []struct {
+		name           string
+		pvbs           []*velerov1api.PodVolumeBackup
+		pvb            *velerov1api.PodVolumeBackup
+		needErrs       []bool
+		acceptedPvbs   []string
+		preparedPvbs   []string
+		cancelledPvbs  []string
+		inProgressPvbs []string
+		resumeErr      error
+		expectedError  string
+	}{
+		{
+			name: "Other pvb",
+			pvb:  pvbBuilder().Phase(velerov1api.PodVolumeBackupPhasePrepared).Result(),
+		},
+		{
+			name:           "InProgress pvb, not the current node",
+			pvb:            pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseInProgress).Result(),
+			inProgressPvbs: []string{pvbName},
+		},
+		{
+			name:           "InProgress pvb, resume error and update error",
+			pvb:            pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseInProgress).Node("node-1").Result(),
+			needErrs:       []bool{false, false, true, false, false, false},
+			resumeErr:      errors.New("fake-resume-error"),
+			inProgressPvbs: []string{pvbName},
+		},
+		{
+			name:           "InProgress pvb, resume error and update succeed",
+			pvb:            pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseInProgress).Node("node-1").Result(),
+			resumeErr:      errors.New("fake-resume-error"),
+			cancelledPvbs:  []string{pvbName},
+			inProgressPvbs: []string{pvbName},
+		},
+		{
+			name:           "InProgress pvb and resume succeed",
+			pvb:            pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseInProgress).Node("node-1").Result(),
+			inProgressPvbs: []string{pvbName},
+		},
+		{
+			name:          "Error",
+			needErrs:      []bool{false, false, false, false, false, true},
+			pvb:           pvbBuilder().Phase(velerov1api.PodVolumeBackupPhasePrepared).Result(),
+			expectedError: "error to list PVBs: List error",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.TODO()
+			r, err := initPVBReconciler(test.needErrs...)
+			r.nodeName = "node-1"
+			require.NoError(t, err)
+
+			assert.NoError(t, r.client.Create(ctx, test.pvb))
+
+			dt := &pvbResumeTestHelper{
+				resumeErr: test.resumeErr,
+			}
+
+			funcResumeCancellableDataBackup = dt.resumeCancellableDataPath
+
+			// Run the test
+			err = r.AttemptPVBResume(ctx, r.logger.WithField("name", test.name), test.pvb.Namespace)
+
+			if test.expectedError != "" {
+				assert.EqualError(t, err, test.expectedError)
+			} else {
+				assert.NoError(t, err)
+
+				for _, pvbName := range test.cancelledPvbs {
+					pvb := &velerov1api.PodVolumeBackup{}
+					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvbName}, pvb)
+					require.NoError(t, err)
+					assert.True(t, pvb.Spec.Cancel)
+				}
+
+				for _, pvbName := range test.acceptedPvbs {
+					pvb := &velerov1api.PodVolumeBackup{}
+					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvbName}, pvb)
+					require.NoError(t, err)
+					assert.Equal(t, velerov1api.PodVolumeBackupPhaseAccepted, pvb.Status.Phase)
+				}
+
+				for _, pvbName := range test.preparedPvbs {
+					pvb := &velerov1api.PodVolumeBackup{}
+					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvbName}, pvb)
+					require.NoError(t, err)
+					assert.Equal(t, velerov1api.PodVolumeBackupPhasePrepared, pvb.Status.Phase)
+				}
+
+				for _, pvbName := range test.inProgressPvbs {
+					pvb := &velerov1api.PodVolumeBackup{}
+					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvbName}, pvb)
+					require.NoError(t, err)
+					assert.Equal(t, velerov1api.PodVolumeBackupPhaseInProgress, pvb.Status.Phase)
+				}
+			}
+		})
+	}
+}
+
+func TestResumeCancellablePodVolumeBackup(t *testing.T) {
+	tests := []struct {
+		name             string
+		pvbs             []velerov1api.PodVolumeBackup
+		pvb              *velerov1api.PodVolumeBackup
+		getExposeErr     error
+		exposeResult     *exposer.ExposeResult
+		createWatcherErr error
+		initWatcherErr   error
+		startWatcherErr  error
+		mockInit         bool
+		mockStart        bool
+		mockClose        bool
+		expectedError    string
+	}{
+		{
+			name:          "get expose failed",
+			pvb:           pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseInProgress).Result(),
+			getExposeErr:  errors.New("fake-expose-error"),
+			expectedError: fmt.Sprintf("error to get exposed PVB %s: fake-expose-error", pvbName),
+		},
+		{
+			name:          "no expose",
+			pvb:           pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseAccepted).Node("node-1").Result(),
+			expectedError: fmt.Sprintf("no expose result is available for the current node for PVB %s", pvbName),
+		},
+		{
+			name: "watcher init error",
+			pvb:  pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseAccepted).Node("node-1").Result(),
+			exposeResult: &exposer.ExposeResult{
+				ByPod: exposer.ExposeByPod{
+					HostingPod: &corev1api.Pod{},
+				},
+			},
+			mockInit:       true,
+			mockClose:      true,
+			initWatcherErr: errors.New("fake-init-watcher-error"),
+			expectedError:  fmt.Sprintf("error to init asyncBR watcher for PVB %s: fake-init-watcher-error", pvbName),
+		},
+		{
+			name: "start watcher error",
+			pvb:  pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseAccepted).Node("node-1").Result(),
+			exposeResult: &exposer.ExposeResult{
+				ByPod: exposer.ExposeByPod{
+					HostingPod: &corev1api.Pod{},
+				},
+			},
+			mockInit:        true,
+			mockStart:       true,
+			mockClose:       true,
+			startWatcherErr: errors.New("fake-start-watcher-error"),
+			expectedError:   fmt.Sprintf("error to resume asyncBR watcher for PVB %s: fake-start-watcher-error", pvbName),
+		},
+		{
+			name: "succeed",
+			pvb:  pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseAccepted).Node("node-1").Result(),
+			exposeResult: &exposer.ExposeResult{
+				ByPod: exposer.ExposeByPod{
+					HostingPod: &corev1api.Pod{},
+				},
+			},
+			mockInit:  true,
+			mockStart: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.TODO()
+			r, err := initPVBReconciler()
+			r.nodeName = "node-1"
+			require.NoError(t, err)
+
+			mockAsyncBR := datapathmocks.NewAsyncBR(t)
+
+			if test.mockInit {
+				mockAsyncBR.On("Init", mock.Anything, mock.Anything).Return(test.initWatcherErr)
+			}
+
+			if test.mockStart {
+				mockAsyncBR.On("StartBackup", mock.Anything, mock.Anything, mock.Anything).Return(test.startWatcherErr)
+			}
+
+			if test.mockClose {
+				mockAsyncBR.On("Close", mock.Anything).Return()
+			}
+
+			dt := &pvbResumeTestHelper{
+				getExposeErr: test.getExposeErr,
+				exposeResult: test.exposeResult,
+				asyncBR:      mockAsyncBR,
+			}
+
+			r.exposer = dt
+
+			datapath.MicroServiceBRWatcherCreator = dt.newMicroServiceBRWatcher
+
+			err = r.resumeCancellableDataPath(ctx, test.pvb, velerotest.NewLogger())
+			if test.expectedError != "" {
+				assert.EqualError(t, err, test.expectedError)
 			}
 		})
 	}

@@ -202,12 +202,27 @@ func TestNewGenericEventPredicate(t *testing.T) {
 }
 
 func TestNewUpdateEventPredicate(t *testing.T) {
-	predicate := NewUpdateEventPredicate(func(client.Object, client.Object) bool {
-		return false
-	})
+	predicate := NewUpdateEventPredicate(
+		func(client.Object, client.Object) bool {
+			return false
+		},
+	)
 
 	assert.False(t, predicate.Update(event.UpdateEvent{}))
 	assert.True(t, predicate.Create(event.CreateEvent{}))
 	assert.True(t, predicate.Delete(event.DeleteEvent{}))
 	assert.True(t, predicate.Generic(event.GenericEvent{}))
+}
+
+func TestNewCreateEventPredicate(t *testing.T) {
+	predicate := NewCreateEventPredicate(
+		func(client.Object) bool {
+			return false
+		},
+	)
+
+	assert.False(t, predicate.Create(event.CreateEvent{}))
+	assert.True(t, predicate.Update(event.UpdateEvent{}))
+	assert.True(t, predicate.Generic(event.GenericEvent{}))
+	assert.True(t, predicate.Delete(event.DeleteEvent{}))
 }

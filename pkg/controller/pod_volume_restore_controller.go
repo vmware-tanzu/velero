@@ -908,3 +908,103 @@ func UpdatePVRWithRetry(ctx context.Context, client client.Client, namespacedNam
 		return true, nil
 	})
 }
+
+var funcResumeCancellablePVR = (*PodVolumeRestoreReconciler).resumeCancellableDataPath
+
+func (r *PodVolumeRestoreReconciler) AttemptPVRResume(ctx context.Context, logger *logrus.Entry, ns string) error {
+	pvrs := &velerov1api.PodVolumeRestoreList{}
+	if err := r.client.List(ctx, pvrs, &client.ListOptions{Namespace: ns}); err != nil {
+		r.logger.WithError(errors.WithStack(err)).Error("failed to list PVRs")
+		return errors.Wrapf(err, "error to list PVRs")
+	}
+
+	for i := range pvrs.Items {
+		pvr := &pvrs.Items[i]
+		if IsLegacyPVR(pvr) {
+			continue
+		}
+
+		if pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseInProgress {
+			if pvr.Status.Node != r.nodeName {
+				logger.WithField("PVR", pvr.Name).WithField("current node", r.nodeName).Infof("PVR should be resumed by another node %s", pvr.Status.Node)
+				continue
+			}
+
+			err := funcResumeCancellablePVR(r, ctx, pvr, logger)
+			if err == nil {
+				logger.WithField("PVR", pvr.Name).WithField("current node", r.nodeName).Info("Completed to resume in progress PVR")
+				continue
+			}
+
+			logger.WithField("PVR", pvr.GetName()).WithError(err).Warn("Failed to resume data path for PVR, have to cancel it")
+
+			resumeErr := err
+			err = UpdatePVRWithRetry(ctx, r.client, types.NamespacedName{Namespace: pvr.Namespace, Name: pvr.Name}, logger.WithField("PVR", pvr.Name),
+				func(pvr *velerov1api.PodVolumeRestore) bool {
+					if pvr.Spec.Cancel {
+						return false
+					}
+
+					pvr.Spec.Cancel = true
+					pvr.Status.Message = fmt.Sprintf("Resume InProgress PVR failed with error %v, mark it as cancel", resumeErr)
+
+					return true
+				})
+			if err != nil {
+				logger.WithField("PVR", pvr.GetName()).WithError(errors.WithStack(err)).Error("Failed to trigger PVR cancel")
+			}
+		} else if !isPVRInFinalState(pvr) {
+			logger.WithField("PVR", pvr.GetName()).Infof("find a PVR with status %s", pvr.Status.Phase)
+		}
+	}
+
+	return nil
+}
+
+func (r *PodVolumeRestoreReconciler) resumeCancellableDataPath(ctx context.Context, pvr *velerov1api.PodVolumeRestore, log logrus.FieldLogger) error {
+	log.Info("Resume cancelable PVR")
+
+	res, err := r.exposer.GetExposed(ctx, getPVROwnerObject(pvr), r.client, r.nodeName, r.resourceTimeout)
+	if err != nil {
+		return errors.Wrapf(err, "error to get exposed PVR %s", pvr.Name)
+	}
+
+	if res == nil {
+		return errors.Errorf("no expose result is available for the current node for PVR %s", pvr.Name)
+	}
+
+	callbacks := datapath.Callbacks{
+		OnCompleted: r.OnDataPathCompleted,
+		OnFailed:    r.OnDataPathFailed,
+		OnCancelled: r.OnDataPathCancelled,
+		OnProgress:  r.OnDataPathProgress,
+	}
+
+	asyncBR, err := r.dataPathMgr.CreateMicroServiceBRWatcher(ctx, r.client, r.kubeClient, r.mgr, datapath.TaskTypeRestore, pvr.Name, pvr.Namespace, res.ByPod.HostingPod.Name, res.ByPod.HostingContainer, pvr.Name, callbacks, true, log)
+	if err != nil {
+		return errors.Wrapf(err, "error to create asyncBR watcher for PVR %s", pvr.Name)
+	}
+
+	resumeComplete := false
+	defer func() {
+		if !resumeComplete {
+			r.closeDataPath(ctx, pvr.Name)
+		}
+	}()
+
+	if err := asyncBR.Init(ctx, nil); err != nil {
+		return errors.Wrapf(err, "error to init asyncBR watcher for PVR %s", pvr.Name)
+	}
+
+	if err := asyncBR.StartRestore(pvr.Spec.SnapshotID, datapath.AccessPoint{
+		ByPath: res.ByPod.VolumeName,
+	}, pvr.Spec.UploaderSettings); err != nil {
+		return errors.Wrapf(err, "error to resume asyncBR watcher for PVR %s", pvr.Name)
+	}
+
+	resumeComplete = true
+
+	log.Infof("asyncBR is resumed for PVR %s", pvr.Name)
+
+	return nil
+}

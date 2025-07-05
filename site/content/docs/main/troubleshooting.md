@@ -222,6 +222,20 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
    Ensure that the key exists within the secret's data by checking the output from `kubectl -n velero describe secret $BSL_SECRET` or `kubectl -n velero describe secret $VSL_SECRET`.
    If it does not exist, follow the instructions for [editing a Kubernetes secret][12] to add the base64 encoded credentials data.
 
+## Kopia repository files' ownership mismatch
+
+Velero sets the files' ownership created in the Kopia repository to `default@default`.
+
+If users need to use Kopia CLI to connect to the Velero created Kopia repositories, please use the following CLI as an example to avoid overwriting the ownership by accident.
+``` bash
+kopia repository connect <type> <--read-only> --bucket= --override-username=default --override-hostname=default
+```
+
+If the ownership conflict error(`maintenance must be run by designated user`) already happens,
+Velero doesn't handle the conflict by design.
+To resolve it, please use Kopia maintenance CLI to set the ownership correctly, e.g. `kopia maintenance set --owner=default@default`.
+
+Please refer to [Issue 9007](https://github.com/vmware-tanzu/velero/issues/9007) for more information.
 
 [1]: debugging-restores.md
 [2]: debugging-install.md

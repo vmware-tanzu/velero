@@ -86,6 +86,39 @@ func TestVSExecute(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "VS not have VSClass",
+			backup: builder.ForBackup("velero", "backup").
+				Phase(velerov1api.BackupPhaseInProgress).Result(),
+			vs: builder.ForVolumeSnapshot("velero", "vs").
+				ObjectMeta(builder.WithLabels(
+					velerov1api.BackupNameLabel, "backup")).
+				Status().
+				BoundVolumeSnapshotContentName("vsc").Result(),
+			vsc: builder.ForVolumeSnapshotContent("vsc").Status(
+				&snapshotv1api.VolumeSnapshotContentStatus{
+					SnapshotHandle: &snapshotHandle,
+				},
+			).Result(),
+			expectedErr: "",
+			expectedAdditionalItems: []velero.ResourceIdentifier{
+				{
+					GroupResource: kuberesource.VolumeSnapshotContents,
+					Name:          "vsc",
+				},
+			},
+			expectedItemToUpdate: []velero.ResourceIdentifier{
+				{
+					GroupResource: kuberesource.VolumeSnapshots,
+					Namespace:     "velero",
+					Name:          "vs",
+				},
+				{
+					GroupResource: kuberesource.VolumeSnapshotContents,
+					Name:          "vsc",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tests {
