@@ -329,10 +329,12 @@ func installKibishii(
 	baseDir := resolveBasePath(kibishiiDirectory)
 	fmt.Printf("Using image registry proxy %s to patch Kibishii images. Base Dir: %s\n", imageRegistryProxy, baseDir)
 
+	sanitizedTargetKustomizeDir := strings.ReplaceAll(targetKustomizeDir, "overlays/sc-reclaim-policy", "")
+
 	kibishiiImage := readBaseKibishiiImage(path.Join(baseDir, "base", "kibishii.yaml"))
 	if err := generateKibishiiImagePatch(
 		path.Join(imageRegistryProxy, kibishiiImage),
-		path.Join(targetKustomizeDir, "worker-image-patch.yaml"),
+		path.Join(sanitizedTargetKustomizeDir, "worker-image-patch.yaml"),
 	); err != nil {
 		return nil
 	}
@@ -340,7 +342,7 @@ func installKibishii(
 	jumpPadImage := readBaseJumpPadImage(path.Join(baseDir, "base", "jump-pad.yaml"))
 	if err := generateJumpPadPatch(
 		path.Join(imageRegistryProxy, jumpPadImage),
-		path.Join(targetKustomizeDir, "jump-pad-image-patch.yaml"),
+		path.Join(sanitizedTargetKustomizeDir, "jump-pad-image-patch.yaml"),
 	); err != nil {
 		return nil
 	}
@@ -348,7 +350,7 @@ func installKibishii(
 	etcdImage := readBaseEtcdImage(path.Join(baseDir, "base", "etcd.yaml"))
 	if err := generateEtcdImagePatch(
 		path.Join(imageRegistryProxy, etcdImage),
-		path.Join(targetKustomizeDir, "etcd-image-patch.yaml"),
+		path.Join(sanitizedTargetKustomizeDir, "etcd-image-patch.yaml"),
 	); err != nil {
 		return nil
 	}
