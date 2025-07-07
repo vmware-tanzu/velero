@@ -269,6 +269,7 @@ type VeleroOptions struct {
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
+	NodeAgentDisableHostPath        bool
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -404,6 +405,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 			WithResources(o.NodeAgentPodResources),
 			WithSecret(secretPresent),
 			WithServiceAccountName(serviceAccountName),
+			WithNodeAgentDisableHostPath(o.NodeAgentDisableHostPath),
 		}
 		if len(o.Features) > 0 {
 			dsOpts = append(dsOpts, WithFeatures(o.Features))
