@@ -59,6 +59,9 @@ type CSISnapshotExposeParam struct {
 	// HostingPodAnnotations is the annotations that are going to apply to the hosting pod
 	HostingPodAnnotations map[string]string
 
+	// HostingPodTolerations is the tolerations that are going to apply to the hosting pod
+	HostingPodTolerations []corev1api.Toleration
+
 	// OperationTimeout specifies the time wait for resources operations in Expose
 	OperationTimeout time.Duration
 
@@ -215,6 +218,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 		csiExposeParam.OperationTimeout,
 		csiExposeParam.HostingPodLabels,
 		csiExposeParam.HostingPodAnnotations,
+		csiExposeParam.HostingPodTolerations,
 		csiExposeParam.Affinity,
 		csiExposeParam.Resources,
 		backupPVCReadOnly,
@@ -528,6 +532,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	operationTimeout time.Duration,
 	label map[string]string,
 	annotation map[string]string,
+	toleration []corev1api.Toleration,
 	affinity *kube.LoadAffinity,
 	resources corev1api.ResourceRequirements,
 	backupPVCReadOnly bool,
@@ -586,7 +591,6 @@ func (e *csiSnapshotExposer) createBackupPod(
 	var securityCtx *corev1api.PodSecurityContext
 	nodeSelector := map[string]string{}
 	podOS := corev1api.PodOS{}
-	toleration := []corev1api.Toleration{}
 	if nodeOS == kube.NodeOSWindows {
 		userID := "ContainerAdministrator"
 		securityCtx = &corev1api.PodSecurityContext{

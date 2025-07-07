@@ -59,6 +59,9 @@ type PodVolumeExposeParam struct {
 	// HostingPodAnnotations is the annotations that are going to apply to the hosting pod
 	HostingPodAnnotations map[string]string
 
+	// HostingPodTolerations is the tolerations that are going to apply to the hosting pod
+	HostingPodTolerations []corev1api.Toleration
+
 	// Resources defines the resource requirements of the hosting pod
 	Resources corev1api.ResourceRequirements
 
@@ -147,7 +150,7 @@ func (e *podVolumeExposer) Expose(ctx context.Context, ownerObject corev1api.Obj
 
 	curLog.WithField("path", path).Infof("Host path is retrieved for pod %s, volume %s", param.ClientPodName, param.ClientPodVolume)
 
-	hostingPod, err := e.createHostingPod(ctx, ownerObject, param.Type, path.ByPath, param.OperationTimeout, param.HostingPodLabels, param.HostingPodAnnotations, pod.Spec.NodeName, param.Resources, nodeOS)
+	hostingPod, err := e.createHostingPod(ctx, ownerObject, param.Type, path.ByPath, param.OperationTimeout, param.HostingPodLabels, param.HostingPodAnnotations, param.HostingPodTolerations, pod.Spec.NodeName, param.Resources, nodeOS)
 	if err != nil {
 		return errors.Wrapf(err, "error to create hosting pod")
 	}
@@ -263,7 +266,7 @@ func (e *podVolumeExposer) CleanUp(ctx context.Context, ownerObject corev1api.Ob
 }
 
 func (e *podVolumeExposer) createHostingPod(ctx context.Context, ownerObject corev1api.ObjectReference, exposeType string, hostPath string,
-	operationTimeout time.Duration, label map[string]string, annotation map[string]string, selectedNode string, resources corev1api.ResourceRequirements, nodeOS string) (*corev1api.Pod, error) {
+	operationTimeout time.Duration, label map[string]string, annotation map[string]string, toleration []corev1api.Toleration, selectedNode string, resources corev1api.ResourceRequirements, nodeOS string) (*corev1api.Pod, error) {
 	hostingPodName := ownerObject.Name
 
 	containerName := string(ownerObject.UID)
@@ -318,7 +321,6 @@ func (e *podVolumeExposer) createHostingPod(ctx context.Context, ownerObject cor
 	var securityCtx *corev1api.PodSecurityContext
 	nodeSelector := map[string]string{}
 	podOS := corev1api.PodOS{}
-	toleration := []corev1api.Toleration{}
 	if nodeOS == kube.NodeOSWindows {
 		userID := "ContainerAdministrator"
 		securityCtx = &corev1api.PodSecurityContext{

@@ -756,9 +756,14 @@ func (r *PodVolumeBackupReconciler) closeDataPath(ctx context.Context, pvbName s
 func (r *PodVolumeBackupReconciler) setupExposeParam(pvb *velerov1api.PodVolumeBackup) exposer.PodVolumeExposeParam {
 	log := r.logger.WithField("PVB", pvb.Name)
 
+	nodeOS, err := kube.GetNodeOS(context.Background(), pvb.Spec.Node, r.kubeClient.CoreV1())
+	if err != nil {
+		log.WithError(err).Warnf("Failed to get nodeOS for node %s, use linux node-agent for hosting pod labels, annotations and tolerations", pvb.Spec.Node)
+	}
+
 	hostingPodLabels := map[string]string{velerov1api.PVBLabel: pvb.Name}
 	for _, k := range util.ThirdPartyLabels {
-		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvb.Namespace, k, ""); err != nil {
+		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
 			if err != nodeagent.ErrNodeAgentLabelNotFound {
 				log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
 			}
@@ -769,12 +774,23 @@ func (r *PodVolumeBackupReconciler) setupExposeParam(pvb *velerov1api.PodVolumeB
 
 	hostingPodAnnotation := map[string]string{}
 	for _, k := range util.ThirdPartyAnnotations {
-		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvb.Namespace, k, ""); err != nil {
+		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
 			if err != nodeagent.ErrNodeAgentAnnotationNotFound {
 				log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
 			}
 		} else {
 			hostingPodAnnotation[k] = v
+		}
+	}
+
+	hostingPodTolerations := []corev1api.Toleration{}
+	for _, k := range util.ThirdPartyTolerations {
+		if v, err := nodeagent.GetToleration(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
+			if err != nodeagent.ErrNodeAgentTolerationNotFound {
+				log.WithError(err).Warnf("Failed to check node-agent toleration, skip adding host pod toleration %s", k)
+			}
+		} else {
+			hostingPodTolerations = append(hostingPodTolerations, *v)
 		}
 	}
 
@@ -785,6 +801,7 @@ func (r *PodVolumeBackupReconciler) setupExposeParam(pvb *velerov1api.PodVolumeB
 		ClientPodVolume:       pvb.Spec.Volume,
 		HostingPodLabels:      hostingPodLabels,
 		HostingPodAnnotations: hostingPodAnnotation,
+		HostingPodTolerations: hostingPodTolerations,
 		OperationTimeout:      r.resourceTimeout,
 		Resources:             r.podResources,
 	}
