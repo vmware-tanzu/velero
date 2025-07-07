@@ -471,14 +471,14 @@ func TestWaitRestoreExecHook(t *testing.T) {
 
 	hookTracker2 := hook.NewMultiHookTracker()
 	restoreName2 := "restore2"
-	hookTracker2.Add(restoreName2, "ns", "pod", "con1", "s1", "h1", "")
-	hookTracker2.Record(restoreName2, "ns", "pod", "con1", "s1", "h1", "", false, nil)
+	hookTracker2.Add(restoreName2, "ns", "pod", "con1", "s1", "h1", "", 0)
+	hookTracker2.Record(restoreName2, "ns", "pod", "con1", "s1", "h1", "", 0, false, nil)
 
 	hookTracker3 := hook.NewMultiHookTracker()
 	restoreName3 := "restore3"
 	podNs, podName, container, source, hookName := "ns", "pod", "con1", "s1", "h1"
 	hookFailed, hookErr := true, fmt.Errorf("hook failed")
-	hookTracker3.Add(restoreName3, podNs, podName, container, source, hookName, hook.PhasePre)
+	hookTracker3.Add(restoreName3, podNs, podName, container, source, hookName, hook.PhasePre, 0)
 
 	tests := []struct {
 		name                   string
@@ -546,7 +546,7 @@ func TestWaitRestoreExecHook(t *testing.T) {
 		if tc.waitSec > 0 {
 			go func() {
 				time.Sleep(time.Second * time.Duration(tc.waitSec))
-				tc.hookTracker.Record(tc.restore.Name, tc.podNs, tc.podName, tc.Container, tc.Source, tc.hookName, hook.PhasePre, tc.hookFailed, tc.hookErr)
+				tc.hookTracker.Record(tc.restore.Name, tc.podNs, tc.podName, tc.Container, tc.Source, tc.hookName, hook.PhasePre, 0, tc.hookFailed, tc.hookErr)
 			}()
 		}
 

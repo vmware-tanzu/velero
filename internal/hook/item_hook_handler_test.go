@@ -1151,6 +1151,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 							WaitTimeout:  metav1.Duration{Duration: time.Minute},
 							WaitForReady: boolptr.False(),
 						},
+						hookIndex: 0,
 					},
 					{
 						HookName:   "hook1",
@@ -1163,6 +1164,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 							WaitTimeout:  metav1.Duration{Duration: time.Minute * 2},
 							WaitForReady: boolptr.False(),
 						},
+						hookIndex: 2,
 					},
 					{
 						HookName:   "hook2",
@@ -1175,6 +1177,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 							WaitTimeout:  metav1.Duration{Duration: time.Minute * 4},
 							WaitForReady: boolptr.True(),
 						},
+						hookIndex: 0,
 					},
 				},
 				"container2": {
@@ -1189,6 +1192,7 @@ func TestGroupRestoreExecHooks(t *testing.T) {
 							WaitTimeout:  metav1.Duration{Duration: time.Second * 3},
 							WaitForReady: boolptr.False(),
 						},
+						hookIndex: 1,
 					},
 				},
 			},
