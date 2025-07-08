@@ -588,6 +588,11 @@ func (r *PodVolumeBackupReconciler) OnDataPathProgress(ctx context.Context, name
 func (r *PodVolumeBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
 		pvb := object.(*velerov1api.PodVolumeBackup)
+
+		if _, err := uploader.ValidateUploaderType(pvb.Spec.UploaderType); err != nil {
+			return false
+		}
+
 		if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseAccepted {
 			return true
 		}
