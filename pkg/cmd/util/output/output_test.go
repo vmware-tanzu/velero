@@ -3,6 +3,7 @@ package output
 import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -34,7 +35,7 @@ func TestClearOutputFlagDefault(t *testing.T) {
 	BindFlags(cmd.Flags())
 	cmd.Flags().Set("output", "json")
 	ClearOutputFlagDefault(cmd)
-	assert.Equal(t, "", cmd.Flags().Lookup("output").Value.String())
+	assert.Empty(t, cmd.Flags().Lookup("output").Value.String())
 }
 
 func cmdWithFormat(use string, format string) *cobra.Command {
@@ -372,9 +373,9 @@ func TestPrintWithFormat(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p, err := PrintWithFormat(tc.input.cmd, tc.input.obj)
 			if tc.hasErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 			assert.Equal(t, tc.printed, p)
 		})

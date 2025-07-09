@@ -732,7 +732,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 
 			for _, e := range test.expectedExecutions {
 				obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(e.pod)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				podCommandExecutor.On("ExecutePodCommand", mock.Anything, obj, e.pod.Namespace, e.pod.Name, e.name, e.hook).Return(e.error)
 			}
 
@@ -1007,17 +1007,17 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 	}
 
 	hookTracker1 := NewMultiHookTracker()
-	hookTracker1.Add("restore1", "default", "my-pod", "container1", HookSourceAnnotation, "<from-annotation>", HookPhase(""))
+	hookTracker1.Add("restore1", "default", "my-pod", "container1", HookSourceAnnotation, "<from-annotation>", HookPhase(""), 0)
 
 	hookTracker2 := NewMultiHookTracker()
-	hookTracker2.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""))
+	hookTracker2.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""), 0)
 
 	hookTracker3 := NewMultiHookTracker()
-	hookTracker3.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""))
-	hookTracker3.Add("restore1", "default", "my-pod", "container2", HookSourceSpec, "my-hook-2", HookPhase(""))
+	hookTracker3.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""), 0)
+	hookTracker3.Add("restore1", "default", "my-pod", "container2", HookSourceSpec, "my-hook-2", HookPhase(""), 0)
 
 	hookTracker4 := NewMultiHookTracker()
-	hookTracker4.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""))
+	hookTracker4.Add("restore1", "default", "my-pod", "container1", HookSourceSpec, "my-hook-1", HookPhase(""), 0)
 
 	tests1 := []struct {
 		name               string
@@ -1264,7 +1264,7 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 
 			for _, e := range test.expectedExecutions {
 				obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(e.pod)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				podCommandExecutor.On("ExecutePodCommand", mock.Anything, obj, e.pod.Namespace, e.pod.Name, e.name, e.hook).Return(e.error)
 			}
 

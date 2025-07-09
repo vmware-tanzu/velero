@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -232,7 +233,7 @@ func TestGetPodSpec(t *testing.T) {
 
 			spec, err := GetPodSpec(context.TODO(), fakeKubeClient, test.namespace, kube.NodeOSLinux)
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, *spec, test.expectSpec)
 			} else {
 				assert.EqualError(t, err, test.expectErr)
@@ -317,7 +318,7 @@ func TestGetConfigs(t *testing.T) {
 
 			result, err := GetConfigs(context.TODO(), test.namespace, fakeKubeClient, "node-agent-config")
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				if test.expectResult == nil {
 					assert.Nil(t, result)
@@ -453,7 +454,7 @@ func TestGetLabelValue(t *testing.T) {
 
 			value, err := GetLabelValue(context.TODO(), fakeKubeClient, test.namespace, "fake-label", kube.NodeOSLinux)
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, test.expectedValue, value)
 			} else {
 				assert.EqualError(t, err, test.expectErr)
@@ -582,8 +583,169 @@ func TestGetAnnotationValue(t *testing.T) {
 
 			value, err := GetAnnotationValue(context.TODO(), fakeKubeClient, test.namespace, "fake-annotation", kube.NodeOSLinux)
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, test.expectedValue, value)
+			} else {
+				assert.EqualError(t, err, test.expectErr)
+			}
+		})
+	}
+}
+
+func TestGetHostPodPath(t *testing.T) {
+	daemonSet := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+	}
+
+	daemonSetWithHostPodVolume := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						{
+							Name: HostPodVolumeMount,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	daemonSetWithHostPodVolumeAndEmptyPath := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						{
+							Name: HostPodVolumeMount,
+							VolumeSource: corev1api.VolumeSource{
+								HostPath: &corev1api.HostPathVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	daemonSetWithHostPodVolumeAndValidPath := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						{
+							Name: HostPodVolumeMount,
+							VolumeSource: corev1api.VolumeSource{
+								HostPath: &corev1api.HostPathVolumeSource{
+									Path: "/var/lib/kubelet/pods",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name          string
+		kubeClientObj []runtime.Object
+		namespace     string
+		osType        string
+		expectedValue string
+		expectErr     string
+	}{
+		{
+			name:      "ds get error",
+			namespace: "fake-ns",
+			osType:    kube.NodeOSWindows,
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectErr: "error getting daemonset node-agent-windows: daemonsets.apps \"node-agent-windows\" not found",
+		},
+		{
+			name:      "no host pod volume",
+			namespace: "fake-ns",
+			osType:    kube.NodeOSLinux,
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectErr: "host pod volume is not found",
+		},
+		{
+			name:      "no host pod volume path",
+			namespace: "fake-ns",
+			osType:    kube.NodeOSLinux,
+			kubeClientObj: []runtime.Object{
+				daemonSetWithHostPodVolume,
+			},
+			expectErr: "host pod volume is not a host path volume",
+		},
+		{
+			name:      "empty host pod volume path",
+			namespace: "fake-ns",
+			osType:    kube.NodeOSLinux,
+			kubeClientObj: []runtime.Object{
+				daemonSetWithHostPodVolumeAndEmptyPath,
+			},
+			expectErr: "host pod volume path is empty",
+		},
+		{
+			name:      "succeed",
+			namespace: "fake-ns",
+			osType:    kube.NodeOSLinux,
+			kubeClientObj: []runtime.Object{
+				daemonSetWithHostPodVolumeAndValidPath,
+			},
+			expectedValue: "/var/lib/kubelet/pods",
+		},
+		{
+			name:      "succeed on empty os type",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithHostPodVolumeAndValidPath,
+			},
+			expectedValue: "/var/lib/kubelet/pods",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			path, err := GetHostPodPath(context.TODO(), fakeKubeClient, test.namespace, test.osType)
+
+			if test.expectErr == "" {
+				require.NoError(t, err)
+				assert.Equal(t, test.expectedValue, path)
 			} else {
 				assert.EqualError(t, err, test.expectErr)
 			}

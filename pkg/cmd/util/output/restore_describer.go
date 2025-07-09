@@ -387,8 +387,11 @@ func describePodVolumeRestores(d *Describer, restores []velerov1api.PodVolumeRes
 	// go through phases in a specific order
 	for _, phase := range []string{
 		string(velerov1api.PodVolumeRestorePhaseCompleted),
+		string(velerov1api.PodVolumeRestorePhaseCanceled),
 		string(velerov1api.PodVolumeRestorePhaseFailed),
 		"In Progress",
+		string(velerov1api.PodVolumeRestorePhasePrepared),
+		string(velerov1api.PodVolumeRestorePhaseAccepted),
 		string(velerov1api.PodVolumeRestorePhaseNew),
 	} {
 		if len(restoresByPhase[phase]) == 0 {
@@ -467,8 +470,11 @@ func groupRestoresByPhase(restores []velerov1api.PodVolumeRestore) map[string][]
 
 	phaseToGroup := map[velerov1api.PodVolumeRestorePhase]string{
 		velerov1api.PodVolumeRestorePhaseCompleted:  string(velerov1api.PodVolumeRestorePhaseCompleted),
+		velerov1api.PodVolumeRestorePhaseCanceled:   string(velerov1api.PodVolumeRestorePhaseCanceled),
 		velerov1api.PodVolumeRestorePhaseFailed:     string(velerov1api.PodVolumeRestorePhaseFailed),
 		velerov1api.PodVolumeRestorePhaseInProgress: "In Progress",
+		velerov1api.PodVolumeRestorePhasePrepared:   string(velerov1api.PodVolumeRestorePhasePrepared),
+		velerov1api.PodVolumeRestorePhaseAccepted:   string(velerov1api.PodVolumeRestorePhaseAccepted),
 		velerov1api.PodVolumeRestorePhaseNew:        string(velerov1api.PodVolumeRestorePhaseNew),
 		"":                                          string(velerov1api.PodVolumeRestorePhaseNew),
 	}

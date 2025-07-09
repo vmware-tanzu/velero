@@ -58,6 +58,7 @@ import (
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 	pkgrestoreUtil "github.com/vmware-tanzu/velero/pkg/util/velero/restore"
 )
 
@@ -390,6 +391,11 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 	info, err := r.fetchBackupInfo(restore.Spec.BackupName)
 	if err != nil {
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Error retrieving backup: %v", err))
+		return backupInfo{}, nil
+	}
+
+	if !veleroutil.BSLIsAvailable(*info.location) {
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("The BSL %s is unavailable, cannot retrieve the backup", info.location.Name))
 		return backupInfo{}, nil
 	}
 
@@ -726,6 +732,10 @@ func (r *restoreReconciler) deleteExternalResources(restore *api.Restore) error 
 			return nil
 		}
 		return errors.Wrap(err, fmt.Sprintf("can't get backup info, backup: %s", restore.Spec.BackupName))
+	}
+
+	if !veleroutil.BSLIsAvailable(*backupInfo.location) {
+		return fmt.Errorf("bsl %s is unavailable, cannot get the backup info", backupInfo.location.Name)
 	}
 
 	// delete restore files in object storage

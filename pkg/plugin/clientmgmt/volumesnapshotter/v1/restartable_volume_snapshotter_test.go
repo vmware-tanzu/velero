@@ -96,7 +96,7 @@ func TestRestartableVolumeSnapshotterReinitialize(t *testing.T) {
 	}
 
 	err := r.Reinitialize(3)
-	assert.EqualError(t, err, "plugin int is not a VolumeSnapshotter")
+	require.EqualError(t, err, "plugin int is not a VolumeSnapshotter")
 
 	volumeSnapshotter := new(providermocks.VolumeSnapshotter)
 	volumeSnapshotter.Test(t)
@@ -104,7 +104,7 @@ func TestRestartableVolumeSnapshotterReinitialize(t *testing.T) {
 
 	volumeSnapshotter.On("Init", r.config).Return(errors.Errorf("init error")).Once()
 	err = r.Reinitialize(volumeSnapshotter)
-	assert.EqualError(t, err, "init error")
+	require.EqualError(t, err, "init error")
 
 	volumeSnapshotter.On("Init", r.config).Return(nil)
 	err = r.Reinitialize(volumeSnapshotter)
@@ -126,7 +126,7 @@ func TestRestartableVolumeSnapshotterGetDelegate(t *testing.T) {
 	}
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
-	assert.EqualError(t, err, "reset error")
+	require.EqualError(t, err, "reset error")
 
 	// Happy path
 	p.On("ResetIfNeeded").Return(nil)
@@ -136,7 +136,7 @@ func TestRestartableVolumeSnapshotterGetDelegate(t *testing.T) {
 	p.On("GetByKindAndName", key).Return(volumeSnapshotter, nil)
 
 	a, err = r.getDelegate()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, volumeSnapshotter, a)
 }
 
@@ -158,7 +158,7 @@ func TestRestartableVolumeSnapshotterInit(t *testing.T) {
 		"color": "blue",
 	}
 	err := r.Init(config)
-	assert.EqualError(t, err, "GetByKindAndName error")
+	require.EqualError(t, err, "GetByKindAndName error")
 
 	// Delegate returns error
 	volumeSnapshotter := new(providermocks.VolumeSnapshotter)
@@ -168,7 +168,7 @@ func TestRestartableVolumeSnapshotterInit(t *testing.T) {
 	volumeSnapshotter.On("Init", config).Return(errors.Errorf("Init error")).Once()
 
 	err = r.Init(config)
-	assert.EqualError(t, err, "Init error")
+	require.EqualError(t, err, "Init error")
 
 	// wipe this out because the previous failed Init call set it
 	r.config = nil
@@ -176,7 +176,7 @@ func TestRestartableVolumeSnapshotterInit(t *testing.T) {
 	// Happy path
 	volumeSnapshotter.On("Init", config).Return(nil)
 	err = r.Init(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, config, r.config)
 
 	// Calling Init twice is forbidden

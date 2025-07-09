@@ -19,6 +19,8 @@ package velero
 import (
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 // GetNodeSelectorFromVeleroServer get the node selector from the Velero server deployment
@@ -59,6 +61,20 @@ func GetVolumeMountsFromVeleroServer(deployment *appsv1api.Deployment) []corev1a
 	for _, container := range deployment.Spec.Template.Spec.Containers {
 		// We only have one container in the Velero server deployment
 		return container.VolumeMounts
+	}
+	return nil
+}
+
+// GetPodSecurityContextsFromVeleroServer get the pod security context from the Velero server deployment
+func GetPodSecurityContextsFromVeleroServer(deployment *appsv1api.Deployment) *corev1api.PodSecurityContext {
+	return deployment.Spec.Template.Spec.SecurityContext
+}
+
+// GetContainerSecurityContextsFromVeleroServer get the security context from the Velero server deployment
+func GetContainerSecurityContextsFromVeleroServer(deployment *appsv1api.Deployment) *corev1api.SecurityContext {
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		// We only have one container in the Velero server deployment
+		return container.SecurityContext
 	}
 	return nil
 }
@@ -104,4 +120,8 @@ func GetVeleroServerAnnotationValue(deployment *appsv1api.Deployment, key string
 	}
 
 	return deployment.Spec.Template.Annotations[key]
+}
+
+func BSLIsAvailable(bsl velerov1api.BackupStorageLocation) bool {
+	return bsl.Status.Phase == velerov1api.BackupStorageLocationPhaseAvailable
 }

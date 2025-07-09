@@ -46,7 +46,7 @@ func mockGCReconciler(fakeClient kbclient.Client, fakeClock *testclocks.FakeCloc
 
 func TestGCReconcile(t *testing.T) {
 	fakeClock := testclocks.NewFakeClock(time.Now())
-	defaultBackupLocation := builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "default").Result()
+	defaultBackupLocation := builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "default").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
 
 	tests := []struct {
 		name                 string
@@ -66,12 +66,12 @@ func TestGCReconcile(t *testing.T) {
 		{
 			name:           "expired backup in read-only storage location is not deleted",
 			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-only").Result(),
-			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result(),
 		},
 		{
 			name:           "expired backup in read-write storage location is deleted",
 			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-write").Result(),
-			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").AccessMode(velerov1api.BackupStorageLocationAccessModeReadWrite).Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").AccessMode(velerov1api.BackupStorageLocationAccessModeReadWrite).Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result(),
 		},
 		{
 			name:           "expired backup with no pending deletion requests is deleted",
@@ -117,6 +117,12 @@ func TestGCReconcile(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name:           "BSL is unavailable",
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Result(),
+			backupLocation: builder.ForBackupStorageLocation(velerov1api.DefaultNamespace, "default").Phase(velerov1api.BackupStorageLocationPhaseUnavailable).Result(),
+			expectError:    true,
 		},
 	}
 

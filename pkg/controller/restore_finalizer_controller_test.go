@@ -151,7 +151,7 @@ func TestRestoreFinalizerReconcile(t *testing.T) {
 				backupStore.On("GetRestoreItemOperations", test.restore.Name).Return([]*itemoperation.RestoreOperation{}, nil)
 			}
 			if test.backup != nil {
-				assert.NoError(t, r.Client.Create(context.Background(), test.backup))
+				require.NoError(t, r.Client.Create(context.Background(), test.backup))
 				backupStore.On("GetBackupVolumeInfos", test.backup.Name).Return(nil, nil)
 				pluginManager.On("GetRestoreItemActionsV2").Return(nil, nil)
 				pluginManager.On("CleanupClients")
@@ -457,7 +457,7 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 		for pvName, expectedPVInfo := range tc.expectedPatch {
 			pv := &corev1api.PersistentVolume{}
 			err := ctx.crClient.Get(context.Background(), crclient.ObjectKey{Name: pvName}, pv)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t, expectedPVInfo.ReclaimPolicy, string(pv.Spec.PersistentVolumeReclaimPolicy))
 			assert.Equal(t, expectedPVInfo.Labels, pv.Labels)
@@ -471,14 +471,14 @@ func TestWaitRestoreExecHook(t *testing.T) {
 
 	hookTracker2 := hook.NewMultiHookTracker()
 	restoreName2 := "restore2"
-	hookTracker2.Add(restoreName2, "ns", "pod", "con1", "s1", "h1", "")
-	hookTracker2.Record(restoreName2, "ns", "pod", "con1", "s1", "h1", "", false, nil)
+	hookTracker2.Add(restoreName2, "ns", "pod", "con1", "s1", "h1", "", 0)
+	hookTracker2.Record(restoreName2, "ns", "pod", "con1", "s1", "h1", "", 0, false, nil)
 
 	hookTracker3 := hook.NewMultiHookTracker()
 	restoreName3 := "restore3"
 	podNs, podName, container, source, hookName := "ns", "pod", "con1", "s1", "h1"
 	hookFailed, hookErr := true, fmt.Errorf("hook failed")
-	hookTracker3.Add(restoreName3, podNs, podName, container, source, hookName, hook.PhasePre)
+	hookTracker3.Add(restoreName3, podNs, podName, container, source, hookName, hook.PhasePre, 0)
 
 	tests := []struct {
 		name                   string
@@ -546,7 +546,7 @@ func TestWaitRestoreExecHook(t *testing.T) {
 		if tc.waitSec > 0 {
 			go func() {
 				time.Sleep(time.Second * time.Duration(tc.waitSec))
-				tc.hookTracker.Record(tc.restore.Name, tc.podNs, tc.podName, tc.Container, tc.Source, tc.hookName, hook.PhasePre, tc.hookFailed, tc.hookErr)
+				tc.hookTracker.Record(tc.restore.Name, tc.podNs, tc.podName, tc.Container, tc.Source, tc.hookName, hook.PhasePre, 0, tc.hookFailed, tc.hookErr)
 			}()
 		}
 
@@ -555,7 +555,7 @@ func TestWaitRestoreExecHook(t *testing.T) {
 
 		updated := &velerov1api.Restore{}
 		err := ctx.crClient.Get(context.Background(), crclient.ObjectKey{Namespace: velerov1api.DefaultNamespace, Name: tc.restore.Name}, updated)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, tc.expectedHooksAttempted, updated.Status.HookStatus.HooksAttempted)
 		assert.Equal(t, tc.expectedHooksFailed, updated.Status.HookStatus.HooksFailed)
 	}

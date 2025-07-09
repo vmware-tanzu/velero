@@ -29,6 +29,7 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -415,7 +416,6 @@ func TestGenerateVolumeInfoForCSIVolumeSnapshot(t *testing.T) {
 					BoundVolumeSnapshotContentName: stringPtr("testContent"),
 				},
 			},
-			volumeSnapshotClass:   *builder.ForVolumeSnapshotClass("testClass").Driver("pd.csi.storage.gke.io").Result(),
 			volumeSnapshotContent: *builder.ForVolumeSnapshotContent("testContent").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: stringPtr("testSnapshotHandle")}).Result(),
 			expectedVolumeInfos:   []*BackupVolumeInfo{},
 		},
@@ -440,8 +440,7 @@ func TestGenerateVolumeInfoForCSIVolumeSnapshot(t *testing.T) {
 					ReadyToUse:                     &readyToUse,
 				},
 			},
-			volumeSnapshotClass:   *builder.ForVolumeSnapshotClass("testClass").Driver("pd.csi.storage.gke.io").Result(),
-			volumeSnapshotContent: *builder.ForVolumeSnapshotContent("testContent").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: stringPtr("testSnapshotHandle")}).Result(),
+			volumeSnapshotContent: *builder.ForVolumeSnapshotContent("testContent").Driver("pd.csi.storage.gke.io").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: stringPtr("testSnapshotHandle")}).Result(),
 			pvMap: map[string]pvcPvInfo{
 				"testPV": {
 					PVCName:      "testPVC",
@@ -758,7 +757,8 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 	defer features.Disable(velerov1api.CSIFeatureFlag)
 	tests := []struct {
 		name                string
-		volumeSnapshotClass *snapshotv1api.VolumeSnapshotClass
+		vs                  *snapshotv1api.VolumeSnapshot
+		vsc                 *snapshotv1api.VolumeSnapshotContent
 		dataUpload          *velerov2alpha1.DataUpload
 		operation           *itemoperation.BackupOperation
 		pvMap               map[string]pvcPvInfo
@@ -830,86 +830,19 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 			expectedVolumeInfos: []*BackupVolumeInfo{},
 		},
 		{
-			name: "VolumeSnapshotClass cannot be found for operation",
-			dataUpload: builder.ForDataUpload("velero", "testDU").DataMover("velero").CSISnapshot(&velerov2alpha1.CSISnapshotSpec{
-				VolumeSnapshot: "testVS",
-			}).SnapshotID("testSnapshotHandle").StartTimestamp(&now).Result(),
-			operation: &itemoperation.BackupOperation{
-				Spec: itemoperation.BackupOperationSpec{
-					OperationID: "testOperation",
-					ResourceIdentifier: velero.ResourceIdentifier{
-						GroupResource: schema.GroupResource{
-							Group:    "",
-							Resource: "persistentvolumeclaims",
-						},
-						Namespace: "velero",
-						Name:      "testPVC",
-					},
-					PostOperationItems: []velero.ResourceIdentifier{
-						{
-							GroupResource: schema.GroupResource{
-								Group:    "velero.io",
-								Resource: "datauploads",
-							},
-							Namespace: "velero",
-							Name:      "testDU",
-						},
-					},
-				},
-			},
-			pvMap: map[string]pvcPvInfo{
-				"testPV": {
-					PVCName:      "testPVC",
-					PVCNamespace: "velero",
-					PV: corev1api.PersistentVolume{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:   "testPV",
-							Labels: map[string]string{"a": "b"},
-						},
-						Spec: corev1api.PersistentVolumeSpec{
-							PersistentVolumeReclaimPolicy: corev1api.PersistentVolumeReclaimDelete,
-						},
-					},
-				},
-			},
-			expectedVolumeInfos: []*BackupVolumeInfo{
-				{
-					PVCName:           "testPVC",
-					PVCNamespace:      "velero",
-					PVName:            "testPV",
-					BackupMethod:      CSISnapshot,
-					SnapshotDataMoved: true,
-					StartTimestamp:    &now,
-					CSISnapshotInfo: &CSISnapshotInfo{
-						SnapshotHandle: FieldValueIsUnknown,
-						VSCName:        FieldValueIsUnknown,
-						OperationID:    FieldValueIsUnknown,
-						Size:           0,
-					},
-					SnapshotDataMovementInfo: &SnapshotDataMovementInfo{
-						DataMover:    "velero",
-						UploaderType: "kopia",
-						OperationID:  "testOperation",
-					},
-					PVInfo: &PVInfo{
-						ReclaimPolicy: string(corev1api.PersistentVolumeReclaimDelete),
-						Labels:        map[string]string{"a": "b"},
-					},
-				},
-			},
-		},
-		{
 			name: "Normal DataUpload case",
 			dataUpload: builder.ForDataUpload("velero", "testDU").
 				DataMover("velero").
 				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{
-					VolumeSnapshot: "testVS",
+					VolumeSnapshot: "vs-01",
 					SnapshotClass:  "testClass",
+					Driver:         "pd.csi.storage.gke.io",
 				}).SnapshotID("testSnapshotHandle").
 				StartTimestamp(&now).
 				Phase(velerov2alpha1.DataUploadPhaseCompleted).
 				Result(),
-			volumeSnapshotClass: builder.ForVolumeSnapshotClass("testClass").Driver("pd.csi.storage.gke.io").Result(),
+			vs:  builder.ForVolumeSnapshot(velerov1api.DefaultNamespace, "vs-01").Status().BoundVolumeSnapshotContentName("vsc-01").Result(),
+			vsc: builder.ForVolumeSnapshotContent("vsc-01").Driver("pd.csi.storage.gke.io").Result(),
 			operation: &itemoperation.BackupOperation{
 				Spec: itemoperation.BackupOperationSpec{
 					OperationID: "testOperation",
@@ -995,14 +928,17 @@ func TestGenerateVolumeInfoFromDataUpload(t *testing.T) {
 				}
 			}
 
-			volumesInfo.crClient = velerotest.NewFakeControllerRuntimeClient(t)
+			objects := make([]runtime.Object, 0)
 			if tc.dataUpload != nil {
-				volumesInfo.crClient.Create(context.TODO(), tc.dataUpload)
+				objects = append(objects, tc.dataUpload)
 			}
-
-			if tc.volumeSnapshotClass != nil {
-				volumesInfo.crClient.Create(context.TODO(), tc.volumeSnapshotClass)
+			if tc.vs != nil {
+				objects = append(objects, tc.vs)
 			}
+			if tc.vsc != nil {
+				objects = append(objects, tc.vsc)
+			}
+			volumesInfo.crClient = velerotest.NewFakeControllerRuntimeClient(t, objects...)
 
 			volumesInfo.logger = logging.DefaultLogger(logrus.DebugLevel, logging.FormatJSON)
 

@@ -41,12 +41,8 @@ const (
 // It will return an error if it's invalid.
 func ValidateUploaderType(t string) (string, error) {
 	t = strings.TrimSpace(t)
-	if t != ResticType && t != KopiaType {
-		return "", fmt.Errorf("invalid uploader type '%s', valid upload types are: '%s', '%s'", t, ResticType, KopiaType)
-	}
-
-	if t == ResticType {
-		return fmt.Sprintf("Uploader '%s' is deprecated, don't use it for new backups, otherwise the backups won't be available for restore when this functionality is removed in a future version of Velero", t), nil
+	if t != KopiaType {
+		return "", fmt.Errorf("invalid uploader type '%s', valid type: '%s'", t, KopiaType)
 	}
 
 	return "", nil

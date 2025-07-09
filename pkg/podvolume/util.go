@@ -17,12 +17,14 @@ limitations under the License.
 package podvolume
 
 import (
+	"fmt"
 	"strings"
 
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/podvolume/configs"
 	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
@@ -141,6 +143,19 @@ func GetSnapshotIdentifier(podVolumeBackups *velerov1api.PodVolumeBackupList) ma
 	}
 
 	return res
+}
+
+func GetRealSource(pvb *velerov1api.PodVolumeBackup) string {
+	pvcName := ""
+	if pvb.Annotations != nil {
+		pvcName = pvb.Annotations[configs.PVCNameAnnotation]
+	}
+
+	if pvcName != "" {
+		return fmt.Sprintf("%s/%s/%s", pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name, pvcName)
+	} else {
+		return fmt.Sprintf("%s/%s/%s", pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name, pvb.Spec.Volume)
+	}
 }
 
 func getUploaderTypeOrDefault(uploaderType string) string {

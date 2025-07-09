@@ -26,6 +26,7 @@ import (
 	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/fake"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,6 +41,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 type reactor struct {
@@ -162,6 +164,7 @@ func TestExpose(t *testing.T) {
 		expectedVolumeSize            *resource.Quantity
 		expectedReadOnlyPVC           bool
 		expectedBackupPVCStorageClass string
+		expectedAffinity              *corev1api.Affinity
 	}{
 		{
 			name:        "wait vs ready fail",
@@ -466,6 +469,135 @@ func TestExpose(t *testing.T) {
 			},
 			expectedBackupPVCStorageClass: "fake-sc-read-only",
 		},
+		{
+			name:        "Affinity per StorageClass",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				StorageClass:     "fake-sc",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				Affinity: &kube.LoadAffinity{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+					StorageClass: "fake-sc",
+				},
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/os",
+										Operator: corev1api.NodeSelectorOpIn,
+										Values:   []string{"Linux"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "Affinity per StorageClass with expectedBackupPVCStorageClass",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				StorageClass:     "fake-sc",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				BackupPVCConfig: map[string]nodeagent.BackupPVC{
+					"fake-sc": {
+						StorageClass: "fake-sc-read-only",
+					},
+				},
+				Affinity: &kube.LoadAffinity{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+					StorageClass: "fake-sc-read-only",
+				},
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectedBackupPVCStorageClass: "fake-sc-read-only",
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/arch",
+										Operator: corev1api.NodeSelectorOpIn,
+										Values:   []string{"amd64"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "Affinity in exposeParam is nil",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				StorageClass:     "fake-sc",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				BackupPVCConfig: map[string]nodeagent.BackupPVC{
+					"fake-sc": {
+						StorageClass: "fake-sc-read-only",
+					},
+				},
+				Affinity: nil,
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectedBackupPVCStorageClass: "fake-sc-read-only",
+			expectedAffinity:              nil,
+		},
 	}
 
 	for _, test := range tests {
@@ -500,19 +632,19 @@ func TestExpose(t *testing.T) {
 
 			err := exposer.Expose(context.Background(), ownerObject, &test.exposeParam)
 			if err == nil {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
-				_, err = exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
-				assert.NoError(t, err)
+				backupPod, err := exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
+				require.NoError(t, err)
 
 				backupPVC, err := exposer.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				expectedVS, err := exposer.csiSnapshotClient.VolumeSnapshots(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				expectedVSC, err := exposer.csiSnapshotClient.VolumeSnapshotContents().Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				assert.Equal(t, expectedVS.Annotations, vsObject.Annotations)
 				assert.Equal(t, *expectedVS.Spec.VolumeSnapshotClassName, *vsObject.Spec.VolumeSnapshotClassName)
@@ -541,6 +673,10 @@ func TestExpose(t *testing.T) {
 
 				if test.expectedBackupPVCStorageClass != "" {
 					assert.Equal(t, test.expectedBackupPVCStorageClass, *backupPVC.Spec.StorageClassName)
+				}
+
+				if test.expectedAffinity != nil {
+					assert.Equal(t, test.expectedAffinity, backupPod.Spec.Affinity)
 				}
 			} else {
 				assert.EqualError(t, err, test.err)
@@ -710,12 +846,12 @@ func TestGetExpose(t *testing.T) {
 
 			result, err := exposer.GetExposed(context.Background(), ownerObject, test.Timeout, &test.exposeWaitParam)
 			if test.err == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				if test.expectedResult == nil {
 					assert.Nil(t, result)
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, test.expectedResult.ByPod.VolumeName, result.ByPod.VolumeName)
 					assert.Equal(t, test.expectedResult.ByPod.HostingPod.Name, result.ByPod.HostingPod.Name)
 				}

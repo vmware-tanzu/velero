@@ -64,6 +64,7 @@ type DataDownloadReconciler struct {
 	restoreExposer        exposer.GenericRestoreExposer
 	nodeName              string
 	dataPathMgr           *datapath.Manager
+	loadAffinity          []*kube.LoadAffinity
 	restorePVCConfig      nodeagent.RestorePVC
 	podResources          corev1api.ResourceRequirements
 	preparingTimeout      time.Duration
@@ -71,9 +72,19 @@ type DataDownloadReconciler struct {
 	cancelledDataDownload map[string]time.Time
 }
 
-func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
-	restorePVCConfig nodeagent.RestorePVC, podResources corev1api.ResourceRequirements, nodeName string, preparingTimeout time.Duration,
-	logger logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataDownloadReconciler {
+func NewDataDownloadReconciler(
+	client client.Client,
+	mgr manager.Manager,
+	kubeClient kubernetes.Interface,
+	dataPathMgr *datapath.Manager,
+	loadAffinity []*kube.LoadAffinity,
+	restorePVCConfig nodeagent.RestorePVC,
+	podResources corev1api.ResourceRequirements,
+	nodeName string,
+	preparingTimeout time.Duration,
+	logger logrus.FieldLogger,
+	metrics *metrics.ServerMetrics,
+) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:                client,
 		kubeClient:            kubeClient,
@@ -84,6 +95,7 @@ func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeCl
 		restoreExposer:        exposer.NewGenericRestoreExposer(kubeClient, logger),
 		restorePVCConfig:      restorePVCConfig,
 		dataPathMgr:           dataPathMgr,
+		loadAffinity:          loadAffinity,
 		podResources:          podResources,
 		preparingTimeout:      preparingTimeout,
 		metrics:               metrics,
@@ -828,6 +840,8 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		}
 	}
 
+	affinity := kube.GetLoadAffinityByStorageClass(r.loadAffinity, dd.Spec.BackupStorageLocation, log)
+
 	return exposer.GenericRestoreExposeParam{
 		TargetPVCName:         dd.Spec.TargetVolume.PVC,
 		TargetNamespace:       dd.Spec.TargetVolume.Namespace,
@@ -838,6 +852,7 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		ExposeTimeout:         r.preparingTimeout,
 		NodeOS:                nodeOS,
 		RestorePVCConfig:      r.restorePVCConfig,
+		LoadAffinity:          affinity,
 	}, nil
 }
 
@@ -885,7 +900,7 @@ func UpdateDataDownloadWithRetry(ctx context.Context, client client.Client, name
 			err := client.Update(ctx, dd)
 			if err != nil {
 				if apierrors.IsConflict(err) {
-					log.Warnf("failed to update datadownload for %s/%s and will retry it", dd.Namespace, dd.Name)
+					log.Debugf("failed to update datadownload for %s/%s and will retry it", dd.Namespace, dd.Name)
 					return false, nil
 				} else {
 					return false, errors.Wrapf(err, "error updating datadownload %s/%s", dd.Namespace, dd.Name)
@@ -937,7 +952,7 @@ func (r *DataDownloadReconciler) AttemptDataDownloadResume(ctx context.Context, 
 			if err != nil {
 				logger.WithError(errors.WithStack(err)).WithError(errors.WithStack(err)).Error("Failed to trigger datadownload cancel")
 			}
-		} else {
+		} else if !isDataDownloadInFinalState(dd) {
 			// the Prepared CR could be still handled by datadownload controller after node-agent restart
 			// the accepted CR may also suvived from node-agent restart as long as the intermediate objects are all done
 			logger.WithField("datadownload", dd.GetName()).Infof("find a datadownload with status %s", dd.Status.Phase)
