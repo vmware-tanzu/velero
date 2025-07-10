@@ -91,7 +91,7 @@ Where `<phase>` can be one of:
 - `running`: Job was actively running
 - `pending`: Job was created but not yet started
 
-This annotation allows users to understand why a Job was restored with specific modifications and helps with debugging restore behavior.
+This annotation allows users to understand why a Job was restored with specific modifications and helps with debugging restore behavior. The annotation is preserved during the restore process since Velero's `resetMetadata` function only removes specific metadata fields (like uid, resourceVersion) but preserves annotations and labels.
 
 #### 2. Restore Annotations
 
