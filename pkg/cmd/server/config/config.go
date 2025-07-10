@@ -207,7 +207,7 @@ func GetDefaultConfig() *Config {
 		LogLevel:                       logging.LogLevelFlag(logrus.InfoLevel),
 		LogFormat:                      logging.NewFormatFlag(),
 		DefaultVolumesToFsBackup:       podvolumeconfigs.DefaultVolumesToFsBackup,
-		UploaderType:                   uploader.ResticType,
+		UploaderType:                   uploader.KopiaType,
 		MaxConcurrentK8SConnections:    defaultMaxConcurrentK8SConnections,
 		DefaultSnapshotMoveData:        false,
 		DisableInformerCache:           defaultDisableInformerCache,

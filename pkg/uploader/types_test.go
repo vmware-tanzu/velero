@@ -15,12 +15,6 @@ func TestValidateUploaderType(t *testing.T) {
 		wantMsg string
 	}{
 		{
-			"'restic' is a valid type",
-			"restic",
-			"",
-			"Uploader 'restic' is deprecated, don't use it for new backups, otherwise the backups won't be available for restore when this functionality is removed in a future version of Velero",
-		},
-		{
 			"'   kopia  ' is a valid type (space will be trimmed)",
 			"   kopia  ",
 			"",
@@ -29,7 +23,7 @@ func TestValidateUploaderType(t *testing.T) {
 		{
 			"'anything_else' is invalid",
 			"anything_else",
-			"invalid uploader type 'anything_else', valid upload types are: 'restic', 'kopia'",
+			"invalid uploader type 'anything_else', valid type: 'kopia'",
 			"",
 		},
 	}
