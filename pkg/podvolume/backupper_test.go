@@ -343,7 +343,7 @@ func TestBackupPodVolumes(t *testing.T) {
 			},
 			uploaderType: "fake-uploader-type",
 			errs: []string{
-				"invalid uploader type 'fake-uploader-type', valid upload types are: 'restic', 'kopia'",
+				"invalid uploader type 'fake-uploader-type', valid type: 'kopia'",
 			},
 		},
 		{
