@@ -52,10 +52,14 @@ The current logic for handling Jobs during restore will be modified as follows:
 
 #### 1. Annotations
 
-We will introduce the following annotation to control Job restoration behavior:
+We will introduce the following annotations to control Job restoration behavior:
+
+##### Phase-Specific Restoration Policies
 
 ```
-velero.io/job-restore-policy: <policy>
+velero.io/job-restore-policy-completed: <policy>
+velero.io/job-restore-policy-failed: <policy>
+velero.io/job-restore-policy-running: <policy>
 ```
 
 Where `<policy>` can be one of:
@@ -63,11 +67,45 @@ Where `<policy>` can be one of:
 - `restore-paused`: Restore the Job with parallelism=0 (paused)
 - `restore-as-is`: Restore the Job with its original configuration
 
-This annotation can be applied to individual Jobs before backup to control their restoration behavior.
+These annotations can be applied to individual Jobs before backup to control their restoration behavior based on their phase at backup time.
+
+##### General Restoration Policy (applies to all phases)
+
+```
+velero.io/job-restore-policy: <policy>
+```
+
+This annotation provides a fallback policy for any phase that doesn't have a specific policy set. If both a phase-specific and general policy are present, the phase-specific policy takes precedence.
+
+##### Backup Phase Recording
+
+During backup, Velero will automatically add the following annotation to record the Job's phase:
+
+```
+velero.io/job-phase-at-backup: <phase>
+```
+
+Where `<phase>` can be one of:
+- `completed`: Job had a completionTime set
+- `failed`: Job had failed status
+- `running`: Job was actively running
+- `pending`: Job was created but not yet started
+
+This annotation allows users to understand why a Job was restored with specific modifications and helps with debugging restore behavior.
 
 #### 2. Restore Annotations
 
 Instead of modifying the Restore CRD, we will use annotations on the Velero Restore object to control the default behavior for all Jobs:
+
+##### Phase-Specific Restore Policies
+
+```
+velero.io/job-restore-policy-completed: <policy>
+velero.io/job-restore-policy-failed: <policy>
+velero.io/job-restore-policy-running: <policy>
+```
+
+##### General Restore Policy
 
 ```
 velero.io/job-restore-policy: <policy>
@@ -75,11 +113,18 @@ velero.io/job-restore-policy: <policy>
 
 Where `<policy>` can be one of the same values as the Job annotation.
 
-This annotation can be added to the Restore object through the CLI:
+These annotations can be added to the Restore object through the CLI:
 
 ```
+# Set a general policy for all Jobs
 velero restore create --from-backup=my-backup \
   --annotations velero.io/job-restore-policy=<policy>
+
+# Set phase-specific policies
+velero restore create --from-backup=my-backup \
+  --annotations velero.io/job-restore-policy-completed=skip \
+  --annotations velero.io/job-restore-policy-failed=restore-paused \
+  --annotations velero.io/job-restore-policy-running=restore-paused
 ```
 
 The default behavior (if no annotation is specified) will be:
@@ -90,18 +135,28 @@ The default behavior (if no annotation is specified) will be:
 
 The implementation will require changes to the following components:
 
-1. **Restore Controller**:
+1. **Backup Controller**:
+   - Modify the backup process to automatically add the `velero.io/job-phase-at-backup` annotation to all Jobs
+   - Determine the Job phase based on its status (completed, failed, running, or pending)
+   - Preserve any existing Job restore policy annotations during backup
+
+2. **Restore Controller**:
    - Modify the `restoreItem` function in `pkg/restore/restore.go` to check for the Job restore policy
+   - Implement logic to determine which policy to apply based on the Job's phase at backup time
+   - Check for phase-specific policies first, then fall back to general policies
    - Implement logic to modify the Job spec based on the determined policy
    - Add logic to check Job status and apply the appropriate default policy
 
-2. **Restore Annotations**:
-   - Implement support for the new annotation on Restore objects
-   - Update the CLI documentation to explain the new annotation
-   - Implement validation for the annotation value
+3. **Restore Annotations**:
+   - Implement support for the new annotations on Restore objects
+   - Update the CLI documentation to explain the new annotations
+   - Implement validation for the annotation values
+   - Ensure proper precedence of phase-specific over general policies
 
-3. **Documentation**:
+4. **Documentation**:
    - Update documentation to explain the new behavior and options
+   - Document the automatic phase recording during backup
+   - Explain why parallelism is modified for certain Jobs
    - Provide examples of common use cases
 
 #### 4. Modification of Job Resources
@@ -115,6 +170,18 @@ spec:
 
 This change effectively pauses the Job, preventing it from creating new pods until the user explicitly increases the parallelism.
 
+##### Transparency and Documentation
+
+To ensure users understand why a Job's parallelism was modified:
+
+1. The `velero.io/job-phase-at-backup` annotation will be present on all restored Jobs, indicating their phase at backup time
+2. The Velero logs will include information about which policy was applied to each Job and why
+3. The documentation will clearly explain:
+   - The default behavior for each Job phase
+   - Why parallelism is set to 0 for certain Jobs (to prevent unintended re-execution)
+   - How to restore Jobs with their original configuration if needed
+   - The precedence order for annotations (phase-specific > general, Job-level > Restore-level)
+
 ### User Experience
 
 #### Example 1: Default Behavior
@@ -123,11 +190,11 @@ By default, a restore operation will:
 - Skip completed Jobs
 - Restore running and failed Jobs with parallelism=0
 
-This prevents unintended re-execution while preserving the Job resources.
+This prevents unintended re-execution while preserving the Job resources. After restore, Jobs will include the `velero.io/job-phase-at-backup` annotation showing their phase at backup time, helping users understand why certain modifications were made.
 
-#### Example 2: Using Annotations
+#### Example 2: Using Phase-Specific Annotations on Jobs
 
-A user can annotate specific Jobs before backup:
+A user can annotate specific Jobs before backup to control behavior based on phase:
 
 ```yaml
 apiVersion: batch/v1
@@ -135,18 +202,56 @@ kind: Job
 metadata:
   name: important-job
   annotations:
-    velero.io/job-restore-policy: restore-as-is
+    velero.io/job-restore-policy-completed: restore-as-is
+    velero.io/job-restore-policy-failed: restore-paused
+    velero.io/job-restore-policy-running: skip
 spec:
   # ...
 ```
 
-This Job will be restored with its original configuration, even if it was completed.
+This Job will be:
+- Restored with its original configuration if it was completed
+- Restored with parallelism=0 if it had failed
+- Skipped if it was still running
 
-#### Example 3: Using Restore Annotations
+#### Example 3: Using General Annotations on Jobs
 
-A user can specify a global policy for all Jobs during restore by annotating the Restore object:
+A user can also use a general policy that applies to all phases:
 
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: less-important-job
+  annotations:
+    velero.io/job-restore-policy: skip
+spec:
+  # ...
 ```
+
+This Job will be skipped during restore regardless of its phase.
+
+#### Example 4: Using Phase-Specific Restore Annotations
+
+A user can specify different policies for different Job phases during restore:
+
+```bash
+velero restore create --from-backup=my-backup \
+  --annotations velero.io/job-restore-policy-completed=skip \
+  --annotations velero.io/job-restore-policy-failed=restore-paused \
+  --annotations velero.io/job-restore-policy-running=restore-as-is
+```
+
+This will:
+- Skip completed Jobs (default behavior)
+- Restore failed Jobs with parallelism=0
+- Restore running Jobs with their original configuration
+
+#### Example 5: Using General Restore Annotations
+
+A user can specify a global policy for all Jobs during restore:
+
+```bash
 velero restore create --from-backup=my-backup \
   --annotations velero.io/job-restore-policy=skip
 ```
