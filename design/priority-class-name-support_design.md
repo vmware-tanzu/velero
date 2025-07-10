@@ -390,7 +390,11 @@ pod := &corev1api.Pod{
 }
 ```
 
-This ensures that all pods created by Velero (data movers, PVB, and PVR) use a consistent approach for priority class name configuration.
+### VGDP Micro-Service Considerations
+
+With the introduction of VGDP micro-services (as described in the VGDP micro-service design), data mover pods are created as dedicated pods for volume snapshot data movement. These pods will also inherit the priority class configuration from the node-agent-configmap. Since VGDP-MS pods (backupPod/restorePod) inherit their configurations from the node-agent, they will automatically use the priority class name specified in the node-agent-configmap.
+
+This ensures that all pods created by Velero for data movement operations (including VGDP micro-service pods, PVB, and PVR) use a consistent approach for priority class name configuration through the node-agent-configmap.
 
 ## Open Issues
 
