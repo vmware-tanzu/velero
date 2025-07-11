@@ -61,6 +61,10 @@ func TestDaemonSet(t *testing.T) {
 	ds = DaemonSet("velero", WithServiceAccountName("test-sa"))
 	assert.Equal(t, "test-sa", ds.Spec.Template.Spec.ServiceAccountName)
 
+	ds = DaemonSet("velero", WithKubeletRootDir("/data/test/kubelet"))
+	assert.Equal(t, "/data/test/kubelet/pods", ds.Spec.Template.Spec.Volumes[0].HostPath.Path)
+	assert.Equal(t, "/data/test/kubelet/plugins", ds.Spec.Template.Spec.Volumes[1].HostPath.Path)
+
 	ds = DaemonSet("velero", WithForWindows())
 	assert.Equal(t, "node-agent-windows", ds.Spec.Template.Spec.Containers[0].Name)
 	assert.Equal(t, "velero", ds.ObjectMeta.Namespace)

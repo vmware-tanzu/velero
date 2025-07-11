@@ -54,6 +54,8 @@ var (
 	DefaultNodeAgentPodMemLimit   = "0"
 
 	DefaultVeleroNamespace = "velero"
+
+	DefaultKubeletRootDir = "/var/lib/kubelet"
 )
 
 func Labels() map[string]string {
@@ -269,6 +271,7 @@ type VeleroOptions struct {
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
+	KubeletRootDir                  string
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -413,6 +416,10 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		}
 		if len(o.NodeAgentConfigMap) > 0 {
 			dsOpts = append(dsOpts, WithNodeAgentConfigMap(o.NodeAgentConfigMap))
+		}
+
+		if len(o.KubeletRootDir) > 0 {
+			dsOpts = append(dsOpts, WithKubeletRootDir(o.KubeletRootDir))
 		}
 
 		if o.UseNodeAgent {
