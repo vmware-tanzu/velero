@@ -1,0 +1,1 @@
+Fix issue #9053, remove selected-node annotation during PVC restore
