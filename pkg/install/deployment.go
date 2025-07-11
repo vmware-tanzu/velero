@@ -59,6 +59,7 @@ type podTemplateConfig struct {
 	nodeAgentConfigMap              string
 	itemBlockWorkerCount            int
 	forWindows                      bool
+	nodeAgentDisableHostPath        bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -223,6 +224,12 @@ func WithItemBlockWorkerCount(itemBlockWorkerCount int) podTemplateOption {
 func WithForWindows() podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.forWindows = true
+	}
+}
+
+func WithNodeAgentDisableHostPath(disable bool) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.nodeAgentDisableHostPath = disable
 	}
 }
 

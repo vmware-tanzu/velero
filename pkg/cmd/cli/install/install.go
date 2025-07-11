@@ -89,6 +89,7 @@ type Options struct {
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
+	NodeAgentDisableHostPath        bool
 }
 
 // BindFlags adds command line values to the options struct.
@@ -134,6 +135,7 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.DefaultSnapshotMoveData, "default-snapshot-move-data", o.DefaultSnapshotMoveData, "Bool flag to configure Velero server to move data by default for all snapshots supporting data movement. Optional.")
 	flags.BoolVar(&o.DisableInformerCache, "disable-informer-cache", o.DisableInformerCache, "Disable informer cache for Get calls on restore. With this enabled, it will speed up restore in cases where there are backup resources which already exist in the cluster, but for very large clusters this will increase velero memory usage. Default is false (don't disable). Optional.")
 	flags.BoolVar(&o.ScheduleSkipImmediately, "schedule-skip-immediately", o.ScheduleSkipImmediately, "Skip the first scheduled backup immediately after creating a schedule. Default is false (don't skip).")
+	flags.BoolVar(&o.NodeAgentDisableHostPath, "node-agent-disable-host-path", o.NodeAgentDisableHostPath, "Don't mount the pod volume host path to node-agent. Optional. Pod volume host path mount is required by fs-backup but could be disabled for other backup methods.")
 
 	flags.IntVar(
 		&o.KeepLatestMaintenanceJobs,
@@ -218,6 +220,7 @@ func NewInstallOptions() *Options {
 		DefaultSnapshotMoveData:  false,
 		DisableInformerCache:     false,
 		ScheduleSkipImmediately:  false,
+		NodeAgentDisableHostPath: false,
 	}
 }
 
@@ -292,6 +295,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		RepoMaintenanceJobConfigMap:     o.RepoMaintenanceJobConfigMap,
 		NodeAgentConfigMap:              o.NodeAgentConfigMap,
 		ItemBlockWorkerCount:            o.ItemBlockWorkerCount,
+		NodeAgentDisableHostPath:        o.NodeAgentDisableHostPath,
 	}, nil
 }
 

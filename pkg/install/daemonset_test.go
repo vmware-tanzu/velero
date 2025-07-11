@@ -38,6 +38,8 @@ func TestDaemonSet(t *testing.T) {
 	assert.Equal(t, "linux", string(ds.Spec.Template.Spec.OS.Name))
 	assert.Equal(t, corev1api.PodSecurityContext{RunAsUser: &userID}, *ds.Spec.Template.Spec.SecurityContext)
 	assert.Equal(t, corev1api.SecurityContext{Privileged: &boolFalse}, *ds.Spec.Template.Spec.Containers[0].SecurityContext)
+	assert.Len(t, ds.Spec.Template.Spec.Volumes, 3)
+	assert.Len(t, ds.Spec.Template.Spec.Containers[0].VolumeMounts, 3)
 
 	ds = DaemonSet("velero", WithPrivilegedNodeAgent(true))
 	assert.Equal(t, corev1api.SecurityContext{Privileged: &boolTrue}, *ds.Spec.Template.Spec.Containers[0].SecurityContext)
@@ -60,6 +62,10 @@ func TestDaemonSet(t *testing.T) {
 
 	ds = DaemonSet("velero", WithServiceAccountName("test-sa"))
 	assert.Equal(t, "test-sa", ds.Spec.Template.Spec.ServiceAccountName)
+
+	ds = DaemonSet("velero", WithNodeAgentDisableHostPath(true))
+	assert.Len(t, ds.Spec.Template.Spec.Volumes, 1)
+	assert.Len(t, ds.Spec.Template.Spec.Containers[0].VolumeMounts, 1)
 
 	ds = DaemonSet("velero", WithForWindows())
 	assert.Equal(t, "node-agent-windows", ds.Spec.Template.Spec.Containers[0].Name)
