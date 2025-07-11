@@ -813,6 +813,28 @@ func TestCreateRestorePod(t *testing.T) {
 		},
 	}
 
+	daemonSetWin := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "velero",
+			Name:      "node-agent-windows",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1api.SchemeGroupVersion.String(),
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
+						{
+							Image: "fake-image",
+						},
+					},
+				},
+			},
+		},
+	}
+
 	targetPVCObj := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
@@ -828,11 +850,12 @@ func TestCreateRestorePod(t *testing.T) {
 		kubeClientObj []runtime.Object
 		selectedNode  string
 		affinity      *kube.LoadAffinity
+		nodeOS        string
 		expectedPod   *corev1api.Pod
 	}{
 		{
-			name:          "",
-			kubeClientObj: []runtime.Object{daemonSet, targetPVCObj},
+			name:          "linux",
+			kubeClientObj: []runtime.Object{daemonSet, daemonSetWin, targetPVCObj},
 			selectedNode:  "",
 			affinity: &kube.LoadAffinity{
 				NodeSelector: metav1.LabelSelector{
@@ -840,12 +863,31 @@ func TestCreateRestorePod(t *testing.T) {
 						{
 							Key:      "kubernetes.io/os",
 							Operator: metav1.LabelSelectorOpIn,
-							Values:   []string{"Linux"},
+							Values:   []string{"linux"},
 						},
 					},
 				},
 				StorageClass: scName,
 			},
+			nodeOS: "linux",
+		},
+		{
+			name:          "windows",
+			kubeClientObj: []runtime.Object{daemonSet, daemonSetWin, targetPVCObj},
+			selectedNode:  "",
+			affinity: &kube.LoadAffinity{
+				NodeSelector: metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "kubernetes.io/os",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"windows"},
+						},
+					},
+				},
+				StorageClass: scName,
+			},
+			nodeOS: "windows",
 		},
 	}
 
@@ -866,11 +908,12 @@ func TestCreateRestorePod(t *testing.T) {
 				},
 				targetPVCObj,
 				time.Second*3,
-				map[string]string{},
-				map[string]string{},
+				nil,
+				nil,
+				nil,
 				test.selectedNode,
 				corev1api.ResourceRequirements{},
-				"linux",
+				test.nodeOS,
 				test.affinity,
 			)
 
