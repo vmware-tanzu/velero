@@ -277,7 +277,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		asyncBR, err = r.dataPathMgr.CreateMicroServiceBRWatcher(ctx, r.client, r.kubeClient, r.mgr, datapath.TaskTypeBackup,
 			pvb.Name, pvb.Namespace, res.ByPod.HostingPod.Name, res.ByPod.HostingContainer, pvb.Name, callbacks, false, log)
 		if err != nil {
-			if err == datapath.ConcurrentLimitExceed {
+			if errors.Is(err, datapath.ConcurrentLimitExceed) {
 				log.Info("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 			} else {
@@ -729,7 +729,8 @@ func UpdatePVBStatusToFailed(ctx context.Context, c client.Client, pvb *velerov1
 
 			pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
 			pvb.Status.CompletionTimestamp = &metav1.Time{Time: time}
-			if dataPathError, ok := errOut.(datapath.DataPathError); ok {
+			var dataPathError datapath.DataPathError
+	if errors.As(errOut, &dataPathError) {
 				pvb.Status.SnapshotID = dataPathError.GetSnapshotID()
 			}
 			if len(strings.TrimSpace(msg)) == 0 {
