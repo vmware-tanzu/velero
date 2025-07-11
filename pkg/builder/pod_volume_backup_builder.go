@@ -149,3 +149,9 @@ func (b *PodVolumeBackupBuilder) OwnerReference(ref metav1.OwnerReference) *PodV
 	b.object.OwnerReferences = append(b.object.OwnerReferences, ref)
 	return b
 }
+
+// Labels sets the PodVolumeBackup's Labels.
+func (b *PodVolumeBackupBuilder) Labels(label map[string]string) *PodVolumeBackupBuilder {
+	b.object.Labels = label
+	return b
+}

@@ -144,6 +144,7 @@ func initPVBReconcilerWithError(needError ...error) (*PodVolumeBackupReconciler,
 		nil,
 		fakeKubeClient,
 		dataPathMgr,
+		nil,
 		"test-node",
 		time.Minute*5,
 		time.Minute,
@@ -224,6 +225,7 @@ func TestPVBReconcile(t *testing.T) {
 		getExposeNil             bool
 		fsBRInitErr              error
 		fsBRStartErr             error
+		constrained              bool
 		expectedErr              string
 		expectedResult           *ctrl.Result
 		expectDataPath           bool
@@ -316,6 +318,13 @@ func TestPVBReconcile(t *testing.T) {
 		{
 			name: "Unknown pvb status",
 			pvb:  pvbBuilder().Phase("Unknown").Finalizers([]string{PodVolumeFinalizer}).Result(),
+		},
+		{
+			name:           "new pvb but constrained",
+			pvb:            pvbBuilder().Finalizers([]string{PodVolumeFinalizer}).Node("test-node").Result(),
+			constrained:    true,
+			expected:       pvbBuilder().Finalizers([]string{PodVolumeFinalizer}).Result(),
+			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
 		},
 		{
 			name:        "new pvb but accept failed",
@@ -480,6 +489,10 @@ func TestPVBReconcile(t *testing.T) {
 				r.cancelledPVB[test.pvb.Name] = test.sportTime.Time
 			}
 
+			if test.constrained {
+				r.vgdpCounter = &exposer.VgdpCounter{}
+			}
+
 			if test.needMockExposer {
 				r.exposer = &fakePvbExposer{r.client, r.clock, test.peekErr, test.exposeErr, test.getExposeErr, test.getExposeNil}
 			}
@@ -525,13 +538,13 @@ func TestPVBReconcile(t *testing.T) {
 				assert.Equal(t, test.expectedResult.RequeueAfter, actualResult.RequeueAfter)
 			}
 
-			if test.expected != nil || test.expectDeleted {
-				pvb := velerov1api.PodVolumeBackup{}
-				err = r.client.Get(ctx, client.ObjectKey{
-					Name:      test.pvb.Name,
-					Namespace: test.pvb.Namespace,
-				}, &pvb)
+			pvb := velerov1api.PodVolumeBackup{}
+			err = r.client.Get(ctx, client.ObjectKey{
+				Name:      test.pvb.Name,
+				Namespace: test.pvb.Namespace,
+			}, &pvb)
 
+			if test.expected != nil || test.expectDeleted {
 				if test.expectDeleted {
 					assert.True(t, apierrors.IsNotFound(err))
 				} else {
@@ -554,6 +567,12 @@ func TestPVBReconcile(t *testing.T) {
 				assert.Contains(t, r.cancelledPVB, test.pvb.Name)
 			} else {
 				assert.Empty(t, r.cancelledPVB)
+			}
+
+			if isPVBInFinalState(&pvb) || pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseInProgress {
+				assert.NotContains(t, pvb.Labels, exposer.ExposeOnGoingLabel)
+			} else if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseAccepted {
+				assert.Contains(t, pvb.Labels, exposer.ExposeOnGoingLabel)
 			}
 		})
 	}
