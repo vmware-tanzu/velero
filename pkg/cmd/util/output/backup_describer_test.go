@@ -124,9 +124,10 @@ Or label selector:  <none>
 
 Storage Location:  backup-location
 
-Velero-Native Snapshot PVs:  auto
-Snapshot Move Data:          auto
-Data Mover:                  mover
+Velero-Native Snapshot PVs:    auto
+Default Volumes to Fs Backup:  auto
+Snapshot Move Data:            auto
+Data Mover:                    mover
 
 TTL:  72h0m0s
 
@@ -188,9 +189,10 @@ Or label selector:  <none>
 
 Storage Location:  backup-location
 
-Velero-Native Snapshot PVs:  auto
-Snapshot Move Data:          auto
-Data Mover:                  mover
+Velero-Native Snapshot PVs:    auto
+Default Volumes to Fs Backup:  auto
+Snapshot Move Data:            auto
+Data Mover:                    mover
 
 TTL:  72h0m0s
 
@@ -245,9 +247,10 @@ Or label selector:  <none>
 
 Storage Location:  backup-location
 
-Velero-Native Snapshot PVs:  auto
-Snapshot Move Data:          auto
-Data Mover:                  velero
+Velero-Native Snapshot PVs:    auto
+Default Volumes to Fs Backup:  auto
+Snapshot Move Data:            auto
+Data Mover:                    velero
 
 TTL:  0s
 
