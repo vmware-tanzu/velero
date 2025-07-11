@@ -563,7 +563,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 	}}
 
 	if backupPVCReadOnly {
-		volumes[0].VolumeSource.PersistentVolumeClaim.ReadOnly = true
+		volumes[0].PersistentVolumeClaim.ReadOnly = true
 	}
 
 	volumes = append(volumes, podInfo.volumes...)
