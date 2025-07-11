@@ -30,6 +30,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/cacert"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 )
 
@@ -62,7 +63,7 @@ func (l *LogsOptions) BindFlags(flags *pflag.FlagSet) {
 
 func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
 	backup := new(velerov1api.Backup)
-	err := l.Client.Get(context.TODO(), kbclient.ObjectKey{Namespace: f.Namespace(), Name: l.BackupName}, backup)
+	err := l.Client.Get(context.Background(), kbclient.ObjectKey{Namespace: f.Namespace(), Name: l.BackupName}, backup)
 	if apierrors.IsNotFound(err) {
 		return fmt.Errorf("backup %q does not exist", l.BackupName)
 	} else if err != nil {
@@ -77,7 +78,15 @@ func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
 			"until the backup has a phase of Completed or Failed and try again", l.BackupName)
 	}
 
-	err = downloadrequest.Stream(context.Background(), l.Client, f.Namespace(), l.BackupName, velerov1api.DownloadTargetKindBackupLog, os.Stdout, l.Timeout, l.InsecureSkipTLSVerify, l.CaCertFile)
+	// Get BSL cacert if available
+	bslCACert, err := cacert.GetCACertFromBackup(context.Background(), l.Client, f.Namespace(), backup)
+	if err != nil {
+		// Log the error but don't fail - we can still try to download without the BSL cacert
+		fmt.Fprintf(os.Stderr, "WARNING: Error getting cacert from BSL: %v\n", err)
+		bslCACert = ""
+	}
+
+	err = downloadrequest.StreamWithBSLCACert(context.Background(), l.Client, f.Namespace(), l.BackupName, velerov1api.DownloadTargetKindBackupLog, os.Stdout, l.Timeout, l.InsecureSkipTLSVerify, l.CaCertFile, bslCACert)
 	return err
 }
 
