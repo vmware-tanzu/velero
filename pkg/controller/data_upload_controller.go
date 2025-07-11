@@ -917,6 +917,17 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			}
 		}
 
+		hostingPodTolerations := []corev1api.Toleration{}
+		for _, k := range util.ThirdPartyTolerations {
+			if v, err := nodeagent.GetToleration(context.Background(), r.kubeClient, du.Namespace, k, nodeOS); err != nil {
+				if err != nodeagent.ErrNodeAgentTolerationNotFound {
+					log.WithError(err).Warnf("Failed to check node-agent toleration, skip adding host pod toleration %s", k)
+				}
+			} else {
+				hostingPodTolerations = append(hostingPodTolerations, *v)
+			}
+		}
+
 		affinity := kube.GetLoadAffinityByStorageClass(r.loadAffinity, du.Spec.CSISnapshot.SnapshotClass, log)
 
 		return &exposer.CSISnapshotExposeParam{
@@ -925,6 +936,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			StorageClass:          du.Spec.CSISnapshot.StorageClass,
 			HostingPodLabels:      hostingPodLabels,
 			HostingPodAnnotations: hostingPodAnnotation,
+			HostingPodTolerations: hostingPodTolerations,
 			AccessMode:            accessMode,
 			OperationTimeout:      du.Spec.OperationTimeout.Duration,
 			ExposeTimeout:         r.preparingTimeout,

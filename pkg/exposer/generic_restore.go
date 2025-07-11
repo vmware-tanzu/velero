@@ -49,6 +49,9 @@ type GenericRestoreExposeParam struct {
 	// HostingPodAnnotations is the annotations that are going to apply to the hosting pod
 	HostingPodAnnotations map[string]string
 
+	// HostingPodTolerations is the tolerations that are going to apply to the hosting pod
+	HostingPodTolerations []corev1api.Toleration
+
 	// Resources defines the resource requirements of the hosting pod
 	Resources corev1api.ResourceRequirements
 
@@ -140,6 +143,7 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1ap
 		param.OperationTimeout,
 		param.HostingPodLabels,
 		param.HostingPodAnnotations,
+		param.HostingPodTolerations,
 		selectedNode,
 		param.Resources,
 		param.NodeOS,
@@ -405,6 +409,7 @@ func (e *genericRestoreExposer) createRestorePod(
 	operationTimeout time.Duration,
 	label map[string]string,
 	annotation map[string]string,
+	toleration []corev1api.Toleration,
 	selectedNode string,
 	resources corev1api.ResourceRequirements,
 	nodeOS string,
@@ -467,7 +472,6 @@ func (e *genericRestoreExposer) createRestorePod(
 	var securityCtx *corev1api.PodSecurityContext
 	nodeSelector := map[string]string{}
 	podOS := corev1api.PodOS{}
-	toleration := []corev1api.Toleration{}
 	if nodeOS == kube.NodeOSWindows {
 		userID := "ContainerAdministrator"
 		securityCtx = &corev1api.PodSecurityContext{
