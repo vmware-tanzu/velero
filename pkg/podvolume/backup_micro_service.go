@@ -148,9 +148,8 @@ func (r *BackupMicroService) RunCancelableDataPath(ctx context.Context) (string,
 
 		if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseInProgress {
 			return true, nil
-		} else {
-			return false, nil
 		}
+		return false, nil
 	})
 
 	if err != nil {

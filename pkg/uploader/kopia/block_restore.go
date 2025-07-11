@@ -69,13 +69,13 @@ func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remote
 		if bytesToWrite > 0 {
 			offset := 0
 			for bytesToWrite > 0 {
-				if bytesWritten, err := targetFile.Write(buffer[offset:bytesToWrite]); err == nil {
-					progressCb(int64(bytesWritten))
-					bytesToWrite -= bytesWritten
-					offset += bytesWritten
-				} else {
+				bytesWritten, err := targetFile.Write(buffer[offset:bytesToWrite])
+				if err != nil {
 					return errors.Wrapf(err, "failed to write data to file %s", o.targetFileName)
 				}
+				progressCb(int64(bytesWritten))
+				bytesToWrite -= bytesWritten
+				offset += bytesWritten
 			}
 		}
 	}
