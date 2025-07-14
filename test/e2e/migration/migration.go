@@ -261,9 +261,6 @@ func (m *migrationE2E) Backup() error {
 			})
 		}
 
-		var snapshotCheckPoint test.SnapshotCheckPoint
-		snapshotCheckPoint.NamespaceBackedUp = m.CaseBaseName
-
 		if OriginVeleroCfg.SnapshotMoveData {
 			// todo: Remove this as VSC are not preserved post backup. It's 0 by default.
 
