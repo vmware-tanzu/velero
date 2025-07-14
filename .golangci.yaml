@@ -125,13 +125,13 @@ linters:
         - G115
 
     govet:
-      # enable or disable analyzers by name
-      enable:
-        - atomicalign
-      enable-all: false
+      # disable analyzers by name
       disable:
+        - fieldalignment
+        - nilness
         - shadow
-      disable-all: false
+        - unusedwrite
+      enable-all: true
   
     importas:
        alias:
