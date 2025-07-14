@@ -531,11 +531,10 @@ spec:
 `
 
 	file, err := os.OpenFile(patchDirectory, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-	defer file.Close()
-
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
 	patchTemplate, err := template.New("imagePatch").Parse(patchString)
 	if err != nil {
@@ -561,11 +560,10 @@ spec:
       image: {{.Image}}
 `
 	file, err := os.OpenFile(patchDirectory, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-	defer file.Close()
-
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
 	patchTemplate, err := template.New("imagePatch").Parse(patchString)
 	if err != nil {
@@ -610,11 +608,10 @@ spec:
 `
 
 	file, err := os.OpenFile(patchPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-	defer file.Close()
-
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
 	patchTemplate, err := template.New("imagePatch").Parse(patchString)
 	if err != nil {
