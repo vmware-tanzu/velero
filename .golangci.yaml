@@ -128,7 +128,6 @@ linters:
       # disable analyzers by name
       disable:
         - fieldalignment
-        - nilness
         - shadow
         - unusedwrite
       enable-all: true
