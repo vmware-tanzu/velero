@@ -424,7 +424,7 @@ func (r *DataDownloadReconciler) startCancelableDataPath(asyncBR datapath.AsyncB
 	return nil
 }
 
-func (r *DataDownloadReconciler) OnDataDownloadCompleted(ctx context.Context, namespace string, ddName string, result datapath.Result) {
+func (r *DataDownloadReconciler) OnDataDownloadCompleted(ctx context.Context, namespace string, ddName string, _ datapath.Result) {
 	defer r.dataPathMgr.RemoveAsyncBR(ddName)
 
 	log := r.logger.WithField("datadownload", ddName)
@@ -602,17 +602,17 @@ func (r *DataDownloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				CreateFunc: func(event.CreateEvent) bool {
 					return false
 				},
-				DeleteFunc: func(de event.DeleteEvent) bool {
+				DeleteFunc: func(event.DeleteEvent) bool {
 					return false
 				},
-				GenericFunc: func(ge event.GenericEvent) bool {
+				GenericFunc: func(event.GenericEvent) bool {
 					return false
 				},
 			})).
 		Complete(r)
 }
 
-func (r *DataDownloadReconciler) findSnapshotRestoreForPod(ctx context.Context, podObj client.Object) []reconcile.Request {
+func (r *DataDownloadReconciler) findSnapshotRestoreForPod(_ context.Context, podObj client.Object) []reconcile.Request {
 	pod := podObj.(*corev1api.Pod)
 	dd, err := findDataDownloadByPod(r.client, *pod)
 

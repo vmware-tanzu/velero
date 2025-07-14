@@ -154,13 +154,13 @@ func (l *logrusAdapter) ResetNamed(name string) hclog.Logger {
 }
 
 // StandardLogger returns a value that conforms to the stdlib log.Logger interface
-func (l *logrusAdapter) StandardLogger(opts *hclog.StandardLoggerOptions) *log.Logger {
+func (l *logrusAdapter) StandardLogger(*hclog.StandardLoggerOptions) *log.Logger {
 	panic("not implemented")
 }
 
 // Updates the level. This should affect all sub-loggers as well. If an
 // implementation cannot update the level on the fly, it should no-op.
-func (l *logrusAdapter) SetLevel(_ hclog.Level) {
+func (l *logrusAdapter) SetLevel(hclog.Level) {
 }
 
 // ImpliedArgs returns With key/value pairs
@@ -193,6 +193,6 @@ func (l *logrusAdapter) Name() string {
 }
 
 // Return a value that conforms to io.Writer, which can be passed into log.SetOutput()
-func (l *logrusAdapter) StandardWriter(opts *hclog.StandardLoggerOptions) io.Writer {
+func (l *logrusAdapter) StandardWriter(*hclog.StandardLoggerOptions) io.Writer {
 	panic("not implemented")
 }

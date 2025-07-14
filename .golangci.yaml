@@ -238,7 +238,6 @@ linters:
         - name: unnecessary-stmt
         - name: unreachable-code
         - name: unused-parameter
-          disabled: true
         - name: use-any
         - name: var-declaration
         - name: var-naming
@@ -383,6 +382,10 @@ linters:
         linters:
           - dupword
         text: "bucket"
+      - path: examples_test.go
+        text: unused-parameter
+        linters:
+          - revive
 
     generated: lax
     presets:

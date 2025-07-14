@@ -644,17 +644,17 @@ func (r *DataUploadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				CreateFunc: func(event.CreateEvent) bool {
 					return false
 				},
-				DeleteFunc: func(de event.DeleteEvent) bool {
+				DeleteFunc: func(event.DeleteEvent) bool {
 					return false
 				},
-				GenericFunc: func(ge event.GenericEvent) bool {
+				GenericFunc: func(event.GenericEvent) bool {
 					return false
 				},
 			})).
 		Complete(r)
 }
 
-func (r *DataUploadReconciler) findDataUploadForPod(ctx context.Context, podObj client.Object) []reconcile.Request {
+func (r *DataUploadReconciler) findDataUploadForPod(_ context.Context, podObj client.Object) []reconcile.Request {
 	pod := podObj.(*corev1api.Pod)
 	du, err := findDataUploadByPod(r.client, *pod)
 	log := r.logger.WithFields(logrus.Fields{

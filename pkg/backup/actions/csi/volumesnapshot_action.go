@@ -249,7 +249,7 @@ func (p *volumeSnapshotBackupItemAction) Name() string {
 
 func (p *volumeSnapshotBackupItemAction) Progress(
 	operationID string,
-	backup *velerov1api.Backup,
+	_ *velerov1api.Backup,
 ) (velero.OperationProgress, error) {
 	progress := velero.OperationProgress{}
 	if operationID == "" {
@@ -339,8 +339,8 @@ func (p *volumeSnapshotBackupItemAction) Progress(
 
 // Cancel is not implemented for VolumeSnapshotBackupItemAction
 func (p *volumeSnapshotBackupItemAction) Cancel(
-	operationID string,
-	backup *velerov1api.Backup,
+	string,
+	*velerov1api.Backup,
 ) error {
 	// CSI Specification doesn't support canceling a snapshot creation.
 	return nil

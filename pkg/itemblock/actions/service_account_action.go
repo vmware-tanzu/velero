@@ -56,7 +56,7 @@ func (a *ServiceAccountAction) AppliesTo() (velero.ResourceSelector, error) {
 
 // GetRelatedItems checks for any ClusterRoleBindings that have this service account as a subject, and
 // returns the ClusterRoleBinding and associated ClusterRole.
-func (a *ServiceAccountAction) GetRelatedItems(item runtime.Unstructured, backup *v1.Backup) ([]velero.ResourceIdentifier, error) {
+func (a *ServiceAccountAction) GetRelatedItems(item runtime.Unstructured, _ *v1.Backup) ([]velero.ResourceIdentifier, error) {
 	a.log.Info("Running ServiceAccount ItemBlockAction")
 	defer a.log.Info("Done running ServiceAccount ItemBlockAction")
 

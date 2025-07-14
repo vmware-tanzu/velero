@@ -65,7 +65,7 @@ func NewRestoreCommand(f client.Factory) *cobra.Command {
 		Short:  "Run the velero pod volume restore",
 		Long:   "Run the velero pod volume restore",
 		Hidden: true,
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(c *cobra.Command, _ []string) {
 			logLevel := logLevelFlag.Parse()
 			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))
 
@@ -92,7 +92,7 @@ func NewRestoreCommand(f client.Factory) *cobra.Command {
 	_ = command.MarkFlagRequired("pod-volume-restore")
 	_ = command.MarkFlagRequired("resource-timeout")
 
-	command.PreRunE = func(cmd *cobra.Command, args []string) error {
+	command.PreRunE = func(*cobra.Command, []string) error {
 		if config.resourceTimeout <= 0 {
 			return errors.New("resource-timeout must be greater than 0")
 		}

@@ -362,7 +362,7 @@ func TestDeletePVCIfAny(t *testing.T) {
 				{
 					verb:     "get",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-get-error")
 					},
 				},
@@ -391,7 +391,7 @@ func TestDeletePVCIfAny(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-delete-error")
 					},
 				},
@@ -412,7 +412,7 @@ func TestDeletePVCIfAny(t *testing.T) {
 				{
 					verb:     "get",
 					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-get-error")
 					},
 				},
@@ -437,7 +437,7 @@ func TestDeletePVCIfAny(t *testing.T) {
 				{
 					verb:     "patch",
 					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, pvObject, errors.New("fake-patch-error")
 					},
 				},
@@ -469,7 +469,7 @@ func TestDeletePVCIfAny(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, pvcWithVolume, nil
 					},
 				},
@@ -491,7 +491,7 @@ func TestDeletePVCIfAny(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, pvcWithVolume, nil
 					},
 				},
@@ -550,7 +550,7 @@ func TestDeletePVIfAny(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-delete-error")
 					},
 				},
@@ -629,7 +629,7 @@ func TestEnsureDeletePVC(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, pvcObject, nil
 					},
 				},
@@ -645,7 +645,7 @@ func TestEnsureDeletePVC(t *testing.T) {
 				{
 					verb:     "get",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-get-error")
 					},
 				},
@@ -662,7 +662,7 @@ func TestEnsureDeletePVC(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, pvcObject, nil
 					},
 				},
@@ -679,7 +679,7 @@ func TestEnsureDeletePVC(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, pvcObject, nil
 					},
 				},
@@ -736,7 +736,7 @@ func TestEnsureDeletePV(t *testing.T) {
 				{
 					verb:     "get",
 					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, pvObject, nil
 					},
 				},
@@ -751,7 +751,7 @@ func TestEnsureDeletePV(t *testing.T) {
 				{
 					verb:     "get",
 					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-get-error")
 					},
 				},
@@ -767,7 +767,7 @@ func TestEnsureDeletePV(t *testing.T) {
 				{
 					verb:     "get",
 					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, pvObject, nil
 					},
 				},
@@ -826,7 +826,7 @@ func TestRebindPVC(t *testing.T) {
 				{
 					verb:     "patch",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-patch-error")
 					},
 				},
@@ -922,7 +922,7 @@ func TestResetPVBinding(t *testing.T) {
 				{
 					verb:     "patch",
 					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-patch-error")
 					},
 				},
@@ -1012,7 +1012,7 @@ func TestSetPVReclaimPolicy(t *testing.T) {
 				{
 					verb:     "patch",
 					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-patch-error")
 					},
 				},

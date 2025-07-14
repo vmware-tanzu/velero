@@ -77,7 +77,7 @@ func (rt *restoreMsTestHelper) EndingEvent(_ runtime.Object, _ bool, reason stri
 }
 func (rt *restoreMsTestHelper) Shutdown() {}
 
-func (rt *restoreMsTestHelper) Marshal(v any) ([]byte, error) {
+func (rt *restoreMsTestHelper) Marshal(any) ([]byte, error) {
 	if rt.marshalErr != nil {
 		return nil, rt.marshalErr
 	}

@@ -166,7 +166,7 @@ type fakePvbExposer struct {
 	getNil     bool
 }
 
-func (f *fakePvbExposer) Expose(ctx context.Context, ownerObject corev1api.ObjectReference, param exposer.PodVolumeExposeParam) error {
+func (f *fakePvbExposer) Expose(context.Context, corev1api.ObjectReference, exposer.PodVolumeExposeParam) error {
 	if f.exposeErr != nil {
 		return f.exposeErr
 	}
@@ -191,7 +191,7 @@ func (f *fakePvbExposer) GetExposed(context.Context, corev1api.ObjectReference, 
 	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, VolumeName: pvbName, NodeOS: pNodeOS}}, nil
 }
 
-func (f *fakePvbExposer) PeekExposed(ctx context.Context, ownerObject corev1api.ObjectReference) error {
+func (f *fakePvbExposer) PeekExposed(context.Context, corev1api.ObjectReference) error {
 	return f.peekErr
 }
 
@@ -700,7 +700,7 @@ func TestFindPvbForPod(t *testing.T) {
 			name: "no selected label found for pod",
 			pvb:  pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, pvbName).Result(),
-			checkFunc: func(pvb *velerov1api.PodVolumeBackup, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov1api.PodVolumeBackup, requests []reconcile.Request) {
 				// Assert that the function returns a single request
 				assert.Empty(t, requests)
 			},
@@ -708,7 +708,7 @@ func TestFindPvbForPod(t *testing.T) {
 			name: "no matched pod",
 			pvb:  pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, pvbName).Labels(map[string]string{velerov1api.PVBLabel: "non-existing-pvb"}).Result(),
-			checkFunc: func(pvb *velerov1api.PodVolumeBackup, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov1api.PodVolumeBackup, requests []reconcile.Request) {
 				assert.Empty(t, requests)
 			},
 		},
@@ -716,7 +716,7 @@ func TestFindPvbForPod(t *testing.T) {
 			name: "pvb not accepte",
 			pvb:  pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseInProgress).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, pvbName).Labels(map[string]string{velerov1api.PVBLabel: pvbName}).Result(),
-			checkFunc: func(pvb *velerov1api.PodVolumeBackup, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov1api.PodVolumeBackup, requests []reconcile.Request) {
 				assert.Empty(t, requests)
 			},
 		},

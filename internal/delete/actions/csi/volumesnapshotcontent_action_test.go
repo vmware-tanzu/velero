@@ -74,9 +74,9 @@ func TestVSCExecute(t *testing.T) {
 			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
 			expectErr: false,
 			function: func(
-				ctx context.Context,
-				vsc *snapshotv1api.VolumeSnapshotContent,
-				client crclient.Client,
+				context.Context,
+				*snapshotv1api.VolumeSnapshotContent,
+				crclient.Client,
 			) (bool, error) {
 				return true, nil
 			},
@@ -87,9 +87,9 @@ func TestVSCExecute(t *testing.T) {
 			backup:    builder.ForBackup("velero", "backup").ObjectMeta(builder.WithAnnotationsMap(map[string]string{velerov1api.ResourceTimeoutAnnotation: "5s"})).Result(),
 			expectErr: true,
 			function: func(
-				ctx context.Context,
-				vsc *snapshotv1api.VolumeSnapshotContent,
-				client crclient.Client,
+				context.Context,
+				*snapshotv1api.VolumeSnapshotContent,
+				crclient.Client,
 			) (bool, error) {
 				return false, errors.Errorf("test error case")
 			},

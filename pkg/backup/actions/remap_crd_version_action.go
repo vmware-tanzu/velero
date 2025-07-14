@@ -57,7 +57,7 @@ func (a *RemapCRDVersionAction) AppliesTo() (velero.ResourceSelector, error) {
 }
 
 // Execute executes logic necessary to check a CustomResourceDefinition and inspect it for characteristics that necessitate saving it as v1beta1 instead of v1.
-func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, _ *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	a.logger.Info("Executing RemapCRDVersionAction")
 
 	// This plugin is only relevant for CRDs retrieved from the v1 endpoint that were installed via the v1beta1

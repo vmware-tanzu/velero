@@ -75,7 +75,7 @@ type FakeClient struct {
 	listError      error
 }
 
-func (c *FakeClient) Get(ctx context.Context, key kbclient.ObjectKey, obj kbclient.Object, opts ...kbclient.GetOption) error {
+func (c *FakeClient) Get(ctx context.Context, key kbclient.ObjectKey, obj kbclient.Object, _ ...kbclient.GetOption) error {
 	if c.getError != nil {
 		return c.getError
 	}
@@ -274,7 +274,7 @@ type fakeSnapshotExposer struct {
 	getNil          bool
 }
 
-func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.ObjectReference, param any) error {
+func (f *fakeSnapshotExposer) Expose(context.Context, corev1api.ObjectReference, any) error {
 	if f.exposeErr != nil {
 		return f.exposeErr
 	}
@@ -282,7 +282,7 @@ func (f *fakeSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.
 	return nil
 }
 
-func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1api.ObjectReference, tm time.Duration, para any) (*exposer.ExposeResult, error) {
+func (f *fakeSnapshotExposer) GetExposed(context.Context, corev1api.ObjectReference, time.Duration, any) (*exposer.ExposeResult, error) {
 	if f.getErr != nil {
 		return nil, f.getErr
 	}
@@ -301,7 +301,7 @@ func (f *fakeSnapshotExposer) GetExposed(ctx context.Context, du corev1api.Objec
 	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, VolumeName: dataUploadName, NodeOS: pNodeOS}}, nil
 }
 
-func (f *fakeSnapshotExposer) PeekExposed(ctx context.Context, ownerObject corev1api.ObjectReference) error {
+func (f *fakeSnapshotExposer) PeekExposed(context.Context, corev1api.ObjectReference) error {
 	return f.peekErr
 }
 
@@ -319,22 +319,22 @@ type fakeFSBR struct {
 	startErr   error
 }
 
-func (f *fakeFSBR) Init(ctx context.Context, param any) error {
+func (f *fakeFSBR) Init(context.Context, any) error {
 	return f.initErr
 }
 
-func (f *fakeFSBR) StartBackup(source datapath.AccessPoint, uploaderConfigs map[string]string, param any) error {
+func (f *fakeFSBR) StartBackup(datapath.AccessPoint, map[string]string, any) error {
 	return f.startErr
 }
 
-func (f *fakeFSBR) StartRestore(snapshotID string, target datapath.AccessPoint, uploaderConfigs map[string]string) error {
+func (f *fakeFSBR) StartRestore(string, datapath.AccessPoint, map[string]string) error {
 	return nil
 }
 
 func (b *fakeFSBR) Cancel() {
 }
 
-func (b *fakeFSBR) Close(ctx context.Context) {
+func (b *fakeFSBR) Close(context.Context) {
 }
 
 func TestReconcile(t *testing.T) {
@@ -862,7 +862,7 @@ func TestFindDataUploadForPod(t *testing.T) {
 			name: "no selected label found for pod",
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Result(),
-			checkFunc: func(du *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
 				// Assert that the function returns a single request
 				assert.Empty(t, requests)
 			},
@@ -870,7 +870,7 @@ func TestFindDataUploadForPod(t *testing.T) {
 			name: "no matched pod",
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Labels(map[string]string{velerov1api.DataUploadLabel: "non-existing-dataupload"}).Result(),
-			checkFunc: func(du *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
 				assert.Empty(t, requests)
 			},
 		},
@@ -878,7 +878,7 @@ func TestFindDataUploadForPod(t *testing.T) {
 			name: "dataUpload not accepte",
 			du:   dataUploadBuilder().Phase(velerov2alpha1api.DataUploadPhaseInProgress).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataUploadName).Labels(map[string]string{velerov1api.DataUploadLabel: dataUploadName}).Result(),
-			checkFunc: func(du *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov2alpha1api.DataUpload, requests []reconcile.Request) {
 				assert.Empty(t, requests)
 			},
 		},

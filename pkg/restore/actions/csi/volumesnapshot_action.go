@@ -134,23 +134,23 @@ func (p *volumeSnapshotRestoreItemAction) Name() string {
 }
 
 func (p *volumeSnapshotRestoreItemAction) Progress(
-	operationID string,
-	restore *velerov1api.Restore,
+	string,
+	*velerov1api.Restore,
 ) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, nil
 }
 
 func (p *volumeSnapshotRestoreItemAction) Cancel(
-	operationID string,
-	restore *velerov1api.Restore,
+	string,
+	*velerov1api.Restore,
 ) error {
 	// CSI Specification doesn't support canceling a snapshot creation.
 	return nil
 }
 
 func (p *volumeSnapshotRestoreItemAction) AreAdditionalItemsReady(
-	additionalItems []velero.ResourceIdentifier,
-	restore *velerov1api.Restore,
+	[]velero.ResourceIdentifier,
+	*velerov1api.Restore,
 ) (bool, error) {
 	return true, nil
 }

@@ -57,7 +57,7 @@ func (a *ServiceAccountAction) AppliesTo() (velero.ResourceSelector, error) {
 // Execute checks for any ClusterRoleBindings that have this service account as a subject, and
 // adds the ClusterRoleBinding and associated ClusterRole to the list of additional items to
 // be backed up.
-func (a *ServiceAccountAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+func (a *ServiceAccountAction) Execute(item runtime.Unstructured, _ *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	a.log.Info("Running ServiceAccountAction")
 	defer a.log.Info("Done running ServiceAccountAction")
 

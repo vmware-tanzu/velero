@@ -64,7 +64,7 @@ func (fr *fakeRunHelper) Shutdown() {
 
 }
 
-func (fr *fakeRunHelper) ExitWithMessage(logger logrus.FieldLogger, succeed bool, message string, a ...any) {
+func (fr *fakeRunHelper) ExitWithMessage(_ logrus.FieldLogger, succeed bool, message string, a ...any) {
 	fr.succeed = succeed
 	fr.exitMessage = fmt.Sprintf(message, a...)
 }
