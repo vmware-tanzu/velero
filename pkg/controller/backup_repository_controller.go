@@ -132,7 +132,7 @@ func (r *BackupRepoReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *BackupRepoReconciler) invalidateBackupReposForBSL(ctx context.Context, bslObj client.Object) []reconcile.Request {
+func (r *BackupRepoReconciler) invalidateBackupReposForBSL(_ context.Context, bslObj client.Object) []reconcile.Request {
 	bsl := bslObj.(*velerov1api.BackupStorageLocation)
 
 	list := &velerov1api.BackupRepositoryList{}
@@ -296,7 +296,7 @@ func (r *BackupRepoReconciler) getBSL(ctx context.Context, req *velerov1api.Back
 	return loc, nil
 }
 
-func (r *BackupRepoReconciler) getIdentifierByBSL(bsl *velerov1api.BackupStorageLocation, req *velerov1api.BackupRepository) (string, error) {
+func (*BackupRepoReconciler) getIdentifierByBSL(bsl *velerov1api.BackupStorageLocation, req *velerov1api.BackupRepository) (string, error) {
 	repoIdentifier, err := repoconfig.GetRepoIdentifier(bsl, req.Spec.VolumeNamespace)
 	if err != nil {
 		return "", errors.Wrapf(err, "error to get identifier for repo %s", req.Name)

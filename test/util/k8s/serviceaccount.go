@@ -72,7 +72,7 @@ func PatchServiceAccountWithImagePullSecret(ctx context.Context, client TestClie
 	return nil
 }
 
-func CreateServiceAccount(ctx context.Context, client TestClient, namespace string, serviceaccount string) error {
+func CreateServiceAccount(_ context.Context, client TestClient, namespace string, serviceaccount string) error {
 	sa := &corev1api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: serviceaccount,
@@ -88,6 +88,6 @@ func CreateServiceAccount(ctx context.Context, client TestClient, namespace stri
 	return nil
 }
 
-func GetServiceAccount(ctx context.Context, client TestClient, namespace string, serviceAccount string) (*corev1api.ServiceAccount, error) {
+func GetServiceAccount(_ context.Context, client TestClient, namespace string, serviceAccount string) (*corev1api.ServiceAccount, error) {
 	return client.ClientGo.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), serviceAccount, metav1.GetOptions{})
 }

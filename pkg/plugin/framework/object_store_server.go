@@ -51,7 +51,7 @@ func (s *ObjectStoreGRPCServer) getImpl(name string) (velero.ObjectStore, error)
 // Init prepares the ObjectStore for usage using the provided map of
 // configuration key-value pairs. It returns an error if the ObjectStore
 // cannot be initialized from the provided config.
-func (s *ObjectStoreGRPCServer) Init(ctx context.Context, req *proto.ObjectStoreInitRequest) (response *proto.Empty, err error) {
+func (s *ObjectStoreGRPCServer) Init(_ context.Context, req *proto.ObjectStoreInitRequest) (response *proto.Empty, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -130,7 +130,7 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 }
 
 // ObjectExists checks if there is an object with the given key in the object storage bucket.
-func (s *ObjectStoreGRPCServer) ObjectExists(ctx context.Context, req *proto.ObjectExistsRequest) (response *proto.ObjectExistsResponse, err error) {
+func (s *ObjectStoreGRPCServer) ObjectExists(_ context.Context, req *proto.ObjectExistsRequest) (response *proto.ObjectExistsResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -189,7 +189,7 @@ func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream pr
 // ListCommonPrefixes gets a list of all object key prefixes that start with
 // the specified prefix and stop at the next instance of the provided delimiter
 // (this is often used to simulate a directory hierarchy in object storage).
-func (s *ObjectStoreGRPCServer) ListCommonPrefixes(ctx context.Context, req *proto.ListCommonPrefixesRequest) (response *proto.ListCommonPrefixesResponse, err error) {
+func (s *ObjectStoreGRPCServer) ListCommonPrefixes(_ context.Context, req *proto.ListCommonPrefixesRequest) (response *proto.ListCommonPrefixesResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -210,7 +210,7 @@ func (s *ObjectStoreGRPCServer) ListCommonPrefixes(ctx context.Context, req *pro
 }
 
 // ListObjects gets a list of all objects in bucket that have the same prefix.
-func (s *ObjectStoreGRPCServer) ListObjects(ctx context.Context, req *proto.ListObjectsRequest) (response *proto.ListObjectsResponse, err error) {
+func (s *ObjectStoreGRPCServer) ListObjects(_ context.Context, req *proto.ListObjectsRequest) (response *proto.ListObjectsResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -232,7 +232,7 @@ func (s *ObjectStoreGRPCServer) ListObjects(ctx context.Context, req *proto.List
 
 // DeleteObject removes object with the specified key from the given
 // bucket.
-func (s *ObjectStoreGRPCServer) DeleteObject(ctx context.Context, req *proto.DeleteObjectRequest) (response *proto.Empty, err error) {
+func (s *ObjectStoreGRPCServer) DeleteObject(_ context.Context, req *proto.DeleteObjectRequest) (response *proto.Empty, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -252,7 +252,7 @@ func (s *ObjectStoreGRPCServer) DeleteObject(ctx context.Context, req *proto.Del
 }
 
 // CreateSignedURL creates a pre-signed URL for the given bucket and key that expires after ttl.
-func (s *ObjectStoreGRPCServer) CreateSignedURL(ctx context.Context, req *proto.CreateSignedURLRequest) (response *proto.CreateSignedURLResponse, err error) {
+func (s *ObjectStoreGRPCServer) CreateSignedURL(_ context.Context, req *proto.CreateSignedURLRequest) (response *proto.CreateSignedURLResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr

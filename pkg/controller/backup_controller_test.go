@@ -74,7 +74,7 @@ func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Requ
 
 func (b *fakeBackupper) BackupWithResolvers(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
-	itemBlockActionResolver framework.ItemBlockActionResolver,
+	_ framework.ItemBlockActionResolver,
 	volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter,
 ) error {
 	args := b.Called(logger, backup, backupFile, backupItemActionResolver, volumeSnapshotterGetter)
@@ -88,7 +88,7 @@ func (b *fakeBackupper) FinalizeBackup(
 	outBackupFile io.Writer,
 	backupItemActionResolver framework.BackupItemActionResolverV2,
 	asyncBIAOperations []*itemoperation.BackupOperation,
-	backupStore persistence.BackupStore,
+	_ persistence.BackupStore,
 ) error {
 	args := b.Called(logger, backup, inBackupFile, outBackupFile, backupItemActionResolver, asyncBIAOperations)
 	return args.Error(0)

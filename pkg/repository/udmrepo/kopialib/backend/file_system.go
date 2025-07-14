@@ -38,7 +38,7 @@ const (
 	defaultDirMode  = 0o700
 )
 
-func (c *FsBackend) Setup(ctx context.Context, flags map[string]string, logger logrus.FieldLogger) error {
+func (c *FsBackend) Setup(ctx context.Context, flags map[string]string, _ logrus.FieldLogger) error {
 	path, err := mustHaveString(udmrepo.StoreOptionFsPath, flags)
 	if err != nil {
 		return err
@@ -55,7 +55,7 @@ func (c *FsBackend) Setup(ctx context.Context, flags map[string]string, logger l
 	return nil
 }
 
-func (c *FsBackend) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
+func (c *FsBackend) Connect(ctx context.Context, isCreate bool, _ logrus.FieldLogger) (blob.Storage, error) {
 	if !filepath.IsAbs(c.options.Path) {
 		return nil, errors.Errorf("filesystem repository path is not absolute, path: %s", c.options.Path)
 	}

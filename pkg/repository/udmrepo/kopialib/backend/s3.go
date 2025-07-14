@@ -31,7 +31,7 @@ type S3Backend struct {
 	options s3.Options
 }
 
-func (c *S3Backend) Setup(ctx context.Context, flags map[string]string, logger logrus.FieldLogger) error {
+func (c *S3Backend) Setup(ctx context.Context, flags map[string]string, _ logrus.FieldLogger) error {
 	var err error
 	c.options.BucketName, err = mustHaveString(udmrepo.StoreOptionOssBucket, flags)
 	if err != nil {
@@ -53,6 +53,6 @@ func (c *S3Backend) Setup(ctx context.Context, flags map[string]string, logger l
 	return nil
 }
 
-func (c *S3Backend) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
+func (c *S3Backend) Connect(ctx context.Context, _ bool, _ logrus.FieldLogger) (blob.Storage, error) {
 	return s3.New(ctx, &c.options, false)
 }

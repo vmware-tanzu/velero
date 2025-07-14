@@ -627,7 +627,7 @@ spec:
 func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiData) error {
 	timeout := 30 * time.Minute
 	interval := 1 * time.Second
-	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(context.Context) (bool, error) {
 		timeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*20)
 		defer ctxCancel()
 		kibishiiGenerateCmd := exec.CommandContext(
@@ -671,7 +671,7 @@ func verifyData(ctx context.Context, namespace string, kibishiiData *KibishiiDat
 		interval,
 		timeout,
 		true,
-		func(ctx context.Context) (bool, error) {
+		func(context.Context) (bool, error) {
 			timeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*20)
 			defer ctxCancel()
 			kibishiiVerifyCmd := exec.CommandContext(

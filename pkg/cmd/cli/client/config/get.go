@@ -30,7 +30,7 @@ func NewGetCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "get [KEY 1] [KEY 2] [...]",
 		Short: "Get client configuration file values",
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, args []string) {
 			config, err := client.LoadConfig()
 			cmd.CheckError(err)
 

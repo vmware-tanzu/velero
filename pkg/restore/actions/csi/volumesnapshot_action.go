@@ -45,7 +45,7 @@ type volumeSnapshotRestoreItemAction struct {
 // AppliesTo returns information indicating that
 // VolumeSnapshotRestoreItemAction should be invoked while
 // restoring volumesnapshots.snapshot.storage.k8s.io resources.
-func (p *volumeSnapshotRestoreItemAction) AppliesTo() (
+func (*volumeSnapshotRestoreItemAction) AppliesTo() (
 	velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"volumesnapshots.snapshot.storage.k8s.io"},
@@ -129,28 +129,28 @@ func (p *volumeSnapshotRestoreItemAction) Execute(
 	}, nil
 }
 
-func (p *volumeSnapshotRestoreItemAction) Name() string {
+func (*volumeSnapshotRestoreItemAction) Name() string {
 	return "VolumeSnapshotRestoreItemAction"
 }
 
-func (p *volumeSnapshotRestoreItemAction) Progress(
-	operationID string,
-	restore *velerov1api.Restore,
+func (*volumeSnapshotRestoreItemAction) Progress(
+	string,
+	*velerov1api.Restore,
 ) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, nil
 }
 
-func (p *volumeSnapshotRestoreItemAction) Cancel(
-	operationID string,
-	restore *velerov1api.Restore,
+func (*volumeSnapshotRestoreItemAction) Cancel(
+	string,
+	*velerov1api.Restore,
 ) error {
 	// CSI Specification doesn't support canceling a snapshot creation.
 	return nil
 }
 
-func (p *volumeSnapshotRestoreItemAction) AreAdditionalItemsReady(
-	additionalItems []velero.ResourceIdentifier,
-	restore *velerov1api.Restore,
+func (*volumeSnapshotRestoreItemAction) AreAdditionalItemsReady(
+	[]velero.ResourceIdentifier,
+	*velerov1api.Restore,
 ) (bool, error) {
 	return true, nil
 }

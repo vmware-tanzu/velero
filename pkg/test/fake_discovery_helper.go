@@ -35,7 +35,7 @@ type FakeDiscoveryHelper struct {
 	ServerVersionData  *version.Info
 }
 
-func (dh *FakeDiscoveryHelper) KindFor(input schema.GroupVersionKind) (schema.GroupVersionResource, metav1.APIResource, error) {
+func (*FakeDiscoveryHelper) KindFor(schema.GroupVersionKind) (schema.GroupVersionResource, metav1.APIResource, error) {
 	panic("implement me")
 }
 
@@ -99,7 +99,7 @@ func (dh *FakeDiscoveryHelper) Resources() []*metav1.APIResourceList {
 	return dh.ResourceList
 }
 
-func (dh *FakeDiscoveryHelper) Refresh() error {
+func (*FakeDiscoveryHelper) Refresh() error {
 	return nil
 }
 

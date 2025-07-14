@@ -240,7 +240,7 @@ func (r *BackupMicroService) Shutdown() {
 
 var funcMarshal = json.Marshal
 
-func (r *BackupMicroService) OnDataUploadCompleted(ctx context.Context, namespace string, duName string, result datapath.Result) {
+func (r *BackupMicroService) OnDataUploadCompleted(_ context.Context, _ string, duName string, result datapath.Result) {
 	log := r.logger.WithField("dataupload", duName)
 
 	backupBytes, err := funcMarshal(result.Backup)
@@ -259,7 +259,7 @@ func (r *BackupMicroService) OnDataUploadCompleted(ctx context.Context, namespac
 	log.Info("Async fs backup completed")
 }
 
-func (r *BackupMicroService) OnDataUploadFailed(ctx context.Context, namespace string, duName string, err error) {
+func (r *BackupMicroService) OnDataUploadFailed(_ context.Context, _ string, duName string, err error) {
 	log := r.logger.WithField("dataupload", duName)
 	log.WithError(err).Error("Async fs backup data path failed")
 
@@ -269,7 +269,7 @@ func (r *BackupMicroService) OnDataUploadFailed(ctx context.Context, namespace s
 	}
 }
 
-func (r *BackupMicroService) OnDataUploadCancelled(ctx context.Context, namespace string, duName string) {
+func (r *BackupMicroService) OnDataUploadCancelled(_ context.Context, _ string, duName string) {
 	log := r.logger.WithField("dataupload", duName)
 	log.Warn("Async fs backup data path canceled")
 
@@ -279,7 +279,7 @@ func (r *BackupMicroService) OnDataUploadCancelled(ctx context.Context, namespac
 	}
 }
 
-func (r *BackupMicroService) OnDataUploadProgress(ctx context.Context, namespace string, duName string, progress *uploader.Progress) {
+func (r *BackupMicroService) OnDataUploadProgress(_ context.Context, _ string, duName string, progress *uploader.Progress) {
 	log := r.logger.WithFields(logrus.Fields{
 		"dataupload": duName,
 	})

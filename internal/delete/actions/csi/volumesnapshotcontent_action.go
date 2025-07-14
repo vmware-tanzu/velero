@@ -47,7 +47,7 @@ type volumeSnapshotContentDeleteItemAction struct {
 // AppliesTo returns information indicating
 // VolumeSnapshotContentRestoreItemAction action should be invoked
 // while restoring VolumeSnapshotContent.snapshot.storage.k8s.io resources
-func (p *volumeSnapshotContentDeleteItemAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*volumeSnapshotContentDeleteItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"volumesnapshotcontents.snapshot.storage.k8s.io"},
 	}, nil

@@ -205,14 +205,14 @@ type fakeClock struct {
 	now time.Time
 }
 
-func (f *fakeClock) After(time.Duration) <-chan time.Time {
+func (*fakeClock) After(time.Duration) <-chan time.Time {
 	return nil
 }
 
-func (f *fakeClock) NewTicker(time.Duration) clock.Ticker {
+func (*fakeClock) NewTicker(time.Duration) clock.Ticker {
 	return nil
 }
-func (f *fakeClock) NewTimer(time.Duration) clock.Timer {
+func (*fakeClock) NewTimer(time.Duration) clock.Timer {
 	return nil
 }
 
@@ -220,17 +220,17 @@ func (f *fakeClock) Now() time.Time {
 	return f.now
 }
 
-func (f *fakeClock) Since(time.Time) time.Duration {
+func (*fakeClock) Since(time.Time) time.Duration {
 	return 0
 }
 
-func (f *fakeClock) Sleep(time.Duration) {}
+func (*fakeClock) Sleep(time.Duration) {}
 
-func (f *fakeClock) Tick(time.Duration) <-chan time.Time {
+func (*fakeClock) Tick(time.Duration) <-chan time.Time {
 	return nil
 }
 
-func (f *fakeClock) AfterFunc(time.Duration, func()) clock.Timer {
+func (*fakeClock) AfterFunc(time.Duration, func()) clock.Timer {
 	return nil
 }
 

@@ -237,7 +237,7 @@ func (r *BackupMicroService) Shutdown() {
 
 var funcMarshal = json.Marshal
 
-func (r *BackupMicroService) OnDataPathCompleted(ctx context.Context, namespace string, pvbName string, result datapath.Result) {
+func (r *BackupMicroService) OnDataPathCompleted(_ context.Context, _ string, pvbName string, result datapath.Result) {
 	log := r.logger.WithField("PVB", pvbName)
 
 	backupBytes, err := funcMarshal(result.Backup)
@@ -256,7 +256,7 @@ func (r *BackupMicroService) OnDataPathCompleted(ctx context.Context, namespace 
 	log.Info("Async fs backup completed")
 }
 
-func (r *BackupMicroService) OnDataPathFailed(ctx context.Context, namespace string, pvbName string, err error) {
+func (r *BackupMicroService) OnDataPathFailed(_ context.Context, _ string, pvbName string, err error) {
 	log := r.logger.WithField("PVB", pvbName)
 	log.WithError(err).Error("Async fs backup data path failed")
 
@@ -266,7 +266,7 @@ func (r *BackupMicroService) OnDataPathFailed(ctx context.Context, namespace str
 	}
 }
 
-func (r *BackupMicroService) OnDataPathCancelled(ctx context.Context, namespace string, pvbName string) {
+func (r *BackupMicroService) OnDataPathCancelled(_ context.Context, _ string, pvbName string) {
 	log := r.logger.WithField("PVB", pvbName)
 	log.Warn("Async fs backup data path canceled")
 
@@ -276,7 +276,7 @@ func (r *BackupMicroService) OnDataPathCancelled(ctx context.Context, namespace 
 	}
 }
 
-func (r *BackupMicroService) OnDataPathProgress(ctx context.Context, namespace string, pvbName string, progress *uploader.Progress) {
+func (r *BackupMicroService) OnDataPathProgress(_ context.Context, _ string, pvbName string, progress *uploader.Progress) {
 	log := r.logger.WithFields(logrus.Fields{
 		"PVB": pvbName,
 	})

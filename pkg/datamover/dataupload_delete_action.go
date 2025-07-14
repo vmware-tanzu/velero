@@ -23,7 +23,7 @@ type DataUploadDeleteAction struct {
 	client client.Client
 }
 
-func (d *DataUploadDeleteAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*DataUploadDeleteAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"datauploads.velero.io"},
 	}, nil

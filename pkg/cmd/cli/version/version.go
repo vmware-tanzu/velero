@@ -40,7 +40,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "version",
 		Short: "Print the velero version and associated image",
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(*cobra.Command, []string) {
 			var kbClient kbclient.Client
 			if !clientOnly {
 				var err error

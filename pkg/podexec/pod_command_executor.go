@@ -209,6 +209,6 @@ type streamExecutorFactory interface {
 
 type defaultStreamExecutorFactory struct{}
 
-func (f *defaultStreamExecutorFactory) NewSPDYExecutor(config *rest.Config, method string, url *url.URL) (remotecommand.Executor, error) {
+func (*defaultStreamExecutorFactory) NewSPDYExecutor(config *rest.Config, method string, url *url.URL) (remotecommand.Executor, error) {
 	return remotecommand.NewSPDYExecutor(config, method, url)
 }

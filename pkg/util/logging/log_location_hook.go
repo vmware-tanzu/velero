@@ -51,7 +51,7 @@ func (h *LogLocationHook) WithLoggerName(name string) *LogLocationHook {
 	return h
 }
 
-func (h *LogLocationHook) Levels() []logrus.Level {
+func (*LogLocationHook) Levels() []logrus.Level {
 	return logrus.AllLevels
 }
 

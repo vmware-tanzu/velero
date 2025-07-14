@@ -65,7 +65,7 @@ func NewPVCAction(
 }
 
 // AppliesTo returns the resources that PVCAction should be run for
-func (p *PVCAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*PVCAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"persistentvolumeclaims"},
 	}, nil

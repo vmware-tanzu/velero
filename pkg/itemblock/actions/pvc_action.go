@@ -55,7 +55,7 @@ func NewPVCAction(f client.Factory) plugincommon.HandlerInitializer {
 	}
 }
 
-func (a *PVCAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*PVCAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"persistentvolumeclaims"},
 	}, nil
@@ -117,7 +117,7 @@ func (a *PVCAction) GetRelatedItems(item runtime.Unstructured, backup *v1.Backup
 	return relatedItems, nil
 }
 
-func (a *PVCAction) Name() string {
+func (*PVCAction) Name() string {
 	return "PVCItemBlockAction"
 }
 

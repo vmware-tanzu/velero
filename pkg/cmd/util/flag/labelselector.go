@@ -46,6 +46,6 @@ func (ls *LabelSelector) Set(s string) error {
 
 // Type returns a string representation of the
 // LabelSelector type.
-func (ls *LabelSelector) Type() string {
+func (*LabelSelector) Type() string {
 	return "labelSelector"
 }

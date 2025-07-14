@@ -56,7 +56,7 @@ func NewCommand(f velerocli.Factory) *cobra.Command {
 		Use:    "repo-maintenance",
 		Hidden: true,
 		Short:  "VELERO INTERNAL COMMAND ONLY - not intended to be run directly by users",
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(*cobra.Command, []string) {
 			o.Run(f)
 		},
 	}
@@ -83,7 +83,7 @@ func (o *Options) Run(f velerocli.Factory) {
 	}
 }
 
-func (o *Options) initClient(f velerocli.Factory) (client.Client, error) {
+func (*Options) initClient(f velerocli.Factory) (client.Client, error) {
 	scheme := runtime.NewScheme()
 	err := velerov1api.AddToScheme(scheme)
 	if err != nil {

@@ -78,7 +78,7 @@ func TestOptionalHaveBool(t *testing.T) {
 				tc.logger.On("Check", mock.Anything, mock.Anything).Run(tc.retFuncCheck).Return(&zapcore.CheckedEntry{})
 			}
 
-			ctx := logging.WithLogger(t.Context(), func(module string) logging.Logger {
+			ctx := logging.WithLogger(t.Context(), func(string) logging.Logger {
 				return zap.New(tc.logger).Sugar()
 			})
 
@@ -143,7 +143,7 @@ func TestOptionalHaveIntWithDefault(t *testing.T) {
 				tc.logger.On("Check", mock.Anything, mock.Anything).Run(tc.retFuncCheck).Return(&zapcore.CheckedEntry{})
 			}
 
-			ctx := logging.WithLogger(t.Context(), func(module string) logging.Logger {
+			ctx := logging.WithLogger(t.Context(), func(string) logging.Logger {
 				return zap.New(tc.logger).Sugar()
 			})
 

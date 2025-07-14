@@ -42,7 +42,7 @@ type fakeListWatchFactory struct {
 	lw cache.ListerWatcher
 }
 
-func (f *fakeListWatchFactory) NewListWatch(ns string, selector fields.Selector) cache.ListerWatcher {
+func (f *fakeListWatchFactory) NewListWatch(string, fields.Selector) cache.ListerWatcher {
 	return f.lw
 }
 

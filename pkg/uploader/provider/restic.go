@@ -96,7 +96,7 @@ func NewResticUploaderProvider(
 	return &provider, nil
 }
 
-func (rp *resticProvider) Close(ctx context.Context) error {
+func (rp *resticProvider) Close(context.Context) error {
 	_, err := os.Stat(rp.credentialsFile)
 	if err == nil {
 		return os.Remove(rp.credentialsFile)
@@ -116,11 +116,11 @@ func (rp *resticProvider) Close(ctx context.Context) error {
 // RunBackup runs a `backup` command and watches the output to provide
 // progress updates to the caller and return snapshotID, isEmptySnapshot, error
 func (rp *resticProvider) RunBackup(
-	ctx context.Context,
+	_ context.Context,
 	path string,
 	realSource string,
 	tags map[string]string,
-	forceFull bool,
+	_ bool,
 	parentSnapshot string,
 	volMode uploader.PersistentVolumeMode,
 	uploaderCfg map[string]string,
@@ -193,7 +193,7 @@ func (rp *resticProvider) RunBackup(
 // RunRestore runs a `restore` command and monitors the volume size to
 // provide progress updates to the caller.
 func (rp *resticProvider) RunRestore(
-	ctx context.Context,
+	_ context.Context,
 	snapshotID string,
 	volumePath string,
 	volMode uploader.PersistentVolumeMode,
@@ -231,7 +231,7 @@ func (rp *resticProvider) RunRestore(
 	return 0, err
 }
 
-func (rp *resticProvider) parseRestoreExtraFlags(uploaderCfg map[string]string) ([]string, error) {
+func (*resticProvider) parseRestoreExtraFlags(uploaderCfg map[string]string) ([]string, error) {
 	extraFlags := []string{}
 	if len(uploaderCfg) == 0 {
 		return extraFlags, nil

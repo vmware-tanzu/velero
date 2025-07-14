@@ -31,7 +31,7 @@ type GCSBackend struct {
 	options gcs.Options
 }
 
-func (c *GCSBackend) Setup(ctx context.Context, flags map[string]string, logger logrus.FieldLogger) error {
+func (c *GCSBackend) Setup(ctx context.Context, flags map[string]string, _ logrus.FieldLogger) error {
 	var err error
 	c.options.BucketName, err = mustHaveString(udmrepo.StoreOptionOssBucket, flags)
 	if err != nil {
@@ -51,6 +51,6 @@ func (c *GCSBackend) Setup(ctx context.Context, flags map[string]string, logger 
 	return nil
 }
 
-func (c *GCSBackend) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
+func (c *GCSBackend) Connect(ctx context.Context, _ bool, _ logrus.FieldLogger) (blob.Storage, error) {
 	return gcs.New(ctx, &c.options, false)
 }

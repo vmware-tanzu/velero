@@ -117,6 +117,6 @@ func (c *ItemBlockActionGRPCClient) GetRelatedItems(item runtime.Unstructured, b
 
 // This shouldn't be called on the GRPC client since the RestartableItemBlockAction won't delegate
 // this method
-func (c *ItemBlockActionGRPCClient) Name() string {
+func (*ItemBlockActionGRPCClient) Name() string {
 	return ""
 }

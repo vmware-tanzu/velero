@@ -156,7 +156,7 @@ func IsValidS3URLScheme(s3URL string) bool {
 	return true
 }
 
-func (s AWSStorage) ListItems(client *s3.Client, objectsV2Input *s3.ListObjectsV2Input) (*s3.ListObjectsV2Output, error) {
+func (AWSStorage) ListItems(client *s3.Client, objectsV2Input *s3.ListObjectsV2Input) (*s3.ListObjectsV2Output, error) {
 	res, err := client.ListObjectsV2(context.Background(), objectsV2Input)
 	if err != nil {
 		return nil, err
@@ -165,7 +165,7 @@ func (s AWSStorage) ListItems(client *s3.Client, objectsV2Input *s3.ListObjectsV
 	return res, nil
 }
 
-func (s AWSStorage) DeleteItem(client *s3.Client, deleteObjectV2Input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error) {
+func (AWSStorage) DeleteItem(client *s3.Client, deleteObjectV2Input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error) {
 	res, err := client.DeleteObject(context.Background(), deleteObjectV2Input)
 	if err != nil {
 		return nil, err
@@ -238,7 +238,7 @@ func (s AWSStorage) IsObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix
 	return false, nil
 }
 
-func (s AWSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) error {
+func (AWSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, backupObject string) error {
 	config := flag.NewMap()
 	config.Set(bslConfig)
 
@@ -300,7 +300,7 @@ func (s AWSStorage) DeleteObjectsInBucket(cloudCredentialsFile, bslBucket, bslPr
 	return nil
 }
 
-func (s AWSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObject string, snapshotCheck test.SnapshotCheckPoint) error {
+func (AWSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObject string, snapshotCheck test.SnapshotCheckPoint) error {
 	config := flag.NewMap()
 	config.Set(bslConfig)
 	region := config.Data()["region"]
@@ -368,7 +368,7 @@ func (s AWSStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupObj
 	}
 }
 
-func (s AWSStorage) GetMinioBucketSize(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig string) (int64, error) {
+func (AWSStorage) GetMinioBucketSize(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig string) (int64, error) {
 	config := flag.NewMap()
 	config.Set(bslConfig)
 	region := config.Data()["region"]
@@ -416,7 +416,7 @@ func (s AWSStorage) GetMinioBucketSize(cloudCredentialsFile, bslBucket, bslPrefi
 	return totalSize, nil
 }
 
-func (s AWSStorage) GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, objectKey string) (io.ReadCloser, error) {
+func (AWSStorage) GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, objectKey string) (io.ReadCloser, error) {
 	config := flag.NewMap()
 	config.Set(bslConfig)
 	objectsInput := s3.ListObjectsV2Input{}

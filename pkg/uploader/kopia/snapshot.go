@@ -445,7 +445,7 @@ func Restore(ctx context.Context, rep repo.RepositoryWriter, progress *Progress,
 		Parallel:               restoreConcurrency,
 		RestoreDirEntryAtDepth: math.MaxInt32,
 		Cancel:                 cancleCh,
-		ProgressCallback: func(ctx context.Context, stats restore.Stats) {
+		ProgressCallback: func(_ context.Context, stats restore.Stats) {
 			progress.ProgressBytes(stats.RestoredTotalFileSize, stats.EnqueuedTotalFileSize)
 		},
 	})

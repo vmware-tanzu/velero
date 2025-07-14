@@ -38,7 +38,7 @@ type ClusterRoleBindingLister interface {
 type NoopClusterRoleBindingLister struct {
 }
 
-func (noop NoopClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
+func (NoopClusterRoleBindingLister) List() ([]ClusterRoleBinding, error) {
 	return []ClusterRoleBinding{}, nil
 }
 

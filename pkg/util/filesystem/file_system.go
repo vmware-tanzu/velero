@@ -50,31 +50,31 @@ func NewFileSystem() Interface {
 
 type osFileSystem struct{}
 
-func (fs *osFileSystem) Glob(path string) ([]string, error) {
+func (*osFileSystem) Glob(path string) ([]string, error) {
 	return filepath.Glob(path)
 }
 
-func (fs *osFileSystem) TempDir(dir, prefix string) (string, error) {
+func (*osFileSystem) TempDir(dir, prefix string) (string, error) {
 	return os.MkdirTemp(dir, prefix)
 }
 
-func (fs *osFileSystem) MkdirAll(path string, perm os.FileMode) error {
+func (*osFileSystem) MkdirAll(path string, perm os.FileMode) error {
 	return os.MkdirAll(path, perm)
 }
 
-func (fs *osFileSystem) Create(name string) (io.WriteCloser, error) {
+func (*osFileSystem) Create(name string) (io.WriteCloser, error) {
 	return os.Create(name)
 }
 
-func (fs *osFileSystem) OpenFile(name string, flag int, perm os.FileMode) (io.WriteCloser, error) {
+func (*osFileSystem) OpenFile(name string, flag int, perm os.FileMode) (io.WriteCloser, error) {
 	return os.OpenFile(name, flag, perm)
 }
 
-func (fs *osFileSystem) RemoveAll(path string) error {
+func (*osFileSystem) RemoveAll(path string) error {
 	return os.RemoveAll(path)
 }
 
-func (fs *osFileSystem) ReadDir(dirname string) ([]os.FileInfo, error) {
+func (*osFileSystem) ReadDir(dirname string) ([]os.FileInfo, error) {
 	var fileInfos []os.FileInfo
 	dirInfos, ise := os.ReadDir(dirname)
 	if ise != nil {
@@ -89,11 +89,11 @@ func (fs *osFileSystem) ReadDir(dirname string) ([]os.FileInfo, error) {
 	return fileInfos, nil
 }
 
-func (fs *osFileSystem) ReadFile(filename string) ([]byte, error) {
+func (*osFileSystem) ReadFile(filename string) ([]byte, error) {
 	return os.ReadFile(filename)
 }
 
-func (fs *osFileSystem) DirExists(path string) (bool, error) {
+func (*osFileSystem) DirExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
 		return true, nil
@@ -104,10 +104,10 @@ func (fs *osFileSystem) DirExists(path string) (bool, error) {
 	return false, err
 }
 
-func (fs *osFileSystem) TempFile(dir, prefix string) (NameWriteCloser, error) {
+func (*osFileSystem) TempFile(dir, prefix string) (NameWriteCloser, error) {
 	return os.CreateTemp(dir, prefix)
 }
 
-func (fs *osFileSystem) Stat(path string) (os.FileInfo, error) {
+func (*osFileSystem) Stat(path string) (os.FileInfo, error) {
 	return os.Stat(path)
 }

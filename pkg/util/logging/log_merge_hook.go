@@ -52,11 +52,11 @@ func newHookWriter(orgWriter io.Writer, source string, logger *logrus.Logger) io
 	}
 }
 
-func (h *MergeHook) Levels() []logrus.Level {
+func (*MergeHook) Levels() []logrus.Level {
 	return []logrus.Level{ListeningLevel}
 }
 
-func (h *MergeHook) Fire(entry *logrus.Entry) error {
+func (*MergeHook) Fire(entry *logrus.Entry) error {
 	if entry.Message != ListeningMessage {
 		return nil
 	}

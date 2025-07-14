@@ -67,7 +67,7 @@ type Provider interface {
 // NewUploaderProvider initialize provider with specific uploaderType
 func NewUploaderProvider(
 	ctx context.Context,
-	client client.Client,
+	_ client.Client,
 	uploaderType string,
 	requesterType string,
 	repoIdentifier string,

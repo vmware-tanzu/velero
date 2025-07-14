@@ -51,7 +51,7 @@ func (s *VolumeSnapshotterGRPCServer) getImpl(name string) (vsv1.VolumeSnapshott
 // Init prepares the VolumeSnapshotter for usage using the provided map of
 // configuration key-value pairs. It returns an error if the VolumeSnapshotter
 // cannot be initialized from the provided config.
-func (s *VolumeSnapshotterGRPCServer) Init(ctx context.Context, req *proto.VolumeSnapshotterInitRequest) (response *proto.Empty, err error) {
+func (s *VolumeSnapshotterGRPCServer) Init(_ context.Context, req *proto.VolumeSnapshotterInitRequest) (response *proto.Empty, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -72,7 +72,7 @@ func (s *VolumeSnapshotterGRPCServer) Init(ctx context.Context, req *proto.Volum
 
 // CreateVolumeFromSnapshot creates a new block volume, initialized from the provided snapshot,
 // and with the specified type and IOPS (if using provisioned IOPS).
-func (s *VolumeSnapshotterGRPCServer) CreateVolumeFromSnapshot(ctx context.Context, req *proto.CreateVolumeRequest) (response *proto.CreateVolumeResponse, err error) {
+func (s *VolumeSnapshotterGRPCServer) CreateVolumeFromSnapshot(_ context.Context, req *proto.CreateVolumeRequest) (response *proto.CreateVolumeResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -103,7 +103,7 @@ func (s *VolumeSnapshotterGRPCServer) CreateVolumeFromSnapshot(ctx context.Conte
 
 // GetVolumeInfo returns the type and IOPS (if using provisioned IOPS) for a specified block
 // volume.
-func (s *VolumeSnapshotterGRPCServer) GetVolumeInfo(ctx context.Context, req *proto.GetVolumeInfoRequest) (response *proto.GetVolumeInfoResponse, err error) {
+func (s *VolumeSnapshotterGRPCServer) GetVolumeInfo(_ context.Context, req *proto.GetVolumeInfoRequest) (response *proto.GetVolumeInfoResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -133,7 +133,7 @@ func (s *VolumeSnapshotterGRPCServer) GetVolumeInfo(ctx context.Context, req *pr
 
 // CreateSnapshot creates a snapshot of the specified block volume, and applies the provided
 // set of tags to the snapshot.
-func (s *VolumeSnapshotterGRPCServer) CreateSnapshot(ctx context.Context, req *proto.CreateSnapshotRequest) (response *proto.CreateSnapshotResponse, err error) {
+func (s *VolumeSnapshotterGRPCServer) CreateSnapshot(_ context.Context, req *proto.CreateSnapshotRequest) (response *proto.CreateSnapshotResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -154,7 +154,7 @@ func (s *VolumeSnapshotterGRPCServer) CreateSnapshot(ctx context.Context, req *p
 }
 
 // DeleteSnapshot deletes the specified volume snapshot.
-func (s *VolumeSnapshotterGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.DeleteSnapshotRequest) (response *proto.Empty, err error) {
+func (s *VolumeSnapshotterGRPCServer) DeleteSnapshot(_ context.Context, req *proto.DeleteSnapshotRequest) (response *proto.Empty, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -173,7 +173,7 @@ func (s *VolumeSnapshotterGRPCServer) DeleteSnapshot(ctx context.Context, req *p
 	return &proto.Empty{}, nil
 }
 
-func (s *VolumeSnapshotterGRPCServer) GetVolumeID(ctx context.Context, req *proto.GetVolumeIDRequest) (response *proto.GetVolumeIDResponse, err error) {
+func (s *VolumeSnapshotterGRPCServer) GetVolumeID(_ context.Context, req *proto.GetVolumeIDRequest) (response *proto.GetVolumeIDResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -199,7 +199,7 @@ func (s *VolumeSnapshotterGRPCServer) GetVolumeID(ctx context.Context, req *prot
 	return &proto.GetVolumeIDResponse{VolumeID: volumeID}, nil
 }
 
-func (s *VolumeSnapshotterGRPCServer) SetVolumeID(ctx context.Context, req *proto.SetVolumeIDRequest) (response *proto.SetVolumeIDResponse, err error) {
+func (s *VolumeSnapshotterGRPCServer) SetVolumeID(_ context.Context, req *proto.SetVolumeIDRequest) (response *proto.SetVolumeIDResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr

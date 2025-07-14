@@ -139,7 +139,7 @@ func TestGetStorageCredentials(t *testing.T) {
 					},
 				},
 			},
-			getS3Credentials: func(config map[string]string) (*aws.Credentials, error) {
+			getS3Credentials: func(map[string]string) (*aws.Credentials, error) {
 				return nil, errors.New("fake error")
 			},
 			credFileStore: new(credmock.FileStore),
@@ -154,7 +154,7 @@ func TestGetStorageCredentials(t *testing.T) {
 					Config:   map[string]string{},
 				},
 			},
-			getS3Credentials: func(config map[string]string) (*aws.Credentials, error) {
+			getS3Credentials: func(map[string]string) (*aws.Credentials, error) {
 				return nil, nil
 			},
 			credFileStore: new(credmock.FileStore),
@@ -181,7 +181,7 @@ func TestGetStorageCredentials(t *testing.T) {
 					},
 				},
 			},
-			getGCPCredentials: func(config map[string]string) string {
+			getGCPCredentials: func(_ map[string]string) string {
 				return "credentials-from-config-map"
 			},
 			credFileStore: new(credmock.FileStore),
@@ -292,7 +292,7 @@ func TestGetStorageVariables(t *testing.T) {
 					},
 				},
 			},
-			getS3BucketRegion: func(bucket string, config map[string]string) (string, error) {
+			getS3BucketRegion: func(bucket string, _ map[string]string) (string, error) {
 				return "region from bucket: " + bucket, nil
 			},
 			repoBackend: "fake-repo-type",
@@ -314,7 +314,7 @@ func TestGetStorageVariables(t *testing.T) {
 					Config:   map[string]string{},
 				},
 			},
-			getS3BucketRegion: func(bucket string, config map[string]string) (string, error) {
+			getS3BucketRegion: func(string, map[string]string) (string, error) {
 				return "", errors.New("fake error")
 			},
 			expected:    map[string]string{},
@@ -340,7 +340,7 @@ func TestGetStorageVariables(t *testing.T) {
 					},
 				},
 			},
-			getS3BucketRegion: func(bucket string, config map[string]string) (string, error) {
+			getS3BucketRegion: func(bucket string, _ map[string]string) (string, error) {
 				return "region from bucket: " + bucket, nil
 			},
 			repoBackend: "fake-repo-type",
@@ -375,7 +375,7 @@ func TestGetStorageVariables(t *testing.T) {
 					},
 				},
 			},
-			getS3BucketRegion: func(bucket string, config map[string]string) (string, error) {
+			getS3BucketRegion: func(bucket string, _ map[string]string) (string, error) {
 				return "region from bucket: " + bucket, nil
 			},
 			repoBackend: "fake-repo-type",
@@ -656,7 +656,7 @@ func TestPrepareRepo(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncInit: func(ctx context.Context, repoOption udmrepo.RepoOptions, createNew bool) error {
+			retFuncInit: func(_ context.Context, _ udmrepo.RepoOptions, createNew bool) error {
 				if !createNew {
 					return nil
 				}
@@ -677,7 +677,7 @@ func TestPrepareRepo(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncInit: func(ctx context.Context, repoOption udmrepo.RepoOptions, createNew bool) error {
+			retFuncInit: func(_ context.Context, _ udmrepo.RepoOptions, createNew bool) error {
 				if !createNew {
 					return repo.ErrRepositoryNotInitialized
 				}
@@ -698,7 +698,7 @@ func TestPrepareRepo(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncInit: func(ctx context.Context, repoOption udmrepo.RepoOptions, createNew bool) error {
+			retFuncInit: func(_ context.Context, _ udmrepo.RepoOptions, createNew bool) error {
 				if !createNew {
 					return errors.New("fake-error-1")
 				}
@@ -719,7 +719,7 @@ func TestPrepareRepo(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncInit: func(ctx context.Context, repoOption udmrepo.RepoOptions, createNew bool) error {
+			retFuncInit: func(_ context.Context, _ udmrepo.RepoOptions, createNew bool) error {
 				if !createNew {
 					return repo.ErrRepositoryNotInitialized
 				}
@@ -740,7 +740,7 @@ func TestPrepareRepo(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncInit: func(ctx context.Context, repoOption udmrepo.RepoOptions, createNew bool) error {
+			retFuncInit: func(_ context.Context, _ udmrepo.RepoOptions, createNew bool) error {
 				if !createNew {
 					return repo.ErrRepositoryNotInitialized
 				}

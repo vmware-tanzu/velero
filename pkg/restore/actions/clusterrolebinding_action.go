@@ -35,13 +35,13 @@ func NewClusterRoleBindingAction(logger logrus.FieldLogger) *ClusterRoleBindingA
 	return &ClusterRoleBindingAction{logger: logger}
 }
 
-func (a *ClusterRoleBindingAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*ClusterRoleBindingAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"clusterrolebindings"},
 	}, nil
 }
 
-func (a *ClusterRoleBindingAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (*ClusterRoleBindingAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	namespaceMapping := input.Restore.Spec.NamespaceMapping
 	if len(namespaceMapping) == 0 {
 		return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: input.Item.UnstructuredContent()}), nil

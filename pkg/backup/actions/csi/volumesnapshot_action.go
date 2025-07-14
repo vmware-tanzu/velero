@@ -52,7 +52,7 @@ type volumeSnapshotBackupItemAction struct {
 // AppliesTo returns information indicating that the
 // VolumeSnapshotBackupItemAction should be invoked to
 // backup VolumeSnapshots.
-func (p *volumeSnapshotBackupItemAction) AppliesTo() (
+func (*volumeSnapshotBackupItemAction) AppliesTo() (
 	velero.ResourceSelector,
 	error,
 ) {
@@ -236,13 +236,13 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 }
 
 // Name returns the plugin's name.
-func (p *volumeSnapshotBackupItemAction) Name() string {
+func (*volumeSnapshotBackupItemAction) Name() string {
 	return "VolumeSnapshotBackupItemAction"
 }
 
 func (p *volumeSnapshotBackupItemAction) Progress(
 	operationID string,
-	backup *velerov1api.Backup,
+	_ *velerov1api.Backup,
 ) (velero.OperationProgress, error) {
 	progress := velero.OperationProgress{}
 	if operationID == "" {
@@ -331,9 +331,9 @@ func (p *volumeSnapshotBackupItemAction) Progress(
 }
 
 // Cancel is not implemented for VolumeSnapshotBackupItemAction
-func (p *volumeSnapshotBackupItemAction) Cancel(
-	operationID string,
-	backup *velerov1api.Backup,
+func (*volumeSnapshotBackupItemAction) Cancel(
+	string,
+	*velerov1api.Backup,
 ) error {
 	// CSI Specification doesn't support canceling a snapshot creation.
 	return nil

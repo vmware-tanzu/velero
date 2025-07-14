@@ -60,7 +60,7 @@ func (e *Enum) Set(s string) error {
 
 // Type returns a string representation of the
 // Enum type.
-func (e *Enum) Type() string {
+func (*Enum) Type() string {
 	// we don't want the help text to display anything regarding
 	// the type because the usage text for the flag should capture
 	// the possible options.

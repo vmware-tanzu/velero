@@ -60,12 +60,12 @@ func (c *capacityCondition) validate() error {
 	return errors.Errorf("illegal values for capacity %v", c.capacity)
 }
 
-func (s *storageClassCondition) validate() error {
+func (*storageClassCondition) validate() error {
 	// validate by yamlv3
 	return nil
 }
 
-func (c *nfsCondition) validate() error {
+func (*nfsCondition) validate() error {
 	// validate by yamlv3
 	return nil
 }

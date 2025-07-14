@@ -1526,7 +1526,7 @@ type failingClient struct {
 	crclient.Client
 }
 
-func (f *failingClient) List(ctx context.Context, list crclient.ObjectList, opts ...crclient.ListOption) error {
+func (*failingClient) List(context.Context, crclient.ObjectList, ...crclient.ListOption) error {
 	return fmt.Errorf("simulated list error")
 }
 

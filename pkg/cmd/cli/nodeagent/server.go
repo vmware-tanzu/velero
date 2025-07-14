@@ -101,7 +101,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 		Short:  "Run the velero node-agent server",
 		Long:   "Run the velero node-agent server",
 		Hidden: true,
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(c *cobra.Command, _ []string) {
 			logLevel := logLevelFlag.Parse()
 			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))
 

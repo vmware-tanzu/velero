@@ -44,7 +44,7 @@ func NewLogHook() *LogHook {
 }
 
 // Levels returns the logrus levels that the hook should be fired for.
-func (h *LogHook) Levels() []logrus.Level {
+func (*LogHook) Levels() []logrus.Level {
 	return logrus.AllLevels
 }
 

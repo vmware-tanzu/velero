@@ -34,7 +34,7 @@ func NewRestartableProcessFactory() RestartableProcessFactory {
 	return &restartableProcessFactory{}
 }
 
-func (rpf *restartableProcessFactory) NewRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error) {
+func (*restartableProcessFactory) NewRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error) {
 	return newRestartableProcess(command, logger, logLevel)
 }
 

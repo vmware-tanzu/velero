@@ -129,7 +129,7 @@ func (t *testEnvironment) startManager() error {
 	return t.Manager.Start(t.doneMgr)
 }
 
-func (t *testEnvironment) stop() error {
+func (*testEnvironment) stop() error {
 	cancel()
 	return env.Stop()
 }
@@ -137,7 +137,7 @@ func (t *testEnvironment) stop() error {
 type fakeErrorBackupStoreGetter struct {
 }
 
-func (f *fakeErrorBackupStoreGetter) Get(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+func (*fakeErrorBackupStoreGetter) Get(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 	return nil, fmt.Errorf("some error")
 }
 

@@ -175,7 +175,7 @@ func TestStream(t *testing.T) {
 			name:    "timeout waiting for download URL",
 			target:  velerov1api.DownloadTargetKindBackupLog,
 			timeout: 50 * time.Millisecond,
-			setupClient: func(t *testing.T, client kbclient.WithWatch) {
+			setupClient: func(t *testing.T, _ kbclient.WithWatch) {
 				t.Helper()
 			},
 			expectedError:      true,
@@ -382,7 +382,7 @@ func TestStreamWithBSLCACert(t *testing.T) {
 			target:    velerov1api.DownloadTargetKindBackupLog,
 			bslCACert: "test-ca-cert-content",
 			timeout:   50 * time.Millisecond,
-			setupClient: func(t *testing.T, client kbclient.WithWatch) {
+			setupClient: func(t *testing.T, _ kbclient.WithWatch) {
 				t.Helper()
 			},
 			expectedError:      true,
@@ -466,7 +466,7 @@ func TestDownload(t *testing.T) {
 	}{
 		{
 			name: "successful download with gzip for logs",
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
+			serverHandler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				w.Write(compressedContent.Bytes())
 			},
@@ -476,7 +476,7 @@ func TestDownload(t *testing.T) {
 		},
 		{
 			name: "successful download without gzip for backup contents",
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
+			serverHandler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte(testContent))
 			},
@@ -486,7 +486,7 @@ func TestDownload(t *testing.T) {
 		},
 		{
 			name: "404 not found error",
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
+			serverHandler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
 			},
 			target:        velerov1api.DownloadTargetKindBackupLog,
@@ -495,7 +495,7 @@ func TestDownload(t *testing.T) {
 		},
 		{
 			name: "500 internal server error",
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
+			serverHandler: func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Write([]byte("internal server error"))
 			},
@@ -709,7 +709,7 @@ func TestMixedEnvironmentHTTPAndHTTPS(t *testing.T) {
 	testContentHTTPS := "https content"
 
 	// Create HTTP server
-	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(testContentHTTP))
 	}))
@@ -717,7 +717,7 @@ func TestMixedEnvironmentHTTPAndHTTPS(t *testing.T) {
 
 	// Create HTTPS server with self-signed cert
 	tlsCert, serverCACertPEM := createSelfSignedCertificate(t)
-	httpsServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	httpsServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(testContentHTTPS))
 	}))
@@ -955,7 +955,7 @@ func TestConcurrentDownloadsWithBSLCACert(t *testing.T) {
 	tlsCert, serverCACertPEM := createSelfSignedCertificate(t)
 
 	// Create TLS test server
-	tlsServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tlsServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		// Simulate some processing time
 		time.Sleep(10 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
@@ -973,7 +973,7 @@ func TestConcurrentDownloadsWithBSLCACert(t *testing.T) {
 	results := make(chan string, numConcurrent)
 
 	for i := range numConcurrent {
-		go func(idx int) {
+		go func(int) {
 			var buf bytes.Buffer
 			err := download(
 				t.Context(),
@@ -1012,7 +1012,7 @@ func TestDownloadWithBSLCACert(t *testing.T) {
 	tlsCert, serverCACertPEM := createSelfSignedCertificate(t)
 
 	// Create TLS test server with self-signed cert
-	tlsServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tlsServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(testContent))
 	}))
@@ -1023,7 +1023,7 @@ func TestDownloadWithBSLCACert(t *testing.T) {
 	defer tlsServer.Close()
 
 	// Create HTTP test server for non-TLS tests
-	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(testContent))
 	}))
@@ -1124,7 +1124,7 @@ func TestCACertFallback(t *testing.T) {
 	tlsCert, serverCACertPEM := createSelfSignedCertificate(t)
 
 	// Create TLS test server
-	tlsServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tlsServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(testContent))
 	}))

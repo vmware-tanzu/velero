@@ -53,7 +53,7 @@ func GetClients() (*kubernetes.Clientset, *snapshotterClientSet.Clientset, error
 	return client, snapshotterClient, nil
 }
 
-func GetCsiSnapshotHandle(client TestClient, apiVersion string, index map[string]string) ([]string, error) {
+func GetCsiSnapshotHandle(_ TestClient, apiVersion string, index map[string]string) ([]string, error) {
 	_, snapshotClient, err := GetClients()
 
 	var vscList *volumeSnapshotV1.VolumeSnapshotContentList

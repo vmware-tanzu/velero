@@ -108,7 +108,7 @@ func (r *restartableObjectStore) Init(config map[string]string) error {
 
 // init calls Init on objectStore with config. This is split out from Init() so that both Init() and reinitialize() may
 // call it using a specific ObjectStore.
-func (r *restartableObjectStore) init(objectStore velero.ObjectStore, config map[string]string) error {
+func (*restartableObjectStore) init(objectStore velero.ObjectStore, config map[string]string) error {
 	return objectStore.Init(config)
 }
 

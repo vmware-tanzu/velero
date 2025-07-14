@@ -907,11 +907,11 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 	}
 }
 
-func batchDeleteSucceed(ctx context.Context, repoEnsurer *repository.Ensurer, repoMgr repomanager.Manager, directSnapshots map[string][]repotypes.SnapshotIdentifier, backup *velerov1api.Backup, logger logrus.FieldLogger) []error {
+func batchDeleteSucceed(context.Context, *repository.Ensurer, repomanager.Manager, map[string][]repotypes.SnapshotIdentifier, *velerov1api.Backup, logrus.FieldLogger) []error {
 	return nil
 }
 
-func batchDeleteFail(ctx context.Context, repoEnsurer *repository.Ensurer, repoMgr repomanager.Manager, directSnapshots map[string][]repotypes.SnapshotIdentifier, backup *velerov1api.Backup, logger logrus.FieldLogger) []error {
+func batchDeleteFail(context.Context, *repository.Ensurer, repomanager.Manager, map[string][]repotypes.SnapshotIdentifier, *velerov1api.Backup, logrus.FieldLogger) []error {
 	return []error{
 		errors.New("fake-delete-1"),
 		errors.New("fake-delete-2"),

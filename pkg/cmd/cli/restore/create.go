@@ -181,7 +181,7 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 	return nil
 }
 
-func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+func (o *CreateOptions) Validate(c *cobra.Command, _ []string, f client.Factory) error {
 	if o.BackupName != "" && o.ScheduleName != "" {
 		return errors.New("either a backup or schedule must be specified, but not both")
 	}

@@ -39,13 +39,13 @@ func NewJobAction(logger logrus.FieldLogger) *JobAction {
 	return &JobAction{logger: logger}
 }
 
-func (a *JobAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*JobAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"jobs"},
 	}, nil
 }
 
-func (a *JobAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (*JobAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	job := new(batchv1api.Job)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), job); err != nil {
 		return nil, errors.WithStack(err)

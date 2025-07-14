@@ -32,7 +32,7 @@ func NewSetCommand() *cobra.Command {
 		Use:   "set KEY=VALUE [KEY=VALUE]...",
 		Short: "Set client configuration file values",
 		Args:  cobra.MinimumNArgs(1),
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, args []string) {
 			config, err := client.LoadConfig()
 			cmd.CheckError(err)
 

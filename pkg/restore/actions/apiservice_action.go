@@ -35,7 +35,7 @@ func NewAPIServiceAction(logger logrus.FieldLogger) *APIServiceAction {
 	return &APIServiceAction{logger: logger}
 }
 
-func (a *APIServiceAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*APIServiceAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"apiservices"},
 		LabelSelector:     autoregister.AutoRegisterManagedLabel,

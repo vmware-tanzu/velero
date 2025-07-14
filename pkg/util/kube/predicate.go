@@ -69,22 +69,22 @@ func NewAllEventPredicate(f func(object client.Object) bool) predicate.Predicate
 type FalsePredicate struct{}
 
 // Create always returns false
-func (f FalsePredicate) Create(event.CreateEvent) bool {
+func (FalsePredicate) Create(event.CreateEvent) bool {
 	return false
 }
 
 // Delete always returns false
-func (f FalsePredicate) Delete(event.DeleteEvent) bool {
+func (FalsePredicate) Delete(event.DeleteEvent) bool {
 	return false
 }
 
 // Update always returns false
-func (f FalsePredicate) Update(event.UpdateEvent) bool {
+func (FalsePredicate) Update(event.UpdateEvent) bool {
 	return false
 }
 
 // Generic always returns false
-func (f FalsePredicate) Generic(event.GenericEvent) bool {
+func (FalsePredicate) Generic(event.GenericEvent) bool {
 	return false
 }
 

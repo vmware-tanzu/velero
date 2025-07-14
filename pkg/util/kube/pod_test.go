@@ -83,7 +83,7 @@ func TestEnsureDeletePod(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "pods",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, nil
 					},
 				},
@@ -99,7 +99,7 @@ func TestEnsureDeletePod(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "pods",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, nil
 					},
 				},
@@ -115,7 +115,7 @@ func TestEnsureDeletePod(t *testing.T) {
 				{
 					verb:     "get",
 					resource: "pods",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-get-error")
 					},
 				},
@@ -355,7 +355,7 @@ func TestDeletePodIfAny(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "pods",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-delete-error")
 					},
 				},
@@ -615,7 +615,7 @@ type fakePodLog struct {
 	readPos         int
 }
 
-func (fp *fakePodLog) GetPodLogReader(ctx context.Context, podGetter corev1client.CoreV1Interface, pod string, namespace string, logOptions *corev1api.PodLogOptions) (io.ReadCloser, error) {
+func (fp *fakePodLog) GetPodLogReader(context.Context, corev1client.CoreV1Interface, string, string, *corev1api.PodLogOptions) (io.ReadCloser, error) {
 	if fp.getError != nil {
 		return nil, fp.getError
 	}
@@ -638,7 +638,7 @@ func (fp *fakePodLog) Read(p []byte) (n int, err error) {
 	return len(fp.logMessage), nil
 }
 
-func (fp *fakePodLog) Close() error {
+func (*fakePodLog) Close() error {
 	return nil
 }
 
@@ -949,7 +949,7 @@ func (em *exitWithMessageMock) Exit(code int) {
 	em.exitCode = code
 }
 
-func (em *exitWithMessageMock) CreateFile(name string) (*os.File, error) {
+func (em *exitWithMessageMock) CreateFile(string) (*os.File, error) {
 	if em.createErr != nil {
 		return nil, em.createErr
 	}

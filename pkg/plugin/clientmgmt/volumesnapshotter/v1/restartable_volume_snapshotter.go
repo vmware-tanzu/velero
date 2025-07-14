@@ -122,7 +122,7 @@ func (r *RestartableVolumeSnapshotter) Init(config map[string]string) error {
 
 // init calls Init on volumeSnapshotter with config. This is split out from Init() so that both Init() and reinitialize() may
 // call it using a specific VolumeSnapshotter.
-func (r *RestartableVolumeSnapshotter) init(volumeSnapshotter vsv1.VolumeSnapshotter, config map[string]string) error {
+func (*RestartableVolumeSnapshotter) init(volumeSnapshotter vsv1.VolumeSnapshotter, config map[string]string) error {
 	return volumeSnapshotter.Init(config)
 }
 

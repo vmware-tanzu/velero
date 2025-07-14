@@ -73,7 +73,7 @@ func NewPodVolumeRestoreAction(logger logrus.FieldLogger, client corev1client.Co
 	}, nil
 }
 
-func (a *PodVolumeRestoreAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*PodVolumeRestoreAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"pods"},
 	}, nil

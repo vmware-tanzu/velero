@@ -56,7 +56,7 @@ func NewChangeStorageClassAction(
 
 // AppliesTo returns the resources that ChangeStorageClassAction should
 // be run for.
-func (a *ChangeStorageClassAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*ChangeStorageClassAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"persistentvolumeclaims", "persistentvolumes", "statefulsets"},
 	}, nil

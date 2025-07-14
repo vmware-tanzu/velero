@@ -27,11 +27,11 @@ import (
 // overwritten.
 type HcLogLevelHook struct{}
 
-func (h *HcLogLevelHook) Levels() []logrus.Level {
+func (*HcLogLevelHook) Levels() []logrus.Level {
 	return logrus.AllLevels
 }
 
-func (h *HcLogLevelHook) Fire(entry *logrus.Entry) error {
+func (*HcLogLevelHook) Fire(entry *logrus.Entry) error {
 	switch entry.Level {
 	// logrus uses "warning" to represent WarnLevel,
 	// which is not compatible with hclog's "warn".

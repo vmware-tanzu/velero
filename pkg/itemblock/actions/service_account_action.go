@@ -48,7 +48,7 @@ func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingLister
 }
 
 // AppliesTo returns a ResourceSelector that applies only to service accounts.
-func (a *ServiceAccountAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*ServiceAccountAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"serviceaccounts"},
 	}, nil
@@ -56,7 +56,7 @@ func (a *ServiceAccountAction) AppliesTo() (velero.ResourceSelector, error) {
 
 // GetRelatedItems checks for any ClusterRoleBindings that have this service account as a subject, and
 // returns the ClusterRoleBinding and associated ClusterRole.
-func (a *ServiceAccountAction) GetRelatedItems(item runtime.Unstructured, backup *v1.Backup) ([]velero.ResourceIdentifier, error) {
+func (a *ServiceAccountAction) GetRelatedItems(item runtime.Unstructured, _ *v1.Backup) ([]velero.ResourceIdentifier, error) {
 	a.log.Info("Running ServiceAccount ItemBlockAction")
 	defer a.log.Info("Done running ServiceAccount ItemBlockAction")
 
@@ -68,6 +68,6 @@ func (a *ServiceAccountAction) GetRelatedItems(item runtime.Unstructured, backup
 	return actionhelpers.RelatedItemsForServiceAccount(objectMeta, a.clusterRoleBindings, a.log), nil
 }
 
-func (a *ServiceAccountAction) Name() string {
+func (*ServiceAccountAction) Name() string {
 	return "ServiceAccountItemBlockAction"
 }

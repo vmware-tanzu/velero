@@ -41,7 +41,7 @@ var _ restore.Output = &BlockOutput{}
 
 const bufferSize = 128 * 1024
 
-func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remoteFile fs.File, progressCb restore.FileWriteProgress) error {
+func (o *BlockOutput) WriteFile(ctx context.Context, _ string, remoteFile fs.File, progressCb restore.FileWriteProgress) error {
 	remoteReader, err := remoteFile.Open(ctx)
 	if err != nil {
 		return errors.Wrapf(err, "failed to open remote file %s", remoteFile.Name())
@@ -83,7 +83,7 @@ func (o *BlockOutput) WriteFile(ctx context.Context, relativePath string, remote
 	return nil
 }
 
-func (o *BlockOutput) BeginDirectory(ctx context.Context, relativePath string, e fs.Directory) error {
+func (o *BlockOutput) BeginDirectory(context.Context, string, fs.Directory) error {
 	var err error
 	o.targetFileName, err = filepath.EvalSymlinks(o.TargetPath)
 	if err != nil {

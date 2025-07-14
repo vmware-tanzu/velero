@@ -35,7 +35,7 @@ func newProcessFactory() Factory {
 	return &processFactory{}
 }
 
-func (pf *processFactory) newProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (Process, error) {
+func (*processFactory) newProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (Process, error) {
 	return newProcess(command, logger, logLevel)
 }
 

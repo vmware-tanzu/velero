@@ -214,7 +214,7 @@ func (c *PodVolumeRestoreReconcilerLegacy) SetupWithManager(mgr ctrl.Manager) er
 		Complete(c)
 }
 
-func (c *PodVolumeRestoreReconcilerLegacy) findVolumeRestoresForPod(ctx context.Context, pod client.Object) []reconcile.Request {
+func (c *PodVolumeRestoreReconcilerLegacy) findVolumeRestoresForPod(_ context.Context, pod client.Object) []reconcile.Request {
 	list := &velerov1api.PodVolumeRestoreList{}
 	options := &client.ListOptions{
 		LabelSelector: labels.Set(map[string]string{

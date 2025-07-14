@@ -84,7 +84,7 @@ func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.caCertFile, "cacert", o.caCertFile, "Path to a certificate bundle to use when verifying TLS connections. If not specified, the CA certificate from the BackupStorageLocation will be used if available.")
 }
 
-func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+func (o *DownloadOptions) Validate(_ *cobra.Command, _ []string, f client.Factory) error {
 	kbClient, err := f.KubebuilderClient()
 	cmd.CheckError(err)
 
@@ -115,7 +115,7 @@ func (o *DownloadOptions) Complete(args []string) error {
 	return nil
 }
 
-func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
+func (o *DownloadOptions) Run(_ *cobra.Command, f client.Factory) error {
 	kbClient, err := f.KubebuilderClient()
 	cmd.CheckError(err)
 

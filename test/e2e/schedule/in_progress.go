@@ -130,7 +130,7 @@ func (s *InProgressCase) Backup() error {
 			30*time.Second,
 			5*time.Minute,
 			true,
-			func(ctx context.Context) (bool, error) {
+			func(context.Context) (bool, error) {
 				backupList := new(velerov1api.BackupList)
 
 				if err := s.Client.Kubebuilder.List(

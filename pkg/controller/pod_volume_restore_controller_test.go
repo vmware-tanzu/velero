@@ -1268,7 +1268,7 @@ func TestFindPVBForRestorePod(t *testing.T) {
 			name: "no selected label found for pod",
 			pvr:  pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, pvrName).Result(),
-			checkFunc: func(pvr *velerov1api.PodVolumeRestore, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov1api.PodVolumeRestore, requests []reconcile.Request) {
 				// Assert that the function returns a single request
 				assert.Empty(t, requests)
 			},
@@ -1276,7 +1276,7 @@ func TestFindPVBForRestorePod(t *testing.T) {
 			name: "no matched pod",
 			pvr:  pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, pvrName).Labels(map[string]string{velerov1api.PVRLabel: "non-existing-pvr"}).Result(),
-			checkFunc: func(pvr *velerov1api.PodVolumeRestore, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov1api.PodVolumeRestore, requests []reconcile.Request) {
 				assert.Empty(t, requests)
 			},
 		},
@@ -1284,7 +1284,7 @@ func TestFindPVBForRestorePod(t *testing.T) {
 			name: "pvr not accept",
 			pvr:  pvrBuilder().Phase(velerov1api.PodVolumeRestorePhaseInProgress).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, pvrName).Labels(map[string]string{velerov1api.PVRLabel: pvrName}).Result(),
-			checkFunc: func(pvr *velerov1api.PodVolumeRestore, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov1api.PodVolumeRestore, requests []reconcile.Request) {
 				assert.Empty(t, requests)
 			},
 		},

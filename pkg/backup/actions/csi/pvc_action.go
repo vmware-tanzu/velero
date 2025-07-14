@@ -76,7 +76,7 @@ type pvcBackupItemAction struct {
 
 // AppliesTo returns information indicating that the PVCBackupItemAction
 // should be invoked to backup PVCs.
-func (p *pvcBackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*pvcBackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"persistentvolumeclaims"},
 	}, nil
@@ -383,7 +383,7 @@ func (p *pvcBackupItemAction) Execute(
 		additionalItems, operationID, itemToUpdate, nil
 }
 
-func (p *pvcBackupItemAction) Name() string {
+func (*pvcBackupItemAction) Name() string {
 	return "PVCBackupItemAction"
 }
 

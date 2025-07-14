@@ -446,13 +446,13 @@ func (o *Options) Run(c *cobra.Command, f client.Factory) error {
 }
 
 // Complete completes options for a command.
-func (o *Options) Complete(args []string, f client.Factory) error {
+func (o *Options) Complete(_ []string, f client.Factory) error {
 	o.Namespace = f.Namespace()
 	return nil
 }
 
 // Validate validates options provided to a command.
-func (o *Options) Validate(c *cobra.Command, args []string, f client.Factory) error {
+func (o *Options) Validate(c *cobra.Command, _ []string, _ client.Factory) error {
 	if err := output.ValidateFlags(c); err != nil {
 		return err
 	}

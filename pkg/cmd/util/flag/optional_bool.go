@@ -55,6 +55,6 @@ func (f *OptionalBool) Set(val string) error {
 	return nil
 }
 
-func (f *OptionalBool) Type() string {
+func (*OptionalBool) Type() string {
 	return "optionalBool"
 }
