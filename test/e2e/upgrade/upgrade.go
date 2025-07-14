@@ -199,8 +199,17 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 				var snapshotCheckPoint SnapshotCheckPoint
 				snapshotCheckPoint.NamespaceBackedUp = upgradeNamespace
 				By("Snapshot should be created in cloud object store", func() {
-					snapshotCheckPoint, err := GetSnapshotCheckPoint(*veleroCfg.ClientToInstallVelero, veleroCfg, 2,
-						upgradeNamespace, backupName, KibishiiPVCNameList)
+					backupVolumeInfo, err := GetVolumeInfo(
+						veleroCfg.ObjectStoreProvider,
+						veleroCfg.CloudCredentialsFile,
+						veleroCfg.BSLBucket,
+						veleroCfg.BSLPrefix,
+						veleroCfg.BSLConfig,
+						backupName,
+						BackupObjectsPrefix+"/"+backupName,
+					)
+					Expect(err).NotTo(HaveOccurred(), "Failed to get volume info for backup")
+					snapshotCheckPoint, err := BuildSnapshotCheckPointFromVolumeInfo(veleroCfg, backupVolumeInfo, 2, upgradeNamespace, backupName, KibishiiPVCNameList)
 					Expect(err).NotTo(HaveOccurred(), "Fail to get snapshot checkpoint")
 					Expect(CheckSnapshotsInProvider(
 						veleroCfg,

@@ -54,7 +54,6 @@ func (b *TTL) Init() {
 }
 
 func TTLTest() {
-	var err error
 	var veleroCfg VeleroConfig
 	useVolumeSnapshots := true
 	test := new(TTL)
@@ -138,9 +137,20 @@ func TTLTest() {
 				})
 			}
 
-			snapshotCheckPoint, err = GetSnapshotCheckPoint(
-				client,
+			backupVolumeInfo, err := GetVolumeInfo(
+				veleroCfg.ObjectStoreProvider,
+				veleroCfg.CloudCredentialsFile,
+				veleroCfg.BSLBucket,
+				veleroCfg.BSLPrefix,
+				veleroCfg.BSLConfig,
+				test.backupName,
+				BackupObjectsPrefix+"/"+test.backupName,
+			)
+			Expect(err).NotTo(HaveOccurred(), "Failed to get volume info for backup")
+
+			snapshotCheckPoint, err = BuildSnapshotCheckPointFromVolumeInfo(
 				veleroCfg,
+				backupVolumeInfo,
 				2,
 				test.testNS,
 				test.backupName,
