@@ -19,12 +19,11 @@ package backend
 import (
 	"testing"
 
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-
 	"github.com/kopia/kopia/repo/blob/s3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestS3Setup(t *testing.T) {

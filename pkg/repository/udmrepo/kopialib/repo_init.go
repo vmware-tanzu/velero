@@ -20,11 +20,10 @@ import (
 	"context"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/kopia/kopia/repo"
 	"github.com/kopia/kopia/repo/blob"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend"

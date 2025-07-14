@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	appsv1api "k8s.io/api/apps/v1"
@@ -41,6 +39,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/restorehelper"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )

@@ -5,12 +5,11 @@ import (
 	"strings"
 	"time"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	podvolumeconfigs "github.com/vmware-tanzu/velero/pkg/podvolume/configs"

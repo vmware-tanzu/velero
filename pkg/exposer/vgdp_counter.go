@@ -8,13 +8,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
+	ctlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
-
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-
-	ctlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type dynamicQueueLength struct {

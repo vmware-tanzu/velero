@@ -19,9 +19,8 @@ package backend
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/kopia/kopia/repo/blob"
+	"github.com/sirupsen/logrus"
 )
 
 // Store defines the methods for Kopia to establish a connection to

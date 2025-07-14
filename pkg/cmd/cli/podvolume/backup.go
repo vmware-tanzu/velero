@@ -29,8 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
+	ctlcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	ctlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
@@ -41,13 +45,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
-
-	ctrl "sigs.k8s.io/controller-runtime"
-
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-
-	ctlcache "sigs.k8s.io/controller-runtime/pkg/cache"
-	ctlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type podVolumeBackupConfig struct {

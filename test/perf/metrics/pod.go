@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 
 	"github.com/vmware-tanzu/velero/test/util/metrics"

@@ -20,8 +20,6 @@ import (
 	"testing"
 	"time"
 
-	v2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
-
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -43,6 +41,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	v2 "github.com/vmware-tanzu/velero/pkg/plugin/velero/backupitemaction/v2"
 	biav2mocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks/backupitemaction/v2"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )

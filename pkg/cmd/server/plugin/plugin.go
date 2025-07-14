@@ -21,14 +21,13 @@ import (
 	"github.com/spf13/cobra"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
-	"github.com/vmware-tanzu/velero/pkg/constant"
-	"github.com/vmware-tanzu/velero/pkg/datamover"
-
 	dia "github.com/vmware-tanzu/velero/internal/delete/actions/csi"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	bia "github.com/vmware-tanzu/velero/pkg/backup/actions"
 	csibia "github.com/vmware-tanzu/velero/pkg/backup/actions/csi"
 	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/constant"
+	"github.com/vmware-tanzu/velero/pkg/datamover"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	iba "github.com/vmware-tanzu/velero/pkg/itemblock/actions"

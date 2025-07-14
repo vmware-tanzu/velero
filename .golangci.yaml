@@ -405,6 +405,7 @@ issues:
 # with their default values.
 formatters:
   enable:
+    - gci
     - gofmt
     - goimports
 
@@ -415,6 +416,11 @@ formatters:
       - third_party
 
   settings:
+    gci:
+      sections:
+        - standard # Standard section: captures all standard packages.
+        - default # Default section: contains all imports that could not be matched to another section type.
+        - prefix(github.com/vmware-tanzu/velero) # Custom section: groups all imports with the specified Prefix.
     gofmt:
       # simplify code: gofmt with `-s` option, true by default
       simplify: true

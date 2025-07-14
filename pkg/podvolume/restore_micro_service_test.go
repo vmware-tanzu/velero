@@ -29,23 +29,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/datapath"
-	"github.com/vmware-tanzu/velero/pkg/uploader"
-
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
-
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/datapath"
 	datapathmockes "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/uploader"
 )
 
 type restoreMsTestHelper struct {

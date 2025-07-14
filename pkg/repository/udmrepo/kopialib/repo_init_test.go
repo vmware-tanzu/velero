@@ -19,15 +19,13 @@ package kopialib
 import (
 	"testing"
 
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	storagemocks "github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/mocks"
-
-	"github.com/pkg/errors"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 type comparableError struct {
