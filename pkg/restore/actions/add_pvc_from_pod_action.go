@@ -34,7 +34,7 @@ func NewAddPVCFromPodAction(logger logrus.FieldLogger) *AddPVCFromPodAction {
 	return &AddPVCFromPodAction{logger: logger}
 }
 
-func (a *AddPVCFromPodAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*AddPVCFromPodAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"pods"},
 	}, nil

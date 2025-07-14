@@ -38,7 +38,7 @@ func NewPodAction(logger logrus.FieldLogger) *PodAction {
 }
 
 // AppliesTo returns a ResourceSelector that applies only to pods.
-func (a *PodAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*PodAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"pods"},
 	}, nil

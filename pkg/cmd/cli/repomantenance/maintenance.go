@@ -83,7 +83,7 @@ func (o *Options) Run(f velerocli.Factory) {
 	}
 }
 
-func (o *Options) initClient(f velerocli.Factory) (client.Client, error) {
+func (*Options) initClient(f velerocli.Factory) (client.Client, error) {
 	scheme := runtime.NewScheme()
 	err := velerov1api.AddToScheme(scheme)
 	if err != nil {

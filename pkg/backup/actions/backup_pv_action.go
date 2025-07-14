@@ -40,7 +40,7 @@ func NewPVCAction(logger logrus.FieldLogger) *PVCAction {
 	return &PVCAction{log: logger}
 }
 
-func (a *PVCAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*PVCAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"persistentvolumeclaims"},
 	}, nil

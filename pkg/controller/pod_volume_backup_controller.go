@@ -450,7 +450,7 @@ func (r *PodVolumeBackupReconciler) onPrepareTimeout(ctx context.Context, pvb *v
 	log.Info("PVB has been cleaned up")
 }
 
-func (r *PodVolumeBackupReconciler) initCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, res *exposer.ExposeResult, log logrus.FieldLogger) error {
+func (*PodVolumeBackupReconciler) initCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, res *exposer.ExposeResult, log logrus.FieldLogger) error {
 	log.Info("Init cancelable PVB")
 
 	if err := asyncBR.Init(ctx, nil); err != nil {
@@ -462,7 +462,7 @@ func (r *PodVolumeBackupReconciler) initCancelableDataPath(ctx context.Context, 
 	return nil
 }
 
-func (r *PodVolumeBackupReconciler) startCancelableDataPath(asyncBR datapath.AsyncBR, pvb *velerov1api.PodVolumeBackup, res *exposer.ExposeResult, log logrus.FieldLogger) error {
+func (*PodVolumeBackupReconciler) startCancelableDataPath(asyncBR datapath.AsyncBR, pvb *velerov1api.PodVolumeBackup, res *exposer.ExposeResult, log logrus.FieldLogger) error {
 	log.Info("Start cancelable PVB")
 
 	if err := asyncBR.StartBackup(datapath.AccessPoint{

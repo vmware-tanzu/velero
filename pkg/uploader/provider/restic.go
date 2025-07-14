@@ -231,7 +231,7 @@ func (rp *resticProvider) RunRestore(
 	return 0, err
 }
 
-func (rp *resticProvider) parseRestoreExtraFlags(uploaderCfg map[string]string) ([]string, error) {
+func (*resticProvider) parseRestoreExtraFlags(uploaderCfg map[string]string) ([]string, error) {
 	extraFlags := []string{}
 	if len(uploaderCfg) == 0 {
 		return extraFlags, nil

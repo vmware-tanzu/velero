@@ -41,7 +41,7 @@ type volumeSnapshotContentBackupItemAction struct {
 // AppliesTo returns information indicating that the
 // VolumeSnapshotContentBackupItemAction action should be invoked to
 // backup VolumeSnapshotContents.
-func (p *volumeSnapshotContentBackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*volumeSnapshotContentBackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"volumesnapshotcontents.snapshot.storage.k8s.io"},
 	}, nil
@@ -111,12 +111,12 @@ func (p *volumeSnapshotContentBackupItemAction) Execute(
 }
 
 // Name returns the plugin's name.
-func (p *volumeSnapshotContentBackupItemAction) Name() string {
+func (*volumeSnapshotContentBackupItemAction) Name() string {
 	return "VolumeSnapshotContentBackupItemAction"
 }
 
 // Progress is not implemented for VolumeSnapshotContentBackupItemAction.
-func (p *volumeSnapshotContentBackupItemAction) Progress(
+func (*volumeSnapshotContentBackupItemAction) Progress(
 	string,
 	*velerov1api.Backup,
 ) (velero.OperationProgress, error) {
@@ -124,7 +124,7 @@ func (p *volumeSnapshotContentBackupItemAction) Progress(
 }
 
 // Cancel is not implemented for VolumeSnapshotContentBackupItemAction.
-func (p *volumeSnapshotContentBackupItemAction) Cancel(
+func (*volumeSnapshotContentBackupItemAction) Cancel(
 	string,
 	*velerov1api.Backup,
 ) error {

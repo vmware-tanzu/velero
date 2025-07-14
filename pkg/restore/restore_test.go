@@ -1429,7 +1429,7 @@ type recordResourcesAction struct {
 	additionalItemsReadyTimeout time.Duration
 }
 
-func (a *recordResourcesAction) Name() string {
+func (*recordResourcesAction) Name() string {
 	return ""
 }
 
@@ -1459,15 +1459,15 @@ func (a *recordResourcesAction) Execute(input *velero.RestoreItemActionExecuteIn
 	}, nil
 }
 
-func (a *recordResourcesAction) Progress(string, *velerov1api.Restore) (velero.OperationProgress, error) {
+func (*recordResourcesAction) Progress(string, *velerov1api.Restore) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, nil
 }
 
-func (a *recordResourcesAction) Cancel(string, *velerov1api.Restore) error {
+func (*recordResourcesAction) Cancel(string, *velerov1api.Restore) error {
 	return nil
 }
 
-func (a *recordResourcesAction) AreAdditionalItemsReady([]velero.ResourceIdentifier, *velerov1api.Restore) (bool, error) {
+func (*recordResourcesAction) AreAdditionalItemsReady([]velero.ResourceIdentifier, *velerov1api.Restore) (bool, error) {
 	return true, nil
 }
 
@@ -1686,7 +1686,7 @@ func (a *pluggableAction) Execute(input *velero.RestoreItemActionExecuteInput) (
 	return a.executeFunc(input)
 }
 
-func (a *pluggableAction) Name() string {
+func (*pluggableAction) Name() string {
 	return ""
 }
 
@@ -1694,11 +1694,11 @@ func (a *pluggableAction) AppliesTo() (velero.ResourceSelector, error) {
 	return a.selector, nil
 }
 
-func (a *pluggableAction) Progress(string, *velerov1api.Restore) (velero.OperationProgress, error) {
+func (*pluggableAction) Progress(string, *velerov1api.Restore) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, nil
 }
 
-func (a *pluggableAction) Cancel(string, *velerov1api.Restore) error {
+func (*pluggableAction) Cancel(string, *velerov1api.Restore) error {
 	return nil
 }
 
@@ -1707,7 +1707,7 @@ func (a *pluggableAction) addSelector(selector velero.ResourceSelector) *pluggab
 	return a
 }
 
-func (a *pluggableAction) AreAdditionalItemsReady([]velero.ResourceIdentifier, *velerov1api.Restore) (bool, error) {
+func (*pluggableAction) AreAdditionalItemsReady([]velero.ResourceIdentifier, *velerov1api.Restore) (bool, error) {
 	return true, nil
 }
 
@@ -2397,7 +2397,7 @@ type volumeSnapshotter struct {
 }
 
 // Init is a no-op.
-func (vs *volumeSnapshotter) Init(map[string]string) error {
+func (*volumeSnapshotter) Init(map[string]string) error {
 	return nil
 }
 

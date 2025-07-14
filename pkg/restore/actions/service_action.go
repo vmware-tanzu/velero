@@ -42,7 +42,7 @@ func NewServiceAction(logger logrus.FieldLogger) *ServiceAction {
 	return &ServiceAction{log: logger}
 }
 
-func (a *ServiceAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*ServiceAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"services"},
 	}, nil

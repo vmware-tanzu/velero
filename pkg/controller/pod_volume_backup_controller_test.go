@@ -195,11 +195,11 @@ func (f *fakePvbExposer) PeekExposed(context.Context, corev1api.ObjectReference)
 	return f.peekErr
 }
 
-func (f *fakePvbExposer) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
+func (*fakePvbExposer) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (f *fakePvbExposer) CleanUp(context.Context, corev1api.ObjectReference) {
+func (*fakePvbExposer) CleanUp(context.Context, corev1api.ObjectReference) {
 }
 
 func TestPVBReconcile(t *testing.T) {
@@ -935,7 +935,7 @@ func (dt *pvbResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler
 	return dt.resumeErr
 }
 
-func (dt *pvbResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, exposer.PodVolumeExposeParam) error {
+func (*pvbResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, exposer.PodVolumeExposeParam) error {
 	return nil
 }
 
@@ -943,15 +943,15 @@ func (dt *pvbResumeTestHelper) GetExposed(context.Context, corev1api.ObjectRefer
 	return dt.exposeResult, dt.getExposeErr
 }
 
-func (dt *pvbResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
+func (*pvbResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
 	return nil
 }
 
-func (dt *pvbResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
+func (*pvbResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (dt *pvbResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference) {}
+func (*pvbResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference) {}
 
 func (dt *pvbResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
 	datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {

@@ -638,7 +638,7 @@ func (fp *fakePodLog) Read(p []byte) (n int, err error) {
 	return len(fp.logMessage), nil
 }
 
-func (fp *fakePodLog) Close() error {
+func (*fakePodLog) Close() error {
 	return nil
 }
 

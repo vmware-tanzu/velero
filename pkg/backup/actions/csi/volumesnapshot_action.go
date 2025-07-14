@@ -52,7 +52,7 @@ type volumeSnapshotBackupItemAction struct {
 // AppliesTo returns information indicating that the
 // VolumeSnapshotBackupItemAction should be invoked to
 // backup VolumeSnapshots.
-func (p *volumeSnapshotBackupItemAction) AppliesTo() (
+func (*volumeSnapshotBackupItemAction) AppliesTo() (
 	velero.ResourceSelector,
 	error,
 ) {
@@ -243,7 +243,7 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 }
 
 // Name returns the plugin's name.
-func (p *volumeSnapshotBackupItemAction) Name() string {
+func (*volumeSnapshotBackupItemAction) Name() string {
 	return "VolumeSnapshotBackupItemAction"
 }
 
@@ -338,7 +338,7 @@ func (p *volumeSnapshotBackupItemAction) Progress(
 }
 
 // Cancel is not implemented for VolumeSnapshotBackupItemAction
-func (p *volumeSnapshotBackupItemAction) Cancel(
+func (*volumeSnapshotBackupItemAction) Cancel(
 	string,
 	*velerov1api.Backup,
 ) error {

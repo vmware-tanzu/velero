@@ -28,7 +28,7 @@ import (
 
 type fakeProgressUpdater struct{}
 
-func (f *fakeProgressUpdater) UpdateProgress(*uploader.Progress) {}
+func (*fakeProgressUpdater) UpdateProgress(*uploader.Progress) {}
 
 func TestThrottle_ShouldOutput(t *testing.T) {
 	testCases := []struct {

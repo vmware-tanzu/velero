@@ -116,7 +116,7 @@ func (p *Progress) UpdateProgress() {
 }
 
 // UploadStarted statistic the total Error has occurred
-func (p *Progress) UploadStarted() {}
+func (*Progress) UploadStarted() {}
 
 // CachedFile statistic the total bytes been cached currently
 func (p *Progress) CachedFile(_ string, numBytes int64) {
@@ -132,10 +132,10 @@ func (p *Progress) HashedBytes(numBytes int64) {
 }
 
 // HashingFile statistic the file been hashed currently
-func (p *Progress) HashingFile(string) {}
+func (*Progress) HashingFile(string) {}
 
 // ExcludedFile statistic the file been excluded currently
-func (p *Progress) ExcludedFile(string, int64) {}
+func (*Progress) ExcludedFile(string, int64) {}
 
 // ExcludedDir statistic the dir been excluded currently
 func (p *Progress) ExcludedDir(dirname string) {
@@ -148,7 +148,7 @@ func (p *Progress) FinishedHashingFile(string, int64) {
 }
 
 // StartedDirectory called when begin to upload one directory
-func (p *Progress) StartedDirectory(string) {}
+func (*Progress) StartedDirectory(string) {}
 
 // FinishedDirectory called when finish to upload one directory
 func (p *Progress) FinishedDirectory(string) {
@@ -167,12 +167,12 @@ func (p *Progress) ProgressBytes(processedBytes int64, totalBytes int64) {
 	p.UpdateProgress()
 }
 
-func (p *Progress) FinishedFile(string, error) {}
+func (*Progress) FinishedFile(string, error) {}
 
 func (p *Progress) EstimationParameters() upload.EstimationParameters {
 	return p.estimationParam
 }
 
-func (p *Progress) Enabled() bool {
+func (*Progress) Enabled() bool {
 	return true
 }

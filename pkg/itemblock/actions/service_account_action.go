@@ -48,7 +48,7 @@ func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingLister
 }
 
 // AppliesTo returns a ResourceSelector that applies only to service accounts.
-func (a *ServiceAccountAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*ServiceAccountAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"serviceaccounts"},
 	}, nil
@@ -68,6 +68,6 @@ func (a *ServiceAccountAction) GetRelatedItems(item runtime.Unstructured, _ *v1.
 	return actionhelpers.RelatedItemsForServiceAccount(objectMeta, a.clusterRoleBindings, a.log), nil
 }
 
-func (a *ServiceAccountAction) Name() string {
+func (*ServiceAccountAction) Name() string {
 	return "ServiceAccountItemBlockAction"
 }

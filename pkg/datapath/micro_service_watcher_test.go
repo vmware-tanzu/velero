@@ -132,7 +132,7 @@ func (sw *startWatchFake) redirectDataMoverLogs(context.Context, kubernetes.Inte
 	return sw.redirectErr
 }
 
-func (sw *startWatchFake) getResultFromMessage(string, string, logrus.FieldLogger) Result {
+func (*startWatchFake) getResultFromMessage(string, string, logrus.FieldLogger) Result {
 	return Result{}
 }
 

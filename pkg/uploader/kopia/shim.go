@@ -70,7 +70,7 @@ func (sr *shimRepository) OpenObject(ctx context.Context, id object.ID) (object.
 }
 
 // VerifyObject not supported
-func (sr *shimRepository) VerifyObject(context.Context, object.ID) ([]content.ID, error) {
+func (*shimRepository) VerifyObject(context.Context, object.ID) ([]content.ID, error) {
 	return nil, errors.New("VerifyObject is not supported")
 }
 
@@ -130,36 +130,36 @@ func (sr *shimRepository) Time() time.Time {
 }
 
 // ClientOptions is not supported by unified repo
-func (sr *shimRepository) ClientOptions() repo.ClientOptions {
+func (*shimRepository) ClientOptions() repo.ClientOptions {
 	return repo.ClientOptions{}
 }
 
 // Refresh not supported
-func (sr *shimRepository) Refresh(context.Context) error {
+func (*shimRepository) Refresh(context.Context) error {
 	return errors.New("Refresh is not supported")
 }
 
 // ContentInfo not supported
-func (sr *shimRepository) ContentInfo(context.Context, content.ID) (content.Info, error) {
+func (*shimRepository) ContentInfo(context.Context, content.ID) (content.Info, error) {
 	return index.Info{}, errors.New("ContentInfo is not supported")
 }
 
 // PrefetchContents is not supported by unified repo
-func (sr *shimRepository) PrefetchContents(context.Context, []content.ID, string) []content.ID {
+func (*shimRepository) PrefetchContents(context.Context, []content.ID, string) []content.ID {
 	return nil
 }
 
 // PrefetchObjects is not supported by unified repo
-func (sr *shimRepository) PrefetchObjects(context.Context, []object.ID, string) ([]content.ID, error) {
+func (*shimRepository) PrefetchObjects(context.Context, []object.ID, string) ([]content.ID, error) {
 	return nil, errors.New("PrefetchObjects is not supported")
 }
 
 // UpdateDescription is not supported by unified repo
-func (sr *shimRepository) UpdateDescription(string) {
+func (*shimRepository) UpdateDescription(string) {
 }
 
 // NewWriter is not supported by unified repo
-func (sr *shimRepository) NewWriter(context.Context, repo.WriteSessionOptions) (context.Context, repo.RepositoryWriter, error) {
+func (*shimRepository) NewWriter(context.Context, repo.WriteSessionOptions) (context.Context, repo.RepositoryWriter, error) {
 	return nil, nil, errors.New("NewWriter is not supported")
 }
 
@@ -255,7 +255,7 @@ func (sr *shimRepository) ConcatenateObjects(ctx context.Context, objectIDs []ob
 	return object.ParseID(string(id))
 }
 
-func (sr *shimRepository) OnSuccessfulFlush(repo.RepositoryWriterCallback) {
+func (*shimRepository) OnSuccessfulFlush(repo.RepositoryWriterCallback) {
 }
 
 // Flush all the unifited repository data

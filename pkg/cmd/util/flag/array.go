@@ -46,6 +46,6 @@ func (sa *StringArray) Set(s string) error {
 
 // Type returns a string representation of the
 // StringArray type.
-func (sa *StringArray) Type() string {
+func (*StringArray) Type() string {
 	return "stringArray"
 }

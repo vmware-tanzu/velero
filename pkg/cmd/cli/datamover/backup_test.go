@@ -60,7 +60,7 @@ func (fr *fakeRunHelper) RunCancelableDataPath(_ context.Context) (string, error
 	}
 }
 
-func (fr *fakeRunHelper) Shutdown() {
+func (*fakeRunHelper) Shutdown() {
 
 }
 

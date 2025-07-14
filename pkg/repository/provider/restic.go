@@ -62,7 +62,7 @@ func (r *resticRepositoryProvider) PrepareRepo(ctx context.Context, param RepoPa
 	return nil
 }
 
-func (r *resticRepositoryProvider) BoostRepoConnect(context.Context, RepoParam) error {
+func (*resticRepositoryProvider) BoostRepoConnect(context.Context, RepoParam) error {
 	return nil
 }
 

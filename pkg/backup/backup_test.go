@@ -1311,11 +1311,11 @@ func (a *recordResourcesAction) AppliesTo() (velero.ResourceSelector, error) {
 	return a.selector, nil
 }
 
-func (a *recordResourcesAction) Progress(string, *velerov1.Backup) (velero.OperationProgress, error) {
+func (*recordResourcesAction) Progress(string, *velerov1.Backup) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, nil
 }
 
-func (a *recordResourcesAction) Cancel(string, *velerov1.Backup) error {
+func (*recordResourcesAction) Cancel(string, *velerov1.Backup) error {
 	return nil
 }
 
@@ -1782,27 +1782,27 @@ func TestBackupWithInvalidActions(t *testing.T) {
 // an error when AppliesTo() is called.
 type appliesToErrorAction struct{}
 
-func (a *appliesToErrorAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*appliesToErrorAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{}, errors.New("error calling AppliesTo")
 }
 
-func (a *appliesToErrorAction) Execute(runtime.Unstructured, *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
+func (*appliesToErrorAction) Execute(runtime.Unstructured, *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, string, []velero.ResourceIdentifier, error) {
 	panic("not implemented")
 }
 
-func (a *appliesToErrorAction) GetRelatedItems(runtime.Unstructured, *velerov1.Backup) ([]velero.ResourceIdentifier, error) {
+func (*appliesToErrorAction) GetRelatedItems(runtime.Unstructured, *velerov1.Backup) ([]velero.ResourceIdentifier, error) {
 	panic("not implemented")
 }
 
-func (a *appliesToErrorAction) Progress(string, *velerov1.Backup) (velero.OperationProgress, error) {
+func (*appliesToErrorAction) Progress(string, *velerov1.Backup) (velero.OperationProgress, error) {
 	panic("not implemented")
 }
 
-func (a *appliesToErrorAction) Cancel(string, *velerov1.Backup) error {
+func (*appliesToErrorAction) Cancel(string, *velerov1.Backup) error {
 	panic("not implemented")
 }
 
-func (a *appliesToErrorAction) Name() string {
+func (*appliesToErrorAction) Name() string {
 	return ""
 }
 
@@ -4004,7 +4004,7 @@ func TestBackupWithHooks(t *testing.T) {
 
 type fakePodVolumeBackupperFactory struct{}
 
-func (f *fakePodVolumeBackupperFactory) NewBackupper(context.Context, logrus.FieldLogger, *velerov1.Backup, string) (podvolume.Backupper, error) {
+func (*fakePodVolumeBackupperFactory) NewBackupper(context.Context, logrus.FieldLogger, *velerov1.Backup, string) (podvolume.Backupper, error) {
 	return &fakePodVolumeBackupper{}, nil
 }
 
@@ -4246,11 +4246,11 @@ func (a *pluggableAction) Progress(operationID string, backup *velerov1.Backup) 
 	return a.progressFunc(operationID, backup)
 }
 
-func (a *pluggableAction) Cancel(string, *velerov1.Backup) error {
+func (*pluggableAction) Cancel(string, *velerov1.Backup) error {
 	return nil
 }
 
-func (a *pluggableAction) Name() string {
+func (*pluggableAction) Name() string {
 	return ""
 }
 
@@ -4272,7 +4272,7 @@ func (a *pluggableIBA) AppliesTo() (velero.ResourceSelector, error) {
 	return a.selector, nil
 }
 
-func (a *pluggableIBA) Name() string {
+func (*pluggableIBA) Name() string {
 	return ""
 }
 

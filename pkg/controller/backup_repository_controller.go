@@ -296,7 +296,7 @@ func (r *BackupRepoReconciler) getBSL(ctx context.Context, req *velerov1api.Back
 	return loc, nil
 }
 
-func (r *BackupRepoReconciler) getIdentifierByBSL(bsl *velerov1api.BackupStorageLocation, req *velerov1api.BackupRepository) (string, error) {
+func (*BackupRepoReconciler) getIdentifierByBSL(bsl *velerov1api.BackupStorageLocation, req *velerov1api.BackupRepository) (string, error) {
 	repoIdentifier, err := repoconfig.GetRepoIdentifier(bsl, req.Spec.VolumeNamespace)
 	if err != nil {
 		return "", errors.Wrapf(err, "error to get identifier for repo %s", req.Name)

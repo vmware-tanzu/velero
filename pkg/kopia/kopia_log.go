@@ -111,11 +111,11 @@ func (kl *kopiaLog) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 }
 
 // Sync flushes buffered logs (if any).
-func (kl *kopiaLog) Sync() error {
+func (*kopiaLog) Sync() error {
 	return nil
 }
 
-func (kl *kopiaLog) logrusFields(fields []zapcore.Field) logrus.Fields {
+func (*kopiaLog) logrusFields(fields []zapcore.Field) logrus.Fields {
 	if fields == nil {
 		return logrus.Fields{}
 	}

@@ -455,7 +455,7 @@ func (r *PodVolumeRestoreReconciler) onPrepareTimeout(ctx context.Context, pvr *
 	log.Info("PVR has been cleaned up")
 }
 
-func (r *PodVolumeRestoreReconciler) initCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, res *exposer.ExposeResult, log logrus.FieldLogger) error {
+func (*PodVolumeRestoreReconciler) initCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, res *exposer.ExposeResult, log logrus.FieldLogger) error {
 	log.Info("Init cancelable PVR")
 
 	if err := asyncBR.Init(ctx, nil); err != nil {
@@ -467,7 +467,7 @@ func (r *PodVolumeRestoreReconciler) initCancelableDataPath(ctx context.Context,
 	return nil
 }
 
-func (r *PodVolumeRestoreReconciler) startCancelableDataPath(asyncBR datapath.AsyncBR, pvr *velerov1api.PodVolumeRestore, res *exposer.ExposeResult, log logrus.FieldLogger) error {
+func (*PodVolumeRestoreReconciler) startCancelableDataPath(asyncBR datapath.AsyncBR, pvr *velerov1api.PodVolumeRestore, res *exposer.ExposeResult, log logrus.FieldLogger) error {
 	log.Info("Start cancelable PVR")
 
 	if err := asyncBR.StartRestore(pvr.Spec.SnapshotID, datapath.AccessPoint{

@@ -51,7 +51,7 @@ type FakeBackupProgressUpdater struct {
 	Cli             client.Client
 }
 
-func (f *FakeBackupProgressUpdater) UpdateProgress(_ *uploader.Progress) {}
+func (*FakeBackupProgressUpdater) UpdateProgress(*uploader.Progress) {}
 
 type FakeRestoreProgressUpdater struct {
 	PodVolumeRestore *velerov1api.PodVolumeRestore
@@ -60,7 +60,7 @@ type FakeRestoreProgressUpdater struct {
 	Cli              client.Client
 }
 
-func (f *FakeRestoreProgressUpdater) UpdateProgress(_ *uploader.Progress) {}
+func (*FakeRestoreProgressUpdater) UpdateProgress(*uploader.Progress) {}
 
 func TestRunBackup(t *testing.T) {
 	mockBRepo := udmrepomocks.NewBackupRepo(t)

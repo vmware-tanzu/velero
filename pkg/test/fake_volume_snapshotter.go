@@ -46,7 +46,7 @@ type FakeVolumeSnapshotter struct {
 	Error error
 }
 
-func (bs *FakeVolumeSnapshotter) Init(map[string]string) error {
+func (*FakeVolumeSnapshotter) Init(map[string]string) error {
 	return nil
 }
 

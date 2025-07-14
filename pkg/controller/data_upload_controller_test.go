@@ -305,11 +305,11 @@ func (f *fakeSnapshotExposer) PeekExposed(context.Context, corev1api.ObjectRefer
 	return f.peekErr
 }
 
-func (f *fakeSnapshotExposer) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
+func (*fakeSnapshotExposer) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (f *fakeSnapshotExposer) CleanUp(context.Context, corev1api.ObjectReference, string, string) {
+func (*fakeSnapshotExposer) CleanUp(context.Context, corev1api.ObjectReference, string, string) {
 }
 
 type fakeFSBR struct {
@@ -327,14 +327,14 @@ func (f *fakeFSBR) StartBackup(datapath.AccessPoint, map[string]string, any) err
 	return f.startErr
 }
 
-func (f *fakeFSBR) StartRestore(string, datapath.AccessPoint, map[string]string) error {
+func (*fakeFSBR) StartRestore(string, datapath.AccessPoint, map[string]string) error {
 	return nil
 }
 
-func (b *fakeFSBR) Cancel() {
+func (*fakeFSBR) Cancel() {
 }
 
-func (b *fakeFSBR) Close(context.Context) {
+func (*fakeFSBR) Close(context.Context) {
 }
 
 func TestReconcile(t *testing.T) {
@@ -1119,7 +1119,7 @@ func (dt *duResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler,
 	return dt.resumeErr
 }
 
-func (dt *duResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, any) error {
+func (*duResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, any) error {
 	return nil
 }
 
@@ -1127,15 +1127,15 @@ func (dt *duResumeTestHelper) GetExposed(context.Context, corev1api.ObjectRefere
 	return dt.exposeResult, dt.getExposeErr
 }
 
-func (dt *duResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
+func (*duResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
 	return nil
 }
 
-func (dt *duResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
+func (*duResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (dt *duResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference, string, string) {}
+func (*duResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference, string, string) {}
 
 func (dt *duResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
 	datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {

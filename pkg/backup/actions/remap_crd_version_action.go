@@ -50,7 +50,7 @@ func NewRemapCRDVersionAction(logger logrus.FieldLogger, betaCRDClient apiextv1b
 }
 
 // AppliesTo selects the resources the plugin should run against. In this case, CustomResourceDefinitions.
-func (a *RemapCRDVersionAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*RemapCRDVersionAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"customresourcedefinition.apiextensions.k8s.io"},
 	}, nil
