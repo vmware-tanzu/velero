@@ -26,8 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/kopia/kopia/fs"
 	"github.com/kopia/kopia/fs/localfs"
 	"github.com/kopia/kopia/repo"
@@ -37,6 +35,7 @@ import (
 	"github.com/kopia/kopia/snapshot/restore"
 	"github.com/kopia/kopia/snapshot/snapshotfs"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/vmware-tanzu/velero/pkg/kopia"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"

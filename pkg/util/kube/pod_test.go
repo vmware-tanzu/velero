@@ -36,12 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientTesting "k8s.io/client-go/testing"
 
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 func TestEnsureDeletePod(t *testing.T) {
