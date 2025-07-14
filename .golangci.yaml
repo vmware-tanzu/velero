@@ -129,7 +129,6 @@ linters:
       disable:
         - fieldalignment
         - shadow
-        - unusedwrite
       enable-all: true
   
     importas:
