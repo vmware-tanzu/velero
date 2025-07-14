@@ -37,7 +37,7 @@ type volumeSnapshotClassRestoreItemAction struct {
 
 // AppliesTo returns information indicating that VolumeSnapshotClassRestoreItemAction
 // should be invoked while restoring volumesnapshotclass.snapshot.storage.k8s.io resources.
-func (p *volumeSnapshotClassRestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*volumeSnapshotClassRestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"volumesnapshotclasses.snapshot.storage.k8s.io"},
 	}, nil
@@ -80,27 +80,27 @@ func (p *volumeSnapshotClassRestoreItemAction) Execute(
 	}, nil
 }
 
-func (p *volumeSnapshotClassRestoreItemAction) Name() string {
+func (*volumeSnapshotClassRestoreItemAction) Name() string {
 	return "VolumeSnapshotClassRestoreItemAction"
 }
 
-func (p *volumeSnapshotClassRestoreItemAction) Progress(
-	operationID string,
-	restore *velerov1api.Restore,
+func (*volumeSnapshotClassRestoreItemAction) Progress(
+	string,
+	*velerov1api.Restore,
 ) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, nil
 }
 
-func (p *volumeSnapshotClassRestoreItemAction) Cancel(
-	operationID string,
-	restore *velerov1api.Restore,
+func (*volumeSnapshotClassRestoreItemAction) Cancel(
+	string,
+	*velerov1api.Restore,
 ) error {
 	return nil
 }
 
-func (p *volumeSnapshotClassRestoreItemAction) AreAdditionalItemsReady(
-	additionalItems []velero.ResourceIdentifier,
-	restore *velerov1api.Restore,
+func (*volumeSnapshotClassRestoreItemAction) AreAdditionalItemsReady(
+	[]velero.ResourceIdentifier,
+	*velerov1api.Restore,
 ) (bool, error) {
 	return true, nil
 }

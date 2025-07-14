@@ -103,7 +103,7 @@ type InitContainerRestoreHookHandler struct{}
 // If the item is a pod, then hooks are chosen to be run as follows:
 // If the pod has the appropriate annotations specifying the hook action, then hooks from the annotation are run
 // Otherwise, the supplied ResourceRestoreHooks are applied.
-func (i *InitContainerRestoreHookHandler) HandleRestoreHooks(
+func (*InitContainerRestoreHookHandler) HandleRestoreHooks(
 	log logrus.FieldLogger,
 	groupResource schema.GroupResource,
 	obj runtime.Unstructured,
@@ -307,13 +307,13 @@ func (h *DefaultItemHookHandler) HandleHooks(
 // NoOpItemHookHandler is the an itemHookHandler for the Finalize controller where hooks don't run
 type NoOpItemHookHandler struct{}
 
-func (h *NoOpItemHookHandler) HandleHooks(
-	log logrus.FieldLogger,
-	groupResource schema.GroupResource,
-	obj runtime.Unstructured,
-	resourceHooks []ResourceHook,
-	phase HookPhase,
-	hookTracker *HookTracker,
+func (*NoOpItemHookHandler) HandleHooks(
+	logrus.FieldLogger,
+	schema.GroupResource,
+	runtime.Unstructured,
+	[]ResourceHook,
+	HookPhase,
+	*HookTracker,
 ) error {
 	return nil
 }

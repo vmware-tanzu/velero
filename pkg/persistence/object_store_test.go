@@ -1232,12 +1232,12 @@ func newStringReadSeeker(s string) *stringReadSeeker {
 	}
 }
 
-func (srs *stringReadSeeker) Seek(offset int64, whence int) (int64, error) {
+func (*stringReadSeeker) Seek(int64, int) (int64, error) {
 	return 0, nil
 }
 
 type errorReader struct{}
 
-func (r *errorReader) Read([]byte) (int, error) {
+func (*errorReader) Read([]byte) (int, error) {
 	return 0, errors.New("error readers return errors")
 }

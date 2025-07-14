@@ -271,7 +271,7 @@ func (urp *unifiedRepoProvider) PruneRepo(ctx context.Context, param RepoParam) 
 	return nil
 }
 
-func (urp *unifiedRepoProvider) EnsureUnlockRepo(ctx context.Context, param RepoParam) error {
+func (*unifiedRepoProvider) EnsureUnlockRepo(context.Context, RepoParam) error {
 	return nil
 }
 
@@ -372,7 +372,7 @@ func (urp *unifiedRepoProvider) BatchForget(ctx context.Context, snapshotIDs []s
 	return errs
 }
 
-func (urp *unifiedRepoProvider) DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration {
+func (urp *unifiedRepoProvider) DefaultMaintenanceFrequency(context.Context, RepoParam) time.Duration {
 	return urp.repoService.DefaultMaintenanceFrequency()
 }
 
@@ -390,7 +390,7 @@ func (urp *unifiedRepoProvider) GetPassword(param any) (string, error) {
 	return repoPassword, nil
 }
 
-func (urp *unifiedRepoProvider) GetStoreType(param any) (string, error) {
+func (*unifiedRepoProvider) GetStoreType(param any) (string, error) {
 	repoParam, ok := param.(RepoParam)
 	if !ok {
 		return "", errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)

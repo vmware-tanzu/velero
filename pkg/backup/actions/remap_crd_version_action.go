@@ -50,14 +50,14 @@ func NewRemapCRDVersionAction(logger logrus.FieldLogger, betaCRDClient apiextv1b
 }
 
 // AppliesTo selects the resources the plugin should run against. In this case, CustomResourceDefinitions.
-func (a *RemapCRDVersionAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*RemapCRDVersionAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"customresourcedefinition.apiextensions.k8s.io"},
 	}, nil
 }
 
 // Execute executes logic necessary to check a CustomResourceDefinition and inspect it for characteristics that necessitate saving it as v1beta1 instead of v1.
-func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, _ *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	a.logger.Info("Executing RemapCRDVersionAction")
 
 	// This plugin is only relevant for CRDs retrieved from the v1 endpoint that were installed via the v1beta1

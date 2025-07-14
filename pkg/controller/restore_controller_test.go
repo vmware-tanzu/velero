@@ -1028,7 +1028,7 @@ type fakeRestorer struct {
 func (r *fakeRestorer) Restore(
 	info *pkgrestore.Request,
 	actions []riav2.RestoreItemAction,
-	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
+	_ pkgrestore.VolumeSnapshotterGetter,
 ) (results.Result, results.Result) {
 	res := r.Called(info.Log, info.Restore, info.Backup, info.BackupReader, actions)
 

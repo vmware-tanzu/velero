@@ -77,7 +77,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.Credential, "credential", "The credential to be used by this location as a key-value pair, where the key is the Kubernetes Secret name, and the value is the data key name within the Secret. Optional, one value only.")
 }
 
-func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+func (o *CreateOptions) Validate(c *cobra.Command, _ []string, _ client.Factory) error {
 	if err := output.ValidateFlags(c); err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	return nil
 }
 
-func (o *CreateOptions) Complete(args []string, f client.Factory) error {
+func (o *CreateOptions) Complete(args []string, _ client.Factory) error {
 	o.Name = args[0]
 	return nil
 }

@@ -299,7 +299,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		// No matching snapshots
 		{
 			name: "No matching snapshots",
-			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
+			listSnapshotsFunc: func(context.Context, repo.Repository, snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{}, nil
 			},
 			expectedSnapshots: []*snapshot.Manifest{},
@@ -307,7 +307,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		},
 		{
 			name: "Error getting manifest",
-			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
+			listSnapshotsFunc: func(context.Context, repo.Repository, snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{}, errors.New("Error getting manifest")
 			},
 			expectedSnapshots: []*snapshot.Manifest{},
@@ -316,7 +316,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		// Only one matching snapshot
 		{
 			name: "One matching snapshot",
-			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
+			listSnapshotsFunc: func(context.Context, repo.Repository, snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
@@ -347,7 +347,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		// Multiple matching snapshots
 		{
 			name: "Multiple matching snapshots",
-			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
+			listSnapshotsFunc: func(context.Context, repo.Repository, snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
@@ -385,7 +385,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		// Snapshot with different requester
 		{
 			name: "Snapshot with different requester",
-			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
+			listSnapshotsFunc: func(context.Context, repo.Repository, snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
@@ -404,7 +404,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		// Snapshot with different uploader
 		{
 			name: "Snapshot with different uploader",
-			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
+			listSnapshotsFunc: func(context.Context, repo.Repository, snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
@@ -423,7 +423,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		// Snapshot with a later start time
 		{
 			name: "Snapshot with a later start time",
-			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
+			listSnapshotsFunc: func(context.Context, repo.Repository, snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
@@ -443,7 +443,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		// Snapshot with incomplete reason
 		{
 			name: "Snapshot with incomplete reason",
-			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
+			listSnapshotsFunc: func(context.Context, repo.Repository, snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
@@ -463,7 +463,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		// Multiple snapshots with some matching conditions
 		{
 			name: "Multiple snapshots with matching conditions",
-			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
+			listSnapshotsFunc: func(context.Context, repo.Repository, snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
@@ -514,7 +514,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		// Snapshot with manifest SnapshotRequesterTag not found
 		{
 			name: "Snapshot with manifest SnapshotRequesterTag not found",
-			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
+			listSnapshotsFunc: func(context.Context, repo.Repository, snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
@@ -534,7 +534,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		// Snapshot with manifest SnapshotRequesterTag not found
 		{
 			name: "Snapshot with manifest SnapshotUploaderTag not found",
-			listSnapshotsFunc: func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
+			listSnapshotsFunc: func(context.Context, repo.Repository, snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
 				return []*snapshot.Manifest{
 					{
 						Tags: map[string]string{
@@ -697,10 +697,10 @@ func TestRestore(t *testing.T) {
 		},
 		{
 			name: "Failed to restore with filesystem entry",
-			filesystemEntryFunc: func(ctx context.Context, rep repo.Repository, rootID string, consistentAttributes bool) (fs.Entry, error) {
+			filesystemEntryFunc: func(_ context.Context, rep repo.Repository, _ string, _ bool) (fs.Entry, error) {
 				return snapshotfs.EntryFromDirEntry(rep, &snapshot.DirEntry{Type: snapshot.EntryTypeFile}), nil
 			},
-			restoreEntryFunc: func(ctx context.Context, rep repo.Repository, output restore.Output, rootEntry fs.Entry, options restore.Options) (restore.Stats, error) {
+			restoreEntryFunc: func(context.Context, repo.Repository, restore.Output, fs.Entry, restore.Options) (restore.Stats, error) {
 				return restore.Stats{}, errors.New("Unable to get filesystem entry")
 			},
 			snapshotID:    "snapshot-123",
@@ -708,10 +708,10 @@ func TestRestore(t *testing.T) {
 		},
 		{
 			name: "Expect successful",
-			filesystemEntryFunc: func(ctx context.Context, rep repo.Repository, rootID string, consistentAttributes bool) (fs.Entry, error) {
+			filesystemEntryFunc: func(_ context.Context, rep repo.Repository, _ string, _ bool) (fs.Entry, error) {
 				return snapshotfs.EntryFromDirEntry(rep, &snapshot.DirEntry{Type: snapshot.EntryTypeFile}), nil
 			},
-			restoreEntryFunc: func(ctx context.Context, rep repo.Repository, output restore.Output, rootEntry fs.Entry, options restore.Options) (restore.Stats, error) {
+			restoreEntryFunc: func(context.Context, repo.Repository, restore.Output, fs.Entry, restore.Options) (restore.Stats, error) {
 				return restore.Stats{}, nil
 			},
 			snapshotID:    "snapshot-123",
@@ -719,10 +719,10 @@ func TestRestore(t *testing.T) {
 		},
 		{
 			name: "Expect block volume successful",
-			filesystemEntryFunc: func(ctx context.Context, rep repo.Repository, rootID string, consistentAttributes bool) (fs.Entry, error) {
+			filesystemEntryFunc: func(_ context.Context, rep repo.Repository, _ string, _ bool) (fs.Entry, error) {
 				return snapshotfs.EntryFromDirEntry(rep, &snapshot.DirEntry{Type: snapshot.EntryTypeFile}), nil
 			},
-			restoreEntryFunc: func(ctx context.Context, rep repo.Repository, output restore.Output, rootEntry fs.Entry, options restore.Options) (restore.Stats, error) {
+			restoreEntryFunc: func(context.Context, repo.Repository, restore.Output, fs.Entry, restore.Options) (restore.Stats, error) {
 				return restore.Stats{}, nil
 			},
 			snapshotID:    "snapshot-123",
@@ -731,10 +731,10 @@ func TestRestore(t *testing.T) {
 		},
 		{
 			name: "Unable to evaluate symlinks for block volume",
-			filesystemEntryFunc: func(ctx context.Context, rep repo.Repository, rootID string, consistentAttributes bool) (fs.Entry, error) {
+			filesystemEntryFunc: func(_ context.Context, rep repo.Repository, _ string, _ bool) (fs.Entry, error) {
 				return snapshotfs.EntryFromDirEntry(rep, &snapshot.DirEntry{Type: snapshot.EntryTypeFile}), nil
 			},
-			restoreEntryFunc: func(ctx context.Context, rep repo.Repository, output restore.Output, rootEntry fs.Entry, options restore.Options) (restore.Stats, error) {
+			restoreEntryFunc: func(ctx context.Context, _ repo.Repository, output restore.Output, _ fs.Entry, _ restore.Options) (restore.Stats, error) {
 				err := output.BeginDirectory(ctx, "fake-dir", virtualfs.NewStaticDirectory("fake-dir", nil))
 				return restore.Stats{}, err
 			},
@@ -745,10 +745,10 @@ func TestRestore(t *testing.T) {
 		},
 		{
 			name: "Target file is not a block device",
-			filesystemEntryFunc: func(ctx context.Context, rep repo.Repository, rootID string, consistentAttributes bool) (fs.Entry, error) {
+			filesystemEntryFunc: func(_ context.Context, rep repo.Repository, _ string, _ bool) (fs.Entry, error) {
 				return snapshotfs.EntryFromDirEntry(rep, &snapshot.DirEntry{Type: snapshot.EntryTypeFile}), nil
 			},
-			restoreEntryFunc: func(ctx context.Context, rep repo.Repository, output restore.Output, rootEntry fs.Entry, options restore.Options) (restore.Stats, error) {
+			restoreEntryFunc: func(ctx context.Context, _ repo.Repository, output restore.Output, _ fs.Entry, _ restore.Options) (restore.Stats, error) {
 				err := output.BeginDirectory(ctx, "fake-dir", virtualfs.NewStaticDirectory("fake-dir", nil))
 				return restore.Stats{}, err
 			},

@@ -35,13 +35,13 @@ func NewRoleBindingAction(logger logrus.FieldLogger) *RoleBindingAction {
 	return &RoleBindingAction{logger: logger}
 }
 
-func (a *RoleBindingAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*RoleBindingAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"rolebindings"},
 	}, nil
 }
 
-func (a *RoleBindingAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+func (*RoleBindingAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	namespaceMapping := input.Restore.Spec.NamespaceMapping
 	if len(namespaceMapping) == 0 {
 		return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: input.Item.UnstructuredContent()}), nil

@@ -60,7 +60,7 @@ func (l *LogsOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&l.CaCertFile, "cacert", l.CaCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
 }
 
-func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
+func (l *LogsOptions) Run(_ *cobra.Command, f client.Factory) error {
 	backup := new(velerov1api.Backup)
 	err := l.Client.Get(context.TODO(), kbclient.ObjectKey{Namespace: f.Namespace(), Name: l.BackupName}, backup)
 	if apierrors.IsNotFound(err) {

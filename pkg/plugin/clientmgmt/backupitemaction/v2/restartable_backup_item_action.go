@@ -171,11 +171,11 @@ func (r *AdaptedV1RestartableBackupItemAction) Execute(item runtime.Unstructured
 
 // Progress returns with an error since v1 plugins will never return an operationID, which means that
 // any operationID passed in here will be invalid.
-func (r *AdaptedV1RestartableBackupItemAction) Progress(operationID string, backup *api.Backup) (velero.OperationProgress, error) {
+func (*AdaptedV1RestartableBackupItemAction) Progress(string, *api.Backup) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, biav2.AsyncOperationsNotSupportedError()
 }
 
 // Cancel just returns without error since v1 plugins don't implement it.
-func (r *AdaptedV1RestartableBackupItemAction) Cancel(operationID string, backup *api.Backup) error {
+func (*AdaptedV1RestartableBackupItemAction) Cancel(string, *api.Backup) error {
 	return nil
 }

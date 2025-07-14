@@ -72,7 +72,7 @@ func (r *RepositoryService) Forget(bsl *velerov1api.BackupStorageLocation, repo 
 	return r.exec(restic.ForgetCommand(repo.Spec.ResticIdentifier, snapshotID), bsl)
 }
 
-func (r *RepositoryService) DefaultMaintenanceFrequency() time.Duration {
+func (*RepositoryService) DefaultMaintenanceFrequency() time.Duration {
 	return restic.DefaultMaintenanceFrequency
 }
 

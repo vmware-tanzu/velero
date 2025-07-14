@@ -257,7 +257,7 @@ func (v *volumeHelperImpl) shouldIncludeVolumeInBackup(vol corev1api.Volume) boo
 	return includeVolumeInBackup
 }
 
-func (v *volumeHelperImpl) getVolumeFromResource(resource any) (*corev1api.PersistentVolume, *corev1api.Volume, error) {
+func (*volumeHelperImpl) getVolumeFromResource(resource any) (*corev1api.PersistentVolume, *corev1api.Volume, error) {
 	if pv, ok := resource.(*corev1api.PersistentVolume); ok {
 		return pv, nil, nil
 	} else if podVol, ok := resource.(*corev1api.Volume); ok {
