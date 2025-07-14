@@ -23,11 +23,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
 	"golang.org/x/mod/semver"
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
