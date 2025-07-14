@@ -22,9 +22,8 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"

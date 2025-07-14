@@ -19,9 +19,8 @@ package v2
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
