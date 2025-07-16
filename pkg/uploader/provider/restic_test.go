@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
@@ -237,13 +237,13 @@ func TestResticRunRestore(t *testing.T) {
 func TestClose(t *testing.T) {
 	t.Run("Delete existing credentials file", func(t *testing.T) {
 		// Create temporary files for the credentials and caCert
-		credentialsFile, err := os.CreateTemp("", "credentialsFile")
+		credentialsFile, err := os.CreateTemp(t.TempDir(), "credentialsFile")
 		if err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}
 		defer os.Remove(credentialsFile.Name())
 
-		caCertFile, err := os.CreateTemp("", "caCertFile")
+		caCertFile, err := os.CreateTemp(t.TempDir(), "caCertFile")
 		if err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}
@@ -266,7 +266,7 @@ func TestClose(t *testing.T) {
 
 	t.Run("Delete existing caCert file", func(t *testing.T) {
 		// Create temporary files for the credentials and caCert
-		caCertFile, err := os.CreateTemp("", "caCertFile")
+		caCertFile, err := os.CreateTemp(t.TempDir(), "caCertFile")
 		if err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}
@@ -292,7 +292,7 @@ type MockCredentialGetter struct {
 	mock.Mock
 }
 
-func (m *MockCredentialGetter) Path(selector *v1.SecretKeySelector) (string, error) {
+func (m *MockCredentialGetter) Path(selector *corev1api.SecretKeySelector) (string, error) {
 	args := m.Called(selector)
 	return args.Get(0).(string), args.Error(1)
 }
@@ -301,44 +301,47 @@ func TestNewResticUploaderProvider(t *testing.T) {
 	testCases := []struct {
 		name                     string
 		emptyBSL                 bool
-		mockCredFunc             func(*MockCredentialGetter, *v1.SecretKeySelector)
+		mockCredFunc             func(*MockCredentialGetter, *corev1api.SecretKeySelector)
 		resticCmdEnvFunc         func(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error)
 		resticTempCACertFileFunc func(caCert []byte, bsl string, fs filesystem.Interface) (string, error)
-		checkFunc                func(provider Provider, err error)
+		checkFunc                func(t *testing.T, provider Provider, err error)
 	}{
 		{
 			name: "No error in creating temp credentials file",
-			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
+			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
-			checkFunc: func(provider Provider, err error) {
-				assert.NoError(t, err)
+			checkFunc: func(t *testing.T, provider Provider, err error) {
+				t.Helper()
+				require.NoError(t, err)
 				assert.NotNil(t, provider)
 			},
 		}, {
 			name: "Error in creating temp credentials file",
-			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
+			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("", errors.New("error creating temp credentials file"))
 			},
-			checkFunc: func(provider Provider, err error) {
-				assert.Error(t, err)
+			checkFunc: func(t *testing.T, provider Provider, err error) {
+				t.Helper()
+				require.Error(t, err)
 				assert.Nil(t, provider)
 			},
 		}, {
 			name: "ObjectStorage with CACert present and creating CACert file failed",
-			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
+			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
 			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
 				return "", errors.New("error writing CACert file")
 			},
-			checkFunc: func(provider Provider, err error) {
-				assert.Error(t, err)
+			checkFunc: func(t *testing.T, provider Provider, err error) {
+				t.Helper()
+				require.Error(t, err)
 				assert.Nil(t, provider)
 			},
 		}, {
 			name: "Generating repository cmd failed",
-			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
+			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
 			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
@@ -347,13 +350,14 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			resticCmdEnvFunc: func(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error) {
 				return nil, errors.New("error generating repository cmnd env")
 			},
-			checkFunc: func(provider Provider, err error) {
-				assert.Error(t, err)
+			checkFunc: func(t *testing.T, provider Provider, err error) {
+				t.Helper()
+				require.Error(t, err)
 				assert.Nil(t, provider)
 			},
 		}, {
 			name: "New provider with not nil bsl",
-			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
+			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
 			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
@@ -362,15 +366,16 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			resticCmdEnvFunc: func(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error) {
 				return nil, nil
 			},
-			checkFunc: func(provider Provider, err error) {
-				assert.NoError(t, err)
+			checkFunc: func(t *testing.T, provider Provider, err error) {
+				t.Helper()
+				require.NoError(t, err)
 				assert.NotNil(t, provider)
 			},
 		},
 		{
 			name:     "New provider with nil bsl",
 			emptyBSL: true,
-			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *v1.SecretKeySelector) {
+			mockCredFunc: func(credGetter *MockCredentialGetter, repoKeySelector *corev1api.SecretKeySelector) {
 				credGetter.On("Path", repoKeySelector).Return("temp-credentials", nil)
 			},
 			resticTempCACertFileFunc: func(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
@@ -379,8 +384,9 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			resticCmdEnvFunc: func(backupLocation *velerov1api.BackupStorageLocation, credentialFileStore credentials.FileStore) ([]string, error) {
 				return nil, nil
 			},
-			checkFunc: func(provider Provider, err error) {
-				assert.NoError(t, err)
+			checkFunc: func(t *testing.T, provider Provider, err error) {
+				t.Helper()
+				require.NoError(t, err)
 				assert.NotNil(t, provider)
 			},
 		},
@@ -393,7 +399,7 @@ func TestNewResticUploaderProvider(t *testing.T) {
 				bsl = builder.ForBackupStorageLocation("test-ns", "test-name").CACert([]byte("my-cert")).Result()
 			}
 			credGetter := &credentials.CredentialGetter{}
-			repoKeySelector := &v1.SecretKeySelector{}
+			repoKeySelector := &corev1api.SecretKeySelector{}
 			log := logrus.New()
 
 			// Mock CredentialGetter
@@ -406,7 +412,8 @@ func TestNewResticUploaderProvider(t *testing.T) {
 			if tc.resticTempCACertFileFunc != nil {
 				resticTempCACertFileFunc = tc.resticTempCACertFileFunc
 			}
-			tc.checkFunc(NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log))
+			provider, err := NewResticUploaderProvider(repoIdentifier, bsl, credGetter, repoKeySelector, log)
+			tc.checkFunc(t, provider, err)
 		})
 	}
 }

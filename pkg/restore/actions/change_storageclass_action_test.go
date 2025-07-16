@@ -42,11 +42,11 @@ import (
 func TestChangeStorageClassActionExecute(t *testing.T) {
 	tests := []struct {
 		name              string
-		pvOrPvcOrSTS      interface{}
+		pvOrPvcOrSTS      any
 		configMap         *corev1api.ConfigMap
 		storageClass      *storagev1api.StorageClass
 		storageClassSlice []*storagev1api.StorageClass
-		want              interface{}
+		want              any
 		wantErr           error
 	}{
 		{
@@ -257,9 +257,9 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			// validate for both error and non-error cases
 			switch {
 			case tc.wantErr != nil:
-				assert.EqualError(t, err, tc.wantErr.Error())
+				require.EqualError(t, err, tc.wantErr.Error())
 			default:
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				wantUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.want)
 				require.NoError(t, err)

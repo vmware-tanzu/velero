@@ -23,7 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -144,8 +144,8 @@ func (a *ChangeImageNameAction) Execute(input *velero.RestoreItemActionExecuteIn
 	return velero.NewRestoreItemActionExecuteOutput(obj), nil
 }
 
-func (a *ChangeImageNameAction) replaceImageName(obj *unstructured.Unstructured, config *corev1.ConfigMap, filed ...string) error {
-	log := a.logger.WithFields(map[string]interface{}{
+func (a *ChangeImageNameAction) replaceImageName(obj *unstructured.Unstructured, config *corev1api.ConfigMap, filed ...string) error {
+	log := a.logger.WithFields(map[string]any{
 		"kind":      obj.GetKind(),
 		"namespace": obj.GetNamespace(),
 		"name":      obj.GetName(),
@@ -161,12 +161,12 @@ func (a *ChangeImageNameAction) replaceImageName(obj *unstructured.Unstructured,
 	}
 	for i, container := range containers {
 		log.Infoln("container:", container)
-		if image, ok := container.(map[string]interface{})["image"]; ok {
+		if image, ok := container.(map[string]any)["image"]; ok {
 			imageName := image.(string)
 			if exists, newImageName, err := a.isImageReplaceRuleExist(log, imageName, config); exists && err == nil {
 				needUpdateObj = true
 				log.Infof("Updating item's image from %s to %s", imageName, newImageName)
-				container.(map[string]interface{})["image"] = newImageName
+				container.(map[string]any)["image"] = newImageName
 				containers[i] = container
 			}
 		}
@@ -179,7 +179,7 @@ func (a *ChangeImageNameAction) replaceImageName(obj *unstructured.Unstructured,
 	return nil
 }
 
-func (a *ChangeImageNameAction) isImageReplaceRuleExist(log *logrus.Entry, oldImageName string, cm *corev1.ConfigMap) (exists bool, newImageName string, err error) {
+func (a *ChangeImageNameAction) isImageReplaceRuleExist(log *logrus.Entry, oldImageName string, cm *corev1api.ConfigMap) (exists bool, newImageName string, err error) {
 	if oldImageName == "" {
 		log.Infoln("Item has no old image name specified")
 		return false, "", nil

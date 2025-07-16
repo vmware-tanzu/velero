@@ -16,6 +16,15 @@ limitations under the License.
 
 package util
 
-var ThirdPartyLabels []string = []string{
+var ThirdPartyLabels = []string{
 	"azure.workload.identity/use",
+}
+
+var ThirdPartyAnnotations = []string{
+	"iam.amazonaws.com/role",
+}
+
+var ThirdPartyTolerations = []string{
+	"kubernetes.azure.com/scalesetpriority",
+	"CriticalAddonsOnly",
 }

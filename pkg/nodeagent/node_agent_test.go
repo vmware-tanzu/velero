@@ -22,8 +22,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/stretchr/testify/require"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -41,7 +42,7 @@ type reactor struct {
 }
 
 func TestIsRunning(t *testing.T) {
-	ds := &appsv1.DaemonSet{
+	ds := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -106,15 +107,15 @@ func TestIsRunning(t *testing.T) {
 
 func TestIsRunningInNode(t *testing.T) {
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	corev1api.AddToScheme(scheme)
 
 	nonNodeAgentPod := builder.ForPod("fake-ns", "fake-pod").Result()
 	nodeAgentPodNotRunning := builder.ForPod("fake-ns", "fake-pod").Labels(map[string]string{"role": "node-agent"}).Result()
-	nodeAgentPodRunning1 := builder.ForPod("fake-ns", "fake-pod-1").Labels(map[string]string{"role": "node-agent"}).Phase(corev1.PodRunning).Result()
-	nodeAgentPodRunning2 := builder.ForPod("fake-ns", "fake-pod-2").Labels(map[string]string{"role": "node-agent"}).Phase(corev1.PodRunning).Result()
+	nodeAgentPodRunning1 := builder.ForPod("fake-ns", "fake-pod-1").Labels(map[string]string{"role": "node-agent"}).Phase(corev1api.PodRunning).Result()
+	nodeAgentPodRunning2 := builder.ForPod("fake-ns", "fake-pod-2").Labels(map[string]string{"role": "node-agent"}).Phase(corev1api.PodRunning).Result()
 	nodeAgentPodRunning3 := builder.ForPod("fake-ns", "fake-pod-3").
 		Labels(map[string]string{"role": "node-agent"}).
-		Phase(corev1.PodRunning).
+		Phase(corev1api.PodRunning).
 		NodeName("fake-node").
 		Result()
 
@@ -185,11 +186,11 @@ func TestIsRunningInNode(t *testing.T) {
 }
 
 func TestGetPodSpec(t *testing.T) {
-	podSpec := corev1.PodSpec{
+	podSpec := corev1api.PodSpec{
 		NodeName: "fake-node",
 	}
 
-	daemonSet := &appsv1.DaemonSet{
+	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -197,8 +198,8 @@ func TestGetPodSpec(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
 				Spec: podSpec,
 			},
 		},
@@ -209,7 +210,7 @@ func TestGetPodSpec(t *testing.T) {
 		kubeClientObj []runtime.Object
 		namespace     string
 		expectErr     string
-		expectSpec    corev1.PodSpec
+		expectSpec    corev1api.PodSpec
 	}{
 		{
 			name:      "ds is not found",
@@ -232,7 +233,7 @@ func TestGetPodSpec(t *testing.T) {
 
 			spec, err := GetPodSpec(context.TODO(), fakeKubeClient, test.namespace, kube.NodeOSLinux)
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, *spec, test.expectSpec)
 			} else {
 				assert.EqualError(t, err, test.expectErr)
@@ -317,7 +318,7 @@ func TestGetConfigs(t *testing.T) {
 
 			result, err := GetConfigs(context.TODO(), test.namespace, fakeKubeClient, "node-agent-config")
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				if test.expectResult == nil {
 					assert.Nil(t, result)
@@ -334,7 +335,7 @@ func TestGetConfigs(t *testing.T) {
 }
 
 func TestGetLabelValue(t *testing.T) {
-	daemonSet := &appsv1.DaemonSet{
+	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -344,7 +345,7 @@ func TestGetLabelValue(t *testing.T) {
 		},
 	}
 
-	daemonSetWithOtherLabel := &appsv1.DaemonSet{
+	daemonSetWithOtherLabel := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -352,8 +353,8 @@ func TestGetLabelValue(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"fake-other-label": "fake-value-1",
@@ -363,7 +364,7 @@ func TestGetLabelValue(t *testing.T) {
 		},
 	}
 
-	daemonSetWithLabel := &appsv1.DaemonSet{
+	daemonSetWithLabel := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -371,8 +372,8 @@ func TestGetLabelValue(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"fake-label": "fake-value-2",
@@ -382,7 +383,7 @@ func TestGetLabelValue(t *testing.T) {
 		},
 	}
 
-	daemonSetWithEmptyLabel := &appsv1.DaemonSet{
+	daemonSetWithEmptyLabel := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "fake-ns",
 			Name:      "node-agent",
@@ -390,8 +391,8 @@ func TestGetLabelValue(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "DaemonSet",
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"fake-label": "",
@@ -453,8 +454,408 @@ func TestGetLabelValue(t *testing.T) {
 
 			value, err := GetLabelValue(context.TODO(), fakeKubeClient, test.namespace, "fake-label", kube.NodeOSLinux)
 			if test.expectErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, test.expectedValue, value)
+			} else {
+				assert.EqualError(t, err, test.expectErr)
+			}
+		})
+	}
+}
+
+func TestGetAnnotationValue(t *testing.T) {
+	daemonSet := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+	}
+
+	daemonSetWithOtherAnnotation := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"fake-other-annotation": "fake-value-1",
+					},
+				},
+			},
+		},
+	}
+
+	daemonSetWithAnnotation := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"fake-annotation": "fake-value-2",
+					},
+				},
+			},
+		},
+	}
+
+	daemonSetWithEmptyAnnotation := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"fake-annotation": "",
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name          string
+		kubeClientObj []runtime.Object
+		namespace     string
+		expectedValue string
+		expectErr     string
+	}{
+		{
+			name:      "ds get error",
+			namespace: "fake-ns",
+			expectErr: "error getting node-agent daemonset: daemonsets.apps \"node-agent\" not found",
+		},
+		{
+			name:      "no annotation",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectErr: ErrNodeAgentAnnotationNotFound.Error(),
+		},
+		{
+			name:      "no expecting annotation",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithOtherAnnotation,
+			},
+			expectErr: ErrNodeAgentAnnotationNotFound.Error(),
+		},
+		{
+			name:      "expecting annotation",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithAnnotation,
+			},
+			expectedValue: "fake-value-2",
+		},
+		{
+			name:      "expecting empty annotation",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithEmptyAnnotation,
+			},
+			expectedValue: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			value, err := GetAnnotationValue(context.TODO(), fakeKubeClient, test.namespace, "fake-annotation", kube.NodeOSLinux)
+			if test.expectErr == "" {
+				require.NoError(t, err)
+				assert.Equal(t, test.expectedValue, value)
+			} else {
+				assert.EqualError(t, err, test.expectErr)
+			}
+		})
+	}
+}
+
+func TestGetToleration(t *testing.T) {
+	daemonSet := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+	}
+
+	daemonSetWithOtherToleration := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Tolerations: []corev1api.Toleration{
+						{
+							Key: "other-toleration-key",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	daemonSetWithToleration := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Tolerations: []corev1api.Toleration{
+						{
+							Key:   "fake-toleration",
+							Value: "true",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name          string
+		kubeClientObj []runtime.Object
+		namespace     string
+		expectedValue corev1api.Toleration
+		expectErr     string
+	}{
+		// {
+		// 	name:      "ds get error",
+		// 	namespace: "fake-ns",
+		// 	expectErr: "error getting node-agent daemonset: daemonsets.apps \"node-agent\" not found",
+		// },
+		{
+			name:      "no toleration",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectErr: ErrNodeAgentTolerationNotFound.Error(),
+		},
+		{
+			name:      "no expecting toleration",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithOtherToleration,
+			},
+			expectErr: ErrNodeAgentTolerationNotFound.Error(),
+		},
+		{
+			name:      "expecting toleration",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithToleration,
+			},
+			expectedValue: corev1api.Toleration{
+				Key:   "fake-toleration",
+				Value: "true",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			value, err := GetToleration(context.TODO(), fakeKubeClient, test.namespace, "fake-toleration", kube.NodeOSLinux)
+			if test.expectErr == "" {
+				require.NoError(t, err)
+				assert.Equal(t, test.expectedValue, *value)
+			} else {
+				assert.EqualError(t, err, test.expectErr)
+			}
+		})
+	}
+}
+
+func TestGetHostPodPath(t *testing.T) {
+	daemonSet := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+	}
+
+	daemonSetWithHostPodVolume := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						{
+							Name: HostPodVolumeMount,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	daemonSetWithHostPodVolumeAndEmptyPath := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						{
+							Name: HostPodVolumeMount,
+							VolumeSource: corev1api.VolumeSource{
+								HostPath: &corev1api.HostPathVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	daemonSetWithHostPodVolumeAndValidPath := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						{
+							Name: HostPodVolumeMount,
+							VolumeSource: corev1api.VolumeSource{
+								HostPath: &corev1api.HostPathVolumeSource{
+									Path: "/var/lib/kubelet/pods",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name          string
+		kubeClientObj []runtime.Object
+		namespace     string
+		osType        string
+		expectedValue string
+		expectErr     string
+	}{
+		{
+			name:      "ds get error",
+			namespace: "fake-ns",
+			osType:    kube.NodeOSWindows,
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectErr: "error getting daemonset node-agent-windows: daemonsets.apps \"node-agent-windows\" not found",
+		},
+		{
+			name:      "no host pod volume",
+			namespace: "fake-ns",
+			osType:    kube.NodeOSLinux,
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectErr: "host pod volume is not found",
+		},
+		{
+			name:      "no host pod volume path",
+			namespace: "fake-ns",
+			osType:    kube.NodeOSLinux,
+			kubeClientObj: []runtime.Object{
+				daemonSetWithHostPodVolume,
+			},
+			expectErr: "host pod volume is not a host path volume",
+		},
+		{
+			name:      "empty host pod volume path",
+			namespace: "fake-ns",
+			osType:    kube.NodeOSLinux,
+			kubeClientObj: []runtime.Object{
+				daemonSetWithHostPodVolumeAndEmptyPath,
+			},
+			expectErr: "host pod volume path is empty",
+		},
+		{
+			name:      "succeed",
+			namespace: "fake-ns",
+			osType:    kube.NodeOSLinux,
+			kubeClientObj: []runtime.Object{
+				daemonSetWithHostPodVolumeAndValidPath,
+			},
+			expectedValue: "/var/lib/kubelet/pods",
+		},
+		{
+			name:      "succeed on empty os type",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithHostPodVolumeAndValidPath,
+			},
+			expectedValue: "/var/lib/kubelet/pods",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			path, err := GetHostPodPath(context.TODO(), fakeKubeClient, test.namespace, test.osType)
+
+			if test.expectErr == "" {
+				require.NoError(t, err)
+				assert.Equal(t, test.expectedValue, path)
 			} else {
 				assert.EqualError(t, err, test.expectErr)
 			}

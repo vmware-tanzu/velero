@@ -25,20 +25,21 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	storagev1api "k8s.io/api/storage/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
+
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestNamespaceAndName(t *testing.T) {
@@ -49,7 +50,7 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 	tests := []struct {
 		name                          string
 		expectNSFound                 bool
-		nsPhase                       corev1.NamespacePhase
+		nsPhase                       corev1api.NamespacePhase
 		nsDeleting                    bool
 		expectCreate                  bool
 		alreadyExists                 bool
@@ -67,7 +68,7 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 		{
 			name:                  "namespace found, terminating phase",
 			expectNSFound:         true,
-			nsPhase:               corev1.NamespaceTerminating,
+			nsPhase:               corev1api.NamespaceTerminating,
 			expectedResult:        false,
 			expectedCreatedResult: false,
 		},
@@ -93,14 +94,14 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 		{
 			name:                  "namespace not found initially, create returns already exists error, returned namespace is terminating",
 			alreadyExists:         true,
-			nsPhase:               corev1.NamespaceTerminating,
+			nsPhase:               corev1api.NamespaceTerminating,
 			expectedResult:        false,
 			expectedCreatedResult: false,
 		},
 		{
 			name:                          "same namespace found earlier, terminating phase already tracked",
 			expectNSFound:                 true,
-			nsPhase:                       corev1.NamespaceTerminating,
+			nsPhase:                       corev1api.NamespaceTerminating,
 			expectedResult:                false,
 			expectedCreatedResult:         false,
 			nsAlreadyInTerminationTracker: true,
@@ -110,7 +111,7 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 	resourceDeletionStatusTracker := NewResourceDeletionStatusTracker()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			namespace := &corev1.Namespace{
+			namespace := &corev1api.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -132,11 +133,11 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 			if test.expectNSFound {
 				nsClient.On("Get", "test", metav1.GetOptions{}).Return(namespace, nil)
 			} else {
-				nsClient.On("Get", "test", metav1.GetOptions{}).Return(&corev1.Namespace{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, "test"))
+				nsClient.On("Get", "test", metav1.GetOptions{}).Return(&corev1api.Namespace{}, apierrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, "test"))
 			}
 
 			if test.alreadyExists {
-				nsClient.On("Create", namespace).Return(namespace, k8serrors.NewAlreadyExists(schema.GroupResource{Resource: "namespaces"}, "test"))
+				nsClient.On("Create", namespace).Return(namespace, apierrors.NewAlreadyExists(schema.GroupResource{Resource: "namespaces"}, "test"))
 			}
 
 			if test.expectCreate {
@@ -160,9 +161,9 @@ func TestEnsureNamespaceExistsAndIsReady(t *testing.T) {
 func TestGetVolumeDirectorySuccess(t *testing.T) {
 	tests := []struct {
 		name string
-		pod  *corev1.Pod
-		pvc  *corev1.PersistentVolumeClaim
-		pv   *corev1.PersistentVolume
+		pod  *corev1api.Pod
+		pvc  *corev1api.PersistentVolumeClaim
+		pv   *corev1api.PersistentVolume
 		want string
 	}{
 		{
@@ -183,7 +184,7 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 			name: "Block CSI volume with a PVC/PV does not append '/mount' to the volume name",
 			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").PersistentVolumeClaimSource("my-pvc").Result()).Result(),
 			pvc:  builder.ForPersistentVolumeClaim("ns-1", "my-pvc").VolumeName("a-pv").Result(),
-			pv:   builder.ForPersistentVolume("a-pv").CSI("csi.test.com", "provider-volume-id").VolumeMode(corev1.PersistentVolumeBlock).Result(),
+			pv:   builder.ForPersistentVolume("a-pv").CSI("csi.test.com", "provider-volume-id").VolumeMode(corev1api.PersistentVolumeBlock).Result(),
 			want: "a-pv",
 		},
 		{
@@ -216,17 +217,18 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "csi.test.com"},
 	}
 	for _, tc := range tests {
-		clientBuilder := fake.NewClientBuilder().WithLists(&storagev1api.CSIDriverList{Items: []storagev1api.CSIDriver{csiDriver}})
-
+		objs := []runtime.Object{&csiDriver}
 		if tc.pvc != nil {
-			clientBuilder = clientBuilder.WithObjects(tc.pvc)
+			objs = append(objs, tc.pvc)
 		}
 		if tc.pv != nil {
-			clientBuilder = clientBuilder.WithObjects(tc.pv)
+			objs = append(objs, tc.pv)
 		}
 
+		fakeKubeClient := fake.NewSimpleClientset(objs...)
+
 		// Function under test
-		dir, err := GetVolumeDirectory(context.Background(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, clientBuilder.Build())
+		dir, err := GetVolumeDirectory(context.Background(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, fakeKubeClient)
 
 		require.NoError(t, err)
 		assert.Equal(t, tc.want, dir)
@@ -237,23 +239,23 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 func TestGetVolumeModeSuccess(t *testing.T) {
 	tests := []struct {
 		name string
-		pod  *corev1.Pod
-		pvc  *corev1.PersistentVolumeClaim
-		pv   *corev1.PersistentVolume
+		pod  *corev1api.Pod
+		pvc  *corev1api.PersistentVolumeClaim
+		pv   *corev1api.PersistentVolume
 		want uploader.PersistentVolumeMode
 	}{
 		{
 			name: "Filesystem PVC volume",
 			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").PersistentVolumeClaimSource("my-pvc").Result()).Result(),
 			pvc:  builder.ForPersistentVolumeClaim("ns-1", "my-pvc").VolumeName("a-pv").Result(),
-			pv:   builder.ForPersistentVolume("a-pv").VolumeMode(corev1.PersistentVolumeFilesystem).Result(),
+			pv:   builder.ForPersistentVolume("a-pv").VolumeMode(corev1api.PersistentVolumeFilesystem).Result(),
 			want: uploader.PersistentVolumeFilesystem,
 		},
 		{
 			name: "Block PVC volume",
 			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").PersistentVolumeClaimSource("my-pvc").Result()).Result(),
 			pvc:  builder.ForPersistentVolumeClaim("ns-1", "my-pvc").VolumeName("a-pv").Result(),
-			pv:   builder.ForPersistentVolume("a-pv").VolumeMode(corev1.PersistentVolumeBlock).Result(),
+			pv:   builder.ForPersistentVolume("a-pv").VolumeMode(corev1api.PersistentVolumeBlock).Result(),
 			want: uploader.PersistentVolumeBlock,
 		},
 		{
@@ -264,17 +266,18 @@ func TestGetVolumeModeSuccess(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		clientBuilder := fake.NewClientBuilder()
-
+		objs := []runtime.Object{}
 		if tc.pvc != nil {
-			clientBuilder = clientBuilder.WithObjects(tc.pvc)
+			objs = append(objs, tc.pvc)
 		}
 		if tc.pv != nil {
-			clientBuilder = clientBuilder.WithObjects(tc.pv)
+			objs = append(objs, tc.pv)
 		}
 
+		fakeKubeClient := fake.NewSimpleClientset(objs...)
+
 		// Function under test
-		mode, err := GetVolumeMode(context.Background(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, clientBuilder.Build())
+		mode, err := GetVolumeMode(context.Background(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, fakeKubeClient)
 
 		require.NoError(t, err)
 		assert.Equal(t, tc.want, mode)
@@ -493,7 +496,6 @@ func TestSinglePathMatch(t *testing.T) {
 	fakeFS.MkdirAll("testDir2/subpath", 0755)
 
 	_, err := SinglePathMatch("./*/subpath", fakeFS, logrus.StandardLogger())
-	assert.Error(t, err)
 	require.ErrorContains(t, err, "expected one matching path")
 }
 

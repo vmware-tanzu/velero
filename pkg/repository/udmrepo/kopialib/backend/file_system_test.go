@@ -20,8 +20,11 @@ import (
 	"context"
 	"testing"
 
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+
 	"github.com/kopia/kopia/repo/blob/filesystem"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 )
@@ -63,14 +66,15 @@ func TestFSSetup(t *testing.T) {
 		},
 	}
 
+	logger := velerotest.NewLogger()
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			fsFlags := FsBackend{}
 
-			err := fsFlags.Setup(context.Background(), tc.flags)
+			err := fsFlags.Setup(context.Background(), tc.flags, logger)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedOptions, fsFlags.options)
 			} else {
 				assert.EqualError(t, err, tc.expectedErr)

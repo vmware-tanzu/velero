@@ -28,8 +28,8 @@ import (
 	v1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
+	corev1api "k8s.io/api/core/v1"
+	storagev1api "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,16 +52,16 @@ func TestExecute(t *testing.T) {
 	tests := []struct {
 		name               string
 		backup             *velerov1api.Backup
-		pvc                *corev1.PersistentVolumeClaim
-		pv                 *corev1.PersistentVolume
-		sc                 *storagev1.StorageClass
+		pvc                *corev1api.PersistentVolumeClaim
+		pv                 *corev1api.PersistentVolume
+		sc                 *storagev1api.StorageClass
 		vsClass            *snapshotv1api.VolumeSnapshotClass
 		operationID        string
 		expectedErr        error
 		expectedBackup     *velerov1api.Backup
 		expectedDataUpload *velerov2alpha1.DataUpload
-		expectedPVC        *corev1.PersistentVolumeClaim
-		resourcePolicy     *corev1.ConfigMap
+		expectedPVC        *corev1api.PersistentVolumeClaim
+		resourcePolicy     *corev1api.ConfigMap
 	}{
 		{
 			name:        "Skip PVC BIA when backup is in finalizing phase",
@@ -71,7 +71,7 @@ func TestExecute(t *testing.T) {
 		{
 			name:        "Test SnapshotMoveData",
 			backup:      builder.ForBackup("velero", "test").SnapshotMoveData(true).CSISnapshotTimeout(1 * time.Minute).Result(),
-			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1.ClaimBound).Result(),
+			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
 			pv:          builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
 			sc:          builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
 			vsClass:     builder.ForVolumeSnapshotClass("testVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
@@ -117,22 +117,22 @@ func TestExecute(t *testing.T) {
 		{
 			name:        "Verify PVC is modified as expected",
 			backup:      builder.ForBackup("velero", "test").SnapshotMoveData(true).CSISnapshotTimeout(1 * time.Minute).Result(),
-			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1.ClaimBound).Result(),
+			pvc:         builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
 			pv:          builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
 			sc:          builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
 			vsClass:     builder.ForVolumeSnapshotClass("tescVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
 			operationID: ".",
 			expectedErr: nil,
 			expectedPVC: builder.ForPersistentVolumeClaim("velero", "testPVC").
-				ObjectMeta(builder.WithAnnotations(velerov1api.MustIncludeAdditionalItemAnnotation, "true", velerov1api.DataUploadNameAnnotation, "velero/", velerov1api.VolumeSnapshotLabel, ""),
-					builder.WithLabels(velerov1api.BackupNameLabel, "test", velerov1api.VolumeSnapshotLabel, "")).
-				VolumeName("testPV").StorageClass("testSC").Phase(corev1.ClaimBound).Result(),
+				ObjectMeta(builder.WithAnnotations(velerov1api.MustIncludeAdditionalItemAnnotation, "true", velerov1api.DataUploadNameAnnotation, "velero/"),
+					builder.WithLabels(velerov1api.BackupNameLabel, "test")).
+				VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
 		},
 		{
 			name:           "Test ResourcePolicy",
 			backup:         builder.ForBackup("velero", "test").ResourcePolicies("resourcePolicy").SnapshotVolumes(false).Result(),
 			resourcePolicy: builder.ForConfigMap("velero", "resourcePolicy").Data("policy", "{\"version\":\"v1\", \"volumePolicies\":[{\"conditions\":{\"csi\": {}},\"action\":{\"type\":\"snapshot\"}}]}").Result(),
-			pvc:            builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1.ClaimBound).Result(),
+			pvc:            builder.ForPersistentVolumeClaim("velero", "testPVC").VolumeName("testPV").StorageClass("testSC").Phase(corev1api.ClaimBound).Result(),
 			pv:             builder.ForPersistentVolume("testPV").CSI("hostpath", "testVolume").Result(),
 			sc:             builder.ForStorageClass("testSC").Provisioner("hostpath").Result(),
 			vsClass:        builder.ForVolumeSnapshotClass("tescVSClass").Driver("hostpath").ObjectMeta(builder.WithLabels(velerov1api.VolumeSnapshotClassSelectorLabel, "")).Result(),
@@ -142,25 +142,26 @@ func TestExecute(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(*testing.T) {
-			crClient := velerotest.NewFakeControllerRuntimeClient(t)
 			logger := logrus.New()
 			logger.Level = logrus.DebugLevel
-
+			objects := make([]runtime.Object, 0)
 			if tc.pvc != nil {
-				require.NoError(t, crClient.Create(context.Background(), tc.pvc))
+				objects = append(objects, tc.pvc)
 			}
 			if tc.pv != nil {
-				require.NoError(t, crClient.Create(context.Background(), tc.pv))
+				objects = append(objects, tc.pv)
 			}
 			if tc.sc != nil {
-				require.NoError(t, crClient.Create(context.Background(), tc.sc))
+				objects = append(objects, tc.sc)
 			}
 			if tc.vsClass != nil {
-				require.NoError(t, crClient.Create(context.Background(), tc.vsClass))
+				objects = append(objects, tc.vsClass)
 			}
 			if tc.resourcePolicy != nil {
-				require.NoError(t, crClient.Create(context.Background(), tc.resourcePolicy))
+				objects = append(objects, tc.resourcePolicy)
 			}
+
+			crClient := velerotest.NewFakeControllerRuntimeClient(t, objects...)
 
 			pvcBIA := pvcBackupItemAction{
 				log:      logger,
@@ -217,10 +218,10 @@ func TestExecute(t *testing.T) {
 			}
 
 			if tc.expectedPVC != nil {
-				resultPVC := new(corev1.PersistentVolumeClaim)
+				resultPVC := new(corev1api.PersistentVolumeClaim)
 				runtime.DefaultUnstructuredConverter.FromUnstructured(resultUnstructed.UnstructuredContent(), resultPVC)
 
-				require.True(t, cmp.Equal(tc.expectedPVC, resultPVC, cmpopts.IgnoreFields(corev1.PersistentVolumeClaim{}, "ResourceVersion", "Annotations", "Labels")))
+				require.True(t, cmp.Equal(tc.expectedPVC, resultPVC, cmpopts.IgnoreFields(corev1api.PersistentVolumeClaim{}, "ResourceVersion", "Annotations", "Labels")))
 			}
 		})
 	}

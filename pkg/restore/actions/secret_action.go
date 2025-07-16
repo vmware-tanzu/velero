@@ -23,7 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,13 +58,13 @@ func (s *SecretAction) Execute(input *velero.RestoreItemActionExecuteInput) (*ve
 	s.logger.Info("Executing SecretAction")
 	defer s.logger.Info("Done executing SecretAction")
 
-	var secret corev1.Secret
+	var secret corev1api.Secret
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), &secret); err != nil {
 		return nil, errors.Wrap(err, "unable to convert secret from runtime.Unstructured")
 	}
 
 	log := s.logger.WithField("secret", kube.NamespaceAndName(&secret))
-	if secret.Type != corev1.SecretTypeServiceAccountToken {
+	if secret.Type != corev1api.SecretTypeServiceAccountToken {
 		log.Debug("No match found - including this secret")
 		return &velero.RestoreItemActionExecuteOutput{
 			UpdatedItem: input.Item,
@@ -74,7 +74,7 @@ func (s *SecretAction) Execute(input *velero.RestoreItemActionExecuteInput) (*ve
 	// The auto created service account token secret will be created by kube controller automatically again(before Kubernetes v1.22), no need to restore.
 	// This will cause the patch operation of managedFields failed if we restore it as the secret is removed immediately
 	// after restoration and the patch operation reports not found error.
-	list := &corev1.ServiceAccountList{}
+	list := &corev1api.ServiceAccountList{}
 	if err := s.client.List(context.Background(), list, &client.ListOptions{Namespace: secret.Namespace}); err != nil {
 		return nil, errors.Wrap(err, "unable to list the service accounts")
 	}

@@ -96,13 +96,13 @@ func (ks *kopiaRepoService) Init(ctx context.Context, repoOption udmrepo.RepoOpt
 	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
 
 	if createNew {
-		if err := CreateBackupRepo(repoCtx, repoOption); err != nil {
+		if err := CreateBackupRepo(repoCtx, repoOption, ks.logger); err != nil {
 			return err
 		}
 
 		return writeInitParameters(repoCtx, repoOption, ks.logger)
 	}
-	return ConnectBackupRepo(repoCtx, repoOption)
+	return ConnectBackupRepo(repoCtx, repoOption, ks.logger)
 }
 
 func (ks *kopiaRepoService) Open(ctx context.Context, repoOption udmrepo.RepoOptions) (udmrepo.BackupRepo, error) {
@@ -599,6 +599,32 @@ func writeInitParameters(ctx context.Context, repoOption udmrepo.RepoOptions, lo
 		if overwriteQuickMaintainInterval != time.Duration(0) {
 			logger.Infof("Quick maintenance interval change from %v to %v", p.QuickCycle.Interval, overwriteQuickMaintainInterval)
 			p.QuickCycle.Interval = overwriteQuickMaintainInterval
+		}
+		// the repoOption.StorageOptions are set via
+		// udmrepo.WithStoreOptions -> udmrepo.GetStoreOptions (interface)
+		// -> pkg/repository/provider.GetStoreOptions(param interface{}) -> pkg/repository/provider.getStorageVariables(..., backupRepoConfig)
+		// where backupRepoConfig comes from param.(RepoParam).BackupRepo.Spec.RepositoryConfig map[string]string
+		// where RepositoryConfig comes from pkg/controller/getBackupRepositoryConfig(...)
+		// where it gets a configMap name from pkg/cmd/server/config/Config.BackupRepoConfig
+		// which gets set via velero server flag `backup-repository-configmap` "The name of ConfigMap containing backup repository configurations."
+		// and data stored as json under ConfigMap.Data[repoType] where repoType is BackupRepository.Spec.RepositoryType: either kopia or restic
+		// repoOption.StorageOptions[udmrepo.StoreOptionKeyFullMaintenanceInterval] would for example look like
+		// configMapName.data.kopia: {"fullMaintenanceInterval": "eagerGC"}
+		fullMaintIntervalOption := udmrepo.FullMaintenanceIntervalOptions(repoOption.StorageOptions[udmrepo.StoreOptionKeyFullMaintenanceInterval])
+		priorMaintInterval := p.FullCycle.Interval
+		switch fullMaintIntervalOption {
+		case udmrepo.FastGC:
+			p.FullCycle.Interval = udmrepo.FastGCInterval
+		case udmrepo.EagerGC:
+			p.FullCycle.Interval = udmrepo.EagerGCInterval
+		case udmrepo.NormalGC:
+			p.FullCycle.Interval = udmrepo.NormalGCInterval
+		case "": // do nothing
+		default:
+			return errors.Errorf("invalid full maintenance interval option %s", fullMaintIntervalOption)
+		}
+		if priorMaintInterval != p.FullCycle.Interval {
+			logger.Infof("Full maintenance interval change from %v to %v", priorMaintInterval, p.FullCycle.Interval)
 		}
 
 		p.Owner = r.ClientOptions().UsernameAtHost()

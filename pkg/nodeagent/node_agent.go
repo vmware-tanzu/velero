@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -41,11 +41,19 @@ const (
 
 	// nodeAgentRole marks pods with node-agent role on all nodes.
 	nodeAgentRole = "node-agent"
+
+	// HostPodVolumeMount is the name of the volume in node-agent for host-pod mount
+	HostPodVolumeMount = "host-pods"
+
+	// HostPodVolumeMountPoint is the mount point of the volume in node-agent for host-pod mount
+	HostPodVolumeMountPoint = "host_pods"
 )
 
 var (
-	ErrDaemonSetNotFound      = errors.New("daemonset not found")
-	ErrNodeAgentLabelNotFound = errors.New("node-agent label not found")
+	ErrDaemonSetNotFound           = errors.New("daemonset not found")
+	ErrNodeAgentLabelNotFound      = errors.New("node-agent label not found")
+	ErrNodeAgentAnnotationNotFound = errors.New("node-agent annotation not found")
+	ErrNodeAgentTolerationNotFound = errors.New("node-agent toleration not found")
 )
 
 type LoadConcurrency struct {
@@ -136,7 +144,7 @@ func isRunningInNode(ctx context.Context, namespace string, nodeName string, crC
 		return errors.New("node name is empty")
 	}
 
-	pods := new(v1.PodList)
+	pods := new(corev1api.PodList)
 	parsedSelector, err := labels.Parse(fmt.Sprintf("role=%s", nodeAgentRole))
 	if err != nil {
 		return errors.Wrap(err, "fail to parse selector")
@@ -165,7 +173,7 @@ func isRunningInNode(ctx context.Context, namespace string, nodeName string, crC
 	return errors.Errorf("daemonset pod not found in running state in node %s", nodeName)
 }
 
-func GetPodSpec(ctx context.Context, kubeClient kubernetes.Interface, namespace string, osType string) (*v1.PodSpec, error) {
+func GetPodSpec(ctx context.Context, kubeClient kubernetes.Interface, namespace string, osType string) (*corev1api.PodSpec, error) {
 	dsName := daemonSet
 	if osType == kube.NodeOSWindows {
 		dsName = daemonsetWindows
@@ -224,4 +232,89 @@ func GetLabelValue(ctx context.Context, kubeClient kubernetes.Interface, namespa
 	}
 
 	return val, nil
+}
+
+func GetAnnotationValue(ctx context.Context, kubeClient kubernetes.Interface, namespace string, key string, osType string) (string, error) {
+	dsName := daemonSet
+	if osType == kube.NodeOSWindows {
+		dsName = daemonsetWindows
+	}
+
+	ds, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, dsName, metav1.GetOptions{})
+	if err != nil {
+		return "", errors.Wrapf(err, "error getting %s daemonset", dsName)
+	}
+
+	if ds.Spec.Template.Annotations == nil {
+		return "", ErrNodeAgentAnnotationNotFound
+	}
+
+	val, found := ds.Spec.Template.Annotations[key]
+	if !found {
+		return "", ErrNodeAgentAnnotationNotFound
+	}
+
+	return val, nil
+}
+
+func GetToleration(ctx context.Context, kubeClient kubernetes.Interface, namespace string, key string, osType string) (*corev1api.Toleration, error) {
+	dsName := daemonSet
+	if osType == kube.NodeOSWindows {
+		dsName = daemonsetWindows
+	}
+
+	ds, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, dsName, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting %s daemonset", dsName)
+	}
+
+	for i, t := range ds.Spec.Template.Spec.Tolerations {
+		if t.Key == key {
+			return &ds.Spec.Template.Spec.Tolerations[i], nil
+		}
+	}
+
+	return nil, ErrNodeAgentTolerationNotFound
+}
+
+func GetHostPodPath(ctx context.Context, kubeClient kubernetes.Interface, namespace string, osType string) (string, error) {
+	dsName := daemonSet
+	if osType == kube.NodeOSWindows {
+		dsName = daemonsetWindows
+	}
+
+	ds, err := kubeClient.AppsV1().DaemonSets(namespace).Get(ctx, dsName, metav1.GetOptions{})
+	if err != nil {
+		return "", errors.Wrapf(err, "error getting daemonset %s", dsName)
+	}
+
+	var volume *corev1api.Volume
+	for _, v := range ds.Spec.Template.Spec.Volumes {
+		if v.Name == HostPodVolumeMount {
+			volume = &v
+			break
+		}
+	}
+
+	if volume == nil {
+		return "", errors.New("host pod volume is not found")
+	}
+
+	if volume.HostPath == nil {
+		return "", errors.New("host pod volume is not a host path volume")
+	}
+
+	if volume.HostPath.Path == "" {
+		return "", errors.New("host pod volume path is empty")
+	}
+
+	return volume.HostPath.Path, nil
+}
+
+func HostPodVolumeMountPath() string {
+	return "/" + HostPodVolumeMountPoint
+}
+
+func HostPodVolumeMountPathWin() string {
+	return "\\" + HostPodVolumeMountPoint
 }

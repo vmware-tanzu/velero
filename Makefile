@@ -22,11 +22,21 @@ PKG := github.com/vmware-tanzu/velero
 
 # Where to push the docker image.
 REGISTRY ?= velero
-GCR_REGISTRY ?= gcr.io/velero-gcp
+# In order to push images to an insecure registry, follow the two steps:
+#   1. Set "INSECURE_REGISTRY=true" 
+#   2. Provide your own buildx builder instance by setting "BUILDX_INSTANCE=your-own-builder-instance"
+#      The builder can be created with the following command:
+#        cat << EOF > buildkitd.toml
+#        [registry."insecure-registry-ip:port"]
+#        http = true
+#        insecure = true
+#        EOF
+#        docker buildx create --name=velero-builder --driver=docker-container --bootstrap --use --config ./buildkitd.toml
+#      Refer to https://github.com/docker/buildx/issues/1370#issuecomment-1288516840 for more details
+INSECURE_REGISTRY ?= false
 
 # Image name
 IMAGE ?= $(REGISTRY)/$(BIN)
-GCR_IMAGE ?= $(GCR_REGISTRY)/$(BIN)
 
 # We allow the Dockerfile to be configurable to enable the use of custom Dockerfiles
 # that pull base images from different registries.
@@ -55,7 +65,7 @@ endif
 BUILDER_IMAGE := $(REGISTRY)/build-image:$(BUILDER_IMAGE_TAG)
 BUILDER_IMAGE_CACHED := $(shell docker images -q ${BUILDER_IMAGE} 2>/dev/null )
 
-HUGO_IMAGE := hugo-builder
+HUGO_IMAGE := ghcr.io/gohugoio/hugo
 
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
@@ -69,10 +79,8 @@ TAG_LATEST ?= false
 
 ifeq ($(TAG_LATEST), true)
 	IMAGE_TAGS ?= $(IMAGE):$(VERSION) $(IMAGE):latest
-	GCR_IMAGE_TAGS ?= $(GCR_IMAGE):$(VERSION) $(GCR_IMAGE):latest
 else
 	IMAGE_TAGS ?= $(IMAGE):$(VERSION)
-	GCR_IMAGE_TAGS ?= $(GCR_IMAGE):$(VERSION)
 endif
 
 # check buildx is enabled only if docker is in path
@@ -100,11 +108,10 @@ comma=,
 # The version of restic binary to be downloaded
 RESTIC_VERSION ?= 0.15.0
 
-CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le
+CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 darwin-arm64 windows-amd64 linux-ppc64le linux-s390x
 BUILD_OUTPUT_TYPE ?= docker
 BUILD_OS ?= linux
 BUILD_ARCH ?= amd64
-BUILD_TAG_GCR ?= false
 BUILD_WINDOWS_VERSION ?= ltsc2022
 
 ifeq ($(BUILD_OUTPUT_TYPE), docker)
@@ -122,9 +129,6 @@ ALL_OS_ARCH.windows = $(foreach os, $(filter windows,$(ALL_OS)), $(foreach arch,
 ALL_OS_ARCH = $(ALL_OS_ARCH.linux)$(ALL_OS_ARCH.windows)
 
 ALL_IMAGE_TAGS = $(IMAGE_TAGS)
-ifeq ($(BUILD_TAG_GCR), true)
-	ALL_IMAGE_TAGS += $(GCR_IMAGE_TAGS)
-endif
 
 # set git sha and tree state
 GIT_SHA = $(shell git rev-parse HEAD)
@@ -289,22 +293,22 @@ container-windows:
 
 push-manifest:
 	@echo "building manifest: $(IMAGE_TAG) for $(foreach osarch, $(ALL_OS_ARCH), $(IMAGE_TAG)-${osarch})"
-	@docker manifest create --amend $(IMAGE_TAG) $(foreach osarch, $(ALL_OS_ARCH), $(IMAGE_TAG)-${osarch})
+	@docker manifest create --amend --insecure=$(INSECURE_REGISTRY) $(IMAGE_TAG) $(foreach osarch, $(ALL_OS_ARCH), $(IMAGE_TAG)-${osarch})
 
 	@set -x; \
 	for arch in $(ALL_ARCH.windows); do \
 		for osversion in $(ALL_OSVERSIONS.windows); do \
 			BASEIMAGE=mcr.microsoft.com/windows/nanoserver:$${osversion}; \
-			full_version=`docker manifest inspect $${BASEIMAGE} | jq -r '.manifests[0].platform["os.version"]'`; \
+			full_version=`docker manifest inspect --insecure=$(INSECURE_REGISTRY) $${BASEIMAGE} | jq -r '.manifests[0].platform["os.version"]'`; \
 			docker manifest annotate --os windows --arch $${arch} --os-version $${full_version} $(IMAGE_TAG) $(IMAGE_TAG)-windows-$${osversion}-$${arch}; \
 		done; \
 	done
 
 	@echo "pushing manifest $(IMAGE_TAG)"
-	@docker manifest push --purge $(IMAGE_TAG)
+	@docker manifest push --purge --insecure=$(INSECURE_REGISTRY) $(IMAGE_TAG)
 
 	@echo "pushed manifest $(IMAGE_TAG):"
-	@docker manifest inspect $(IMAGE_TAG)
+	@docker manifest inspect --insecure=$(INSECURE_REGISTRY) $(IMAGE_TAG)
 
 SKIP_TESTS ?=
 test: build-dirs
@@ -447,7 +451,7 @@ release:
 serve-docs: build-image-hugo
 	docker run \
 	--rm \
-	-v "$$(pwd)/site:/srv/hugo" \
+	-v "$$(pwd)/site:/project" \
 	-it -p 1313:1313 \
 	$(HUGO_IMAGE) \
 	server --bind=0.0.0.0 --enableGitInfo=false

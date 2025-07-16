@@ -71,6 +71,7 @@ type itemBackupper struct {
 	podVolumeBackupper       podvolume.Backupper
 	podVolumeSnapshotTracker *podvolume.Tracker
 	volumeSnapshotterGetter  VolumeSnapshotterGetter
+	kubernetesBackupper      *kubernetesBackupper
 
 	itemHookHandler                    hook.ItemHookHandler
 	snapshotLocationVolumeSnapshotters map[string]vsv1.VolumeSnapshotter
@@ -95,6 +96,8 @@ func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstr
 	if !selectedForBackup || err != nil || len(files) == 0 || finalize {
 		return selectedForBackup, files, err
 	}
+	ib.tarWriter.Lock()
+	defer ib.tarWriter.Unlock()
 	for _, file := range files {
 		if err := ib.tarWriter.WriteHeader(file.Header); err != nil {
 			return false, []FileForArchive{}, errors.WithStack(err)
@@ -159,7 +162,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 	namespace := metadata.GetNamespace()
 	name := metadata.GetName()
 
-	log := logger.WithFields(map[string]interface{}{
+	log := logger.WithFields(map[string]any{
 		"name":      name,
 		"resource":  groupResource.String(),
 		"namespace": namespace,
@@ -218,7 +221,7 @@ func (ib *itemBackupper) backupItemInternal(logger logrus.FieldLogger, obj runti
 					ib.podVolumeSnapshotTracker.Track(pod, volume.Name)
 
 					if found, pvcName := ib.podVolumeSnapshotTracker.TakenForPodVolume(pod, volume.Name); found {
-						log.WithFields(map[string]interface{}{
+						log.WithFields(map[string]any{
 							"podVolume": volume,
 							"pvcName":   pvcName,
 						}).Info("Pod volume uses a persistent volume claim which has already been backed up from another pod, skipping.")
@@ -590,7 +593,18 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 	}
 
 	if ib.backupRequest.ResPolicies != nil {
-		if action, err := ib.backupRequest.ResPolicies.GetMatchAction(pv); err != nil {
+		pvc := new(corev1api.PersistentVolumeClaim)
+		if pv.Spec.ClaimRef != nil {
+			err = ib.kbClient.Get(context.Background(), kbClient.ObjectKey{
+				Namespace: pv.Spec.ClaimRef.Namespace,
+				Name:      pv.Spec.ClaimRef.Name},
+				pvc)
+			if err != nil {
+				return err
+			}
+		}
+		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
+		if action, err := ib.backupRequest.ResPolicies.GetMatchAction(vfd); err != nil {
 			log.WithError(err).Errorf("Error getting matched resource policies for pv %s", pv.Name)
 			return nil
 		} else if action != nil && action.Type == resourcepolicies.Skip {
@@ -693,8 +707,8 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 
 func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource schema.GroupResource, backupItemActionName string) (*resourcepolicies.Action, error) {
 	if ib.backupRequest.ResPolicies != nil && groupResource == kuberesource.PersistentVolumeClaims && (backupItemActionName == csiBIAPluginName || backupItemActionName == vsphereBIAPluginName) {
-		pvc := corev1api.PersistentVolumeClaim{}
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pvc); err != nil {
+		pvc := &corev1api.PersistentVolumeClaim{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pvc); err != nil {
 			return nil, errors.WithStack(err)
 		}
 
@@ -707,7 +721,8 @@ func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource 
 		if err := ib.kbClient.Get(context.Background(), kbClient.ObjectKey{Name: pvName}, pv); err != nil {
 			return nil, errors.WithStack(err)
 		}
-		return ib.backupRequest.ResPolicies.GetMatchAction(pv)
+		vfd := resourcepolicies.NewVolumeFilterData(pv, nil, pvc)
+		return ib.backupRequest.ResPolicies.GetMatchAction(vfd)
 	}
 
 	return nil, nil

@@ -18,14 +18,19 @@ package kube
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -732,7 +737,7 @@ func TestCollectPodLogs(t *testing.T) {
 			if test.expectErr != "" {
 				assert.EqualError(t, err, test.expectErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, fp.outputMessage, test.message)
 			}
 		})
@@ -929,6 +934,288 @@ func TestDiagnosePod(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			diag := DiagnosePod(tc.pod)
 			assert.Equal(t, tc.expected, diag)
+		})
+	}
+}
+
+type exitWithMessageMock struct {
+	createErr error
+	writeFail bool
+	filePath  string
+	exitCode  int
+}
+
+func (em *exitWithMessageMock) Exit(code int) {
+	em.exitCode = code
+}
+
+func (em *exitWithMessageMock) CreateFile(name string) (*os.File, error) {
+	if em.createErr != nil {
+		return nil, em.createErr
+	}
+
+	if em.writeFail {
+		return os.OpenFile(em.filePath, os.O_CREATE|os.O_RDONLY, 0500)
+	} else {
+		return os.Create(em.filePath)
+	}
+}
+
+func TestExitPodWithMessage(t *testing.T) {
+	tests := []struct {
+		name             string
+		message          string
+		succeed          bool
+		args             []any
+		createErr        error
+		writeFail        bool
+		expectedExitCode int
+		expectedMessage  string
+	}{
+		{
+			name:             "create pod file failed",
+			createErr:        errors.New("fake-create-file-error"),
+			succeed:          true,
+			expectedExitCode: 1,
+		},
+		{
+			name:             "write pod file failed",
+			writeFail:        true,
+			succeed:          true,
+			expectedExitCode: 1,
+		},
+		{
+			name:    "not succeed",
+			message: "fake-message-1, arg-1 %s, arg-2 %v, arg-3 %v",
+			args: []any{
+				"arg-1-1",
+				10,
+				false,
+			},
+			expectedExitCode: 1,
+			expectedMessage:  fmt.Sprintf("fake-message-1, arg-1 %s, arg-2 %v, arg-3 %v", "arg-1-1", 10, false),
+		},
+		{
+			name:    "not succeed",
+			message: "fake-message-2, arg-1 %s, arg-2 %v, arg-3 %v",
+			args: []any{
+				"arg-1-2",
+				20,
+				true,
+			},
+			succeed:         true,
+			expectedMessage: fmt.Sprintf("fake-message-2, arg-1 %s, arg-2 %v, arg-3 %v", "arg-1-2", 20, true),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			podFile := filepath.Join(os.TempDir(), uuid.NewString())
+
+			em := exitWithMessageMock{
+				createErr: test.createErr,
+				writeFail: test.writeFail,
+				filePath:  podFile,
+			}
+
+			funcExit = em.Exit
+			funcCreateFile = em.CreateFile
+
+			ExitPodWithMessage(velerotest.NewLogger(), test.succeed, test.message, test.args...)
+
+			assert.Equal(t, test.expectedExitCode, em.exitCode)
+
+			if test.createErr == nil && !test.writeFail {
+				reader, err := os.Open(podFile)
+				require.NoError(t, err)
+
+				message, err := io.ReadAll(reader)
+				require.NoError(t, err)
+
+				reader.Close()
+
+				assert.Equal(t, test.expectedMessage, string(message))
+			}
+		})
+	}
+}
+
+func TestGetLoadAffinityByStorageClass(t *testing.T) {
+	tests := []struct {
+		name             string
+		affinityList     []*LoadAffinity
+		scName           string
+		expectedAffinity *LoadAffinity
+	}{
+		{
+			name: "get global affinity",
+			affinityList: []*LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+					StorageClass: "storage-class-01",
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+				},
+			},
+			scName: "",
+			expectedAffinity: &LoadAffinity{
+				NodeSelector: metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "kubernetes.io/os",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"Linux"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "get affinity for StorageClass but only global affinity exists",
+			affinityList: []*LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Windows"},
+							},
+						},
+					},
+				},
+			},
+			scName: "storage-class-01",
+			expectedAffinity: &LoadAffinity{
+				NodeSelector: metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "kubernetes.io/os",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"Linux"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "get affinity for StorageClass",
+			affinityList: []*LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/control-plane=",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{""},
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/os",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"Linux"},
+							},
+						},
+					},
+					StorageClass: "storage-class-01",
+				},
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+					StorageClass: "invalid-storage-class",
+				},
+			},
+			scName: "storage-class-01",
+			expectedAffinity: &LoadAffinity{
+				NodeSelector: metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "kubernetes.io/os",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"Linux"},
+						},
+					},
+				},
+				StorageClass: "storage-class-01",
+			},
+		},
+		{
+			name: "Cannot find a match Affinity",
+			affinityList: []*LoadAffinity{
+				{
+					NodeSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "kubernetes.io/arch",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"amd64"},
+							},
+						},
+					},
+					StorageClass: "invalid-storage-class",
+				},
+			},
+			scName:           "storage-class-01",
+			expectedAffinity: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := GetLoadAffinityByStorageClass(test.affinityList, test.scName, velerotest.NewLogger())
+
+			assert.Equal(t, test.expectedAffinity, result)
 		})
 	}
 }

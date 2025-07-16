@@ -160,7 +160,7 @@ func TestValidateIncludesExcludes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := ValidateIncludesExcludes(tc.includes, tc.excludes)
 
-			require.Equal(t, len(tc.want), len(errs))
+			require.Len(t, errs, len(tc.want))
 
 			for i := 0; i < len(tc.want); i++ {
 				assert.Equal(t, tc.want[i].Error(), errs[i].Error())
@@ -361,7 +361,7 @@ func TestValidateScopedIncludesExcludes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := ValidateScopedIncludesExcludes(tc.includes, tc.excludes)
 
-			require.Equal(t, len(tc.wantErr), len(errs))
+			require.Len(t, errs, len(tc.wantErr))
 
 			for i := 0; i < len(tc.wantErr); i++ {
 				assert.Equal(t, tc.wantErr[i].Error(), errs[i].Error())

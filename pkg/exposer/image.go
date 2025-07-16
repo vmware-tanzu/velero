@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
@@ -30,12 +30,14 @@ import (
 type inheritedPodInfo struct {
 	image          string
 	serviceAccount string
-	env            []v1.EnvVar
-	envFrom        []v1.EnvFromSource
-	volumeMounts   []v1.VolumeMount
-	volumes        []v1.Volume
+	env            []corev1api.EnvVar
+	envFrom        []corev1api.EnvFromSource
+	volumeMounts   []corev1api.VolumeMount
+	volumes        []corev1api.Volume
 	logLevelArgs   []string
 	logFormatArgs  []string
+	dnsPolicy      corev1api.DNSPolicy
+	dnsConfig      *corev1api.PodDNSConfig
 }
 
 func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veleroNamespace string, osType string) (inheritedPodInfo, error) {
@@ -57,6 +59,9 @@ func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veler
 	podInfo.envFrom = podSpec.Containers[0].EnvFrom
 	podInfo.volumeMounts = podSpec.Containers[0].VolumeMounts
 	podInfo.volumes = podSpec.Volumes
+
+	podInfo.dnsPolicy = podSpec.DNSPolicy
+	podInfo.dnsConfig = podSpec.DNSConfig
 
 	args := podSpec.Containers[0].Args
 	for i, arg := range args {

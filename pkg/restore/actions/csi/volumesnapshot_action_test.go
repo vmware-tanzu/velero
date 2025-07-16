@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -36,6 +34,7 @@ import (
 	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util"
 )
 
 var (
@@ -89,13 +88,13 @@ func TestResetVolumeSnapshotSpecForRestore(t *testing.T) {
 			before := tc.vs.DeepCopy()
 			resetVolumeSnapshotSpecForRestore(&tc.vs, &tc.vscName)
 
-			assert.Equalf(t, tc.vs.Name, before.Name, "unexpected change to Object.Name, Want: %s; Got %s", tc.name, before.Name, tc.vs.Name)
-			assert.Equal(t, tc.vs.Namespace, before.Namespace, "unexpected change to Object.Namespace, Want: %s; Got %s", tc.name, before.Namespace, tc.vs.Namespace)
+			assert.Equalf(t, tc.vs.Name, before.Name, "unexpected change to Object.Name, Want: %s; Got %s", before.Name, tc.vs.Name)
+			assert.Equalf(t, tc.vs.Namespace, before.Namespace, "unexpected change to Object.Namespace, Want: %s; Got %s", before.Namespace, tc.vs.Namespace)
 			assert.NotNil(t, tc.vs.Spec.Source)
 			assert.Nil(t, tc.vs.Spec.Source.PersistentVolumeClaimName)
 			assert.NotNil(t, tc.vs.Spec.Source.VolumeSnapshotContentName)
 			assert.Equal(t, *tc.vs.Spec.Source.VolumeSnapshotContentName, tc.vscName)
-			assert.Equal(t, *tc.vs.Spec.VolumeSnapshotClassName, *before.Spec.VolumeSnapshotClassName, "unexpected value for Spec.VolumeSnapshotClassName, Want: %s, Got: %s",
+			assert.Equalf(t, *tc.vs.Spec.VolumeSnapshotClassName, *before.Spec.VolumeSnapshotClassName, "unexpected value for Spec.VolumeSnapshotClassName, Want: %s, Got: %s",
 				*tc.vs.Spec.VolumeSnapshotClassName, *before.Spec.VolumeSnapshotClassName)
 			assert.Nil(t, tc.vs.Status)
 		})
@@ -103,15 +102,15 @@ func TestResetVolumeSnapshotSpecForRestore(t *testing.T) {
 }
 
 func TestVSExecute(t *testing.T) {
-	snapshotHandle := "vsc"
+	newVscName := util.GenerateSha256FromRestoreUIDAndVsName("restoreUID", "vsName")
 	tests := []struct {
-		name        string
-		item        runtime.Unstructured
-		vs          *snapshotv1api.VolumeSnapshot
-		restore     *velerov1api.Restore
-		expectErr   bool
-		createVS    bool
-		expectedVSC *snapshotv1api.VolumeSnapshotContent
+		name       string
+		item       runtime.Unstructured
+		vs         *snapshotv1api.VolumeSnapshot
+		restore    *velerov1api.Restore
+		expectErr  bool
+		createVS   bool
+		expectedVS *snapshotv1api.VolumeSnapshot
 	}{
 		{
 			name:      "Restore's RestorePVs is false",
@@ -119,45 +118,24 @@ func TestVSExecute(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name:      "Namespace remapping and VS already exists in cluster. Nothing change",
-			vs:        builder.ForVolumeSnapshot("ns", "name").Result(),
-			restore:   builder.ForRestore("velero", "restore").NamespaceMappings("ns", "newNS").Result(),
-			createVS:  true,
-			expectErr: false,
-		},
-		{
-			name:      "VS doesn't have VolumeSnapshotHandleAnnotation annotation",
-			vs:        builder.ForVolumeSnapshot("ns", "name").Result(),
-			restore:   builder.ForRestore("velero", "restore").NamespaceMappings("ns", "newNS").Result(),
-			expectErr: true,
-		},
-		{
-			name: "VS doesn't have DriverNameAnnotation annotation",
-			vs: builder.ForVolumeSnapshot("ns", "name").ObjectMeta(
-				builder.WithAnnotations(velerov1api.VolumeSnapshotHandleAnnotation, ""),
-			).Result(),
+			name:      "VS doesn't have VSC in status",
+			vs:        builder.ForVolumeSnapshot("ns", "name").ObjectMeta(builder.WithAnnotations("1", "1")).Status().Result(),
 			restore:   builder.ForRestore("velero", "restore").NamespaceMappings("ns", "newNS").Result(),
 			expectErr: true,
 		},
 		{
 			name: "Normal case, VSC should be created",
-			vs: builder.ForVolumeSnapshot("ns", "test").ObjectMeta(builder.WithAnnotationsMap(
-				map[string]string{
-					velerov1api.VolumeSnapshotHandleAnnotation: "vsc",
-					velerov1api.DriverNameAnnotation:           "pd.csi.storage.gke.io",
-				},
-			)).Result(),
-			restore:   builder.ForRestore("velero", "restore").Result(),
-			expectErr: false,
-			expectedVSC: builder.ForVolumeSnapshotContent("vsc").ObjectMeta(
-				builder.WithLabels(velerov1api.RestoreNameLabel, "restore"),
-			).VolumeSnapshotRef("ns", "test").
-				DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).
-				Driver("pd.csi.storage.gke.io").
-				Source(snapshotv1api.VolumeSnapshotContentSource{
-					SnapshotHandle: &snapshotHandle,
-				}).
-				Result(),
+			vs: builder.ForVolumeSnapshot("ns", "vsName").ObjectMeta(
+				builder.WithAnnotationsMap(
+					map[string]string{
+						velerov1api.VolumeSnapshotHandleAnnotation: "vsc",
+						velerov1api.DriverNameAnnotation:           "pd.csi.storage.gke.io",
+					},
+				),
+			).SourceVolumeSnapshotContentName(newVscName).Status().BoundVolumeSnapshotContentName("vscName").Result(),
+			restore:    builder.ForRestore("velero", "restore").ObjectMeta(builder.WithUID("restoreUID")).Result(),
+			expectErr:  false,
+			expectedVS: builder.ForVolumeSnapshot("ns", "test").SourceVolumeSnapshotContentName(newVscName).Result(),
 		},
 	}
 
@@ -181,10 +159,11 @@ func TestVSExecute(t *testing.T) {
 				}
 			}
 
-			_, err := p.Execute(
+			result, err := p.Execute(
 				&velero.RestoreItemActionExecuteInput{
-					Item:    test.item,
-					Restore: test.restore,
+					Item:           test.item,
+					ItemFromBackup: test.item,
+					Restore:        test.restore,
 				},
 			)
 
@@ -192,18 +171,11 @@ func TestVSExecute(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			if test.expectedVSC != nil {
-				vscList := new(snapshotv1api.VolumeSnapshotContentList)
-				require.NoError(t, p.crClient.List(context.TODO(), vscList))
-				require.True(t, cmp.Equal(
-					*test.expectedVSC,
-					vscList.Items[0],
-					cmpopts.IgnoreFields(
-						snapshotv1api.VolumeSnapshotContent{},
-						"Kind", "APIVersion", "GenerateName", "Name",
-						"ResourceVersion",
-					),
-				))
+			if test.expectedVS != nil {
+				var vs snapshotv1api.VolumeSnapshot
+				require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(
+					result.UpdatedItem.UnstructuredContent(), &vs))
+				require.Equal(t, test.expectedVS.Spec, vs.Spec)
 			}
 		})
 	}

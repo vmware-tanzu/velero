@@ -35,7 +35,7 @@ import (
 func TestRestartableGetObjectStore(t *testing.T) {
 	tests := []struct {
 		name          string
-		plugin        interface{}
+		plugin        any
 		getError      error
 		expectedError string
 	}{
@@ -97,7 +97,7 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 	}
 
 	err := r.Reinitialize(3)
-	assert.EqualError(t, err, "plugin int is not a ObjectStore")
+	require.EqualError(t, err, "plugin int is not a ObjectStore")
 
 	objectStore := new(providermocks.ObjectStore)
 	objectStore.Test(t)
@@ -105,7 +105,7 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 
 	objectStore.On("Init", r.config).Return(errors.Errorf("init error")).Once()
 	err = r.Reinitialize(objectStore)
-	assert.EqualError(t, err, "init error")
+	require.EqualError(t, err, "init error")
 
 	objectStore.On("Init", r.config).Return(nil)
 	err = r.Reinitialize(objectStore)
@@ -127,7 +127,7 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 	}
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
-	assert.EqualError(t, err, "reset error")
+	require.EqualError(t, err, "reset error")
 
 	// Happy path
 	p.On("ResetIfNeeded").Return(nil)
@@ -137,7 +137,7 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 	p.On("GetByKindAndName", key).Return(objectStore, nil)
 
 	a, err = r.getDelegate()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, objectStore, a)
 }
 
@@ -159,7 +159,7 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 		"color": "blue",
 	}
 	err := r.Init(config)
-	assert.EqualError(t, err, "GetByKindAndName error")
+	require.EqualError(t, err, "GetByKindAndName error")
 
 	// Delegate returns error
 	objectStore := new(providermocks.ObjectStore)
@@ -169,7 +169,7 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 	objectStore.On("Init", config).Return(errors.Errorf("Init error")).Once()
 
 	err = r.Init(config)
-	assert.EqualError(t, err, "Init error")
+	require.EqualError(t, err, "Init error")
 
 	// wipe this out because the previous failed Init call set it
 	r.config = nil
@@ -177,7 +177,7 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 	// Happy path
 	objectStore.On("Init", config).Return(nil)
 	err = r.Init(config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, config, r.config)
 
 	// Calling Init twice is forbidden
@@ -189,7 +189,7 @@ func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 	restartabletest.RunRestartableDelegateTests(
 		t,
 		common.PluginKindObjectStore,
-		func(key process.KindAndName, p process.RestartableProcess) interface{} {
+		func(key process.KindAndName, p process.RestartableProcess) any {
 			return &restartableObjectStore{
 				key:                 key,
 				sharedPluginProcess: p,
@@ -200,39 +200,39 @@ func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "PutObject",
-			Inputs:                  []interface{}{"bucket", "key", strings.NewReader("body")},
-			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+			Inputs:                  []any{"bucket", "key", strings.NewReader("body")},
+			ExpectedErrorOutputs:    []any{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "GetObject",
-			Inputs:                  []interface{}{"bucket", "key"},
-			ExpectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{io.NopCloser(strings.NewReader("object")), errors.Errorf("delegate error")},
+			Inputs:                  []any{"bucket", "key"},
+			ExpectedErrorOutputs:    []any{nil, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{io.NopCloser(strings.NewReader("object")), errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "ListCommonPrefixes",
-			Inputs:                  []interface{}{"bucket", "prefix", "delimiter"},
-			ExpectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
+			Inputs:                  []any{"bucket", "prefix", "delimiter"},
+			ExpectedErrorOutputs:    []any{([]string)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{[]string{"a", "b"}, errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "ListObjects",
-			Inputs:                  []interface{}{"bucket", "prefix"},
-			ExpectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
+			Inputs:                  []any{"bucket", "prefix"},
+			ExpectedErrorOutputs:    []any{([]string)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{[]string{"a", "b"}, errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "DeleteObject",
-			Inputs:                  []interface{}{"bucket", "key"},
-			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+			Inputs:                  []any{"bucket", "key"},
+			ExpectedErrorOutputs:    []any{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "CreateSignedURL",
-			Inputs:                  []interface{}{"bucket", "key", 30 * time.Minute},
-			ExpectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{"signedURL", errors.Errorf("delegate error")},
+			Inputs:                  []any{"bucket", "key", 30 * time.Minute},
+			ExpectedErrorOutputs:    []any{"", errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{"signedURL", errors.Errorf("delegate error")},
 		},
 	)
 }

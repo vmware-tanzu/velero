@@ -46,14 +46,7 @@ import (
 )
 
 const (
-	AnnBindCompleted          = "pv.kubernetes.io/bind-completed"
-	AnnBoundByController      = "pv.kubernetes.io/bound-by-controller"
-	AnnStorageProvisioner     = "volume.kubernetes.io/storage-provisioner"
-	AnnBetaStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
-	AnnSelectedNode           = "volume.kubernetes.io/selected-node"
-)
-
-const (
+	AnnSelectedNode          = "volume.kubernetes.io/selected-node"
 	GenerateNameRandomLength = 5
 )
 
@@ -70,18 +63,6 @@ func (p *pvcRestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
 		IncludedResources: []string{"persistentvolumeclaims"},
 		//TODO: add label selector volumeSnapshotLabel
 	}, nil
-}
-
-func removePVCAnnotations(pvc *corev1api.PersistentVolumeClaim, remove []string) {
-	if pvc.Annotations == nil {
-		pvc.Annotations = make(map[string]string)
-		return
-	}
-	for k := range pvc.Annotations {
-		if util.Contains(remove, k) {
-			delete(pvc.Annotations, k)
-		}
-	}
 }
 
 func resetPVCSpec(pvc *corev1api.PersistentVolumeClaim, vsName string) {
@@ -148,21 +129,6 @@ func (p *pvcRestoreItemAction) Execute(
 		}, nil
 	}
 
-	// remove the VolumeSnapshot name annotation as well
-	// clean the DataUploadNameLabel for snapshot data mover case.
-	removePVCAnnotations(
-		&pvc,
-		[]string{
-			AnnBindCompleted,
-			AnnBoundByController,
-			AnnStorageProvisioner,
-			AnnBetaStorageProvisioner,
-			AnnSelectedNode,
-			velerov1api.VolumeSnapshotLabel,
-			velerov1api.DataUploadNameAnnotation,
-		},
-	)
-
 	// If cross-namespace restore is configured, change the namespace
 	// for PVC object to be restored
 	newNamespace, ok := input.Restore.Spec.NamespaceMapping[pvc.GetNamespace()]
@@ -220,8 +186,10 @@ func (p *pvcRestoreItemAction) Execute(
 			logger.Infof("DataDownload %s/%s is created successfully.",
 				dataDownload.Namespace, dataDownload.Name)
 		} else {
-			volumeSnapshotName, ok := pvcFromBackup.Annotations[velerov1api.VolumeSnapshotLabel]
-			if !ok {
+			targetVSName := ""
+			if vsName, nameOK := pvcFromBackup.Annotations[velerov1api.VolumeSnapshotLabel]; nameOK {
+				targetVSName = util.GenerateSha256FromRestoreUIDAndVsName(string(input.Restore.UID), vsName)
+			} else {
 				logger.Info("Skipping PVCRestoreItemAction for PVC,",
 					"PVC does not have a CSI VolumeSnapshot.")
 				// Make no change in the input PVC.
@@ -229,8 +197,9 @@ func (p *pvcRestoreItemAction) Execute(
 					UpdatedItem: input.Item,
 				}, nil
 			}
+
 			if err := restoreFromVolumeSnapshot(
-				&pvc, newNamespace, p.crClient, volumeSnapshotName, logger,
+				&pvc, newNamespace, p.crClient, targetVSName, logger,
 			); err != nil {
 				logger.Errorf("Failed to restore PVC from VolumeSnapshot.")
 				return nil, errors.WithStack(err)
@@ -502,19 +471,17 @@ func restoreFromVolumeSnapshot(
 		},
 		vs,
 	); err != nil {
-		return errors.Wrapf(err,
-			fmt.Sprintf("Failed to get Volumesnapshot %s/%s to restore PVC %s/%s",
-				newNamespace, volumeSnapshotName, newNamespace, pvc.Name),
-		)
+		return errors.Wrapf(err, "Failed to get Volumesnapshot %s/%s to restore PVC %s/%s",
+			newNamespace, volumeSnapshotName, newNamespace, pvc.Name)
 	}
 
 	if _, exists := vs.Annotations[velerov1api.VolumeSnapshotRestoreSize]; exists {
 		restoreSize, err := resource.ParseQuantity(
 			vs.Annotations[velerov1api.VolumeSnapshotRestoreSize])
 		if err != nil {
-			return errors.Wrapf(err, fmt.Sprintf(
+			return errors.Wrapf(err,
 				"Failed to parse %s from annotation on Volumesnapshot %s/%s into restore size",
-				vs.Annotations[velerov1api.VolumeSnapshotRestoreSize], vs.Namespace, vs.Name))
+				vs.Annotations[velerov1api.VolumeSnapshotRestoreSize], vs.Namespace, vs.Name)
 		}
 		// It is possible that the volume provider allocated a larger
 		// capacity volume than what was requested in the backed up PVC.
@@ -598,7 +565,7 @@ func (p *pvcRestoreItemAction) isResourceExist(
 }
 
 func NewPvcRestoreItemAction(f client.Factory) plugincommon.HandlerInitializer {
-	return func(logger logrus.FieldLogger) (interface{}, error) {
+	return func(logger logrus.FieldLogger) (any, error) {
 		crClient, err := f.KubebuilderClient()
 		if err != nil {
 			return nil, err

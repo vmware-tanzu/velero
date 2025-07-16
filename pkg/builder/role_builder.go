@@ -17,21 +17,21 @@ limitations under the License.
 package builder
 
 import (
-	rbacv1api "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // RoleBuilder builds Role objects.
 type RoleBuilder struct {
-	object *rbacv1api.Role
+	object *rbacv1.Role
 }
 
 // ForRole is the constructor for a RoleBuilder.
 func ForRole(ns, name string) *RoleBuilder {
 	return &RoleBuilder{
-		object: &rbacv1api.Role{
+		object: &rbacv1.Role{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: rbacv1api.SchemeGroupVersion.String(),
+				APIVersion: rbacv1.SchemeGroupVersion.String(),
 				Kind:       "Role",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -43,7 +43,7 @@ func ForRole(ns, name string) *RoleBuilder {
 }
 
 // Result returns the built Role.
-func (b *RoleBuilder) Result() *rbacv1api.Role {
+func (b *RoleBuilder) Result() *rbacv1.Role {
 	return b.object
 }
 

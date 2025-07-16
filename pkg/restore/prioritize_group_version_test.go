@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -74,7 +74,7 @@ func TestK8sPrioritySort(t *testing.T) {
 func TestUserResourceGroupVersionPriorities(t *testing.T) {
 	tests := []struct {
 		name       string
-		cm         *corev1.ConfigMap
+		cm         *corev1api.ConfigMap
 		want       map[string]metav1.APIGroup
 		wantErrMsg string
 	}{

@@ -20,5 +20,6 @@ const (
 	ControllerServerStatusRequest   = "server-status-request"
 	ControllerRestoreFinalizer      = "restore-finalizer"
 
-	PluginCSIPVCRestoreRIA = "velero.io/csi-pvc-restorer"
+	PluginCSIPVCRestoreRIA            = "velero.io/csi-pvc-restorer"
+	PluginCsiVolumeSnapshotRestoreRIA = "velero.io/csi-volumesnapshot-restorer"
 )

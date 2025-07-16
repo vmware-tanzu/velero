@@ -74,6 +74,10 @@ func DeletePVAndPVCIfAny(ctx context.Context, client corev1client.CoreV1Interfac
 	if err := EnsureDeletePVC(ctx, client, pvcName, pvcNamespace, ensureTimeout); err != nil {
 		log.Warnf("failed to delete pvc %s/%s with err %v", pvcNamespace, pvcName, err)
 	}
+
+	if err := EnsurePVDeleted(ctx, client, pvcObj.Spec.VolumeName, ensureTimeout); err != nil {
+		log.Warnf("pv %s was not removed with err %v", pvcObj.Spec.VolumeName, err)
+	}
 }
 
 // WaitPVCBound wait for binding of a PVC specified by name and returns the bound PV object
@@ -83,7 +87,7 @@ func WaitPVCBound(ctx context.Context, pvcGetter corev1client.CoreV1Interface,
 	err := wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
 		tmpPVC, err := pvcGetter.PersistentVolumeClaims(namespace).Get(ctx, pvc, metav1.GetOptions{})
 		if err != nil {
-			return false, errors.Wrapf(err, fmt.Sprintf("error to get pvc %s/%s", namespace, pvc))
+			return false, errors.Wrapf(err, "error to get pvc %s/%s", namespace, pvc)
 		}
 
 		if tmpPVC.Spec.VolumeName == "" {
@@ -151,6 +155,37 @@ func EnsureDeletePVC(ctx context.Context, pvcGetter corev1client.CoreV1Interface
 			return errors.Errorf("timeout to assure pvc %s is deleted, finalizers in pvc %v", pvcName, updated.Finalizers)
 		} else {
 			return errors.Wrapf(err, "error to ensure pvc deleted for %s", pvcName)
+		}
+	}
+
+	return nil
+}
+
+// EnsurePVDeleted ensures a PV has been deleted. This function is supposed to be called after EnsureDeletePVC
+// If timeout is 0, it doesn't wait and return nil
+func EnsurePVDeleted(ctx context.Context, pvGetter corev1client.CoreV1Interface, pvName string, timeout time.Duration) error {
+	if timeout == 0 {
+		return nil
+	}
+
+	err := wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
+		_, err := pvGetter.PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+
+			return false, errors.Wrapf(err, "error to get pv %s", pvName)
+		}
+
+		return false, nil
+	})
+
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.Errorf("timeout to assure pv %s is deleted", pvName)
+		} else {
+			return errors.Wrapf(err, "error to ensure pv is deleted for %s", pvName)
 		}
 	}
 
@@ -270,8 +305,14 @@ func SetPVReclaimPolicy(ctx context.Context, pvGetter corev1client.CoreV1Interfa
 // WaitPVCConsumed waits for a PVC to be consumed by a pod so that the selected node is set by the pod scheduling; or does
 // nothing if the consuming doesn't affect the PV provision.
 // The latest PVC and the selected node will be returned.
-func WaitPVCConsumed(ctx context.Context, pvcGetter corev1client.CoreV1Interface, pvc string, namespace string,
-	storageClient storagev1.StorageV1Interface, timeout time.Duration, ignoreConsume bool) (string, *corev1api.PersistentVolumeClaim, error) {
+func WaitPVCConsumed(
+	ctx context.Context,
+	pvcGetter corev1client.CoreV1Interface,
+	pvc string, namespace string,
+	storageClient storagev1.StorageV1Interface,
+	timeout time.Duration,
+	ignoreConsume bool,
+) (string, *corev1api.PersistentVolumeClaim, error) {
 	selectedNode := ""
 	var updated *corev1api.PersistentVolumeClaim
 	var storageClass *storagev1api.StorageClass
@@ -318,7 +359,7 @@ func WaitPVBound(ctx context.Context, pvGetter corev1client.CoreV1Interface, pvN
 	err := wait.PollUntilContextTimeout(ctx, waitInternal, timeout, true, func(ctx context.Context) (bool, error) {
 		tmpPV, err := pvGetter.PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 		if err != nil {
-			return false, errors.Wrapf(err, fmt.Sprintf("failed to get pv %s", pvName))
+			return false, errors.Wrapf(err, "failed to get pv %s", pvName)
 		}
 
 		if tmpPV.Spec.ClaimRef == nil {
@@ -356,8 +397,8 @@ func IsPVCBound(pvc *corev1api.PersistentVolumeClaim) bool {
 
 // MakePodPVCAttachment returns the volume mounts and devices for a pod needed to attach a PVC
 func MakePodPVCAttachment(volumeName string, volumeMode *corev1api.PersistentVolumeMode, readOnly bool) ([]corev1api.VolumeMount, []corev1api.VolumeDevice, string) {
-	var volumeMounts []corev1api.VolumeMount = nil
-	var volumeDevices []corev1api.VolumeDevice = nil
+	var volumeMounts []corev1api.VolumeMount
+	var volumeDevices []corev1api.VolumeDevice
 	volumePath := "/" + volumeName
 
 	if volumeMode != nil && *volumeMode == corev1api.PersistentVolumeBlock {
@@ -432,45 +473,84 @@ func DiagnosePV(pv *corev1api.PersistentVolume) string {
 }
 
 func GetPVCAttachingNodeOS(pvc *corev1api.PersistentVolumeClaim, nodeClient corev1client.CoreV1Interface,
-	storageClient storagev1.StorageV1Interface, log logrus.FieldLogger) (string, error) {
+	storageClient storagev1.StorageV1Interface, log logrus.FieldLogger) string {
 	var nodeOS string
 	var scFsType string
 
 	if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == corev1api.PersistentVolumeBlock {
 		log.Infof("Use linux node for block mode PVC %s/%s", pvc.Namespace, pvc.Name)
-		return NodeOSLinux, nil
+		return NodeOSLinux
 	}
 
-	if value := pvc.Annotations[KubeAnnSelectedNode]; value != "" {
-		os, err := GetNodeOS(context.Background(), value, nodeClient)
-		if err != nil {
-			return "", errors.Wrapf(err, "error to get os from node %s for PVC %s/%s", value, pvc.Namespace, pvc.Name)
-		}
+	if pvc.Spec.VolumeName == "" {
+		log.Warnf("PVC %s/%s is not bound to a PV", pvc.Namespace, pvc.Name)
+	}
 
-		nodeOS = os
+	if pvc.Spec.StorageClassName == nil {
+		log.Warnf("PVC %s/%s is not with storage class", pvc.Namespace, pvc.Name)
+	}
+
+	nodeName := ""
+	if pvc.Spec.VolumeName != "" {
+		if n, err := GetPVAttachedNode(context.Background(), pvc.Spec.VolumeName, storageClient); err != nil {
+			log.WithError(err).Warnf("Failed to get attached node for PVC %s/%s", pvc.Namespace, pvc.Name)
+		} else {
+			nodeName = n
+		}
+	}
+
+	if nodeName == "" {
+		if value := pvc.Annotations[KubeAnnSelectedNode]; value != "" {
+			nodeName = value
+		}
+	}
+
+	if nodeName != "" {
+		if os, err := GetNodeOS(context.Background(), nodeName, nodeClient); err != nil {
+			log.WithError(err).Warnf("Failed to get os from node %s for PVC %s/%s", nodeName, pvc.Namespace, pvc.Name)
+		} else {
+			nodeOS = os
+		}
 	}
 
 	if pvc.Spec.StorageClassName != nil {
-		sc, err := storageClient.StorageClasses().Get(context.Background(), *pvc.Spec.StorageClassName, metav1.GetOptions{})
-		if err != nil {
-			return "", errors.Wrapf(err, "error to get storage class %s", *pvc.Spec.StorageClassName)
-		}
-
-		if sc.Parameters != nil {
+		if sc, err := storageClient.StorageClasses().Get(context.Background(), *pvc.Spec.StorageClassName, metav1.GetOptions{}); err != nil {
+			log.WithError(err).Warnf("Failed to get storage class %s for PVC %s/%s", *pvc.Spec.StorageClassName, pvc.Namespace, pvc.Name)
+		} else if sc.Parameters != nil {
 			scFsType = strings.ToLower(sc.Parameters["csi.storage.k8s.io/fstype"])
 		}
 	}
 
 	if nodeOS != "" {
-		log.Infof("Deduced node os %s from selected node for PVC %s/%s (fsType %s)", nodeOS, pvc.Namespace, pvc.Name, scFsType)
-		return nodeOS, nil
+		log.Infof("Deduced node os %s from selected/attached node for PVC %s/%s (fsType %s)", nodeOS, pvc.Namespace, pvc.Name, scFsType)
+		return nodeOS
 	}
 
 	if scFsType == "ntfs" {
-		log.Infof("Deduced Windows node os from fsType for PVC %s/%s", pvc.Namespace, pvc.Name)
-		return NodeOSWindows, nil
+		log.Infof("Deduced Windows node os from fsType %s for PVC %s/%s", scFsType, pvc.Namespace, pvc.Name)
+		return NodeOSWindows
+	}
+
+	if scFsType != "" {
+		log.Infof("Deduced linux node os from fsType %s for PVC %s/%s", scFsType, pvc.Namespace, pvc.Name)
+		return NodeOSLinux
 	}
 
 	log.Warnf("Cannot deduce node os for PVC %s/%s, default to linux", pvc.Namespace, pvc.Name)
-	return NodeOSLinux, nil
+	return NodeOSLinux
+}
+
+func GetPVAttachedNode(ctx context.Context, pv string, storageClient storagev1.StorageV1Interface) (string, error) {
+	vaList, err := storageClient.VolumeAttachments().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", errors.Wrapf(err, "error listing volumeattachment")
+	}
+
+	for _, va := range vaList.Items {
+		if va.Spec.Source.PersistentVolumeName != nil && *va.Spec.Source.PersistentVolumeName == pv {
+			return va.Spec.NodeName, nil
+		}
+	}
+
+	return "", nil
 }

@@ -27,8 +27,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,11 +37,8 @@ import (
 	clientgofake "k8s.io/client-go/kubernetes/fake"
 	ctrl "sigs.k8s.io/controller-runtime"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
@@ -68,11 +65,13 @@ func dataDownloadBuilder() *builder.DataDownloadBuilder {
 		PV:        "test-pv",
 		PVC:       "test-pvc",
 		Namespace: "test-ns",
-	}).NodeOS(velerov2alpha1api.NodeOS("linux"))
+	})
 }
 
-func initDataDownloadReconciler(objects []runtime.Object, needError ...bool) (*DataDownloadReconciler, error) {
-	var errs []error = make([]error, 6)
+func initDataDownloadReconciler(t *testing.T, objects []any, needError ...bool) (*DataDownloadReconciler, error) {
+	t.Helper()
+
+	var errs = make([]error, 6)
 	for k, isError := range needError {
 		if k == 0 && isError {
 			errs[0] = fmt.Errorf("Get error")
@@ -88,27 +87,23 @@ func initDataDownloadReconciler(objects []runtime.Object, needError ...bool) (*D
 			errs[5] = fmt.Errorf("List error")
 		}
 	}
-	return initDataDownloadReconcilerWithError(objects, errs...)
+	return initDataDownloadReconcilerWithError(t, objects, errs...)
 }
 
-func initDataDownloadReconcilerWithError(objects []runtime.Object, needError ...error) (*DataDownloadReconciler, error) {
-	scheme := runtime.NewScheme()
-	err := velerov1api.AddToScheme(scheme)
-	if err != nil {
-		return nil, err
-	}
-	err = velerov2alpha1api.AddToScheme(scheme)
-	if err != nil {
-		return nil, err
-	}
-	err = corev1.AddToScheme(scheme)
-	if err != nil {
-		return nil, err
+func initDataDownloadReconcilerWithError(t *testing.T, objects []any, needError ...error) (*DataDownloadReconciler, error) {
+	t.Helper()
+
+	runtimeObjects := make([]runtime.Object, 0)
+
+	for _, obj := range objects {
+		runtimeObjects = append(runtimeObjects, obj.(runtime.Object))
 	}
 
-	fakeClient := &FakeClient{
-		Client: fake.NewClientBuilder().WithScheme(scheme).Build(),
+	fakeClient := FakeClient{
+		Client: velerotest.NewFakeControllerRuntimeClient(t, runtimeObjects...),
 	}
+
+	fakeKubeClient := clientgofake.NewSimpleClientset(runtimeObjects...)
 
 	for k := range needError {
 		if k == 0 {
@@ -126,39 +121,45 @@ func initDataDownloadReconcilerWithError(objects []runtime.Object, needError ...
 		}
 	}
 
-	var fakeKubeClient *clientgofake.Clientset
-	if len(objects) != 0 {
-		fakeKubeClient = clientgofake.NewSimpleClientset(objects...)
-	} else {
-		fakeKubeClient = clientgofake.NewSimpleClientset()
-	}
-
 	fakeFS := velerotest.NewFakeFileSystem()
 	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", "test-uid", "test-pvc")
-	_, err = fakeFS.Create(pathGlob)
+	_, err := fakeFS.Create(pathGlob)
 	if err != nil {
 		return nil, err
 	}
 
 	dataPathMgr := datapath.NewManager(1)
 
-	return NewDataDownloadReconciler(fakeClient, nil, fakeKubeClient, dataPathMgr, nodeagent.RestorePVC{}, corev1.ResourceRequirements{}, "test-node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics()), nil
+	return NewDataDownloadReconciler(
+		&fakeClient,
+		nil,
+		fakeKubeClient,
+		dataPathMgr,
+		nil,
+		nodeagent.RestorePVC{},
+		corev1api.ResourceRequirements{},
+		"test-node",
+		time.Minute*5,
+		velerotest.NewLogger(),
+		metrics.NewServerMetrics()), nil
 }
 
 func TestDataDownloadReconcile(t *testing.T) {
-	daemonSet := &appsv1.DaemonSet{
+	sc := builder.ForStorageClass("sc").Result()
+
+	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "velero",
 			Name:      "node-agent",
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
-			APIVersion: appsv1.SchemeGroupVersion.String(),
+			APIVersion: appsv1api.SchemeGroupVersion.String(),
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Containers: []corev1api.Container{
 						{
 							Image: "fake-image",
 						},
@@ -171,89 +172,204 @@ func TestDataDownloadReconcile(t *testing.T) {
 	node := builder.ForNode("fake-node").Labels(map[string]string{kube.NodeOSLabel: kube.NodeOSLinux}).Result()
 
 	tests := []struct {
-		name              string
-		dd                *velerov2alpha1api.DataDownload
-		targetPVC         *corev1.PersistentVolumeClaim
-		dataMgr           *datapath.Manager
-		needErrs          []bool
-		needCreateFSBR    bool
-		isExposeErr       bool
-		isGetExposeErr    bool
-		isPeekExposeErr   bool
-		isNilExposer      bool
-		isFSBRInitErr     bool
-		isFSBRRestoreErr  bool
-		notNilExpose      bool
-		notMockCleanUp    bool
-		mockInit          bool
-		mockInitErr       error
-		mockStart         bool
-		mockStartErr      error
-		mockCancel        bool
-		mockClose         bool
-		expected          *velerov2alpha1api.DataDownload
-		expectedStatusMsg string
-		checkFunc         func(du velerov2alpha1api.DataDownload) bool
-		expectedResult    *ctrl.Result
+		name                     string
+		dd                       *velerov2alpha1api.DataDownload
+		notCreateDD              bool
+		targetPVC                *corev1api.PersistentVolumeClaim
+		dataMgr                  *datapath.Manager
+		needErrs                 []bool
+		needCreateFSBR           bool
+		needDelete               bool
+		sportTime                *metav1.Time
+		isExposeErr              bool
+		isGetExposeErr           bool
+		isGetExposeNil           bool
+		isPeekExposeErr          bool
+		isNilExposer             bool
+		notNilExpose             bool
+		notMockCleanUp           bool
+		mockInit                 bool
+		mockInitErr              error
+		mockStart                bool
+		mockStartErr             error
+		mockCancel               bool
+		mockClose                bool
+		needExclusiveUpdateError error
+		expected                 *velerov2alpha1api.DataDownload
+		expectDeleted            bool
+		expectCancelRecord       bool
+		expectedResult           *ctrl.Result
+		expectedErr              string
+		expectDataPath           bool
 	}{
 		{
-			name:      "Unknown data download status",
-			dd:        dataDownloadBuilder().Phase("Unknown").Cancel(true).Result(),
+			name:        "dd not found",
+			dd:          dataDownloadBuilder().Result(),
+			notCreateDD: true,
+		},
+		{
+			name: "dd not created in velero default namespace",
+			dd:   builder.ForDataDownload("test-ns", dataDownloadName).Result(),
+		},
+		{
+			name:        "get dd fail",
+			dd:          dataDownloadBuilder().Result(),
+			needErrs:    []bool{true, false, false, false},
+			expectedErr: "Get error",
+		},
+		{
+			name: "dd is not for built-in dm",
+			dd:   dataDownloadBuilder().DataMover("other").Result(),
+		},
+		{
+			name:     "add finalizer to dd",
+			dd:       dataDownloadBuilder().Result(),
+			expected: dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+		},
+		{
+			name:        "add finalizer to dd failed",
+			dd:          dataDownloadBuilder().Result(),
+			needErrs:    []bool{false, false, true, false},
+			expectedErr: "error updating datadownload velero/datadownload-1: Update error",
+		},
+		{
+			name:       "dd is under deletion",
+			dd:         dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			needDelete: true,
+			expected:   dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Result(),
+		},
+		{
+			name:        "dd is under deletion but cancel failed",
+			dd:          dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			needErrs:    []bool{false, false, true, false},
+			needDelete:  true,
+			expectedErr: "error updating datadownload velero/datadownload-1: Update error",
+		},
+		{
+			name:          "dd is under deletion and in terminal state",
+			dd:            dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataDownloadPhaseFailed).Result(),
+			sportTime:     &metav1.Time{Time: time.Now()},
+			needDelete:    true,
+			expectDeleted: true,
+		},
+		{
+			name:        "dd is under deletion and in terminal state, but remove finalizer failed",
+			dd:          dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataDownloadPhaseFailed).Result(),
+			needErrs:    []bool{false, false, true, false},
+			needDelete:  true,
+			expectedErr: "error updating datadownload velero/datadownload-1: Update error",
+		},
+		{
+			name:               "delay cancel negative for others",
+			dd:                 dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
+			sportTime:          &metav1.Time{Time: time.Now()},
+			expectCancelRecord: true,
+		},
+		{
+			name:               "delay cancel negative for inProgress",
+			dd:                 dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Result(),
+			sportTime:          &metav1.Time{Time: time.Now().Add(-time.Minute * 58)},
+			expectCancelRecord: true,
+		},
+		{
+			name:      "delay cancel affirmative for others",
+			dd:        dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
+			sportTime: &metav1.Time{Time: time.Now().Add(-time.Minute * 5)},
+			expected:  dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Result(),
+		},
+		{
+			name:      "delay cancel affirmative for inProgress",
+			dd:        dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Result(),
+			sportTime: &metav1.Time{Time: time.Now().Add(-time.Hour)},
+			expected:  dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Result(),
+		},
+		{
+			name:               "delay cancel failed",
+			dd:                 dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Result(),
+			needErrs:           []bool{false, false, true, false},
+			sportTime:          &metav1.Time{Time: time.Now().Add(-time.Hour)},
+			expected:           dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Result(),
+			expectCancelRecord: true,
+		},
+		{
+			name: "Unknown data download status",
+			dd:   dataDownloadBuilder().Phase("Unknown").Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+		},
+		{
+			name:           "new dd but no target PVC",
+			dd:             dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectedResult: &ctrl.Result{Requeue: true},
+		},
+		{
+			name:                     "new dd but accept failed",
+			dd:                       dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			targetPVC:                builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			needExclusiveUpdateError: errors.New("exclusive-update-error"),
+			expected:                 dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectedErr:              "error accepting the data download datadownload-1: exclusive-update-error",
+		},
+		{
+			name:      "dd is cancel on accepted",
+			dd:        dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Result(),
 			targetPVC: builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			expected:  dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Result(),
 		},
 		{
-			name:              "Cancel data downloand in progress and patch data download error",
-			dd:                dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Result(),
-			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			needErrs:          []bool{false, false, false, true},
-			needCreateFSBR:    true,
-			expectedStatusMsg: "Patch error",
+			name:        "dd is accepted but setup expose param failed",
+			dd:          dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).NodeOS("xxx").Result(),
+			targetPVC:   builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			expected:    dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).NodeOS("xxx").Phase(velerov2alpha1api.DataDownloadPhaseFailed).Message("failed to set exposer parameters").Result(),
+			expectedErr: "no appropriate node to run datadownload velero/datadownload-1: node with OS xxx doesn't exist",
 		},
 		{
-			name:       "Cancel data downloand in progress with empty FSBR",
-			dd:         dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Result(),
-			targetPVC:  builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			mockCancel: true,
+			name:        "dd expose failed",
+			dd:          dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			targetPVC:   builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			isExposeErr: true,
+			expected:    dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataDownloadPhaseFailed).Message("error to expose snapshot").Result(),
+			expectedErr: "Error to expose restore exposer",
 		},
 		{
-			name: "Cancel data downloand in progress with create FSBR",
-			dd: func() *velerov2alpha1api.DataDownload {
-				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Result()
-				dd.Status.Node = "test-node"
-				return dd
-			}(),
+			name:      "dd succeeds for accepted",
+			dd:        dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			targetPVC: builder.ForPersistentVolumeClaim("test-ns", "test-pvc").StorageClass("sc").Result(),
+			expected:  dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
+		},
+		{
+			name:     "prepare timeout on accepted",
+			dd:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Finalizers([]string{DataUploadDownloadFinalizer}).AcceptedTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 30)}).Result(),
+			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataDownloadPhaseFailed).Message("timeout on preparing data download").Result(),
+		},
+		{
+			name:            "peek error on accepted",
+			dd:              dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			isPeekExposeErr: true,
+			expected:        dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Message("found a datadownload velero/datadownload-1 with expose error: fake-peek-error. mark it as cancel").Result(),
+		},
+		{
+			name:     "cancel on prepared",
+			dd:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Cancel(true).Result(),
+			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Result(),
+		},
+		{
+			name:           "Failed to get restore expose on prepared",
+			dd:             dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
 			targetPVC:      builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			needCreateFSBR: true,
-			mockCancel:     true,
-			expected:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseCanceling).Result(),
+			isGetExposeErr: true,
+			expected:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Finalizers([]string{DataUploadDownloadFinalizer}).Message("restore exposer is not ready").Result(),
+			expectedErr:    "Error to get restore exposer",
 		},
 		{
-			name: "Cancel data downloand in progress without create FSBR",
-			dd: func() *velerov2alpha1api.DataDownload {
-				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Result()
-				dd.Status.Node = "test-node"
-				return dd
-			}(),
+			name:           "Get nil restore expose on prepared",
+			dd:             dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
 			targetPVC:      builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			needCreateFSBR: false,
-			mockCancel:     true,
-			expected:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Result(),
-		},
-		{
-			name: "Cancel data downloand in progress in different node",
-			dd: func() *velerov2alpha1api.DataDownload {
-				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Result()
-				dd.Status.Node = "different-node"
-				return dd
-			}(),
-			targetPVC:      builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			needCreateFSBR: false,
-			mockCancel:     true,
-			expected:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Result(),
+			isGetExposeNil: true,
+			expected:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Finalizers([]string{DataUploadDownloadFinalizer}).Message("exposed snapshot is not ready").Result(),
+			expectedErr:    "no expose result is available for the current node",
 		},
 		{
 			name:           "Error in data path is concurrent limited",
-			dd:             dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
+			dd:             dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
 			targetPVC:      builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
 			dataMgr:        datapath.NewManager(0),
 			notNilExpose:   true,
@@ -261,158 +377,104 @@ func TestDataDownloadReconcile(t *testing.T) {
 			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
 		},
 		{
-			name:              "data path init error",
-			dd:                dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
-			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			mockInit:          true,
-			mockInitErr:       errors.New("fake-data-path-init-error"),
-			mockClose:         true,
-			notNilExpose:      true,
-			expectedStatusMsg: "error initializing asyncBR: fake-data-path-init-error",
+			name:         "data path init error",
+			dd:           dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			targetPVC:    builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			mockInit:     true,
+			mockInitErr:  errors.New("fake-data-path-init-error"),
+			mockClose:    true,
+			notNilExpose: true,
+			expected:     dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Finalizers([]string{DataUploadDownloadFinalizer}).Message("error initializing data path").Result(),
+			expectedErr:  "error initializing asyncBR: fake-data-path-init-error",
 		},
 		{
 			name:           "Unable to update status to in progress for data download",
-			dd:             dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
+			dd:             dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
 			targetPVC:      builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			needErrs:       []bool{false, false, false, true},
+			needErrs:       []bool{false, false, true, false},
 			mockInit:       true,
 			mockClose:      true,
 			notNilExpose:   true,
 			notMockCleanUp: true,
-			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
+			expected:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
 		},
 		{
-			name:              "data path start error",
-			dd:                dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
-			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			mockInit:          true,
-			mockStart:         true,
-			mockStartErr:      errors.New("fake-data-path-start-error"),
-			mockClose:         true,
-			notNilExpose:      true,
-			expectedStatusMsg: "error starting async restore for pod test-name, volume test-pvc: fake-data-path-start-error",
+			name:         "data path start error",
+			dd:           dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			targetPVC:    builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			mockInit:     true,
+			mockStart:    true,
+			mockStartErr: errors.New("fake-data-path-start-error"),
+			mockClose:    true,
+			notNilExpose: true,
+			expected:     dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Finalizers([]string{DataUploadDownloadFinalizer}).Message("error starting data path").Result(),
+			expectedErr:  "error starting async restore for pod test-name, volume test-pvc: fake-data-path-start-error",
 		},
 		{
-			name:              "accept DataDownload error",
-			dd:                dataDownloadBuilder().Result(),
-			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			needErrs:          []bool{false, false, true, false},
-			expectedStatusMsg: "Update error",
+			name:           "Prepare succeeds",
+			dd:             dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			targetPVC:      builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			mockInit:       true,
+			mockStart:      true,
+			notNilExpose:   true,
+			notMockCleanUp: true,
+			expectDataPath: true,
+			expected:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
 		},
 		{
-			name: "Not create target pvc",
-			dd:   dataDownloadBuilder().Result(),
+			name:     "In progress dd is not handled by the current node",
+			dd:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
 		},
 		{
-			name:              "Uninitialized dataDownload",
-			dd:                dataDownloadBuilder().Result(),
-			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			isNilExposer:      true,
-			expectedStatusMsg: "uninitialized generic exposer",
+			name:     "In progress dd is not set as cancel",
+			dd:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
 		},
 		{
-			name:      "DataDownload not created in velero default namespace",
-			dd:        builder.ForDataDownload("test-ns", dataDownloadName).Result(),
-			targetPVC: builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			name:     "Cancel data downloand in progress with empty FSBR",
+			dd:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Cancel(true).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
 		},
 		{
-			name:              "Failed to get dataDownload",
-			dd:                builder.ForDataDownload("test-ns", dataDownloadName).Result(),
-			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			needErrs:          []bool{true, false, false, false},
-			expectedStatusMsg: "Get error",
+			name:               "Cancel data downloand in progress and patch data download error",
+			dd:                 dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			needErrs:           []bool{false, false, true, false},
+			needCreateFSBR:     true,
+			expected:           dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectedErr:        "error updating datadownload velero/datadownload-1: Update error",
+			expectCancelRecord: true,
+			expectDataPath:     true,
 		},
 		{
-			name:      "Unsupported dataDownload type",
-			dd:        dataDownloadBuilder().DataMover("Unsuppoorted type").Result(),
-			targetPVC: builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-		},
-		{
-			name:      "Restore is exposed",
-			dd:        dataDownloadBuilder().NodeOS(velerov2alpha1api.NodeOSLinux).Result(),
-			targetPVC: builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-		},
-		{
-			name:              "Expected node doesn't exist",
-			dd:                dataDownloadBuilder().NodeOS(velerov2alpha1api.NodeOSWindows).Result(),
-			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			expectedStatusMsg: "no appropriate node to run datadownload",
-		},
-		{
-			name:      "Get empty restore exposer",
-			dd:        dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
-			targetPVC: builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-		},
-		{
-			name:              "Failed to get restore exposer",
-			dd:                dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
-			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			expectedStatusMsg: "Error to get restore exposer",
-			isGetExposeErr:    true,
-		},
-		{
-			name:              "Error to start restore expose",
-			dd:                dataDownloadBuilder().Result(),
-			targetPVC:         builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
-			expectedStatusMsg: "Error to expose restore exposer",
-			isExposeErr:       true,
-		},
-		{
-			name:     "prepare timeout",
-			dd:       dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).AcceptedTimestamp(&metav1.Time{Time: time.Now().Add(-time.Minute * 5)}).Result(),
-			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Result(),
-		},
-		{
-			name:            "peek error",
-			dd:              dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
-			isPeekExposeErr: true,
-			expected:        dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseCanceled).Result(),
-		},
-		{
-			name: "dataDownload with enabled cancel",
-			dd: func() *velerov2alpha1api.DataDownload {
-				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result()
-				controllerutil.AddFinalizer(dd, DataUploadDownloadFinalizer)
-				dd.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-				return dd
-			}(),
-			checkFunc: func(du velerov2alpha1api.DataDownload) bool {
-				return du.Spec.Cancel
-			},
-			expected: dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
-		},
-		{
-			name: "dataDownload with remove finalizer and should not be retrieved",
-			dd: func() *velerov2alpha1api.DataDownload {
-				dd := dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseFailed).Cancel(true).Result()
-				controllerutil.AddFinalizer(dd, DataUploadDownloadFinalizer)
-				dd.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-				return dd
-			}(),
-			checkFunc: func(dd velerov2alpha1api.DataDownload) bool {
-				return !controllerutil.ContainsFinalizer(&dd, DataUploadDownloadFinalizer)
-			},
+			name:               "Cancel data downloand in progress succeeds",
+			dd:                 dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Cancel(true).Finalizers([]string{DataUploadDownloadFinalizer}).Node("test-node").Result(),
+			needCreateFSBR:     true,
+			mockCancel:         true,
+			expected:           dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseCanceling).Cancel(true).Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectDataPath:     true,
+			expectCancelRecord: true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			objs := []runtime.Object{daemonSet, node}
-			if test.targetPVC != nil {
-				objs = append(objs, test.targetPVC)
-			}
-			r, err := initDataDownloadReconciler(objs, test.needErrs...)
-			require.NoError(t, err)
-			defer func() {
-				r.client.Delete(ctx, test.dd, &kbclient.DeleteOptions{})
-				if test.targetPVC != nil {
-					r.client.Delete(ctx, test.targetPVC, &kbclient.DeleteOptions{})
-				}
-			}()
+			objects := []any{daemonSet, node, sc}
 
-			ctx := context.Background()
-			if test.dd.Namespace == velerov1api.DefaultNamespace {
-				err = r.client.Create(ctx, test.dd)
+			if test.targetPVC != nil {
+				objects = append(objects, test.targetPVC)
+			}
+
+			r, err := initDataDownloadReconciler(t, objects, test.needErrs...)
+			require.NoError(t, err)
+
+			if !test.notCreateDD {
+				err = r.client.Create(context.Background(), test.dd)
+				require.NoError(t, err)
+			}
+
+			if test.needDelete {
+				err = r.client.Delete(context.Background(), test.dd)
 				require.NoError(t, err)
 			}
 
@@ -420,6 +482,17 @@ func TestDataDownloadReconcile(t *testing.T) {
 				r.dataPathMgr = test.dataMgr
 			} else {
 				r.dataPathMgr = datapath.NewManager(1)
+			}
+
+			if test.sportTime != nil {
+				r.cancelledDataDownload[test.dd.Name] = test.sportTime.Time
+			}
+
+			funcExclusiveUpdateDataDownload = exclusiveUpdateDataDownload
+			if test.needExclusiveUpdateError != nil {
+				funcExclusiveUpdateDataDownload = func(context.Context, kbclient.Client, *velerov2alpha1api.DataDownload, func(*velerov2alpha1api.DataDownload)) (bool, error) {
+					return false, test.needExclusiveUpdateError
+				}
 			}
 
 			datapath.MicroServiceBRWatcherCreator = func(kbclient.Client, kubernetes.Interface, manager.Manager, string, string,
@@ -444,7 +517,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 				return asyncBR
 			}
 
-			if test.isExposeErr || test.isGetExposeErr || test.isPeekExposeErr || test.isNilExposer || test.notNilExpose {
+			if test.isExposeErr || test.isGetExposeErr || test.isGetExposeNil || test.isPeekExposeErr || test.isNilExposer || test.notNilExpose {
 				if test.isNilExposer {
 					r.restoreExposer = nil
 				} else {
@@ -453,11 +526,13 @@ func TestDataDownloadReconcile(t *testing.T) {
 						if test.isExposeErr {
 							ep.On("Expose", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("Error to expose restore exposer"))
 						} else if test.notNilExpose {
-							hostingPod := builder.ForPod("test-ns", "test-name").Volumes(&corev1.Volume{Name: "test-pvc"}).Result()
+							hostingPod := builder.ForPod("test-ns", "test-name").Volumes(&corev1api.Volume{Name: "test-pvc"}).Result()
 							hostingPod.ObjectMeta.SetUID("test-uid")
 							ep.On("GetExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: hostingPod, VolumeName: "test-pvc"}}, nil)
 						} else if test.isGetExposeErr {
 							ep.On("GetExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("Error to get restore exposer"))
+						} else if test.isGetExposeNil {
+							ep.On("GetExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 						} else if test.isPeekExposeErr {
 							ep.On("PeekExposed", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("fake-peek-error"))
 						}
@@ -485,48 +560,47 @@ func TestDataDownloadReconcile(t *testing.T) {
 				},
 			})
 
-			if test.expectedStatusMsg != "" {
-				require.ErrorContains(t, err, test.expectedStatusMsg)
+			if test.expectedErr != "" {
+				require.EqualError(t, err, test.expectedErr)
 			} else {
 				require.NoError(t, err)
 			}
-
-			require.NotNil(t, actualResult)
 
 			if test.expectedResult != nil {
 				assert.Equal(t, test.expectedResult.Requeue, actualResult.Requeue)
 				assert.Equal(t, test.expectedResult.RequeueAfter, actualResult.RequeueAfter)
 			}
 
-			dd := velerov2alpha1api.DataDownload{}
-			err = r.client.Get(ctx, kbclient.ObjectKey{
-				Name:      test.dd.Name,
-				Namespace: test.dd.Namespace,
-			}, &dd)
+			if test.expected != nil || test.expectDeleted {
+				dd := velerov2alpha1api.DataDownload{}
+				err = r.client.Get(ctx, kbclient.ObjectKey{
+					Name:      test.dd.Name,
+					Namespace: test.dd.Namespace,
+				}, &dd)
 
-			if test.expected != nil {
-				require.NoError(t, err)
-				assert.Equal(t, test.expected.Status.Phase, dd.Status.Phase)
-			}
-
-			if test.isGetExposeErr {
-				assert.Contains(t, dd.Status.Message, test.expectedStatusMsg)
-			}
-			if test.dd.Namespace == velerov1api.DefaultNamespace {
-				if controllerutil.ContainsFinalizer(test.dd, DataUploadDownloadFinalizer) {
-					assert.True(t, true, apierrors.IsNotFound(err))
+				if test.expectDeleted {
+					assert.True(t, apierrors.IsNotFound(err))
 				} else {
 					require.NoError(t, err)
+
+					assert.Equal(t, test.expected.Status.Phase, dd.Status.Phase)
+					assert.Contains(t, dd.Status.Message, test.expected.Status.Message)
+					assert.Equal(t, dd.Finalizers, test.expected.Finalizers)
+					assert.Equal(t, dd.Spec.Cancel, test.expected.Spec.Cancel)
 				}
-			} else {
-				assert.True(t, true, apierrors.IsNotFound(err))
 			}
 
-			if !test.needCreateFSBR {
+			if !test.expectDataPath {
 				assert.Nil(t, r.dataPathMgr.GetAsyncBR(test.dd.Name))
+			} else {
+				assert.NotNil(t, r.dataPathMgr.GetAsyncBR(test.dd.Name))
 			}
 
-			t.Logf("%s: \n %v \n", test.name, dd)
+			if test.expectCancelRecord {
+				assert.Contains(t, r.cancelledDataDownload, test.dd.Name)
+			} else {
+				assert.Empty(t, r.cancelledDataDownload)
+			}
 		})
 	}
 }
@@ -535,22 +609,22 @@ func TestOnDataDownloadFailed(t *testing.T) {
 	for _, getErr := range []bool{true, false} {
 		ctx := context.TODO()
 		needErrs := []bool{getErr, false, false, false}
-		r, err := initDataDownloadReconciler(nil, needErrs...)
+		r, err := initDataDownloadReconciler(t, nil, needErrs...)
 		require.NoError(t, err)
 
 		dd := dataDownloadBuilder().Result()
 		namespace := dd.Namespace
 		ddName := dd.Name
 		// Add the DataDownload object to the fake client
-		assert.NoError(t, r.client.Create(ctx, dd))
+		require.NoError(t, r.client.Create(ctx, dd))
 		r.OnDataDownloadFailed(ctx, namespace, ddName, fmt.Errorf("Failed to handle %v", ddName))
 		updatedDD := &velerov2alpha1api.DataDownload{}
 		if getErr {
-			assert.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+			require.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 			assert.NotEqual(t, velerov2alpha1api.DataDownloadPhaseFailed, updatedDD.Status.Phase)
 			assert.True(t, updatedDD.Status.StartTimestamp.IsZero())
 		} else {
-			assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+			require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 			assert.Equal(t, velerov2alpha1api.DataDownloadPhaseFailed, updatedDD.Status.Phase)
 			assert.True(t, updatedDD.Status.StartTimestamp.IsZero())
 		}
@@ -561,22 +635,22 @@ func TestOnDataDownloadCancelled(t *testing.T) {
 	for _, getErr := range []bool{true, false} {
 		ctx := context.TODO()
 		needErrs := []bool{getErr, false, false, false}
-		r, err := initDataDownloadReconciler(nil, needErrs...)
+		r, err := initDataDownloadReconciler(t, nil, needErrs...)
 		require.NoError(t, err)
 
 		dd := dataDownloadBuilder().Result()
 		namespace := dd.Namespace
 		ddName := dd.Name
 		// Add the DataDownload object to the fake client
-		assert.NoError(t, r.client.Create(ctx, dd))
+		require.NoError(t, r.client.Create(ctx, dd))
 		r.OnDataDownloadCancelled(ctx, namespace, ddName)
 		updatedDD := &velerov2alpha1api.DataDownload{}
 		if getErr {
-			assert.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+			require.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 			assert.NotEqual(t, velerov2alpha1api.DataDownloadPhaseFailed, updatedDD.Status.Phase)
 			assert.True(t, updatedDD.Status.StartTimestamp.IsZero())
 		} else {
-			assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+			require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 			assert.Equal(t, velerov2alpha1api.DataDownloadPhaseCanceled, updatedDD.Status.Phase)
 			assert.False(t, updatedDD.Status.StartTimestamp.IsZero())
 			assert.False(t, updatedDD.Status.CompletionTimestamp.IsZero())
@@ -603,7 +677,7 @@ func TestOnDataDownloadCompleted(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.TODO()
 			needErrs := []bool{test.isGetErr, false, false, false}
-			r, err := initDataDownloadReconciler(nil, needErrs...)
+			r, err := initDataDownloadReconciler(t, nil, needErrs...)
 			r.restoreExposer = func() exposer.GenericRestoreExposer {
 				ep := exposermockes.NewGenericRestoreExposer(t)
 				if test.rebindVolumeErr {
@@ -620,15 +694,15 @@ func TestOnDataDownloadCompleted(t *testing.T) {
 			namespace := dd.Namespace
 			ddName := dd.Name
 			// Add the DataDownload object to the fake client
-			assert.NoError(t, r.client.Create(ctx, dd))
+			require.NoError(t, r.client.Create(ctx, dd))
 			r.OnDataDownloadCompleted(ctx, namespace, ddName, datapath.Result{})
 			updatedDD := &velerov2alpha1api.DataDownload{}
 			if test.isGetErr {
-				assert.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+				require.Error(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 				assert.Equal(t, velerov2alpha1api.DataDownloadPhase(""), updatedDD.Status.Phase)
 				assert.True(t, updatedDD.Status.CompletionTimestamp.IsZero())
 			} else {
-				assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
+				require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: ddName, Namespace: namespace}, updatedDD))
 				assert.Equal(t, velerov2alpha1api.DataDownloadPhaseCompleted, updatedDD.Status.Phase)
 				assert.False(t, updatedDD.Status.CompletionTimestamp.IsZero())
 			}
@@ -661,14 +735,14 @@ func TestOnDataDownloadProgress(t *testing.T) {
 		{
 			name:     "failed to patch datadownload",
 			dd:       dataDownloadBuilder().Result(),
-			needErrs: []bool{false, false, false, true},
+			needErrs: []bool{false, false, true, false},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.TODO()
 
-			r, err := initDataDownloadReconciler(nil, test.needErrs...)
+			r, err := initDataDownloadReconciler(t, nil, test.needErrs...)
 			require.NoError(t, err)
 			defer func() {
 				r.client.Delete(ctx, test.dd, &kbclient.DeleteOptions{})
@@ -678,7 +752,7 @@ func TestOnDataDownloadProgress(t *testing.T) {
 			namespace := dd.Namespace
 			duName := dd.Name
 			// Add the DataDownload object to the fake client
-			assert.NoError(t, r.client.Create(context.Background(), dd))
+			require.NoError(t, r.client.Create(context.Background(), dd))
 
 			// Create a Progress object
 			progress := &uploader.Progress{
@@ -691,7 +765,7 @@ func TestOnDataDownloadProgress(t *testing.T) {
 			if len(test.needErrs) != 0 && !test.needErrs[0] {
 				// Get the updated DataDownload object from the fake client
 				updatedDu := &velerov2alpha1api.DataDownload{}
-				assert.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
+				require.NoError(t, r.client.Get(ctx, types.NamespacedName{Name: duName, Namespace: namespace}, updatedDu))
 				// Assert that the DataDownload object has been updated with the progress
 				assert.Equal(t, test.progress.TotalBytes, updatedDu.Status.Progress.TotalBytes)
 				assert.Equal(t, test.progress.BytesDone, updatedDu.Status.Progress.BytesDone)
@@ -702,18 +776,18 @@ func TestOnDataDownloadProgress(t *testing.T) {
 
 func TestFindDataDownloadForPod(t *testing.T) {
 	needErrs := []bool{false, false, false, false}
-	r, err := initDataDownloadReconciler(nil, needErrs...)
+	r, err := initDataDownloadReconciler(t, nil, needErrs...)
 	require.NoError(t, err)
 	tests := []struct {
 		name      string
 		du        *velerov2alpha1api.DataDownload
-		pod       *corev1.Pod
+		pod       *corev1api.Pod
 		checkFunc func(*velerov2alpha1api.DataDownload, []reconcile.Request)
 	}{
 		{
 			name: "find dataDownload for pod",
 			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
-			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: dataDownloadName}).Status(corev1.PodStatus{Phase: corev1.PodRunning}).Result(),
+			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: dataDownloadName}).Status(corev1api.PodStatus{Phase: corev1api.PodRunning}).Result(),
 			checkFunc: func(du *velerov2alpha1api.DataDownload, requests []reconcile.Request) {
 				// Assert that the function returns a single request
 				assert.Len(t, requests, 1)
@@ -788,7 +862,7 @@ func TestAcceptDataDownload(t *testing.T) {
 	}
 	for _, test := range tests {
 		ctx := context.Background()
-		r, err := initDataDownloadReconcilerWithError(nil, test.needErrs...)
+		r, err := initDataDownloadReconcilerWithError(t, nil, test.needErrs...)
 		require.NoError(t, err)
 
 		err = r.client.Create(ctx, test.dd)
@@ -832,7 +906,7 @@ func TestOnDdPrepareTimeout(t *testing.T) {
 	}
 	for _, test := range tests {
 		ctx := context.Background()
-		r, err := initDataDownloadReconcilerWithError(nil, test.needErrs...)
+		r, err := initDataDownloadReconcilerWithError(t, nil, test.needErrs...)
 		require.NoError(t, err)
 
 		err = r.client.Create(ctx, test.dd)
@@ -877,13 +951,13 @@ func TestTryCancelDataDownload(t *testing.T) {
 	}
 	for _, test := range tests {
 		ctx := context.Background()
-		r, err := initDataDownloadReconcilerWithError(nil, test.needErrs...)
+		r, err := initDataDownloadReconcilerWithError(t, nil, test.needErrs...)
 		require.NoError(t, err)
 
 		err = r.client.Create(ctx, test.dd)
 		require.NoError(t, err)
 
-		r.tryCancelAcceptedDataDownload(ctx, test.dd, "")
+		r.tryCancelDataDownload(ctx, test.dd, "")
 
 		if test.expectedErr == "" {
 			assert.NoError(t, err)
@@ -935,7 +1009,7 @@ func TestUpdateDataDownloadWithRetry(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			ctx, cancelFunc := context.WithTimeout(context.TODO(), time.Second*5)
 			defer cancelFunc()
-			r, err := initDataDownloadReconciler(nil, tc.needErrs...)
+			r, err := initDataDownloadReconciler(t, nil, tc.needErrs...)
 			require.NoError(t, err)
 			err = r.client.Create(ctx, dataDownloadBuilder().Result())
 			require.NoError(t, err)
@@ -969,27 +1043,27 @@ func (dt *ddResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler,
 	return dt.resumeErr
 }
 
-func (dt *ddResumeTestHelper) Expose(context.Context, corev1.ObjectReference, exposer.GenericRestoreExposeParam) error {
+func (dt *ddResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, exposer.GenericRestoreExposeParam) error {
 	return nil
 }
 
-func (dt *ddResumeTestHelper) GetExposed(context.Context, corev1.ObjectReference, kbclient.Client, string, time.Duration) (*exposer.ExposeResult, error) {
+func (dt *ddResumeTestHelper) GetExposed(context.Context, corev1api.ObjectReference, kbclient.Client, string, time.Duration) (*exposer.ExposeResult, error) {
 	return dt.exposeResult, dt.getExposeErr
 }
 
-func (dt *ddResumeTestHelper) PeekExposed(context.Context, corev1.ObjectReference) error {
+func (dt *ddResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
 	return nil
 }
 
-func (dt *ddResumeTestHelper) DiagnoseExpose(context.Context, corev1.ObjectReference) string {
+func (dt *ddResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (dt *ddResumeTestHelper) RebindVolume(context.Context, corev1.ObjectReference, string, string, time.Duration) error {
+func (dt *ddResumeTestHelper) RebindVolume(context.Context, corev1api.ObjectReference, string, string, time.Duration) error {
 	return nil
 }
 
-func (dt *ddResumeTestHelper) CleanUp(context.Context, corev1.ObjectReference) {}
+func (dt *ddResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference) {}
 
 func (dt *ddResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
 	datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {
@@ -1010,33 +1084,12 @@ func TestAttemptDataDownloadResume(t *testing.T) {
 		expectedError           string
 	}{
 		{
-			name:                   "accepted DataDownload with no dd label",
-			dd:                     dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
-			cancelledDataDownloads: []string{dataDownloadName},
-			acceptedDataDownloads:  []string{dataDownloadName},
+			name: "Other DataDownload",
+			dd:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
 		},
 		{
-			name:                   "accepted DataDownload in the current node",
-			dd:                     dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).AcceptedByNode("node-1").Result(),
-			cancelledDataDownloads: []string{dataDownloadName},
-			acceptedDataDownloads:  []string{dataDownloadName},
-		},
-		{
-			name:                   "accepted DataDownload with dd label but is canceled",
-			dd:                     dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Cancel(true).AcceptedByNode("node-1").Result(),
-			acceptedDataDownloads:  []string{dataDownloadName},
-			cancelledDataDownloads: []string{dataDownloadName},
-		},
-		{
-			name:                  "accepted DataDownload with dd label but cancel fail",
-			dd:                    dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).AcceptedByNode("node-1").Result(),
-			needErrs:              []bool{false, false, true, false, false, false},
-			acceptedDataDownloads: []string{dataDownloadName},
-		},
-		{
-			name:                   "prepared DataDownload",
-			dd:                     dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhasePrepared).Result(),
-			prepareddDataDownloads: []string{dataDownloadName},
+			name: "Other DataDownload",
+			dd:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
 		},
 		{
 			name:                    "InProgress DataDownload, not the current node",
@@ -1073,14 +1126,14 @@ func TestAttemptDataDownloadResume(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.TODO()
-			r, err := initDataDownloadReconciler(nil, test.needErrs...)
+			r, err := initDataDownloadReconciler(t, nil, test.needErrs...)
 			r.nodeName = "node-1"
 			require.NoError(t, err)
 			defer func() {
 				r.client.Delete(ctx, test.dd, &kbclient.DeleteOptions{})
 			}()
 
-			assert.NoError(t, r.client.Create(ctx, test.dd))
+			require.NoError(t, r.client.Create(ctx, test.dd))
 
 			dt := &duResumeTestHelper{
 				resumeErr: test.resumeErr,
@@ -1153,7 +1206,7 @@ func TestResumeCancellableRestore(t *testing.T) {
 			dd:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Node("node-1").Result(),
 			exposeResult: &exposer.ExposeResult{
 				ByPod: exposer.ExposeByPod{
-					HostingPod: &corev1.Pod{},
+					HostingPod: &corev1api.Pod{},
 				},
 			},
 			mockInit:       true,
@@ -1166,7 +1219,7 @@ func TestResumeCancellableRestore(t *testing.T) {
 			dd:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Node("node-1").Result(),
 			exposeResult: &exposer.ExposeResult{
 				ByPod: exposer.ExposeByPod{
-					HostingPod: &corev1.Pod{},
+					HostingPod: &corev1api.Pod{},
 				},
 			},
 			mockInit:        true,
@@ -1180,7 +1233,7 @@ func TestResumeCancellableRestore(t *testing.T) {
 			dd:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Node("node-1").Result(),
 			exposeResult: &exposer.ExposeResult{
 				ByPod: exposer.ExposeByPod{
-					HostingPod: &corev1.Pod{},
+					HostingPod: &corev1api.Pod{},
 				},
 			},
 			mockInit:  true,
@@ -1191,7 +1244,7 @@ func TestResumeCancellableRestore(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.TODO()
-			r, err := initDataDownloadReconciler(nil, false)
+			r, err := initDataDownloadReconciler(t, nil, false)
 			r.nodeName = "node-1"
 			require.NoError(t, err)
 

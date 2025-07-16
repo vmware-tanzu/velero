@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/kopia/kopia/repo"
+	"github.com/kopia/kopia/repo/maintenance"
 	"github.com/kopia/kopia/repo/manifest"
 	"github.com/kopia/kopia/repo/object"
 	"github.com/pkg/errors"
@@ -249,6 +250,7 @@ func TestMaintain(t *testing.T) {
 				tc.returnRepoWriter.On("AlsoLogToContentLog", mock.Anything).Return(nil)
 				tc.returnRepoWriter.On("Close", mock.Anything).Return(nil)
 				tc.returnRepoWriter.On("FindManifests", mock.Anything, mock.Anything).Return(nil, tc.findManifestError)
+				tc.returnRepoWriter.On("ClientOptions").Return(repo.ClientOptions{})
 			}
 
 			err := service.Maintain(ctx, tc.repoOptions)
@@ -264,6 +266,9 @@ func TestMaintain(t *testing.T) {
 
 func TestWriteInitParameters(t *testing.T) {
 	var directRpo *repomocks.DirectRepository
+	assertFullMaintIntervalEqual := func(expected, actual *maintenance.Params) bool {
+		return assert.Equal(t, expected.FullCycle.Interval, actual.FullCycle.Interval)
+	}
 	testCases := []struct {
 		name                 string
 		repoOptions          udmrepo.RepoOptions
@@ -272,7 +277,11 @@ func TestWriteInitParameters(t *testing.T) {
 		repoOpen             func(context.Context, string, string, *repo.Options) (repo.Repository, error)
 		newRepoWriterError   error
 		replaceManifestError error
-		expectedErr          string
+		// expected replacemanifest params to be received by maintenance.SetParams, and therefore writeInitParameters
+		expectedReplaceManifestsParams *maintenance.Params
+		// allows for asserting only certain fields are set as expected
+		assertReplaceManifestsParams func(*maintenance.Params, *maintenance.Params) bool
+		expectedErr                  string
 	}{
 		{
 			name: "repo open fail, repo not exist",
@@ -323,6 +332,61 @@ func TestWriteInitParameters(t *testing.T) {
 			replaceManifestError: errors.New("fake-replace-manifest-error"),
 			expectedErr:          "error to init write repo parameters: error to set maintenance params: put manifest: fake-replace-manifest-error",
 		},
+		{
+			name: "repo with maintenance interval has expected params",
+			repoOptions: udmrepo.RepoOptions{
+				ConfigFilePath: "/tmp",
+				StorageOptions: map[string]string{
+					udmrepo.StoreOptionKeyFullMaintenanceInterval: string(udmrepo.FastGC),
+				},
+			},
+			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
+				return directRpo, nil
+			},
+			returnRepo:       new(repomocks.DirectRepository),
+			returnRepoWriter: new(repomocks.DirectRepositoryWriter),
+			expectedReplaceManifestsParams: &maintenance.Params{
+				FullCycle: maintenance.CycleParams{
+					Interval: udmrepo.FastGCInterval,
+				},
+			},
+			assertReplaceManifestsParams: assertFullMaintIntervalEqual,
+		},
+		{
+			name: "repo with empty maintenance interval has expected params",
+			repoOptions: udmrepo.RepoOptions{
+				ConfigFilePath: "/tmp",
+				StorageOptions: map[string]string{
+					udmrepo.StoreOptionKeyFullMaintenanceInterval: string(""),
+				},
+			},
+			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
+				return directRpo, nil
+			},
+			returnRepo:       new(repomocks.DirectRepository),
+			returnRepoWriter: new(repomocks.DirectRepositoryWriter),
+			expectedReplaceManifestsParams: &maintenance.Params{
+				FullCycle: maintenance.CycleParams{
+					Interval: udmrepo.NormalGCInterval,
+				},
+			},
+			assertReplaceManifestsParams: assertFullMaintIntervalEqual,
+		},
+		{
+			name: "repo with invalid maintenance interval has expected errors",
+			repoOptions: udmrepo.RepoOptions{
+				ConfigFilePath: "/tmp",
+				StorageOptions: map[string]string{
+					udmrepo.StoreOptionKeyFullMaintenanceInterval: string("foo"),
+				},
+			},
+			repoOpen: func(context.Context, string, string, *repo.Options) (repo.Repository, error) {
+				return directRpo, nil
+			},
+			returnRepo:       new(repomocks.DirectRepository),
+			returnRepoWriter: new(repomocks.DirectRepositoryWriter),
+			expectedErr:      "error to init write repo parameters: invalid full maintenance interval option foo",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -346,15 +410,26 @@ func TestWriteInitParameters(t *testing.T) {
 
 			if tc.returnRepoWriter != nil {
 				tc.returnRepoWriter.On("Close", mock.Anything).Return(nil)
-				tc.returnRepoWriter.On("ReplaceManifests", mock.Anything, mock.Anything, mock.Anything).Return(manifest.ID(""), tc.replaceManifestError)
+				if tc.replaceManifestError != nil {
+					tc.returnRepoWriter.On("ReplaceManifests", mock.Anything, mock.Anything, mock.Anything).Return(manifest.ID(""), tc.replaceManifestError)
+				}
+				if tc.expectedReplaceManifestsParams != nil {
+					tc.returnRepoWriter.On("ReplaceManifests", mock.AnythingOfType("context.backgroundCtx"), mock.AnythingOfType("map[string]string"), mock.AnythingOfType("*maintenance.Params")).Return(manifest.ID(""), nil)
+					tc.returnRepoWriter.On("Flush", mock.Anything).Return(nil)
+				}
 			}
 
 			err := writeInitParameters(ctx, tc.repoOptions, logger)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tc.expectedErr)
+				require.EqualError(t, err, tc.expectedErr)
+			}
+			if tc.expectedReplaceManifestsParams != nil {
+				actualReplaceManifestsParams, converted := tc.returnRepoWriter.Calls[0].Arguments.Get(2).(*maintenance.Params)
+				assert.True(t, converted)
+				tc.assertReplaceManifestsParams(tc.expectedReplaceManifestsParams, actualReplaceManifestsParams)
 			}
 		})
 	}
@@ -863,7 +938,7 @@ func TestUpdateProgress(t *testing.T) {
 			if len(tc.logMessage) > 0 {
 				assert.Contains(t, logMessage, tc.logMessage)
 			} else {
-				assert.Equal(t, "", logMessage)
+				assert.Empty(t, logMessage)
 			}
 		})
 	}
@@ -951,7 +1026,7 @@ func TestReaderSeek(t *testing.T) {
 			ret, err := kr.Seek(0, 0)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedRet, ret)
 			} else {
 				assert.EqualError(t, err, tc.expectedErr)
@@ -1082,7 +1157,7 @@ func TestWriterWrite(t *testing.T) {
 			ret, err := kr.Write(nil)
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedRet, ret)
 			} else {
 				assert.EqualError(t, err, tc.expectedErr)
@@ -1130,7 +1205,7 @@ func TestWriterCheckpoint(t *testing.T) {
 			ret, err := kr.Checkpoint()
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedRet, ret)
 			} else {
 				assert.EqualError(t, err, tc.expectedErr)
@@ -1178,7 +1253,7 @@ func TestWriterResult(t *testing.T) {
 			ret, err := kr.Result()
 
 			if tc.expectedErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedRet, ret)
 			} else {
 				assert.EqualError(t, err, tc.expectedErr)
@@ -1265,7 +1340,7 @@ func TestMaintainProgress(t *testing.T) {
 			if len(tc.logMessage) > 0 {
 				assert.Contains(t, logMessage, tc.logMessage)
 			} else {
-				assert.Equal(t, "", logMessage)
+				assert.Empty(t, logMessage)
 			}
 		})
 	}

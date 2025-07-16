@@ -96,6 +96,7 @@ func (r *restoreOperationsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Restore{}, builder.WithPredicates(kube.FalsePredicate{})).
 		WatchesRawSource(s).
+		Named(constant.ControllerRestoreOperations).
 		Complete(r)
 }
 

@@ -42,7 +42,7 @@ type PVCAction struct {
 }
 
 func NewPVCAction(f client.Factory) plugincommon.HandlerInitializer {
-	return func(logger logrus.FieldLogger) (interface{}, error) {
+	return func(logger logrus.FieldLogger) (any, error) {
 		crClient, err := f.KubebuilderClient()
 		if err != nil {
 			return nil, errors.WithStack(err)
@@ -105,9 +105,67 @@ func (a *PVCAction) GetRelatedItems(item runtime.Unstructured, backup *v1.Backup
 		}
 	}
 
+	// Gather groupedPVCs based on VGS label provided in the backup
+	groupedPVCs, err := a.getGroupedPVCs(context.Background(), pvc, backup)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add the groupedPVCs to relatedItems so that they processed in a single item block
+	relatedItems = append(relatedItems, groupedPVCs...)
+
 	return relatedItems, nil
 }
 
 func (a *PVCAction) Name() string {
-	return "PodItemBlockAction"
+	return "PVCItemBlockAction"
+}
+
+// getGroupedPVCs returns other PVCs in the same group based on the VGS label key in the Backup spec.
+func (a *PVCAction) getGroupedPVCs(ctx context.Context, pvc *corev1api.PersistentVolumeClaim, backup *v1.Backup) ([]velero.ResourceIdentifier, error) {
+	var related []velero.ResourceIdentifier
+
+	vgsLabelKey := backup.Spec.VolumeGroupSnapshotLabelKey
+	if vgsLabelKey == "" {
+		a.log.Debug("No VolumeGroupSnapshotLabelKey provided in backup spec; skipping PVC grouping")
+		return nil, nil
+	}
+
+	groupID, ok := pvc.Labels[vgsLabelKey]
+	if !ok || groupID == "" {
+		// PVC does not belong to any VGS group or groupID has empty value
+		a.log.Debug("PVC does not belong to any PVC group or group label value is empty; skipping PVC grouping")
+		return nil, nil
+	}
+
+	pvcList := new(corev1api.PersistentVolumeClaimList)
+	if err := a.crClient.List(
+		ctx,
+		pvcList,
+		crclient.InNamespace(pvc.Namespace),
+		crclient.MatchingLabels{vgsLabelKey: groupID},
+	); err != nil {
+		return nil, errors.Wrapf(err, "failed to list PVCs for VGS grouping with label %s=%s in namespace %s", vgsLabelKey, groupID, pvc.Namespace)
+	}
+
+	if len(pvcList.Items) <= 1 {
+		// Only the current PVC exists in this group
+		return nil, nil
+	}
+
+	for _, groupPVC := range pvcList.Items {
+		if groupPVC.Name == pvc.Name {
+			continue
+		}
+
+		a.log.Infof("Adding grouped PVC %s (group %s) to relatedItems for PVC %s", groupPVC.Name, groupID, pvc.Name)
+
+		related = append(related, velero.ResourceIdentifier{
+			GroupResource: kuberesource.PersistentVolumeClaims,
+			Namespace:     groupPVC.Namespace,
+			Name:          groupPVC.Name,
+		})
+	}
+
+	return related, nil
 }

@@ -21,8 +21,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -84,7 +84,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 		return nil, errors.Errorf("object was of unexpected type %T", input.Item)
 	}
 
-	log := a.logger.WithFields(map[string]interface{}{
+	log := a.logger.WithFields(map[string]any{
 		"kind":      obj.GetKind(),
 		"namespace": obj.GetNamespace(),
 		"name":      obj.GetName(),
@@ -92,7 +92,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 
 	// change StatefulSet volumeClaimTemplates storageClassName
 	if obj.GetKind() == "StatefulSet" {
-		sts := new(appsv1.StatefulSet)
+		sts := new(appsv1api.StatefulSet)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), sts); err != nil {
 			return nil, err
 		}
@@ -140,7 +140,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 	return velero.NewRestoreItemActionExecuteOutput(obj), nil
 }
 
-func (a *ChangeStorageClassAction) isStorageClassExist(log *logrus.Entry, storageClass *string, cm *corev1.ConfigMap) (exists bool, newStorageClass string, err error) {
+func (a *ChangeStorageClassAction) isStorageClassExist(log *logrus.Entry, storageClass *string, cm *corev1api.ConfigMap) (exists bool, newStorageClass string, err error) {
 	if storageClass == nil || *storageClass == "" {
 		log.Debug("Item has no storage class specified")
 		return false, "", nil

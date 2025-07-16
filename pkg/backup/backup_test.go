@@ -35,7 +35,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -72,11 +72,14 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 		"v1/PersistentVolume": "persistentvolumes",
 	}
 
-	h := newHarness(t)
+	h := newHarness(t, nil)
+	defer h.itemBlockPool.Stop()
+
 	req := &Request{
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
 		BackedUpItems:    NewBackedUpItemsMap(),
+		ItemBlockChannel: h.itemBlockPool.GetInputChannel(),
 	}
 
 	backupFile := bytes.NewBuffer([]byte{})
@@ -132,11 +135,13 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 // backed up. It validates this by comparing their values to the length of
 // the request's BackedUpItems field.
 func TestBackupProgressIsUpdated(t *testing.T) {
-	h := newHarness(t)
+	h := newHarness(t, nil)
+	defer h.itemBlockPool.Stop()
 	req := &Request{
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
 		BackedUpItems:    NewBackedUpItemsMap(),
+		ItemBlockChannel: h.itemBlockPool.GetInputChannel(),
 	}
 	backupFile := bytes.NewBuffer([]byte{})
 
@@ -866,14 +871,17 @@ func TestBackupOldResourceFiltering(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1044,14 +1052,17 @@ func TestCRDInclusion(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1140,14 +1151,17 @@ func TestBackupResourceCohabitation(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1168,13 +1182,15 @@ func TestBackupResourceCohabitation(t *testing.T) {
 // backed up in each backup. Verification is done by looking at the contents of the backup
 // tarball. This covers a specific issue that was fixed by https://github.com/vmware-tanzu/velero/pull/485.
 func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
-	h := newHarness(t)
+	h := newHarness(t, nil)
+	defer h.itemBlockPool.Stop()
 
 	// run and verify backup 1
 	backup1 := &Request{
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
 		BackedUpItems:    NewBackedUpItemsMap(),
+		ItemBlockChannel: h.itemBlockPool.GetInputChannel(),
 	}
 	backup1File := bytes.NewBuffer([]byte{})
 
@@ -1190,6 +1206,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
 		BackedUpItems:    NewBackedUpItemsMap(),
+		ItemBlockChannel: h.itemBlockPool.GetInputChannel(),
 	}
 	backup2File := bytes.NewBuffer([]byte{})
 
@@ -1233,14 +1250,17 @@ func TestBackupResourceOrdering(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1341,6 +1361,9 @@ func (a *recordResourcesAction) WithSkippedCSISnapshotFlag(flag bool) *recordRes
 // TestBackupItemActionsForSkippedPV runs backups with backup item actions, and
 // verifies that the data in SkippedPVTracker is updated as expected.
 func TestBackupItemActionsForSkippedPV(t *testing.T) {
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
+
 	tests := []struct {
 		name             string
 		backupReq        *Request
@@ -1358,13 +1381,14 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 				Backup:           defaultBackup().SnapshotVolumes(false).Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			resPolicies: &resourcepolicies.ResourcePolicies{
 				Version: "v1",
 				VolumePolicies: []resourcepolicies.VolumePolicy{
 					{
 						Action: resourcepolicies.Action{Type: "snapshot"},
-						Conditions: map[string]interface{}{
+						Conditions: map[string]any{
 							"storageClass": []string{"gp2"},
 						},
 					},
@@ -1375,12 +1399,12 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 					builder.ForPersistentVolume("pv-1").StorageClass("gp2").Result(),
 				),
 				test.PVCs(
-					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").StorageClass("gp2").Phase(corev1.ClaimBound).Result(),
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").StorageClass("gp2").Phase(corev1api.ClaimBound).Result(),
 				),
 			},
 			runtimeResources: []runtime.Object{
 				builder.ForPersistentVolume("pv-1").StorageClass("gp2").Result(),
-				builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").StorageClass("gp2").Phase(corev1.ClaimBound).Result(),
+				builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").StorageClass("gp2").Phase(corev1api.ClaimBound).Result(),
 			},
 			actions: []*recordResourcesAction{
 				new(recordResourcesAction).WithName(csiBIAPluginName).ForNamespace("ns-1").ForResource("persistentvolumeclaims").WithSkippedCSISnapshotFlag(true),
@@ -1404,15 +1428,16 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 					},
 					includedPVs: map[string]struct{}{},
 				},
-				BackedUpItems: NewBackedUpItemsMap(),
+				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVCs(
-					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Phase(corev1.ClaimBound).Result(),
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Phase(corev1api.ClaimBound).Result(),
 				),
 			},
 			runtimeResources: []runtime.Object{
-				builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Phase(corev1.ClaimBound).Result(),
+				builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Phase(corev1api.ClaimBound).Result(),
 				builder.ForPersistentVolume("pv-1").StorageClass("gp2").Result(),
 			},
 			actions: []*recordResourcesAction{
@@ -1430,7 +1455,7 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(tt *testing.T) {
 			var (
-				h          = newHarness(t)
+				h          = newHarness(t, itemBlockPool)
 				backupFile = bytes.NewBuffer([]byte{})
 				fakeClient = test.NewFakeControllerRuntimeClient(t, tc.runtimeResources...)
 			)
@@ -1451,7 +1476,7 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, tc.backupReq, backupFile, actions, nil, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if tc.expectSkippedPVs != nil {
 				for pvName, reasons := range tc.expectSkippedPVs {
@@ -1644,14 +1669,17 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1666,7 +1694,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, req, backupFile, actions, nil, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			for action, want := range tc.actions {
 				assert.Equal(t, want, action.ids)
@@ -1726,14 +1754,17 @@ func TestBackupWithInvalidActions(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1849,7 +1880,7 @@ func TestBackupActionModifications(t *testing.T) {
 			},
 			actions: []biav2.BackupItemAction{
 				modifyingActionGetter(func(item *unstructured.Unstructured) {
-					item.Object["spec"].(map[string]interface{})["nodeName"] = "foo"
+					item.Object["spec"].(map[string]any)["nodeName"] = "foo"
 				}),
 			},
 			want: map[string]unstructuredObject{
@@ -1877,14 +1908,17 @@ func TestBackupActionModifications(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1894,7 +1928,7 @@ func TestBackupActionModifications(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, req, backupFile, tc.actions, nil, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assertTarballFileContents(t, backupFile, tc.want)
 		})
@@ -2134,14 +2168,17 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2151,7 +2188,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, req, backupFile, tc.actions, nil, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assertTarballContents(t, backupFile, append(tc.want, "metadata/version")...)
 		})
@@ -2392,14 +2429,17 @@ func TestItemBlockActionsRunForCorrectItems(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2414,7 +2454,7 @@ func TestItemBlockActionsRunForCorrectItems(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, req, backupFile, nil, actions, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			for action, want := range tc.actions {
 				assert.Equal(t, want, action.ids)
@@ -2474,14 +2514,17 @@ func TestBackupWithInvalidItemBlockActions(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2727,14 +2770,17 @@ func TestItemBlockActionRelatedItems(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2744,7 +2790,7 @@ func TestItemBlockActionRelatedItems(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, req, backupFile, nil, tc.actions, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assertTarballContents(t, backupFile, append(tc.want, "metadata/version")...)
 		})
@@ -2883,6 +2929,8 @@ func (*fakeVolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 // struct in place of real volume snapshotters.
 func TestBackupWithSnapshots(t *testing.T) {
 	// TODO: add more verification for skippedPVTracker
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	tests := []struct {
 		name              string
 		req               *Request
@@ -2900,6 +2948,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -2935,6 +2984,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -2971,6 +3021,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3007,6 +3058,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3043,6 +3095,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3077,6 +3130,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3094,6 +3148,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				Backup:           defaultBackup().Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3114,6 +3169,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3132,6 +3188,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3153,6 +3210,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3200,7 +3258,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h          = newHarness(t)
+				h          = newHarness(t, itemBlockPool)
 				backupFile = bytes.NewBuffer([]byte{})
 			)
 
@@ -3209,7 +3267,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, tc.req, backupFile, nil, nil, tc.snapshotterGetter)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t, tc.want, tc.req.VolumeSnapshots)
 		})
@@ -3271,6 +3329,8 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	tests := []struct {
 		name         string
 		req          *Request
@@ -3284,6 +3344,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 				Backup:           defaultBackup().Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -3315,6 +3376,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 				Backup:           defaultBackup().Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -3346,6 +3408,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 				Backup:           defaultBackup().Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
+				ItemBlockChannel: itemBlockPool.GetInputChannel(),
 			},
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -3362,7 +3425,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h          = newHarness(t)
+				h          = newHarness(t, itemBlockPool)
 				backupFile = bytes.NewBuffer([]byte{})
 			)
 
@@ -3371,7 +3434,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 			}
 
 			err := h.backupper.Backup(h.log, tc.req, backupFile, tc.actions, nil, nil)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			resultOper := *tc.req.GetItemOperationsList()
 			// set want Created times so it won't fail the assert.Equal test
@@ -3421,14 +3484,17 @@ func TestBackupWithInvalidHooks(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -3892,14 +3958,17 @@ func TestBackupWithHooks(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile         = bytes.NewBuffer([]byte{})
 				podCommandExecutor = new(test.MockPodCommandExecutor)
@@ -3926,17 +3995,7 @@ func TestBackupWithHooks(t *testing.T) {
 			require.NoError(t, h.backupper.Backup(h.log, req, backupFile, nil, tc.actions, nil))
 
 			if tc.wantHookExecutionLog != nil {
-				// as the post hook execution in async way, check the existence rather than the exact order
-				assert.Equal(t, len(tc.wantHookExecutionLog), len(podCommandExecutor.HookExecutionLog))
-				m := map[string]struct{}{}
-				for _, entry := range podCommandExecutor.HookExecutionLog {
-					m[entry.String()] = struct{}{}
-				}
-
-				for _, entry := range tc.wantHookExecutionLog {
-					_, exist := m[entry.String()]
-					assert.True(t, exist)
-				}
+				assert.Equal(t, tc.wantHookExecutionLog, podCommandExecutor.HookExecutionLog)
 			}
 			assertTarballContents(t, backupFile, append(tc.wantBackedUp, "metadata/version")...)
 		})
@@ -3955,7 +4014,7 @@ type fakePodVolumeBackupper struct {
 
 // BackupPodVolumes returns one pod volume backup per entry in volumes, with namespace "velero"
 // and name "pvb-<pod-namespace>-<pod-name>-<volume-name>".
-func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1.Pod, volumes []string, _ *resourcepolicies.Policies, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, *podvolume.PVCBackupSummary, []error) {
+func (b *fakePodVolumeBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1api.Pod, volumes []string, _ *resourcepolicies.Policies, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, *podvolume.PVCBackupSummary, []error) {
 	var res []*velerov1.PodVolumeBackup
 	pvcSummary := podvolume.NewPVCBackupSummary()
 
@@ -3978,9 +4037,9 @@ func (b *fakePodVolumeBackupper) WaitAllPodVolumesProcessed(log logrus.FieldLogg
 	return b.pvbs
 }
 
-func (b *fakePodVolumeBackupper) GetPodVolumeBackup(namespace, name string) (*velerov1.PodVolumeBackup, error) {
+func (b *fakePodVolumeBackupper) GetPodVolumeBackupByPodAndVolume(podNamespace, podName, volume string) (*velerov1.PodVolumeBackup, error) {
 	for _, pvb := range b.pvbs {
-		if pvb.Namespace == namespace && pvb.Name == name {
+		if pvb.Spec.Pod.Namespace == podNamespace && pvb.Spec.Pod.Name == podName && pvb.Spec.Volume == volume {
 			return pvb, nil
 		}
 	}
@@ -4005,7 +4064,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 		name              string
 		backup            *velerov1.Backup
 		apiResources      []*test.APIResource
-		pod               *corev1.Pod
+		pod               *corev1api.Pod
 		vsl               *velerov1.VolumeSnapshotLocation
 		snapshotterGetter volumeSnapshotterGetter
 		want              []*velerov1.PodVolumeBackup
@@ -4017,10 +4076,10 @@ func TestBackupWithPodVolume(t *testing.T) {
 				test.Pods(
 					builder.ForPod("ns-1", "pod-1").
 						ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "foo")).
-						Volumes(&corev1.Volume{
+						Volumes(&corev1api.Volume{
 							Name: "foo",
-							VolumeSource: corev1.VolumeSource{
-								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							VolumeSource: corev1api.VolumeSource{
+								PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 									ClaimName: "foo",
 								},
 							},
@@ -4123,15 +4182,18 @@ func TestBackupWithPodVolume(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:            tc.backup,
 					SnapshotLocations: []*velerov1.VolumeSnapshotLocation{tc.vsl},
 					SkippedPVTracker:  NewSkipPVTracker(),
 					BackedUpItems:     NewBackedUpItemsMap(),
+					ItemBlockChannel:  itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -4216,8 +4278,9 @@ func (a *pluggableIBA) Name() string {
 
 type harness struct {
 	*test.APIServer
-	backupper *kubernetesBackupper
-	log       logrus.FieldLogger
+	backupper     *kubernetesBackupper
+	log           logrus.FieldLogger
+	itemBlockPool ItemBlockWorkerPool
 }
 
 func (h *harness) addItems(t *testing.T, resource *test.APIResource) {
@@ -4241,7 +4304,7 @@ func (h *harness) addItems(t *testing.T, resource *test.APIResource) {
 	}
 }
 
-func newHarness(t *testing.T) *harness {
+func newHarness(t *testing.T, itemBlockPool *ItemBlockWorkerPool) *harness {
 	t.Helper()
 
 	apiServer := test.NewAPIServer(t)
@@ -4250,6 +4313,9 @@ func newHarness(t *testing.T) *harness {
 	discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, log)
 	require.NoError(t, err)
 
+	if itemBlockPool == nil {
+		itemBlockPool = StartItemBlockWorkerPool(context.Background(), 1, log)
+	}
 	return &harness{
 		APIServer: apiServer,
 		backupper: &kubernetesBackupper{
@@ -4262,7 +4328,8 @@ func newHarness(t *testing.T) *harness {
 			podVolumeBackupperFactory: new(fakePodVolumeBackupperFactory),
 			podVolumeTimeout:          60 * time.Second,
 		},
-		log: log,
+		log:           log,
+		itemBlockPool: *itemBlockPool,
 	}
 }
 
@@ -4282,7 +4349,7 @@ func defaultBackup() *builder.BackupBuilder {
 	return builder.ForBackup(velerov1.DefaultNamespace, "backup-1").DefaultVolumesToFsBackup(false)
 }
 
-func toUnstructuredOrFail(t *testing.T, obj interface{}) map[string]interface{} {
+func toUnstructuredOrFail(t *testing.T, obj any) map[string]any {
 	t.Helper()
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
@@ -4318,7 +4385,7 @@ func assertTarballContents(t *testing.T, backupFile io.Reader, items ...string) 
 }
 
 // unstructuredObject is a type alias to improve readability.
-type unstructuredObject map[string]interface{}
+type unstructuredObject map[string]any
 
 // assertTarballFileContents verifies that the gzipped tarball stored in the provided
 // backupFile contains the files specified as keys in 'want', and for each of those
@@ -4356,7 +4423,7 @@ func assertTarballFileContents(t *testing.T, backupFile io.Reader, want map[stri
 		// json-unmarshal the data from the tarball
 		var got unstructuredObject
 		err := json.Unmarshal(gotData, &got)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		if err != nil {
 			continue
 		}
@@ -5235,14 +5302,17 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -5271,9 +5341,9 @@ func TestBackupNamespaces(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
-					builder.ForNamespace("ns-1").Result(),
-					builder.ForNamespace("ns-2").Result(),
-					builder.ForNamespace("ns-3").Result(),
+					builder.ForNamespace("ns-1").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-2").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-3").Phase(corev1api.NamespaceActive).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -5294,9 +5364,9 @@ func TestBackupNamespaces(t *testing.T) {
 			}).Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
-					builder.ForNamespace("ns-1").Result(),
-					builder.ForNamespace("ns-2").Result(),
-					builder.ForNamespace("ns-3").Result(),
+					builder.ForNamespace("ns-1").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-2").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-3").Phase(corev1api.NamespaceActive).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -5320,9 +5390,9 @@ func TestBackupNamespaces(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
-					builder.ForNamespace("ns-1").Result(),
-					builder.ForNamespace("ns-2").Result(),
-					builder.ForNamespace("ns-3").Result(),
+					builder.ForNamespace("ns-1").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-2").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-3").Phase(corev1api.NamespaceActive).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -5341,9 +5411,9 @@ func TestBackupNamespaces(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
-					builder.ForNamespace("ns-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
-					builder.ForNamespace("ns-2").Result(),
-					builder.ForNamespace("ns-3").Result(),
+					builder.ForNamespace("ns-1").ObjectMeta(builder.WithLabels("a", "b")).Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-2").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-3").Phase(corev1api.NamespaceActive).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -5361,9 +5431,9 @@ func TestBackupNamespaces(t *testing.T) {
 			backup: defaultBackup().IncludedNamespaces("invalid*").Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
-					builder.ForNamespace("ns-1").Result(),
-					builder.ForNamespace("ns-2").Result(),
-					builder.ForNamespace("ns-3").Result(),
+					builder.ForNamespace("ns-1").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-2").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-3").Phase(corev1api.NamespaceActive).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -5376,9 +5446,9 @@ func TestBackupNamespaces(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Namespaces(
-					builder.ForNamespace("ns-1").Result(),
-					builder.ForNamespace("ns-2").Result(),
-					builder.ForNamespace("ns-3").Result(),
+					builder.ForNamespace("ns-1").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-2").Phase(corev1api.NamespaceActive).Result(),
+					builder.ForNamespace("ns-3").Phase(corev1api.NamespaceActive).Result(),
 				),
 				test.Deployments(
 					builder.ForDeployment("ns-1", "deploy-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -5397,14 +5467,17 @@ func TestBackupNamespaces(t *testing.T) {
 		},
 	}
 
+	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				h   = newHarness(t)
+				h   = newHarness(t, itemBlockPool)
 				req = &Request{
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
+					ItemBlockChannel: itemBlockPool.GetInputChannel(),
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)

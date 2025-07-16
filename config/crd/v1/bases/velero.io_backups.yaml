@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: backups.velero.io
 spec:
   group: velero.io
@@ -62,7 +62,6 @@ spec:
                 description: |-
                   DefaultVolumesToRestic specifies whether restic should be used to take a
                   backup of all pod volumes by default.
-
 
                   Deprecated: this field is no longer used and will be removed entirely in future. Use DefaultVolumesToFsBackup instead.
                 nullable: true
@@ -508,6 +507,10 @@ spec:
                       uploads to perform when using the uploader.
                     type: integer
                 type: object
+              volumeGroupSnapshotLabelKey:
+                description: VolumeGroupSnapshotLabelKey specifies the label key to
+                  group PVCs under a VGS.
+                type: string
               volumeSnapshotLocations:
                 description: VolumeSnapshotLocations is a list containing names of
                   VolumeSnapshotLocations associated with this backup.

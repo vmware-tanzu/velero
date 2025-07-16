@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: podvolumerestores.velero.io
 spec:
   group: velero.io
@@ -15,39 +15,40 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: Namespace of the pod containing the volume to be restored
-      jsonPath: .spec.pod.namespace
-      name: Namespace
+    - description: PodVolumeRestore status such as New/InProgress
+      jsonPath: .status.phase
+      name: Status
       type: string
-    - description: Name of the pod containing the volume to be restored
-      jsonPath: .spec.pod.name
-      name: Pod
+    - description: Time duration since this PodVolumeRestore was started
+      jsonPath: .status.startTimestamp
+      name: Started
+      type: date
+    - description: Completed bytes
+      format: int64
+      jsonPath: .status.progress.bytesDone
+      name: Bytes Done
+      type: integer
+    - description: Total bytes
+      format: int64
+      jsonPath: .status.progress.totalBytes
+      name: Total Bytes
+      type: integer
+    - description: Name of the Backup Storage Location where the backup data is stored
+      jsonPath: .spec.backupStorageLocation
+      name: Storage Location
+      type: string
+    - description: Time duration since this PodVolumeRestore was created
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - description: Name of the node where the PodVolumeRestore is processed
+      jsonPath: .status.node
+      name: Node
       type: string
     - description: The type of the uploader to handle data transfer
       jsonPath: .spec.uploaderType
       name: Uploader Type
       type: string
-    - description: Name of the volume to be restored
-      jsonPath: .spec.volume
-      name: Volume
-      type: string
-    - description: Pod Volume Restore status such as New/InProgress
-      jsonPath: .status.phase
-      name: Status
-      type: string
-    - description: Pod Volume Restore status such as New/InProgress
-      format: int64
-      jsonPath: .status.progress.totalBytes
-      name: TotalBytes
-      type: integer
-    - description: Pod Volume Restore status such as New/InProgress
-      format: int64
-      jsonPath: .status.progress.bytesDone
-      name: BytesDone
-      type: integer
-    - jsonPath: .metadata.creationTimestamp
-      name: Age
-      type: date
     name: v1
     schema:
       openAPIV3Schema:
@@ -77,6 +78,11 @@ spec:
                   BackupStorageLocation is the name of the backup storage location
                   where the backup repository is stored.
                 type: string
+              cancel:
+                description: |-
+                  Cancel indicates request to cancel the ongoing PodVolumeRestore. It can be set
+                  when the PodVolumeRestore is in InProgress phase
+                type: boolean
               pod:
                 description: Pod is a reference to the pod containing the volume to
                   be restored.
@@ -93,7 +99,6 @@ spec:
                       the event) or if no container name is specified "spec.containers[2]" (container with
                       index 2 in this pod). This syntax is chosen only to have some well-defined way of
                       referencing a part of an object.
-                      TODO: this design is not final and this field is subject to change in the future.
                     type: string
                   kind:
                     description: |-
@@ -163,6 +168,13 @@ spec:
           status:
             description: PodVolumeRestoreStatus is the current status of a PodVolumeRestore.
             properties:
+              acceptedTimestamp:
+                description: |-
+                  AcceptedTimestamp records the time the pod volume restore is to be prepared.
+                  The server's time is used for AcceptedTimestamp
+                format: date-time
+                nullable: true
+                type: string
               completionTimestamp:
                 description: |-
                   CompletionTimestamp records the time a restore was completed.
@@ -174,11 +186,19 @@ spec:
               message:
                 description: Message is a message about the pod volume restore's status.
                 type: string
+              node:
+                description: Node is name of the node where the pod volume restore
+                  is processed.
+                type: string
               phase:
                 description: Phase is the current state of the PodVolumeRestore.
                 enum:
                 - New
+                - Accepted
+                - Prepared
                 - InProgress
+                - Canceling
+                - Canceled
                 - Completed
                 - Failed
                 type: string

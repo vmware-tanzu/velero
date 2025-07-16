@@ -79,6 +79,8 @@ These configuration parameters are expected as values to the following command l
 1. `--debug-velero-pod-restart`: A switch for debugging velero pod restart.
 1. `--fail-fast`: A switch for for failing fast on meeting error.
 1. `--has-vsphere-plugin`: A switch to indicate whether the Velero vSphere plugin is installed for vSphere environment.
+1. `--worker-os`: A switch to indicate the workload should be ran on windows or linux OS.
+1. `--image-registry-proxy`: specifies a custom image registry proxy to be used for pulling container images.
 
 These configurations or parameters are used to generate install options for Velero for each test suite.
 
@@ -131,8 +133,8 @@ Below is a mapping between `make` variables to E2E configuration flags.
 1. `DEBUG_VELERO_POD_RESTART`: `-debug-velero-pod-restart`. Optional.
 1. `FAIL_FAST`: `--fail-fast`. Optional.
 1. `HAS_VSPHERE_PLUGIN`: `--has-vsphere-plugin`. Optional.
-
-
+1. `WORKER_OS`: `--worker-os`. Optional.
+1. `IMAGE_REGISTRY_PROXY`: `--image-registry-proxy.` Optional.
 
 ### Examples
 
@@ -328,26 +330,26 @@ STANDBY_CLUSTER=wl-antreav1311 \
 DEFAULT_CLUSTER_NAME=192.168.0.4 \
 STANDBY_CLUSTER_NAME=192.168.0.3 \
 FEATURES=EnableCSI \
-PLUGINS=gcr.io/velero-gcp/velero-plugin-for-aws:main \
+PLUGINS=velero/velero-plugin-for-aws:main \
 HAS_VSPHERE_PLUGIN=false \
 OBJECT_STORE_PROVIDER=aws \
 CREDS_FILE=$HOME/aws-credential \
 BSL_CONFIG=region=us-east-1 \
 BSL_BUCKET=nightly-normal-account4-test \
 BSL_PREFIX=nightly \
-ADDITIONAL_BSL_PLUGINS=gcr.io/velero-gcp/velero-plugin-for-aws:main \
+ADDITIONAL_BSL_PLUGINS=velero/velero-plugin-for-aws:main \
 ADDITIONAL_OBJECT_STORE_PROVIDER=aws \
 ADDITIONAL_BSL_CONFIG=region=us-east-1 \
 ADDITIONAL_BSL_BUCKET=nightly-restrict-account-test \
 ADDITIONAL_BSL_PREFIX=nightly \
 ADDITIONAL_CREDS_FILE=$HOME/aws-credential \
-VELERO_IMAGE=gcr.io/velero-gcp/velero:main \
-RESTORE_HELPER_IMAGE=gcr.io/velero-gcp/velero-restore-helper:main \
+VELERO_IMAGE=velero/velero:main \
+RESTORE_HELPER_IMAGE=velero/velero:main \
 VERSION=main \
 SNAPSHOT_MOVE_DATA=true \
 STANDBY_CLUSTER_CLOUD_PROVIDER=vsphere \
 STANDBY_CLUSTER_OBJECT_STORE_PROVIDER=aws \
-STANDBY_CLUSTER_PLUGINS=gcr.io/velero-gcp/velero-plugin-for-aws:main \
+STANDBY_CLUSTER_PLUGINS=velero/velero-plugin-for-aws:main \
 DISABLE_INFORMER_CACHE=true \
 REGISTRY_CREDENTIAL_FILE=$HOME/.docker/config.json \
 GINKGO_LABELS=Migration \

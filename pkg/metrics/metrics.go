@@ -47,6 +47,7 @@ const (
 	backupItemsErrorsGauge        = "backup_items_errors"
 	backupWarningTotal            = "backup_warning_total"
 	backupLastStatus              = "backup_last_status"
+	backupLocationStatus          = "backup_location_status_gauge"
 	restoreTotal                  = "restore_total"
 	restoreAttemptTotal           = "restore_attempt_total"
 	restoreValidationFailedTotal  = "restore_validation_failed_total"
@@ -77,6 +78,7 @@ const (
 	// Labels
 	nodeMetricLabel         = "node"
 	podVolumeOperationLabel = "operation"
+	bslNameLabel            = "backup_location_name"
 	pvbNameLabel            = "pod_volume_backup"
 	scheduleLabel           = "schedule"
 	backupNameLabel         = "backupName"
@@ -227,6 +229,14 @@ func NewServerMetrics() *ServerMetrics {
 					Help:      "Last status of the backup. A value of 1 is success, 0 is failure",
 				},
 				[]string{scheduleLabel},
+			),
+			backupLocationStatus: prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      backupLocationStatus,
+					Help:      "The status of backup location.  A value of 1 is available, 0 is unavailable",
+				},
+				[]string{bslNameLabel},
 			),
 			restoreTotal: prometheus.NewGauge(
 				prometheus.GaugeOpts{
@@ -886,5 +896,19 @@ func (m *ServerMetrics) RegisterCSISnapshotSuccesses(backupSchedule, backupName 
 func (m *ServerMetrics) RegisterCSISnapshotFailures(backupSchedule, backupName string, csiSnapshotsFailed int) {
 	if c, ok := m.metrics[csiSnapshotFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule, backupName).Add(float64(csiSnapshotsFailed))
+	}
+}
+
+// RegisterBackupLocationAvailable records the availability of a backup location.
+func (m *ServerMetrics) RegisterBackupLocationAvailable(backupLocationName string) {
+	if g, ok := m.metrics[backupLocationStatus].(*prometheus.GaugeVec); ok {
+		g.WithLabelValues(backupLocationName).Set(float64(1))
+	}
+}
+
+// RegisterBackupLocationUnavailable records the availability of a backup location.
+func (m *ServerMetrics) RegisterBackupLocationUnavailable(backupLocationName string) {
+	if g, ok := m.metrics[backupLocationStatus].(*prometheus.GaugeVec); ok {
+		g.WithLabelValues(backupLocationName).Set(float64(0))
 	}
 }

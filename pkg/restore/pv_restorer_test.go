@@ -135,7 +135,7 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			switch tc.expectedErr {
 			case true:
 				assert.Nil(t, res)
-				assert.Error(t, err)
+				require.Error(t, err)
 			case false:
 				assert.Equal(t, tc.expectedRes, res)
 				assert.NoError(t, err)
@@ -209,7 +209,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 			volumeSnapshotter.On("SetVolumeID", tc.obj, "volume-1").Return(tc.obj, nil)
 
 			_, err := r.executePVAction(tc.obj)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			volumeSnapshotter.AssertExpectations(t)
 		})
@@ -253,7 +253,7 @@ type testUnstructured struct {
 func newTestUnstructured() *testUnstructured {
 	obj := &testUnstructured{
 		Unstructured: &unstructured.Unstructured{
-			Object: make(map[string]interface{}),
+			Object: make(map[string]any),
 		},
 	}
 
@@ -275,15 +275,15 @@ func (obj *testUnstructured) WithStatus(fields ...string) *testUnstructured {
 	return obj.withMap("status", fields...)
 }
 
-func (obj *testUnstructured) WithMetadataField(field string, value interface{}) *testUnstructured {
+func (obj *testUnstructured) WithMetadataField(field string, value any) *testUnstructured {
 	return obj.withMapEntry("metadata", field, value)
 }
 
-func (obj *testUnstructured) WithSpecField(field string, value interface{}) *testUnstructured {
+func (obj *testUnstructured) WithSpecField(field string, value any) *testUnstructured {
 	return obj.withMapEntry("spec", field, value)
 }
 
-func (obj *testUnstructured) WithStatusField(field string, value interface{}) *testUnstructured {
+func (obj *testUnstructured) WithStatusField(field string, value any) *testUnstructured {
 	return obj.withMapEntry("status", field, value)
 }
 
@@ -297,7 +297,7 @@ func (obj *testUnstructured) WithAnnotations(fields ...string) *testUnstructured
 }
 
 func (obj *testUnstructured) WithAnnotationValues(fieldVals map[string]string) *testUnstructured {
-	annotations := make(map[string]interface{})
+	annotations := make(map[string]any)
 	for field, val := range fieldVals {
 		annotations[field] = val
 	}
@@ -312,7 +312,7 @@ func (obj *testUnstructured) WithName(name string) *testUnstructured {
 }
 
 func (obj *testUnstructured) withMap(name string, fields ...string) *testUnstructured {
-	m := make(map[string]interface{})
+	m := make(map[string]any)
 	obj.Object[name] = m
 
 	for _, field := range fields {
@@ -322,14 +322,14 @@ func (obj *testUnstructured) withMap(name string, fields ...string) *testUnstruc
 	return obj
 }
 
-func (obj *testUnstructured) withMapEntry(mapName, field string, value interface{}) *testUnstructured {
-	var m map[string]interface{}
+func (obj *testUnstructured) withMapEntry(mapName, field string, value any) *testUnstructured {
+	var m map[string]any
 
 	if res, ok := obj.Unstructured.Object[mapName]; !ok {
-		m = make(map[string]interface{})
+		m = make(map[string]any)
 		obj.Unstructured.Object[mapName] = m
 	} else {
-		m = res.(map[string]interface{})
+		m = res.(map[string]any)
 	}
 
 	m[field] = value

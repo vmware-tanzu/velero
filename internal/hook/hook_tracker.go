@@ -46,6 +46,9 @@ type hookKey struct {
 	// Container indicates the container hooks use.
 	// For hooks specified in the backup/restore spec, the container might be the same under different hookName.
 	container string
+	// hookIndex contains the slice index for the specific hook, in order to track multiple hooks
+	// for the same container
+	hookIndex int
 }
 
 // hookStatus records the execution status of a specific hook.
@@ -69,23 +72,21 @@ type HookTracker struct {
 	// HookExecutedCnt indicates the number of executed hooks.
 	hookExecutedCnt int
 	// hookErrs records hook execution errors if any.
-	hookErrs        []HookErrInfo
-	AsyncItemBlocks *sync.WaitGroup
+	hookErrs []HookErrInfo
 }
 
 // NewHookTracker creates a hookTracker instance.
 func NewHookTracker() *HookTracker {
 	return &HookTracker{
-		lock:            &sync.RWMutex{},
-		tracker:         make(map[hookKey]hookStatus),
-		AsyncItemBlocks: &sync.WaitGroup{},
+		lock:    &sync.RWMutex{},
+		tracker: make(map[hookKey]hookStatus),
 	}
 }
 
 // Add adds a hook to the hook tracker
 // Add must precede the Record for each individual hook.
 // In other words, a hook must be added to the tracker before its execution result is recorded.
-func (ht *HookTracker) Add(podNamespace, podName, container, source, hookName string, hookPhase HookPhase) {
+func (ht *HookTracker) Add(podNamespace, podName, container, source, hookName string, hookPhase HookPhase, hookIndex int) {
 	ht.lock.Lock()
 	defer ht.lock.Unlock()
 
@@ -96,6 +97,7 @@ func (ht *HookTracker) Add(podNamespace, podName, container, source, hookName st
 		container:    container,
 		hookPhase:    hookPhase,
 		hookName:     hookName,
+		hookIndex:    hookIndex,
 	}
 
 	if _, ok := ht.tracker[key]; !ok {
@@ -110,7 +112,7 @@ func (ht *HookTracker) Add(podNamespace, podName, container, source, hookName st
 // Record records the hook's execution status
 // Add must precede the Record for each individual hook.
 // In other words, a hook must be added to the tracker before its execution result is recorded.
-func (ht *HookTracker) Record(podNamespace, podName, container, source, hookName string, hookPhase HookPhase, hookFailed bool, hookErr error) error {
+func (ht *HookTracker) Record(podNamespace, podName, container, source, hookName string, hookPhase HookPhase, hookIndex int, hookFailed bool, hookErr error) error {
 	ht.lock.Lock()
 	defer ht.lock.Unlock()
 
@@ -121,6 +123,7 @@ func (ht *HookTracker) Record(podNamespace, podName, container, source, hookName
 		container:    container,
 		hookPhase:    hookPhase,
 		hookName:     hookName,
+		hookIndex:    hookIndex,
 	}
 
 	if _, ok := ht.tracker[key]; !ok {
@@ -143,8 +146,6 @@ func (ht *HookTracker) Record(podNamespace, podName, container, source, hookName
 
 // Stat returns the number of attempted hooks and failed hooks
 func (ht *HookTracker) Stat() (hookAttemptedCnt int, hookFailedCnt int) {
-	ht.AsyncItemBlocks.Wait()
-
 	ht.lock.RLock()
 	defer ht.lock.RUnlock()
 
@@ -183,24 +184,24 @@ func NewMultiHookTracker() *MultiHookTracker {
 }
 
 // Add adds a backup/restore hook to the tracker
-func (mht *MultiHookTracker) Add(name, podNamespace, podName, container, source, hookName string, hookPhase HookPhase) {
+func (mht *MultiHookTracker) Add(name, podNamespace, podName, container, source, hookName string, hookPhase HookPhase, hookIndex int) {
 	mht.lock.Lock()
 	defer mht.lock.Unlock()
 
 	if _, ok := mht.trackers[name]; !ok {
 		mht.trackers[name] = NewHookTracker()
 	}
-	mht.trackers[name].Add(podNamespace, podName, container, source, hookName, hookPhase)
+	mht.trackers[name].Add(podNamespace, podName, container, source, hookName, hookPhase, hookIndex)
 }
 
 // Record records a backup/restore hook execution status
-func (mht *MultiHookTracker) Record(name, podNamespace, podName, container, source, hookName string, hookPhase HookPhase, hookFailed bool, hookErr error) error {
+func (mht *MultiHookTracker) Record(name, podNamespace, podName, container, source, hookName string, hookPhase HookPhase, hookIndex int, hookFailed bool, hookErr error) error {
 	mht.lock.RLock()
 	defer mht.lock.RUnlock()
 
 	var err error
 	if _, ok := mht.trackers[name]; ok {
-		err = mht.trackers[name].Record(podNamespace, podName, container, source, hookName, hookPhase, hookFailed, hookErr)
+		err = mht.trackers[name].Record(podNamespace, podName, container, source, hookName, hookPhase, hookIndex, hookFailed, hookErr)
 	} else {
 		err = fmt.Errorf("the backup/restore not exist in hook tracker, backup/restore name: %s", name)
 	}

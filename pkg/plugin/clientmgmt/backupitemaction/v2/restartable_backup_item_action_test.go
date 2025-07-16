@@ -36,7 +36,7 @@ import (
 func TestRestartableGetBackupItemAction(t *testing.T) {
 	tests := []struct {
 		name          string
-		plugin        interface{}
+		plugin        any
 		getError      error
 		expectedError string
 	}{
@@ -88,7 +88,7 @@ func TestRestartableBackupItemActionGetDelegate(t *testing.T) {
 	r := NewRestartableBackupItemAction(name, p)
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
-	assert.EqualError(t, err, "reset error")
+	require.EqualError(t, err, "reset error")
 
 	// Happy path
 	p.On("ResetIfNeeded").Return(nil)
@@ -97,7 +97,7 @@ func TestRestartableBackupItemActionGetDelegate(t *testing.T) {
 	p.On("GetByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, a)
 }
 
@@ -105,7 +105,7 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 	b := new(v1.Backup)
 
 	pv := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"color": "blue",
 		},
 	}
@@ -113,7 +113,7 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 	oid := "operation1"
 
 	pvToReturn := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"color": "green",
 		},
 	}
@@ -127,7 +127,7 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 	restartabletest.RunRestartableDelegateTests(
 		t,
 		common.PluginKindBackupItemAction,
-		func(key process.KindAndName, p process.RestartableProcess) interface{} {
+		func(key process.KindAndName, p process.RestartableProcess) any {
 			return &RestartableBackupItemAction{
 				Key:                 key,
 				SharedPluginProcess: p,
@@ -138,27 +138,27 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "AppliesTo",
-			Inputs:                  []interface{}{},
-			ExpectedErrorOutputs:    []interface{}{velero.ResourceSelector{}, errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{velero.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
+			Inputs:                  []any{},
+			ExpectedErrorOutputs:    []any{velero.ResourceSelector{}, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{velero.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "Execute",
-			Inputs:                  []interface{}{pv, b},
-			ExpectedErrorOutputs:    []interface{}{nil, ([]velero.ResourceIdentifier)(nil), "", ([]velero.ResourceIdentifier)(nil), errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{pvToReturn, additionalItems, "", ([]velero.ResourceIdentifier)(nil), errors.Errorf("delegate error")},
+			Inputs:                  []any{pv, b},
+			ExpectedErrorOutputs:    []any{nil, ([]velero.ResourceIdentifier)(nil), "", ([]velero.ResourceIdentifier)(nil), errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{pvToReturn, additionalItems, "", ([]velero.ResourceIdentifier)(nil), errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "Progress",
-			Inputs:                  []interface{}{oid, b},
-			ExpectedErrorOutputs:    []interface{}{velero.OperationProgress{}, errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{velero.OperationProgress{}, errors.Errorf("delegate error")},
+			Inputs:                  []any{oid, b},
+			ExpectedErrorOutputs:    []any{velero.OperationProgress{}, errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{velero.OperationProgress{}, errors.Errorf("delegate error")},
 		},
 		restartabletest.RestartableDelegateTest{
 			Function:                "Cancel",
-			Inputs:                  []interface{}{oid, b},
-			ExpectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
-			ExpectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
+			Inputs:                  []any{oid, b},
+			ExpectedErrorOutputs:    []any{errors.Errorf("reset error")},
+			ExpectedDelegateOutputs: []any{errors.Errorf("delegate error")},
 		},
 	)
 }

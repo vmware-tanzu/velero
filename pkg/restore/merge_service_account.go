@@ -54,7 +54,7 @@ func mergeServiceAccounts(fromCluster, fromBackup *unstructured.Unstructured) (*
 	}
 	// The DefaultUnstructuredConverter.ToUnstructured function will populate the creation timestamp with the nil value
 	// However, we remove this on both the backup and cluster objects before comparison, and we don't want it in any patches.
-	delete(desiredUnstructured["metadata"].(map[string]interface{}), "creationTimestamp")
+	delete(desiredUnstructured["metadata"].(map[string]any), "creationTimestamp")
 
 	return &unstructured.Unstructured{Object: desiredUnstructured}, nil
 }

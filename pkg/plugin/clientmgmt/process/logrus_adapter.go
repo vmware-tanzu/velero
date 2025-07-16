@@ -37,8 +37,8 @@ type logrusAdapter struct {
 
 // args are alternating key, value pairs, where the keys
 // are expected to be strings, and values can be any type.
-func argsToFields(args ...interface{}) logrus.Fields {
-	fields := make(map[string]interface{})
+func argsToFields(args ...any) logrus.Fields {
+	fields := make(map[string]any)
 
 	for i := 0; i < len(args); i += 2 {
 		switch args[i] {
@@ -52,7 +52,7 @@ func argsToFields(args ...interface{}) logrus.Fields {
 			// to log at based on the hclog-compatible `@level` field which
 			// we're adding via HcLogLevelHook).
 		default:
-			var val interface{}
+			var val any
 			if i+1 < len(args) {
 				val = args[i+1]
 			}
@@ -66,27 +66,27 @@ func argsToFields(args ...interface{}) logrus.Fields {
 
 // Trace emits a message and key/value pairs at the DEBUG level
 // (logrus doesn't have a TRACE level)
-func (l *logrusAdapter) Trace(msg string, args ...interface{}) {
+func (l *logrusAdapter) Trace(msg string, args ...any) {
 	l.Debug(msg, args...)
 }
 
 // Debug emits a message and key/value pairs at the DEBUG level
-func (l *logrusAdapter) Debug(msg string, args ...interface{}) {
+func (l *logrusAdapter) Debug(msg string, args ...any) {
 	l.impl.WithFields(argsToFields(args...)).Debug(msg)
 }
 
 // Info emits a message and key/value pairs at the INFO level
-func (l *logrusAdapter) Info(msg string, args ...interface{}) {
+func (l *logrusAdapter) Info(msg string, args ...any) {
 	l.impl.WithFields(argsToFields(args...)).Info(msg)
 }
 
 // Warn emits a message and key/value pairs at the WARN level
-func (l *logrusAdapter) Warn(msg string, args ...interface{}) {
+func (l *logrusAdapter) Warn(msg string, args ...any) {
 	l.impl.WithFields(argsToFields(args...)).Warn(msg)
 }
 
 // Error emits a message and key/value pairs at the ERROR level
-func (l *logrusAdapter) Error(msg string, args ...interface{}) {
+func (l *logrusAdapter) Error(msg string, args ...any) {
 	l.impl.WithFields(argsToFields(args...)).Error(msg)
 }
 
@@ -121,7 +121,7 @@ func (l *logrusAdapter) IsError() bool {
 }
 
 // With creates a sublogger that will always have the given key/value pairs
-func (l *logrusAdapter) With(args ...interface{}) hclog.Logger {
+func (l *logrusAdapter) With(args ...any) hclog.Logger {
 	return &logrusAdapter{
 		impl:  l.impl.WithFields(argsToFields(args...)),
 		level: l.level,
@@ -164,7 +164,7 @@ func (l *logrusAdapter) SetLevel(_ hclog.Level) {
 }
 
 // ImpliedArgs returns With key/value pairs
-func (l *logrusAdapter) ImpliedArgs() []interface{} {
+func (l *logrusAdapter) ImpliedArgs() []any {
 	panic("not implemented")
 }
 
@@ -172,7 +172,7 @@ func (l *logrusAdapter) ImpliedArgs() []interface{} {
 // keys must be strings
 // vals can be any type, but display is implementation specific
 // Emit a message and key/value pairs at a provided log level
-func (l *logrusAdapter) Log(level hclog.Level, msg string, args ...interface{}) {
+func (l *logrusAdapter) Log(level hclog.Level, msg string, args ...any) {
 	switch level {
 	case hclog.Trace:
 		l.Trace(msg, args...)

@@ -25,7 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -64,12 +64,12 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 			checkPod, err := client.ClientGo.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 			if err != nil {
 				//Should ignore "etcdserver: request timed out" kind of errors, try to get pod status again before timeout.
-				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...\n", namespace, podName, corev1.PodRunning)))
+				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...\n", namespace, podName, corev1api.PodRunning)))
 				return false, nil
 			}
 			// If any pod is still waiting we don't need to check any more so return and wait for next poll interval
-			if checkPod.Status.Phase != corev1.PodRunning {
-				fmt.Printf("Pod %s is in state %s waiting for it to be %s\n", podName, checkPod.Status.Phase, corev1.PodRunning)
+			if checkPod.Status.Phase != corev1api.PodRunning {
+				fmt.Printf("Pod %s is in state %s waiting for it to be %s\n", podName, checkPod.Status.Phase, corev1api.PodRunning)
 				return false, nil
 			}
 		}
@@ -77,7 +77,7 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 		return true, nil
 	})
 	if err != nil {
-		return errors.Wrapf(err, fmt.Sprintf("Failed to wait for pods in namespace %s to start running", namespace))
+		return errors.Wrapf(err, "Failed to wait for pods in namespace %s to start running", namespace)
 	}
 	return nil
 }
@@ -284,12 +284,12 @@ func GetPVByPVCName(client TestClient, namespace, pvcName string) (string, error
 	return pv_value.Name, nil
 }
 
-func PrepareVolumeList(volumeNameList []string) (vols []*corev1.Volume) {
+func PrepareVolumeList(volumeNameList []string) (vols []*corev1api.Volume) {
 	for i, volume := range volumeNameList {
-		vols = append(vols, &corev1.Volume{
+		vols = append(vols, &corev1api.Volume{
 			Name: volume,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+			VolumeSource: corev1api.VolumeSource{
+				PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 					ClaimName: fmt.Sprintf("pvc-%d", i),
 					ReadOnly:  false,
 				},
@@ -322,32 +322,80 @@ func WriteRandomDataToFileInPod(ctx context.Context, namespace, podName, contain
 	return cmd.Run()
 }
 
-func CreateFileToPod(ctx context.Context, namespace, podName, containerName, volume, filename, content string) error {
+func CreateFileToPod(
+	ctx context.Context,
+	namespace string,
+	podName string,
+	containerName string,
+	volume string,
+	filename string,
+	content string,
+	workerOS string,
+) error {
+	filePath := fmt.Sprintf("/%s/%s", volume, filename)
+	shell := "/bin/sh"
+	shellParameter := "-c"
+
+	if workerOS == common.WorkerOSWindows {
+		filePath = fmt.Sprintf("C:\\%s\\%s", volume, filename)
+		shell = "cmd"
+		shellParameter = "/c"
+	}
+
 	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
-		"--", "/bin/sh", "-c", fmt.Sprintf("echo ns-%s pod-%s volume-%s  > /%s/%s", namespace, podName, volume, volume, filename)}
+		"--", shell, shellParameter, fmt.Sprintf("echo ns-%s pod-%s volume-%s  > %s", namespace, podName, volume, filePath)}
+
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	return cmd.Run()
 }
 
-func FileExistInPV(ctx context.Context, namespace, podName, containerName, volume, filename string) (bool, error) {
-	stdout, stderr, err := ReadFileFromPodVolume(ctx, namespace, podName, containerName, volume, filename)
+func FileExistInPV(
+	ctx context.Context,
+	namespace string,
+	podName string,
+	containerName string,
+	volume string,
+	filename string,
+	workerOS string,
+) (bool, error) {
+	stdout, stderr, err := ReadFileFromPodVolume(ctx, namespace, podName, containerName, volume, filename, workerOS)
 
 	output := fmt.Sprintf("%s:%s", stdout, stderr)
-	if strings.Contains(output, fmt.Sprintf("/%s/%s: No such file or directory", volume, filename)) {
-		return false, nil
-	} else {
-		if err == nil {
-			return true, nil
-		} else {
-			return false, errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s",
-				filename, volume, podName, namespace))
+
+	if workerOS == common.WorkerOSWindows {
+		if strings.Contains(output, "The system cannot find the file specified") {
+			return false, nil
 		}
 	}
+
+	if strings.Contains(output, fmt.Sprintf("/%s/%s: No such file or directory", volume, filename)) {
+		return false, nil
+	}
+
+	if err == nil {
+		return true, nil
+	} else {
+		return false, errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s",
+			filename, volume, podName, namespace))
+	}
 }
-func ReadFileFromPodVolume(ctx context.Context, namespace, podName, containerName, volume, filename string) (string, string, error) {
+func ReadFileFromPodVolume(
+	ctx context.Context,
+	namespace string,
+	podName string,
+	containerName string,
+	volume string,
+	filename string,
+	workerOS string,
+) (string, string, error) {
 	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", "cat", fmt.Sprintf("/%s/%s", volume, filename)}
+	if workerOS == common.WorkerOSWindows {
+		arg = []string{"exec", "-n", namespace, "-c", containerName, podName,
+			"--", "cmd", "/c", fmt.Sprintf("type C:\\%s\\%s", volume, filename)}
+	}
+
 	cmd := exec.CommandContext(ctx, "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
 	stdout, stderr, err := veleroexec.RunCommand(cmd)
@@ -415,13 +463,13 @@ func GetAllService(ctx context.Context) (string, error) {
 	return stdout, nil
 }
 
-func CreateVolumes(pvcName string, volumeNameList []string) (vols []*corev1.Volume) {
-	vols = []*corev1.Volume{}
+func CreateVolumes(pvcName string, volumeNameList []string) (vols []*corev1api.Volume) {
+	vols = []*corev1api.Volume{}
 	for _, volume := range volumeNameList {
-		vols = append(vols, &corev1.Volume{
+		vols = append(vols, &corev1api.Volume{
 			Name: volume,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+			VolumeSource: corev1api.VolumeSource{
+				PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 					ClaimName: pvcName,
 					ReadOnly:  false,
 				},

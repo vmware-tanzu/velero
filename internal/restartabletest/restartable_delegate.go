@@ -46,7 +46,7 @@ func (rp *MockRestartableProcess) ResetIfNeeded() error {
 	return args.Error(0)
 }
 
-func (rp *MockRestartableProcess) GetByKindAndName(key process.KindAndName) (interface{}, error) {
+func (rp *MockRestartableProcess) GetByKindAndName(key process.KindAndName) (any, error) {
 	args := rp.Called(key)
 	return args.Get(0), args.Error(1)
 }
@@ -57,21 +57,21 @@ func (rp *MockRestartableProcess) Stop() {
 
 type RestartableDelegateTest struct {
 	Function                string
-	Inputs                  []interface{}
-	ExpectedErrorOutputs    []interface{}
-	ExpectedDelegateOutputs []interface{}
+	Inputs                  []any
+	ExpectedErrorOutputs    []any
+	ExpectedDelegateOutputs []any
 }
 
 type Mockable interface {
 	Test(t mock.TestingT)
-	On(method string, args ...interface{}) *mock.Call
+	On(method string, args ...any) *mock.Call
 	AssertExpectations(t mock.TestingT) bool
 }
 
 func RunRestartableDelegateTests(
 	t *testing.T,
 	kind common.PluginKind,
-	newRestartable func(key process.KindAndName, p process.RestartableProcess) interface{},
+	newRestartable func(key process.KindAndName, p process.RestartableProcess) any,
 	newMock func() Mockable,
 	tests ...RestartableDelegateTest,
 ) {
@@ -92,7 +92,7 @@ func RunRestartableDelegateTests(
 			method := reflect.ValueOf(r).MethodByName(tc.Function)
 			require.NotEmpty(t, method)
 
-			// Convert the test case inputs ([]interface{}) to []reflect.Value
+			// Convert the test case inputs ([]any) to []reflect.Value
 			var inputValues []reflect.Value
 			for i := range tc.Inputs {
 				inputValues = append(inputValues, reflect.ValueOf(tc.Inputs[i]))
@@ -102,8 +102,8 @@ func RunRestartableDelegateTests(
 			actual := method.Call(inputValues)
 
 			// This Function asserts that the actual outputs match the expected outputs
-			checkOutputs := func(expected []interface{}, actual []reflect.Value) {
-				require.Equal(t, len(expected), len(actual))
+			checkOutputs := func(expected []any, actual []reflect.Value) {
+				require.Len(t, actual, len(expected))
 
 				for i := range actual {
 					// Get the underlying value from the reflect.Value
@@ -115,7 +115,7 @@ func RunRestartableDelegateTests(
 					expectedErr, expectedErrOk := expected[i].(error)
 					// If both are errors, use EqualError
 					if actualErrOk && expectedErrOk {
-						assert.EqualError(t, actualErr, expectedErr.Error())
+						require.EqualError(t, actualErr, expectedErr.Error())
 						continue
 					}
 

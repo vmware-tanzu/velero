@@ -46,6 +46,7 @@ import (
 	"github.com/vmware-tanzu/velero/internal/resourcemodifiers"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
@@ -57,6 +58,7 @@ import (
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 	pkgrestoreUtil "github.com/vmware-tanzu/velero/pkg/util/velero/restore"
 )
 
@@ -297,6 +299,7 @@ func (r *restoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *restoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.Restore{}).
+		Named(constant.ControllerRestore).
 		Complete(r)
 }
 
@@ -391,12 +394,17 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 		return backupInfo{}, nil
 	}
 
+	if !veleroutil.BSLIsAvailable(*info.location) {
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("The BSL %s is unavailable, cannot retrieve the backup", info.location.Name))
+		return backupInfo{}, nil
+	}
+
 	// Fill in the ScheduleName so it's easier to consume for metrics.
 	if restore.Spec.ScheduleName == "" {
 		restore.Spec.ScheduleName = info.backup.GetLabels()[api.ScheduleNameLabel]
 	}
 
-	var resourceModifiers *resourcemodifiers.ResourceModifiers = nil
+	var resourceModifiers *resourcemodifiers.ResourceModifiers
 	if restore.Spec.ResourceModifier != nil && strings.EqualFold(restore.Spec.ResourceModifier.Kind, resourcemodifiers.ConfigmapRefType) {
 		ResourceModifierConfigMap := &corev1api.ConfigMap{}
 		err := r.kbClient.Get(context.Background(), client.ObjectKey{Namespace: restore.Namespace, Name: restore.Spec.ResourceModifier.Name}, ResourceModifierConfigMap)
@@ -406,10 +414,10 @@ func (r *restoreReconciler) validateAndComplete(restore *api.Restore) (backupInf
 		}
 		resourceModifiers, err = resourcemodifiers.GetResourceModifiersFromConfig(ResourceModifierConfigMap)
 		if err != nil {
-			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("Error in parsing resource modifiers provided in configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name)).Error())
+			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrapf(err, "Error in parsing resource modifiers provided in configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name).Error())
 			return backupInfo{}, nil
 		} else if err = resourceModifiers.Validate(); err != nil {
-			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrapf(err, fmt.Sprintf("Validation error in resource modifiers provided in configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name)).Error())
+			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrapf(err, "Validation error in resource modifiers provided in configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name).Error())
 			return backupInfo{}, nil
 		}
 		r.logger.Infof("Retrieved Resource modifiers provided in configmap %s/%s", restore.Namespace, restore.Spec.ResourceModifier.Name)
@@ -724,6 +732,10 @@ func (r *restoreReconciler) deleteExternalResources(restore *api.Restore) error 
 			return nil
 		}
 		return errors.Wrap(err, fmt.Sprintf("can't get backup info, backup: %s", restore.Spec.BackupName))
+	}
+
+	if !veleroutil.BSLIsAvailable(*backupInfo.location) {
+		return fmt.Errorf("bsl %s is unavailable, cannot get the backup info", backupInfo.location.Name)
 	}
 
 	// delete restore files in object storage

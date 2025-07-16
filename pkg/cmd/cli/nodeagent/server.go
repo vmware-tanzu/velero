@@ -26,11 +26,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bombsimon/logrusr/v3"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	storagev1api "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -39,16 +40,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned"
 
-	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
@@ -60,7 +60,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
-	"github.com/vmware-tanzu/velero/pkg/repository"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -75,10 +74,6 @@ var (
 const (
 	// the port where prometheus metrics are exposed
 	defaultMetricsAddress = ":8085"
-
-	// defaultCredentialsDirectory is the path on disk where credential
-	// files will be written to
-	defaultCredentialsDirectory = "/tmp/credentials"
 
 	defaultResourceTimeout         = 10 * time.Minute
 	defaultDataMoverPrepareTimeout = 30 * time.Minute
@@ -159,7 +154,8 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		return nil, err
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	ctrl.SetLogger(logrusr.New(logger))
+	klog.SetLogger(logrusr.New(logger)) // klog.Logger is used by k8s.io/client-go
 
 	if err := velerov1api.AddToScheme(scheme); err != nil {
 		cancelFunc()
@@ -169,7 +165,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		cancelFunc()
 		return nil, err
 	}
-	if err := v1.AddToScheme(scheme); err != nil {
+	if err := corev1api.AddToScheme(scheme); err != nil {
 		cancelFunc()
 		return nil, err
 	}
@@ -183,7 +179,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 	// use a field selector to filter to only pods scheduled on this node.
 	cacheOption := cache.Options{
 		ByObject: map[ctrlclient.Object]cache.ByObject{
-			&v1.Pod{}: {
+			&corev1api.Pod{}: {
 				Field: fields.Set{"spec.nodeName": nodeName}.AsSelector(),
 			},
 			&velerov1api.PodVolumeBackup{}: {
@@ -198,7 +194,7 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 			&velerov2alpha1api.DataDownload{}: {
 				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
 			},
-			&v1.Event{}: {
+			&corev1api.Event{}: {
 				Field: fields.Set{"metadata.namespace": factory.Namespace()}.AsSelector(),
 			},
 		},
@@ -287,41 +283,11 @@ func (s *nodeAgentServer) run() {
 	s.metrics.RegisterAllMetrics()
 	s.metrics.InitMetricsForNode(s.nodeName)
 
-	s.markInProgressCRsFailed()
-
 	s.logger.Info("Starting controllers")
 
-	credentialFileStore, err := credentials.NewNamespacedFileStore(
-		s.mgr.GetClient(),
-		s.namespace,
-		defaultCredentialsDirectory,
-		filesystem.NewFileSystem(),
-	)
-	if err != nil {
-		s.logger.Fatalf("Failed to create credentials file store: %v", err)
-	}
-
-	credSecretStore, err := credentials.NewNamespacedSecretStore(s.mgr.GetClient(), s.namespace)
-	if err != nil {
-		s.logger.Fatalf("Failed to create secret file store: %v", err)
-	}
-
-	credentialGetter := &credentials.CredentialGetter{FromFile: credentialFileStore, FromSecret: credSecretStore}
-	repoEnsurer := repository.NewEnsurer(s.mgr.GetClient(), s.logger, s.config.resourceTimeout)
-	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.dataPathMgr, repoEnsurer,
-		credentialGetter, s.nodeName, s.mgr.GetScheme(), s.metrics, s.logger)
-
-	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
-		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
-	}
-
-	if err = controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.dataPathMgr, repoEnsurer, credentialGetter, s.logger).SetupWithManager(s.mgr); err != nil {
-		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
-	}
-
-	var loadAffinity *kube.LoadAffinity
+	var loadAffinity []*kube.LoadAffinity
 	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
-		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
+		loadAffinity = s.dataPathConfigs.LoadAffinity
 		s.logger.Infof("Using customized loadAffinity %v", loadAffinity)
 	}
 
@@ -331,7 +297,7 @@ func (s *nodeAgentServer) run() {
 		s.logger.Infof("Using customized backupPVC config %v", backupPVCConfig)
 	}
 
-	podResources := v1.ResourceRequirements{}
+	podResources := corev1api.ResourceRequirements{}
 	if s.dataPathConfigs != nil && s.dataPathConfigs.PodResources != nil {
 		if res, err := kube.ParseResourceRequirements(s.dataPathConfigs.PodResources.CPURequest, s.dataPathConfigs.PodResources.MemoryRequest, s.dataPathConfigs.PodResources.CPULimit, s.dataPathConfigs.PodResources.MemoryLimit); err != nil {
 			s.logger.WithError(err).Warn("Pod resource requirements are invalid, ignore")
@@ -339,6 +305,20 @@ func (s *nodeAgentServer) run() {
 			podResources = res
 			s.logger.Infof("Using customized pod resource requirements %v", s.dataPathConfigs.PodResources)
 		}
+	}
+
+	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger)
+	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
+		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
+	}
+
+	pvrReconciler := controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.logger)
+	if err := pvrReconciler.SetupWithManager(s.mgr); err != nil {
+		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
+	}
+
+	if err := controller.InitLegacyPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.namespace, s.config.resourceTimeout, s.logger); err != nil {
+		s.logger.WithError(err).Fatal("Unable to create the legacy pod volume restore controller")
 	}
 
 	dataUploadReconciler := controller.NewDataUploadReconciler(
@@ -356,7 +336,7 @@ func (s *nodeAgentServer) run() {
 		s.logger,
 		s.metrics,
 	)
-	if err = dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
+	if err := dataUploadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
@@ -366,8 +346,21 @@ func (s *nodeAgentServer) run() {
 		s.logger.Infof("Using customized restorePVC config %v", restorePVCConfig)
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, restorePVCConfig, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
-	if err = dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(
+		s.mgr.GetClient(),
+		s.mgr,
+		s.kubeClient,
+		s.dataPathMgr,
+		loadAffinity,
+		restorePVCConfig,
+		podResources,
+		s.nodeName,
+		s.config.dataMoverPrepareTimeout,
+		s.logger,
+		s.metrics,
+	)
+
+	if err := dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}
 
@@ -384,6 +377,16 @@ func (s *nodeAgentServer) run() {
 		if err := dataDownloadReconciler.AttemptDataDownloadResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt data download resume")
 		}
+
+		if err := pvbReconciler.AttemptPVBResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt PVB resume")
+		}
+
+		if err := pvrReconciler.AttemptPVRResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt PVR resume")
+		}
+
+		s.markLegacyPVRsFailed(s.mgr.GetClient())
 	}()
 
 	s.logger.Info("Controllers starting...")
@@ -412,7 +415,7 @@ func (s *nodeAgentServer) runProfiler() {
 }
 
 func (s *nodeAgentServer) waitCacheForResume() error {
-	podInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &v1.Pod{})
+	podInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &corev1api.Pod{})
 	if err != nil {
 		return errors.Wrap(err, "error getting pod informer")
 	}
@@ -427,7 +430,17 @@ func (s *nodeAgentServer) waitCacheForResume() error {
 		return errors.Wrap(err, "error getting dd informer")
 	}
 
-	if !cacheutil.WaitForCacheSync(s.ctx.Done(), podInformer.HasSynced, duInformer.HasSynced, ddInformer.HasSynced) {
+	pvbInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov1api.PodVolumeBackup{})
+	if err != nil {
+		return errors.Wrap(err, "error getting PVB informer")
+	}
+
+	pvrInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov1api.PodVolumeRestore{})
+	if err != nil {
+		return errors.Wrap(err, "error getting PVR informer")
+	}
+
+	if !cacheutil.WaitForCacheSync(s.ctx.Done(), podInformer.HasSynced, duInformer.HasSynced, ddInformer.HasSynced, pvbInformer.HasSynced, pvrInformer.HasSynced) {
 		return errors.New("error waiting informer synced")
 	}
 
@@ -437,8 +450,12 @@ func (s *nodeAgentServer) waitCacheForResume() error {
 // validatePodVolumesHostPath validates that the pod volumes path contains a
 // directory for each Pod running on this node
 func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface) error {
-	files, err := s.fileSystem.ReadDir("/host_pods/")
+	files, err := s.fileSystem.ReadDir(nodeagent.HostPodVolumeMountPath())
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			s.logger.Warnf("Pod volumes host path [%s] doesn't exist, fs-backup is disabled", nodeagent.HostPodVolumeMountPath())
+			return nil
+		}
 		return errors.Wrap(err, "could not read pod volumes host path")
 	}
 
@@ -461,7 +478,7 @@ func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface
 
 		// if the pod is a mirror pod, the directory name is the hash value of the
 		// mirror pod annotation
-		if hash, ok := pod.GetAnnotations()[v1.MirrorPodAnnotationKey]; ok {
+		if hash, ok := pod.GetAnnotations()[corev1api.MirrorPodAnnotationKey]; ok {
 			dirName = hash
 		}
 
@@ -469,7 +486,7 @@ func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface
 			valid = false
 			s.logger.WithFields(logrus.Fields{
 				"pod":  fmt.Sprintf("%s/%s", pod.GetNamespace(), pod.GetName()),
-				"path": "/host_pods/" + dirName,
+				"path": nodeagent.HostPodVolumeMountPath() + "/" + dirName,
 			}).Debug("could not find volumes for pod in host path")
 		}
 	}
@@ -481,60 +498,24 @@ func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface
 	return nil
 }
 
-// if there is a restarting during the reconciling of pvbs/pvrs/etc, these CRs may be stuck in progress status
-// markInProgressCRsFailed tries to mark the in progress CRs as failed when starting the server to avoid the issue
-func (s *nodeAgentServer) markInProgressCRsFailed() {
-	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
-	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
-	if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
-		return
-	}
-
-	s.markInProgressPVBsFailed(client)
-
-	s.markInProgressPVRsFailed(client)
-}
-
-func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {
-	pvbs := &velerov1api.PodVolumeBackupList{}
-	if err := client.List(s.ctx, pvbs, &ctrlclient.ListOptions{Namespace: s.namespace}); err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to list podvolumebackups")
-		return
-	}
-	for i, pvb := range pvbs.Items {
-		if pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseInProgress {
-			s.logger.Debugf("the status of podvolumebackup %q is %q, skip", pvb.GetName(), pvb.Status.Phase)
-			continue
-		}
-		if pvb.Spec.Node != s.nodeName {
-			s.logger.Debugf("the node of podvolumebackup %q is %q, not %q, skip", pvb.GetName(), pvb.Spec.Node, s.nodeName)
-			continue
-		}
-
-		if err := controller.UpdatePVBStatusToFailed(s.ctx, client, &pvbs.Items[i],
-			fmt.Errorf("found a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, velerov1api.PodVolumeBackupPhaseFailed),
-			"", time.Now(), s.logger); err != nil {
-			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumebackup %q", pvb.GetName())
-			continue
-		}
-		s.logger.WithField("podvolumebackup", pvb.GetName()).Warn(pvb.Status.Message)
-	}
-}
-
-func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
+func (s *nodeAgentServer) markLegacyPVRsFailed(client ctrlclient.Client) {
 	pvrs := &velerov1api.PodVolumeRestoreList{}
 	if err := client.List(s.ctx, pvrs, &ctrlclient.ListOptions{Namespace: s.namespace}); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("failed to list podvolumerestores")
 		return
 	}
+
 	for i, pvr := range pvrs.Items {
+		if !controller.IsLegacyPVR(&pvr) {
+			continue
+		}
+
 		if pvr.Status.Phase != velerov1api.PodVolumeRestorePhaseInProgress {
 			s.logger.Debugf("the status of podvolumerestore %q is %q, skip", pvr.GetName(), pvr.Status.Phase)
 			continue
 		}
 
-		pod := &v1.Pod{}
+		pod := &corev1api.Pod{}
 		if err := client.Get(s.ctx, types.NamespacedName{
 			Namespace: pvr.Spec.Pod.Namespace,
 			Name:      pvr.Spec.Pod.Name,
@@ -548,8 +529,8 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 			continue
 		}
 
-		if err := controller.UpdatePVRStatusToFailed(s.ctx, client, &pvrs.Items[i],
-			fmt.Sprintf("get a podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, velerov1api.PodVolumeRestorePhaseFailed),
+		if err := controller.UpdatePVRStatusToFailed(s.ctx, client, &pvrs.Items[i], errors.New("cannot survive from node-agent restart"),
+			fmt.Sprintf("get a legacy podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, velerov1api.PodVolumeRestorePhaseFailed),
 			time.Now(), s.logger); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumerestore %q", pvr.GetName())
 			continue

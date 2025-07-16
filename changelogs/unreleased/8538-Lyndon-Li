@@ -1,1 +1,0 @@
-Fix issue #8539, validate uploader types when o.CRDsOnly is set to false only since CRD installation doesn't rely on uploader types

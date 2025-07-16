@@ -41,8 +41,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 
-	corev1api "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -92,6 +92,10 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, errors.Wrapf(err, "error getting BackupStorageLocation %s", req.String())
+	}
+	if !veleroutil.BSLIsAvailable(*location) {
+		log.Errorf("BackupStorageLocation is in unavailable state, skip syncing backup from it.")
+		return ctrl.Result{}, nil
 	}
 
 	pluginManager := b.newPluginManager(log)
@@ -263,44 +267,6 @@ func (b *backupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					log.Infof("Created CSI VolumeSnapshotClass %s", vsClass.Name)
 				}
 			}
-
-			log.Info("Syncing CSI volumesnapshotcontents in backup")
-			snapConts, err := backupStore.GetCSIVolumeSnapshotContents(backupName)
-			if err != nil {
-				log.WithError(errors.WithStack(err)).Error("Error getting CSI volumesnapshotcontents for this backup from backup store")
-				continue
-			}
-
-			log.Infof("Syncing %d CSI volumesnapshotcontents in backup", len(snapConts))
-			for _, snapCont := range snapConts {
-				// TODO: Reset ResourceVersion prior to persisting VolumeSnapshotContents
-				snapCont.ResourceVersion = ""
-				// Make the VolumeSnapshotContent static
-				snapCont.Spec.Source = snapshotv1api.VolumeSnapshotContentSource{
-					SnapshotHandle: snapCont.Status.SnapshotHandle,
-				}
-				// Set VolumeSnapshotRef to none exist one, because VolumeSnapshotContent
-				// validation webhook will check whether name and namespace are nil.
-				// external-snapshotter needs Source pointing to snapshot and VolumeSnapshot
-				// reference's UID to nil to determine the VolumeSnapshotContent is deletable.
-				snapCont.Spec.VolumeSnapshotRef = corev1api.ObjectReference{
-					APIVersion: snapshotv1api.SchemeGroupVersion.String(),
-					Kind:       "VolumeSnapshot",
-					Namespace:  "ns-" + string(snapCont.UID),
-					Name:       "name-" + string(snapCont.UID),
-				}
-				err := b.client.Create(ctx, snapCont, &client.CreateOptions{})
-				switch {
-				case err != nil && apierrors.IsAlreadyExists(err):
-					log.Debugf("volumesnapshotcontent %s already exists in cluster", snapCont.Name)
-					continue
-				case err != nil && !apierrors.IsAlreadyExists(err):
-					log.WithError(errors.WithStack(err)).Errorf("Error syncing volumesnapshotcontent %s into cluster", snapCont.Name)
-					continue
-				default:
-					log.Infof("Created CSI volumesnapshotcontent %s", snapCont.Name)
-				}
-			}
 		}
 	}
 
@@ -367,6 +333,7 @@ func (b *backupSyncReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Filter all BSL events, because this controller is supposed to run periodically, not by event.
 		For(&velerov1api.BackupStorageLocation{}, builder.WithPredicates(kube.FalsePredicate{})).
 		WatchesRawSource(backupSyncSource).
+		Named(constant.ControllerBackupSync).
 		Complete(b)
 }
 

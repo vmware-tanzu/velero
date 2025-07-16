@@ -25,7 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
+	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -126,6 +126,18 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 			Type: corev1api.SeccompProfileTypeRuntimeDefault,
 		},
 		RunAsUser:    &id,
+		RunAsNonRoot: boolptr.True(),
+	}
+	customID := int64(44444)
+	customSecurityContext := corev1api.SecurityContext{
+		AllowPrivilegeEscalation: boolptr.False(),
+		Capabilities: &corev1api.Capabilities{
+			Drop: []corev1api.Capability{"ALL"},
+		},
+		SeccompProfile: &corev1api.SeccompProfile{
+			Type: corev1api.SeccompProfileTypeRuntimeDefault,
+		},
+		RunAsUser:    &customID,
 		RunAsNonRoot: boolptr.True(),
 	}
 
@@ -264,18 +276,40 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 						Command([]string{"/velero-restore-helper"}).Result()).
 				Result(),
 		},
+		{
+			name: "Restoring pod with custom container SecurityContext uses this SecurityContext for the restore initContainer",
+			pod: builder.ForPod("ns-1", "my-pod").
+				ObjectMeta(
+					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				Containers(
+					builder.ForContainer("app-container", "app-image").
+						SecurityContext(&customSecurityContext).Result()).
+				Result(),
+			want: builder.ForPod("ns-1", "my-pod").
+				ObjectMeta(
+					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				Containers(
+					builder.ForContainer("app-container", "app-image").
+						SecurityContext(&customSecurityContext).Result()).
+				InitContainers(
+					newRestoreInitContainerBuilder(defaultRestoreHelperImage, "").
+						Resources(&resourceReqs).
+						SecurityContext(&customSecurityContext).
+						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).
+						Command([]string{"/velero-restore-helper"}).Result()).Result(),
+		},
 	}
 
-	veleroDeployment := &appsv1.Deployment{
+	veleroDeployment := &appsv1api.Deployment{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: appsv1.SchemeGroupVersion.String(),
+			APIVersion: appsv1api.SchemeGroupVersion.String(),
 			Kind:       "Deployment",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "velero",
 			Name:      "velero",
 		},
-		Spec: appsv1.DeploymentSpec{
+		Spec: appsv1api.DeploymentSpec{
 			Template: corev1api.PodTemplateSpec{
 				Spec: corev1api.PodSpec{
 					Containers: []corev1api.Container{
@@ -299,7 +333,7 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 			require.NoError(t, err)
 
 			// Default to using the same pod for both Item and ItemFromBackup if podFromBackup not provided
-			var unstructuredPodFromBackup map[string]interface{}
+			var unstructuredPodFromBackup map[string]any
 			if tc.podFromBackup != nil {
 				unstructuredPodFromBackup, err = runtime.DefaultUnstructuredConverter.ToUnstructured(tc.podFromBackup)
 				require.NoError(t, err)
@@ -330,7 +364,7 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 
 			// method under test
 			res, err := a.Execute(input)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			updatedPod := new(corev1api.Pod)
 			require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), updatedPod))

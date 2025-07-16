@@ -44,13 +44,17 @@ const CSI = "csi"
 const Velero = "velero"
 const VeleroRestoreHelper = "velero-restore-helper"
 
-const UploaderTypeRestic = "restic"
+const (
+	UploaderTypeRestic = "restic"
+	UploaderTypeKopia  = "kopia"
+)
 
 const (
 	KubeSystemNamespace           = "kube-system"
 	VSphereCSIControllerNamespace = "vmware-system-csi"
 	VeleroVSphereSecretName       = "velero-vsphere-config-secret"
 	VeleroVSphereConfigMapName    = "velero-vsphere-plugin-config"
+	BackupRepositoryConfigName    = "backup-repository-config"
 )
 
 var PublicCloudProviders = []string{AWS, Azure, GCP, Vsphere}
@@ -63,8 +67,8 @@ var UUIDgen uuid.UUID
 var VeleroCfg VeleroConfig
 
 type E2EReport struct {
-	TestDescription string                 `yaml:"Test Description"`
-	OtherFields     map[string]interface{} `yaml:",inline"`
+	TestDescription string         `yaml:"Test Description"`
+	OtherFields     map[string]any `yaml:",inline"`
 }
 
 var ReportData *E2EReport
@@ -83,6 +87,8 @@ type VeleroConfig struct {
 	CloudProvider                     string
 	ObjectStoreProvider               string
 	VeleroNamespace                   string
+	PodLabels                         string
+	ServiceAccountAnnotations         string
 	AdditionalBSLProvider             string
 	AdditionalBSLBucket               string
 	AdditionalBSLPrefix               string
@@ -124,6 +130,8 @@ type VeleroConfig struct {
 	EKSPolicyARN                      string
 	FailFast                          bool
 	HasVspherePlugin                  bool
+	ImageRegistryProxy                string
+	WorkerOS                          string
 }
 
 type VeleroCfgInPerf struct {

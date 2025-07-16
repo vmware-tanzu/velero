@@ -25,7 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -299,12 +299,12 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		}
 	}
 
-	var resModifiers *corev1.TypedLocalObjectReference = nil
+	var resModifiers *corev1api.TypedLocalObjectReference
 
 	if o.ResourceModifierConfigMap != "" {
-		resModifiers = &corev1.TypedLocalObjectReference{
+		resModifiers = &corev1api.TypedLocalObjectReference{
 			// Group for core API is ""
-			APIGroup: &corev1.SchemeGroupVersion.Group,
+			APIGroup: &corev1api.SchemeGroupVersion.Group,
 			Kind:     resourcemodifiers.ConfigmapRefType,
 			Name:     o.ResourceModifierConfigMap,
 		}
@@ -369,7 +369,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 		_, _ = restoreInformer.AddEventHandler(
 			cache.FilteringResourceEventHandler{
-				FilterFunc: func(obj interface{}) bool {
+				FilterFunc: func(obj any) bool {
 					restore, ok := obj.(*api.Restore)
 					if !ok {
 						return false
@@ -377,14 +377,14 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					return restore.Name == o.RestoreName
 				},
 				Handler: cache.ResourceEventHandlerFuncs{
-					UpdateFunc: func(_, obj interface{}) {
+					UpdateFunc: func(_, obj any) {
 						restore, ok := obj.(*api.Restore)
 						if !ok {
 							return
 						}
 						updates <- restore
 					},
-					DeleteFunc: func(obj interface{}) {
+					DeleteFunc: func(obj any) {
 						restore, ok := obj.(*api.Restore)
 						if !ok {
 							return

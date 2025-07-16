@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -32,8 +32,8 @@ func TestNamespacedFileStore(t *testing.T) {
 		name             string
 		namespace        string
 		fsRoot           string
-		secrets          []*corev1.Secret
-		secretSelector   *corev1.SecretKeySelector
+		secrets          []*corev1api.Secret
+		secretSelector   *corev1api.SecretKeySelector
 		wantErr          string
 		expectedPath     string
 		expectedContents string
@@ -48,7 +48,7 @@ func TestNamespacedFileStore(t *testing.T) {
 			namespace:      "ns1",
 			fsRoot:         "/tmp/credentials",
 			secretSelector: builder.ForSecretKeySelector("credential", "key2").Result(),
-			secrets: []*corev1.Secret{
+			secrets: []*corev1api.Secret{
 				builder.ForSecret("ns1", "credential").Data(map[string][]byte{
 					"key1": []byte("ns1-secretdata1"),
 					"key2": []byte("ns1-secretdata2"),

@@ -25,6 +25,8 @@ import (
 	"reflect"
 	"time"
 
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+
 	"context"
 
 	"github.com/sirupsen/logrus"
@@ -124,6 +126,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 					},
 				},
 			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
+			},
 		}
 		dbr := defaultTestDbr()
 		td := setupBackupDeletionControllerTest(t, dbr, location, backup)
@@ -190,7 +195,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		err = td.fakeClient.Create(context.TODO(), existing2)
 		require.NoError(t, err)
 		_, err = td.controller.Reconcile(context.TODO(), td.req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// verify "existing" is deleted
 		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
 			Namespace: existing.Namespace,
@@ -252,7 +257,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 	t.Run("backup storage location is in read-only mode", func(t *testing.T) {
 		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").StorageLocation("default").Result()
-		location := builder.ForBackupStorageLocation("velero", "default").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result()
+		location := builder.ForBackupStorageLocation("velero", "default").Phase(velerov1api.BackupStorageLocationPhaseAvailable).AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result()
 
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
 
@@ -266,6 +271,24 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.Len(t, res.Status.Errors, 1)
 		assert.Equal(t, "cannot delete backup because backup storage location default is currently in read-only mode", res.Status.Errors[0])
 	})
+
+	t.Run("backup storage location is in unavailable state", func(t *testing.T) {
+		backup := builder.ForBackup(velerov1api.DefaultNamespace, "foo").StorageLocation("default").Result()
+		location := builder.ForBackupStorageLocation("velero", "default").Phase(velerov1api.BackupStorageLocationPhaseUnavailable).Result()
+
+		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
+
+		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		require.NoError(t, err)
+
+		res := &velerov1api.DeleteBackupRequest{}
+		err = td.fakeClient.Get(ctx, td.req.NamespacedName, res)
+		require.NoError(t, err)
+		assert.Equal(t, "Processed", string(res.Status.Phase))
+		assert.Len(t, res.Status.Errors, 1)
+		assert.Equal(t, "cannot delete backup because backup storage location default is currently in Unavailable state", res.Status.Errors[0])
+	})
+
 	t.Run("full delete, no errors", func(t *testing.T) {
 		input := defaultTestDbr()
 
@@ -294,6 +317,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 						Bucket: "bucket",
 					},
 				},
+			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 		}
 
@@ -366,7 +392,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		td.backupStore.AssertCalled(t, "DeleteBackup", input.Spec.BackupName)
 
@@ -413,6 +439,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 						Bucket: "bucket",
 					},
 				},
+			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 		}
 
@@ -487,7 +516,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())
@@ -515,6 +544,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 						Bucket: "bucket",
 					},
 				},
+			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
 			},
 		}
 
@@ -598,6 +630,9 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 					},
 				},
 			},
+			Status: velerov1api.BackupStorageLocationStatus{
+				Phase: velerov1api.BackupStorageLocationPhaseAvailable,
+			},
 		}
 
 		snapshotLocation := &velerov1api.VolumeSnapshotLocation{
@@ -609,7 +644,13 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 				Provider: "provider-1",
 			},
 		}
-		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), backup, location, snapshotLocation)
+
+		csiSnapshot := builder.ForVolumeSnapshot("user-ns", "vs-1").ObjectMeta(
+			builder.WithLabelsMap(map[string]string{
+				"velero.io/backup-name": "foo",
+			})).SourcePVC("some-pvc").Result()
+
+		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), backup, location, snapshotLocation, csiSnapshot)
 		td.volumeSnapshotter.SnapshotsTaken.Insert("snap-1")
 
 		snapshots := []*volume.Snapshot{
@@ -653,6 +694,13 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 			Name:      backup.Name,
 		}, &velerov1api.Backup{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
+
+		// leaked CSI snapshot should be deleted
+		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+			Namespace: "user-ns",
+			Name:      "vs-1",
+		}, &snapshotv1api.VolumeSnapshot{})
+		assert.True(t, apierrors.IsNotFound(err), "Expected not found error for the leaked CSI snapshot, but actual value of error: %v", err)
 
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())
@@ -852,7 +900,7 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			})
 
 			res, err := getSnapshotsInBackup(context.TODO(), veleroBackup, clientBuilder.Build())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.True(t, reflect.DeepEqual(res, test.expected))
 		})
@@ -1022,7 +1070,7 @@ func TestDeleteMovedSnapshots(t *testing.T) {
 			if test.expected == nil {
 				assert.Nil(t, errs)
 			} else {
-				assert.Equal(t, len(test.expected), len(errs))
+				assert.Len(t, errs, len(test.expected))
 				for i := range test.expected {
 					assert.EqualError(t, errs[i], test.expected[i])
 				}

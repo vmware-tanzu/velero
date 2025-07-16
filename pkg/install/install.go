@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -152,11 +152,11 @@ func crdsAreReady(kbClient kbclient.Client, crds []*unstructured.Unstructured) (
 	return true, nil
 }
 
-func isAvailable(c appsv1.DeploymentCondition) bool {
+func isAvailable(c appsv1api.DeploymentCondition) bool {
 	// Make sure that the deployment has been available for at least 10 seconds.
 	// This is because the deployment can show as Ready momentarily before the pods fall into a CrashLoopBackOff.
 	// See podutils.IsPodAvailable upstream for similar logic with pods
-	if c.Type == appsv1.DeploymentAvailable && c.Status == corev1.ConditionTrue {
+	if c.Type == appsv1api.DeploymentAvailable && c.Status == corev1api.ConditionTrue {
 		if !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(10*time.Second).Before(time.Now()) {
 			return true
 		}
@@ -166,7 +166,7 @@ func isAvailable(c appsv1.DeploymentCondition) bool {
 
 // DeploymentIsReady will poll the Kubernetes API server to see if the velero deployment is ready to service user requests.
 func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, error) {
-	gvk := schema.FromAPIVersionAndKind(appsv1.SchemeGroupVersion.String(), "Deployment")
+	gvk := schema.FromAPIVersionAndKind(appsv1api.SchemeGroupVersion.String(), "Deployment")
 	apiResource := metav1.APIResource{
 		Name:       "deployments",
 		Namespaced: true,
@@ -186,7 +186,7 @@ func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, e
 			return false, errors.Wrap(err, "error waiting for deployment to be ready")
 		}
 
-		deploy := new(appsv1.Deployment)
+		deploy := new(appsv1api.Deployment)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredDeployment.Object, deploy); err != nil {
 			return false, errors.Wrap(err, "error converting deployment from unstructured")
 		}
@@ -219,7 +219,7 @@ func NodeAgentWindowsIsReady(factory client.DynamicFactory, namespace string) (b
 }
 
 func daemonSetIsReady(factory client.DynamicFactory, namespace string, name string) (bool, error) {
-	gvk := schema.FromAPIVersionAndKind(appsv1.SchemeGroupVersion.String(), "DaemonSet")
+	gvk := schema.FromAPIVersionAndKind(appsv1api.SchemeGroupVersion.String(), "DaemonSet")
 	apiResource := metav1.APIResource{
 		Name:       "daemonsets",
 		Namespaced: true,
@@ -242,7 +242,7 @@ func daemonSetIsReady(factory client.DynamicFactory, namespace string, name stri
 			return false, errors.Wrap(err, "error waiting for daemonset to be ready")
 		}
 
-		daemonSet := new(appsv1.DaemonSet)
+		daemonSet := new(appsv1api.DaemonSet)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredDaemonSet.Object, daemonSet); err != nil {
 			return false, errors.Wrap(err, "error converting daemonset from unstructured")
 		}
@@ -284,7 +284,7 @@ func createResource(r *unstructured.Unstructured, factory client.DynamicFactory,
 	id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
 
 	// Helper to reduce boilerplate message about the same object
-	log := func(f string, a ...interface{}) {
+	log := func(f string, a ...any) {
 		format := strings.Join([]string{id, ": ", f, "\n"}, "")
 		fmt.Fprintf(w, format, a...)
 	}
@@ -310,7 +310,7 @@ func CreateClient(r *unstructured.Unstructured, factory client.DynamicFactory, w
 	id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
 
 	// Helper to reduce boilerplate message about the same object
-	log := func(f string, a ...interface{}) {
+	log := func(f string, a ...any) {
 		format := strings.Join([]string{id, ": ", f, "\n"}, "")
 		fmt.Fprintf(w, format, a...)
 	}

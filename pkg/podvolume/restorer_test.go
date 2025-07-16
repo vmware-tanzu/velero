@@ -26,7 +26,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	appv1 "k8s.io/api/apps/v1"
+	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -121,8 +121,8 @@ func TestGetVolumesRepositoryType(t *testing.T) {
 	}
 }
 
-func createNodeAgentDaemonset() *appv1.DaemonSet {
-	ds := &appv1.DaemonSet{
+func createNodeAgentDaemonset() *appsv1api.DaemonSet {
+	ds := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "node-agent",
 			Namespace: velerov1api.DefaultNamespace,
@@ -310,30 +310,6 @@ func TestRestorePodVolumes(t *testing.T) {
 			errs: []expectError{
 				{
 					err: "pod volume restore failed: fake-message",
-				},
-			},
-		},
-		{
-			name: "pod is not running on linux nodes",
-			pvbs: []*velerov1api.PodVolumeBackup{
-				createPVBObj(true, true, 1, "kopia"),
-			},
-			kubeClientObj: []runtime.Object{
-				createNodeAgentDaemonset(),
-				createWindowsNodeObj(),
-				createPVCObj(1),
-				createPodObj(true, true, true, 1),
-			},
-			ctlClientObj: []runtime.Object{
-				createBackupRepoObj(),
-			},
-			restoredPod:     createPodObj(true, true, true, 1),
-			sourceNamespace: "fake-ns",
-			bsl:             "fake-bsl",
-			runtimeScheme:   scheme,
-			errs: []expectError{
-				{
-					err: "restored pod fake-ns/fake-pod is not running in linux node(fake-node-name): os type windows for node fake-node-name is not linux",
 				},
 			},
 		},

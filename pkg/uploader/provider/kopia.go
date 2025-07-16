@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/kopia/kopia/snapshot/snapshotfs"
+	"github.com/kopia/kopia/snapshot/upload"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -85,7 +85,7 @@ func NewKopiaUploaderProvider(
 }
 
 // CheckContext check context status check if context is timeout or cancel and backup restore once finished it will quit and return
-func (kp *kopiaProvider) CheckContext(ctx context.Context, finishChan chan struct{}, restoreChan chan struct{}, uploader *snapshotfs.Uploader) {
+func (kp *kopiaProvider) CheckContext(ctx context.Context, finishChan chan struct{}, restoreChan chan struct{}, uploader *upload.Uploader) {
 	select {
 	case <-finishChan:
 		kp.log.Infof("Action finished")
@@ -135,7 +135,7 @@ func (kp *kopiaProvider) RunBackup(
 		"parentSnapshot": parentSnapshot,
 	})
 	repoWriter := kopia.NewShimRepo(kp.bkRepo)
-	kpUploader := snapshotfs.NewUploader(repoWriter)
+	kpUploader := upload.NewUploader(repoWriter)
 	kpUploader.Progress = kopia.NewProgress(updater, backupProgressCheckInterval, log)
 	kpUploader.FailFast = true
 	quit := make(chan struct{})
@@ -192,7 +192,7 @@ func (kp *kopiaProvider) RunBackup(
 	return snapshotInfo.ID, false, snapshotInfo.Size, nil
 }
 
-func (kp *kopiaProvider) GetPassword(param interface{}) (string, error) {
+func (kp *kopiaProvider) GetPassword(param any) (string, error) {
 	if kp.credGetter.FromSecret == nil {
 		return "", errors.New("invalid credentials interface")
 	}

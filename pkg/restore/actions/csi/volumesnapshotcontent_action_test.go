@@ -17,6 +17,8 @@ limitations under the License.
 package csi
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
@@ -27,18 +29,25 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	factorymocks "github.com/vmware-tanzu/velero/pkg/client/mocks"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util"
 )
 
 func TestVSCExecute(t *testing.T) {
+	snapshotHandleName := "testHandle"
+	newVscName := util.GenerateSha256FromRestoreUIDAndVsName("restoreUID", "vsName")
 	tests := []struct {
 		name          string
 		item          runtime.Unstructured
 		vsc           *snapshotv1api.VolumeSnapshotContent
 		restore       *velerov1api.Restore
 		expectErr     bool
+		createVSC     bool
 		expectedItems []velero.ResourceIdentifier
+		expectedVSC   *snapshotv1api.VolumeSnapshotContent
 	}{
 		{
 			name:      "Restore's RestorePVs is false",
@@ -46,14 +55,16 @@ func TestVSCExecute(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name: "Normal case, additional items should return",
+			name: "Normal case, additional items should return    ",
 			vsc: builder.ForVolumeSnapshotContent("test").ObjectMeta(builder.WithAnnotationsMap(
 				map[string]string{
 					velerov1api.PrefixedSecretNameAnnotation:      "name",
 					velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
 				},
-			)).Result(),
-			restore:   builder.ForRestore("velero", "restore").Result(),
+			)).VolumeSnapshotRef("velero", "vsName", "vsUID").
+				Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).Result(),
+			restore: builder.ForRestore("velero", "restore").ObjectMeta(builder.WithUID("restoreUID")).
+				NamespaceMappings("velero", "restore").Result(),
 			expectErr: false,
 			expectedItems: []velero.ResourceIdentifier{
 				{
@@ -62,31 +73,80 @@ func TestVSCExecute(t *testing.T) {
 					Name:          "name",
 				},
 			},
+			expectedVSC: builder.ForVolumeSnapshotContent(newVscName).ObjectMeta(builder.WithAnnotationsMap(
+				map[string]string{
+					velerov1api.PrefixedSecretNameAnnotation:      "name",
+					velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
+				},
+			)).VolumeSnapshotRef("restore", newVscName, "").
+				Source(snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: &snapshotHandleName}).
+				DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).
+				Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).Result(),
+		},
+		{
+			name: "VSC exists in cluster, same as the normal case",
+			vsc: builder.ForVolumeSnapshotContent("test").ObjectMeta(builder.WithAnnotationsMap(
+				map[string]string{
+					velerov1api.PrefixedSecretNameAnnotation:      "name",
+					velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
+				},
+			)).VolumeSnapshotRef("velero", "vsName", "vsUID").
+				Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).Result(),
+			restore: builder.ForRestore("velero", "restore").ObjectMeta(builder.WithUID("restoreUID")).
+				NamespaceMappings("velero", "restore").Result(),
+			createVSC: true,
+			expectErr: false,
+			expectedVSC: builder.ForVolumeSnapshotContent(newVscName).ObjectMeta(builder.WithAnnotationsMap(
+				map[string]string{
+					velerov1api.PrefixedSecretNameAnnotation:      "name",
+					velerov1api.PrefixedSecretNamespaceAnnotation: "namespace",
+				},
+			)).VolumeSnapshotRef("restore", newVscName, "").
+				Source(snapshotv1api.VolumeSnapshotContentSource{SnapshotHandle: &snapshotHandleName}).
+				DeletionPolicy(snapshotv1api.VolumeSnapshotContentRetain).
+				Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &snapshotHandleName}).Result(),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p, err := NewVolumeSnapshotContentRestoreItemAction(logrus.StandardLogger())
-			require.NoError(t, err)
-
-			action := p.(*volumeSnapshotContentRestoreItemAction)
+			action := volumeSnapshotContentRestoreItemAction{
+				log:    logrus.StandardLogger(),
+				client: velerotest.NewFakeControllerRuntimeClient(t),
+			}
 
 			if test.vsc != nil {
 				vsMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(test.vsc)
 				require.NoError(t, err)
 				test.item = &unstructured.Unstructured{Object: vsMap}
+
+				if test.createVSC {
+					require.NoError(t, action.client.Create(context.TODO(), test.vsc))
+				}
 			}
 
 			output, err := action.Execute(
 				&velero.RestoreItemActionExecuteInput{
-					Item:    test.item,
-					Restore: test.restore,
+					Item:           test.item,
+					ItemFromBackup: test.item,
+					Restore:        test.restore,
 				},
 			)
 
 			if test.expectErr == false {
 				require.NoError(t, err)
+			}
+
+			if test.expectedVSC != nil {
+				vsc := new(snapshotv1api.VolumeSnapshotContent)
+				require.NoError(t,
+					runtime.DefaultUnstructuredConverter.FromUnstructured(
+						output.UpdatedItem.UnstructuredContent(),
+						vsc,
+					),
+				)
+
+				require.Equal(t, test.expectedVSC, vsc)
 			}
 
 			if len(test.expectedItems) > 0 {
@@ -111,4 +171,21 @@ func TestVSCAppliesTo(t *testing.T) {
 		},
 		selector,
 	)
+}
+
+func TestNewVolumeSnapshotContentRestoreItemAction(t *testing.T) {
+	logger := logrus.StandardLogger()
+	crClient := velerotest.NewFakeControllerRuntimeClient(t)
+
+	f := &factorymocks.Factory{}
+	f.On("KubebuilderClient").Return(nil, fmt.Errorf(""))
+	plugin := NewVolumeSnapshotContentRestoreItemAction(f)
+	_, err := plugin(logger)
+	require.Error(t, err)
+
+	f1 := &factorymocks.Factory{}
+	f1.On("KubebuilderClient").Return(crClient, nil)
+	plugin1 := NewVolumeSnapshotContentRestoreItemAction(f1)
+	_, err1 := plugin1(logger)
+	require.NoError(t, err1)
 }

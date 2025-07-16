@@ -23,13 +23,13 @@ import (
 	"time"
 
 	"github.com/kopia/kopia/repo"
-	"github.com/kopia/kopia/snapshot/snapshotfs"
+	"github.com/kopia/kopia/snapshot/upload"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -172,7 +172,7 @@ func TestCheckContext(t *testing.T) {
 		name          string
 		finishChan    chan struct{}
 		restoreChan   chan struct{}
-		uploader      *snapshotfs.Uploader
+		uploader      *upload.Uploader
 		expectCancel  bool
 		expectBackup  bool
 		expectRestore bool
@@ -181,7 +181,7 @@ func TestCheckContext(t *testing.T) {
 			name:          "FinishChan",
 			finishChan:    make(chan struct{}),
 			restoreChan:   make(chan struct{}),
-			uploader:      &snapshotfs.Uploader{},
+			uploader:      &upload.Uploader{},
 			expectCancel:  false,
 			expectBackup:  false,
 			expectRestore: false,
@@ -236,13 +236,13 @@ func TestGetPassword(t *testing.T) {
 	testCases := []struct {
 		name           string
 		empytSecret    bool
-		credGetterFunc func(*mocks.SecretStore, *v1.SecretKeySelector)
+		credGetterFunc func(*mocks.SecretStore, *corev1api.SecretKeySelector)
 		expectError    bool
 		expectedPass   string
 	}{
 		{
 			name: "valid credentials interface",
-			credGetterFunc: func(ss *mocks.SecretStore, selector *v1.SecretKeySelector) {
+			credGetterFunc: func(ss *mocks.SecretStore, selector *corev1api.SecretKeySelector) {
 				ss.On("Get", selector).Return("test", nil)
 			},
 			expectError:  false,
@@ -256,7 +256,7 @@ func TestGetPassword(t *testing.T) {
 		},
 		{
 			name: "ErrorGettingPassword",
-			credGetterFunc: func(ss *mocks.SecretStore, selector *v1.SecretKeySelector) {
+			credGetterFunc: func(ss *mocks.SecretStore, selector *corev1api.SecretKeySelector) {
 				ss.On("Get", selector).Return("", errors.New("error getting password"))
 			},
 			expectError:  true,
@@ -272,7 +272,7 @@ func TestGetPassword(t *testing.T) {
 			if !tc.empytSecret {
 				credGetter.FromSecret = mockCredGetter
 			}
-			repoKeySelector := &v1.SecretKeySelector{LocalObjectReference: v1.LocalObjectReference{Name: "velero-repo-credentials"}, Key: "repository-password"}
+			repoKeySelector := &corev1api.SecretKeySelector{LocalObjectReference: corev1api.LocalObjectReference{Name: "velero-repo-credentials"}, Key: "repository-password"}
 
 			if tc.credGetterFunc != nil {
 				tc.credGetterFunc(mockCredGetter, repoKeySelector)
@@ -284,9 +284,9 @@ func TestGetPassword(t *testing.T) {
 
 			password, err := kp.GetPassword(nil)
 			if tc.expectError {
-				assert.Error(t, err, "Expected an error")
+				require.Error(t, err, "Expected an error")
 			} else {
-				assert.NoError(t, err, "Expected no error")
+				require.NoError(t, err, "Expected no error")
 			}
 
 			assert.Equal(t, tc.expectedPass, password, "Expected password to match")
@@ -383,7 +383,7 @@ func TestNewKopiaUploaderProvider(t *testing.T) {
 			if tc.expectedError != "" {
 				require.ErrorContains(t, err, tc.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			// Verify that the expected methods were called on the mocks.

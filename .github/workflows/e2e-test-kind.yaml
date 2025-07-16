@@ -89,9 +89,10 @@ jobs:
       - name: Install MinIO
         run:
           docker run -d --rm -p 9000:9000 -e "MINIO_ACCESS_KEY=minio" -e "MINIO_SECRET_KEY=minio123" -e "MINIO_DEFAULT_BUCKETS=bucket,additional-bucket" bitnami/minio:2021.6.17-debian-10-r7
-      - uses: engineerd/setup-kind@v0.5.0
+      - uses: engineerd/setup-kind@v0.6.2
         with:
-          version: "v0.21.0"
+          skipClusterLogsExport: true
+          version: "v0.27.0"
           image: "kindest/node:v${{ matrix.k8s }}"
       - name: Fetch built CLI
         id: cli-cache
@@ -120,6 +121,8 @@ jobs:
           curl -LO https://dl.k8s.io/release/v${{ matrix.k8s }}/bin/linux/amd64/kubectl
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
+          git clone https://github.com/vmware-tanzu-experiments/distributed-data-generator.git -b main /tmp/kibishii
+
           GOPATH=~/go \
               CLOUD_PROVIDER=kind \
               OBJECT_STORE_PROVIDER=aws \
@@ -131,7 +134,9 @@ jobs:
               ADDITIONAL_CREDS_FILE=/tmp/credential \
               ADDITIONAL_BSL_BUCKET=additional-bucket \
               VELERO_IMAGE=velero:pr-test-linux-amd64 \
+              PLUGINS=velero/velero-plugin-for-aws:latest \
               GINKGO_LABELS="${{ matrix.labels }}" \
+              KIBISHII_DIRECTORY=/tmp/kibishii/kubernetes/yaml/ \
               make -C test/ run-e2e
         timeout-minutes: 30
       - name: Upload debug bundle

@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -36,6 +37,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 const (
@@ -44,6 +46,7 @@ const (
 	gcFailureBSLNotFound     = "BSLNotFound"
 	gcFailureBSLCannotGet    = "BSLCannotGet"
 	gcFailureBSLReadOnly     = "BSLReadOnly"
+	gcFailureBSLUnavailable  = "BSLUnavailable"
 )
 
 // gcReconciler creates DeleteBackupRequests for expired backups.
@@ -90,6 +93,7 @@ func (c *gcReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			},
 		})).
 		WatchesRawSource(s).
+		Named(constant.ControllerGarbageCollection).
 		Complete(c)
 }
 
@@ -143,10 +147,16 @@ func (c *gcReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
 		} else {
 			backup.Labels[garbageCollectionFailure] = gcFailureBSLCannotGet
 		}
+
 		if err := c.Update(ctx, backup); err != nil {
 			log.WithError(err).Error("error updating backup labels")
 		}
 		return ctrl.Result{}, errors.Wrap(err, "error getting backup storage location")
+	}
+
+	if !veleroutil.BSLIsAvailable(*loc) {
+		log.Infof("BSL %s is unavailable, cannot gc backup", loc.Name)
+		return ctrl.Result{}, fmt.Errorf("bsl %s is unavailable, cannot gc backup", loc.Name)
 	}
 
 	if loc.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {

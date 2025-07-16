@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	rbac "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	rbacbeta "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +34,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/actionhelpers"
 )
 
-func newV1ClusterRoleBindingList(rbacCRBList []rbac.ClusterRoleBinding) []actionhelpers.ClusterRoleBinding {
+func newV1ClusterRoleBindingList(rbacCRBList []rbacv1.ClusterRoleBinding) []actionhelpers.ClusterRoleBinding {
 	var crbs []actionhelpers.ClusterRoleBinding
 	for _, c := range rbacCRBList {
 		crbs = append(crbs, actionhelpers.V1ClusterRoleBinding{Crb: c})
@@ -53,7 +53,7 @@ func newV1beta1ClusterRoleBindingList(rbacCRBList []rbacbeta.ClusterRoleBinding)
 }
 
 type FakeV1ClusterRoleBindingLister struct {
-	v1crbs []rbac.ClusterRoleBinding
+	v1crbs []rbacv1.ClusterRoleBinding
 }
 
 func (f FakeV1ClusterRoleBindingLister) List() ([]actionhelpers.ClusterRoleBinding, error) {
@@ -98,17 +98,17 @@ func TestNewServiceAccountAction(t *testing.T) {
 	}{
 		{
 			name:    "rbac v1 API instantiates an saAction",
-			version: rbac.SchemeGroupVersion.Version,
+			version: rbacv1.SchemeGroupVersion.Version,
 			expectedCRBs: []actionhelpers.ClusterRoleBinding{
 				actionhelpers.V1ClusterRoleBinding{
-					Crb: rbac.ClusterRoleBinding{
+					Crb: rbacv1.ClusterRoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "v1crb-1",
 						},
 					},
 				},
 				actionhelpers.V1ClusterRoleBinding{
-					Crb: rbac.ClusterRoleBinding{
+					Crb: rbacv1.ClusterRoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "v1crb-2",
 						},
@@ -146,7 +146,7 @@ func TestNewServiceAccountAction(t *testing.T) {
 	discoveryHelper := velerotest.FakeDiscoveryHelper{}
 	logger := velerotest.NewLogger()
 
-	v1crbs := []rbac.ClusterRoleBinding{
+	v1crbs := []rbacv1.ClusterRoleBinding{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "v1crb-1",
@@ -173,7 +173,7 @@ func TestNewServiceAccountAction(t *testing.T) {
 	}
 
 	clusterRoleBindingListers := map[string]actionhelpers.ClusterRoleBindingLister{
-		rbac.SchemeGroupVersion.Version:     FakeV1ClusterRoleBindingLister{v1crbs: v1crbs},
+		rbacv1.SchemeGroupVersion.Version:   FakeV1ClusterRoleBindingLister{v1crbs: v1crbs},
 		rbacbeta.SchemeGroupVersion.Version: FakeV1beta1ClusterRoleBindingLister{v1beta1crbs: v1beta1crbs},
 		"":                                  actionhelpers.NoopClusterRoleBindingLister{},
 	}
@@ -183,7 +183,7 @@ func TestNewServiceAccountAction(t *testing.T) {
 			// We only care about the preferred version, nothing else in the list
 			discoveryHelper.APIGroupsList = []metav1.APIGroup{
 				{
-					Name: rbac.GroupName,
+					Name: rbacv1.GroupName,
 					PreferredVersion: metav1.GroupVersionForDiscovery{
 						Version: test.version,
 					},
@@ -200,7 +200,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 	tests := []struct {
 		name                    string
 		serviceAccount          runtime.Unstructured
-		crbs                    []rbac.ClusterRoleBinding
+		crbs                    []rbacv1.ClusterRoleBinding
 		expectedAdditionalItems []velero.ResourceIdentifier
 	}{
 		{
@@ -230,9 +230,9 @@ func TestServiceAccountActionExecute(t *testing.T) {
 				}
 			}
 			`),
-			crbs: []rbac.ClusterRoleBinding{
+			crbs: []rbacv1.ClusterRoleBinding{
 				{
-					Subjects: []rbac.Subject{
+					Subjects: []rbacv1.Subject{
 						{
 							Kind:      "non-matching-kind",
 							Namespace: "non-matching-ns",
@@ -244,17 +244,17 @@ func TestServiceAccountActionExecute(t *testing.T) {
 							Name:      "velero",
 						},
 						{
-							Kind:      rbac.ServiceAccountKind,
+							Kind:      rbacv1.ServiceAccountKind,
 							Namespace: "non-matching-ns",
 							Name:      "velero",
 						},
 						{
-							Kind:      rbac.ServiceAccountKind,
+							Kind:      rbacv1.ServiceAccountKind,
 							Namespace: "velero",
 							Name:      "non-matching-name",
 						},
 					},
-					RoleRef: rbac.RoleRef{
+					RoleRef: rbacv1.RoleRef{
 						Name: "role",
 					},
 				},
@@ -273,19 +273,19 @@ func TestServiceAccountActionExecute(t *testing.T) {
 				}
 			}
 			`),
-			crbs: []rbac.ClusterRoleBinding{
+			crbs: []rbacv1.ClusterRoleBinding{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "crb-1",
 					},
-					Subjects: []rbac.Subject{
+					Subjects: []rbacv1.Subject{
 						{
 							Kind:      "non-matching-kind",
 							Namespace: "non-matching-ns",
 							Name:      "non-matching-name",
 						},
 					},
-					RoleRef: rbac.RoleRef{
+					RoleRef: rbacv1.RoleRef{
 						Name: "role-1",
 					},
 				},
@@ -293,19 +293,19 @@ func TestServiceAccountActionExecute(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "crb-2",
 					},
-					Subjects: []rbac.Subject{
+					Subjects: []rbacv1.Subject{
 						{
 							Kind:      "non-matching-kind",
 							Namespace: "non-matching-ns",
 							Name:      "non-matching-name",
 						},
 						{
-							Kind:      rbac.ServiceAccountKind,
+							Kind:      rbacv1.ServiceAccountKind,
 							Namespace: "velero",
 							Name:      "velero",
 						},
 					},
-					RoleRef: rbac.RoleRef{
+					RoleRef: rbacv1.RoleRef{
 						Name: "role-2",
 					},
 				},
@@ -313,14 +313,14 @@ func TestServiceAccountActionExecute(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "crb-3",
 					},
-					Subjects: []rbac.Subject{
+					Subjects: []rbacv1.Subject{
 						{
-							Kind:      rbac.ServiceAccountKind,
+							Kind:      rbacv1.ServiceAccountKind,
 							Namespace: "velero",
 							Name:      "velero",
 						},
 					},
-					RoleRef: rbac.RoleRef{
+					RoleRef: rbacv1.RoleRef{
 						Name: "role-3",
 					},
 				},
@@ -328,9 +328,9 @@ func TestServiceAccountActionExecute(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "crb-4",
 					},
-					Subjects: []rbac.Subject{
+					Subjects: []rbacv1.Subject{
 						{
-							Kind:      rbac.ServiceAccountKind,
+							Kind:      rbacv1.ServiceAccountKind,
 							Namespace: "velero",
 							Name:      "velero",
 						},
@@ -340,7 +340,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 							Name:      "non-matching-name",
 						},
 					},
-					RoleRef: rbac.RoleRef{
+					RoleRef: rbacv1.RoleRef{
 						Name: "role-4",
 					},
 				},
@@ -385,7 +385,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 			res, additional, err := action.Execute(test.serviceAccount, nil)
 
 			assert.Equal(t, test.serviceAccount, res)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// ensure slices are ordered for valid comparison
 			sort.Slice(test.expectedAdditionalItems, func(i, j int) bool {
@@ -592,7 +592,7 @@ func TestServiceAccountActionExecuteOnBeta1(t *testing.T) {
 			res, additional, err := action.Execute(test.serviceAccount, nil)
 
 			assert.Equal(t, test.serviceAccount, res)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// ensure slices are ordered for valid comparison
 			sort.Slice(test.expectedAdditionalItems, func(i, j int) bool {

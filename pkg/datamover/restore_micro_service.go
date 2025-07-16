@@ -88,7 +88,7 @@ func (r *RestoreMicroService) Init() error {
 
 	handler, err := r.ddInformer.AddEventHandler(
 		cachetool.ResourceEventHandlerFuncs{
-			UpdateFunc: func(oldObj interface{}, newObj interface{}) {
+			UpdateFunc: func(oldObj any, newObj any) {
 				oldDd := oldObj.(*velerov2alpha1api.DataDownload)
 				newDd := newObj.(*velerov2alpha1api.DataDownload)
 

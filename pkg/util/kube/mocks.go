@@ -8,7 +8,8 @@ import (
 )
 
 // Client knows how to perform CRUD operations on Kubernetes objects.
-// go:generate mockery --name=Client
+//
+//go:generate mockery --name=Client
 type Client interface {
 	client.Reader
 	client.Writer

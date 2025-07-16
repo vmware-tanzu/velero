@@ -376,7 +376,7 @@ func (urp *unifiedRepoProvider) DefaultMaintenanceFrequency(ctx context.Context,
 	return urp.repoService.DefaultMaintenanceFrequency()
 }
 
-func (urp *unifiedRepoProvider) GetPassword(param interface{}) (string, error) {
+func (urp *unifiedRepoProvider) GetPassword(param any) (string, error) {
 	_, ok := param.(RepoParam)
 	if !ok {
 		return "", errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
@@ -390,7 +390,7 @@ func (urp *unifiedRepoProvider) GetPassword(param interface{}) (string, error) {
 	return repoPassword, nil
 }
 
-func (urp *unifiedRepoProvider) GetStoreType(param interface{}) (string, error) {
+func (urp *unifiedRepoProvider) GetStoreType(param any) (string, error) {
 	repoParam, ok := param.(RepoParam)
 	if !ok {
 		return "", errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
@@ -399,7 +399,7 @@ func (urp *unifiedRepoProvider) GetStoreType(param interface{}) (string, error) 
 	return getStorageType(repoParam.BackupLocation), nil
 }
 
-func (urp *unifiedRepoProvider) GetStoreOptions(param interface{}) (map[string]string, error) {
+func (urp *unifiedRepoProvider) GetStoreOptions(param any) (map[string]string, error) {
 	repoParam, ok := param.(RepoParam)
 	if !ok {
 		return map[string]string{}, errors.Errorf("invalid parameter, expect %T, actual %T", RepoParam{}, param)
@@ -506,6 +506,10 @@ func getStorageCredentials(backupLocation *velerov1api.BackupStorageLocation, cr
 	return result, nil
 }
 
+// Translates user specified options (backupRepoConfig) to internal parameters
+// so we would accept only the options that are well defined in the internal system.
+// Users' inputs should not be treated as safe any time.
+// We remove the unnecessary parameters and keep the modules/logics below safe
 func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repoBackend string, repoName string, backupRepoConfig map[string]string) (map[string]string, error) {
 	result := make(map[string]string)
 
@@ -576,9 +580,17 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 	result[udmrepo.StoreOptionOssRegion] = strings.Trim(region, "/")
 	result[udmrepo.StoreOptionFsPath] = config["fspath"]
 
+	// We remove the unnecessary parameters and keep the modules/logics below safe
 	if backupRepoConfig != nil {
-		if v, found := backupRepoConfig[udmrepo.StoreOptionCacheLimit]; found {
-			result[udmrepo.StoreOptionCacheLimit] = v
+		// range of valid params to keep, everything else will be discarded.
+		validParams := []string{
+			udmrepo.StoreOptionCacheLimit,
+			udmrepo.StoreOptionKeyFullMaintenanceInterval,
+		}
+		for _, param := range validParams {
+			if v, found := backupRepoConfig[param]; found {
+				result[param] = v
+			}
 		}
 	}
 

@@ -208,7 +208,7 @@ func TestRemapCRDVersionActionData(t *testing.T) {
 			// For ElasticSearch and Kibana, problems manifested when additionalPrinterColumns was moved from the top-level spec down to the
 			// versions slice.
 			if test.expectAdditionalColumns {
-				_, ok := item.UnstructuredContent()["spec"].(map[string]interface{})["additionalPrinterColumns"]
+				_, ok := item.UnstructuredContent()["spec"].(map[string]any)["additionalPrinterColumns"]
 				assert.True(t, ok)
 			}
 

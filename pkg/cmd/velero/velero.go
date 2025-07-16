@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/debug"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/podvolume"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/repomantenance"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -126,6 +127,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		debug.NewCommand(f),
 		repomantenance.NewCommand(f),
 		datamover.NewCommand(f),
+		podvolume.NewCommand(f),
 	)
 
 	// init and add the klog flags

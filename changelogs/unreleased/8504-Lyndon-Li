@@ -1,1 +1,0 @@
-Fix issue #8416, #8417, deploy Velero server and node-agent in linux/Windows hybrid env

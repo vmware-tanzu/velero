@@ -92,7 +92,7 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 	if !ok {
 		return nil, errors.Errorf("unexpected type %T", updated1)
 	}
-	var iops int64 = 0
+	var iops int64
 	if snapshotInfo.volumeIOPS != nil {
 		iops = *snapshotInfo.volumeIOPS
 	}

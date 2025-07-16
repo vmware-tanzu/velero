@@ -19,7 +19,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
+	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -120,6 +121,43 @@ volumePolicies:
 `,
 			wantErr: false,
 		},
+		{
+			name: "supported format pvcLabels",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      pvcLabels:
+        environment: production
+        app: database
+    action:
+      type: skip
+`,
+			wantErr: false,
+		},
+		{
+			name: "error format of pvcLabels (not a map)",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      pvcLabels: "production"
+    action:
+      type: skip
+`,
+			wantErr: true,
+		},
+		{
+			name: "supported format pvcLabels with extra keys",
+			yamlData: `version: v1
+volumePolicies:
+  - conditions:
+      pvcLabels:
+        environment: production
+        region: us-west
+    action:
+      type: skip
+`,
+			wantErr: false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -138,20 +176,20 @@ func TestGetResourceMatchedAction(t *testing.T) {
 		VolumePolicies: []VolumePolicy{
 			{
 				Action: Action{Type: "skip"},
-				Conditions: map[string]interface{}{
+				Conditions: map[string]any{
 					"capacity":     "0,10Gi",
 					"storageClass": []string{"gp2", "ebs-sc"},
-					"csi": interface{}(
-						map[string]interface{}{
+					"csi": any(
+						map[string]any{
 							"driver": "aws.efs.csi.driver",
 						}),
 				},
 			},
 			{
 				Action: Action{Type: "skip"},
-				Conditions: map[string]interface{}{
-					"csi": interface{}(
-						map[string]interface{}{
+				Conditions: map[string]any{
+					"csi": any(
+						map[string]any{
 							"driver":           "files.csi.driver",
 							"volumeAttributes": map[string]string{"protocol": "nfs"},
 						}),
@@ -159,23 +197,31 @@ func TestGetResourceMatchedAction(t *testing.T) {
 			},
 			{
 				Action: Action{Type: "snapshot"},
-				Conditions: map[string]interface{}{
+				Conditions: map[string]any{
 					"capacity":     "10,100Gi",
 					"storageClass": []string{"gp2", "ebs-sc"},
-					"csi": interface{}(
-						map[string]interface{}{
+					"csi": any(
+						map[string]any{
 							"driver": "aws.efs.csi.driver",
 						}),
 				},
 			},
 			{
 				Action: Action{Type: "fs-backup"},
-				Conditions: map[string]interface{}{
+				Conditions: map[string]any{
 					"storageClass": []string{"gp2", "ebs-sc"},
-					"csi": interface{}(
-						map[string]interface{}{
+					"csi": any(
+						map[string]any{
 							"driver": "aws.efs.csi.driver",
 						}),
+				},
+			},
+			{
+				Action: Action{Type: "snapshot"},
+				Conditions: map[string]any{
+					"pvcLabels": map[string]string{
+						"environment": "production",
+					},
 				},
 			},
 		},
@@ -230,6 +276,29 @@ func TestGetResourceMatchedAction(t *testing.T) {
 			},
 			expectedAction: nil,
 		},
+		{
+			name: "match pvcLabels condition",
+			volume: &structuredVolume{
+				capacity:     *resource.NewQuantity(5<<30, resource.BinarySI),
+				storageClass: "some-class",
+				pvcLabels: map[string]string{
+					"environment": "production",
+					"team":        "backend",
+				},
+			},
+			expectedAction: &Action{Type: "snapshot"},
+		},
+		{
+			name: "mismatch pvcLabels condition",
+			volume: &structuredVolume{
+				capacity:     *resource.NewQuantity(5<<30, resource.BinarySI),
+				storageClass: "some-class",
+				pvcLabels: map[string]string{
+					"environment": "staging",
+				},
+			},
+			expectedAction: nil,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -260,30 +329,52 @@ func TestGetResourceMatchedAction(t *testing.T) {
 
 func TestGetResourcePoliciesFromConfig(t *testing.T) {
 	// Create a test ConfigMap
-	cm := &v1.ConfigMap{
+	cm := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "test-namespace",
 		},
 		Data: map[string]string{
-			"test-data": "version: v1\nvolumePolicies:\n  - conditions:\n      capacity: '0,10Gi'\n      csi:\n        driver: disks.csi.driver\n    action:\n      type: skip\n  - conditions:\n      csi:\n        driver: files.csi.driver\n        volumeAttributes:\n          protocol: nfs\n    action:\n      type: skip",
+			"test-data": `version: v1
+volumePolicies:
+  - conditions:
+      capacity: '0,10Gi'
+      csi:
+        driver: disks.csi.driver
+    action:
+      type: skip
+  - conditions:
+      csi:
+        driver: files.csi.driver
+        volumeAttributes:
+          protocol: nfs
+    action:
+      type: skip
+  - conditions:
+      pvcLabels:
+        environment: production
+    action:
+      type: skip
+`,
 		},
 	}
 
 	// Call the function and check for errors
 	resPolicies, err := getResourcePoliciesFromConfig(cm)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check that the returned resourcePolicies object contains the expected data
 	assert.Equal(t, "v1", resPolicies.version)
-	assert.Len(t, resPolicies.volumePolicies, 2)
+
+	assert.Len(t, resPolicies.volumePolicies, 3)
+
 	policies := ResourcePolicies{
 		Version: "v1",
 		VolumePolicies: []VolumePolicy{
 			{
-				Conditions: map[string]interface{}{
+				Conditions: map[string]any{
 					"capacity": "0,10Gi",
-					"csi": map[string]interface{}{
+					"csi": map[string]any{
 						"driver": "disks.csi.driver",
 					},
 				},
@@ -292,8 +383,8 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 				},
 			},
 			{
-				Conditions: map[string]interface{}{
-					"csi": map[string]interface{}{
+				Conditions: map[string]any{
+					"csi": map[string]any{
 						"driver":           "files.csi.driver",
 						"volumeAttributes": map[string]string{"protocol": "nfs"},
 					},
@@ -302,13 +393,25 @@ func TestGetResourcePoliciesFromConfig(t *testing.T) {
 					Type: Skip,
 				},
 			},
+			{
+				Conditions: map[string]any{
+					"pvcLabels": map[string]string{
+						"environment": "production",
+					},
+				},
+				Action: Action{
+					Type: Skip,
+				},
+			},
 		},
 	}
+
 	p := &Policies{}
 	err = p.BuildPolicy(&policies)
 	if err != nil {
-		t.Fatalf("failed to build policy with error %v", err)
+		t.Fatalf("failed to build policy: %v", err)
 	}
+
 	assert.Equal(t, p, resPolicies)
 }
 
@@ -316,7 +419,9 @@ func TestGetMatchAction(t *testing.T) {
 	testCases := []struct {
 		name     string
 		yamlData string
-		vol      *v1.PersistentVolume
+		vol      *corev1api.PersistentVolume
+		podVol   *corev1api.Volume
+		pvc      *corev1api.PersistentVolumeClaim
 		skip     bool
 	}{
 		{
@@ -327,10 +432,10 @@ volumePolicies:
    csi: {}
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "ebs.csi.aws.com"},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "ebs.csi.aws.com"},
 					}},
 			},
 			skip: true,
@@ -343,10 +448,10 @@ volumePolicies:
    csi: {}
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
 					}},
 			},
 			skip: false,
@@ -360,10 +465,10 @@ volumePolicies:
         driver: files.csi.driver
     action:
       type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "disks.csi.driver"},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "disks.csi.driver"},
 					}},
 			},
 			skip: false,
@@ -377,10 +482,10 @@ volumePolicies:
         driver: files.csi.driver
     action:
       type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver"},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "files.csi.driver"},
 					}},
 			},
 			skip: true,
@@ -397,10 +502,10 @@ volumePolicies:
     action:
       type: skip
 `,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "disks.csi.driver"},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "disks.csi.driver"},
 					}},
 			},
 			skip: false,
@@ -417,10 +522,10 @@ volumePolicies:
     action:
       type: skip
 `,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
 					}},
 			},
 			skip: false,
@@ -437,10 +542,10 @@ volumePolicies:
     action:
       type: skip
 `,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"protocol": "nfs"}},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"protocol": "nfs"}},
 					}},
 			},
 			skip: true,
@@ -461,10 +566,10 @@ volumePolicies:
           protocol: nfs
     action:
       type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "disks.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "disks.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
 					}},
 			},
 			skip: true,
@@ -485,10 +590,10 @@ volumePolicies:
           protocol: nfs
     action:
       type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1"}},
 					}},
 			},
 			skip: false,
@@ -509,10 +614,10 @@ volumePolicies:
           protocol: nfs
     action:
       type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1", "protocol": "nfs"}},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "files.csi.driver", VolumeAttributes: map[string]string{"key1": "val1", "protocol": "nfs"}},
 					}},
 			},
 			skip: true,
@@ -525,13 +630,13 @@ volumePolicies:
     capacity: "0,100Gi"
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
 					},
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						CSI: &v1.CSIPersistentVolumeSource{Driver: "ebs.csi.aws.com"},
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						CSI: &corev1api.CSIPersistentVolumeSource{Driver: "ebs.csi.aws.com"},
 					}},
 			},
 			skip: true,
@@ -544,10 +649,10 @@ volumePolicies:
     nfs: {}
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						NFS: &v1.NFSVolumeSource{Server: "192.168.1.20"},
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						NFS: &corev1api.NFSVolumeSource{Server: "192.168.1.20"},
 					}},
 			},
 			skip: true,
@@ -560,13 +665,13 @@ volumePolicies:
     capacity: "0,100Gi"
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
 					},
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						NFS: &v1.NFSVolumeSource{Server: "192.168.1.20"},
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						NFS: &corev1api.NFSVolumeSource{Server: "192.168.1.20"},
 					},
 				},
 			},
@@ -581,10 +686,10 @@ volumePolicies:
     nfs: {}
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
 					},
 				},
 			},
@@ -601,13 +706,13 @@ volumePolicies:
       - hostPath
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
 					},
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						HostPath: &v1.HostPathVolumeSource{Path: "/mnt/data"},
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						HostPath: &corev1api.HostPathVolumeSource{Path: "/mnt/data"},
 					},
 				},
 			},
@@ -623,14 +728,232 @@ volumePolicies:
       - local
   action:
     type: skip`,
-			vol: &v1.PersistentVolume{
-				Spec: v1.PersistentVolumeSpec{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: resource.MustParse("1Gi"),
+			vol: &corev1api.PersistentVolume{
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
 					},
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						HostPath: &v1.HostPathVolumeSource{Path: "/mnt/data"},
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{
+						HostPath: &corev1api.HostPathVolumeSource{Path: "/mnt/data"},
 					},
+				},
+			},
+			skip: false,
+		},
+		{
+			name: "PVC labels match",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+    pvcLabels:
+      environment: production
+  action:
+    type: skip`,
+			vol: &corev1api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-1",
+				},
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{},
+					ClaimRef: &corev1api.ObjectReference{
+						Namespace: "default",
+						Name:      "pvc-1",
+					},
+				},
+			},
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-1",
+					Labels:    map[string]string{"environment": "production"},
+				},
+			},
+			skip: true,
+		},
+		{
+			name: "PVC labels match, criteria label is a subset of the pvc labels",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+    pvcLabels:
+      environment: production
+  action:
+    type: skip`,
+			vol: &corev1api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-1",
+				},
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{},
+					ClaimRef: &corev1api.ObjectReference{
+						Namespace: "default",
+						Name:      "pvc-1",
+					},
+				},
+			},
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-1",
+					Labels:    map[string]string{"environment": "production", "app": "backend"},
+				},
+			},
+			skip: true,
+		},
+		{
+			name: "PVC labels match don't match exactly",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+    pvcLabels:
+      environment: production
+      app: frontend
+  action:
+    type: skip`,
+			vol: &corev1api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-1",
+				},
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{},
+					ClaimRef: &corev1api.ObjectReference{
+						Namespace: "default",
+						Name:      "pvc-1",
+					},
+				},
+			},
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-1",
+					Labels:    map[string]string{"environment": "production"},
+				},
+			},
+			skip: false,
+		},
+		{
+			name: "PVC labels mismatch",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    capacity: "0,100Gi"
+    pvcLabels:
+      environment: production
+  action:
+    type: skip`,
+			vol: &corev1api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-2",
+				},
+				Spec: corev1api.PersistentVolumeSpec{
+					Capacity: corev1api.ResourceList{
+						corev1api.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					PersistentVolumeSource: corev1api.PersistentVolumeSource{},
+					ClaimRef: &corev1api.ObjectReference{
+						Namespace: "default",
+						Name:      "pvc-2",
+					},
+				},
+			},
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-1",
+					Labels:    map[string]string{"environment": "staging"},
+				},
+			},
+			skip: false,
+		},
+		{
+			name: "PodVolume case with PVC labels match",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    pvcLabels:
+      environment: production
+  action:
+    type: skip`,
+			vol:    nil,
+			podVol: &corev1api.Volume{Name: "pod-vol-1"},
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-1",
+					Labels:    map[string]string{"environment": "production"},
+				},
+			},
+			skip: true,
+		},
+		{
+			name: "PodVolume case with PVC labels mismatch",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    pvcLabels:
+      environment: production
+  action:
+    type: skip`,
+			vol:    nil,
+			podVol: &corev1api.Volume{Name: "pod-vol-2"},
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-2",
+					Labels:    map[string]string{"environment": "staging"},
+				},
+			},
+			skip: false,
+		},
+		{
+			name: "PodVolume case with PVC labels match with extra keys on PVC",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    pvcLabels:
+      environment: production
+  action:
+    type: skip`,
+			vol:    nil,
+			podVol: &corev1api.Volume{Name: "pod-vol-3"},
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-3",
+					Labels:    map[string]string{"environment": "production", "app": "backend"},
+				},
+			},
+			skip: true,
+		},
+		{
+			name: "PodVolume case with PVC labels don't match exactly",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+    pvcLabels:
+      environment: production
+      app: frontend
+  action:
+    type: skip`,
+			vol:    nil,
+			podVol: &corev1api.Volume{Name: "pod-vol-4"},
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-4",
+					Labels:    map[string]string{"environment": "production"},
 				},
 			},
 			skip: false,
@@ -642,12 +965,25 @@ volumePolicies:
 			if err != nil {
 				t.Fatalf("got error when get match action %v", err)
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			policies := &Policies{}
 			err = policies.BuildPolicy(resPolicies)
-			assert.NoError(t, err)
-			action, err := policies.GetMatchAction(tc.vol)
-			assert.NoError(t, err)
+			require.NoError(t, err)
+			vfd := VolumeFilterData{}
+			if tc.pvc != nil {
+				vfd.PVC = tc.pvc
+			}
+
+			if tc.vol != nil {
+				vfd.PersistentVolume = tc.vol
+			}
+
+			if tc.podVol != nil {
+				vfd.PodVolume = tc.podVol
+			}
+
+			action, err := policies.GetMatchAction(vfd)
+			require.NoError(t, err)
 
 			if tc.skip {
 				if action.Type != Skip {
@@ -656,6 +992,84 @@ volumePolicies:
 			} else if action != nil && action.Type == Skip {
 				t.Fatalf("Expected action not skip but is %v", action.Type)
 			}
+		})
+	}
+}
+
+func TestGetMatchAction_Errors(t *testing.T) {
+	p := &Policies{}
+
+	testCases := []struct {
+		name        string
+		input       any
+		expectedErr string
+	}{
+		{
+			name:        "invalid input type",
+			input:       "invalid input",
+			expectedErr: "failed to convert input to VolumeFilterData",
+		},
+		{
+			name: "no volume provided",
+			input: VolumeFilterData{
+				PersistentVolume: nil,
+				PodVolume:        nil,
+				PVC:              nil,
+			},
+			expectedErr: "failed to convert object",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			action, err := p.GetMatchAction(tc.input)
+			require.ErrorContains(t, err, tc.expectedErr)
+			assert.Nil(t, action)
+		})
+	}
+}
+
+func TestParsePVC(t *testing.T) {
+	tests := []struct {
+		name           string
+		pvc            *corev1api.PersistentVolumeClaim
+		expectedLabels map[string]string
+		expectErr      bool
+	}{
+		{
+			name: "valid PVC with labels",
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"env": "prod"},
+				},
+			},
+			expectedLabels: map[string]string{"env": "prod"},
+			expectErr:      false,
+		},
+		{
+			name: "valid PVC with empty labels",
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{},
+				},
+			},
+			expectedLabels: nil,
+			expectErr:      false,
+		},
+		{
+			name:           "nil PVC pointer",
+			pvc:            (*corev1api.PersistentVolumeClaim)(nil),
+			expectedLabels: nil,
+			expectErr:      false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &structuredVolume{}
+			s.parsePVC(tc.pvc)
+
+			assert.Equal(t, tc.expectedLabels, s.pvcLabels)
 		})
 	}
 }

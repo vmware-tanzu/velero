@@ -18,11 +18,12 @@ package k8s
 
 import (
 	"fmt"
+	"path"
 	"time"
 
 	"golang.org/x/net/context"
-	apps "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -36,43 +37,48 @@ const (
 	PollInterval         = 2 * time.Second
 	PollTimeout          = 15 * time.Minute
 	DefaultContainerName = "container-busybox"
+	TestImage            = "busybox:1.37.0"
 )
 
 // DeploymentBuilder builds Deployment objects.
 type DeploymentBuilder struct {
-	*apps.Deployment
+	*appsv1api.Deployment
 }
 
-func (d *DeploymentBuilder) Result() *apps.Deployment {
+func (d *DeploymentBuilder) Result() *appsv1api.Deployment {
 	return d.Deployment
 }
 
 // newDeployment returns a RollingUpdate Deployment with a fake container image
-func NewDeployment(name, ns string, replicas int32, labels map[string]string, containers []v1.Container) *DeploymentBuilder {
-	if containers == nil {
-		containers = []v1.Container{
-			{
-				Name:    DefaultContainerName,
-				Image:   "gcr.io/velero-gcp/busybox:latest",
-				Command: []string{"sleep", "1000000"},
-				// Make pod obeys the restricted pod security standards.
-				SecurityContext: &v1.SecurityContext{
-					AllowPrivilegeEscalation: boolptr.False(),
-					Capabilities: &v1.Capabilities{
-						Drop: []v1.Capability{"ALL"},
-					},
-					RunAsNonRoot: boolptr.True(),
-					RunAsUser:    func(i int64) *int64 { return &i }(65534),
-					RunAsGroup:   func(i int64) *int64 { return &i }(65534),
-					SeccompProfile: &v1.SeccompProfile{
-						Type: v1.SeccompProfileTypeRuntimeDefault,
-					},
+func NewDeployment(name, ns string, replicas int32, labels map[string]string, imageRegistryProxy string) *DeploymentBuilder {
+	imageAddress := TestImage
+	if imageRegistryProxy != "" {
+		imageAddress = path.Join(imageRegistryProxy, TestImage)
+	}
+
+	containers := []corev1api.Container{
+		{
+			Name:    DefaultContainerName,
+			Image:   imageAddress,
+			Command: []string{"sleep", "1000000"},
+			// Make pod obeys the restricted pod security standards.
+			SecurityContext: &corev1api.SecurityContext{
+				AllowPrivilegeEscalation: boolptr.False(),
+				Capabilities: &corev1api.Capabilities{
+					Drop: []corev1api.Capability{"ALL"},
+				},
+				RunAsNonRoot: boolptr.True(),
+				RunAsUser:    func(i int64) *int64 { return &i }(65534),
+				RunAsGroup:   func(i int64) *int64 { return &i }(65534),
+				SeccompProfile: &corev1api.SeccompProfile{
+					Type: corev1api.SeccompProfileTypeRuntimeDefault,
 				},
 			},
-		}
+		},
 	}
+
 	return &DeploymentBuilder{
-		&apps.Deployment{
+		&appsv1api.Deployment{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Deployment",
 				APIVersion: "apps/v1",
@@ -82,21 +88,21 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string, co
 				Name:      name,
 				Labels:    labels,
 			},
-			Spec: apps.DeploymentSpec{
+			Spec: appsv1api.DeploymentSpec{
 				Replicas: &replicas,
 				Selector: &metav1.LabelSelector{MatchLabels: labels},
-				Strategy: apps.DeploymentStrategy{
-					Type:          apps.RollingUpdateDeploymentStrategyType,
-					RollingUpdate: new(apps.RollingUpdateDeployment),
+				Strategy: appsv1api.DeploymentStrategy{
+					Type:          appsv1api.RollingUpdateDeploymentStrategyType,
+					RollingUpdate: new(appsv1api.RollingUpdateDeployment),
 				},
-				Template: v1.PodTemplateSpec{
+				Template: corev1api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: labels,
 					},
-					Spec: v1.PodSpec{
-						SecurityContext: &v1.PodSecurityContext{
+					Spec: corev1api.PodSpec{
+						SecurityContext: &corev1api.PodSecurityContext{
 							FSGroup:             func(i int64) *int64 { return &i }(65534),
-							FSGroupChangePolicy: func(policy v1.PodFSGroupChangePolicy) *v1.PodFSGroupChangePolicy { return &policy }(v1.FSGroupChangeAlways),
+							FSGroupChangePolicy: func(policy corev1api.PodFSGroupChangePolicy) *corev1api.PodFSGroupChangePolicy { return &policy }(corev1api.FSGroupChangeAlways),
 						},
 						Containers: containers,
 					},
@@ -106,10 +112,10 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string, co
 	}
 }
 
-func (d *DeploymentBuilder) WithVolume(volumes []*v1.Volume) *DeploymentBuilder {
-	vmList := []v1.VolumeMount{}
+func (d *DeploymentBuilder) WithVolume(volumes []*corev1api.Volume) *DeploymentBuilder {
+	vmList := []corev1api.VolumeMount{}
 	for _, v := range volumes {
-		vmList = append(vmList, v1.VolumeMount{
+		vmList = append(vmList, corev1api.VolumeMount{
 			Name:      v.Name,
 			MountPath: "/" + v.Name,
 		})
@@ -121,15 +127,15 @@ func (d *DeploymentBuilder) WithVolume(volumes []*v1.Volume) *DeploymentBuilder 
 	return d
 }
 
-func CreateDeploy(c clientset.Interface, ns string, deployment *apps.Deployment) error {
+func CreateDeploy(c clientset.Interface, ns string, deployment *appsv1api.Deployment) error {
 	_, err := c.AppsV1().Deployments(ns).Create(context.TODO(), deployment, metav1.CreateOptions{})
 	return err
 }
-func CreateDeployment(c clientset.Interface, ns string, deployment *apps.Deployment) (*apps.Deployment, error) {
+func CreateDeployment(c clientset.Interface, ns string, deployment *appsv1api.Deployment) (*appsv1api.Deployment, error) {
 	return c.AppsV1().Deployments(ns).Create(context.TODO(), deployment, metav1.CreateOptions{})
 }
 
-func GetDeployment(c clientset.Interface, ns, name string) (*apps.Deployment, error) {
+func GetDeployment(c clientset.Interface, ns, name string) (*appsv1api.Deployment, error) {
 	return c.AppsV1().Deployments(ns).Get(context.TODO(), name, metav1.GetOptions{})
 }
 

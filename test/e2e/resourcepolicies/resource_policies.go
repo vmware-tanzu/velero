@@ -23,11 +23,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -151,7 +152,15 @@ func (r *ResourcePoliciesCase) Verify() error {
 					if vol.Name != volName {
 						continue
 					}
-					content, _, err := ReadFileFromPodVolume(r.Ctx, ns, pod.Name, "container-busybox", vol.Name, FileName)
+					content, _, err := ReadFileFromPodVolume(
+						r.Ctx,
+						ns,
+						pod.Name,
+						"container-busybox",
+						vol.Name,
+						FileName,
+						r.VeleroCfg.WorkerOS,
+					)
 					if i%2 == 0 {
 						Expect(err).To(HaveOccurred(), "Expected file not found") // File should not exist
 					} else {
@@ -186,7 +195,7 @@ func (r *ResourcePoliciesCase) Clean() error {
 	return nil
 }
 
-func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []*v1.Volume) error {
+func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []*corev1api.Volume) error {
 	var err error
 	for i := range volList {
 		pvcName := fmt.Sprintf("pvc-%d", i)
@@ -208,8 +217,8 @@ func (r *ResourcePoliciesCase) createPVC(index int, namespace string, volList []
 	return nil
 }
 
-func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volList []*v1.Volume) error {
-	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"resource-policies": "resource-policies"}, nil).WithVolume(volList).Result()
+func (r *ResourcePoliciesCase) createDeploymentWithVolume(namespace string, volList []*corev1api.Volume) error {
+	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"resource-policies": "resource-policies"}, r.VeleroCfg.ImageRegistryProxy).WithVolume(volList).Result()
 	deployment, err := CreateDeployment(r.Client.ClientGo, namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create deloyment %s the namespace %q", deployment.Name, namespace))
@@ -231,7 +240,16 @@ func (r *ResourcePoliciesCase) writeDataIntoPods(namespace, volName string) erro
 			if vol.Name != volName {
 				continue
 			}
-			err := CreateFileToPod(r.Ctx, namespace, pod.Name, "container-busybox", vol.Name, FileName, fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, pod.Name, vol.Name))
+			err := CreateFileToPod(
+				r.Ctx,
+				namespace,
+				pod.Name,
+				"container-busybox",
+				vol.Name,
+				FileName,
+				fmt.Sprintf("ns-%s pod-%s volume-%s", namespace, pod.Name, vol.Name),
+				common.WorkerOSLinux,
+			)
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("failed to create file into pod %s in namespace: %q", pod.Name, namespace))
 			}

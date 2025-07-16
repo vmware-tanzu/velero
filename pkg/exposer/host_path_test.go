@@ -18,34 +18,38 @@ package exposer
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 func TestGetPodVolumeHostPath(t *testing.T) {
 	tests := []struct {
 		name              string
-		getVolumeDirFunc  func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (string, error)
-		getVolumeModeFunc func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (uploader.PersistentVolumeMode, error)
+		getVolumeDirFunc  func(context.Context, logrus.FieldLogger, *corev1api.Pod, string, kubernetes.Interface) (string, error)
+		getVolumeModeFunc func(context.Context, logrus.FieldLogger, *corev1api.Pod, string, kubernetes.Interface) (uploader.PersistentVolumeMode, error)
 		pathMatchFunc     func(string, filesystem.Interface, logrus.FieldLogger) (string, error)
-		pod               *corev1.Pod
+		pod               *corev1api.Pod
 		pvc               string
 		err               string
 	}{
 		{
 			name: "get volume dir fail",
-			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (string, error) {
+			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1api.Pod, string, kubernetes.Interface) (string, error) {
 				return "", errors.New("fake-error-1")
 			},
 			pod: builder.ForPod(velerov1api.DefaultNamespace, "fake-pod-1").Result(),
@@ -54,10 +58,10 @@ func TestGetPodVolumeHostPath(t *testing.T) {
 		},
 		{
 			name: "single path match fail",
-			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (string, error) {
+			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1api.Pod, string, kubernetes.Interface) (string, error) {
 				return "", nil
 			},
-			getVolumeModeFunc: func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (uploader.PersistentVolumeMode, error) {
+			getVolumeModeFunc: func(context.Context, logrus.FieldLogger, *corev1api.Pod, string, kubernetes.Interface) (uploader.PersistentVolumeMode, error) {
 				return uploader.PersistentVolumeFilesystem, nil
 			},
 			pathMatchFunc: func(string, filesystem.Interface, logrus.FieldLogger) (string, error) {
@@ -69,7 +73,7 @@ func TestGetPodVolumeHostPath(t *testing.T) {
 		},
 		{
 			name: "get block volume dir success",
-			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1.Pod, string, ctrlclient.Client) (
+			getVolumeDirFunc: func(context.Context, logrus.FieldLogger, *corev1api.Pod, string, kubernetes.Interface) (
 				string, error) {
 				return "fake-pvc-1", nil
 			},
@@ -98,6 +102,61 @@ func TestGetPodVolumeHostPath(t *testing.T) {
 			_, err := GetPodVolumeHostPath(context.Background(), test.pod, test.pvc, nil, nil, velerotest.NewLogger())
 			if test.err != "" || err != nil {
 				assert.EqualError(t, err, test.err)
+			}
+		})
+	}
+}
+
+func TestExtractPodVolumeHostPath(t *testing.T) {
+	tests := []struct {
+		name               string
+		getHostPodPathFunc func(context.Context, kubernetes.Interface, string, string) (string, error)
+		path               string
+		osType             string
+		expectedErr        string
+		expected           string
+	}{
+		{
+			name: "get host pod path error",
+			getHostPodPathFunc: func(context.Context, kubernetes.Interface, string, string) (string, error) {
+				return "", errors.New("fake-error-1")
+			},
+
+			expectedErr: "error getting host pod path from node-agent: fake-error-1",
+		},
+		{
+			name: "Windows os",
+			getHostPodPathFunc: func(context.Context, kubernetes.Interface, string, string) (string, error) {
+				return "/var/lib/kubelet/pods", nil
+			},
+			path:     fmt.Sprintf("\\%s\\pod-id-xxx\\volumes\\kubernetes.io~csi\\pvc-id-xxx\\mount", nodeagent.HostPodVolumeMountPoint),
+			osType:   kube.NodeOSWindows,
+			expected: "\\var\\lib\\kubelet\\pods\\pod-id-xxx\\volumes\\kubernetes.io~csi\\pvc-id-xxx\\mount",
+		},
+		{
+			name: "linux OS",
+			getHostPodPathFunc: func(context.Context, kubernetes.Interface, string, string) (string, error) {
+				return "/var/lib/kubelet/pods", nil
+			},
+			path:     fmt.Sprintf("/%s/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount", nodeagent.HostPodVolumeMountPoint),
+			osType:   kube.NodeOSLinux,
+			expected: "/var/lib/kubelet/pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.getHostPodPathFunc != nil {
+				getHostPodPath = test.getHostPodPathFunc
+			}
+
+			path, err := ExtractPodVolumeHostPath(context.Background(), test.path, nil, "", test.osType)
+
+			if test.expectedErr != "" {
+				assert.EqualError(t, err, test.expectedErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, test.expected, path)
 			}
 		})
 	}

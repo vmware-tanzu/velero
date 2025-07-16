@@ -22,31 +22,27 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"github.com/vmware-tanzu/velero/pkg/constant"
-	"github.com/vmware-tanzu/velero/pkg/itemoperation"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-
-	storagev1api "k8s.io/api/storage/v1"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	corev1api "k8s.io/api/core/v1"
+	storagev1api "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/clock"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/constant"
+	"github.com/vmware-tanzu/velero/pkg/itemoperation"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
 )
@@ -92,6 +88,7 @@ func NewRestoreFinalizerReconciler(
 func (r *restoreFinalizerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Restore{}).
+		Named(constant.ControllerRestoreFinalizer).
 		Complete(r)
 }
 
@@ -343,7 +340,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 
 				err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, ctx.resourceTimeout, true, func(context.Context) (bool, error) {
 					// wait for PVC to be bound
-					pvc := &v1.PersistentVolumeClaim{}
+					pvc := &corev1api.PersistentVolumeClaim{}
 					err := ctx.crClient.Get(context.Background(), client.ObjectKey{Name: volInfo.PVCName, Namespace: restoredNamespace}, pvc)
 					if apierrors.IsNotFound(err) {
 						log.Debug("error not finding PVC")
@@ -367,7 +364,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 					// We are handling a common but specific scenario where a PVC is in a pending state and uses a storage class with
 					// VolumeBindingMode set to WaitForFirstConsumer. In this case, the PV patch step is skipped to avoid
 					// failures due to the PVC not being bound, which could cause a timeout and result in a failed restore.
-					if pvc.Status.Phase == v1.ClaimPending {
+					if pvc.Status.Phase == corev1api.ClaimPending {
 						// check if storage class used has VolumeBindingMode as WaitForFirstConsumer
 						scName := *pvc.Spec.StorageClassName
 						sc := &storagev1api.StorageClass{}
@@ -385,14 +382,14 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 						}
 					}
 
-					if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
+					if pvc.Status.Phase != corev1api.ClaimBound || pvc.Spec.VolumeName == "" {
 						log.Debugf("PVC: %s not ready", pvc.Name)
 						return false, nil
 					}
 
 					// wait for PV to be bound
 					pvName := pvc.Spec.VolumeName
-					pv := &v1.PersistentVolume{}
+					pv := &corev1api.PersistentVolume{}
 					err = ctx.crClient.Get(context.Background(), client.ObjectKey{Name: pvName}, pv)
 					if apierrors.IsNotFound(err) {
 						log.Debugf("error not finding PV: %s", pvName)
@@ -402,7 +399,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 						return false, err
 					}
 
-					if pv.Spec.ClaimRef == nil || pv.Status.Phase != v1.VolumeBound {
+					if pv.Spec.ClaimRef == nil || pv.Status.Phase != corev1api.VolumeBound {
 						log.Debugf("PV: %s not ready", pvName)
 						return false, nil
 					}
@@ -417,7 +414,7 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 					if needPatch(pv, volInfo.PVInfo) {
 						updatedPV := pv.DeepCopy()
 						updatedPV.Labels = volInfo.PVInfo.Labels
-						updatedPV.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimPolicy(volInfo.PVInfo.ReclaimPolicy)
+						updatedPV.Spec.PersistentVolumeReclaimPolicy = corev1api.PersistentVolumeReclaimPolicy(volInfo.PVInfo.ReclaimPolicy)
 						if err := kubeutil.PatchResource(pv, updatedPV, ctx.crClient); err != nil {
 							return false, err
 						}
@@ -446,8 +443,8 @@ func (ctx *finalizerContext) patchDynamicPVWithVolumeInfo() (errs results.Result
 	return errs
 }
 
-func needPatch(newPV *v1.PersistentVolume, pvInfo *volume.PVInfo) bool {
-	if newPV.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimPolicy(pvInfo.ReclaimPolicy) {
+func needPatch(newPV *corev1api.PersistentVolume, pvInfo *volume.PVInfo) bool {
+	if newPV.Spec.PersistentVolumeReclaimPolicy != corev1api.PersistentVolumeReclaimPolicy(pvInfo.ReclaimPolicy) {
 		return true
 	}
 

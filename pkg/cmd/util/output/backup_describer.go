@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
@@ -119,7 +119,7 @@ func DescribeBackup(
 }
 
 // DescribeResourcePolicies describes resource policies in human-readable format
-func DescribeResourcePolicies(d *Describer, resPolicies *v1.TypedLocalObjectReference) {
+func DescribeResourcePolicies(d *Describer, resPolicies *corev1api.TypedLocalObjectReference) {
 	d.Printf("Resource policies:\n")
 	d.Printf("\tType:\t%s\n", resPolicies.Kind)
 	d.Printf("\tName:\t%s\n", resPolicies.Name)
@@ -786,7 +786,11 @@ func describePodVolumeBackups(d *Describer, details bool, podVolumeBackups []vel
 	for _, phase := range []string{
 		string(velerov1api.PodVolumeBackupPhaseCompleted),
 		string(velerov1api.PodVolumeBackupPhaseFailed),
+		string(velerov1api.PodVolumeBackupPhaseCanceled),
 		"In Progress",
+		string(velerov1api.PodVolumeBackupPhaseCanceling),
+		string(velerov1api.PodVolumeBackupPhasePrepared),
+		string(velerov1api.PodVolumeBackupPhaseAccepted),
 		string(velerov1api.PodVolumeBackupPhaseNew),
 	} {
 		if len(backupsByPhase[phase]) == 0 {
@@ -822,7 +826,11 @@ func groupByPhase(backups []velerov1api.PodVolumeBackup) map[string][]velerov1ap
 	phaseToGroup := map[velerov1api.PodVolumeBackupPhase]string{
 		velerov1api.PodVolumeBackupPhaseCompleted:  string(velerov1api.PodVolumeBackupPhaseCompleted),
 		velerov1api.PodVolumeBackupPhaseFailed:     string(velerov1api.PodVolumeBackupPhaseFailed),
+		velerov1api.PodVolumeBackupPhaseCanceled:   string(velerov1api.PodVolumeBackupPhaseCanceled),
 		velerov1api.PodVolumeBackupPhaseInProgress: "In Progress",
+		velerov1api.PodVolumeBackupPhaseCanceling:  string(velerov1api.PodVolumeBackupPhaseCanceling),
+		velerov1api.PodVolumeBackupPhasePrepared:   string(velerov1api.PodVolumeBackupPhasePrepared),
+		velerov1api.PodVolumeBackupPhaseAccepted:   string(velerov1api.PodVolumeBackupPhaseAccepted),
 		velerov1api.PodVolumeBackupPhaseNew:        string(velerov1api.PodVolumeBackupPhaseNew),
 		"":                                         string(velerov1api.PodVolumeBackupPhaseNew),
 	}

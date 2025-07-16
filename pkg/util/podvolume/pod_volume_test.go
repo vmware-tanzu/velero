@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -384,17 +384,17 @@ func TestGetVolumesByPod(t *testing.T) {
 
 func TestIsPVCDefaultToFSBackup(t *testing.T) {
 	objs := []runtime.Object{
-		&v1.Pod{
+		&corev1api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod1",
 				Namespace: "default",
 			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
 					{
 						Name: "csi-vol1",
-						VolumeSource: v1.VolumeSource{
-							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 								ClaimName: "csi-pvc1",
 							},
 						},
@@ -402,7 +402,7 @@ func TestIsPVCDefaultToFSBackup(t *testing.T) {
 				},
 			},
 		},
-		&v1.Pod{
+		&corev1api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod2",
 				Namespace: "default",
@@ -410,12 +410,12 @@ func TestIsPVCDefaultToFSBackup(t *testing.T) {
 					"backup.velero.io/backup-volumes": "csi-vol1",
 				},
 			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
 					{
 						Name: "csi-vol1",
-						VolumeSource: v1.VolumeSource{
-							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 								ClaimName: "csi-pvc1",
 							},
 						},
@@ -423,33 +423,33 @@ func TestIsPVCDefaultToFSBackup(t *testing.T) {
 				},
 			},
 		},
-		&v1.Pod{
+		&corev1api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod3",
 				Namespace: "default",
 			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
 					{
 						Name: "csi-vol1",
-						VolumeSource: v1.VolumeSource{
-							EmptyDir: &v1.EmptyDirVolumeSource{},
+						VolumeSource: corev1api.VolumeSource{
+							EmptyDir: &corev1api.EmptyDirVolumeSource{},
 						},
 					},
 				},
 			},
 		},
-		&v1.Pod{
+		&corev1api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "awesome-pod-1",
 				Namespace: "awesome-ns",
 			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
 					{
 						Name: "csi-vol1",
-						VolumeSource: v1.VolumeSource{
-							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 								ClaimName: "awesome-csi-pvc1",
 							},
 						},
@@ -457,17 +457,17 @@ func TestIsPVCDefaultToFSBackup(t *testing.T) {
 				},
 			},
 		},
-		&v1.Pod{
+		&corev1api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "awesome-pod-2",
 				Namespace: "awesome-ns",
 			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
 					{
 						Name: "csi-vol1",
-						VolumeSource: v1.VolumeSource{
-							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 								ClaimName: "awesome-csi-pvc1",
 							},
 						},
@@ -475,7 +475,7 @@ func TestIsPVCDefaultToFSBackup(t *testing.T) {
 				},
 			},
 		},
-		&v1.Pod{
+		&corev1api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod1",
 				Namespace: "uploader-ns",
@@ -483,12 +483,12 @@ func TestIsPVCDefaultToFSBackup(t *testing.T) {
 					"backup.velero.io/backup-volumes": "csi-vol1",
 				},
 			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
 					{
 						Name: "csi-vol1",
-						VolumeSource: v1.VolumeSource{
-							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 								ClaimName: "csi-pvc1",
 							},
 						},
@@ -496,7 +496,7 @@ func TestIsPVCDefaultToFSBackup(t *testing.T) {
 				},
 			},
 		},
-		&v1.Pod{
+		&corev1api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod2",
 				Namespace: "uploader-ns",
@@ -504,12 +504,12 @@ func TestIsPVCDefaultToFSBackup(t *testing.T) {
 					"backup.velero.io/backup-volumes": "csi-vol1",
 				},
 			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
 					{
 						Name: "csi-vol1",
-						VolumeSource: v1.VolumeSource{
-							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 								ClaimName: "csi-pvc1",
 							},
 						},
@@ -575,36 +575,36 @@ func TestIsPVCDefaultToFSBackup(t *testing.T) {
 func TestGetPodVolumeNameForPVC(t *testing.T) {
 	testCases := []struct {
 		name               string
-		pod                v1.Pod
+		pod                corev1api.Pod
 		pvcName            string
 		expectError        bool
 		expectedVolumeName string
 	}{
 		{
 			name: "should get volume name for pod with multiple PVCs",
-			pod: v1.Pod{
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
+			pod: corev1api.Pod{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
 						{
 							Name: "csi-vol1",
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							VolumeSource: corev1api.VolumeSource{
+								PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 									ClaimName: "csi-pvc1",
 								},
 							},
 						},
 						{
 							Name: "csi-vol2",
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							VolumeSource: corev1api.VolumeSource{
+								PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 									ClaimName: "csi-pvc2",
 								},
 							},
 						},
 						{
 							Name: "csi-vol3",
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							VolumeSource: corev1api.VolumeSource{
+								PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 									ClaimName: "csi-pvc3",
 								},
 							},
@@ -618,13 +618,13 @@ func TestGetPodVolumeNameForPVC(t *testing.T) {
 		},
 		{
 			name: "should get volume name from pod using exactly one PVC",
-			pod: v1.Pod{
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
+			pod: corev1api.Pod{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
 						{
 							Name: "csi-vol1",
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							VolumeSource: corev1api.VolumeSource{
+								PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 									ClaimName: "csi-pvc1",
 								},
 							},
@@ -638,21 +638,21 @@ func TestGetPodVolumeNameForPVC(t *testing.T) {
 		},
 		{
 			name: "should return error for pod with no PVCs",
-			pod: v1.Pod{
-				Spec: v1.PodSpec{},
+			pod: corev1api.Pod{
+				Spec: corev1api.PodSpec{},
 			},
 			pvcName:     "csi-pvc2",
 			expectError: true,
 		},
 		{
 			name: "should return error for pod with no matching PVC",
-			pod: v1.Pod{
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
+			pod: corev1api.Pod{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
 						{
 							Name: "csi-vol1",
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							VolumeSource: corev1api.VolumeSource{
+								PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 									ClaimName: "csi-pvc1",
 								},
 							},
@@ -679,17 +679,17 @@ func TestGetPodVolumeNameForPVC(t *testing.T) {
 
 func TestGetPodsUsingPVC(t *testing.T) {
 	objs := []runtime.Object{
-		&v1.Pod{
+		&corev1api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod1",
 				Namespace: "default",
 			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
 					{
 						Name: "csi-vol1",
-						VolumeSource: v1.VolumeSource{
-							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 								ClaimName: "csi-pvc1",
 							},
 						},
@@ -697,17 +697,17 @@ func TestGetPodsUsingPVC(t *testing.T) {
 				},
 			},
 		},
-		&v1.Pod{
+		&corev1api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod2",
 				Namespace: "default",
 			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
 					{
 						Name: "csi-vol1",
-						VolumeSource: v1.VolumeSource{
-							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 								ClaimName: "csi-pvc1",
 							},
 						},
@@ -715,33 +715,33 @@ func TestGetPodsUsingPVC(t *testing.T) {
 				},
 			},
 		},
-		&v1.Pod{
+		&corev1api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod3",
 				Namespace: "default",
 			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
 					{
 						Name: "csi-vol1",
-						VolumeSource: v1.VolumeSource{
-							EmptyDir: &v1.EmptyDirVolumeSource{},
+						VolumeSource: corev1api.VolumeSource{
+							EmptyDir: &corev1api.EmptyDirVolumeSource{},
 						},
 					},
 				},
 			},
 		},
-		&v1.Pod{
+		&corev1api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod1",
 				Namespace: "awesome-ns",
 			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
 					{
 						Name: "csi-vol1",
-						VolumeSource: v1.VolumeSource{
-							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
 								ClaimName: "csi-pvc1",
 							},
 						},
@@ -787,7 +787,7 @@ func TestGetPodsUsingPVC(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			actualPods, err := GetPodsUsingPVC(tc.pvcNamespace, tc.pvcName, fakeClient)
-			assert.NoErrorf(t, err, "Want error=nil; Got error=%v", err)
+			require.NoErrorf(t, err, "Want error=nil; Got error=%v", err)
 			assert.Lenf(t, actualPods, tc.expectedPodCount, "unexpected number of pods in result; Want: %d; Got: %d", tc.expectedPodCount, len(actualPods))
 		})
 	}

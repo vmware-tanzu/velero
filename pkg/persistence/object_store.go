@@ -49,8 +49,6 @@ type BackupInfo struct {
 	VolumeSnapshots,
 	BackupItemOperations,
 	BackupResourceList,
-	CSIVolumeSnapshots,
-	CSIVolumeSnapshotContents,
 	CSIVolumeSnapshotClasses,
 	BackupVolumeInfo io.Reader
 }
@@ -72,7 +70,6 @@ type BackupStore interface {
 	GetPodVolumeBackups(name string) ([]*velerov1api.PodVolumeBackup, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
 	GetCSIVolumeSnapshots(name string) ([]*snapshotv1api.VolumeSnapshot, error)
-	GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1api.VolumeSnapshotContent, error)
 	GetCSIVolumeSnapshotClasses(name string) ([]*snapshotv1api.VolumeSnapshotClass, error)
 	PutBackupVolumeInfos(name string, volumeInfo io.Reader) error
 	GetBackupVolumeInfos(name string) ([]*volume.BackupVolumeInfo, error)
@@ -187,7 +184,7 @@ func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocatio
 		return nil, err
 	}
 
-	log := logger.WithFields(logrus.Fields(map[string]interface{}{
+	log := logger.WithFields(logrus.Fields(map[string]any{
 		"bucket": bucket,
 		"prefix": prefix,
 	}))
@@ -269,15 +266,13 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 	// Since the logic for all of these files is the exact same except for the name and the contents,
 	// use a map literal to iterate through them and write them to the bucket.
 	var backupObjs = map[string]io.Reader{
-		s.layout.getPodVolumeBackupsKey(info.Name):          info.PodVolumeBackups,
-		s.layout.getBackupVolumeSnapshotsKey(info.Name):     info.VolumeSnapshots,
-		s.layout.getBackupItemOperationsKey(info.Name):      info.BackupItemOperations,
-		s.layout.getBackupResourceListKey(info.Name):        info.BackupResourceList,
-		s.layout.getCSIVolumeSnapshotKey(info.Name):         info.CSIVolumeSnapshots,
-		s.layout.getCSIVolumeSnapshotContentsKey(info.Name): info.CSIVolumeSnapshotContents,
-		s.layout.getCSIVolumeSnapshotClassesKey(info.Name):  info.CSIVolumeSnapshotClasses,
-		s.layout.getBackupResultsKey(info.Name):             info.BackupResults,
-		s.layout.getBackupVolumeInfoKey(info.Name):          info.BackupVolumeInfo,
+		s.layout.getPodVolumeBackupsKey(info.Name):         info.PodVolumeBackups,
+		s.layout.getBackupVolumeSnapshotsKey(info.Name):    info.VolumeSnapshots,
+		s.layout.getBackupItemOperationsKey(info.Name):     info.BackupItemOperations,
+		s.layout.getBackupResourceListKey(info.Name):       info.BackupResourceList,
+		s.layout.getCSIVolumeSnapshotClassesKey(info.Name): info.CSIVolumeSnapshotClasses,
+		s.layout.getBackupResultsKey(info.Name):            info.BackupResults,
+		s.layout.getBackupVolumeInfoKey(info.Name):         info.BackupVolumeInfo,
 	}
 
 	for key, reader := range backupObjs {
@@ -410,7 +405,7 @@ func tryGet(objectStore velero.ObjectStore, bucket, key string) (io.ReadCloser, 
 
 // decode extracts a .json.gz file reader into the object pointed to
 // by 'into'.
-func decode(jsongzReader io.Reader, into interface{}) error {
+func decode(jsongzReader io.Reader, into any) error {
 	gzr, err := gzip.NewReader(jsongzReader)
 	if err != nil {
 		return errors.WithStack(err)

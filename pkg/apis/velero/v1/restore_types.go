@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -123,7 +123,7 @@ type RestoreSpec struct {
 	// ResourceModifier specifies the reference to JSON resource patches that should be applied to resources before restoration.
 	// +optional
 	// +nullable
-	ResourceModifier *v1.TypedLocalObjectReference `json:"resourceModifier,omitempty"`
+	ResourceModifier *corev1api.TypedLocalObjectReference `json:"resourceModifier,omitempty"`
 
 	// UploaderConfig specifies the configuration for the restore.
 	// +optional

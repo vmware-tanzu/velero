@@ -32,7 +32,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	appsv1 "k8s.io/api/apps/v1"
+	appsv1api "k8s.io/api/apps/v1"
 	batchv1api "k8s.io/api/batch/v1"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -233,12 +234,13 @@ func newServer(f client.Factory, config *config.Config, logger *logrus.Logger) (
 		cancelFunc()
 		return nil, err
 	}
-	if err := appsv1.AddToScheme(scheme); err != nil {
+	if err := appsv1api.AddToScheme(scheme); err != nil {
 		cancelFunc()
 		return nil, err
 	}
 
 	ctrl.SetLogger(logrusr.New(logger))
+	klog.SetLogger(logrusr.New(logger)) // klog.Logger is used by k8s.io/client-go
 
 	var mgr manager.Manager
 	retry := 10
@@ -502,15 +504,9 @@ func (s *server) initRepoManager() error {
 		s.namespace,
 		s.mgr.GetClient(),
 		s.repoLocker,
-		s.repoEnsurer,
 		s.credentialFileStore,
 		s.credentialSecretStore,
-		s.config.RepoMaintenanceJobConfig,
-		s.config.PodResources,
-		s.config.KeepLatestMaintenanceJobs,
 		s.logger,
-		s.logLevel,
-		s.config.LogFormat,
 	)
 
 	return nil
@@ -594,6 +590,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		},
 		newPluginManager,
 		backupStoreGetter,
+		s.metrics,
 		s.logger,
 	)
 	if err := bslr.SetupWithManager(s.mgr); err != nil {
@@ -638,6 +635,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.DefaultBackupLocation,
 			s.config.DefaultVolumesToFsBackup,
 			s.config.DefaultBackupTTL,
+			s.config.DefaultVGSLabelKey,
 			s.config.DefaultCSISnapshotTimeout,
 			s.config.ResourceTimeout,
 			s.config.DefaultItemOperationTimeout,
@@ -731,9 +729,14 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.namespace,
 			s.logger,
 			s.mgr.GetClient(),
+			s.repoManager,
 			s.config.RepoMaintenanceFrequency,
 			s.config.BackupRepoConfig,
-			s.repoManager,
+			s.config.KeepLatestMaintenanceJobs,
+			s.config.RepoMaintenanceJobConfig,
+			s.config.PodResources,
+			s.logLevel,
+			s.config.LogFormat,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupRepo)
 		}
@@ -959,6 +962,7 @@ func markInProgressBackupsFailed(ctx context.Context, client ctrlclient.Client, 
 		}
 		log.WithField("backup", backup.GetName()).Warn(updated.Status.FailureReason)
 		markDataUploadsCancel(ctx, client, backup, log)
+		markPodVolumeBackupsCancel(ctx, client, backup, log)
 	}
 }
 
@@ -981,8 +985,10 @@ func markInProgressRestoresFailed(ctx context.Context, client ctrlclient.Client,
 			log.WithError(errors.WithStack(err)).Errorf("failed to patch restore %q", restore.GetName())
 			continue
 		}
+
 		log.WithField("restore", restore.GetName()).Warn(updated.Status.FailureReason)
 		markDataDownloadsCancel(ctx, client, restore, log)
+		markPodVolumeRestoresCancel(ctx, client, restore, log)
 	}
 }
 
@@ -1064,6 +1070,93 @@ func markDataDownloadsCancel(ctx context.Context, client ctrlclient.Client, rest
 				continue
 			}
 			log.WithField("datadownload", dd.GetName()).Warn(dd.Status.Message)
+		}
+	}
+}
+
+func markPodVolumeBackupsCancel(ctx context.Context, client ctrlclient.Client, backup velerov1api.Backup, log logrus.FieldLogger) {
+	pvbs := &velerov1api.PodVolumeBackupList{}
+
+	if err := client.List(ctx, pvbs, &ctrlclient.ListOptions{
+		Namespace: backup.GetNamespace(),
+		LabelSelector: labels.Set(map[string]string{
+			velerov1api.BackupUIDLabel: string(backup.GetUID()),
+		}).AsSelector(),
+	}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list PVBs")
+		return
+	}
+
+	for i := range pvbs.Items {
+		pvb := pvbs.Items[i]
+		if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseAccepted ||
+			pvb.Status.Phase == velerov1api.PodVolumeBackupPhasePrepared ||
+			pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseInProgress ||
+			pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseNew ||
+			pvb.Status.Phase == "" {
+			err := controller.UpdatePVBWithRetry(ctx, client, types.NamespacedName{Namespace: pvb.Namespace, Name: pvb.Name}, log.WithField("PVB", pvb.Name),
+				func(pvb *velerov1api.PodVolumeBackup) bool {
+					if pvb.Spec.Cancel {
+						return false
+					}
+
+					pvb.Spec.Cancel = true
+					pvb.Status.Message = fmt.Sprintf("PVB is in status %q during the velero server starting, mark it as cancel", pvb.Status.Phase)
+
+					return true
+				})
+
+			if err != nil {
+				log.WithError(errors.WithStack(err)).Errorf("failed to mark PVB %q cancel", pvb.GetName())
+				continue
+			}
+			log.WithField("PVB is mark for cancel due to server restart", pvb.GetName()).Warn(pvb.Status.Message)
+		}
+	}
+}
+
+func markPodVolumeRestoresCancel(ctx context.Context, client ctrlclient.Client, restore velerov1api.Restore, log logrus.FieldLogger) {
+	pvrs := &velerov1api.PodVolumeRestoreList{}
+
+	if err := client.List(ctx, pvrs, &ctrlclient.ListOptions{
+		Namespace: restore.GetNamespace(),
+		LabelSelector: labels.Set(map[string]string{
+			velerov1api.RestoreUIDLabel: string(restore.GetUID()),
+		}).AsSelector(),
+	}); err != nil {
+		log.WithError(errors.WithStack(err)).Error("failed to list PVRs")
+		return
+	}
+
+	for i := range pvrs.Items {
+		pvr := pvrs.Items[i]
+		if controller.IsLegacyPVR(&pvr) {
+			log.WithField("PVR", pvr.GetName()).Warn("Found a legacy PVR during velero server restart, cannot stop it")
+			continue
+		}
+
+		if pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseAccepted ||
+			pvr.Status.Phase == velerov1api.PodVolumeRestorePhasePrepared ||
+			pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseInProgress ||
+			pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseNew ||
+			pvr.Status.Phase == "" {
+			err := controller.UpdatePVRWithRetry(ctx, client, types.NamespacedName{Namespace: pvr.Namespace, Name: pvr.Name}, log.WithField("PVR", pvr.Name),
+				func(pvr *velerov1api.PodVolumeRestore) bool {
+					if pvr.Spec.Cancel {
+						return false
+					}
+
+					pvr.Spec.Cancel = true
+					pvr.Status.Message = fmt.Sprintf("PVR is in status %q during the velero server starting, mark it as cancel", pvr.Status.Phase)
+
+					return true
+				})
+
+			if err != nil {
+				log.WithError(errors.WithStack(err)).Errorf("failed to mark PVR %q cancel", pvr.GetName())
+				continue
+			}
+			log.WithField("PVR is mark for cancel due to server restart", pvr.GetName()).Warn(pvr.Status.Message)
 		}
 	}
 }

@@ -140,7 +140,15 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 			veleroCfg.ProvideSnapshotsVolumeParam = provideSnapshotVolumesParmInBackup
 
 			// Set DefaultVolumesToFsBackup to false since DefaultVolumesToFsBackup was set to true during installation
-			Expect(RunKibishiiTests(veleroCfg, backupName, restoreName, "", kibishiiNamespace, useVolumeSnapshots, false)).To(Succeed(),
+			Expect(RunKibishiiTests(
+				veleroCfg,
+				backupName,
+				restoreName,
+				"",
+				kibishiiNamespace,
+				useVolumeSnapshots,
+				false,
+			)).To(Succeed(),
 				"Failed to successfully backup and restore Kibishii namespace")
 		})
 
@@ -172,7 +180,9 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 
 				Expect(VeleroInstall(context.Background(), &veleroCfg, false)).To(Succeed())
 			}
-			Expect(VeleroAddPluginsForProvider(context.TODO(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, veleroCfg.AdditionalBSLProvider, veleroCfg.AddBSLPlugins)).To(Succeed())
+			plugins, err := GetPlugins(context.TODO(), veleroCfg, false)
+			Expect(err).To(Succeed())
+			Expect(AddPlugins(plugins, veleroCfg)).To(Succeed())
 
 			// Create Secret for additional BSL
 			secretName := fmt.Sprintf("bsl-credentials-%s", UUIDgen)
@@ -210,7 +220,17 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 				}
 				veleroCfg.ProvideSnapshotsVolumeParam = !provideSnapshotVolumesParmInBackup
 				workloadNS := kibishiiNamespace + bsl
-				Expect(RunKibishiiTests(veleroCfg, backupName, restoreName, bsl, workloadNS, useVolumeSnapshots, !useVolumeSnapshots)).To(Succeed(),
+				Expect(
+					RunKibishiiTests(
+						veleroCfg,
+						backupName,
+						restoreName,
+						bsl,
+						workloadNS,
+						useVolumeSnapshots,
+						!useVolumeSnapshots,
+					),
+				).To(Succeed(),
 					"Failed to successfully backup and restore Kibishii namespace using BSL %s", bsl)
 			}
 		})

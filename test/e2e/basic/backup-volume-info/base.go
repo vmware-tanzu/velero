@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
@@ -113,7 +113,7 @@ func (v *BackupVolumeInfo) CreateResources() error {
 		pvcCount := 4
 		Expect(pvcCount).To(BeNumerically(">", 3))
 
-		var vols []*v1.Volume
+		var vols []*corev1api.Volume
 		for i := 0; i <= pvcCount-1; i++ {
 			pvcName := fmt.Sprintf("volume-info-pvc-%d", i)
 			pvc, err := CreatePVC(v.Client, createNSName, pvcName, StorageClassName, nil)
@@ -121,7 +121,7 @@ func (v *BackupVolumeInfo) CreateResources() error {
 			volumeName := fmt.Sprintf("volume-info-pv-%d", i)
 			vols = append(vols, CreateVolumes(pvc.Name, []string{volumeName})...)
 		}
-		deployment := NewDeployment(v.CaseBaseName, createNSName, 1, labels, nil).WithVolume(vols).Result()
+		deployment := NewDeployment(v.CaseBaseName, createNSName, 1, labels, v.VeleroCfg.ImageRegistryProxy).WithVolume(vols).Result()
 		deployment, err := CreateDeployment(v.Client.ClientGo, createNSName, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", createNSName))
@@ -138,8 +138,16 @@ func (v *BackupVolumeInfo) CreateResources() error {
 				// Hitting issue https://github.com/vmware-tanzu/velero/issues/7388
 				// So populate data only to some of pods, leave other pods empty to verify empty PV datamover
 				if i%2 == 0 {
-					Expect(CreateFileToPod(v.Ctx, createNSName, pod.Name, DefaultContainerName, vols[i].Name,
-						fmt.Sprintf("file-%s", pod.Name), CreateFileContent(createNSName, pod.Name, vols[i].Name))).To(Succeed())
+					Expect(CreateFileToPod(
+						v.Ctx,
+						createNSName,
+						pod.Name,
+						DefaultContainerName,
+						vols[i].Name,
+						fmt.Sprintf("file-%s", pod.Name),
+						CreateFileContent(createNSName, pod.Name, vols[i].Name),
+						WorkerOSLinux,
+					)).To(Succeed())
 				}
 			}
 		}

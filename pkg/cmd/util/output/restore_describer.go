@@ -27,7 +27,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/volume"
 
-	v1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -362,8 +362,11 @@ func describePodVolumeRestores(d *Describer, restores []velerov1api.PodVolumeRes
 	// go through phases in a specific order
 	for _, phase := range []string{
 		string(velerov1api.PodVolumeRestorePhaseCompleted),
+		string(velerov1api.PodVolumeRestorePhaseCanceled),
 		string(velerov1api.PodVolumeRestorePhaseFailed),
 		"In Progress",
+		string(velerov1api.PodVolumeRestorePhasePrepared),
+		string(velerov1api.PodVolumeRestorePhaseAccepted),
 		string(velerov1api.PodVolumeRestorePhaseNew),
 	} {
 		if len(restoresByPhase[phase]) == 0 {
@@ -442,8 +445,11 @@ func groupRestoresByPhase(restores []velerov1api.PodVolumeRestore) map[string][]
 
 	phaseToGroup := map[velerov1api.PodVolumeRestorePhase]string{
 		velerov1api.PodVolumeRestorePhaseCompleted:  string(velerov1api.PodVolumeRestorePhaseCompleted),
+		velerov1api.PodVolumeRestorePhaseCanceled:   string(velerov1api.PodVolumeRestorePhaseCanceled),
 		velerov1api.PodVolumeRestorePhaseFailed:     string(velerov1api.PodVolumeRestorePhaseFailed),
 		velerov1api.PodVolumeRestorePhaseInProgress: "In Progress",
+		velerov1api.PodVolumeRestorePhasePrepared:   string(velerov1api.PodVolumeRestorePhasePrepared),
+		velerov1api.PodVolumeRestorePhaseAccepted:   string(velerov1api.PodVolumeRestorePhaseAccepted),
 		velerov1api.PodVolumeRestorePhaseNew:        string(velerov1api.PodVolumeRestorePhaseNew),
 		"":                                          string(velerov1api.PodVolumeRestorePhaseNew),
 	}
@@ -488,7 +494,7 @@ func describeRestoreResourceList(ctx context.Context, kbClient kbclient.Client, 
 }
 
 // DescribeResourceModifier describes resource policies in human-readable format
-func DescribeResourceModifier(d *Describer, resModifier *v1.TypedLocalObjectReference) {
+func DescribeResourceModifier(d *Describer, resModifier *corev1api.TypedLocalObjectReference) {
 	d.Printf("Resource modifier:\n")
 	d.Printf("\tType:\t%s\n", resModifier.Kind)
 	d.Printf("\tName:\t%s\n", resModifier.Name)

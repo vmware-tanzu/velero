@@ -52,7 +52,7 @@ func TestNewPodCommandExecutor(t *testing.T) {
 func TestExecutePodCommandMissingInputs(t *testing.T) {
 	tests := []struct {
 		name         string
-		item         map[string]interface{}
+		item         map[string]any
 		podNamespace string
 		podName      string
 		hookName     string
@@ -63,22 +63,22 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 		},
 		{
 			name: "missing pod namespace",
-			item: map[string]interface{}{},
+			item: map[string]any{},
 		},
 		{
 			name:         "missing pod name",
-			item:         map[string]interface{}{},
+			item:         map[string]any{},
 			podNamespace: "ns",
 		},
 		{
 			name:         "missing hookName",
-			item:         map[string]interface{}{},
+			item:         map[string]any{},
 			podNamespace: "ns",
 			podName:      "pod",
 		},
 		{
 			name:         "missing hook",
-			item:         map[string]interface{}{},
+			item:         map[string]any{},
 			podNamespace: "ns",
 			podName:      "pod",
 			hookName:     "hook",
@@ -130,7 +130,7 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 			err := e.ExecutePodCommand(velerotest.NewLogger(), test.item, test.podNamespace, test.podName, test.hookName, test.hook)
 
 			if hookPodContainerNotSame && test.hook.Container == pod.Spec.Containers[0].Name {
-				assert.Error(t, fmt.Errorf("hook exec container is overwritten"))
+				require.Error(t, fmt.Errorf("hook exec container is overwritten"))
 			}
 			assert.Error(t, err)
 		})
@@ -257,7 +257,7 @@ func TestEnsureContainerExists(t *testing.T) {
 	}
 
 	err := ensureContainerExists(pod, "bar")
-	assert.EqualError(t, err, `no such container: "bar"`)
+	require.EqualError(t, err, `no such container: "bar"`)
 
 	err = ensureContainerExists(pod, "foo")
 	assert.NoError(t, err)

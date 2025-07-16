@@ -45,6 +45,7 @@ type volumeConditions struct {
 	NFS          *nFSVolumeSource  `yaml:"nfs,omitempty"`
 	CSI          *csiVolumeSource  `yaml:"csi,omitempty"`
 	VolumeTypes  []SupportedVolume `yaml:"volumeTypes,omitempty"`
+	PVCLabels    map[string]string `yaml:"pvcLabels,omitempty"`
 }
 
 func (c *capacityCondition) validate() error {
@@ -78,7 +79,7 @@ func (c *csiCondition) validate() error {
 }
 
 // decodeStruct restric validate the keys in decoded mappings to exist as fields in the struct being decoded into
-func decodeStruct(r io.Reader, s interface{}) error {
+func decodeStruct(r io.Reader, s any) error {
 	dec := yaml.NewDecoder(r)
 	dec.KnownFields(true)
 	return dec.Decode(s)

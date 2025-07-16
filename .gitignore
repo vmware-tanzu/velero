@@ -54,6 +54,12 @@ tilt-resources/cloud
 test/e2e/report.xml
 coverage.out
 __debug_bin*
+debug.test*
 
 # make lint cache
 .cache/
+
+# Go telemetry directory created when container sets HOME to working directory
+# This happens because Makefile uses 'docker run -w /github.com/vmware-tanzu/velero'
+# and Go's os.UserConfigDir() falls back to $HOME/.config when XDG_CONFIG_HOME is unset
+.config/

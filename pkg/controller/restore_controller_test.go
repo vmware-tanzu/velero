@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clocktesting "k8s.io/utils/clock/testing"
@@ -66,7 +66,7 @@ func TestFetchBackupInfo(t *testing.T) {
 		{
 			name:              "lister has backup",
 			backupName:        "backup-1",
-			informerLocations: []*velerov1api.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()},
+			informerLocations: []*velerov1api.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()},
 			informerBackups:   []*velerov1api.Backup{defaultBackup().StorageLocation("default").Result()},
 			expectedRes:       defaultBackup().StorageLocation("default").Result(),
 		},
@@ -74,7 +74,7 @@ func TestFetchBackupInfo(t *testing.T) {
 			name:              "lister does not have a backup, but backupSvc does",
 			backupName:        "backup-1",
 			backupStoreBackup: defaultBackup().StorageLocation("default").Result(),
-			informerLocations: []*velerov1api.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()},
+			informerLocations: []*velerov1api.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()},
 			informerBackups:   []*velerov1api.Backup{defaultBackup().StorageLocation("default").Result()},
 			expectedRes:       defaultBackup().StorageLocation("default").Result(),
 		},
@@ -125,7 +125,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				}
 
 				for _, itm := range test.informerBackups {
-					assert.NoError(t, r.kbClient.Create(context.Background(), itm))
+					require.NoError(t, r.kbClient.Create(context.Background(), itm))
 				}
 			}
 
@@ -180,7 +180,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 			)
 
 			if test.restore != nil {
-				assert.NoError(t, fakeClient.Create(context.Background(), test.restore))
+				require.NoError(t, fakeClient.Create(context.Background(), test.restore))
 			}
 
 			r := NewRestoreReconciler(
@@ -211,7 +211,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 }
 
 func TestRestoreReconcile(t *testing.T) {
-	defaultStorageLocation := builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()
+	defaultStorageLocation := builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
 
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
 	require.NoError(t, err)
@@ -464,6 +464,22 @@ func TestRestoreReconcile(t *testing.T) {
 			expectedCompletedTime: &timestamp,
 			expectedRestorerCall:  NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseInProgress).Result(),
 		},
+		{
+			name:                     "Restore creation is rejected when BSL is unavailable",
+			location:                 builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Phase(velerov1api.BackupStorageLocationPhaseUnavailable).Result(),
+			restore:                  NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseNew).Result(),
+			backup:                   defaultBackup().StorageLocation("default").Result(),
+			expectedErr:              false,
+			expectedPhase:            string(velerov1api.RestorePhaseNew),
+			expectedValidationErrors: []string{"The BSL default is unavailable, cannot retrieve the backup"},
+		},
+		{
+			name:        "Restore deletion is rejected when BSL is unavailable.",
+			location:    builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Phase(velerov1api.BackupStorageLocationPhaseUnavailable).Result(),
+			restore:     NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseCompleted).ObjectMeta(builder.WithFinalizers(ExternalResourcesFinalizer), builder.WithDeletionTimestamp(timestamp.Time)).Result(),
+			backup:      defaultBackup().StorageLocation("default").Result(),
+			expectedErr: true,
+		},
 	}
 
 	formatFlag := logging.FormatText
@@ -508,7 +524,7 @@ func TestRestoreReconcile(t *testing.T) {
 				require.NoError(t, r.kbClient.Create(context.Background(), test.location))
 			}
 			if test.backup != nil {
-				assert.NoError(t, r.kbClient.Create(context.Background(), test.backup))
+				require.NoError(t, r.kbClient.Create(context.Background(), test.backup))
 			}
 
 			if test.restore != nil {
@@ -738,7 +754,7 @@ func TestValidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 			Result(),
 	))
 
-	location := builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()
+	location := builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
 	require.NoError(t, r.kbClient.Create(context.Background(), location))
 
 	restore = &velerov1api.Restore{
@@ -790,14 +806,14 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		},
 		Spec: velerov1api.RestoreSpec{
 			BackupName: "backup-1",
-			ResourceModifier: &corev1.TypedLocalObjectReference{
+			ResourceModifier: &corev1api.TypedLocalObjectReference{
 				Kind: resourcemodifiers.ConfigmapRefType,
 				Name: "test-configmap",
 			},
 		},
 	}
 
-	location := builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()
+	location := builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Phase(velerov1api.BackupStorageLocationPhaseAvailable).Result()
 	require.NoError(t, r.kbClient.Create(context.Background(), location))
 
 	require.NoError(t, r.kbClient.Create(
@@ -820,14 +836,14 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		},
 		Spec: velerov1api.RestoreSpec{
 			BackupName: "backup-1",
-			ResourceModifier: &corev1.TypedLocalObjectReference{
+			ResourceModifier: &corev1api.TypedLocalObjectReference{
 				Kind: resourcemodifiers.ConfigmapRefType,
 				Name: "test-configmap",
 			},
 		},
 	}
 
-	cm1 := &corev1.ConfigMap{
+	cm1 := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: velerov1api.DefaultNamespace,
@@ -848,7 +864,7 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		},
 		Spec: velerov1api.RestoreSpec{
 			BackupName: "backup-1",
-			ResourceModifier: &corev1.TypedLocalObjectReference{
+			ResourceModifier: &corev1api.TypedLocalObjectReference{
 				// intentional to ensure case insensitivity works as expected
 				Kind: "confIGMaP",
 				Name: "test-configmap-invalid",
@@ -856,7 +872,7 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		},
 	}
 
-	invalidVersionCm := &corev1.ConfigMap{
+	invalidVersionCm := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap-invalid",
 			Namespace: velerov1api.DefaultNamespace,
@@ -877,14 +893,14 @@ func TestValidateAndCompleteWithResourceModifierSpecified(t *testing.T) {
 		},
 		Spec: velerov1api.RestoreSpec{
 			BackupName: "backup-1",
-			ResourceModifier: &corev1.TypedLocalObjectReference{
+			ResourceModifier: &corev1api.TypedLocalObjectReference{
 				Kind: resourcemodifiers.ConfigmapRefType,
 				Name: "test-configmap-invalid-operator",
 			},
 		},
 	}
 
-	invalidOperatorCm := &corev1.ConfigMap{
+	invalidOperatorCm := &corev1api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap-invalid-operator",
 			Namespace: velerov1api.DefaultNamespace,

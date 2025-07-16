@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1api "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerocredentials "github.com/vmware-tanzu/velero/internal/credentials"
 	credmock "github.com/vmware-tanzu/velero/internal/credentials/mocks"
@@ -538,7 +538,7 @@ func TestGetStoreOptions(t *testing.T) {
 	testCases := []struct {
 		name        string
 		funcTable   localFuncTable
-		repoParam   interface{}
+		repoParam   any
 		expected    map[string]string
 		expectedErr string
 	}{
@@ -602,7 +602,7 @@ func TestGetStoreOptions(t *testing.T) {
 
 func TestPrepareRepo(t *testing.T) {
 	bsl := velerov1api.BackupStorageLocation{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "fake-bsl",
 			Namespace: velerov1api.DefaultNamespace,
 		},
@@ -798,9 +798,9 @@ func TestForget(t *testing.T) {
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
 		backupRepo      *reposervicenmocks.BackupRepo
-		retFuncOpen     []interface{}
-		retFuncDelete   interface{}
-		retFuncFlush    interface{}
+		retFuncOpen     []any
+		retFuncDelete   any
+		retFuncFlush    any
 		credStoreReturn string
 		credStoreError  error
 		expectedErr     string
@@ -822,7 +822,7 @@ func TestForget(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -847,7 +847,7 @@ func TestForget(t *testing.T) {
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
 			backupRepo:  new(reposervicenmocks.BackupRepo),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -875,7 +875,7 @@ func TestForget(t *testing.T) {
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
 			backupRepo:  new(reposervicenmocks.BackupRepo),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -947,9 +947,9 @@ func TestBatchForget(t *testing.T) {
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
 		backupRepo      *reposervicenmocks.BackupRepo
-		retFuncOpen     []interface{}
-		retFuncDelete   interface{}
-		retFuncFlush    interface{}
+		retFuncOpen     []any
+		retFuncDelete   any
+		retFuncFlush    any
 		credStoreReturn string
 		credStoreError  error
 		snapshots       []string
@@ -972,7 +972,7 @@ func TestBatchForget(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -997,7 +997,7 @@ func TestBatchForget(t *testing.T) {
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
 			backupRepo:  new(reposervicenmocks.BackupRepo),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -1026,7 +1026,7 @@ func TestBatchForget(t *testing.T) {
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
 			backupRepo:  new(reposervicenmocks.BackupRepo),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -1083,7 +1083,7 @@ func TestBatchForget(t *testing.T) {
 			if tc.expectedErr == nil {
 				assert.Empty(t, errs)
 			} else {
-				assert.Equal(t, len(tc.expectedErr), len(errs))
+				assert.Len(t, errs, len(tc.expectedErr))
 
 				for i := range tc.expectedErr {
 					assert.EqualError(t, errs[i], tc.expectedErr[i])
@@ -1095,7 +1095,7 @@ func TestBatchForget(t *testing.T) {
 
 func TestInitRepo(t *testing.T) {
 	bsl := velerov1api.BackupStorageLocation{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "fake-bsl",
 			Namespace: velerov1api.DefaultNamespace,
 		},
@@ -1106,7 +1106,7 @@ func TestInitRepo(t *testing.T) {
 		funcTable       localFuncTable
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
-		retFuncInit     interface{}
+		retFuncInit     any
 		credStoreReturn string
 		credStoreError  error
 		readOnlyBSL     bool
@@ -1206,7 +1206,7 @@ func TestConnectToRepo(t *testing.T) {
 		funcTable       localFuncTable
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
-		retFuncInit     interface{}
+		retFuncInit     any
 		credStoreReturn string
 		credStoreError  error
 		expectedErr     string
@@ -1297,8 +1297,8 @@ func TestBoostRepoConnect(t *testing.T) {
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
 		backupRepo      *reposervicenmocks.BackupRepo
-		retFuncInit     interface{}
-		retFuncOpen     []interface{}
+		retFuncInit     any
+		retFuncOpen     []any
 		credStoreReturn string
 		credStoreError  error
 		expectedErr     string
@@ -1320,7 +1320,7 @@ func TestBoostRepoConnect(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -1347,7 +1347,7 @@ func TestBoostRepoConnect(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -1374,7 +1374,7 @@ func TestBoostRepoConnect(t *testing.T) {
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
 			backupRepo:  new(reposervicenmocks.BackupRepo),
-			retFuncOpen: []interface{}{
+			retFuncOpen: []any{
 				func(context.Context, udmrepo.RepoOptions) udmrepo.BackupRepo {
 					return backupRepo
 				},
@@ -1438,7 +1438,7 @@ func TestPruneRepo(t *testing.T) {
 		funcTable       localFuncTable
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
-		retFuncMaintain interface{}
+		retFuncMaintain any
 		credStoreReturn string
 		credStoreError  error
 		expectedErr     string

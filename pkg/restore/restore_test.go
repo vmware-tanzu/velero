@@ -25,6 +25,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/collections"
+
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -1025,15 +1028,15 @@ func TestInvalidTarballContents(t *testing.T) {
 func assertWantErrsOrWarnings(t *testing.T, wantRes Result, res Result) {
 	t.Helper()
 	if wantRes.Velero != nil {
-		assert.Equal(t, len(wantRes.Velero), len(res.Velero))
+		assert.Len(t, res.Velero, len(wantRes.Velero))
 		for i := range res.Velero {
 			assert.Contains(t, res.Velero[i], wantRes.Velero[i])
 		}
 	}
 	if wantRes.Namespaces != nil {
-		assert.Equal(t, len(wantRes.Namespaces), len(res.Namespaces))
+		assert.Len(t, res.Namespaces, len(wantRes.Namespaces))
 		for ns := range res.Namespaces {
-			assert.Equal(t, len(wantRes.Namespaces[ns]), len(res.Namespaces[ns]))
+			assert.Len(t, res.Namespaces[ns], len(wantRes.Namespaces[ns]))
 			for i := range res.Namespaces[ns] {
 				assert.Contains(t, res.Namespaces[ns][i], wantRes.Namespaces[ns][i])
 			}
@@ -1408,7 +1411,7 @@ func TestRestoreItems(t *testing.T) {
 			assertEmptyResults(t, warnings, errs)
 			assertRestoredItems(t, h, tc.want)
 			if len(tc.expectedRestoreItems) > 0 {
-				assert.EqualValues(t, tc.expectedRestoreItems, data.RestoredItems)
+				assert.Equal(t, tc.expectedRestoreItems, data.RestoredItems)
 			}
 		})
 	}
@@ -2343,19 +2346,19 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 			}
 
 			res, err := client.Get(context.TODO(), item.GetName(), metav1.GetOptions{})
-			if !assert.NoError(t, err) {
+			if !assert.NoError(t, err) { //nolint:testifylint // require is inappropriate
 				continue
 			}
 
 			itemJSON, err := json.Marshal(item)
-			if !assert.NoError(t, err) {
+			if !assert.NoError(t, err) { //nolint:testifylint // require is inappropriate
 				continue
 			}
 
 			t.Logf("%v", string(itemJSON))
 
-			u := make(map[string]interface{})
-			if !assert.NoError(t, json.Unmarshal(itemJSON, &u)) {
+			u := make(map[string]any)
+			if !assert.NoError(t, json.Unmarshal(itemJSON, &u)) { //nolint:testifylint // require is inappropriate
 				continue
 			}
 			want := &unstructured.Unstructured{Object: u}
@@ -3627,7 +3630,7 @@ func (cr *createRecorder) reactor() func(kubetesting.Action) (bool, runtime.Obje
 		}
 
 		accessor, err := meta.Accessor(createAction.GetObject())
-		assert.NoError(cr.t, err)
+		require.NoError(cr.t, err)
 
 		cr.resources = append(cr.resources, resourceID{
 			groupResource: action.GetResource().GroupResource().String(),
@@ -3650,7 +3653,7 @@ func assertAPIContents(t *testing.T, h *harness, want map[*test.APIResource][]st
 
 	for r, want := range want {
 		res, err := h.DynamicClient.Resource(r.GVR()).List(context.TODO(), metav1.ListOptions{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		if err != nil {
 			continue
 		}
@@ -3761,7 +3764,7 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 				kubeutil.KubeAnnBindCompleted,
 				kubeutil.KubeAnnBoundByController,
 				kubeutil.KubeAnnDynamicallyProvisioned,
-			).WithSpecField("claimRef", map[string]interface{}{
+			).WithSpecField("claimRef", map[string]any{
 				"namespace":       "ns-1",
 				"name":            "pvc-1",
 				"uid":             "abc",
@@ -3769,7 +3772,7 @@ func Test_resetVolumeBindingInfo(t *testing.T) {
 			expected: newTestUnstructured().WithMetadataField("kind", "persistentVolume").
 				WithName("pv-1").
 				WithAnnotations(kubeutil.KubeAnnDynamicallyProvisioned).
-				WithSpecField("claimRef", map[string]interface{}{
+				WithSpecField("claimRef", map[string]any{
 					"namespace": "ns-1", "name": "pvc-1"}).Unstructured,
 		},
 		{
@@ -3809,7 +3812,7 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		{
 			name: "The input obj isn't service",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Pod",
 				},
 			},
@@ -3818,7 +3821,7 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		{
 			name: "The StatusError contains no causes",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Service",
 				},
 			},
@@ -3832,7 +3835,7 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		{
 			name: "The causes contains not only port already allocated error",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Service",
 				},
 			},
@@ -3852,9 +3855,9 @@ func TestIsAlreadyExistsError(t *testing.T) {
 		{
 			name: "Get already allocated error but the service doesn't exist",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Service",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
@@ -3878,9 +3881,9 @@ func TestIsAlreadyExistsError(t *testing.T) {
 				builder.ForService("default", "test").Result(),
 			),
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": "Service",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
@@ -3939,7 +3942,7 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		{
 			name: "Invalid PV, expect false.",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": 1,
 				},
 			},
@@ -3948,10 +3951,10 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		{
 			name: "Cannot find VS, expect false",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
@@ -3962,15 +3965,15 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		{
 			name: "VS's source PVC is nil, expect false",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
-					"spec": map[string]interface{}{
-						"claimRef": map[string]interface{}{
+					"spec": map[string]any{
+						"claimRef": map[string]any{
 							"namespace": "velero",
 							"name":      "test",
 						},
@@ -3983,10 +3986,10 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		{
 			name: "PVs claimref is nil, expect false.",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "velero",
 						"name":      "test",
 					},
@@ -3999,15 +4002,15 @@ func TestHasCSIVolumeSnapshot(t *testing.T) {
 		{
 			name: "Find VS, expect true.",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "velero",
 						"name":      "test",
 					},
-					"spec": map[string]interface{}{
-						"claimRef": map[string]interface{}{
+					"spec": map[string]any{
+						"claimRef": map[string]any{
 							"namespace": "velero",
 							"name":      "test",
 						},
@@ -4048,7 +4051,7 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		{
 			name: "Invalid PV, expect false.",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind": 1,
 				},
 			},
@@ -4057,10 +4060,10 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		{
 			name: "PV without ClaimRef, expect false",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
@@ -4073,15 +4076,15 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		{
 			name: "Cannot find DataUploadResult CM, expect false",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
-					"spec": map[string]interface{}{
-						"claimRef": map[string]interface{}{
+					"spec": map[string]any{
+						"claimRef": map[string]any{
 							"namespace": "velero",
 							"name":      "testPVC",
 						},
@@ -4095,15 +4098,15 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		{
 			name: "Find DataUploadResult CM, expect true",
 			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
+				Object: map[string]any{
 					"kind":       "PersistentVolume",
 					"apiVersion": "v1",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"namespace": "default",
 						"name":      "test",
 					},
-					"spec": map[string]interface{}{
-						"claimRef": map[string]interface{}{
+					"spec": map[string]any{
+						"claimRef": map[string]any{
 							"namespace": "velero",
 							"name":      "testPVC",
 						},
@@ -4136,6 +4139,104 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			require.Equal(t, tc.expectedResult, hasSnapshotDataUpload(ctx, tc.obj))
+		})
+	}
+}
+
+func TestDetermineRestoreStatus(t *testing.T) {
+	tests := []struct {
+		name                string
+		annotations         map[string]string
+		restoreSpecIncludes *bool
+		expectedDecision    bool
+	}{
+		{
+			name:                "No annotation, fallback to restore spec",
+			annotations:         nil,
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    true,
+		},
+		{
+			name:                "No annotation, restore spec excludes",
+			annotations:         nil,
+			restoreSpecIncludes: boolptr.False(),
+			expectedDecision:    false,
+		},
+		{
+			name:                "Annotation explicitly set to true, restore spec is false",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "true"},
+			restoreSpecIncludes: boolptr.False(),
+			expectedDecision:    true,
+		},
+		{
+			name:                "Annotation explicitly set to false, restore spec is true",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "false"},
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    false,
+		},
+		{
+			name:                "Invalid annotation value, fallback to restore spec",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "foo"},
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    true,
+		},
+		{
+			name:                "Empty annotation value, fallback to restore spec",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: ""},
+			restoreSpecIncludes: boolptr.False(),
+			expectedDecision:    false,
+		},
+		{
+			name:                "Mixed-case annotation value 'True' should be treated as true",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "True"},
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    true,
+		},
+		{
+			name:                "Mixed-case annotation value 'FALSE' should be treated as false",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "FALSE"},
+			restoreSpecIncludes: boolptr.True(),
+			expectedDecision:    false,
+		},
+		{
+			name:                "Nil IncludesExcludes, but annotation is 'true'",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "true"},
+			restoreSpecIncludes: nil,
+			expectedDecision:    true,
+		},
+		{
+			name:                "Nil IncludesExcludes, but annotation is 'false'",
+			annotations:         map[string]string{ObjectStatusRestoreAnnotationKey: "false"},
+			restoreSpecIncludes: nil,
+			expectedDecision:    false,
+		},
+		{
+			name:                "Nil IncludesExcludes, no annotation (default to false)",
+			annotations:         nil,
+			restoreSpecIncludes: nil,
+			expectedDecision:    false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			obj := &unstructured.Unstructured{}
+			obj.SetAnnotations(test.annotations)
+
+			var includesExcludes *collections.IncludesExcludes
+			if test.restoreSpecIncludes != nil {
+				includesExcludes = collections.NewIncludesExcludes()
+				if *test.restoreSpecIncludes {
+					includesExcludes.Includes("*")
+				} else {
+					includesExcludes.Excludes("*")
+				}
+			}
+
+			log := logrus.New()
+			result := determineRestoreStatus(obj, includesExcludes, "testGroupResource", log)
+
+			assert.Equal(t, test.expectedDecision, result)
 		})
 	}
 }
