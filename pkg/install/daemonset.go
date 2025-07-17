@@ -24,6 +24,7 @@ import (
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/config"
 
 	"github.com/vmware-tanzu/velero/internal/velero"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
@@ -63,8 +64,8 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 	if c.forWindows {
 		dsName = "node-agent-windows"
 	}
-	hostPodsVolumePath := filepath.Join(c.kubeletRootDir, "pods")
-	hostPluginsVolumePath := filepath.Join(c.kubeletRootDir, "plugins")
+	hostPodsVolumePath := filepath.Join(c.kubeletRootDir, kubeletconfig.DefaultKubeletPodsDirName)
+	hostPluginsVolumePath := filepath.Join(c.kubeletRootDir, kubeletconfig.DefaultKubeletPluginsDirName)
 	volumes := []corev1api.Volume{}
 	volumeMounts := []corev1api.VolumeMount{}
 	if !c.nodeAgentDisableHostPath {
