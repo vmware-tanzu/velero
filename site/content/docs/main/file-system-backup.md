@@ -200,7 +200,7 @@ In this approach, Velero will back up all pod volumes using FSB with the excepti
 - Hostpath volumes
 - **Volumes explicitly excluded using annotations** (see below)
 
-**Important:** When you exclude a volume from FSB using annotations, Velero will attempt to back it up using volume snapshots instead (if properly configured with VolumeSnapshotLocation).
+**Important:** When you exclude a volume from FSB using annotations, Velero will attempt to back it up using volume snapshots instead (if CSI snapshots are enabled and the volume is a CSI volume or if properly configured with a compatible VolumeSnapshotLocation).
 
 It is possible to exclude volumes from being backed up using the `backup.velero.io/backup-volumes-excludes` 
 annotation on the pod.  
@@ -272,8 +272,8 @@ containing a volume to be backed up using FSB must be annotated with the volume'
 
 **Note:** Volumes not annotated for FSB will be considered for volume snapshots if:
 - `--snapshot-volumes` is not set to `false`
-- A VolumeSnapshotLocation is configured
-- The volume type supports snapshots  
+- The volume supports snapshots (either CSI or native)
+- Either the volume is a CSI volume and CSI snapshots are enabled or there is a compatible VolumeSnapshotLocation configured  
 
 Instructions to back up using this approach are as follows:
 
@@ -527,7 +527,7 @@ When Velero encounters a volume during backup, it follows this decision flow:
    - No → Attempt volume snapshot (if configured)
 
 3. **For volume snapshots to succeed:**
-   - VolumeSnapshotLocation must be configured
+   - CSI snapshots must be enabled for CSI volumes or compatible VolumeSnapshotLocation must be configured
    - Volume type must be supported by the snapshot provider
    - `--snapshot-volumes` must not be `false`
 
