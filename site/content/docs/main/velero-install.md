@@ -21,6 +21,7 @@ velero install \
     --velero-pod-mem-request <MEMORY_REQUEST> \
     --velero-pod-cpu-limit <CPU_LIMIT> \
     --velero-pod-mem-limit <MEMORY_LIMIT> \
+    --kubelet-root-dir <PATH_TO_KUBELET_ROOT_DIR> \
     [--use-node-agent] \
     [--default-volumes-to-fs-backup] \
     [--node-agent-pod-cpu-request <CPU_REQUEST>] \

@@ -31,6 +31,9 @@ For some use cases, Velero node-agent requires to run under privileged mode. For
 
 If you've already run `velero install` without the `--use-node-agent` or `--privileged-node-agent` flag, you can run the same command again, including the `--use-node-agent` or `--privileged-node-agent` flag, to add CSI snapshot data movement to your existing install.
 
+## Customize the kubelet root path of the node-agent
+When installing with the `--use-node-agent` flag, the node-agent will mount the default kubelet paths `/var/lib/kubelet/pods` and `/var/lib/kubelet/plugins` (hostPath). To customize these kubelet mount paths, use the `--kubelet-root-dir` flag.
+
 ## Default Pod Volume backup to file system backup
 
 By default, `velero install` does not enable the use of File System Backup (FSB) to take backups of all pod volumes. You must apply an [annotation](file-system-backup.md/#using-opt-in-pod-volume-backup) to every pod which contains volumes for Velero to use FSB for the backup.
