@@ -19,6 +19,7 @@ package persistence
 import (
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -189,10 +190,21 @@ func (b *objectBackupStoreGetter) Get(location *velerov1api.BackupStorageLocatio
 		"prefix": prefix,
 	}))
 
+	filenameSuffix := ""
+	encryption := location.Spec.Encryption
+
+	if encryption != nil && encryption.Type != velerov1api.EncryptionTypeNone {
+		filenameSuffix = fmt.Sprintf(".%s", encryption.Type)
+		objectStore, err = NewEncryptedStore(objectStore, encryption.Type, log, encryption.Options)
+		if err != nil {
+			return nil, errors.Wrap(err, "initializing encryption wrapper")
+		}
+	}
+
 	return &objectBackupStore{
 		objectStore: objectStore,
 		bucket:      bucket,
-		layout:      NewObjectStoreLayout(prefix),
+		layout:      NewObjectStoreLayout(prefix, filenameSuffix),
 		logger:      log,
 	}, nil
 }
