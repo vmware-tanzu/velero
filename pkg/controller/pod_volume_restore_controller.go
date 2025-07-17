@@ -820,9 +820,14 @@ func (r *PodVolumeRestoreReconciler) OnDataPathProgress(ctx context.Context, nam
 func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolumeRestore) exposer.PodVolumeExposeParam {
 	log := r.logger.WithField("PVR", pvr.Name)
 
+	nodeOS, err := kube.GetNodeOS(context.Background(), pvr.Status.Node, r.kubeClient.CoreV1())
+	if err != nil {
+		log.WithError(err).Warnf("Failed to get nodeOS for node %s, use linux node-agent for hosting pod labels, annotations and tolerations", pvr.Status.Node)
+	}
+
 	hostingPodLabels := map[string]string{velerov1api.PVRLabel: pvr.Name}
 	for _, k := range util.ThirdPartyLabels {
-		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvr.Namespace, k, ""); err != nil {
+		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvr.Namespace, k, nodeOS); err != nil {
 			if err != nodeagent.ErrNodeAgentLabelNotFound {
 				log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
 			}
@@ -833,12 +838,23 @@ func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolume
 
 	hostingPodAnnotation := map[string]string{}
 	for _, k := range util.ThirdPartyAnnotations {
-		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvr.Namespace, k, ""); err != nil {
+		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvr.Namespace, k, nodeOS); err != nil {
 			if err != nodeagent.ErrNodeAgentAnnotationNotFound {
 				log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
 			}
 		} else {
 			hostingPodAnnotation[k] = v
+		}
+	}
+
+	hostingPodTolerations := []corev1api.Toleration{}
+	for _, k := range util.ThirdPartyTolerations {
+		if v, err := nodeagent.GetToleration(context.Background(), r.kubeClient, pvr.Namespace, k, nodeOS); err != nil {
+			if err != nodeagent.ErrNodeAgentTolerationNotFound {
+				log.WithError(err).Warnf("Failed to check node-agent toleration, skip adding host pod toleration %s", k)
+			}
+		} else {
+			hostingPodTolerations = append(hostingPodTolerations, *v)
 		}
 	}
 
@@ -849,6 +865,7 @@ func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolume
 		ClientPodVolume:       pvr.Spec.Volume,
 		HostingPodLabels:      hostingPodLabels,
 		HostingPodAnnotations: hostingPodAnnotation,
+		HostingPodTolerations: hostingPodTolerations,
 		OperationTimeout:      r.resourceTimeout,
 		Resources:             r.podResources,
 	}

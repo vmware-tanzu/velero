@@ -60,6 +60,7 @@ type podTemplateConfig struct {
 	itemBlockWorkerCount            int
 	forWindows                      bool
 	kubeletRootDir                  string
+	nodeAgentDisableHostPath        bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -230,6 +231,12 @@ func WithForWindows() podTemplateOption {
 func WithKubeletRootDir(kubeletRootDir string) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.kubeletRootDir = kubeletRootDir
+	}
+}
+
+func WithNodeAgentDisableHostPath(disable bool) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.nodeAgentDisableHostPath = disable
 	}
 }
 

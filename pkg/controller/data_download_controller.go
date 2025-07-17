@@ -840,6 +840,17 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		}
 	}
 
+	hostingPodTolerations := []corev1api.Toleration{}
+	for _, k := range util.ThirdPartyTolerations {
+		if v, err := nodeagent.GetToleration(context.Background(), r.kubeClient, dd.Namespace, k, nodeOS); err != nil {
+			if err != nodeagent.ErrNodeAgentTolerationNotFound {
+				log.WithError(err).Warnf("Failed to check node-agent toleration, skip adding host pod toleration %s", k)
+			}
+		} else {
+			hostingPodTolerations = append(hostingPodTolerations, *v)
+		}
+	}
+
 	affinity := kube.GetLoadAffinityByStorageClass(r.loadAffinity, dd.Spec.BackupStorageLocation, log)
 
 	return exposer.GenericRestoreExposeParam{
@@ -847,6 +858,7 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		TargetNamespace:       dd.Spec.TargetVolume.Namespace,
 		HostingPodLabels:      hostingPodLabels,
 		HostingPodAnnotations: hostingPodAnnotation,
+		HostingPodTolerations: hostingPodTolerations,
 		Resources:             r.podResources,
 		OperationTimeout:      dd.Spec.OperationTimeout.Duration,
 		ExposeTimeout:         r.preparingTimeout,

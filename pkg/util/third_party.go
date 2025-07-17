@@ -23,3 +23,8 @@ var ThirdPartyLabels = []string{
 var ThirdPartyAnnotations = []string{
 	"iam.amazonaws.com/role",
 }
+
+var ThirdPartyTolerations = []string{
+	"kubernetes.azure.com/scalesetpriority",
+	"CriticalAddonsOnly",
+}
