@@ -118,6 +118,34 @@ func TestVSExecute(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Backup in finalizing phase - skip VSC lookup",
+			backup: builder.ForBackup("velero", "backup").
+				Phase(velerov1api.BackupPhaseFinalizing).Result(),
+			vs: builder.ForVolumeSnapshot("velero", "vs").
+				ObjectMeta(builder.WithLabels(
+					velerov1api.BackupNameLabel, "backup")).
+				Status().
+				BoundVolumeSnapshotContentName("vsc").Result(),
+			vsc:                     nil, // VSC won't be created/fetched
+			expectedErr:             "",
+			expectedAdditionalItems: nil,
+			expectedItemToUpdate:    nil,
+		},
+		{
+			name: "Backup in finalizing partially failed phase - skip VSC lookup",
+			backup: builder.ForBackup("velero", "backup").
+				Phase(velerov1api.BackupPhaseFinalizingPartiallyFailed).Result(),
+			vs: builder.ForVolumeSnapshot("velero", "vs").
+				ObjectMeta(builder.WithLabels(
+					velerov1api.BackupNameLabel, "backup")).
+				Status().
+				BoundVolumeSnapshotContentName("vsc").Result(),
+			vsc:                     nil, // VSC won't be created/fetched
+			expectedErr:             "",
+			expectedAdditionalItems: nil,
+			expectedItemToUpdate:    nil,
+		},
 	}
 
 	for _, tc := range tests {
