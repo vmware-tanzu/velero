@@ -23,6 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/vmware-tanzu/velero/internal/velero"
 )
@@ -177,7 +178,9 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 				Name: "cloud-credentials",
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
-						SecretName: "cloud-credentials",
+						// read-only for Owner, Group, Public
+						DefaultMode: ptr.To(int32(0444)),
+						SecretName:  "cloud-credentials",
 					},
 				},
 			},
