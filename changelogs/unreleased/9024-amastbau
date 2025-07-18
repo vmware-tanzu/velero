@@ -1,0 +1,1 @@
+Fix Issue 8816 When specifying LabelSelector on restore, related items such as PVC and VolumeSnapshot are not included
