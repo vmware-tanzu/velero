@@ -17,9 +17,8 @@ limitations under the License.
 package builder
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	corev1api "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )

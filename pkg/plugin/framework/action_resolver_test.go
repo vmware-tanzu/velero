@@ -19,9 +19,8 @@ package framework
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/labels"
-
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
