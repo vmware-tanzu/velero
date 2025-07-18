@@ -177,6 +177,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 							Resources: c.resources,
 						},
 					},
+					PriorityClassName: c.priorityClassName,
 				},
 			},
 		},

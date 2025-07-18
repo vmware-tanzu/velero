@@ -37,6 +37,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/csi"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 // CSISnapshotExposeParam define the input param for Expose of CSI snapshots
@@ -82,6 +83,12 @@ type CSISnapshotExposeParam struct {
 
 	// NodeOS specifies the OS of node that the source volume is attaching
 	NodeOS string
+
+	// NodeAgentNamespace is the namespace where the node agent is running
+	NodeAgentNamespace string
+
+	// NodeAgentConfigMap is the name of the ConfigMap containing node agent configurations
+	NodeAgentConfigMap string
 }
 
 // CSISnapshotExposeWaitParam define the input param for WaitExposed of CSI snapshots
@@ -224,6 +231,8 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 		backupPVCReadOnly,
 		spcNoRelabeling,
 		csiExposeParam.NodeOS,
+		csiExposeParam.NodeAgentNamespace,
+		csiExposeParam.NodeAgentConfigMap,
 	)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pod")
@@ -538,6 +547,8 @@ func (e *csiSnapshotExposer) createBackupPod(
 	backupPVCReadOnly bool,
 	spcNoRelabeling bool,
 	nodeOS string,
+	nodeAgentNamespace string,
+	nodeAgentConfigMap string,
 ) (*corev1api.Pod, error) {
 	podName := ownerObject.Name
 
@@ -547,6 +558,13 @@ func (e *csiSnapshotExposer) createBackupPod(
 	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, nodeOS)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
+	}
+
+	// Get the priority class name from node-agent-configmap if available
+	priorityClassName, err := veleroutil.GetDataMoverPriorityClassName(ctx, nodeAgentNamespace, e.kubeClient, nodeAgentConfigMap)
+	if err != nil {
+		e.log.WithError(err).Warn("Failed to get priority class name from node-agent-configmap, using empty value")
+		priorityClassName = ""
 	}
 
 	var gracePeriod int64
@@ -679,6 +697,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 					Resources:     resources,
 				},
 			},
+			PriorityClassName:             priorityClassName,
 			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes:                       volumes,

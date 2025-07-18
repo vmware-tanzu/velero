@@ -61,6 +61,7 @@ type podTemplateConfig struct {
 	itemBlockWorkerCount            int
 	forWindows                      bool
 	nodeAgentDisableHostPath        bool
+	priorityClassName               string
 }
 
 func WithImage(image string) podTemplateOption {
@@ -219,6 +220,12 @@ func WithRepoMaintenanceJobConfigMap(repoMaintenanceJobConfigMap string) podTemp
 func WithItemBlockWorkerCount(itemBlockWorkerCount int) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.itemBlockWorkerCount = itemBlockWorkerCount
+	}
+}
+
+func WithPriorityClassName(priorityClassName string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.priorityClassName = priorityClassName
 	}
 }
 
@@ -400,6 +407,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1api.Deployme
 							},
 						},
 					},
+					PriorityClassName: c.priorityClassName,
 				},
 			},
 		},
