@@ -31,6 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
+	crfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"context"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -38,6 +41,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+
+	"k8s.io/client-go/kubernetes/scheme"
+
+	"github.com/vmware-tanzu/velero/pkg/restorehelper"
 )
 
 func TestGetImage(t *testing.T) {
@@ -157,13 +164,28 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 		want             *corev1api.Pod
 	}{
 		{
-			name: "Restoring pod with no other initContainers adds the restore initContainer",
-			pod: builder.ForPod("ns-1", "my-pod").ObjectMeta(
-				builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+			name: "Restoring pod with no other initContainers adds the restore initContainer when volumes need file system restores",
+			pod: builder.ForPod("ns-1", "my-pod").
+				ObjectMeta(builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				Volumes(
+					builder.ForVolume("myvol").PersistentVolumeClaimSource("pvc-1").Result(),
+				).
 				Result(),
+			podVolumeBackups: []runtime.Object{
+				builder.ForPodVolumeBackup(veleroNs, "pvb-1").
+					PodName("my-pod").
+					PodNamespace("ns-1").
+					Volume("myvol").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					SnapshotID("foo").
+					Result(),
+			},
 			want: builder.ForPod("ns-1", "my-pod").
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				Volumes(
+					builder.ForVolume("myvol").PersistentVolumeClaimSource("pvc-1").Result(),
+				).
 				InitContainers(
 					newRestoreInitContainerBuilder(defaultRestoreHelperImage, "").
 						Resources(&resourceReqs).
@@ -172,15 +194,30 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 						Command([]string{"/velero-restore-helper"}).Result()).Result(),
 		},
 		{
-			name: "Restoring pod with other initContainers adds the restore initContainer as the first one",
+			name: "Restoring pod with other initContainers adds the restore initContainer as the first one when volumes need file system restores",
 			pod: builder.ForPod("ns-1", "my-pod").
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				Volumes(
+					builder.ForVolume("myvol").PersistentVolumeClaimSource("pvc-1").Result(),
+				).
 				InitContainers(builder.ForContainer("first-container", "").Result()).
 				Result(),
+			podVolumeBackups: []runtime.Object{
+				builder.ForPodVolumeBackup(veleroNs, "pvb-1").
+					PodName("my-pod").
+					PodNamespace("ns-1").
+					Volume("myvol").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					SnapshotID("foo").
+					Result(),
+			},
 			want: builder.ForPod("ns-1", "my-pod").
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				Volumes(
+					builder.ForVolume("myvol").PersistentVolumeClaimSource("pvc-1").Result(),
+				).
 				InitContainers(
 					newRestoreInitContainerBuilder(defaultRestoreHelperImage, "").
 						Resources(&resourceReqs).
@@ -277,17 +314,32 @@ func TestPodVolumeRestoreActionExecute(t *testing.T) {
 				Result(),
 		},
 		{
-			name: "Restoring pod with custom container SecurityContext uses this SecurityContext for the restore initContainer",
+			name: "Restoring pod with custom container SecurityContext uses this SecurityContext for the restore initContainer when volumes need file system restores",
 			pod: builder.ForPod("ns-1", "my-pod").
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				Volumes(
+					builder.ForVolume("myvol").PersistentVolumeClaimSource("pvc-1").Result(),
+				).
 				Containers(
 					builder.ForContainer("app-container", "app-image").
 						SecurityContext(&customSecurityContext).Result()).
 				Result(),
+			podVolumeBackups: []runtime.Object{
+				builder.ForPodVolumeBackup(veleroNs, "pvb-1").
+					PodName("my-pod").
+					PodNamespace("ns-1").
+					Volume("myvol").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					SnapshotID("foo").
+					Result(),
+			},
 			want: builder.ForPod("ns-1", "my-pod").
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				Volumes(
+					builder.ForVolume("myvol").PersistentVolumeClaimSource("pvc-1").Result(),
+				).
 				Containers(
 					builder.ForContainer("app-container", "app-image").
 						SecurityContext(&customSecurityContext).Result()).
@@ -424,6 +476,264 @@ func TestGetCommand(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := getCommand(velerotest.NewLogger(), tc.configMap)
 			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+// This tests that restore-wait is added when file system restore volume exists, nothing added otherwise,
+// and removed if it exists but is not needed.
+// issue: 8870
+func TestPodVolumeRestoreActionExecuteWithFileSystemShouldAddWaitInitContainer(t *testing.T) {
+	tests := []struct {
+		name                   string
+		pod                    *corev1api.Pod
+		podFromBackup          *corev1api.Pod
+		podVolumeBackups       []*velerov1api.PodVolumeBackup
+		restore                *velerov1api.Restore
+		expectedInitContainers int
+		expectedError          error
+	}{
+		{
+			name: "no pod volume backups results in no init container",
+			pod: builder.ForPod("ns", "pod").
+				ObjectMeta(builder.WithUID("pod-uid")).
+				Volumes(
+					builder.ForVolume("volume-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("volume-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				Result(),
+			podFromBackup: builder.ForPod("ns", "pod").
+				ObjectMeta(builder.WithUID("pod-uid")).
+				Volumes(
+					builder.ForVolume("volume-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("volume-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				Result(),
+			podVolumeBackups:       nil,
+			restore:                builder.ForRestore("velero", "restore-1").Backup("test-backup").Result(),
+			expectedInitContainers: 0,
+			expectedError:          nil,
+		},
+		{
+			name: "pod volume backups that don't match pod's volumes results in no init container",
+			pod: builder.ForPod("ns", "pod").
+				ObjectMeta(builder.WithUID("pod-uid")).
+				Volumes(
+					builder.ForVolume("volume-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("volume-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				Result(),
+			podFromBackup: builder.ForPod("ns", "pod").
+				ObjectMeta(builder.WithUID("pod-uid")).
+				Volumes(
+					builder.ForVolume("volume-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("volume-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				Result(),
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "test-backup")).
+					PodName("different-pod").
+					PodNamespace("ns").
+					Volume("volume-1").
+					SnapshotID("snapshot-1").
+					Result(),
+			},
+			restore:                builder.ForRestore("velero", "restore-1").Backup("test-backup").Result(),
+			expectedInitContainers: 0,
+			expectedError:          nil,
+		},
+		{
+			name: "matching pod volume backup results in init container being added",
+			pod: builder.ForPod("ns", "pod").
+				ObjectMeta(builder.WithUID("pod-uid")).
+				Volumes(
+					builder.ForVolume("volume-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("volume-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				Result(),
+			podFromBackup: builder.ForPod("ns", "pod").
+				ObjectMeta(builder.WithUID("pod-uid")).
+				Volumes(
+					builder.ForVolume("volume-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("volume-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				Result(),
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "test-backup")).
+					PodName("pod").
+					PodNamespace("ns").
+					Volume("volume-1").
+					SnapshotID("snapshot-1").
+					Result(),
+			},
+			restore:                builder.ForRestore("velero", "restore-1").Backup("test-backup").Result(),
+			expectedInitContainers: 1,
+			expectedError:          nil,
+		},
+		{
+			name: "matching pod volume backup with matching pod name and namespace results in init container being added",
+			pod: builder.ForPod("ns", "pod").
+				ObjectMeta(builder.WithUID("pod-uid")).
+				Volumes(
+					builder.ForVolume("volume-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("volume-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				Result(),
+			podFromBackup: builder.ForPod("ns", "pod").
+				ObjectMeta(builder.WithUID("pod-uid")).
+				Volumes(
+					builder.ForVolume("volume-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("volume-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				Result(),
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "test-backup")).
+					PodName("pod").
+					PodNamespace("ns").
+					Volume("volume-1").
+					SnapshotID("snapshot-1").
+					Result(),
+			},
+			restore:                builder.ForRestore("velero", "restore-1").Backup("test-backup").Result(),
+			expectedInitContainers: 1,
+			expectedError:          nil,
+		},
+		{
+			name: "existing init container is removed when no file system restore is needed",
+			pod: builder.ForPod("ns", "pod").
+				ObjectMeta(builder.WithUID("pod-uid")).
+				Volumes(
+					builder.ForVolume("volume-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("volume-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				InitContainers(
+					builder.ForContainer(restorehelper.WaitInitContainer, "velero/velero:latest").
+						Command([]string{"/velero-restore-helper"}).
+						Args("restore-1").
+						Result(),
+					builder.ForContainer("another-init", "another-image").Result(),
+				).
+				Result(),
+			podFromBackup: builder.ForPod("ns", "pod").
+				ObjectMeta(builder.WithUID("pod-uid")).
+				Volumes(
+					builder.ForVolume("volume-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("volume-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				Result(),
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				// This PVB doesn't match the pod's name, so needsFileSystemRestore will be false
+				builder.ForPodVolumeBackup("velero", "pvb-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "test-backup")).
+					PodName("different-pod").
+					PodNamespace("ns").
+					Volume("volume-1").
+					SnapshotID("snapshot-1").
+					Result(),
+			},
+			restore:                builder.ForRestore("velero", "restore-1").Backup("test-backup").Result(),
+			expectedInitContainers: 1, // Only the "another-init" container should remain
+			expectedError:          nil,
+		},
+		{
+			name: "existing legacy init container is removed when no file system restore is needed",
+			pod: builder.ForPod("ns", "pod").
+				ObjectMeta(builder.WithUID("pod-uid")).
+				Volumes(
+					builder.ForVolume("volume-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("volume-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				InitContainers(
+					builder.ForContainer(restorehelper.WaitInitContainerLegacy, "velero/velero:latest").
+						Command([]string{"/velero-restore-helper"}).
+						Args("restore-1").
+						Result(),
+					builder.ForContainer("another-init", "another-image").Result(),
+				).
+				Result(),
+			podFromBackup: builder.ForPod("ns", "pod").
+				ObjectMeta(builder.WithUID("pod-uid")).
+				Volumes(
+					builder.ForVolume("volume-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("volume-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				Result(),
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				// This PVB doesn't match the pod's name, so needsFileSystemRestore will be false
+				builder.ForPodVolumeBackup("velero", "pvb-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, "test-backup")).
+					PodName("different-pod").
+					PodNamespace("ns").
+					Volume("volume-1").
+					SnapshotID("snapshot-1").
+					Result(),
+			},
+			restore:                builder.ForRestore("velero", "restore-1").Backup("test-backup").Result(),
+			expectedInitContainers: 1, // Only the "another-init" container should remain
+			expectedError:          nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup
+			var (
+				client   = crfake.NewClientBuilder().Build()
+				crClient = client
+			)
+
+			// Register the PodVolumeBackup type with the scheme
+			require.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
+
+			// Create the PodVolumeBackups in the fake client
+			for _, pvb := range tc.podVolumeBackups {
+				require.NoError(t, crClient.Create(context.Background(), pvb))
+			}
+
+			// Create a fake clientset
+			clientset := fake.NewSimpleClientset()
+
+			// Create the action
+			action := &PodVolumeRestoreAction{
+				logger:      logrus.StandardLogger(),
+				client:      clientset.CoreV1().ConfigMaps("velero"),
+				crClient:    crClient,
+				veleroImage: "velero/velero:latest",
+			}
+
+			// Convert the pod to unstructured
+			podMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pod)
+			require.NoError(t, err)
+			podFromBackupMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.podFromBackup)
+			require.NoError(t, err)
+
+			// Create the input
+			input := &velero.RestoreItemActionExecuteInput{
+				Item:           &unstructured.Unstructured{Object: podMap},
+				ItemFromBackup: &unstructured.Unstructured{Object: podFromBackupMap},
+				Restore:        tc.restore,
+			}
+
+			// Execute the action
+			output, err := action.Execute(input)
+
+			// Verify the results
+			if tc.expectedError != nil {
+				assert.Equal(t, tc.expectedError, err)
+			} else {
+				require.NoError(t, err)
+
+				// Convert the output back to a pod
+				outputPod := new(corev1api.Pod)
+				err = runtime.DefaultUnstructuredConverter.FromUnstructured(output.UpdatedItem.UnstructuredContent(), outputPod)
+				require.NoError(t, err)
+
+				// Check if the init container was added or removed as expected
+				assert.Len(t, outputPod.Spec.InitContainers, tc.expectedInitContainers, "Unexpected number of init containers")
+			}
 		})
 	}
 }
