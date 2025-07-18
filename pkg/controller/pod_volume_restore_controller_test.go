@@ -617,7 +617,7 @@ func initPodVolumeRestoreReconcilerWithError(objects []runtime.Object, cliObj []
 
 	dataPathMgr := datapath.NewManager(1)
 
-	return NewPodVolumeRestoreReconciler(fakeClient, nil, fakeKubeClient, dataPathMgr, "test-node", time.Minute*5, time.Minute, corev1api.ResourceRequirements{}, velerotest.NewLogger()), nil
+	return NewPodVolumeRestoreReconciler(fakeClient, nil, fakeKubeClient, dataPathMgr, nil, "test-node", time.Minute*5, time.Minute, corev1api.ResourceRequirements{}, velerotest.NewLogger()), nil
 }
 
 func TestPodVolumeRestoreReconcile(t *testing.T) {
@@ -669,6 +669,7 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 		mockCancel               bool
 		mockClose                bool
 		needExclusiveUpdateError error
+		constrained              bool
 		expected                 *velerov1api.PodVolumeRestore
 		expectDeleted            bool
 		expectCancelRecord       bool
@@ -764,6 +765,14 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 		{
 			name: "Unknown pvr status",
 			pvr:  builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, pvrName).Phase("Unknown").Finalizers([]string{PodVolumeFinalizer}).Result(),
+		},
+		{
+			name:           "new pvb but constrained",
+			pvr:            builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, pvrName).Finalizers([]string{PodVolumeFinalizer}).PodNamespace("test-ns").PodName("test-pod").Result(),
+			targetPod:      builder.ForPod("test-ns", "test-pod").InitContainers(&corev1api.Container{Name: restorehelper.WaitInitContainer}).InitContainerState(corev1api.ContainerState{Running: &corev1api.ContainerStateRunning{}}).Result(),
+			constrained:    true,
+			expected:       builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, pvrName).Finalizers([]string{PodVolumeFinalizer}).Result(),
+			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
 		},
 		{
 			name:        "new pvr but accept failed",
@@ -942,6 +951,10 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 				r.cancelledPVR[test.pvr.Name] = test.sportTime.Time
 			}
 
+			if test.constrained {
+				r.vgdpCounter = &exposer.VgdpCounter{}
+			}
+
 			funcExclusiveUpdatePodVolumeRestore = exclusiveUpdatePodVolumeRestore
 			if test.needExclusiveUpdateError != nil {
 				funcExclusiveUpdatePodVolumeRestore = func(context.Context, kbclient.Client, *velerov1api.PodVolumeRestore, func(*velerov1api.PodVolumeRestore)) (bool, error) {
@@ -1029,13 +1042,13 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 				assert.Equal(t, test.expectedResult.RequeueAfter, actualResult.RequeueAfter)
 			}
 
-			if test.expected != nil || test.expectDeleted {
-				pvr := velerov1api.PodVolumeRestore{}
-				err = r.client.Get(ctx, kbclient.ObjectKey{
-					Name:      test.pvr.Name,
-					Namespace: test.pvr.Namespace,
-				}, &pvr)
+			pvr := velerov1api.PodVolumeRestore{}
+			err = r.client.Get(ctx, kbclient.ObjectKey{
+				Name:      test.pvr.Name,
+				Namespace: test.pvr.Namespace,
+			}, &pvr)
 
+			if test.expected != nil || test.expectDeleted {
 				if test.expectDeleted {
 					assert.True(t, apierrors.IsNotFound(err))
 				} else {
@@ -1058,6 +1071,12 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 				assert.Contains(t, r.cancelledPVR, test.pvr.Name)
 			} else {
 				assert.Empty(t, r.cancelledPVR)
+			}
+
+			if isPVRInFinalState(&pvr) || pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseInProgress {
+				assert.NotContains(t, pvr.Labels, exposer.ExposeOnGoingLabel)
+			} else if pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseAccepted {
+				assert.Contains(t, pvr.Labels, exposer.ExposeOnGoingLabel)
 			}
 		})
 	}
