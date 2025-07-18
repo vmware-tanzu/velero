@@ -35,6 +35,8 @@ import (
 	veleroutil "github.com/vmware-tanzu/velero/test/util/velero"
 )
 
+const BackupObjectsPrefix = "backups"
+
 type migrationE2E struct {
 	framework.TestCase
 	useVolumeSnapshots bool
@@ -263,6 +265,8 @@ func (m *migrationE2E) Backup() error {
 		snapshotCheckPoint.NamespaceBackedUp = m.CaseBaseName
 
 		if OriginVeleroCfg.SnapshotMoveData {
+			// todo: Remove this as VSC are not preserved post backup. It's 0 by default.
+
 			//VolumeSnapshotContent should be deleted after data movement
 			_, err := util.CheckVolumeSnapshotCR(
 				*m.VeleroCfg.DefaultClient,
@@ -284,16 +288,27 @@ func (m *migrationE2E) Backup() error {
 			}
 
 			By("Snapshot should be created in cloud object store with retain policy", func() {
-				snapshotCheckPoint, err = veleroutil.GetSnapshotCheckPoint(
-					*OriginVeleroCfg.DefaultClient,
+				backupVolumeInfo, err := providers.GetVolumeInfo(
+					OriginVeleroCfg.ObjectStoreProvider,
+					OriginVeleroCfg.CloudCredentialsFile,
+					OriginVeleroCfg.BSLBucket,
+					OriginVeleroCfg.BSLPrefix,
+					OriginVeleroCfg.BSLConfig,
+					m.BackupName,
+					BackupObjectsPrefix+"/"+m.BackupName,
+				)
+				Expect(err).NotTo(HaveOccurred(), "Failed to get volume info for backup")
+
+				snapshotCheckPoint, err := veleroutil.BuildSnapshotCheckPointFromVolumeInfo(
 					OriginVeleroCfg,
+					backupVolumeInfo,
 					m.kibishiiData.ExpectedNodes,
 					m.CaseBaseName,
 					m.BackupName,
 					kibishii.GetKibishiiPVCNameList(m.kibishiiData.ExpectedNodes),
 				)
-
 				Expect(err).NotTo(HaveOccurred(), "Fail to get snapshot checkpoint")
+
 				Expect(providers.CheckSnapshotsInProvider(
 					OriginVeleroCfg,
 					m.BackupName,
