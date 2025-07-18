@@ -582,11 +582,11 @@ func (s *objectBackupStore) DeleteRestore(name string) error {
 	return errors.WithStack(kerrors.NewAggregate(errs))
 }
 
-func (s *objectBackupStore) PutRestoreLog(backup string, restore string, log io.Reader) error {
+func (s *objectBackupStore) PutRestoreLog(_ string, restore string, log io.Reader) error {
 	return s.objectStore.PutObject(s.bucket, s.layout.getRestoreLogKey(restore), log)
 }
 
-func (s *objectBackupStore) PutRestoreResults(backup string, restore string, results io.Reader) error {
+func (s *objectBackupStore) PutRestoreResults(_ string, restore string, results io.Reader) error {
 	return s.objectStore.PutObject(s.bucket, s.layout.getRestoreResultsKey(restore), results)
 }
 

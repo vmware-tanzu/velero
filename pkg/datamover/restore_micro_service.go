@@ -215,7 +215,7 @@ func (r *RestoreMicroService) Shutdown() {
 	}
 }
 
-func (r *RestoreMicroService) OnDataDownloadCompleted(ctx context.Context, namespace string, ddName string, result datapath.Result) {
+func (r *RestoreMicroService) OnDataDownloadCompleted(_ context.Context, _ string, ddName string, result datapath.Result) {
 	log := r.logger.WithField("datadownload", ddName)
 
 	restoreBytes, err := funcMarshal(result.Restore)
@@ -234,7 +234,7 @@ func (r *RestoreMicroService) OnDataDownloadCompleted(ctx context.Context, names
 	log.Info("Async fs restore data path completed")
 }
 
-func (r *RestoreMicroService) OnDataDownloadFailed(ctx context.Context, namespace string, ddName string, err error) {
+func (r *RestoreMicroService) OnDataDownloadFailed(_ context.Context, _ string, ddName string, err error) {
 	log := r.logger.WithField("datadownload", ddName)
 	log.WithError(err).Error("Async fs restore data path failed")
 
@@ -244,7 +244,7 @@ func (r *RestoreMicroService) OnDataDownloadFailed(ctx context.Context, namespac
 	}
 }
 
-func (r *RestoreMicroService) OnDataDownloadCancelled(ctx context.Context, namespace string, ddName string) {
+func (r *RestoreMicroService) OnDataDownloadCancelled(_ context.Context, _ string, ddName string) {
 	log := r.logger.WithField("datadownload", ddName)
 	log.Warn("Async fs restore data path canceled")
 
@@ -254,7 +254,7 @@ func (r *RestoreMicroService) OnDataDownloadCancelled(ctx context.Context, names
 	}
 }
 
-func (r *RestoreMicroService) OnDataDownloadProgress(ctx context.Context, namespace string, ddName string, progress *uploader.Progress) {
+func (r *RestoreMicroService) OnDataDownloadProgress(_ context.Context, _ string, ddName string, progress *uploader.Progress) {
 	log := r.logger.WithFields(logrus.Fields{
 		"datadownload": ddName,
 	})

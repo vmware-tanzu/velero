@@ -49,7 +49,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   use + " [NAME1] [NAME2] [NAME...]",
 		Short: "Describe restores",
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, args []string) {
 			kbClient, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 

@@ -56,7 +56,7 @@ func NewChangeImageNameAction(
 
 // AppliesTo returns the resources that ChangeImageNameAction should
 // be run for.
-func (a *ChangeImageNameAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*ChangeImageNameAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"deployments", "statefulsets", "daemonsets", "replicasets", "replicationcontrollers", "jobs", "cronjobs", "pods"},
 	}, nil
@@ -179,7 +179,7 @@ func (a *ChangeImageNameAction) replaceImageName(obj *unstructured.Unstructured,
 	return nil
 }
 
-func (a *ChangeImageNameAction) isImageReplaceRuleExist(log *logrus.Entry, oldImageName string, cm *corev1api.ConfigMap) (exists bool, newImageName string, err error) {
+func (*ChangeImageNameAction) isImageReplaceRuleExist(log *logrus.Entry, oldImageName string, cm *corev1api.ConfigMap) (exists bool, newImageName string, err error) {
 	if oldImageName == "" {
 		log.Infoln("Item has no old image name specified")
 		return false, "", nil

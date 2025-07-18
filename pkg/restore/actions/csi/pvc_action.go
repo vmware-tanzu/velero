@@ -58,7 +58,7 @@ type pvcRestoreItemAction struct {
 
 // AppliesTo returns information indicating that the
 // PVCRestoreItemAction should be run while restoring PVCs.
-func (p *pvcRestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*pvcRestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"persistentvolumeclaims"},
 		//TODO: add label selector volumeSnapshotLabel
@@ -219,7 +219,7 @@ func (p *pvcRestoreItemAction) Execute(
 	}, nil
 }
 
-func (p *pvcRestoreItemAction) Name() string {
+func (*pvcRestoreItemAction) Name() string {
 	return "PVCRestoreItemAction"
 }
 
@@ -309,9 +309,9 @@ func (p *pvcRestoreItemAction) Cancel(
 	return err
 }
 
-func (p *pvcRestoreItemAction) AreAdditionalItemsReady(
-	additionalItems []velero.ResourceIdentifier,
-	restore *velerov1api.Restore,
+func (*pvcRestoreItemAction) AreAdditionalItemsReady(
+	[]velero.ResourceIdentifier,
+	*velerov1api.Restore,
 ) (bool, error) {
 	return true, nil
 }

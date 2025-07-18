@@ -28,7 +28,7 @@ import (
 
 type fakeProgressUpdater struct{}
 
-func (f *fakeProgressUpdater) UpdateProgress(p *uploader.Progress) {}
+func (*fakeProgressUpdater) UpdateProgress(*uploader.Progress) {}
 
 func TestThrottle_ShouldOutput(t *testing.T) {
 	testCases := []struct {
@@ -60,7 +60,7 @@ func TestThrottle_ShouldOutput(t *testing.T) {
 	}
 }
 
-func TestProgress(t *testing.T) {
+func TestProgress(*testing.T) {
 	fileName := "test-filename"
 	var numBytes int64 = 1
 	testCases := []struct {

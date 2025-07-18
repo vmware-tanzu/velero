@@ -71,7 +71,7 @@ func TestIsRunning(t *testing.T) {
 				{
 					verb:     "get",
 					resource: "daemonsets",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-get-error")
 					},
 				},
@@ -263,7 +263,7 @@ func TestGetConfigs(t *testing.T) {
 				{
 					verb:     "get",
 					resource: "configmaps",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-get-error")
 					},
 				},
