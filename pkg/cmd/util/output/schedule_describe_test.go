@@ -42,9 +42,10 @@ Backup Template:
   
   Storage Location:  
   
-  Velero-Native Snapshot PVs:  auto
-  Snapshot Move Data:          auto
-  Data Mover:                  velero
+  Velero-Native Snapshot PVs:    auto
+  Default Volumes to Fs Backup:  auto
+  Snapshot Move Data:            auto
+  Data Mover:                    velero
   
   TTL:  0s
   
@@ -91,9 +92,10 @@ Backup Template:
   
   Storage Location:  
   
-  Velero-Native Snapshot PVs:  auto
-  Snapshot Move Data:          auto
-  Data Mover:                  velero
+  Velero-Native Snapshot PVs:    auto
+  Default Volumes to Fs Backup:  auto
+  Snapshot Move Data:            auto
+  Data Mover:                    velero
   
   TTL:  0s
   
