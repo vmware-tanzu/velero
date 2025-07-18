@@ -25,7 +25,17 @@ the one backing Kubernetes volumes, for example, a durable storage.
 
 Cons:
 - It backs up data from the live file system, in which way the data is not captured at the same point in time, so is less consistent than the snapshot approaches.
-- It access the file system from the mounted hostpath directory, so Velero Node Agent pods need to run as root user and even under privileged mode in some environments.  
+- It access the file system from the mounted hostpath directory, so Velero Node Agent pods need to run as root user and even under privileged mode in some environments.
+
+## Relationship with Volume Snapshots
+
+It's important to understand that File System Backup (FSB) and volume snapshots (native/CSI) are **mutually exclusive** for the same volume:
+
+- When FSB is performed on a volume, Velero will **skip** taking a snapshot of that volume
+- When FSB is opted out for a volume, Velero will **attempt** to take a snapshot (if configured)
+- This prevents duplicate backups of the same data
+
+This behavior is automatic and ensures optimal backup performance and storage usage.  
 
 **NOTE:** hostPath volumes are not supported, but the [local volume type][5] is supported.  
 **NOTE:** restic is under the deprecation process by following [Velero Deprecation Policy][17], for more details, see the Restic Deprecation section.
@@ -188,6 +198,9 @@ In this approach, Velero will back up all pod volumes using FSB with the excepti
 
 - Volumes mounting the default service account token, Kubernetes Secrets, and ConfigMaps
 - Hostpath volumes
+- **Volumes explicitly excluded using annotations** (see below)
+
+**Important:** When you exclude a volume from FSB using annotations, Velero will attempt to back it up using volume snapshots instead (if CSI snapshots are enabled and the volume is a CSI volume or if properly configured with a compatible VolumeSnapshotLocation).
 
 It is possible to exclude volumes from being backed up using the `backup.velero.io/backup-volumes-excludes` 
 annotation on the pod.  
@@ -255,7 +268,12 @@ Instructions to back up using this approach are as follows:
 
 Velero, by default, uses this approach to discover pod volumes that need to be backed up using FSB. Every pod 
 containing a volume to be backed up using FSB must be annotated with the volume's name using the 
-`backup.velero.io/backup-volumes` annotation.  
+`backup.velero.io/backup-volumes` annotation.
+
+**Note:** Volumes not annotated for FSB will be considered for volume snapshots if:
+- `--snapshot-volumes` is not set to `false`
+- The volume supports snapshots (either CSI or native)
+- Either the volume is a CSI volume and CSI snapshots are enabled or there is a compatible VolumeSnapshotLocation configured  
 
 Instructions to back up using this approach are as follows:
 
@@ -472,6 +490,46 @@ kubectl -n velero logs DAEMON_POD_NAME
 
 **NOTE**: You can increase the verbosity of the pod logs by adding `--log-level=debug` as an argument
 to the container command in the deployment/daemonset pod template spec.
+
+### Verifying backup methods used
+
+To understand which backup method was used for your volumes:
+
+1. Check if volumes were skipped for FSB:
+   ```bash
+   velero backup logs BACKUP_NAME | grep "skipped PVs"
+   ```
+   This will show volumes opted out of FSB, which may still be backed up via snapshots.
+
+2. Verify volume snapshots were created:
+   ```bash
+   velero backup describe BACKUP_NAME --details
+   ```
+   Look for the "Velero-Native Snapshots" or "CSI Snapshots" sections.
+
+3. Check PodVolumeBackups for FSB:
+   ```bash
+   kubectl -n velero get podvolumebackups -l velero.io/backup-name=BACKUP_NAME
+   ```
+
+**Note:** A volume appearing in the "skipped PVs" summary doesn't mean it wasn't backed up - it may have been backed up via volume snapshot instead.
+
+## Backup Method Decision Flow
+
+When Velero encounters a volume during backup, it follows this decision flow:
+
+1. **Is the volume opted out of FSB?** (via `backup.velero.io/backup-volumes-excludes`)
+   - Yes → Skip FSB, attempt volume snapshot (if configured)
+   - No → Continue to step 2
+
+2. **Is the volume opted in for FSB?** (via `backup.velero.io/backup-volumes` or `--default-volumes-to-fs-backup`)
+   - Yes → Perform FSB, skip volume snapshot
+   - No → Attempt volume snapshot (if configured)
+
+3. **For volume snapshots to succeed:**
+   - CSI snapshots must be enabled for CSI volumes or compatible VolumeSnapshotLocation must be configured
+   - Volume type must be supported by the snapshot provider
+   - `--snapshot-volumes` must not be `false`
 
 ## How backup and restore work
 
