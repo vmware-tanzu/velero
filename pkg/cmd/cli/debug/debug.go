@@ -90,7 +90,7 @@ func (o *option) complete(f client.Factory, fs *pflag.FlagSet) error {
 	}
 	absOutputPath, err := filepath.Abs(o.outputPath)
 	if err != nil {
-		return fmt.Errorf("invalid output path: %v", err)
+		return fmt.Errorf("invalid output path: %w", err)
 	}
 	o.outputPath = absOutputPath
 	tmpDir, err := os.MkdirTemp("", "crashd")
@@ -106,7 +106,7 @@ func (o *option) complete(f client.Factory, fs *pflag.FlagSet) error {
 	}
 	o.kubeconfigPath, err = filepath.Abs(kp)
 	if err != nil {
-		return fmt.Errorf("invalid kubeconfig path: %s, %v", kp, err)
+		return fmt.Errorf("invalid kubeconfig path: %s, %w", kp, err)
 	}
 	o.kubeContext = kc
 	return nil
