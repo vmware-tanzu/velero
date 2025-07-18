@@ -151,7 +151,7 @@ func TTLTest() {
 			snapshotCheckPoint, err = BuildSnapshotCheckPointFromVolumeInfo(
 				veleroCfg,
 				backupVolumeInfo,
-				2,
+				DefaultKibishiiWorkerCounts,
 				test.testNS,
 				test.backupName,
 				KibishiiPVCNameList,

@@ -166,7 +166,7 @@ func RunKibishiiTests(
 			}
 		}
 
-		snapshotCheckPoint, err := BuildSnapshotCheckPointFromVolumeInfo(veleroCfg, backupVolumeInfo, 2, kibishiiNamespace, backupName, KibishiiPVCNameList)
+		snapshotCheckPoint, err := BuildSnapshotCheckPointFromVolumeInfo(veleroCfg, backupVolumeInfo, DefaultKibishiiWorkerCounts, kibishiiNamespace, backupName, KibishiiPVCNameList)
 		if err != nil {
 			return errors.Wrap(err, "Fail to get snapshot checkpoint")
 		}

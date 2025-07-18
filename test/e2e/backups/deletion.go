@@ -183,7 +183,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupLoc
 		if veleroCfg.CloudProvider == Vsphere {
 			// For vSphere, checking snapshot should base on namespace and backup name
 			for _, ns := range workloadNamespaceList {
-				snapshotCheckPoint, err := BuildSnapshotCheckPointFromVolumeInfo(veleroCfg, backupVolumeInfo, 2, ns, backupName, KibishiiPVCNameList)
+				snapshotCheckPoint, err := BuildSnapshotCheckPointFromVolumeInfo(veleroCfg, backupVolumeInfo, DefaultKibishiiWorkerCounts, ns, backupName, KibishiiPVCNameList)
 				Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 				err = CheckSnapshotsInProvider(
 					veleroCfg,
