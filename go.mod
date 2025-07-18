@@ -26,7 +26,7 @@ require (
 	github.com/hashicorp/go-plugin v1.6.0
 	github.com/joho/godotenv v1.3.0
 	github.com/kopia/kopia v0.16.0
-	github.com/kubernetes-csi/external-snapshotter/client/v7 v7.0.0
+	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.2.0
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
 	github.com/petar/GoLLRB v0.0.0-20210522233825-ae3b015fd3e9
