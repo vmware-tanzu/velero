@@ -223,7 +223,7 @@ func (h *DefaultItemHookHandler) HandleHooks(
 		hookFromAnnotations = getPodExecHookFromAnnotations(metadata.GetAnnotations(), "", log)
 	}
 	if hookFromAnnotations != nil {
-		hookTracker.Add(namespace, name, hookFromAnnotations.Container, HookSourceAnnotation, "", phase)
+		hookTracker.Add(namespace, name, hookFromAnnotations.Container, HookSourceAnnotation, "", phase, 0)
 
 		hookLog := log.WithFields(
 			logrus.Fields{
@@ -239,7 +239,7 @@ func (h *DefaultItemHookHandler) HandleHooks(
 			hookLog.WithError(errExec).Error("Error executing hook")
 			hookFailed = true
 		}
-		errTracker := hookTracker.Record(namespace, name, hookFromAnnotations.Container, HookSourceAnnotation, "", phase, hookFailed, errExec)
+		errTracker := hookTracker.Record(namespace, name, hookFromAnnotations.Container, HookSourceAnnotation, "", phase, 0, hookFailed, errExec)
 		if errTracker != nil {
 			hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 		}
@@ -267,10 +267,10 @@ func (h *DefaultItemHookHandler) HandleHooks(
 			hooks = resourceHook.Post
 		}
 
-		for _, hook := range hooks {
+		for i, hook := range hooks {
 			if groupResource == kuberesource.Pods {
 				if hook.Exec != nil {
-					hookTracker.Add(namespace, name, hook.Exec.Container, HookSourceSpec, resourceHook.Name, phase)
+					hookTracker.Add(namespace, name, hook.Exec.Container, HookSourceSpec, resourceHook.Name, phase, i)
 					// The remaining hooks will only be executed if modeFailError is nil.
 					// Otherwise, execution will stop and only hook collection will occur.
 					if modeFailError == nil {
@@ -291,7 +291,7 @@ func (h *DefaultItemHookHandler) HandleHooks(
 								modeFailError = err
 							}
 						}
-						errTracker := hookTracker.Record(namespace, name, hook.Exec.Container, HookSourceSpec, resourceHook.Name, phase, hookFailed, err)
+						errTracker := hookTracker.Record(namespace, name, hook.Exec.Container, HookSourceSpec, resourceHook.Name, phase, i, hookFailed, err)
 						if errTracker != nil {
 							hookLog.WithError(errTracker).Warn("Error recording the hook in hook tracker")
 						}
@@ -534,6 +534,11 @@ type PodExecRestoreHook struct {
 	HookSource string
 	Hook       velerov1api.ExecRestoreHook
 	executed   bool
+	// hookIndex contains the slice index for the specific hook from the restore spec
+	// in order to track multiple hooks. Stored here because restore hook results are recorded
+	// outside of the original slice iteration
+	// for the same container
+	hookIndex int
 }
 
 // GroupRestoreExecHooks returns a list of hooks to be executed in a pod grouped by
@@ -561,12 +566,13 @@ func GroupRestoreExecHooks(
 		if hookFromAnnotation.Container == "" {
 			hookFromAnnotation.Container = pod.Spec.Containers[0].Name
 		}
-		hookTrack.Add(restoreName, metadata.GetNamespace(), metadata.GetName(), hookFromAnnotation.Container, HookSourceAnnotation, "<from-annotation>", HookPhase(""))
+		hookTrack.Add(restoreName, metadata.GetNamespace(), metadata.GetName(), hookFromAnnotation.Container, HookSourceAnnotation, "<from-annotation>", HookPhase(""), 0)
 		byContainer[hookFromAnnotation.Container] = []PodExecRestoreHook{
 			{
 				HookName:   "<from-annotation>",
 				HookSource: HookSourceAnnotation,
 				Hook:       *hookFromAnnotation,
+				hookIndex:  0,
 			},
 		}
 		return byContainer, nil
@@ -579,7 +585,7 @@ func GroupRestoreExecHooks(
 		if !rrh.Selector.applicableTo(kuberesource.Pods, namespace, labels) {
 			continue
 		}
-		for _, rh := range rrh.RestoreHooks {
+		for i, rh := range rrh.RestoreHooks {
 			if rh.Exec == nil {
 				continue
 			}
@@ -587,6 +593,7 @@ func GroupRestoreExecHooks(
 				HookName:   rrh.Name,
 				Hook:       *rh.Exec,
 				HookSource: HookSourceSpec,
+				hookIndex:  i,
 			}
 			// default to false if attr WaitForReady not set
 			if named.Hook.WaitForReady == nil {
@@ -596,7 +603,7 @@ func GroupRestoreExecHooks(
 			if named.Hook.Container == "" {
 				named.Hook.Container = pod.Spec.Containers[0].Name
 			}
-			hookTrack.Add(restoreName, metadata.GetNamespace(), metadata.GetName(), named.Hook.Container, HookSourceSpec, rrh.Name, HookPhase(""))
+			hookTrack.Add(restoreName, metadata.GetNamespace(), metadata.GetName(), named.Hook.Container, HookSourceSpec, rrh.Name, HookPhase(""), i)
 			byContainer[named.Hook.Container] = append(byContainer[named.Hook.Container], named)
 		}
 	}

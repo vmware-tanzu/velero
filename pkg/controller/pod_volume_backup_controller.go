@@ -59,7 +59,7 @@ const (
 
 // NewPodVolumeBackupReconciler creates the PodVolumeBackupReconciler instance
 func NewPodVolumeBackupReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
-	nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, podResources corev1api.ResourceRequirements,
+	counter *exposer.VgdpCounter, nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, podResources corev1api.ResourceRequirements,
 	metrics *metrics.ServerMetrics, logger logrus.FieldLogger) *PodVolumeBackupReconciler {
 	return &PodVolumeBackupReconciler{
 		client:           client,
@@ -71,6 +71,7 @@ func NewPodVolumeBackupReconciler(client client.Client, mgr manager.Manager, kub
 		metrics:          metrics,
 		podResources:     podResources,
 		dataPathMgr:      dataPathMgr,
+		vgdpCounter:      counter,
 		preparingTimeout: preparingTimeout,
 		resourceTimeout:  resourceTimeout,
 		exposer:          exposer.NewPodVolumeExposer(kubeClient, logger),
@@ -90,6 +91,7 @@ type PodVolumeBackupReconciler struct {
 	logger           logrus.FieldLogger
 	podResources     corev1api.ResourceRequirements
 	dataPathMgr      *datapath.Manager
+	vgdpCounter      *exposer.VgdpCounter
 	preparingTimeout time.Duration
 	resourceTimeout  time.Duration
 	cancelledPVB     map[string]time.Time
@@ -212,6 +214,11 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, nil
 		}
 
+		if r.vgdpCounter != nil && r.vgdpCounter.IsConstrained(ctx, r.logger) {
+			log.Debug("Data path initiation is constrained, requeue later")
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
+		}
+
 		log.Info("Accepting PVB")
 
 		if err := r.acceptPodVolumeBackup(ctx, pvb); err != nil {
@@ -278,7 +285,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			pvb.Name, pvb.Namespace, res.ByPod.HostingPod.Name, res.ByPod.HostingContainer, pvb.Name, callbacks, false, log)
 		if err != nil {
 			if err == datapath.ConcurrentLimitExceed {
-				log.Info("Data path instance is concurrent limited requeue later")
+				log.Debug("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 			} else {
 				return r.errorOut(ctx, pvb, err, "error to create data path", log)
@@ -303,6 +310,8 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 			pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseInProgress
 			pvb.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
+
+			delete(pvb.Labels, exposer.ExposeOnGoingLabel)
 
 			return true
 		}); err != nil {
@@ -370,6 +379,11 @@ func (r *PodVolumeBackupReconciler) acceptPodVolumeBackup(ctx context.Context, p
 		pvb.Status.AcceptedTimestamp = &metav1.Time{Time: r.clock.Now()}
 		pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseAccepted
 
+		if pvb.Labels == nil {
+			pvb.Labels = make(map[string]string)
+		}
+		pvb.Labels[exposer.ExposeOnGoingLabel] = "true"
+
 		return true
 	})
 }
@@ -386,6 +400,8 @@ func (r *PodVolumeBackupReconciler) tryCancelPodVolumeBackup(ctx context.Context
 		if message != "" {
 			pvb.Status.Message = message
 		}
+
+		delete(pvb.Labels, exposer.ExposeOnGoingLabel)
 	})
 
 	if err != nil {
@@ -428,6 +444,8 @@ func (r *PodVolumeBackupReconciler) onPrepareTimeout(ctx context.Context, pvb *v
 	succeeded, err := funcExclusiveUpdatePodVolumeBackup(ctx, r.client, pvb, func(pvb *velerov1api.PodVolumeBackup) {
 		pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
 		pvb.Status.Message = "timeout on preparing PVB"
+
+		delete(pvb.Labels, exposer.ExposeOnGoingLabel)
 	})
 
 	if err != nil {
@@ -508,6 +526,8 @@ func (r *PodVolumeBackupReconciler) OnDataPathCompleted(ctx context.Context, nam
 			pvb.Status.Message = "volume was empty so no snapshot was taken"
 		}
 
+		delete(pvb.Labels, exposer.ExposeOnGoingLabel)
+
 		return true
 	}); err != nil {
 		log.WithError(err).Error("error updating PVB status")
@@ -565,6 +585,8 @@ func (r *PodVolumeBackupReconciler) OnDataPathCancelled(ctx context.Context, nam
 		}
 		pvb.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 
+		delete(pvb.Labels, exposer.ExposeOnGoingLabel)
+
 		return true
 	}); err != nil {
 		log.WithError(err).Error("error updating PVB status on cancel")
@@ -588,6 +610,11 @@ func (r *PodVolumeBackupReconciler) OnDataPathProgress(ctx context.Context, name
 func (r *PodVolumeBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
 		pvb := object.(*velerov1api.PodVolumeBackup)
+
+		if _, err := uploader.ValidateUploaderType(pvb.Spec.UploaderType); err != nil {
+			return false
+		}
+
 		if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseAccepted {
 			return true
 		}
@@ -736,6 +763,8 @@ func UpdatePVBStatusToFailed(ctx context.Context, c client.Client, pvb *velerov1
 				pvb.Status.StartTimestamp = &metav1.Time{Time: time}
 			}
 
+			delete(pvb.Labels, exposer.ExposeOnGoingLabel)
+
 			return true
 		}); patchErr != nil {
 		log.WithError(patchErr).Warn("error updating PVB status")
@@ -756,9 +785,14 @@ func (r *PodVolumeBackupReconciler) closeDataPath(ctx context.Context, pvbName s
 func (r *PodVolumeBackupReconciler) setupExposeParam(pvb *velerov1api.PodVolumeBackup) exposer.PodVolumeExposeParam {
 	log := r.logger.WithField("PVB", pvb.Name)
 
+	nodeOS, err := kube.GetNodeOS(context.Background(), pvb.Spec.Node, r.kubeClient.CoreV1())
+	if err != nil {
+		log.WithError(err).Warnf("Failed to get nodeOS for node %s, use linux node-agent for hosting pod labels, annotations and tolerations", pvb.Spec.Node)
+	}
+
 	hostingPodLabels := map[string]string{velerov1api.PVBLabel: pvb.Name}
 	for _, k := range util.ThirdPartyLabels {
-		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvb.Namespace, k, ""); err != nil {
+		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
 			if err != nodeagent.ErrNodeAgentLabelNotFound {
 				log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
 			}
@@ -769,12 +803,23 @@ func (r *PodVolumeBackupReconciler) setupExposeParam(pvb *velerov1api.PodVolumeB
 
 	hostingPodAnnotation := map[string]string{}
 	for _, k := range util.ThirdPartyAnnotations {
-		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvb.Namespace, k, ""); err != nil {
+		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
 			if err != nodeagent.ErrNodeAgentAnnotationNotFound {
 				log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
 			}
 		} else {
 			hostingPodAnnotation[k] = v
+		}
+	}
+
+	hostingPodTolerations := []corev1api.Toleration{}
+	for _, k := range util.ThirdPartyTolerations {
+		if v, err := nodeagent.GetToleration(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
+			if err != nodeagent.ErrNodeAgentTolerationNotFound {
+				log.WithError(err).Warnf("Failed to check node-agent toleration, skip adding host pod toleration %s", k)
+			}
+		} else {
+			hostingPodTolerations = append(hostingPodTolerations, *v)
 		}
 	}
 
@@ -785,6 +830,7 @@ func (r *PodVolumeBackupReconciler) setupExposeParam(pvb *velerov1api.PodVolumeB
 		ClientPodVolume:       pvb.Spec.Volume,
 		HostingPodLabels:      hostingPodLabels,
 		HostingPodAnnotations: hostingPodAnnotation,
+		HostingPodTolerations: hostingPodTolerations,
 		OperationTimeout:      r.resourceTimeout,
 		Resources:             r.podResources,
 	}
@@ -843,4 +889,100 @@ func UpdatePVBWithRetry(ctx context.Context, client client.Client, namespacedNam
 
 		return true, nil
 	})
+}
+
+var funcResumeCancellablePVB = (*PodVolumeBackupReconciler).resumeCancellableDataPath
+
+func (r *PodVolumeBackupReconciler) AttemptPVBResume(ctx context.Context, logger *logrus.Entry, ns string) error {
+	pvbs := &velerov1api.PodVolumeBackupList{}
+	if err := r.client.List(ctx, pvbs, &client.ListOptions{Namespace: ns}); err != nil {
+		r.logger.WithError(errors.WithStack(err)).Error("failed to list PVBs")
+		return errors.Wrapf(err, "error to list PVBs")
+	}
+
+	for i := range pvbs.Items {
+		pvb := &pvbs.Items[i]
+		if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseInProgress {
+			if pvb.Spec.Node != r.nodeName {
+				logger.WithField("PVB", pvb.Name).WithField("current node", r.nodeName).Infof("PVB should be resumed by another node %s", pvb.Spec.Node)
+				continue
+			}
+
+			err := funcResumeCancellablePVB(r, ctx, pvb, logger)
+			if err == nil {
+				logger.WithField("PVB", pvb.Name).WithField("current node", r.nodeName).Info("Completed to resume in progress PVB")
+				continue
+			}
+
+			logger.WithField("PVB", pvb.GetName()).WithError(err).Warn("Failed to resume data path for PVB, have to cancel it")
+
+			resumeErr := err
+			err = UpdatePVBWithRetry(ctx, r.client, types.NamespacedName{Namespace: pvb.Namespace, Name: pvb.Name}, logger.WithField("PVB", pvb.Name),
+				func(pvb *velerov1api.PodVolumeBackup) bool {
+					if pvb.Spec.Cancel {
+						return false
+					}
+
+					pvb.Spec.Cancel = true
+					pvb.Status.Message = fmt.Sprintf("Resume InProgress PVB failed with error %v, mark it as cancel", resumeErr)
+
+					return true
+				})
+			if err != nil {
+				logger.WithField("PVB", pvb.GetName()).WithError(errors.WithStack(err)).Error("Failed to trigger PVB cancel")
+			}
+		} else if !isPVBInFinalState(pvb) {
+			logger.WithField("PVB", pvb.GetName()).Infof("find a PVB with status %s", pvb.Status.Phase)
+		}
+	}
+
+	return nil
+}
+
+func (r *PodVolumeBackupReconciler) resumeCancellableDataPath(ctx context.Context, pvb *velerov1api.PodVolumeBackup, log logrus.FieldLogger) error {
+	log.Info("Resume cancelable PVB")
+
+	res, err := r.exposer.GetExposed(ctx, getPVBOwnerObject(pvb), r.client, r.nodeName, r.resourceTimeout)
+	if err != nil {
+		return errors.Wrapf(err, "error to get exposed PVB %s", pvb.Name)
+	}
+
+	if res == nil {
+		return errors.Errorf("no expose result is available for the current node for PVB %s", pvb.Name)
+	}
+
+	callbacks := datapath.Callbacks{
+		OnCompleted: r.OnDataPathCompleted,
+		OnFailed:    r.OnDataPathFailed,
+		OnCancelled: r.OnDataPathCancelled,
+		OnProgress:  r.OnDataPathProgress,
+	}
+
+	asyncBR, err := r.dataPathMgr.CreateMicroServiceBRWatcher(ctx, r.client, r.kubeClient, r.mgr, datapath.TaskTypeBackup, pvb.Name, pvb.Namespace, res.ByPod.HostingPod.Name, res.ByPod.HostingContainer, pvb.Name, callbacks, true, log)
+	if err != nil {
+		return errors.Wrapf(err, "error to create asyncBR watcher for PVB %s", pvb.Name)
+	}
+
+	resumeComplete := false
+	defer func() {
+		if !resumeComplete {
+			r.closeDataPath(ctx, pvb.Name)
+		}
+	}()
+
+	if err := asyncBR.Init(ctx, nil); err != nil {
+		return errors.Wrapf(err, "error to init asyncBR watcher for PVB %s", pvb.Name)
+	}
+
+	if err := asyncBR.StartBackup(datapath.AccessPoint{
+		ByPath: res.ByPod.VolumeName,
+	}, pvb.Spec.UploaderSettings, nil); err != nil {
+		return errors.Wrapf(err, "error to resume asyncBR watcher for PVB %s", pvb.Name)
+	}
+
+	resumeComplete = true
+
+	log.Infof("asyncBR is resumed for PVB %s", pvb.Name)
+
+	return nil
 }

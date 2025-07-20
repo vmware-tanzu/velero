@@ -64,6 +64,8 @@ type DataDownloadReconciler struct {
 	restoreExposer        exposer.GenericRestoreExposer
 	nodeName              string
 	dataPathMgr           *datapath.Manager
+	vgdpCounter           *exposer.VgdpCounter
+	loadAffinity          []*kube.LoadAffinity
 	restorePVCConfig      nodeagent.RestorePVC
 	podResources          corev1api.ResourceRequirements
 	preparingTimeout      time.Duration
@@ -71,9 +73,20 @@ type DataDownloadReconciler struct {
 	cancelledDataDownload map[string]time.Time
 }
 
-func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
-	restorePVCConfig nodeagent.RestorePVC, podResources corev1api.ResourceRequirements, nodeName string, preparingTimeout time.Duration,
-	logger logrus.FieldLogger, metrics *metrics.ServerMetrics) *DataDownloadReconciler {
+func NewDataDownloadReconciler(
+	client client.Client,
+	mgr manager.Manager,
+	kubeClient kubernetes.Interface,
+	dataPathMgr *datapath.Manager,
+	counter *exposer.VgdpCounter,
+	loadAffinity []*kube.LoadAffinity,
+	restorePVCConfig nodeagent.RestorePVC,
+	podResources corev1api.ResourceRequirements,
+	nodeName string,
+	preparingTimeout time.Duration,
+	logger logrus.FieldLogger,
+	metrics *metrics.ServerMetrics,
+) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:                client,
 		kubeClient:            kubeClient,
@@ -84,6 +97,8 @@ func NewDataDownloadReconciler(client client.Client, mgr manager.Manager, kubeCl
 		restoreExposer:        exposer.NewGenericRestoreExposer(kubeClient, logger),
 		restorePVCConfig:      restorePVCConfig,
 		dataPathMgr:           dataPathMgr,
+		vgdpCounter:           counter,
+		loadAffinity:          loadAffinity,
 		podResources:          podResources,
 		preparingTimeout:      preparingTimeout,
 		metrics:               metrics,
@@ -208,12 +223,25 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if dd.Status.Phase == "" || dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseNew {
-		log.Info("Data download starting")
+		if dd.Spec.Cancel {
+			log.Debugf("Data download is canceled in Phase %s", dd.Status.Phase)
+
+			r.tryCancelDataDownload(ctx, dd, "")
+
+			return ctrl.Result{}, nil
+		}
+
+		if r.vgdpCounter != nil && r.vgdpCounter.IsConstrained(ctx, r.logger) {
+			log.Debug("Data path initiation is constrained, requeue later")
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
+		}
 
 		if _, err := r.getTargetPVC(ctx, dd); err != nil {
 			log.WithField("error", err).Debugf("Cannot find target PVC for DataDownload yet. Retry later.")
 			return ctrl.Result{Requeue: true}, nil
 		}
+
+		log.Info("Data download starting")
 
 		accepted, err := r.acceptDataDownload(ctx, dd)
 		if err != nil {
@@ -226,12 +254,6 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 
 		log.Info("Data download is accepted")
-
-		if dd.Spec.Cancel {
-			log.Debugf("Data download is been canceled %s in Phase %s", dd.GetName(), dd.Status.Phase)
-			r.OnDataDownloadCancelled(ctx, dd.GetNamespace(), dd.GetName())
-			return ctrl.Result{}, nil
-		}
 
 		exposeParam, err := r.setupExposeParam(dd)
 		if err != nil {
@@ -300,7 +322,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			dd.Name, dd.Namespace, result.ByPod.HostingPod.Name, result.ByPod.HostingContainer, dd.Name, callbacks, false, log)
 		if err != nil {
 			if err == datapath.ConcurrentLimitExceed {
-				log.Info("Data path instance is concurrent limited requeue later")
+				log.Debug("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 			} else {
 				return r.errorOut(ctx, dd, err, "error to create data path", log)
@@ -324,6 +346,8 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 			dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseInProgress
 			dd.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
+
+			delete(dd.Labels, exposer.ExposeOnGoingLabel)
 
 			return true
 		}); err != nil {
@@ -442,6 +466,8 @@ func (r *DataDownloadReconciler) OnDataDownloadCompleted(ctx context.Context, na
 		dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseCompleted
 		dd.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 
+		delete(dd.Labels, exposer.ExposeOnGoingLabel)
+
 		return true
 	}); err != nil {
 		log.WithError(err).Error("error updating data download status")
@@ -492,6 +518,8 @@ func (r *DataDownloadReconciler) OnDataDownloadCancelled(ctx context.Context, na
 		}
 		dd.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 
+		delete(dd.Labels, exposer.ExposeOnGoingLabel)
+
 		return true
 	}); err != nil {
 		log.WithError(err).Error("error updating data download status")
@@ -513,6 +541,8 @@ func (r *DataDownloadReconciler) tryCancelDataDownload(ctx context.Context, dd *
 		if message != "" {
 			dataDownload.Status.Message = message
 		}
+
+		delete(dataDownload.Labels, exposer.ExposeOnGoingLabel)
 	})
 
 	if err != nil {
@@ -690,6 +720,8 @@ func (r *DataDownloadReconciler) updateStatusToFailed(ctx context.Context, dd *v
 		dd.Status.Message = errors.WithMessage(err, msg).Error()
 		dd.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 
+		delete(dd.Labels, exposer.ExposeOnGoingLabel)
+
 		return true
 	}); patchErr != nil {
 		log.WithError(patchErr).Error("error updating DataDownload status")
@@ -712,6 +744,11 @@ func (r *DataDownloadReconciler) acceptDataDownload(ctx context.Context, dd *vel
 		datadownload.Status.Phase = velerov2alpha1api.DataDownloadPhaseAccepted
 		datadownload.Status.AcceptedByNode = r.nodeName
 		datadownload.Status.AcceptedTimestamp = &metav1.Time{Time: r.Clock.Now()}
+
+		if datadownload.Labels == nil {
+			datadownload.Labels = make(map[string]string)
+		}
+		datadownload.Labels[exposer.ExposeOnGoingLabel] = "true"
 	}
 
 	succeeded, err := funcExclusiveUpdateDataDownload(ctx, r.client, updated, updateFunc)
@@ -737,6 +774,8 @@ func (r *DataDownloadReconciler) onPrepareTimeout(ctx context.Context, dd *veler
 	succeeded, err := funcExclusiveUpdateDataDownload(ctx, r.client, dd, func(dd *velerov2alpha1api.DataDownload) {
 		dd.Status.Phase = velerov2alpha1api.DataDownloadPhaseFailed
 		dd.Status.Message = "timeout on preparing data download"
+
+		delete(dd.Labels, exposer.ExposeOnGoingLabel)
 	})
 
 	if err != nil {
@@ -828,16 +867,31 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		}
 	}
 
+	hostingPodTolerations := []corev1api.Toleration{}
+	for _, k := range util.ThirdPartyTolerations {
+		if v, err := nodeagent.GetToleration(context.Background(), r.kubeClient, dd.Namespace, k, nodeOS); err != nil {
+			if err != nodeagent.ErrNodeAgentTolerationNotFound {
+				log.WithError(err).Warnf("Failed to check node-agent toleration, skip adding host pod toleration %s", k)
+			}
+		} else {
+			hostingPodTolerations = append(hostingPodTolerations, *v)
+		}
+	}
+
+	affinity := kube.GetLoadAffinityByStorageClass(r.loadAffinity, dd.Spec.BackupStorageLocation, log)
+
 	return exposer.GenericRestoreExposeParam{
 		TargetPVCName:         dd.Spec.TargetVolume.PVC,
 		TargetNamespace:       dd.Spec.TargetVolume.Namespace,
 		HostingPodLabels:      hostingPodLabels,
 		HostingPodAnnotations: hostingPodAnnotation,
+		HostingPodTolerations: hostingPodTolerations,
 		Resources:             r.podResources,
 		OperationTimeout:      dd.Spec.OperationTimeout.Duration,
 		ExposeTimeout:         r.preparingTimeout,
 		NodeOS:                nodeOS,
 		RestorePVCConfig:      r.restorePVCConfig,
+		LoadAffinity:          affinity,
 	}, nil
 }
 
@@ -937,7 +991,7 @@ func (r *DataDownloadReconciler) AttemptDataDownloadResume(ctx context.Context, 
 			if err != nil {
 				logger.WithError(errors.WithStack(err)).WithError(errors.WithStack(err)).Error("Failed to trigger datadownload cancel")
 			}
-		} else {
+		} else if !isDataDownloadInFinalState(dd) {
 			// the Prepared CR could be still handled by datadownload controller after node-agent restart
 			// the accepted CR may also suvived from node-agent restart as long as the intermediate objects are all done
 			logger.WithField("datadownload", dd.GetName()).Infof("find a datadownload with status %s", dd.Status.Phase)

@@ -57,6 +57,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/constant"
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	"github.com/vmware-tanzu/velero/pkg/datapath"
+	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -140,6 +141,7 @@ type nodeAgentServer struct {
 	csiSnapshotClient *snapshotv1client.Clientset
 	dataPathMgr       *datapath.Manager
 	dataPathConfigs   *nodeagent.Configs
+	vgdpCounter       *exposer.VgdpCounter
 }
 
 func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, config nodeAgentServerConfig) (*nodeAgentServer, error) {
@@ -276,13 +278,11 @@ func (s *nodeAgentServer) run() {
 	s.metrics.RegisterAllMetrics()
 	s.metrics.InitMetricsForNode(s.nodeName)
 
-	s.markInProgressCRsFailed()
-
 	s.logger.Info("Starting controllers")
 
-	var loadAffinity *kube.LoadAffinity
+	var loadAffinity []*kube.LoadAffinity
 	if s.dataPathConfigs != nil && len(s.dataPathConfigs.LoadAffinity) > 0 {
-		loadAffinity = s.dataPathConfigs.LoadAffinity[0]
+		loadAffinity = s.dataPathConfigs.LoadAffinity
 		s.logger.Infof("Using customized loadAffinity %v", loadAffinity)
 	}
 
@@ -302,12 +302,22 @@ func (s *nodeAgentServer) run() {
 		}
 	}
 
-	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger)
+	if s.dataPathConfigs != nil && s.dataPathConfigs.LoadConcurrency != nil && s.dataPathConfigs.LoadConcurrency.PrepareQueueLength > 0 {
+		if counter, err := exposer.StartVgdpCounter(s.ctx, s.mgr, s.dataPathConfigs.LoadConcurrency.PrepareQueueLength); err != nil {
+			s.logger.WithError(err).Warnf("Failed to start VGDP counter, VDGP loads are not constrained")
+		} else {
+			s.vgdpCounter = counter
+			s.logger.Infof("VGDP loads are constrained with %d", s.dataPathConfigs.LoadConcurrency.PrepareQueueLength)
+		}
+	}
+
+	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger)
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
 	}
 
-	if err := controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.logger).SetupWithManager(s.mgr); err != nil {
+	pvrReconciler := controller.NewPodVolumeRestoreReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.logger)
+	if err := pvrReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the pod volume restore controller")
 	}
 
@@ -321,6 +331,7 @@ func (s *nodeAgentServer) run() {
 		s.kubeClient,
 		s.csiSnapshotClient.SnapshotV1(),
 		s.dataPathMgr,
+		s.vgdpCounter,
 		loadAffinity,
 		backupPVCConfig,
 		podResources,
@@ -340,7 +351,21 @@ func (s *nodeAgentServer) run() {
 		s.logger.Infof("Using customized restorePVC config %v", restorePVCConfig)
 	}
 
-	dataDownloadReconciler := controller.NewDataDownloadReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, restorePVCConfig, podResources, s.nodeName, s.config.dataMoverPrepareTimeout, s.logger, s.metrics)
+	dataDownloadReconciler := controller.NewDataDownloadReconciler(
+		s.mgr.GetClient(),
+		s.mgr,
+		s.kubeClient,
+		s.dataPathMgr,
+		s.vgdpCounter,
+		loadAffinity,
+		restorePVCConfig,
+		podResources,
+		s.nodeName,
+		s.config.dataMoverPrepareTimeout,
+		s.logger,
+		s.metrics,
+	)
+
 	if err := dataDownloadReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.WithError(err).Fatal("Unable to create the data download controller")
 	}
@@ -358,6 +383,16 @@ func (s *nodeAgentServer) run() {
 		if err := dataDownloadReconciler.AttemptDataDownloadResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt data download resume")
 		}
+
+		if err := pvbReconciler.AttemptPVBResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt PVB resume")
+		}
+
+		if err := pvrReconciler.AttemptPVRResume(s.ctx, s.logger.WithField("node", s.nodeName), s.namespace); err != nil {
+			s.logger.WithError(errors.WithStack(err)).Error("Failed to attempt PVR resume")
+		}
+
+		s.markLegacyPVRsFailed(s.mgr.GetClient())
 	}()
 
 	s.logger.Info("Controllers starting...")
@@ -383,7 +418,17 @@ func (s *nodeAgentServer) waitCacheForResume() error {
 		return errors.Wrap(err, "error getting dd informer")
 	}
 
-	if !cacheutil.WaitForCacheSync(s.ctx.Done(), podInformer.HasSynced, duInformer.HasSynced, ddInformer.HasSynced) {
+	pvbInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov1api.PodVolumeBackup{})
+	if err != nil {
+		return errors.Wrap(err, "error getting PVB informer")
+	}
+
+	pvrInformer, err := s.mgr.GetCache().GetInformer(s.ctx, &velerov1api.PodVolumeRestore{})
+	if err != nil {
+		return errors.Wrap(err, "error getting PVR informer")
+	}
+
+	if !cacheutil.WaitForCacheSync(s.ctx.Done(), podInformer.HasSynced, duInformer.HasSynced, ddInformer.HasSynced, pvbInformer.HasSynced, pvrInformer.HasSynced) {
 		return errors.New("error waiting informer synced")
 	}
 
@@ -441,54 +486,18 @@ func (s *nodeAgentServer) validatePodVolumesHostPath(client kubernetes.Interface
 	return nil
 }
 
-// if there is a restarting during the reconciling of pvbs/pvrs/etc, these CRs may be stuck in progress status
-// markInProgressCRsFailed tries to mark the in progress CRs as failed when starting the server to avoid the issue
-func (s *nodeAgentServer) markInProgressCRsFailed() {
-	// the function is called before starting the controller manager, the embedded client isn't ready to use, so create a new one here
-	client, err := ctrlclient.New(s.mgr.GetConfig(), ctrlclient.Options{Scheme: s.mgr.GetScheme()})
-	if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to create client")
-		return
-	}
-
-	s.markInProgressPVBsFailed(client)
-
-	s.markInProgressPVRsFailed(client)
-}
-
-func (s *nodeAgentServer) markInProgressPVBsFailed(client ctrlclient.Client) {
-	pvbs := &velerov1api.PodVolumeBackupList{}
-	if err := client.List(s.ctx, pvbs, &ctrlclient.ListOptions{Namespace: s.namespace}); err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("failed to list podvolumebackups")
-		return
-	}
-	for i, pvb := range pvbs.Items {
-		if pvb.Status.Phase != velerov1api.PodVolumeBackupPhaseInProgress {
-			s.logger.Debugf("the status of podvolumebackup %q is %q, skip", pvb.GetName(), pvb.Status.Phase)
-			continue
-		}
-		if pvb.Spec.Node != s.nodeName {
-			s.logger.Debugf("the node of podvolumebackup %q is %q, not %q, skip", pvb.GetName(), pvb.Spec.Node, s.nodeName)
-			continue
-		}
-
-		if err := controller.UpdatePVBStatusToFailed(s.ctx, client, &pvbs.Items[i],
-			fmt.Errorf("found a podvolumebackup with status %q during the server starting, mark it as %q", velerov1api.PodVolumeBackupPhaseInProgress, velerov1api.PodVolumeBackupPhaseFailed),
-			"", time.Now(), s.logger); err != nil {
-			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumebackup %q", pvb.GetName())
-			continue
-		}
-		s.logger.WithField("podvolumebackup", pvb.GetName()).Warn(pvb.Status.Message)
-	}
-}
-
-func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
+func (s *nodeAgentServer) markLegacyPVRsFailed(client ctrlclient.Client) {
 	pvrs := &velerov1api.PodVolumeRestoreList{}
 	if err := client.List(s.ctx, pvrs, &ctrlclient.ListOptions{Namespace: s.namespace}); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("failed to list podvolumerestores")
 		return
 	}
+
 	for i, pvr := range pvrs.Items {
+		if !controller.IsLegacyPVR(&pvr) {
+			continue
+		}
+
 		if pvr.Status.Phase != velerov1api.PodVolumeRestorePhaseInProgress {
 			s.logger.Debugf("the status of podvolumerestore %q is %q, skip", pvr.GetName(), pvr.Status.Phase)
 			continue
@@ -509,7 +518,7 @@ func (s *nodeAgentServer) markInProgressPVRsFailed(client ctrlclient.Client) {
 		}
 
 		if err := controller.UpdatePVRStatusToFailed(s.ctx, client, &pvrs.Items[i], errors.New("cannot survive from node-agent restart"),
-			fmt.Sprintf("get a podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, velerov1api.PodVolumeRestorePhaseFailed),
+			fmt.Sprintf("get a legacy podvolumerestore with status %q during the server starting, mark it as %q", velerov1api.PodVolumeRestorePhaseInProgress, velerov1api.PodVolumeRestorePhaseFailed),
 			time.Now(), s.logger); err != nil {
 			s.logger.WithError(errors.WithStack(err)).Errorf("failed to patch podvolumerestore %q", pvr.GetName())
 			continue

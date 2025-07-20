@@ -237,13 +237,13 @@ func TestResticRunRestore(t *testing.T) {
 func TestClose(t *testing.T) {
 	t.Run("Delete existing credentials file", func(t *testing.T) {
 		// Create temporary files for the credentials and caCert
-		credentialsFile, err := os.CreateTemp("", "credentialsFile")
+		credentialsFile, err := os.CreateTemp(t.TempDir(), "credentialsFile")
 		if err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}
 		defer os.Remove(credentialsFile.Name())
 
-		caCertFile, err := os.CreateTemp("", "caCertFile")
+		caCertFile, err := os.CreateTemp(t.TempDir(), "caCertFile")
 		if err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}
@@ -266,7 +266,7 @@ func TestClose(t *testing.T) {
 
 	t.Run("Delete existing caCert file", func(t *testing.T) {
 		// Create temporary files for the credentials and caCert
-		caCertFile, err := os.CreateTemp("", "caCertFile")
+		caCertFile, err := os.CreateTemp(t.TempDir(), "caCertFile")
 		if err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}

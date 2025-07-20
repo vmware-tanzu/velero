@@ -55,7 +55,7 @@ import (
 )
 
 func NewPodVolumeRestoreReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
-	nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, podResources corev1api.ResourceRequirements,
+	counter *exposer.VgdpCounter, nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, podResources corev1api.ResourceRequirements,
 	logger logrus.FieldLogger) *PodVolumeRestoreReconciler {
 	return &PodVolumeRestoreReconciler{
 		client:           client,
@@ -66,6 +66,7 @@ func NewPodVolumeRestoreReconciler(client client.Client, mgr manager.Manager, ku
 		clock:            &clocks.RealClock{},
 		podResources:     podResources,
 		dataPathMgr:      dataPathMgr,
+		vgdpCounter:      counter,
 		preparingTimeout: preparingTimeout,
 		resourceTimeout:  resourceTimeout,
 		exposer:          exposer.NewPodVolumeExposer(kubeClient, logger),
@@ -83,6 +84,7 @@ type PodVolumeRestoreReconciler struct {
 	podResources     corev1api.ResourceRequirements
 	exposer          exposer.PodVolumeExposer
 	dataPathMgr      *datapath.Manager
+	vgdpCounter      *exposer.VgdpCounter
 	preparingTimeout time.Duration
 	resourceTimeout  time.Duration
 	cancelledPVR     map[string]time.Time
@@ -210,6 +212,11 @@ func (r *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			return ctrl.Result{}, nil
 		}
 
+		if r.vgdpCounter != nil && r.vgdpCounter.IsConstrained(ctx, r.logger) {
+			log.Debug("Data path initiation is constrained, requeue later")
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
+		}
+
 		log.Info("Accepting PVR")
 
 		if err := r.acceptPodVolumeRestore(ctx, pvr); err != nil {
@@ -282,7 +289,7 @@ func (r *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			pvr.Name, pvr.Namespace, res.ByPod.HostingPod.Name, res.ByPod.HostingContainer, pvr.Name, callbacks, false, log)
 		if err != nil {
 			if err == datapath.ConcurrentLimitExceed {
-				log.Info("Data path instance is concurrent limited requeue later")
+				log.Debug("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 			} else {
 				return r.errorOut(ctx, pvr, err, "error to create data path", log)
@@ -305,6 +312,8 @@ func (r *PodVolumeRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 			pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseInProgress
 			pvr.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
+
+			delete(pvr.Labels, exposer.ExposeOnGoingLabel)
 
 			return true
 		}); err != nil {
@@ -373,6 +382,11 @@ func (r *PodVolumeRestoreReconciler) acceptPodVolumeRestore(ctx context.Context,
 		pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseAccepted
 		pvr.Status.Node = r.nodeName
 
+		if pvr.Labels == nil {
+			pvr.Labels = make(map[string]string)
+		}
+		pvr.Labels[exposer.ExposeOnGoingLabel] = "true"
+
 		return true
 	})
 }
@@ -389,6 +403,8 @@ func (r *PodVolumeRestoreReconciler) tryCancelPodVolumeRestore(ctx context.Conte
 		if message != "" {
 			pvr.Status.Message = message
 		}
+
+		delete(pvr.Labels, exposer.ExposeOnGoingLabel)
 	})
 
 	if err != nil {
@@ -433,6 +449,8 @@ func (r *PodVolumeRestoreReconciler) onPrepareTimeout(ctx context.Context, pvr *
 	succeeded, err := funcExclusiveUpdatePodVolumeRestore(ctx, r.client, pvr, func(pvr *velerov1api.PodVolumeRestore) {
 		pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
 		pvr.Status.Message = "timeout on preparing PVR"
+
+		delete(pvr.Labels, exposer.ExposeOnGoingLabel)
 	})
 
 	if err != nil {
@@ -498,6 +516,8 @@ func UpdatePVRStatusToFailed(ctx context.Context, c client.Client, pvr *velerov1
 			pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
 			pvr.Status.Message = errors.WithMessage(err, msg).Error()
 			pvr.Status.CompletionTimestamp = &metav1.Time{Time: time}
+
+			delete(pvr.Labels, exposer.ExposeOnGoingLabel)
 
 			return true
 		}); patchErr != nil {
@@ -749,6 +769,8 @@ func (r *PodVolumeRestoreReconciler) OnDataPathCompleted(ctx context.Context, na
 		pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseCompleted
 		pvr.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 
+		delete(pvr.Labels, exposer.ExposeOnGoingLabel)
+
 		return true
 	}); err != nil {
 		log.WithError(err).Error("error updating PVR status")
@@ -798,6 +820,8 @@ func (r *PodVolumeRestoreReconciler) OnDataPathCancelled(ctx context.Context, na
 		}
 		pvr.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
 
+		delete(pvr.Labels, exposer.ExposeOnGoingLabel)
+
 		return true
 	}); err != nil {
 		log.WithError(err).Error("error updating PVR status on cancel")
@@ -820,9 +844,14 @@ func (r *PodVolumeRestoreReconciler) OnDataPathProgress(ctx context.Context, nam
 func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolumeRestore) exposer.PodVolumeExposeParam {
 	log := r.logger.WithField("PVR", pvr.Name)
 
+	nodeOS, err := kube.GetNodeOS(context.Background(), pvr.Status.Node, r.kubeClient.CoreV1())
+	if err != nil {
+		log.WithError(err).Warnf("Failed to get nodeOS for node %s, use linux node-agent for hosting pod labels, annotations and tolerations", pvr.Status.Node)
+	}
+
 	hostingPodLabels := map[string]string{velerov1api.PVRLabel: pvr.Name}
 	for _, k := range util.ThirdPartyLabels {
-		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvr.Namespace, k, ""); err != nil {
+		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvr.Namespace, k, nodeOS); err != nil {
 			if err != nodeagent.ErrNodeAgentLabelNotFound {
 				log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
 			}
@@ -833,12 +862,23 @@ func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolume
 
 	hostingPodAnnotation := map[string]string{}
 	for _, k := range util.ThirdPartyAnnotations {
-		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvr.Namespace, k, ""); err != nil {
+		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvr.Namespace, k, nodeOS); err != nil {
 			if err != nodeagent.ErrNodeAgentAnnotationNotFound {
 				log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
 			}
 		} else {
 			hostingPodAnnotation[k] = v
+		}
+	}
+
+	hostingPodTolerations := []corev1api.Toleration{}
+	for _, k := range util.ThirdPartyTolerations {
+		if v, err := nodeagent.GetToleration(context.Background(), r.kubeClient, pvr.Namespace, k, nodeOS); err != nil {
+			if err != nodeagent.ErrNodeAgentTolerationNotFound {
+				log.WithError(err).Warnf("Failed to check node-agent toleration, skip adding host pod toleration %s", k)
+			}
+		} else {
+			hostingPodTolerations = append(hostingPodTolerations, *v)
 		}
 	}
 
@@ -849,6 +889,7 @@ func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolume
 		ClientPodVolume:       pvr.Spec.Volume,
 		HostingPodLabels:      hostingPodLabels,
 		HostingPodAnnotations: hostingPodAnnotation,
+		HostingPodTolerations: hostingPodTolerations,
 		OperationTimeout:      r.resourceTimeout,
 		Resources:             r.podResources,
 	}
@@ -907,4 +948,104 @@ func UpdatePVRWithRetry(ctx context.Context, client client.Client, namespacedNam
 
 		return true, nil
 	})
+}
+
+var funcResumeCancellablePVR = (*PodVolumeRestoreReconciler).resumeCancellableDataPath
+
+func (r *PodVolumeRestoreReconciler) AttemptPVRResume(ctx context.Context, logger *logrus.Entry, ns string) error {
+	pvrs := &velerov1api.PodVolumeRestoreList{}
+	if err := r.client.List(ctx, pvrs, &client.ListOptions{Namespace: ns}); err != nil {
+		r.logger.WithError(errors.WithStack(err)).Error("failed to list PVRs")
+		return errors.Wrapf(err, "error to list PVRs")
+	}
+
+	for i := range pvrs.Items {
+		pvr := &pvrs.Items[i]
+		if IsLegacyPVR(pvr) {
+			continue
+		}
+
+		if pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseInProgress {
+			if pvr.Status.Node != r.nodeName {
+				logger.WithField("PVR", pvr.Name).WithField("current node", r.nodeName).Infof("PVR should be resumed by another node %s", pvr.Status.Node)
+				continue
+			}
+
+			err := funcResumeCancellablePVR(r, ctx, pvr, logger)
+			if err == nil {
+				logger.WithField("PVR", pvr.Name).WithField("current node", r.nodeName).Info("Completed to resume in progress PVR")
+				continue
+			}
+
+			logger.WithField("PVR", pvr.GetName()).WithError(err).Warn("Failed to resume data path for PVR, have to cancel it")
+
+			resumeErr := err
+			err = UpdatePVRWithRetry(ctx, r.client, types.NamespacedName{Namespace: pvr.Namespace, Name: pvr.Name}, logger.WithField("PVR", pvr.Name),
+				func(pvr *velerov1api.PodVolumeRestore) bool {
+					if pvr.Spec.Cancel {
+						return false
+					}
+
+					pvr.Spec.Cancel = true
+					pvr.Status.Message = fmt.Sprintf("Resume InProgress PVR failed with error %v, mark it as cancel", resumeErr)
+
+					return true
+				})
+			if err != nil {
+				logger.WithField("PVR", pvr.GetName()).WithError(errors.WithStack(err)).Error("Failed to trigger PVR cancel")
+			}
+		} else if !isPVRInFinalState(pvr) {
+			logger.WithField("PVR", pvr.GetName()).Infof("find a PVR with status %s", pvr.Status.Phase)
+		}
+	}
+
+	return nil
+}
+
+func (r *PodVolumeRestoreReconciler) resumeCancellableDataPath(ctx context.Context, pvr *velerov1api.PodVolumeRestore, log logrus.FieldLogger) error {
+	log.Info("Resume cancelable PVR")
+
+	res, err := r.exposer.GetExposed(ctx, getPVROwnerObject(pvr), r.client, r.nodeName, r.resourceTimeout)
+	if err != nil {
+		return errors.Wrapf(err, "error to get exposed PVR %s", pvr.Name)
+	}
+
+	if res == nil {
+		return errors.Errorf("no expose result is available for the current node for PVR %s", pvr.Name)
+	}
+
+	callbacks := datapath.Callbacks{
+		OnCompleted: r.OnDataPathCompleted,
+		OnFailed:    r.OnDataPathFailed,
+		OnCancelled: r.OnDataPathCancelled,
+		OnProgress:  r.OnDataPathProgress,
+	}
+
+	asyncBR, err := r.dataPathMgr.CreateMicroServiceBRWatcher(ctx, r.client, r.kubeClient, r.mgr, datapath.TaskTypeRestore, pvr.Name, pvr.Namespace, res.ByPod.HostingPod.Name, res.ByPod.HostingContainer, pvr.Name, callbacks, true, log)
+	if err != nil {
+		return errors.Wrapf(err, "error to create asyncBR watcher for PVR %s", pvr.Name)
+	}
+
+	resumeComplete := false
+	defer func() {
+		if !resumeComplete {
+			r.closeDataPath(ctx, pvr.Name)
+		}
+	}()
+
+	if err := asyncBR.Init(ctx, nil); err != nil {
+		return errors.Wrapf(err, "error to init asyncBR watcher for PVR %s", pvr.Name)
+	}
+
+	if err := asyncBR.StartRestore(pvr.Spec.SnapshotID, datapath.AccessPoint{
+		ByPath: res.ByPod.VolumeName,
+	}, pvr.Spec.UploaderSettings); err != nil {
+		return errors.Wrapf(err, "error to resume asyncBR watcher for PVR %s", pvr.Name)
+	}
+
+	resumeComplete = true
+
+	log.Infof("asyncBR is resumed for PVR %s", pvr.Name)
+
+	return nil
 }

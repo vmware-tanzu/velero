@@ -12,7 +12,6 @@ The implemented [VGDP LoadAffinity design][3] already defined the a structure `L
 
 There are still some limitations of this design:
 * The affinity setting is global. Say there are two StorageClasses and the underlying storage can only provision volumes to part of the cluster nodes. The supported nodes don't have intersection. Then the affinity will definitely not work in some cases.
-* The old design only take the first element of the []*LoadAffinity array. By this way, it cannot support the or logic between Affinity selectors.
 * The old design focuses on the backupPod affinity, but the restorePod also needs the affinity setting.
 
 As a result, create this design to address the limitations.
@@ -34,7 +33,6 @@ This design still uses the ConfigMap specified by `velero node-agent` CLI's para
 Upon the implemented [VGDP LoadAffinity design][3] introduced `[]*LoadAffinity` structure, this design add a new field `StorageClass`. This field is optional.
 * If the `LoadAffinity` element's `StorageClass` doesn't have value, it means this element is applied to global, just as the old design.
 * If the `LoadAffinity` element's `StorageClass` has value, it means this element is applied to the VGDP instances' PVCs use the specified StorageClass.
-* To support the or logic between LoadAffinity elements, this design allows multiple instances of `LoadAffinity` whose `StorageClass` field have the same value.
 * The `LoadAffinity` element whose `StorageClass` has value has higher priority than the `LoadAffinity` element whose `StorageClass` doesn't have value.
 
 
@@ -93,14 +91,8 @@ flowchart TD
 
     O -->|No loadAffinity configured| R[No affinity constraints<br/>Schedule on any available node<br/>🌐 DEFAULT]
     
-    N --> S{Multiple rules in array?}
-    S -->|Yes| T[Apply all rules as OR conditions<br/>Pod scheduled on nodes matching ANY rule]
-    S -->|No| U[Apply single rule<br/>Pod scheduled on nodes matching this rule]
-
-    O --> S
-    
-    T --> V[Validate node-agent availability<br/>⚠️ Ensure node-agent pods exist on target nodes]
-    U --> V
+    O --> V[Validate node-agent availability<br/>⚠️ Ensure node-agent pods exist on target nodes]
+    N --> V
     
     V --> W{Node-agent available on selected nodes?}
     W -->|Yes| X[✅ VGDP Pod scheduled successfully]
@@ -125,40 +117,6 @@ flowchart TD
 ```
 
 ### Examples
-
-#### Multiple LoadAffinities
-
-``` json
-{
-    "loadAffinity": [
-        {
-            "nodeSelector": {
-                "matchLabels": {
-                    "beta.kubernetes.io/instance-type": "Standard_B4ms"
-                }
-            }
-        },
-        {
-            "nodeSelector": {
-                "matchExpressions": [
-                    {
-                        "key": "topology.kubernetes.io/zone",
-                        "operator": "In",
-                        "values": [
-                            "us-central1-a"
-                        ]
-                    }
-                ]
-            }
-        }
-    ]
-}
-```
-
-This sample demonstrates how to use multiple affinities in `loadAffinity`. That can support more complicated scenarios, e.g. need to filter nodes satisfied either of two conditions, instead of satisfied both of two conditions.
-
-In this example, the VGDP pods will be assigned to nodes, which instance type is `Standard_B4ms` or which zone is `us-central1-a`.
-
 
 #### LoadAffinity interacts with LoadAffinityPerStorageClass
 

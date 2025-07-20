@@ -590,6 +590,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		},
 		newPluginManager,
 		backupStoreGetter,
+		s.metrics,
 		s.logger,
 	)
 	if err := bslr.SetupWithManager(s.mgr); err != nil {

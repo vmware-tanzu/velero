@@ -32,11 +32,11 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
 	"golang.org/x/mod/semver"
 	"k8s.io/apimachinery/pkg/labels"
 	ver "k8s.io/apimachinery/pkg/util/version"
@@ -243,6 +243,12 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 
 	io.VolumeSnapshotConfig = flag.NewMap()
 	io.VolumeSnapshotConfig.Set(veleroCfg.VSLConfig)
+
+	io.PodLabels = flag.NewMap()
+	io.PodLabels.Set(veleroCfg.PodLabels)
+
+	io.ServiceAccountAnnotations = flag.NewMap()
+	io.ServiceAccountAnnotations.Set(veleroCfg.ServiceAccountAnnotations)
 
 	io.Plugins = flag.NewStringArray(plugins...)
 	io.Features = veleroCfg.Features

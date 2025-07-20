@@ -592,6 +592,116 @@ func TestGetAnnotationValue(t *testing.T) {
 	}
 }
 
+func TestGetToleration(t *testing.T) {
+	daemonSet := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+	}
+
+	daemonSetWithOtherToleration := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Tolerations: []corev1api.Toleration{
+						{
+							Key: "other-toleration-key",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	daemonSetWithToleration := &appsv1api.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fake-ns",
+			Name:      "node-agent",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "DaemonSet",
+		},
+		Spec: appsv1api.DaemonSetSpec{
+			Template: corev1api.PodTemplateSpec{
+				Spec: corev1api.PodSpec{
+					Tolerations: []corev1api.Toleration{
+						{
+							Key:   "fake-toleration",
+							Value: "true",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name          string
+		kubeClientObj []runtime.Object
+		namespace     string
+		expectedValue corev1api.Toleration
+		expectErr     string
+	}{
+		// {
+		// 	name:      "ds get error",
+		// 	namespace: "fake-ns",
+		// 	expectErr: "error getting node-agent daemonset: daemonsets.apps \"node-agent\" not found",
+		// },
+		{
+			name:      "no toleration",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectErr: ErrNodeAgentTolerationNotFound.Error(),
+		},
+		{
+			name:      "no expecting toleration",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithOtherToleration,
+			},
+			expectErr: ErrNodeAgentTolerationNotFound.Error(),
+		},
+		{
+			name:      "expecting toleration",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				daemonSetWithToleration,
+			},
+			expectedValue: corev1api.Toleration{
+				Key:   "fake-toleration",
+				Value: "true",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			value, err := GetToleration(context.TODO(), fakeKubeClient, test.namespace, "fake-toleration", kube.NodeOSLinux)
+			if test.expectErr == "" {
+				require.NoError(t, err)
+				assert.Equal(t, test.expectedValue, *value)
+			} else {
+				assert.EqualError(t, err, test.expectErr)
+			}
+		})
+	}
+}
+
 func TestGetHostPodPath(t *testing.T) {
 	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{

@@ -23,6 +23,7 @@ import (
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/vmware-tanzu/velero/internal/velero"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
@@ -63,6 +64,54 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 		dsName = "node-agent-windows"
 	}
 
+	volumes := []corev1api.Volume{}
+	volumeMounts := []corev1api.VolumeMount{}
+	if !c.nodeAgentDisableHostPath {
+		volumes = append(volumes, []corev1api.Volume{
+			{
+				Name: "host-pods",
+				VolumeSource: corev1api.VolumeSource{
+					HostPath: &corev1api.HostPathVolumeSource{
+						Path: "/var/lib/kubelet/pods",
+					},
+				},
+			},
+			{
+				Name: "host-plugins",
+				VolumeSource: corev1api.VolumeSource{
+					HostPath: &corev1api.HostPathVolumeSource{
+						Path: "/var/lib/kubelet/plugins",
+					},
+				},
+			},
+		}...)
+
+		volumeMounts = append(volumeMounts, []corev1api.VolumeMount{
+			{
+				Name:             nodeagent.HostPodVolumeMount,
+				MountPath:        nodeagent.HostPodVolumeMountPath(),
+				MountPropagation: &mountPropagationMode,
+			},
+			{
+				Name:             "host-plugins",
+				MountPath:        "/var/lib/kubelet/plugins",
+				MountPropagation: &mountPropagationMode,
+			},
+		}...)
+	}
+
+	volumes = append(volumes, corev1api.Volume{
+		Name: "scratch",
+		VolumeSource: corev1api.VolumeSource{
+			EmptyDir: new(corev1api.EmptyDirVolumeSource),
+		},
+	})
+
+	volumeMounts = append(volumeMounts, corev1api.VolumeMount{
+		Name:      "scratch",
+		MountPath: "/scratch",
+	})
+
 	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: objectMeta(namespace, dsName),
 		TypeMeta: metav1.TypeMeta{
@@ -88,30 +137,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 					SecurityContext: &corev1api.PodSecurityContext{
 						RunAsUser: &userID,
 					},
-					Volumes: []corev1api.Volume{
-						{
-							Name: "host-pods",
-							VolumeSource: corev1api.VolumeSource{
-								HostPath: &corev1api.HostPathVolumeSource{
-									Path: "/var/lib/kubelet/pods",
-								},
-							},
-						},
-						{
-							Name: "host-plugins",
-							VolumeSource: corev1api.VolumeSource{
-								HostPath: &corev1api.HostPathVolumeSource{
-									Path: "/var/lib/kubelet/plugins",
-								},
-							},
-						},
-						{
-							Name: "scratch",
-							VolumeSource: corev1api.VolumeSource{
-								EmptyDir: new(corev1api.EmptyDirVolumeSource),
-							},
-						},
-					},
+					Volumes: volumes,
 					Containers: []corev1api.Container{
 						{
 							Name:            dsName,
@@ -125,22 +151,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 							SecurityContext: &corev1api.SecurityContext{
 								Privileged: &c.privilegedNodeAgent,
 							},
-							VolumeMounts: []corev1api.VolumeMount{
-								{
-									Name:             nodeagent.HostPodVolumeMount,
-									MountPath:        nodeagent.HostPodVolumeMountPath(),
-									MountPropagation: &mountPropagationMode,
-								},
-								{
-									Name:             "host-plugins",
-									MountPath:        "/var/lib/kubelet/plugins",
-									MountPropagation: &mountPropagationMode,
-								},
-								{
-									Name:      "scratch",
-									MountPath: "/scratch",
-								},
-							},
+							VolumeMounts: volumeMounts,
 							Env: []corev1api.EnvVar{
 								{
 									Name: "NODE_NAME",
@@ -178,7 +189,9 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 				Name: "cloud-credentials",
 				VolumeSource: corev1api.VolumeSource{
 					Secret: &corev1api.SecretVolumeSource{
-						SecretName: "cloud-credentials",
+						// read-only for Owner, Group, Public
+						DefaultMode: ptr.To(int32(0444)),
+						SecretName:  "cloud-credentials",
 					},
 				},
 			},

@@ -23,11 +23,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
 	"golang.org/x/mod/semver"
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
@@ -408,6 +408,14 @@ func installVeleroServer(
 
 	if options.ItemBlockWorkerCount > 1 {
 		args = append(args, fmt.Sprintf("--item-block-worker-count=%d", options.ItemBlockWorkerCount))
+	}
+
+	if len(options.PodLabels.Data()) > 0 {
+		args = append(args, "--pod-labels", options.PodLabels.String())
+	}
+
+	if len(options.ServiceAccountAnnotations.Data()) > 0 {
+		args = append(args, "--sa-annotations", options.ServiceAccountAnnotations.String())
 	}
 
 	// Only version no older than v1.15 support --backup-repository-configmap.

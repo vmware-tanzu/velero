@@ -87,6 +87,8 @@ type VeleroConfig struct {
 	CloudProvider                     string
 	ObjectStoreProvider               string
 	VeleroNamespace                   string
+	PodLabels                         string
+	ServiceAccountAnnotations         string
 	AdditionalBSLProvider             string
 	AdditionalBSLBucket               string
 	AdditionalBSLPrefix               string
