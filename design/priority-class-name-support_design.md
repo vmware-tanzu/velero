@@ -193,13 +193,13 @@ We'll update the `Configs` struct in `pkg/nodeagent/node_agent.go` to include a 
 type Configs struct {
     // ... existing fields ...
     
-    // PriorityClassName is the priority class name for both the node agent daemonset 
-    // and the data mover pods it creates
+    // PriorityClassName is the priority class name for the data mover pods 
+    // created by the node agent
     PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 ```
 
-This will allow users to configure the priority class name for both the node agent daemonset and data mover pods through a single node-agent-configmap. For example:
+This will allow users to configure the priority class name for data mover pods through the node-agent-configmap. Note that the node agent daemonset itself gets its priority class from the `--node-agent-priority-class-name` CLI flag during installation, not from this configmap. For example:
 
 ```bash
 # Create the ConfigMap before running velero install
