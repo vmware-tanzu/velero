@@ -71,7 +71,8 @@ func (n *namespacedFileStore) Path(selector *corev1api.SecretKeySelector) (strin
 
 	keyFilePath := filepath.Join(n.fsRoot, fmt.Sprintf("%s-%s", selector.Name, selector.Key))
 
-	file, err := n.fs.OpenFile(keyFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	// owner RW perms, group R perms, no public perms
+	file, err := n.fs.OpenFile(keyFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0640)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to open credentials file for writing")
 	}

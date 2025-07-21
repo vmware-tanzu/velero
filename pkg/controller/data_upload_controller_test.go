@@ -241,6 +241,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		fakeSnapshotClient.SnapshotV1(),
 		dataPathMgr,
 		nil,
+		nil,
 		map[string]nodeagent.BackupPVC{},
 		corev1api.ResourceRequirements{},
 		testclocks.NewFakeClock(now),
@@ -258,7 +259,6 @@ func dataUploadBuilder() *builder.DataUploadBuilder {
 		VolumeSnapshot: "fake-volume-snapshot",
 	}
 	return builder.ForDataUpload(velerov1api.DefaultNamespace, dataUploadName).
-		Labels(map[string]string{velerov1api.DataUploadLabel: dataUploadName}).
 		BackupStorageLocation("bsl-loc").
 		DataMover("velero").
 		SnapshotType("CSI").SourceNamespace("fake-ns").SourcePVC("test-pvc").CSISnapshot(csi)
@@ -361,6 +361,7 @@ func TestReconcile(t *testing.T) {
 		getExposeNil             bool
 		fsBRInitErr              error
 		fsBRStartErr             error
+		constrained              bool
 		expectedErr              string
 		expectedResult           *ctrl.Result
 		expectDataPath           bool
@@ -465,16 +466,24 @@ func TestReconcile(t *testing.T) {
 			expectedErr: "unknown type type of snapshot exposer is not exist",
 		},
 		{
+			name:               "du is cancel on new",
+			du:                 dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Result(),
+			expectCancelRecord: true,
+			expected:           dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataUploadPhaseCanceled).Result(),
+		},
+		{
+			name:           "new du but constrained",
+			du:             dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			constrained:    true,
+			expected:       dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			expectedResult: &ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5},
+		},
+		{
 			name:                     "new du but accept failed",
 			du:                       dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
 			needExclusiveUpdateError: errors.New("exclusive-update-error"),
 			expected:                 dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
 			expectedErr:              "error accepting the data upload dataupload-1: exclusive-update-error",
-		},
-		{
-			name:     "du is cancel on accepted",
-			du:       dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Result(),
-			expected: dataUploadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Cancel(true).Phase(velerov2alpha1api.DataUploadPhaseCanceled).Result(),
 		},
 		{
 			name:        "du is accepted but setup expose param failed on getting PVC",
@@ -636,6 +645,10 @@ func TestReconcile(t *testing.T) {
 				r.cancelledDataUpload[test.du.Name] = test.sportTime.Time
 			}
 
+			if test.constrained {
+				r.vgdpCounter = &exposer.VgdpCounter{}
+			}
+
 			if test.du.Spec.SnapshotType == fakeSnapshotType {
 				r.snapshotExposerList = map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer{fakeSnapshotType: &fakeSnapshotExposer{r.client, r.Clock, test.ambiguousNodeOS, test.peekErr, test.exposeErr, test.getExposeErr, test.getExposeNil}}
 			} else if test.du.Spec.SnapshotType == velerov2alpha1api.SnapshotTypeCSI {
@@ -683,13 +696,13 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, test.expectedResult.RequeueAfter, actualResult.RequeueAfter)
 			}
 
-			if test.expected != nil || test.expectDeleted {
-				du := velerov2alpha1api.DataUpload{}
-				err = r.client.Get(ctx, kbclient.ObjectKey{
-					Name:      test.du.Name,
-					Namespace: test.du.Namespace,
-				}, &du)
+			du := velerov2alpha1api.DataUpload{}
+			err = r.client.Get(ctx, kbclient.ObjectKey{
+				Name:      test.du.Name,
+				Namespace: test.du.Namespace,
+			}, &du)
 
+			if test.expected != nil || test.expectDeleted {
 				if test.expectDeleted {
 					assert.True(t, apierrors.IsNotFound(err))
 				} else {
@@ -712,6 +725,12 @@ func TestReconcile(t *testing.T) {
 				assert.Contains(t, r.cancelledDataUpload, test.du.Name)
 			} else {
 				assert.Empty(t, r.cancelledDataUpload)
+			}
+
+			if isDataUploadInFinalState(&du) || du.Status.Phase == velerov2alpha1api.DataUploadPhaseInProgress {
+				assert.NotContains(t, du.Labels, exposer.ExposeOnGoingLabel)
+			} else if du.Status.Phase == velerov2alpha1api.DataUploadPhaseAccepted {
+				assert.Contains(t, du.Labels, exposer.ExposeOnGoingLabel)
 			}
 		})
 	}
