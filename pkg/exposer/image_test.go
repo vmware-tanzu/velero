@@ -177,6 +177,11 @@ func TestGetInheritedPodInfo(t *testing.T) {
 						},
 					},
 					ServiceAccountName: "sa-1",
+					ImagePullSecrets: []corev1api.LocalObjectReference{
+						{
+							Name: "imagePullSecret1",
+						},
+					},
 				},
 			},
 		},
@@ -316,6 +321,11 @@ func TestGetInheritedPodInfo(t *testing.T) {
 				logLevelArgs: []string{
 					"--log-level",
 					"debug",
+				},
+				imagePullSecrets: []corev1api.LocalObjectReference{
+					{
+						Name: "imagePullSecret1",
+					},
 				},
 			},
 		},

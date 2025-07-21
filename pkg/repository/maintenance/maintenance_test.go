@@ -910,6 +910,11 @@ func TestBuildJob(t *testing.T) {
 							},
 						},
 					},
+					ImagePullSecrets: []corev1api.LocalObjectReference{
+						{
+							Name: "imagePullSecret1",
+						},
+					},
 				},
 			},
 		},
@@ -934,6 +939,7 @@ func TestBuildJob(t *testing.T) {
 		expectedPodLabel           map[string]string
 		expectedSecurityContext    *corev1api.SecurityContext
 		expectedPodSecurityContext *corev1api.PodSecurityContext
+		expectedImagePullSecrets   []corev1api.LocalObjectReference
 	}{
 		{
 			name: "Valid maintenance job without third party labels",
@@ -981,6 +987,11 @@ func TestBuildJob(t *testing.T) {
 			expectedPodSecurityContext: &corev1api.PodSecurityContext{
 				RunAsNonRoot: boolptr.True(),
 			},
+			expectedImagePullSecrets: []corev1api.LocalObjectReference{
+				{
+					Name: "imagePullSecret1",
+				},
+			},
 		},
 		{
 			name: "Valid maintenance job with third party labels",
@@ -1025,6 +1036,11 @@ func TestBuildJob(t *testing.T) {
 			},
 			expectedSecurityContext:    nil,
 			expectedPodSecurityContext: nil,
+			expectedImagePullSecrets: []corev1api.LocalObjectReference{
+				{
+					Name: "imagePullSecret1",
+				},
+			},
 		},
 		{
 			name: "Error getting Velero server deployment",
@@ -1076,7 +1092,16 @@ func TestBuildJob(t *testing.T) {
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 
 			// Call the function to test
-			job, err := buildJob(cli, t.Context(), param.BackupRepo, param.BackupLocation.Name, tc.m, *tc.m.PodResources, tc.logLevel, tc.logFormat)
+			job, err := buildJob(
+				cli,
+				t.Context(),
+				param.BackupRepo,
+				param.BackupLocation.Name,
+				tc.m,
+				*tc.m.PodResources,
+				tc.logLevel,
+				tc.logFormat,
+			)
 
 			// Check the error
 			if tc.expectedError {
@@ -1131,6 +1156,8 @@ func TestBuildJob(t *testing.T) {
 				assert.Equal(t, expectedArgs, container.Args)
 
 				assert.Equal(t, tc.expectedPodLabel, job.Spec.Template.Labels)
+
+				assert.Equal(t, tc.expectedImagePullSecrets, job.Spec.Template.Spec.ImagePullSecrets)
 			}
 		})
 	}
