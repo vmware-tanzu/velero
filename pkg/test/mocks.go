@@ -1,8 +1,8 @@
 package test
 
 import (
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
-	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v7/listers/volumesnapshot/v1"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	snapshotv1listers "github.com/kubernetes-csi/external-snapshotter/client/v8/listers/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 

@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	volumeSnapshotV1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
-	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned"
+	volumeSnapshotV1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
