@@ -465,12 +465,12 @@ func TestPVBReconcile(t *testing.T) {
 			require.NoError(t, err)
 
 			if !test.notCreatePvb {
-				err = r.client.Create(context.Background(), test.pvb)
+				err = r.client.Create(t.Context(), test.pvb)
 				require.NoError(t, err)
 			}
 
 			if test.needDelete {
-				err = r.client.Delete(context.Background(), test.pvb)
+				err = r.client.Delete(t.Context(), test.pvb)
 				require.NoError(t, err)
 			}
 
@@ -579,7 +579,7 @@ func TestPVBReconcile(t *testing.T) {
 }
 
 func TestOnPVBCancelled(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	r, err := initPVBReconciler()
 	require.NoError(t, err)
 	pvb := pvbBuilder().Result()
@@ -626,7 +626,7 @@ func TestOnPVBProgress(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 
 			r, err := initPVBReconciler(test.needErrs...)
 			require.NoError(t, err)
@@ -638,7 +638,7 @@ func TestOnPVBProgress(t *testing.T) {
 			namespace := pvb.Namespace
 			pvbName := pvb.Name
 
-			require.NoError(t, r.client.Create(context.Background(), pvb))
+			require.NoError(t, r.client.Create(t.Context(), pvb))
 
 			// Create a Progress object
 			progress := &uploader.Progress{
@@ -658,7 +658,7 @@ func TestOnPVBProgress(t *testing.T) {
 }
 
 func TestOnPvbFailed(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	r, err := initPVBReconciler()
 	require.NoError(t, err)
 
@@ -677,7 +677,7 @@ func TestOnPvbFailed(t *testing.T) {
 }
 
 func TestOnPvbCompleted(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	r, err := initPVBReconciler()
 	require.NoError(t, err)
 
@@ -741,11 +741,11 @@ func TestFindPvbForPod(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		assert.NoError(t, r.client.Create(ctx, test.pod))
 		assert.NoError(t, r.client.Create(ctx, test.pvb))
 
-		requests := r.findPVBForPod(context.Background(), test.pod)
+		requests := r.findPVBForPod(t.Context(), test.pod)
 		test.checkFunc(test.pvb, requests)
 		r.client.Delete(ctx, test.pvb, &client.DeleteOptions{})
 		if test.pod != nil {
@@ -774,7 +774,7 @@ func TestAcceptPvb(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initPVBReconcilerWithError(test.needErrs...)
 		require.NoError(t, err)
 
@@ -817,7 +817,7 @@ func TestOnPvbPrepareTimeout(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initPVBReconcilerWithError(test.needErrs...)
 		require.NoError(t, err)
 
@@ -862,7 +862,7 @@ func TestTryCancelPvb(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initPVBReconcilerWithError(test.needErrs...)
 		require.NoError(t, err)
 
@@ -919,7 +919,7 @@ func TestUpdatePvbWithRetry(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			ctx, cancelFunc := context.WithTimeout(context.TODO(), time.Second*5)
+			ctx, cancelFunc := context.WithTimeout(t.Context(), time.Second*5)
 			defer cancelFunc()
 			r, err := initPVBReconciler(tc.needErrs...)
 			require.NoError(t, err)
@@ -1028,7 +1028,7 @@ func TestAttemptPVBResume(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			r, err := initPVBReconciler(test.needErrs...)
 			r.nodeName = "node-1"
 			require.NoError(t, err)
@@ -1051,28 +1051,28 @@ func TestAttemptPVBResume(t *testing.T) {
 
 				for _, pvbName := range test.cancelledPvbs {
 					pvb := &velerov1api.PodVolumeBackup{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvbName}, pvb)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: pvbName}, pvb)
 					require.NoError(t, err)
 					assert.True(t, pvb.Spec.Cancel)
 				}
 
 				for _, pvbName := range test.acceptedPvbs {
 					pvb := &velerov1api.PodVolumeBackup{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvbName}, pvb)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: pvbName}, pvb)
 					require.NoError(t, err)
 					assert.Equal(t, velerov1api.PodVolumeBackupPhaseAccepted, pvb.Status.Phase)
 				}
 
 				for _, pvbName := range test.preparedPvbs {
 					pvb := &velerov1api.PodVolumeBackup{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvbName}, pvb)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: pvbName}, pvb)
 					require.NoError(t, err)
 					assert.Equal(t, velerov1api.PodVolumeBackupPhasePrepared, pvb.Status.Phase)
 				}
 
 				for _, pvbName := range test.inProgressPvbs {
 					pvb := &velerov1api.PodVolumeBackup{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvbName}, pvb)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: pvbName}, pvb)
 					require.NoError(t, err)
 					assert.Equal(t, velerov1api.PodVolumeBackupPhaseInProgress, pvb.Status.Phase)
 				}
@@ -1149,7 +1149,7 @@ func TestResumeCancellablePodVolumeBackup(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			r, err := initPVBReconciler()
 			r.nodeName = "node-1"
 			require.NoError(t, err)

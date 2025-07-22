@@ -775,7 +775,7 @@ func TestPrepareRepo(t *testing.T) {
 				bsl.Spec.AccessMode = velerov1api.BackupStorageLocationAccessModeReadWrite
 			}
 
-			err := urp.PrepareRepo(context.Background(), RepoParam{
+			err := urp.PrepareRepo(t.Context(), RepoParam{
 				BackupLocation: &bsl,
 				BackupRepo:     &velerov1api.BackupRepository{},
 			})
@@ -924,7 +924,7 @@ func TestForget(t *testing.T) {
 				backupRepo.On("Close", mock.Anything).Return(nil)
 			}
 
-			err := urp.Forget(context.Background(), "", RepoParam{
+			err := urp.Forget(t.Context(), "", RepoParam{
 				BackupLocation: &velerov1api.BackupStorageLocation{},
 				BackupRepo:     &velerov1api.BackupRepository{},
 			})
@@ -1075,7 +1075,7 @@ func TestBatchForget(t *testing.T) {
 				backupRepo.On("Close", mock.Anything).Return(nil)
 			}
 
-			errs := urp.BatchForget(context.Background(), tc.snapshots, RepoParam{
+			errs := urp.BatchForget(t.Context(), tc.snapshots, RepoParam{
 				BackupLocation: &velerov1api.BackupStorageLocation{},
 				BackupRepo:     &velerov1api.BackupRepository{},
 			})
@@ -1186,7 +1186,7 @@ func TestInitRepo(t *testing.T) {
 				bsl.Spec.AccessMode = velerov1api.BackupStorageLocationAccessModeReadWrite
 			}
 
-			err := urp.InitRepo(context.Background(), RepoParam{
+			err := urp.InitRepo(t.Context(), RepoParam{
 				BackupLocation: &bsl,
 				BackupRepo:     &velerov1api.BackupRepository{},
 			})
@@ -1274,7 +1274,7 @@ func TestConnectToRepo(t *testing.T) {
 				tc.repoService.On("Init", mock.Anything, mock.Anything, mock.Anything).Return(tc.retFuncInit)
 			}
 
-			err := urp.ConnectToRepo(context.Background(), RepoParam{
+			err := urp.ConnectToRepo(t.Context(), RepoParam{
 				BackupLocation: &velerov1api.BackupStorageLocation{},
 				BackupRepo:     &velerov1api.BackupRepository{},
 			})
@@ -1418,7 +1418,7 @@ func TestBoostRepoConnect(t *testing.T) {
 				backupRepo.On("Close", mock.Anything).Return(nil)
 			}
 
-			err := urp.BoostRepoConnect(context.Background(), RepoParam{
+			err := urp.BoostRepoConnect(t.Context(), RepoParam{
 				BackupLocation: &velerov1api.BackupStorageLocation{},
 				BackupRepo:     &velerov1api.BackupRepository{},
 			})
@@ -1506,7 +1506,7 @@ func TestPruneRepo(t *testing.T) {
 				tc.repoService.On("Maintain", mock.Anything, mock.Anything).Return(tc.retFuncMaintain)
 			}
 
-			err := urp.PruneRepo(context.Background(), RepoParam{
+			err := urp.PruneRepo(t.Context(), RepoParam{
 				BackupLocation: &velerov1api.BackupStorageLocation{},
 				BackupRepo:     &velerov1api.BackupRepository{},
 			})

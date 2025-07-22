@@ -1,7 +1,6 @@
 package exposer
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -151,7 +150,7 @@ func TestIsConstrained(t *testing.T) {
 
 			test.counter.client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(test.kubeClientObj...).Build()
 
-			result := test.counter.IsConstrained(context.TODO(), velerotest.NewLogger())
+			result := test.counter.IsConstrained(t.Context(), velerotest.NewLogger())
 
 			assert.Equal(t, test.expected, result)
 

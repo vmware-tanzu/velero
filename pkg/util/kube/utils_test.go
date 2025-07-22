@@ -17,7 +17,6 @@ limitations under the License.
 package kube
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -228,7 +227,7 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 		fakeKubeClient := fake.NewSimpleClientset(objs...)
 
 		// Function under test
-		dir, err := GetVolumeDirectory(context.Background(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, fakeKubeClient)
+		dir, err := GetVolumeDirectory(t.Context(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, fakeKubeClient)
 
 		require.NoError(t, err)
 		assert.Equal(t, tc.want, dir)
@@ -277,7 +276,7 @@ func TestGetVolumeModeSuccess(t *testing.T) {
 		fakeKubeClient := fake.NewSimpleClientset(objs...)
 
 		// Function under test
-		mode, err := GetVolumeMode(context.Background(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, fakeKubeClient)
+		mode, err := GetVolumeMode(t.Context(), logrus.StandardLogger(), tc.pod, tc.pod.Spec.Volumes[0].Name, fakeKubeClient)
 
 		require.NoError(t, err)
 		assert.Equal(t, tc.want, mode)

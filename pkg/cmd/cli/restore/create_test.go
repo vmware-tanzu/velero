@@ -17,7 +17,6 @@ limitations under the License.
 package restore
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -157,9 +156,9 @@ func TestCreateCommand(t *testing.T) {
 
 		kbclient := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 		schedule := builder.ForSchedule(cmdtest.VeleroNameSpace, fromSchedule).Result()
-		require.NoError(t, kbclient.Create(context.Background(), schedule, &controllerclient.CreateOptions{}))
+		require.NoError(t, kbclient.Create(t.Context(), schedule, &controllerclient.CreateOptions{}))
 		backup := builder.ForBackup(cmdtest.VeleroNameSpace, "test-backup").FromSchedule(schedule).Phase(velerov1api.BackupPhaseCompleted).Result()
-		require.NoError(t, kbclient.Create(context.Background(), backup, &controllerclient.CreateOptions{}))
+		require.NoError(t, kbclient.Create(t.Context(), backup, &controllerclient.CreateOptions{}))
 
 		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
 		f.On("KubebuilderWatchClient").Return(kbclient, nil)

@@ -177,7 +177,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 				BackupName: input.Spec.BackupName,
 			},
 		}
-		err := td.fakeClient.Create(context.TODO(), existing)
+		err := td.fakeClient.Create(t.Context(), existing)
 		require.NoError(t, err)
 		existing2 :=
 			&velerov1api.DeleteBackupRequest{
@@ -192,12 +192,12 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 					BackupName: "some-other-backup",
 				},
 			}
-		err = td.fakeClient.Create(context.TODO(), existing2)
+		err = td.fakeClient.Create(t.Context(), existing2)
 		require.NoError(t, err)
-		_, err = td.controller.Reconcile(context.TODO(), td.req)
+		_, err = td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 		// verify "existing" is deleted
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: existing.Namespace,
 			Name:      existing.Name,
 		}, &velerov1api.DeleteBackupRequest{})
@@ -205,7 +205,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
 		// verify "existing2" remains
-		assert.NoError(t, td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		assert.NoError(t, td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: existing2.Namespace,
 			Name:      existing2.Name,
 		}, &velerov1api.DeleteBackupRequest{}))
@@ -215,7 +215,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td := setupBackupDeletionControllerTest(t, dbr)
 
 		td.controller.backupTracker.Add(td.req.Namespace, dbr.Spec.BackupName)
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -229,7 +229,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 	t.Run("unable to find backup", func(t *testing.T) {
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr())
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -244,7 +244,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), backup)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -261,7 +261,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -278,7 +278,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 		td := setupBackupDeletionControllerTest(t, defaultTestDbr(), location, backup)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -357,7 +357,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td.backupStore.On("GetBackupContents", input.Spec.BackupName).Return(io.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 		td.backupStore.On("DeleteBackup", input.Spec.BackupName).Return(nil)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		// the dbr should be deleted
@@ -369,26 +369,26 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		}
 
 		// backup CR, restore CR restore-1 and restore-2 should be deleted
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      backup.Name,
 		}, &velerov1api.Backup{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-1",
 		}, &velerov1api.Restore{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-2",
 		}, &velerov1api.Restore{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
 		// restore-3 should remain
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
@@ -481,7 +481,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 
 		td.volumeSnapshotter.SnapshotsTaken.Insert("snap-1")
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		// the dbr should be deleted
@@ -493,26 +493,26 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		}
 
 		// backup CR, restore CR restore-1 and restore-2 should be deleted
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      backup.Name,
 		}, &velerov1api.Backup{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-1",
 		}, &velerov1api.Restore{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-2",
 		}, &velerov1api.Restore{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
 		// restore-3 should remain
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-3",
 		}, &velerov1api.Restore{})
@@ -582,7 +582,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td.backupStore.On("GetBackupVolumeSnapshots", input.Spec.BackupName).Return(snapshots, nil)
 		td.backupStore.On("DeleteBackup", input.Spec.BackupName).Return(nil)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		td.backupStore.AssertNotCalled(t, "GetBackupContents", mock.Anything)
@@ -597,7 +597,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		}
 
 		// backup CR should be deleted
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      backup.Name,
 		}, &velerov1api.Backup{})
@@ -674,7 +674,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td.backupStore.On("GetBackupContents", input.Spec.BackupName).Return(nil, fmt.Errorf("error downloading tarball"))
 		td.backupStore.On("DeleteBackup", input.Spec.BackupName).Return(nil)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		td.backupStore.AssertCalled(t, "GetBackupContents", input.Spec.BackupName)
@@ -689,14 +689,14 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		}
 
 		// backup CR should be deleted
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: velerov1api.DefaultNamespace,
 			Name:      backup.Name,
 		}, &velerov1api.Backup{})
 		assert.True(t, apierrors.IsNotFound(err), "Expected not found error, but actual value of error: %v", err)
 
 		// leaked CSI snapshot should be deleted
-		err = td.fakeClient.Get(context.TODO(), types.NamespacedName{
+		err = td.fakeClient.Get(t.Context(), types.NamespacedName{
 			Namespace: "user-ns",
 			Name:      "vs-1",
 		}, &snapshotv1api.VolumeSnapshot{})
@@ -714,7 +714,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		input.Status.Phase = velerov1api.DeleteBackupRequestPhaseProcessed
 		td := setupBackupDeletionControllerTest(t, input)
 		td.backupStore.On("DeleteBackup", mock.Anything).Return(nil)
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -733,7 +733,7 @@ func TestBackupDeletionControllerReconcile(t *testing.T) {
 		td := setupBackupDeletionControllerTest(t, input)
 		td.backupStore.On("DeleteBackup", mock.Anything).Return(nil)
 
-		_, err := td.controller.Reconcile(context.TODO(), td.req)
+		_, err := td.controller.Reconcile(t.Context(), td.req)
 		require.NoError(t, err)
 
 		res := &velerov1api.DeleteBackupRequest{}
@@ -899,7 +899,7 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 				Items: test.podVolumeBackups,
 			})
 
-			res, err := getSnapshotsInBackup(context.TODO(), veleroBackup, clientBuilder.Build())
+			res, err := getSnapshotsInBackup(t.Context(), veleroBackup, clientBuilder.Build())
 			require.NoError(t, err)
 
 			assert.True(t, reflect.DeepEqual(res, test.expected))
@@ -1066,7 +1066,7 @@ func TestDeleteMovedSnapshots(t *testing.T) {
 				batchDeleteSnapshotFunc = batchDeleteFail
 			}
 
-			errs := controller.deleteMovedSnapshots(context.Background(), veleroBackup)
+			errs := controller.deleteMovedSnapshots(t.Context(), veleroBackup)
 			if test.expected == nil {
 				assert.Nil(t, errs)
 			} else {

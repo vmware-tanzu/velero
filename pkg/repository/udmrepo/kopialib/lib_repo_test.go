@@ -132,7 +132,7 @@ func TestOpen(t *testing.T) {
 				tc.returnRepo.On("Close", mock.Anything).Return(nil)
 			}
 
-			repo, err := service.Open(context.Background(), tc.repoOptions)
+			repo, err := service.Open(t.Context(), tc.repoOptions)
 
 			if repo != nil {
 				require.Equal(t, tc.expected.description, repo.(*kopiaRepository).description)
@@ -226,7 +226,7 @@ func TestMaintain(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := velerotest.NewLogger()
-			ctx := context.Background()
+			ctx := t.Context()
 
 			service := kopiaRepoService{
 				logger: logger,
@@ -392,7 +392,7 @@ func TestWriteInitParameters(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := velerotest.NewLogger()
-			ctx := context.Background()
+			ctx := t.Context()
 
 			if tc.repoOpen != nil {
 				kopiaRepoOpen = tc.repoOpen
@@ -414,7 +414,7 @@ func TestWriteInitParameters(t *testing.T) {
 					tc.returnRepoWriter.On("ReplaceManifests", mock.Anything, mock.Anything, mock.Anything).Return(manifest.ID(""), tc.replaceManifestError)
 				}
 				if tc.expectedReplaceManifestsParams != nil {
-					tc.returnRepoWriter.On("ReplaceManifests", mock.AnythingOfType("context.backgroundCtx"), mock.AnythingOfType("map[string]string"), mock.AnythingOfType("*maintenance.Params")).Return(manifest.ID(""), nil)
+					tc.returnRepoWriter.On("ReplaceManifests", mock.Anything, mock.AnythingOfType("map[string]string"), mock.AnythingOfType("*maintenance.Params")).Return(manifest.ID(""), nil)
 					tc.returnRepoWriter.On("Flush", mock.Anything).Return(nil)
 				}
 			}
@@ -521,7 +521,7 @@ func TestOpenObject(t *testing.T) {
 				kr.rawRepo = tc.rawRepo
 			}
 
-			_, err := kr.OpenObject(context.Background(), udmrepo.ID(tc.objectID))
+			_, err := kr.OpenObject(t.Context(), udmrepo.ID(tc.objectID))
 
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)
@@ -563,7 +563,7 @@ func TestGetManifest(t *testing.T) {
 				kr.rawRepo = tc.rawRepo
 			}
 
-			err := kr.GetManifest(context.Background(), udmrepo.ID(""), &udmrepo.RepoManifest{})
+			err := kr.GetManifest(t.Context(), udmrepo.ID(""), &udmrepo.RepoManifest{})
 
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)
@@ -602,7 +602,7 @@ func TestFindManifests(t *testing.T) {
 				kr.rawRepo = tc.rawRepo
 			}
 
-			_, err := kr.FindManifests(context.Background(), udmrepo.ManifestFilter{})
+			_, err := kr.FindManifests(t.Context(), udmrepo.ManifestFilter{})
 
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)
@@ -661,7 +661,7 @@ func TestClose(t *testing.T) {
 				kr.rawWriter = tc.rawWriter
 			}
 
-			err := kr.Close(context.Background())
+			err := kr.Close(t.Context())
 
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)
@@ -700,7 +700,7 @@ func TestPutManifest(t *testing.T) {
 				kr.rawWriter = tc.rawWriter
 			}
 
-			_, err := kr.PutManifest(context.Background(), udmrepo.RepoManifest{
+			_, err := kr.PutManifest(t.Context(), udmrepo.RepoManifest{
 				Metadata: &udmrepo.ManifestEntryMetadata{},
 			})
 
@@ -741,7 +741,7 @@ func TestDeleteManifest(t *testing.T) {
 				kr.rawWriter = tc.rawWriter
 			}
 
-			err := kr.DeleteManifest(context.Background(), udmrepo.ID(""))
+			err := kr.DeleteManifest(t.Context(), udmrepo.ID(""))
 
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)
@@ -780,7 +780,7 @@ func TestFlush(t *testing.T) {
 				kr.rawWriter = tc.rawWriter
 			}
 
-			err := kr.Flush(context.Background())
+			err := kr.Flush(t.Context())
 
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)
@@ -852,7 +852,7 @@ func TestConcatenateObjects(t *testing.T) {
 				kr.rawWriter = tc.rawWriter
 			}
 
-			_, err := kr.ConcatenateObjects(context.Background(), tc.objectIDs)
+			_, err := kr.ConcatenateObjects(t.Context(), tc.objectIDs)
 
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)
@@ -895,7 +895,7 @@ func TestNewObjectWriter(t *testing.T) {
 				kr.rawWriter = tc.rawWriter
 			}
 
-			ret := kr.NewObjectWriter(context.Background(), udmrepo.ObjectWriteOptions{})
+			ret := kr.NewObjectWriter(t.Context(), udmrepo.ObjectWriteOptions{})
 
 			assert.Equal(t, tc.expectedRet, ret)
 		})

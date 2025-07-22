@@ -17,7 +17,6 @@ limitations under the License.
 package kube
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -45,9 +44,9 @@ func TestInternalLW(t *testing.T) {
 	close(stop)
 
 	backupList := new(velerov1api.BackupList)
-	err := client.List(context.Background(), backupList)
+	err := client.List(t.Context(), backupList)
 	require.NoError(t, err)
 
-	_, err = client.Watch(context.Background(), backupList)
+	_, err = client.Watch(t.Context(), backupList)
 	require.NoError(t, err)
 }

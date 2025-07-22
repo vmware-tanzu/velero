@@ -17,7 +17,6 @@ limitations under the License.
 package restore
 
 import (
-	"context"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -128,7 +127,7 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			}
 
 			for _, loc := range tc.locations {
-				require.NoError(t, r.kbclient.Create(context.TODO(), loc))
+				require.NoError(t, r.kbclient.Create(t.Context(), loc))
 			}
 
 			res, err := r.executePVAction(tc.obj)
@@ -192,7 +191,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 			)
 
 			for _, loc := range tc.locations {
-				require.NoError(t, fakeClient.Create(context.Background(), loc))
+				require.NoError(t, fakeClient.Create(t.Context(), loc))
 			}
 
 			r := &pvRestorer{

@@ -33,8 +33,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	crfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"context"
-
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
@@ -690,7 +688,7 @@ func TestPodVolumeRestoreActionExecuteWithFileSystemShouldAddWaitInitContainer(t
 
 			// Create the PodVolumeBackups in the fake client
 			for _, pvb := range tc.podVolumeBackups {
-				require.NoError(t, crClient.Create(context.Background(), pvb))
+				require.NoError(t, crClient.Create(t.Context(), pvb))
 			}
 
 			// Create a fake clientset

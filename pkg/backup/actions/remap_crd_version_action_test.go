@@ -17,7 +17,6 @@ limitations under the License.
 package actions
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -48,7 +47,7 @@ func TestRemapCRDVersionAction(t *testing.T) {
 	// keep the same one for all 3 tests, since there's little value in recreating it
 	b := builder.ForCustomResourceDefinitionV1Beta1("test.velero.io")
 	c := b.Result()
-	_, err := betaClient.Create(context.TODO(), c, metav1.CreateOptions{})
+	_, err := betaClient.Create(t.Context(), c, metav1.CreateOptions{})
 	require.NoError(t, err)
 	a := NewRemapCRDVersionAction(velerotest.NewLogger(), betaClient, fakeDiscoveryHelper())
 
@@ -189,7 +188,7 @@ func TestRemapCRDVersionActionData(t *testing.T) {
 			err = json.Unmarshal(f, &crd)
 			require.NoError(t, err)
 
-			_, err = betaClient.Create(context.TODO(), &crd, metav1.CreateOptions{})
+			_, err = betaClient.Create(t.Context(), &crd, metav1.CreateOptions{})
 			require.NoError(t, err)
 
 			// Run method under test
@@ -213,7 +212,7 @@ func TestRemapCRDVersionActionData(t *testing.T) {
 			}
 
 			// Clean up the item created in the test.
-			betaClient.Delete(context.TODO(), crd.Name, metav1.DeleteOptions{})
+			betaClient.Delete(t.Context(), crd.Name, metav1.DeleteOptions{})
 		})
 	}
 }

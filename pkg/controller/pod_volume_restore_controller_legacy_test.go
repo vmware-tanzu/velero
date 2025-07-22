@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -43,7 +42,7 @@ func TestFindVolumeRestoresForPodLegacy(t *testing.T) {
 		Client: clientBuilder.Build(),
 		logger: logrus.New(),
 	}
-	requests := reconciler.findVolumeRestoresForPod(context.Background(), pod)
+	requests := reconciler.findVolumeRestoresForPod(t.Context(), pod)
 	assert.Empty(t, requests)
 
 	// contain one matching PVR
@@ -89,6 +88,6 @@ func TestFindVolumeRestoresForPodLegacy(t *testing.T) {
 			},
 		},
 	}).Build()
-	requests = reconciler.findVolumeRestoresForPod(context.Background(), pod)
+	requests = reconciler.findVolumeRestoresForPod(t.Context(), pod)
 	assert.Len(t, requests, 1)
 }

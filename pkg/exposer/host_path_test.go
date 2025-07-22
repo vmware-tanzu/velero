@@ -99,7 +99,7 @@ func TestGetPodVolumeHostPath(t *testing.T) {
 				singlePathMatch = test.pathMatchFunc
 			}
 
-			_, err := GetPodVolumeHostPath(context.Background(), test.pod, test.pvc, nil, nil, velerotest.NewLogger())
+			_, err := GetPodVolumeHostPath(t.Context(), test.pod, test.pvc, nil, nil, velerotest.NewLogger())
 			if test.err != "" || err != nil {
 				assert.EqualError(t, err, test.err)
 			}
@@ -150,7 +150,7 @@ func TestExtractPodVolumeHostPath(t *testing.T) {
 				getHostPodPath = test.getHostPodPathFunc
 			}
 
-			path, err := ExtractPodVolumeHostPath(context.Background(), test.path, nil, "", test.osType)
+			path, err := ExtractPodVolumeHostPath(t.Context(), test.path, nil, "", test.osType)
 
 			if test.expectedErr != "" {
 				assert.EqualError(t, err, test.expectedErr)

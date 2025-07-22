@@ -108,7 +108,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 
 			kubeClient := fake.NewSimpleClientset()
 			for _, pod := range tt.pods {
-				_, err := kubeClient.CoreV1().Pods(pod.GetNamespace()).Create(context.TODO(), pod, metav1.CreateOptions{})
+				_, err := kubeClient.CoreV1().Pods(pod.GetNamespace()).Create(t.Context(), pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Error(err)
 				}

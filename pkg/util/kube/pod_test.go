@@ -134,7 +134,7 @@ func TestEnsureDeletePod(t *testing.T) {
 
 			var kubeClient kubernetes.Interface = fakeKubeClient
 
-			err := EnsureDeletePod(context.Background(), kubeClient.CoreV1(), test.podName, test.namespace, time.Millisecond)
+			err := EnsureDeletePod(t.Context(), kubeClient.CoreV1(), test.podName, test.namespace, time.Millisecond)
 			if err != nil {
 				assert.EqualError(t, err, test.err)
 			} else {
@@ -377,7 +377,7 @@ func TestDeletePodIfAny(t *testing.T) {
 			var kubeClient kubernetes.Interface = fakeKubeClient
 
 			logMessage := ""
-			DeletePodIfAny(context.Background(), kubeClient.CoreV1(), test.podName, test.podNamespace, velerotest.NewSingleLogger(&logMessage))
+			DeletePodIfAny(t.Context(), kubeClient.CoreV1(), test.podName, test.podNamespace, velerotest.NewSingleLogger(&logMessage))
 
 			if len(test.logMessage) > 0 {
 				assert.Contains(t, logMessage, test.logMessage)
@@ -733,7 +733,7 @@ func TestCollectPodLogs(t *testing.T) {
 			}
 			podLogReaderGetter = fp.GetPodLogReader
 
-			err := CollectPodLogs(context.Background(), nil, test.pod, "", test.container, fp)
+			err := CollectPodLogs(t.Context(), nil, test.pod, "", test.container, fp)
 			if test.expectErr != "" {
 				assert.EqualError(t, err, test.expectErr)
 			} else {

@@ -736,7 +736,7 @@ func TestWaitExecHandleHooks(t *testing.T) {
 				podCommandExecutor.On("ExecutePodCommand", mock.Anything, obj, e.pod.Namespace, e.pod.Name, e.name, e.hook).Return(e.error)
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 			if test.sharedHooksContextTimeout > 0 {
 				var ctxCancel context.CancelFunc
 				ctx, ctxCancel = context.WithTimeout(ctx, test.sharedHooksContextTimeout)
@@ -1268,7 +1268,7 @@ func TestRestoreHookTrackerUpdate(t *testing.T) {
 				podCommandExecutor.On("ExecutePodCommand", mock.Anything, obj, e.pod.Namespace, e.pod.Name, e.name, e.hook).Return(e.error)
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 			_ = h.HandleHooks(ctx, velerotest.NewLogger(), test.initialPod, test.byContainer, test.hookTracker, "restore1")
 			_, actualFailed := test.hookTracker.Stat("restore1")
 			assert.Equal(t, test.expectedFailed, actualFailed)

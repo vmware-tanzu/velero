@@ -80,7 +80,7 @@ func MockFuncs(s *snapshotMockes, args []mockArgs) {
 }
 
 func TestSnapshotSource(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	sourceInfo := snapshot.SourceInfo{
 		UserName: "testUserName",
 		Host:     "testHost",
@@ -557,7 +557,7 @@ func TestFindPreviousSnapshotManifest(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var repo repo.Repository
 			listSnapshotsFunc = tc.listSnapshotsFunc
-			snapshots, err := findPreviousSnapshotManifest(context.Background(), repo, sourceInfo, snapshotTags, &noLaterThan, logrus.New())
+			snapshots, err := findPreviousSnapshotManifest(t.Context(), repo, sourceInfo, snapshotTags, &noLaterThan, logrus.New())
 
 			// Check if the returned error matches the expected error
 			if tc.expectedError != nil {
@@ -648,9 +648,9 @@ func TestBackup(t *testing.T) {
 			var snapshotInfo *uploader.SnapshotInfo
 			var err error
 			if tc.isEmptyUploader {
-				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), nil, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, map[string]string{}, tc.tags, &logrus.Logger{})
+				snapshotInfo, isSnapshotEmpty, err = Backup(t.Context(), nil, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, map[string]string{}, tc.tags, &logrus.Logger{})
 			} else {
-				snapshotInfo, isSnapshotEmpty, err = Backup(context.Background(), s.uploderMock, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, map[string]string{}, tc.tags, &logrus.Logger{})
+				snapshotInfo, isSnapshotEmpty, err = Backup(t.Context(), s.uploderMock, s.repoWriterMock, tc.sourcePath, "", tc.forceFull, tc.parentSnapshot, tc.volMode, map[string]string{}, tc.tags, &logrus.Logger{})
 			}
 			// Check if the returned error matches the expected error
 			if tc.expectedError != nil {
@@ -789,7 +789,7 @@ func TestRestore(t *testing.T) {
 			repoWriterMock.On("OpenObject", mock.Anything, mock.Anything).Return(em, nil)
 
 			progress := new(Progress)
-			bytesRestored, fileCount, err := Restore(context.Background(), repoWriterMock, progress, tc.snapshotID, tc.dest, tc.volMode, map[string]string{}, logrus.New(), nil)
+			bytesRestored, fileCount, err := Restore(t.Context(), repoWriterMock, progress, tc.snapshotID, tc.dest, tc.volMode, map[string]string{}, logrus.New(), nil)
 
 			// Check if the returned error matches the expected error
 			if tc.expectedError != nil {

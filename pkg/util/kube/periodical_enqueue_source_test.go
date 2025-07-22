@@ -40,7 +40,7 @@ import (
 func TestStart(t *testing.T) {
 	require.NoError(t, velerov1.AddToScheme(scheme.Scheme))
 
-	ctx, cancelFunc := context.WithCancel(context.TODO())
+	ctx, cancelFunc := context.WithCancel(t.Context())
 	client := (&fake.ClientBuilder{}).Build()
 	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedItemBasedRateLimiter[reconcile.Request]())
 	source := NewPeriodicalEnqueueSource(logrus.WithContext(ctx).WithField("controller", "PES_TEST"), client, &velerov1.ScheduleList{}, 1*time.Second, PeriodicalEnqueueSourceOption{})
@@ -72,7 +72,7 @@ func TestStart(t *testing.T) {
 func TestPredicate(t *testing.T) {
 	require.NoError(t, velerov1.AddToScheme(scheme.Scheme))
 
-	ctx, cancelFunc := context.WithCancel(context.TODO())
+	ctx, cancelFunc := context.WithCancel(t.Context())
 	client := (&fake.ClientBuilder{}).Build()
 	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedItemBasedRateLimiter[reconcile.Request]())
 
@@ -116,7 +116,7 @@ func TestPredicate(t *testing.T) {
 func TestOrder(t *testing.T) {
 	require.NoError(t, velerov1.AddToScheme(scheme.Scheme))
 
-	ctx, cancelFunc := context.WithCancel(context.TODO())
+	ctx, cancelFunc := context.WithCancel(t.Context())
 	client := (&fake.ClientBuilder{}).Build()
 	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedItemBasedRateLimiter[reconcile.Request]())
 	source := NewPeriodicalEnqueueSource(

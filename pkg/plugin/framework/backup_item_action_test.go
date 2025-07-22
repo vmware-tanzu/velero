@@ -23,7 +23,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -167,7 +166,7 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 				Backup: test.backup,
 			}
 
-			resp, err := s.Execute(context.Background(), req)
+			resp, err := s.Execute(t.Context(), req)
 
 			// Verify error
 			assert.Equal(t, test.expectError, err != nil)

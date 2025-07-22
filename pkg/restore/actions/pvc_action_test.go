@@ -18,7 +18,6 @@ package actions
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"testing"
 
@@ -130,16 +129,16 @@ func TestPVCActionExecute(t *testing.T) {
 
 			// set up test data
 			if tc.configMap != nil {
-				_, err := clientset.CoreV1().ConfigMaps(tc.configMap.Namespace).Create(context.TODO(), tc.configMap, metav1.CreateOptions{})
+				_, err := clientset.CoreV1().ConfigMaps(tc.configMap.Namespace).Create(t.Context(), tc.configMap, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
 			if tc.node != nil {
-				_, err := clientset.CoreV1().Nodes().Create(context.TODO(), tc.node, metav1.CreateOptions{})
+				_, err := clientset.CoreV1().Nodes().Create(t.Context(), tc.node, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 			if tc.newNode != nil {
-				_, err := clientset.CoreV1().Nodes().Create(context.TODO(), tc.newNode, metav1.CreateOptions{})
+				_, err := clientset.CoreV1().Nodes().Create(t.Context(), tc.newNode, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 			unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pvc)

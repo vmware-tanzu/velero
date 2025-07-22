@@ -17,7 +17,6 @@ limitations under the License.
 package exposer
 
 import (
-	"context"
 	"reflect"
 	"testing"
 
@@ -325,7 +324,7 @@ func TestGetInheritedPodInfo(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
-			info, err := getInheritedPodInfo(context.Background(), fakeKubeClient, test.namespace, kube.NodeOSLinux)
+			info, err := getInheritedPodInfo(t.Context(), fakeKubeClient, test.namespace, kube.NodeOSLinux)
 
 			if test.expectErr == "" {
 				require.NoError(t, err)

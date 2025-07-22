@@ -17,7 +17,6 @@ limitations under the License.
 package csi
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -121,7 +120,7 @@ func TestVSCExecute(t *testing.T) {
 				test.item = &unstructured.Unstructured{Object: vsMap}
 
 				if test.createVSC {
-					require.NoError(t, action.client.Create(context.TODO(), test.vsc))
+					require.NoError(t, action.client.Create(t.Context(), test.vsc))
 				}
 			}
 

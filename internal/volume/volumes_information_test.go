@@ -17,7 +17,6 @@ limitations under the License.
 package volume
 
 import (
-	"context"
 	"sync"
 	"testing"
 
@@ -738,7 +737,7 @@ func TestGenerateVolumeInfoFromPVB(t *testing.T) {
 				}
 			}
 			if tc.pod != nil {
-				require.NoError(t, volumesInfo.crClient.Create(context.TODO(), tc.pod))
+				require.NoError(t, volumesInfo.crClient.Create(t.Context(), tc.pod))
 			}
 			volumesInfo.logger = logging.DefaultLogger(logrus.DebugLevel, logging.FormatJSON)
 
