@@ -138,7 +138,7 @@ Backup Template:
   Storage Location:  
   
   Velero-Native Snapshot PVs:    auto
-  Default Volumes to Fs Backup:  true
+  File System Backup (Default):  true
   Snapshot Move Data:            auto
   Data Mover:                    velero
   
@@ -185,7 +185,7 @@ Backup Template:
   Storage Location:  
   
   Velero-Native Snapshot PVs:    auto
-  Default Volumes to Fs Backup:  false
+  File System Backup (Default):  false
   Snapshot Move Data:            auto
   Data Mover:                    velero
   
