@@ -25,11 +25,12 @@ import (
 // ObjectStoreLayout defines how Velero's persisted files map to
 // keys in an object storage bucket.
 type ObjectStoreLayout struct {
-	rootPrefix string
-	subdirs    map[string]string
+	rootPrefix     string
+	filenameSuffix string
+	subdirs        map[string]string
 }
 
-func NewObjectStoreLayout(prefix string) *ObjectStoreLayout {
+func NewObjectStoreLayout(prefix, filenameSuffix string) *ObjectStoreLayout {
 	if prefix != "" && !strings.HasSuffix(prefix, "/") {
 		prefix = prefix + "/"
 	}
@@ -44,8 +45,9 @@ func NewObjectStoreLayout(prefix string) *ObjectStoreLayout {
 	}
 
 	return &ObjectStoreLayout{
-		rootPrefix: prefix,
-		subdirs:    subdirs,
+		rootPrefix:     prefix,
+		filenameSuffix: filenameSuffix,
+		subdirs:        subdirs,
 	}
 }
 
@@ -70,69 +72,69 @@ func (l *ObjectStoreLayout) getRestoreDir(restore string) string {
 }
 
 func (l *ObjectStoreLayout) getBackupMetadataKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, "velero-backup.json")
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("velero-backup.json%s", l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getBackupContentsKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s.tar.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s.tar.gz%s", backup, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getBackupLogKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-logs.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-logs.gz%s", backup, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getPodVolumeBackupsKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-podvolumebackups.json.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-podvolumebackups.json.gz%s", backup, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getBackupVolumeSnapshotsKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-volumesnapshots.json.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-volumesnapshots.json.gz%s", backup, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getBackupItemOperationsKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-itemoperations.json.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-itemoperations.json.gz%s", backup, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getBackupResourceListKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-resource-list.json.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-resource-list.json.gz%s", backup, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getRestoreLogKey(restore string) string {
-	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-logs.gz", restore))
+	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-logs.gz%s", restore, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getRestoreResultsKey(restore string) string {
-	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-results.gz", restore))
+	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-results.gz%s", restore, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getRestoreResourceListKey(restore string) string {
-	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-resource-list.json.gz", restore))
+	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-resource-list.json.gz%s", restore, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getRestoreItemOperationsKey(restore string) string {
-	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-itemoperations.json.gz", restore))
+	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-itemoperations.json.gz%s", restore, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getCSIVolumeSnapshotKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csi-volumesnapshots.json.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csi-volumesnapshots.json.gz%s", backup, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getCSIVolumeSnapshotContentsKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csi-volumesnapshotcontents.json.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csi-volumesnapshotcontents.json.gz%s", backup, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getCSIVolumeSnapshotClassesKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csi-volumesnapshotclasses.json.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csi-volumesnapshotclasses.json.gz%s", backup, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getBackupResultsKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-results.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-results.gz%s", backup, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getBackupVolumeInfoKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-volumeinfo.json.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-volumeinfo.json.gz%s", backup, l.filenameSuffix))
 }
 
 func (l *ObjectStoreLayout) getRestoreVolumeInfoKey(restore string) string {
-	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("%s-volumeinfo.json.gz", restore))
+	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("%s-volumeinfo.json.gz%s", restore, l.filenameSuffix))
 }

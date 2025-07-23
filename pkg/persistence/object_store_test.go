@@ -61,7 +61,7 @@ func newObjectBackupStoreTestHarness(bucket, prefix string) *objectBackupStoreTe
 		objectBackupStore: &objectBackupStore{
 			objectStore: objectStore,
 			bucket:      bucket,
-			layout:      NewObjectStoreLayout(prefix),
+			layout:      NewObjectStoreLayout(prefix, ""),
 			logger:      velerotest.NewLogger(),
 		},
 		objectStore: objectStore,
@@ -598,7 +598,7 @@ func TestDeleteBackup(t *testing.T) {
 			backupStore := &objectBackupStore{
 				objectStore: objectStore,
 				bucket:      "test-bucket",
-				layout:      NewObjectStoreLayout(test.prefix),
+				layout:      NewObjectStoreLayout(test.prefix, ""),
 				logger:      velerotest.NewLogger(),
 			}
 			defer objectStore.AssertExpectations(t)
@@ -650,7 +650,7 @@ func TestDeleteRestore(t *testing.T) {
 			backupStore := &objectBackupStore{
 				objectStore: objectStore,
 				bucket:      "test-bucket",
-				layout:      NewObjectStoreLayout(test.prefix),
+				layout:      NewObjectStoreLayout(test.prefix, ""),
 				logger:      velerotest.NewLogger(),
 			}
 			defer objectStore.AssertExpectations(t)
