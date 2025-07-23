@@ -105,6 +105,100 @@ Backup Template:
 Last Backup:  2023-06-25 15:04:05 +0000 UTC
 `
 
+	input3 := builder.ForSchedule("velero", "schedule-3").
+		Phase(velerov1api.SchedulePhaseEnabled).
+		CronSchedule("0 0 * * *").
+		Template(builder.ForBackup("velero", "backup-1").DefaultVolumesToFsBackup(true).Result().Spec).
+		LastBackupTime("2023-06-25 15:04:05").Result()
+	expect3 := `Name:         schedule-3
+Namespace:    velero
+Labels:       <none>
+Annotations:  <none>
+
+Phase:  Enabled
+
+Paused:  false
+
+Schedule:  0 0 * * *
+
+Backup Template:
+  Namespaces:
+    Included:  *
+    Excluded:  <none>
+  
+  Resources:
+    Included:        *
+    Excluded:        <none>
+    Cluster-scoped:  auto
+  
+  Label selector:  <none>
+  
+  Or label selector:  <none>
+  
+  Storage Location:  
+  
+  Velero-Native Snapshot PVs:    auto
+  File System Backup (Default):  true
+  Snapshot Move Data:            auto
+  Data Mover:                    velero
+  
+  TTL:  0s
+  
+  CSISnapshotTimeout:    0s
+  ItemOperationTimeout:  0s
+  
+  Hooks:  <none>
+
+Last Backup:  2023-06-25 15:04:05 +0000 UTC
+`
+
+	input4 := builder.ForSchedule("velero", "schedule-4").
+		Phase(velerov1api.SchedulePhaseEnabled).
+		CronSchedule("0 0 * * *").
+		Template(builder.ForBackup("velero", "backup-1").DefaultVolumesToFsBackup(false).Result().Spec).
+		LastBackupTime("2023-06-25 15:04:05").Result()
+	expect4 := `Name:         schedule-4
+Namespace:    velero
+Labels:       <none>
+Annotations:  <none>
+
+Phase:  Enabled
+
+Paused:  false
+
+Schedule:  0 0 * * *
+
+Backup Template:
+  Namespaces:
+    Included:  *
+    Excluded:  <none>
+  
+  Resources:
+    Included:        *
+    Excluded:        <none>
+    Cluster-scoped:  auto
+  
+  Label selector:  <none>
+  
+  Or label selector:  <none>
+  
+  Storage Location:  
+  
+  Velero-Native Snapshot PVs:    auto
+  File System Backup (Default):  false
+  Snapshot Move Data:            auto
+  Data Mover:                    velero
+  
+  TTL:  0s
+  
+  CSISnapshotTimeout:    0s
+  ItemOperationTimeout:  0s
+  
+  Hooks:  <none>
+
+Last Backup:  2023-06-25 15:04:05 +0000 UTC
+`
+
 	testcases := []struct {
 		name   string
 		input  *velerov1api.Schedule
@@ -119,6 +213,16 @@ Last Backup:  2023-06-25 15:04:05 +0000 UTC
 			name:   "schedule enabled",
 			input:  input2,
 			expect: expect2,
+		},
+		{
+			name:   "schedule with DefaultVolumesToFsBackup is true",
+			input:  input3,
+			expect: expect3,
+		},
+		{
+			name:   "schedule with DefaultVolumesToFsBackup is false",
+			input:  input4,
+			expect: expect4,
 		},
 	}
 

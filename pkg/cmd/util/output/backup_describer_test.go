@@ -282,6 +282,71 @@ Hooks:
 OrderedResources:
   kind1: rs1-1, rs1-2
 `
+	input4 := builder.ForBackup("test-ns", "test-backup-4").
+		DefaultVolumesToFsBackup(true).
+		StorageLocation("backup-location").
+		Result().Spec
+
+	expect4 := `Namespaces:
+  Included:  *
+  Excluded:  <none>
+
+Resources:
+  Included:        *
+  Excluded:        <none>
+  Cluster-scoped:  auto
+
+Label selector:  <none>
+
+Or label selector:  <none>
+
+Storage Location:  backup-location
+
+Velero-Native Snapshot PVs:    auto
+File System Backup (Default):  true
+Snapshot Move Data:            auto
+Data Mover:                    velero
+
+TTL:  0s
+
+CSISnapshotTimeout:    0s
+ItemOperationTimeout:  0s
+
+Hooks:  <none>
+`
+
+	input5 := builder.ForBackup("test-ns", "test-backup-5").
+		DefaultVolumesToFsBackup(false).
+		StorageLocation("backup-location").
+		Result().Spec
+
+	expect5 := `Namespaces:
+  Included:  *
+  Excluded:  <none>
+
+Resources:
+  Included:        *
+  Excluded:        <none>
+  Cluster-scoped:  auto
+
+Label selector:  <none>
+
+Or label selector:  <none>
+
+Storage Location:  backup-location
+
+Velero-Native Snapshot PVs:    auto
+File System Backup (Default):  false
+Snapshot Move Data:            auto
+Data Mover:                    velero
+
+TTL:  0s
+
+CSISnapshotTimeout:    0s
+ItemOperationTimeout:  0s
+
+Hooks:  <none>
+`
 
 	testcases := []struct {
 		name   string
@@ -302,6 +367,16 @@ OrderedResources:
 			name:   "old resource filter with hooks and ordered resources",
 			input:  input3,
 			expect: expect3,
+		},
+		{
+			name:   "DefaultVolumesToFsBackup is true",
+			input:  input4,
+			expect: expect4,
+		},
+		{
+			name:   "DefaultVolumesToFsBackup is false",
+			input:  input5,
+			expect: expect5,
 		},
 	}
 
