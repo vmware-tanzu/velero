@@ -303,7 +303,7 @@ Or label selector:  <none>
 Storage Location:  backup-location
 
 Velero-Native Snapshot PVs:    auto
-Default Volumes to Fs Backup:  true
+File System Backup (Default):  true
 Snapshot Move Data:            auto
 Data Mover:                    velero
 
@@ -336,7 +336,7 @@ Or label selector:  <none>
 Storage Location:  backup-location
 
 Velero-Native Snapshot PVs:    auto
-Default Volumes to Fs Backup:  false
+File System Backup (Default):  false
 Snapshot Move Data:            auto
 Data Mover:                    velero
 
