@@ -28,14 +28,15 @@ import (
 )
 
 type inheritedPodInfo struct {
-	image          string
-	serviceAccount string
-	env            []v1.EnvVar
-	envFrom        []v1.EnvFromSource
-	volumeMounts   []v1.VolumeMount
-	volumes        []v1.Volume
-	logLevelArgs   []string
-	logFormatArgs  []string
+	image            string
+	serviceAccount   string
+	env              []v1.EnvVar
+	envFrom          []v1.EnvFromSource
+	volumeMounts     []v1.VolumeMount
+	volumes          []v1.Volume
+	logLevelArgs     []string
+	logFormatArgs    []string
+	imagePullSecrets []v1.LocalObjectReference
 }
 
 func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veleroNamespace string, osType string) (inheritedPodInfo, error) {
@@ -70,6 +71,8 @@ func getInheritedPodInfo(ctx context.Context, client kubernetes.Interface, veler
 			podInfo.logLevelArgs = append(podInfo.logLevelArgs, arg)
 		}
 	}
+
+	podInfo.imagePullSecrets = podSpec.ImagePullSecrets
 
 	return podInfo, nil
 }

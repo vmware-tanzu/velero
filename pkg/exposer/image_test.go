@@ -26,11 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 func TestGetInheritedPodInfo(t *testing.T) {
@@ -177,6 +177,11 @@ func TestGetInheritedPodInfo(t *testing.T) {
 						},
 					},
 					ServiceAccountName: "sa-1",
+					ImagePullSecrets: []v1.LocalObjectReference{
+						{
+							Name: "imagePullSecret1",
+						},
+					},
 				},
 			},
 		},
@@ -316,6 +321,11 @@ func TestGetInheritedPodInfo(t *testing.T) {
 				logLevelArgs: []string{
 					"--log-level",
 					"debug",
+				},
+				imagePullSecrets: []v1.LocalObjectReference{
+					{
+						Name: "imagePullSecret1",
+					},
 				},
 			},
 		},

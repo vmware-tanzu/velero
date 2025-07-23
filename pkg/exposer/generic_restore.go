@@ -510,6 +510,7 @@ func (e *genericRestoreExposer) createRestorePod(ctx context.Context, ownerObjec
 			RestartPolicy:                 corev1.RestartPolicyNever,
 			SecurityContext:               securityCtx,
 			Tolerations:                   toleration,
+			ImagePullSecrets:              podInfo.imagePullSecrets,
 		},
 	}
 
