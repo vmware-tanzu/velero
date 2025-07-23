@@ -17,7 +17,6 @@ limitations under the License.
 package backup
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -43,8 +42,8 @@ func TestDeleteCommand(t *testing.T) {
 	f := &factorymocks.Factory{}
 
 	client := velerotest.NewFakeControllerRuntimeClient(t)
-	client.Create(context.Background(), builder.ForBackup(cmdtest.VeleroNameSpace, backup1).Result(), &controllerclient.CreateOptions{})
-	client.Create(context.Background(), builder.ForBackup("default", backup2).Result(), &controllerclient.CreateOptions{})
+	client.Create(t.Context(), builder.ForBackup(cmdtest.VeleroNameSpace, backup1).Result(), &controllerclient.CreateOptions{})
+	client.Create(t.Context(), builder.ForBackup("default", backup2).Result(), &controllerclient.CreateOptions{})
 
 	f.On("KubebuilderClient").Return(client, nil)
 	f.On("Namespace").Return(cmdtest.VeleroNameSpace)

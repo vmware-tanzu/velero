@@ -17,7 +17,6 @@ limitations under the License.
 package csi
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -198,7 +197,7 @@ func TestWaitVolumeSnapshotReady(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := snapshotFake.NewSimpleClientset(test.clientObj...)
 
-			vs, err := WaitVolumeSnapshotReady(context.Background(), fakeClient.SnapshotV1(), test.vsName, test.namespace, time.Millisecond, velerotest.NewLogger())
+			vs, err := WaitVolumeSnapshotReady(t.Context(), fakeClient.SnapshotV1(), test.vsName, test.namespace, time.Millisecond, velerotest.NewLogger())
 			if err != nil {
 				require.EqualError(t, err, test.err)
 			} else {
@@ -390,7 +389,7 @@ func TestEnsureDeleteVS(t *testing.T) {
 				fakeSnapshotClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
 			}
 
-			err := EnsureDeleteVS(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vsName, test.namespace, time.Millisecond)
+			err := EnsureDeleteVS(t.Context(), fakeSnapshotClient.SnapshotV1(), test.vsName, test.namespace, time.Millisecond)
 			if err != nil {
 				assert.EqualError(t, err, test.err)
 			} else {
@@ -500,7 +499,7 @@ func TestEnsureDeleteVSC(t *testing.T) {
 				fakeSnapshotClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
 			}
 
-			err := EnsureDeleteVSC(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vscName, time.Millisecond)
+			err := EnsureDeleteVSC(t.Context(), fakeSnapshotClient.SnapshotV1(), test.vscName, time.Millisecond)
 			if test.err != "" {
 				assert.EqualError(t, err, test.err)
 			} else {
@@ -554,7 +553,7 @@ func TestDeleteVolumeSnapshotContentIfAny(t *testing.T) {
 
 			logMessage := ""
 
-			DeleteVolumeSnapshotContentIfAny(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vscName, velerotest.NewSingleLogger(&logMessage))
+			DeleteVolumeSnapshotContentIfAny(t.Context(), fakeSnapshotClient.SnapshotV1(), test.vscName, velerotest.NewSingleLogger(&logMessage))
 
 			if len(test.logMessage) > 0 {
 				assert.Contains(t, logMessage, test.logMessage)
@@ -618,7 +617,7 @@ func TestDeleteVolumeSnapshotIfAny(t *testing.T) {
 
 			logMessage := ""
 
-			DeleteVolumeSnapshotIfAny(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vsName, test.vsNamespace, velerotest.NewSingleLogger(&logMessage))
+			DeleteVolumeSnapshotIfAny(t.Context(), fakeSnapshotClient.SnapshotV1(), test.vsName, test.vsNamespace, velerotest.NewSingleLogger(&logMessage))
 
 			if len(test.logMessage) > 0 {
 				assert.Contains(t, logMessage, test.logMessage)
@@ -720,7 +719,7 @@ func TestRetainVSC(t *testing.T) {
 				fakeSnapshotClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
 			}
 
-			returned, err := RetainVSC(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vsc)
+			returned, err := RetainVSC(t.Context(), fakeSnapshotClient.SnapshotV1(), test.vsc)
 
 			if len(test.err) == 0 {
 				require.NoError(t, err)
@@ -814,7 +813,7 @@ func TestRemoveVSCProtect(t *testing.T) {
 				fakeSnapshotClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
 			}
 
-			err := RemoveVSCProtect(context.Background(), fakeSnapshotClient.SnapshotV1(), test.vsc, test.timeout)
+			err := RemoveVSCProtect(t.Context(), fakeSnapshotClient.SnapshotV1(), test.vsc, test.timeout)
 
 			if len(test.err) == 0 {
 				require.NoError(t, err)
@@ -823,7 +822,7 @@ func TestRemoveVSCProtect(t *testing.T) {
 			}
 
 			if test.updated != nil {
-				updated, err := fakeSnapshotClient.SnapshotV1().VolumeSnapshotContents().Get(context.Background(), test.vsc, metav1.GetOptions{})
+				updated, err := fakeSnapshotClient.SnapshotV1().VolumeSnapshotContents().Get(t.Context(), test.vsc, metav1.GetOptions{})
 				require.NoError(t, err)
 
 				assert.Equal(t, test.updated.Finalizers, updated.Finalizers)
@@ -1447,7 +1446,7 @@ func TestSetVolumeSnapshotContentDeletionPolicy(t *testing.T) {
 				require.NoError(t, err)
 				actual := new(snapshotv1api.VolumeSnapshotContent)
 				err := fakeClient.Get(
-					context.TODO(),
+					t.Context(),
 					crclient.ObjectKey{Name: tc.inputVSCName},
 					actual,
 				)
@@ -1501,7 +1500,7 @@ func TestDeleteVolumeSnapshots(t *testing.T) {
 
 			vsList := new(snapshotv1api.VolumeSnapshotList)
 			err := client.List(
-				context.TODO(),
+				t.Context(),
 				vsList,
 				&crclient.ListOptions{
 					Namespace: "velero",
@@ -1511,7 +1510,7 @@ func TestDeleteVolumeSnapshots(t *testing.T) {
 
 			vscList := new(snapshotv1api.VolumeSnapshotContentList)
 			err = client.List(
-				context.TODO(),
+				t.Context(),
 				vscList,
 			)
 			require.NoError(t, err)

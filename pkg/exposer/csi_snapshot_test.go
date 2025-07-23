@@ -17,7 +17,6 @@ limitations under the License.
 package exposer
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -630,20 +629,20 @@ func TestExpose(t *testing.T) {
 				}
 			}
 
-			err := exposer.Expose(context.Background(), ownerObject, &test.exposeParam)
+			err := exposer.Expose(t.Context(), ownerObject, &test.exposeParam)
 			if err == nil {
 				require.NoError(t, err)
 
-				backupPod, err := exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
+				backupPod, err := exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(t.Context(), ownerObject.Name, metav1.GetOptions{})
 				require.NoError(t, err)
 
-				backupPVC, err := exposer.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
+				backupPVC, err := exposer.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(t.Context(), ownerObject.Name, metav1.GetOptions{})
 				require.NoError(t, err)
 
-				expectedVS, err := exposer.csiSnapshotClient.VolumeSnapshots(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
+				expectedVS, err := exposer.csiSnapshotClient.VolumeSnapshots(ownerObject.Namespace).Get(t.Context(), ownerObject.Name, metav1.GetOptions{})
 				require.NoError(t, err)
 
-				expectedVSC, err := exposer.csiSnapshotClient.VolumeSnapshotContents().Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
+				expectedVSC, err := exposer.csiSnapshotClient.VolumeSnapshotContents().Get(t.Context(), ownerObject.Name, metav1.GetOptions{})
 				require.NoError(t, err)
 
 				assert.Equal(t, expectedVS.Annotations, vsObject.Annotations)
@@ -844,7 +843,7 @@ func TestGetExpose(t *testing.T) {
 
 			test.exposeWaitParam.NodeClient = fakeClient
 
-			result, err := exposer.GetExposed(context.Background(), ownerObject, test.Timeout, &test.exposeWaitParam)
+			result, err := exposer.GetExposed(t.Context(), ownerObject, test.Timeout, &test.exposeWaitParam)
 			if test.err == "" {
 				require.NoError(t, err)
 
@@ -942,7 +941,7 @@ func TestPeekExpose(t *testing.T) {
 				}
 			}
 
-			err := exposer.PeekExposed(context.Background(), ownerObject)
+			err := exposer.PeekExposed(t.Context(), ownerObject)
 			if test.err == "" {
 				assert.NoError(t, err)
 			} else {
@@ -1087,7 +1086,7 @@ func Test_csiSnapshotExposer_createBackupPVC(t *testing.T) {
 					APIVersion: tt.ownerBackup.APIVersion,
 				}
 			}
-			got, err := e.createBackupPVC(context.Background(), ownerObject, tt.backupVS, tt.storageClass, tt.accessMode, tt.resource, tt.readOnly)
+			got, err := e.createBackupPVC(t.Context(), ownerObject, tt.backupVS, tt.storageClass, tt.accessMode, tt.resource, tt.readOnly)
 			if !tt.wantErr(t, err, fmt.Sprintf("createBackupPVC(%v, %v, %v, %v, %v, %v)", ownerObject, tt.backupVS, tt.storageClass, tt.accessMode, tt.resource, tt.readOnly)) {
 				return
 			}
@@ -1481,7 +1480,7 @@ end diagnose CSI exposer`,
 				}
 			}
 
-			diag := e.DiagnoseExpose(context.Background(), ownerObject)
+			diag := e.DiagnoseExpose(t.Context(), ownerObject)
 			assert.Equal(t, tt.expected, diag)
 		})
 	}

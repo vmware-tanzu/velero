@@ -17,7 +17,6 @@ limitations under the License.
 package kopialib
 
 import (
-	"context"
 	"testing"
 
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -144,7 +143,7 @@ func TestCreateBackupRepo(t *testing.T) {
 				tc.returnStore.On("GetBlob", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tc.getBlobErr)
 			}
 
-			err := CreateBackupRepo(context.Background(), tc.repoOptions, logger)
+			err := CreateBackupRepo(t.Context(), tc.repoOptions, logger)
 
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)
@@ -229,7 +228,7 @@ func TestConnectBackupRepo(t *testing.T) {
 				tc.returnStore.On("GetBlob", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tc.getBlobErr)
 			}
 
-			err := ConnectBackupRepo(context.Background(), tc.repoOptions, logger)
+			err := ConnectBackupRepo(t.Context(), tc.repoOptions, logger)
 
 			if tc.expectedErr == "" {
 				assert.NoError(t, err)

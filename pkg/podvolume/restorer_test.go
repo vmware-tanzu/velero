@@ -164,7 +164,7 @@ func TestRestorePodVolumes(t *testing.T) {
 	velerov1api.AddToScheme(scheme)
 	corev1api.AddToScheme(scheme)
 
-	ctxWithCancel, cancel := context.WithCancel(context.Background())
+	ctxWithCancel, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	failedPVR := createPVRObj(true, 1)
@@ -364,7 +364,7 @@ func TestRestorePodVolumes(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			if test.ctx != nil {
 				ctx = test.ctx
 			}

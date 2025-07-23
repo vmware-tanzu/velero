@@ -17,7 +17,6 @@ limitations under the License.
 package backup
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -139,7 +138,7 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 
 	expectedBackupSpec := builder.ForBackup("test", cmdtest.VeleroNameSpace).IncludedNamespaces("test").Result().Spec
 	schedule := builder.ForSchedule(cmdtest.VeleroNameSpace, "test").Template(expectedBackupSpec).ObjectMeta(builder.WithLabels("velero.io/test", "true"), builder.WithAnnotations("velero.io/test", "true")).Result()
-	o.client.Create(context.TODO(), schedule, &kbclient.CreateOptions{})
+	o.client.Create(t.Context(), schedule, &kbclient.CreateOptions{})
 
 	t.Run("existing schedule", func(t *testing.T) {
 		backup, err := o.BuildBackup(cmdtest.VeleroNameSpace)
@@ -391,7 +390,7 @@ func TestCreateCommand(t *testing.T) {
 		kbclient := velerotest.NewFakeControllerRuntimeClient(t).(kbclient.WithWatch)
 
 		schedule := builder.ForSchedule(cmdtest.VeleroNameSpace, fromSchedule).Result()
-		kbclient.Create(context.Background(), schedule, &controllerclient.CreateOptions{})
+		kbclient.Create(t.Context(), schedule, &controllerclient.CreateOptions{})
 
 		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
 		f.On("KubebuilderWatchClient").Return(kbclient, nil)

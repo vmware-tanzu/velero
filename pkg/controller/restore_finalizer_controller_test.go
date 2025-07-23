@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"fmt"
 	"syscall"
 	"testing"
@@ -146,21 +145,21 @@ func TestRestoreFinalizerReconcile(t *testing.T) {
 			r.clock = testclocks.NewFakeClock(now)
 
 			if test.restore != nil && test.restore.Namespace == velerov1api.DefaultNamespace {
-				require.NoError(t, r.Client.Create(context.Background(), test.restore))
+				require.NoError(t, r.Client.Create(t.Context(), test.restore))
 				backupStore.On("GetRestoredResourceList", test.restore.Name).Return(map[string][]string{}, nil)
 				backupStore.On("GetRestoreItemOperations", test.restore.Name).Return([]*itemoperation.RestoreOperation{}, nil)
 			}
 			if test.backup != nil {
-				require.NoError(t, r.Client.Create(context.Background(), test.backup))
+				require.NoError(t, r.Client.Create(t.Context(), test.backup))
 				backupStore.On("GetBackupVolumeInfos", test.backup.Name).Return(nil, nil)
 				pluginManager.On("GetRestoreItemActionsV2").Return(nil, nil)
 				pluginManager.On("CleanupClients")
 			}
 			if test.location != nil {
-				require.NoError(t, r.Client.Create(context.Background(), test.location))
+				require.NoError(t, r.Client.Create(t.Context(), test.location))
 			}
 
-			_, err = r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{
+			_, err = r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{
 				Namespace: test.restore.Namespace,
 				Name:      test.restore.Name,
 			}})
@@ -172,7 +171,7 @@ func TestRestoreFinalizerReconcile(t *testing.T) {
 
 			if test.statusCompare {
 				restoreAfter := velerov1api.Restore{}
-				err = fakeClient.Get(context.TODO(), types.NamespacedName{
+				err = fakeClient.Get(t.Context(), types.NamespacedName{
 					Namespace: test.restore.Namespace,
 					Name:      test.restore.Name,
 				}, &restoreAfter)
@@ -443,10 +442,10 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 		}
 
 		for _, pv := range tc.restoredPV {
-			require.NoError(t, ctx.crClient.Create(context.Background(), pv))
+			require.NoError(t, ctx.crClient.Create(t.Context(), pv))
 		}
 		for _, pvc := range tc.restoredPVC {
-			require.NoError(t, ctx.crClient.Create(context.Background(), pvc))
+			require.NoError(t, ctx.crClient.Create(t.Context(), pvc))
 		}
 
 		errs := ctx.patchDynamicPVWithVolumeInfo()
@@ -456,7 +455,7 @@ func TestPatchDynamicPVWithVolumeInfo(t *testing.T) {
 
 		for pvName, expectedPVInfo := range tc.expectedPatch {
 			pv := &corev1api.PersistentVolume{}
-			err := ctx.crClient.Get(context.Background(), crclient.ObjectKey{Name: pvName}, pv)
+			err := ctx.crClient.Get(t.Context(), crclient.ObjectKey{Name: pvName}, pv)
 			require.NoError(t, err)
 
 			assert.Equal(t, expectedPVInfo.ReclaimPolicy, string(pv.Spec.PersistentVolumeReclaimPolicy))
@@ -541,7 +540,7 @@ func TestWaitRestoreExecHook(t *testing.T) {
 			restore:          tc.restore,
 			multiHookTracker: tc.hookTracker,
 		}
-		require.NoError(t, ctx.crClient.Create(context.Background(), tc.restore))
+		require.NoError(t, ctx.crClient.Create(t.Context(), tc.restore))
 
 		if tc.waitSec > 0 {
 			go func() {
@@ -554,7 +553,7 @@ func TestWaitRestoreExecHook(t *testing.T) {
 		assert.Len(t, errs.Namespaces, tc.expectedHookErrs)
 
 		updated := &velerov1api.Restore{}
-		err := ctx.crClient.Get(context.Background(), crclient.ObjectKey{Namespace: velerov1api.DefaultNamespace, Name: tc.restore.Name}, updated)
+		err := ctx.crClient.Get(t.Context(), crclient.ObjectKey{Namespace: velerov1api.DefaultNamespace, Name: tc.restore.Name}, updated)
 		require.NoError(t, err)
 		assert.Equal(t, tc.expectedHooksAttempted, updated.Status.HookStatus.HooksAttempted)
 		assert.Equal(t, tc.expectedHooksFailed, updated.Status.HookStatus.HooksFailed)

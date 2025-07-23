@@ -190,7 +190,7 @@ func Test_backupper_BackupPodVolumes_log_test(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &backupper{
-				ctx: context.Background(),
+				ctx: t.Context(),
 			}
 			logOutput := bytes.Buffer{}
 			var log = logrus.New()
@@ -546,7 +546,7 @@ func TestBackupPodVolumes(t *testing.T) {
 	// TODO add more verification around PVCBackupSummary returned by "BackupPodVolumes"
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 
 			fakeClientBuilder := ctrlfake.NewClientBuilder()
 			if test.runtimeScheme != nil {
@@ -705,7 +705,7 @@ func (l *logHook) Fire(entry *logrus.Entry) error {
 }
 
 func TestWaitAllPodVolumesProcessed(t *testing.T) {
-	timeoutCtx, cancelFunc := context.WithCancel(context.Background())
+	timeoutCtx, cancelFunc := context.WithCancel(t.Context())
 	cancelFunc()
 	log := logrus.New()
 	pvb := builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, "pvb").
@@ -730,7 +730,7 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 		},
 		{
 			name: "failed pvbs",
-			ctx:  context.Background(),
+			ctx:  t.Context(),
 			pvb:  pvb,
 			statusToBeUpdated: &velerov1api.PodVolumeBackupStatus{
 				Phase:   velerov1api.PodVolumeBackupPhaseFailed,
@@ -741,7 +741,7 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 		},
 		{
 			name: "completed pvbs",
-			ctx:  context.Background(),
+			ctx:  t.Context(),
 			pvb:  pvb,
 			statusToBeUpdated: &velerov1api.PodVolumeBackupStatus{
 				Phase:   velerov1api.PodVolumeBackupPhaseCompleted,
@@ -768,7 +768,7 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 
 		informer := cache.NewSharedIndexInformer(&lw, &velerov1api.PodVolumeBackup{}, 0, cache.Indexers{})
 
-		ctx := context.Background()
+		ctx := t.Context()
 		go informer.Run(ctx.Done())
 		require.True(t, cache.WaitForCacheSync(ctx.Done(), informer.HasSynced))
 
@@ -784,11 +784,11 @@ func TestWaitAllPodVolumesProcessed(t *testing.T) {
 
 		if c.statusToBeUpdated != nil {
 			pvb := &velerov1api.PodVolumeBackup{}
-			err := client.Get(context.Background(), ctrlclient.ObjectKey{Namespace: c.pvb.Namespace, Name: c.pvb.Name}, pvb)
+			err := client.Get(t.Context(), ctrlclient.ObjectKey{Namespace: c.pvb.Namespace, Name: c.pvb.Name}, pvb)
 			require.NoError(t, err)
 
 			pvb.Status = *c.statusToBeUpdated
-			err = client.Update(context.Background(), pvb)
+			err = client.Update(t.Context(), pvb)
 			require.NoError(t, err)
 		}
 

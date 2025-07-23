@@ -17,7 +17,6 @@ limitations under the License.
 package kube
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -155,7 +154,7 @@ func TestEvent(t *testing.T) {
 				},
 			}
 
-			_, err = client.CoreV1().Pods("fake-ns").Create(context.Background(), pod, metav1.CreateOptions{})
+			_, err = client.CoreV1().Pods("fake-ns").Create(t.Context(), pod, metav1.CreateOptions{})
 			require.NoError(t, err)
 
 			for i := 0; i < tc.generateDiff; i++ {
@@ -190,7 +189,7 @@ func TestEvent(t *testing.T) {
 
 			recorder.Shutdown()
 
-			items, err := client.CoreV1().Events("fake-ns").List(context.Background(), metav1.ListOptions{})
+			items, err := client.CoreV1().Events("fake-ns").List(t.Context(), metav1.ListOptions{})
 			require.NoError(t, err)
 
 			if tc.expected != len(items.Items) {

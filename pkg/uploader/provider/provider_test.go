@@ -17,7 +17,6 @@ limitations under the License.
 package provider
 
 import (
-	"context"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -42,7 +41,7 @@ type NewUploaderProviderTestCase struct {
 
 func TestNewUploaderProvider(t *testing.T) {
 	// Mock objects or dependencies
-	ctx := context.Background()
+	ctx := t.Context()
 	client := fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()
 	repoIdentifier := "repoIdentifier"
 	bsl := &velerov1api.BackupStorageLocation{}

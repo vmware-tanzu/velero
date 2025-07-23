@@ -616,12 +616,12 @@ func TestReconcile(t *testing.T) {
 			require.NoError(t, err)
 
 			if !test.notCreateDU {
-				err = r.client.Create(context.Background(), test.du)
+				err = r.client.Create(t.Context(), test.du)
 				require.NoError(t, err)
 			}
 
 			if test.needDelete {
-				err = r.client.Delete(context.Background(), test.du)
+				err = r.client.Delete(t.Context(), test.du)
 				require.NoError(t, err)
 			}
 
@@ -737,7 +737,7 @@ func TestReconcile(t *testing.T) {
 }
 
 func TestOnDataUploadCancelled(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	r, err := initDataUploaderReconciler()
 	require.NoError(t, err)
 	// Create a DataUpload object
@@ -785,7 +785,7 @@ func TestOnDataUploadProgress(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 
 			r, err := initDataUploaderReconciler(test.needErrs...)
 			require.NoError(t, err)
@@ -797,7 +797,7 @@ func TestOnDataUploadProgress(t *testing.T) {
 			namespace := du.Namespace
 			duName := du.Name
 			// Add the DataUpload object to the fake client
-			require.NoError(t, r.client.Create(context.Background(), du))
+			require.NoError(t, r.client.Create(t.Context(), du))
 
 			// Create a Progress object
 			progress := &uploader.Progress{
@@ -820,7 +820,7 @@ func TestOnDataUploadProgress(t *testing.T) {
 }
 
 func TestOnDataUploadFailed(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	r, err := initDataUploaderReconciler()
 	require.NoError(t, err)
 
@@ -840,7 +840,7 @@ func TestOnDataUploadFailed(t *testing.T) {
 }
 
 func TestOnDataUploadCompleted(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	r, err := initDataUploaderReconciler()
 	require.NoError(t, err)
 	// Create a DataUpload object
@@ -903,11 +903,11 @@ func TestFindDataUploadForPod(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		assert.NoError(t, r.client.Create(ctx, test.pod))
 		assert.NoError(t, r.client.Create(ctx, test.du))
 		// Call the findDataUploadForPod function
-		requests := r.findDataUploadForPod(context.Background(), test.pod)
+		requests := r.findDataUploadForPod(t.Context(), test.pod)
 		test.checkFunc(test.du, requests)
 		r.client.Delete(ctx, test.du, &kbclient.DeleteOptions{})
 		if test.pod != nil {
@@ -957,7 +957,7 @@ func TestAcceptDataUpload(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initDataUploaderReconcilerWithError(test.needErrs...)
 		require.NoError(t, err)
 
@@ -1001,7 +1001,7 @@ func TestOnDuPrepareTimeout(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initDataUploaderReconcilerWithError(test.needErrs...)
 		require.NoError(t, err)
 
@@ -1046,7 +1046,7 @@ func TestTryCancelDataUpload(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initDataUploaderReconcilerWithError(test.needErrs...)
 		require.NoError(t, err)
 
@@ -1103,7 +1103,7 @@ func TestUpdateDataUploadWithRetry(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			ctx, cancelFunc := context.WithTimeout(context.TODO(), time.Second*5)
+			ctx, cancelFunc := context.WithTimeout(t.Context(), time.Second*5)
 			defer cancelFunc()
 			r, err := initDataUploaderReconciler(tc.needErrs...)
 			require.NoError(t, err)
@@ -1212,7 +1212,7 @@ func TestAttemptDataUploadResume(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			r, err := initDataUploaderReconciler(test.needErrs...)
 			r.nodeName = "node-1"
 			require.NoError(t, err)
@@ -1236,28 +1236,28 @@ func TestAttemptDataUploadResume(t *testing.T) {
 				// Verify DataUploads marked as Canceled
 				for _, duName := range test.cancelledDataUploads {
 					dataUpload := &velerov2alpha1api.DataUpload{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
 					require.NoError(t, err)
 					assert.True(t, dataUpload.Spec.Cancel)
 				}
 				// Verify DataUploads marked as Accepted
 				for _, duName := range test.acceptedDataUploads {
 					dataUpload := &velerov2alpha1api.DataUpload{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
 					require.NoError(t, err)
 					assert.Equal(t, velerov2alpha1api.DataUploadPhaseAccepted, dataUpload.Status.Phase)
 				}
 				// Verify DataUploads marked as Prepared
 				for _, duName := range test.prepareddDataUploads {
 					dataUpload := &velerov2alpha1api.DataUpload{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
 					require.NoError(t, err)
 					assert.Equal(t, velerov2alpha1api.DataUploadPhasePrepared, dataUpload.Status.Phase)
 				}
 				// Verify DataUploads marked as InProgress
 				for _, duName := range test.inProgressDataUploads {
 					dataUpload := &velerov2alpha1api.DataUpload{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
 					require.NoError(t, err)
 					assert.Equal(t, velerov2alpha1api.DataUploadPhaseInProgress, dataUpload.Status.Phase)
 				}
@@ -1339,7 +1339,7 @@ func TestResumeCancellableBackup(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			r, err := initDataUploaderReconciler()
 			r.nodeName = "node-1"
 			require.NoError(t, err)

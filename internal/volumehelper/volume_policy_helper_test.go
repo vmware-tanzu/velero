@@ -17,7 +17,6 @@ limitations under the License.
 package volumehelper
 
 import (
-	"context"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -311,7 +310,7 @@ func TestVolumeHelperImpl_ShouldPerformSnapshot(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
 			if tc.pod != nil {
-				fakeClient.Create(context.Background(), tc.pod)
+				fakeClient.Create(t.Context(), tc.pod)
 			}
 
 			var p *resourcepolicies.Policies
@@ -676,7 +675,7 @@ func TestVolumeHelperImpl_ShouldPerformFSBackup(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, tc.resources...)
 			if tc.pod != nil {
-				fakeClient.Create(context.Background(), tc.pod)
+				fakeClient.Create(t.Context(), tc.pod)
 			}
 
 			var p *resourcepolicies.Policies

@@ -204,7 +204,7 @@ func TestShouldProcess(t *testing.T) {
 
 	for _, ts := range tests {
 		t.Run(ts.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 
 			var objs []runtime.Object
 			if ts.obj != nil {
@@ -513,7 +513,7 @@ func TestFindPVRForTargetPod(t *testing.T) {
 		client: clientBuilder.Build(),
 		logger: logrus.New(),
 	}
-	requests := reconciler.findPVRForTargetPod(context.Background(), pod)
+	requests := reconciler.findPVRForTargetPod(t.Context(), pod)
 	assert.Empty(t, requests)
 
 	// contain one matching PVR
@@ -537,7 +537,7 @@ func TestFindPVRForTargetPod(t *testing.T) {
 			},
 		},
 	}).Build()
-	requests = reconciler.findPVRForTargetPod(context.Background(), pod)
+	requests = reconciler.findPVRForTargetPod(t.Context(), pod)
 	assert.Len(t, requests, 1)
 }
 
@@ -932,12 +932,12 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 			require.NoError(t, err)
 
 			if !test.notCreatePVR {
-				err = r.client.Create(context.Background(), test.pvr)
+				err = r.client.Create(t.Context(), test.pvr)
 				require.NoError(t, err)
 			}
 
 			if test.needDelete {
-				err = r.client.Delete(context.Background(), test.pvr)
+				err = r.client.Delete(t.Context(), test.pvr)
 				require.NoError(t, err)
 			}
 
@@ -1084,7 +1084,7 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 
 func TestOnPodVolumeRestoreFailed(t *testing.T) {
 	for _, getErr := range []bool{true, false} {
-		ctx := context.TODO()
+		ctx := t.Context()
 		needErrs := []bool{getErr, false, false, false}
 		r, err := initPodVolumeRestoreReconciler(nil, []client.Object{}, needErrs...)
 		require.NoError(t, err)
@@ -1110,7 +1110,7 @@ func TestOnPodVolumeRestoreFailed(t *testing.T) {
 
 func TestOnPodVolumeRestoreCancelled(t *testing.T) {
 	for _, getErr := range []bool{true, false} {
-		ctx := context.TODO()
+		ctx := t.Context()
 		needErrs := []bool{getErr, false, false, false}
 		r, err := initPodVolumeRestoreReconciler(nil, nil, needErrs...)
 		require.NoError(t, err)
@@ -1152,7 +1152,7 @@ func TestOnPodVolumeRestoreCompleted(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			needErrs := []bool{test.isGetErr, false, false, false}
 			r, err := initPodVolumeRestoreReconciler(nil, []client.Object{}, needErrs...)
 			r.exposer = func() exposer.PodVolumeExposer {
@@ -1212,7 +1212,7 @@ func TestOnPodVolumeRestoreProgress(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 
 			r, err := initPodVolumeRestoreReconciler(nil, []client.Object{}, test.needErrs...)
 			require.NoError(t, err)
@@ -1224,7 +1224,7 @@ func TestOnPodVolumeRestoreProgress(t *testing.T) {
 			namespace := pvr.Namespace
 			pvrName := pvr.Name
 
-			require.NoError(t, r.client.Create(context.Background(), pvr))
+			require.NoError(t, r.client.Create(t.Context(), pvr))
 
 			// Create a Progress object
 			progress := &uploader.Progress{
@@ -1290,11 +1290,11 @@ func TestFindPVBForRestorePod(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		assert.NoError(t, r.client.Create(ctx, test.pod))
 		assert.NoError(t, r.client.Create(ctx, test.pvr))
 		// Call the findSnapshotRestoreForPod function
-		requests := r.findPVRForRestorePod(context.Background(), test.pod)
+		requests := r.findPVRForRestorePod(t.Context(), test.pod)
 		test.checkFunc(test.pvr, requests)
 		r.client.Delete(ctx, test.pvr, &kbclient.DeleteOptions{})
 		if test.pod != nil {
@@ -1330,7 +1330,7 @@ func TestOnPVRPrepareTimeout(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initPodVolumeRestoreReconcilerWithError(nil, []client.Object{}, test.needErrs...)
 		require.NoError(t, err)
 
@@ -1375,7 +1375,7 @@ func TestTryCancelPVR(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initPodVolumeRestoreReconcilerWithError(nil, []client.Object{}, test.needErrs...)
 		require.NoError(t, err)
 
@@ -1432,7 +1432,7 @@ func TestUpdatePVRWithRetry(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			ctx, cancelFunc := context.WithTimeout(context.TODO(), time.Second*5)
+			ctx, cancelFunc := context.WithTimeout(t.Context(), time.Second*5)
 			defer cancelFunc()
 			r, err := initPodVolumeRestoreReconciler(nil, []client.Object{}, tc.needErrs...)
 			require.NoError(t, err)
@@ -1512,7 +1512,7 @@ func TestAttemptPVRResume(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			r, err := initPodVolumeRestoreReconciler(nil, []client.Object{}, test.needErrs...)
 			r.nodeName = "node-1"
 			require.NoError(t, err)
@@ -1538,21 +1538,21 @@ func TestAttemptPVRResume(t *testing.T) {
 
 				for _, pvrName := range test.cancelledPvrs {
 					pvr := &velerov1api.PodVolumeRestore{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvrName}, pvr)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: pvrName}, pvr)
 					require.NoError(t, err)
 					assert.True(t, pvr.Spec.Cancel)
 				}
 
 				for _, pvrName := range test.acceptedPvrs {
 					pvr := &velerov1api.PodVolumeRestore{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvrName}, pvr)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: pvrName}, pvr)
 					require.NoError(t, err)
 					assert.Equal(t, velerov1api.PodVolumeRestorePhaseAccepted, pvr.Status.Phase)
 				}
 
 				for _, pvrName := range test.preparedPvrs {
 					pvr := &velerov1api.PodVolumeRestore{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: pvrName}, pvr)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: pvrName}, pvr)
 					require.NoError(t, err)
 					assert.Equal(t, velerov1api.PodVolumeRestorePhasePrepared, pvr.Status.Phase)
 				}
@@ -1629,7 +1629,7 @@ func TestResumeCancellablePodVolumeRestore(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			r, err := initPodVolumeRestoreReconciler(nil, []client.Object{})
 			r.nodeName = "node-1"
 			require.NoError(t, err)

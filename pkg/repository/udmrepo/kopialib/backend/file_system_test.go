@@ -17,7 +17,6 @@ limitations under the License.
 package backend
 
 import (
-	"context"
 	"testing"
 
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -71,7 +70,7 @@ func TestFSSetup(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fsFlags := FsBackend{}
 
-			err := fsFlags.Setup(context.Background(), tc.flags, logger)
+			err := fsFlags.Setup(t.Context(), tc.flags, logger)
 
 			if tc.expectedErr == "" {
 				require.NoError(t, err)

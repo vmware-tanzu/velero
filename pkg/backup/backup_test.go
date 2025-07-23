@@ -871,7 +871,7 @@ func TestBackupOldResourceFiltering(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1052,7 +1052,7 @@ func TestCRDInclusion(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1151,7 +1151,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1250,7 +1250,7 @@ func TestBackupResourceOrdering(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1361,7 +1361,7 @@ func (a *recordResourcesAction) WithSkippedCSISnapshotFlag(flag bool) *recordRes
 // TestBackupItemActionsForSkippedPV runs backups with backup item actions, and
 // verifies that the data in SkippedPVTracker is updated as expected.
 func TestBackupItemActionsForSkippedPV(t *testing.T) {
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 
 	tests := []struct {
@@ -1669,7 +1669,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1754,7 +1754,7 @@ func TestBackupWithInvalidActions(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1908,7 +1908,7 @@ func TestBackupActionModifications(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2168,7 +2168,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2429,7 +2429,7 @@ func TestItemBlockActionsRunForCorrectItems(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2514,7 +2514,7 @@ func TestBackupWithInvalidItemBlockActions(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2770,7 +2770,7 @@ func TestItemBlockActionRelatedItems(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2929,7 +2929,7 @@ func (*fakeVolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 // struct in place of real volume snapshotters.
 func TestBackupWithSnapshots(t *testing.T) {
 	// TODO: add more verification for skippedPVTracker
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	tests := []struct {
 		name              string
@@ -3329,7 +3329,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	tests := []struct {
 		name         string
@@ -3484,7 +3484,7 @@ func TestBackupWithInvalidHooks(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -3958,7 +3958,7 @@ func TestBackupWithHooks(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -4182,7 +4182,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -4199,7 +4199,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 			)
 
 			if tc.pod != nil {
-				require.NoError(t, h.backupper.kbClient.Create(context.Background(), tc.pod))
+				require.NoError(t, h.backupper.kbClient.Create(t.Context(), tc.pod))
 			}
 
 			h.backupper.podVolumeBackupperFactory = new(fakePodVolumeBackupperFactory)
@@ -4296,9 +4296,9 @@ func (h *harness) addItems(t *testing.T, resource *test.APIResource) {
 		unstructuredObj := &unstructured.Unstructured{Object: obj}
 
 		if resource.Namespaced {
-			_, err = h.DynamicClient.Resource(resource.GVR()).Namespace(item.GetNamespace()).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
+			_, err = h.DynamicClient.Resource(resource.GVR()).Namespace(item.GetNamespace()).Create(t.Context(), unstructuredObj, metav1.CreateOptions{})
 		} else {
-			_, err = h.DynamicClient.Resource(resource.GVR()).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
+			_, err = h.DynamicClient.Resource(resource.GVR()).Create(t.Context(), unstructuredObj, metav1.CreateOptions{})
 		}
 		require.NoError(t, err)
 	}
@@ -4314,7 +4314,7 @@ func newHarness(t *testing.T, itemBlockPool *ItemBlockWorkerPool) *harness {
 	require.NoError(t, err)
 
 	if itemBlockPool == nil {
-		itemBlockPool = StartItemBlockWorkerPool(context.Background(), 1, log)
+		itemBlockPool = StartItemBlockWorkerPool(t.Context(), 1, log)
 	}
 	return &harness{
 		APIServer: apiServer,
@@ -5302,7 +5302,7 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -5467,7 +5467,7 @@ func TestBackupNamespaces(t *testing.T) {
 		},
 	}
 
-	itemBlockPool := StartItemBlockWorkerPool(context.Background(), 1, logrus.StandardLogger())
+	itemBlockPool := StartItemBlockWorkerPool(t.Context(), 1, logrus.StandardLogger())
 	defer itemBlockPool.Stop()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

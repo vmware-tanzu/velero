@@ -247,7 +247,7 @@ func (r *RestoreMicroService) recordPvrFailed(msg string, err error) {
 	evtMsg := fmt.Sprintf("%s, error %v", msg, err)
 	r.eventRecorder.Event(r.pvr, false, datapath.EventReasonFailed, evtMsg)
 	r.resultSignal <- dataPathResult{
-		err: errors.Wrapf(err, msg),
+		err: errors.Wrap(err, msg),
 	}
 }
 

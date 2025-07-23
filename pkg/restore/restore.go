@@ -1659,7 +1659,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 	if shouldRestoreStatus && statusFieldErr != nil {
 		err := fmt.Errorf("could not get status to be restored %s: %v", kube.NamespaceAndName(obj), statusFieldErr)
-		restoreLogger.Errorf(err.Error())
+		restoreLogger.Error(err.Error())
 		errs.Add(namespace, err)
 		return warnings, errs, itemExists
 	}

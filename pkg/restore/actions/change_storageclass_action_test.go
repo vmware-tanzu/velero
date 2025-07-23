@@ -17,7 +17,6 @@ limitations under the License.
 package actions
 
 import (
-	"context"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -226,18 +225,18 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 
 			// set up test data
 			if tc.configMap != nil {
-				_, err := clientset.CoreV1().ConfigMaps(tc.configMap.Namespace).Create(context.TODO(), tc.configMap, metav1.CreateOptions{})
+				_, err := clientset.CoreV1().ConfigMaps(tc.configMap.Namespace).Create(t.Context(), tc.configMap, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
 			if tc.storageClass != nil {
-				_, err := clientset.StorageV1().StorageClasses().Create(context.TODO(), tc.storageClass, metav1.CreateOptions{})
+				_, err := clientset.StorageV1().StorageClasses().Create(t.Context(), tc.storageClass, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
 			if tc.storageClassSlice != nil {
 				for _, storageClass := range tc.storageClassSlice {
-					_, err := clientset.StorageV1().StorageClasses().Create(context.TODO(), storageClass, metav1.CreateOptions{})
+					_, err := clientset.StorageV1().StorageClasses().Create(t.Context(), storageClass, metav1.CreateOptions{})
 					require.NoError(t, err)
 				}
 			}

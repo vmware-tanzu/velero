@@ -17,7 +17,6 @@ limitations under the License.
 package repository
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -127,7 +126,7 @@ func TestEnsureRepo(t *testing.T) {
 
 			ensurer := NewEnsurer(fakeClient, velerotest.NewLogger(), time.Millisecond)
 
-			repo, err := ensurer.EnsureRepo(context.Background(), velerov1.DefaultNamespace, test.namespace, test.bsl, test.repositoryType)
+			repo, err := ensurer.EnsureRepo(t.Context(), velerov1.DefaultNamespace, test.namespace, test.bsl, test.repositoryType)
 			if err != nil {
 				require.EqualError(t, err, test.err)
 			} else {
@@ -247,7 +246,7 @@ func TestCreateBackupRepositoryAndWait(t *testing.T) {
 
 			ensurer := NewEnsurer(fakeClient, velerotest.NewLogger(), time.Millisecond)
 
-			repo, err := ensurer.createBackupRepositoryAndWait(context.Background(), velerov1.DefaultNamespace, BackupRepositoryKey{
+			repo, err := ensurer.createBackupRepositoryAndWait(t.Context(), velerov1.DefaultNamespace, BackupRepositoryKey{
 				VolumeNamespace: test.namespace,
 				BackupLocation:  test.bsl,
 				RepositoryType:  test.repositoryType,

@@ -17,7 +17,6 @@ limitations under the License.
 package csi
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -132,7 +131,7 @@ func TestVSExecute(t *testing.T) {
 			require.NoError(t, err)
 
 			if tc.vsc != nil {
-				require.NoError(t, vsBIA.crClient.Create(context.TODO(), tc.vsc))
+				require.NoError(t, vsBIA.crClient.Create(t.Context(), tc.vsc))
 			}
 
 			_, additionalItems, _, itemToUpdate, err := vsBIA.Execute(&unstructured.UnstructuredList{Object: item}, tc.backup)
@@ -262,12 +261,12 @@ func TestVSProgress(t *testing.T) {
 			}
 
 			if tc.vs != nil {
-				err := crClient.Create(context.Background(), tc.vs)
+				err := crClient.Create(t.Context(), tc.vs)
 				require.NoError(t, err)
 			}
 
 			if tc.vsc != nil {
-				require.NoError(t, crClient.Create(context.TODO(), tc.vsc))
+				require.NoError(t, crClient.Create(t.Context(), tc.vsc))
 			}
 
 			progress, err := vsBIA.Progress(tc.operationID, tc.backup)

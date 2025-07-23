@@ -17,7 +17,6 @@ limitations under the License.
 package provider
 
 import (
-	"context"
 	"errors"
 	"os"
 	"reflect"
@@ -149,10 +148,10 @@ func TestResticRunBackup(t *testing.T) {
 				tc.volMode = uploader.PersistentVolumeFilesystem
 			}
 			if !tc.nilUpdater {
-				updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: tc.rp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
-				_, _, _, err = tc.rp.RunBackup(context.Background(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, map[string]string{}, &updater)
+				updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: tc.rp.log, Ctx: t.Context(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
+				_, _, _, err = tc.rp.RunBackup(t.Context(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, map[string]string{}, &updater)
 			} else {
-				_, _, _, err = tc.rp.RunBackup(context.Background(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, map[string]string{}, nil)
+				_, _, _, err = tc.rp.RunBackup(t.Context(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, map[string]string{}, nil)
 			}
 
 			tc.rp.log.Infof("test name %v error %v", tc.name, err)
@@ -222,10 +221,10 @@ func TestResticRunRestore(t *testing.T) {
 			}
 			var err error
 			if !tc.nilUpdater {
-				updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: tc.rp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
-				_, err = tc.rp.RunRestore(context.Background(), "", "var", tc.volMode, map[string]string{}, &updater)
+				updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: tc.rp.log, Ctx: t.Context(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
+				_, err = tc.rp.RunRestore(t.Context(), "", "var", tc.volMode, map[string]string{}, &updater)
 			} else {
-				_, err = tc.rp.RunRestore(context.Background(), "", "var", tc.volMode, map[string]string{}, nil)
+				_, err = tc.rp.RunRestore(t.Context(), "", "var", tc.volMode, map[string]string{}, nil)
 			}
 
 			tc.rp.log.Infof("test name %v error %v", tc.name, err)
@@ -253,7 +252,7 @@ func TestClose(t *testing.T) {
 			caCertFile:      caCertFile.Name(),
 		}
 		// Test deleting an existing credentials file
-		err = rp.Close(context.Background())
+		err = rp.Close(t.Context())
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -275,7 +274,7 @@ func TestClose(t *testing.T) {
 			credentialsFile: "",
 			caCertFile:      "",
 		}
-		err = rp.Close(context.Background())
+		err = rp.Close(t.Context())
 		// Test deleting an existing caCert file
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

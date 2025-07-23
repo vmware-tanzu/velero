@@ -17,7 +17,6 @@ limitations under the License.
 package exposer
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -195,7 +194,7 @@ func TestRestoreExpose(t *testing.T) {
 			}
 
 			err := exposer.Expose(
-				context.Background(),
+				t.Context(),
 				ownerObject,
 				GenericRestoreExposeParam{
 					TargetPVCName:    test.targetPVCName,
@@ -440,7 +439,7 @@ func TestRebindVolume(t *testing.T) {
 
 			hookCount = 0
 
-			err := exposer.RebindVolume(context.Background(), ownerObject, test.targetPVCName, test.targetNamespace, time.Millisecond)
+			err := exposer.RebindVolume(t.Context(), ownerObject, test.targetPVCName, test.targetNamespace, time.Millisecond)
 			assert.EqualError(t, err, test.err)
 		})
 	}
@@ -523,7 +522,7 @@ func TestRestorePeekExpose(t *testing.T) {
 				}
 			}
 
-			err := exposer.PeekExposed(context.Background(), ownerObject)
+			err := exposer.PeekExposed(t.Context(), ownerObject)
 			if test.err == "" {
 				assert.NoError(t, err)
 			} else {
@@ -782,7 +781,7 @@ end diagnose restore exposer`,
 				}
 			}
 
-			diag := e.DiagnoseExpose(context.Background(), ownerObject)
+			diag := e.DiagnoseExpose(t.Context(), ownerObject)
 			assert.Equal(t, test.expected, diag)
 		})
 	}
@@ -901,7 +900,7 @@ func TestCreateRestorePod(t *testing.T) {
 			}
 
 			pod, err := exposer.createRestorePod(
-				context.Background(),
+				t.Context(),
 				corev1api.ObjectReference{
 					Namespace: velerov1.DefaultNamespace,
 					Name:      "data-download",

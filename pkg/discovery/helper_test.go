@@ -83,14 +83,14 @@ func TestSortResources(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Logf("before")
+			t.Log("before")
 			for _, r := range test.resources {
-				t.Logf(r.GroupVersion)
+				t.Log(r.GroupVersion)
 			}
 			sortResources(test.resources)
 			t.Logf("after")
 			for _, r := range test.resources {
-				t.Logf(r.GroupVersion)
+				t.Log(r.GroupVersion)
 			}
 			assert.Equal(t, test.expected, test.resources)
 		})

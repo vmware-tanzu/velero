@@ -111,7 +111,7 @@ func TestOnDataPathFailed(t *testing.T) {
 	expectedEventReason := datapath.EventReasonFailed
 	expectedEventMsg := "Data path for PVB fake-pvb failed, error fake-error"
 
-	go bs.OnDataPathFailed(context.TODO(), velerov1api.DefaultNamespace, pvbName, errors.New("fake-error"))
+	go bs.OnDataPathFailed(t.Context(), velerov1api.DefaultNamespace, pvbName, errors.New("fake-error"))
 
 	result := <-bs.resultSignal
 	require.EqualError(t, result.err, expectedErr)
@@ -135,7 +135,7 @@ func TestOnDataPathCancelled(t *testing.T) {
 	expectedEventReason := datapath.EventReasonCancelled
 	expectedEventMsg := "Data path for PVB fake-pvb canceled"
 
-	go bs.OnDataPathCancelled(context.TODO(), velerov1api.DefaultNamespace, pvbName)
+	go bs.OnDataPathCancelled(t.Context(), velerov1api.DefaultNamespace, pvbName)
 
 	result := <-bs.resultSignal
 	require.EqualError(t, result.err, expectedErr)
@@ -183,7 +183,7 @@ func TestOnDataPathCompleted(t *testing.T) {
 
 			funcMarshal = bt.Marshal
 
-			go bs.OnDataPathCompleted(context.TODO(), velerov1api.DefaultNamespace, pvbName, datapath.Result{})
+			go bs.OnDataPathCompleted(t.Context(), velerov1api.DefaultNamespace, pvbName, datapath.Result{})
 
 			result := <-bs.resultSignal
 			if test.marshalErr != nil {
@@ -236,7 +236,7 @@ func TestOnDataPathProgress(t *testing.T) {
 
 			funcMarshal = bt.Marshal
 
-			bs.OnDataPathProgress(context.TODO(), velerov1api.DefaultNamespace, pvbName, &uploader.Progress{})
+			bs.OnDataPathProgress(t.Context(), velerov1api.DefaultNamespace, pvbName, &uploader.Progress{})
 
 			if test.marshalErr != nil {
 				assert.False(t, bt.withEvent)
@@ -294,7 +294,7 @@ func TestRunCancelableDataPath(t *testing.T) {
 	pvbName := "fake-pvb"
 	pvb := builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, pvbName).Phase(velerov1api.PodVolumeBackupPhaseNew).Result()
 	pvbInProgress := builder.ForPodVolumeBackup(velerov1api.DefaultNamespace, pvbName).Phase(velerov1api.PodVolumeBackupPhaseInProgress).Result()
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctxTimeout, cancel := context.WithTimeout(t.Context(), time.Second)
 
 	tests := []struct {
 		name             string
@@ -321,21 +321,21 @@ func TestRunCancelableDataPath(t *testing.T) {
 		},
 		{
 			name:          "create data path fail",
-			ctx:           context.Background(),
+			ctx:           t.Context(),
 			kubeClientObj: []runtime.Object{pvbInProgress},
 			dataPathMgr:   datapath.NewManager(0),
 			expectedErr:   "error to create data path: Concurrent number exceeds",
 		},
 		{
 			name:          "init data path fail",
-			ctx:           context.Background(),
+			ctx:           t.Context(),
 			kubeClientObj: []runtime.Object{pvbInProgress},
 			initErr:       errors.New("fake-init-error"),
 			expectedErr:   "error to initialize data path: fake-init-error",
 		},
 		{
 			name:          "start data path fail",
-			ctx:           context.Background(),
+			ctx:           t.Context(),
 			kubeClientObj: []runtime.Object{pvbInProgress},
 			startErr:      errors.New("fake-start-error"),
 			expectedErr:   "error starting data path backup: fake-start-error",
@@ -350,7 +350,7 @@ func TestRunCancelableDataPath(t *testing.T) {
 		},
 		{
 			name:            "data path returns error",
-			ctx:             context.Background(),
+			ctx:             t.Context(),
 			kubeClientObj:   []runtime.Object{pvbInProgress},
 			dataPathStarted: true,
 			result: &dataPathResult{
@@ -361,7 +361,7 @@ func TestRunCancelableDataPath(t *testing.T) {
 		},
 		{
 			name:            "succeed",
-			ctx:             context.Background(),
+			ctx:             t.Context(),
 			kubeClientObj:   []runtime.Object{pvbInProgress},
 			dataPathStarted: true,
 			result: &dataPathResult{
@@ -386,7 +386,7 @@ func TestRunCancelableDataPath(t *testing.T) {
 			bs := &BackupMicroService{
 				namespace:     velerov1api.DefaultNamespace,
 				pvbName:       pvbName,
-				ctx:           context.Background(),
+				ctx:           t.Context(),
 				client:        fakeClient,
 				dataPathMgr:   datapath.NewManager(1),
 				eventRecorder: bt,
