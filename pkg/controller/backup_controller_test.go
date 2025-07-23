@@ -18,7 +18,6 @@ package controller
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"reflect"
@@ -136,11 +135,11 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 				kbClient:   velerotest.NewFakeControllerRuntimeClient(t),
 				formatFlag: formatFlag,
 				logger:     logger,
-				workerPool: pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
+				workerPool: pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
 			defer c.workerPool.Stop()
 			if test.backup != nil {
-				require.NoError(t, c.kbClient.Create(context.Background(), test.backup))
+				require.NoError(t, c.kbClient.Create(t.Context(), test.backup))
 			}
 			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			assert.Equal(t, ctrl.Result{}, actualResult)
@@ -235,18 +234,18 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				clock:                 &clock.RealClock{},
 				formatFlag:            formatFlag,
 				metrics:               metrics.NewServerMetrics(),
-				workerPool:            pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
+				workerPool:            pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
 			defer c.workerPool.Stop()
 
 			require.NotNil(t, test.backup)
-			require.NoError(t, c.kbClient.Create(context.Background(), test.backup))
+			require.NoError(t, c.kbClient.Create(t.Context(), test.backup))
 
 			actualResult, err := c.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			assert.Equal(t, ctrl.Result{}, actualResult)
 			require.NoError(t, err)
 			res := &velerov1api.Backup{}
-			err = c.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: test.backup.Namespace, Name: test.backup.Name}, res)
+			err = c.kbClient.Get(t.Context(), kbclient.ObjectKey{Namespace: test.backup.Namespace, Name: test.backup.Name}, res)
 			require.NoError(t, err)
 
 			assert.Equal(t, velerov1api.BackupPhaseFailedValidation, res.Status.Phase)
@@ -300,7 +299,7 @@ func TestBackupLocationLabel(t *testing.T) {
 				defaultBackupLocation: test.backupLocation.Name,
 				clock:                 &clock.RealClock{},
 				formatFlag:            formatFlag,
-				workerPool:            pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
+				workerPool:            pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
 			defer c.workerPool.Stop()
 
@@ -397,7 +396,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 				defaultBackupTTL:      defaultBackupTTL.Duration,
 				clock:                 testclocks.NewFakeClock(now),
 				formatFlag:            formatFlag,
-				workerPool:            pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
+				workerPool:            pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
 			defer c.workerPool.Stop()
 
@@ -473,7 +472,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 				defaultBackupTTL: defaultBackupTTL.Duration,
 				clock:            testclocks.NewFakeClock(now),
 				formatFlag:       formatFlag,
-				workerPool:       pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
+				workerPool:       pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
 			defer c.workerPool.Stop()
 
@@ -534,7 +533,7 @@ func TestPrepareBackupRequest_SetsVGSLabelKey(t *testing.T) {
 				defaultVGSLabelKey: test.serverFlagKey,
 				discoveryHelper:    discoveryHelper,
 				clock:              testclocks.NewFakeClock(now),
-				workerPool:         pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
+				workerPool:         pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
 			defer c.workerPool.Stop()
 
@@ -636,7 +635,7 @@ func TestDefaultVolumesToResticDeprecation(t *testing.T) {
 				clock:                    &clock.RealClock{},
 				formatFlag:               formatFlag,
 				defaultVolumesToFsBackup: test.globalVal,
-				workerPool:               pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
+				workerPool:               pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
 			defer c.workerPool.Stop()
 
@@ -1504,7 +1503,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			}
 
 			if test.volumeSnapshot != nil {
-				require.NoError(t, fakeGlobalClient.Create(context.TODO(), test.volumeSnapshot))
+				require.NoError(t, fakeGlobalClient.Create(t.Context(), test.volumeSnapshot))
 			}
 
 			apiServer := velerotest.NewAPIServer(t)
@@ -1539,7 +1538,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				backupper:                backupper,
 				formatFlag:               formatFlag,
 				globalCRClient:           fakeGlobalClient,
-				workerPool:               pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
+				workerPool:               pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
 			defer c.workerPool.Stop()
 
@@ -1566,10 +1565,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 			// add the test's backup to the informer/lister store
 			require.NotNil(t, test.backup)
 
-			require.NoError(t, c.kbClient.Create(context.Background(), test.backup))
+			require.NoError(t, c.kbClient.Create(t.Context(), test.backup))
 
 			// add the default backup storage location to the clientset and the informer/lister store
-			require.NoError(t, fakeClient.Create(context.Background(), defaultBackupLocation))
+			require.NoError(t, fakeClient.Create(t.Context(), defaultBackupLocation))
 
 			// Enable CSI feature flag for SnapshotDataMovement test.
 			if test.enableCSI {
@@ -1586,7 +1585,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			}
 
 			res := &velerov1api.Backup{}
-			err = c.kbClient.Get(context.Background(), kbclient.ObjectKey{Namespace: test.backup.Namespace, Name: test.backup.Name}, res)
+			err = c.kbClient.Get(t.Context(), kbclient.ObjectKey{Namespace: test.backup.Namespace, Name: test.backup.Name}, res)
 			require.NoError(t, err)
 			res.ResourceVersion = ""
 			assert.Equal(t, test.expectedResult, res)
@@ -1747,7 +1746,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 				logger:                   logger,
 				defaultSnapshotLocations: test.defaultLocations,
 				kbClient:                 velerotest.NewFakeControllerRuntimeClient(t),
-				workerPool:               pkgbackup.StartItemBlockWorkerPool(context.Background(), 1, logger),
+				workerPool:               pkgbackup.StartItemBlockWorkerPool(t.Context(), 1, logger),
 			}
 			defer c.workerPool.Stop()
 
@@ -1755,7 +1754,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			backup := test.backup.DeepCopy()
 			backup.Spec.VolumeSnapshotLocations = test.backup.Spec.VolumeSnapshotLocations
 			for _, location := range test.locations {
-				require.NoError(t, c.kbClient.Create(context.Background(), location))
+				require.NoError(t, c.kbClient.Create(t.Context(), location))
 			}
 
 			providerLocations, errs := c.validateAndGetSnapshotLocations(backup)
@@ -1933,7 +1932,7 @@ func TestPatchResourceWorksWithStatus(t *testing.T) {
 				},
 			}
 			// check original exists
-			if err := fakeClient.Get(context.Background(), kbclient.ObjectKeyFromObject(tt.args.updated), fromCluster); err != nil {
+			if err := fakeClient.Get(t.Context(), kbclient.ObjectKeyFromObject(tt.args.updated), fromCluster); err != nil {
 				t.Errorf("PatchResource() error = %v", err)
 			}
 			// ignore resourceVersion
@@ -1943,7 +1942,7 @@ func TestPatchResourceWorksWithStatus(t *testing.T) {
 				t.Errorf("PatchResource() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			// check updated exists
-			if err := fakeClient.Get(context.Background(), kbclient.ObjectKeyFromObject(tt.args.updated), fromCluster); err != nil {
+			if err := fakeClient.Get(t.Context(), kbclient.ObjectKeyFromObject(tt.args.updated), fromCluster); err != nil {
 				t.Errorf("PatchResource() error = %v", err)
 			}
 

@@ -17,7 +17,6 @@ limitations under the License.
 package actions
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -162,15 +161,15 @@ func TestBackupPVAction(t *testing.T) {
 			a := i.(*PVCAction)
 
 			if tc.pvc != nil {
-				require.NoError(t, crClient.Create(context.Background(), tc.pvc))
+				require.NoError(t, crClient.Create(t.Context(), tc.pvc))
 			}
 			for _, pod := range tc.pods {
-				require.NoError(t, crClient.Create(context.Background(), pod))
+				require.NoError(t, crClient.Create(t.Context(), pod))
 			}
 
 			if tc.name == "Test with PVC grouping via VGS label" {
 				groupedPVC := builder.ForPersistentVolumeClaim("velero", "groupedPVC").ObjectMeta(builder.WithLabels("velero.io/group", "db")).VolumeName("groupedPV").Phase(corev1api.ClaimBound).Result()
-				require.NoError(t, crClient.Create(context.Background(), groupedPVC))
+				require.NoError(t, crClient.Create(t.Context(), groupedPVC))
 				backup.Spec.VolumeGroupSnapshotLabelKey = "velero.io/group"
 			}
 
@@ -252,7 +251,7 @@ func Test_getGroupedPVCs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			crClient := velerotest.NewFakeControllerRuntimeClient(t)
 			for _, pvc := range tc.existingPVCs {
-				require.NoError(t, crClient.Create(context.Background(), pvc))
+				require.NoError(t, crClient.Create(t.Context(), pvc))
 			}
 
 			logger := logrus.New()
@@ -263,7 +262,7 @@ func Test_getGroupedPVCs(t *testing.T) {
 
 			backup := builder.ForBackup("ns", "bkp").VolumeGroupSnapshotLabelKey(tc.labelKey).Result()
 
-			related, err := a.getGroupedPVCs(context.Background(), tc.targetPVC, backup)
+			related, err := a.getGroupedPVCs(t.Context(), tc.targetPVC, backup)
 			if tc.expectError {
 				require.Error(t, err)
 			} else {

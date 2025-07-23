@@ -186,7 +186,7 @@ func TestExecute(t *testing.T) {
 			if boolptr.IsSetToTrue(tc.backup.Spec.SnapshotMoveData) == true {
 				go func() {
 					var vsList snapshotv1api.VolumeSnapshotList
-					err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+					err := wait.PollUntilContextTimeout(t.Context(), 1*time.Second, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 						err = pvcBIA.crClient.List(ctx, &vsList, &crclient.ListOptions{Namespace: tc.pvc.Namespace})
 
 						require.NoError(t, err)
@@ -204,12 +204,12 @@ func TestExecute(t *testing.T) {
 						BoundVolumeSnapshotContentName: &vscName,
 						ReadyToUse:                     &readyToUse,
 					}
-					err = pvcBIA.crClient.Update(context.Background(), &vsList.Items[0])
+					err = pvcBIA.crClient.Update(t.Context(), &vsList.Items[0])
 					require.NoError(t, err)
 
 					handleName := "testHandle"
 					vsc := builder.ForVolumeSnapshotContent("testVSC").Status(&snapshotv1api.VolumeSnapshotContentStatus{SnapshotHandle: &handleName}).Result()
-					err = pvcBIA.crClient.Create(context.Background(), vsc)
+					err = pvcBIA.crClient.Create(t.Context(), vsc)
 					require.NoError(t, err)
 				}()
 			}
@@ -223,7 +223,7 @@ func TestExecute(t *testing.T) {
 
 			if tc.expectedDataUpload != nil {
 				dataUploadList := new(velerov2alpha1.DataUploadList)
-				err := crClient.List(context.Background(), dataUploadList, &crclient.ListOptions{LabelSelector: labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: tc.backup.Name})})
+				err := crClient.List(t.Context(), dataUploadList, &crclient.ListOptions{LabelSelector: labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: tc.backup.Name})})
 				require.NoError(t, err)
 				require.Len(t, dataUploadList.Items, 1)
 				require.True(t, cmp.Equal(tc.expectedDataUpload, &dataUploadList.Items[0], cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "ResourceVersion", "Name", "Spec.CSISnapshot.VolumeSnapshot")))
@@ -306,7 +306,7 @@ func TestProgress(t *testing.T) {
 			}
 
 			if tc.dataUpload != nil {
-				err := crClient.Create(context.Background(), tc.dataUpload)
+				err := crClient.Create(t.Context(), tc.dataUpload)
 				require.NoError(t, err)
 			}
 
@@ -375,7 +375,7 @@ func TestCancel(t *testing.T) {
 				crClient: crClient,
 			}
 
-			err := crClient.Create(context.Background(), &tc.dataUpload)
+			err := crClient.Create(t.Context(), &tc.dataUpload)
 			require.NoError(t, err)
 
 			err = pvcBIA.Cancel(tc.operationID, tc.backup)
@@ -384,7 +384,7 @@ func TestCancel(t *testing.T) {
 			}
 
 			du := new(velerov2alpha1.DataUpload)
-			err = crClient.Get(context.Background(), crclient.ObjectKey{Namespace: tc.dataUpload.Namespace, Name: tc.dataUpload.Name}, du)
+			err = crClient.Get(t.Context(), crclient.ObjectKey{Namespace: tc.dataUpload.Namespace, Name: tc.dataUpload.Name}, du)
 			require.NoError(t, err)
 
 			require.True(t, cmp.Equal(tc.expectedDataUpload, *du, cmpopts.IgnoreFields(velerov2alpha1.DataUpload{}, "ResourceVersion")))
@@ -526,7 +526,7 @@ func TestListGroupedPVCs(t *testing.T) {
 				crClient: client,
 			}
 
-			result, err := action.listGroupedPVCs(context.TODO(), tt.namespace, tt.labelKey, tt.groupValue)
+			result, err := action.listGroupedPVCs(t.Context(), tt.namespace, tt.labelKey, tt.groupValue)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
@@ -774,7 +774,7 @@ func TestDetermineVGSClass(t *testing.T) {
 
 			action := &pvcBackupItemAction{crClient: client, log: logger}
 
-			result, err := action.determineVGSClass(context.TODO(), testDriver, tt.backup, tt.pvc)
+			result, err := action.determineVGSClass(t.Context(), testDriver, tt.backup, tt.pvc)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -814,7 +814,7 @@ func TestCreateVolumeGroupSnapshot(t *testing.T) {
 		crClient: crClient,
 	}
 
-	vgs, err := action.createVolumeGroupSnapshot(context.TODO(), testBackup, testPVC, testLabelKey, testLabelValue, testVGSClass)
+	vgs, err := action.createVolumeGroupSnapshot(t.Context(), testBackup, testPVC, testLabelKey, testLabelValue, testVGSClass)
 	require.NoError(t, err)
 	require.NotNil(t, vgs)
 
@@ -830,7 +830,7 @@ func TestCreateVolumeGroupSnapshot(t *testing.T) {
 
 	// Check that it exists in fake client
 	retrieved := &volumegroupsnapshotv1beta1.VolumeGroupSnapshot{}
-	err = crClient.Get(context.TODO(), crclient.ObjectKey{Name: vgs.Name, Namespace: vgs.Namespace}, retrieved)
+	err = crClient.Get(t.Context(), crclient.ObjectKey{Name: vgs.Name, Namespace: vgs.Namespace}, retrieved)
 	require.NoError(t, err)
 }
 
@@ -969,7 +969,7 @@ func TestWaitForVGSAssociatedVS(t *testing.T) {
 				crClient: client,
 			}
 
-			vsMap, err := action.waitForVGSAssociatedVS(context.TODO(), tt.groupedPVCs, vgs, 2*time.Second)
+			vsMap, err := action.waitForVGSAssociatedVS(t.Context(), tt.groupedPVCs, vgs, 2*time.Second)
 
 			if tt.expectErr {
 				if err == nil {
@@ -1073,12 +1073,12 @@ func TestUpdateVGSCreatedVS(t *testing.T) {
 				*tt.vs.Spec.Source.PersistentVolumeClaimName: tt.vs,
 			}
 
-			err := action.updateVGSCreatedVS(context.TODO(), vsMap, vgs, backup)
+			err := action.updateVGSCreatedVS(t.Context(), vsMap, vgs, backup)
 			require.NoError(t, err)
 
 			// Fetch updated VS
 			updated := &snapshotv1api.VolumeSnapshot{}
-			err = client.Get(context.TODO(), crclient.ObjectKey{Name: tt.vs.Name, Namespace: tt.vs.Namespace}, updated)
+			err = client.Get(t.Context(), crclient.ObjectKey{Name: tt.vs.Name, Namespace: tt.vs.Namespace}, updated)
 			require.NoError(t, err)
 
 			if tt.expectOwnerCleared {
@@ -1149,7 +1149,7 @@ func TestPatchVGSCDeletionPolicy(t *testing.T) {
 				crClient: client,
 			}
 
-			err := action.patchVGSCDeletionPolicy(context.TODO(), vgs)
+			err := action.patchVGSCDeletionPolicy(t.Context(), vgs)
 			if tt.expectErr {
 				require.Error(t, err)
 				return
@@ -1157,7 +1157,7 @@ func TestPatchVGSCDeletionPolicy(t *testing.T) {
 			require.NoError(t, err)
 
 			updated := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent{}
-			err = client.Get(context.TODO(), crclient.ObjectKey{Name: "test-vgsc"}, updated)
+			err = client.Get(t.Context(), crclient.ObjectKey{Name: "test-vgsc"}, updated)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedPolicy, updated.Spec.DeletionPolicy)
 		})
@@ -1229,19 +1229,19 @@ func TestDeleteVGSAndVGSC(t *testing.T) {
 				crClient: client,
 			}
 
-			err := action.deleteVGSAndVGSC(context.TODO(), tt.vgs)
+			err := action.deleteVGSAndVGSC(t.Context(), tt.vgs)
 			require.NoError(t, err)
 
 			// Check VGSC is deleted
 			if tt.expectVGSCDelete {
 				got := &volumegroupsnapshotv1beta1.VolumeGroupSnapshotContent{}
-				err = client.Get(context.TODO(), crclient.ObjectKey{Name: "test-vgsc"}, got)
+				err = client.Get(t.Context(), crclient.ObjectKey{Name: "test-vgsc"}, got)
 				assert.True(t, apierrors.IsNotFound(err), "expected VGSC to be deleted")
 			}
 
 			// Check VGS is deleted
 			gotVGS := &volumegroupsnapshotv1beta1.VolumeGroupSnapshot{}
-			err = client.Get(context.TODO(), crclient.ObjectKey{Name: "test-vgs", Namespace: "ns"}, gotVGS)
+			err = client.Get(t.Context(), crclient.ObjectKey{Name: "test-vgs", Namespace: "ns"}, gotVGS)
 			assert.True(t, apierrors.IsNotFound(err), "expected VGS to be deleted")
 		})
 	}
@@ -1321,7 +1321,7 @@ func TestFindExistingVSForBackup(t *testing.T) {
 				crClient: client,
 			}
 
-			vs, err := action.findExistingVSForBackup(context.TODO(), backupUID, backupName, pvcName, namespace)
+			vs, err := action.findExistingVSForBackup(t.Context(), backupUID, backupName, pvcName, namespace)
 			require.NoError(t, err)
 
 			if tt.expectNil {
@@ -1377,7 +1377,7 @@ func TestWaitForVGSCBinding(t *testing.T) {
 				crClient: client,
 			}
 
-			err := action.waitForVGSCBinding(context.TODO(), tt.vgs, 1*time.Second)
+			err := action.waitForVGSCBinding(t.Context(), tt.vgs, 1*time.Second)
 
 			if tt.expectErr {
 				require.Error(t, err)
@@ -1454,7 +1454,7 @@ func TestGetVGSByLabels(t *testing.T) {
 				crClient: client,
 			}
 
-			vgs, err := action.getVGSByLabels(context.TODO(), "test-ns", testLabels)
+			vgs, err := action.getVGSByLabels(t.Context(), "test-ns", testLabels)
 
 			if tt.expectError != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.expectError) {

@@ -101,7 +101,7 @@ func TestReEnsureThisPod(t *testing.T) {
 				log:       velerotest.NewLogger(),
 			}
 
-			err := ms.reEnsureThisPod(context.Background())
+			err := ms.reEnsureThisPod(t.Context())
 			if test.expectErr != "" {
 				assert.EqualError(t, err, test.expectErr)
 			} else {
@@ -374,7 +374,7 @@ func TestStartWatch(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			eventWaitTimeout = time.Second * 5
 
 			sw := startWatchFake{
@@ -615,7 +615,7 @@ func TestRedirectDataMoverLogs(t *testing.T) {
 
 			fakeKubeClient := kubeclientfake.NewSimpleClientset()
 
-			err = redirectDataMoverLogs(context.Background(), fakeKubeClient, "", test.thisPod, "", test.logger)
+			err = redirectDataMoverLogs(t.Context(), fakeKubeClient, "", test.thisPod, "", test.logger)
 			if test.expectErr != "" {
 				assert.EqualError(t, err, test.expectErr)
 			} else {

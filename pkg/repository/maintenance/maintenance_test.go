@@ -122,7 +122,7 @@ func TestDeleteOldJobs(t *testing.T) {
 
 	// Get the remaining jobs
 	jobList := &batchv1api.JobList{}
-	err = cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
+	err = cli.List(t.Context(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
 	require.NoError(t, err)
 
 	// We expect the number of jobs to be equal to 'keep'
@@ -246,13 +246,13 @@ func TestWaitForJobComplete(t *testing.T) {
 
 					original := job.DeepCopy()
 					job.Status.Succeeded = 1
-					err := fakeClient.Status().Patch(context.Background(), job, client.MergeFrom(original))
+					err := fakeClient.Status().Patch(t.Context(), job, client.MergeFrom(original))
 					require.NoError(t, err)
 				}()
 			}
 
 			// Call the function
-			_, err := waitForJobComplete(context.Background(), fakeClient, job.Namespace, job.Name, logger)
+			_, err := waitForJobComplete(t.Context(), fakeClient, job.Namespace, job.Name, logger)
 
 			// Check if the error matches the expectation
 			if tc.expectError {
@@ -387,7 +387,7 @@ func TestGetResultFromJob(t *testing.T) {
 }
 
 func TestGetJobConfig(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	logger := logrus.New()
 	veleroNamespace := "velero"
 	repoMaintenanceJobConfig := "repo-maintenance-job-config"
@@ -562,7 +562,7 @@ func TestGetJobConfig(t *testing.T) {
 }
 
 func TestWaitAllJobsComplete(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second*2)
 
 	veleroNamespace := "velero"
 	repo := &velerov1api.BackupRepository{
@@ -719,7 +719,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 		{
 			name:          "get result error on succeeded job",
-			ctx:           context.TODO(),
+			ctx:           t.Context(),
 			runtimeScheme: scheme,
 			kubeClientObj: []runtime.Object{
 				jobSucceeded1,
@@ -734,7 +734,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 		{
 			name:          "get result error on failed job",
-			ctx:           context.TODO(),
+			ctx:           t.Context(),
 			runtimeScheme: scheme,
 			kubeClientObj: []runtime.Object{
 				jobFailed1,
@@ -749,7 +749,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 		{
 			name:          "less than limit",
-			ctx:           context.TODO(),
+			ctx:           t.Context(),
 			runtimeScheme: scheme,
 			kubeClientObj: []runtime.Object{
 				jobFailed1,
@@ -772,7 +772,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 		{
 			name:          "equal to limit",
-			ctx:           context.TODO(),
+			ctx:           t.Context(),
 			runtimeScheme: scheme,
 			kubeClientObj: []runtime.Object{
 				jobSucceeded2,
@@ -802,7 +802,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		},
 		{
 			name:          "more than limit",
-			ctx:           context.TODO(),
+			ctx:           t.Context(),
 			runtimeScheme: scheme,
 			kubeClientObj: []runtime.Object{
 				jobSucceeded3,
@@ -1076,7 +1076,7 @@ func TestBuildJob(t *testing.T) {
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 
 			// Call the function to test
-			job, err := buildJob(cli, context.TODO(), param.BackupRepo, param.BackupLocation.Name, tc.m, *tc.m.PodResources, tc.logLevel, tc.logFormat)
+			job, err := buildJob(cli, t.Context(), param.BackupRepo, param.BackupLocation.Name, tc.m, *tc.m.PodResources, tc.logLevel, tc.logFormat)
 
 			// Check the error
 			if tc.expectedError {

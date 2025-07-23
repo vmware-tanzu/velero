@@ -86,12 +86,12 @@ func mockBackupRepositoryCR() *velerov1api.BackupRepository {
 func TestPatchBackupRepository(t *testing.T) {
 	rr := mockBackupRepositoryCR()
 	reconciler := mockBackupRepoReconciler(t, "", nil, nil)
-	err := reconciler.Client.Create(context.TODO(), rr)
+	err := reconciler.Client.Create(t.Context(), rr)
 	require.NoError(t, err)
-	err = reconciler.patchBackupRepository(context.Background(), rr, repoReady())
+	err = reconciler.patchBackupRepository(t.Context(), rr, repoReady())
 	require.NoError(t, err)
 	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
-	err = reconciler.patchBackupRepository(context.Background(), rr, repoNotReady("not ready"))
+	err = reconciler.patchBackupRepository(t.Context(), rr, repoNotReady("not ready"))
 	require.NoError(t, err)
 	assert.NotEqual(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 }
@@ -102,7 +102,7 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	rr.Spec.ResticIdentifier = "fake-identifier"
 	rr.Spec.VolumeNamespace = "volume-ns-1"
 	reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
-	err := reconciler.Client.Create(context.TODO(), rr)
+	err := reconciler.Client.Create(t.Context(), rr)
 	require.NoError(t, err)
 	location := velerov1api.BackupStorageLocation{
 		Spec: velerov1api.BackupStorageLocationSpec{
@@ -114,7 +114,7 @@ func TestCheckNotReadyRepo(t *testing.T) {
 		},
 	}
 
-	_, err = reconciler.checkNotReadyRepo(context.TODO(), rr, &location, reconciler.logger)
+	_, err = reconciler.checkNotReadyRepo(t.Context(), rr, &location, reconciler.logger)
 	require.NoError(t, err)
 	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 	assert.Equal(t, "s3:test.amazonaws.com/bucket/restic/volume-ns-1", rr.Spec.ResticIdentifier)
@@ -371,13 +371,13 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			reconciler := mockBackupRepoReconciler(t, "", test.repo, nil)
 			reconciler.clock = &fakeClock{now}
-			err := reconciler.Client.Create(context.TODO(), test.repo)
+			err := reconciler.Client.Create(t.Context(), test.repo)
 			require.NoError(t, err)
 
 			funcStartMaintenanceJob = test.startJobFunc
 			funcWaitMaintenanceJobComplete = test.waitJobFunc
 
-			err = reconciler.runMaintenanceIfDue(context.TODO(), test.repo, velerotest.NewLogger())
+			err = reconciler.runMaintenanceIfDue(t.Context(), test.repo, velerotest.NewLogger())
 			if test.expectedErr == "" {
 				require.NoError(t, err)
 			}
@@ -404,7 +404,7 @@ func TestInitializeRepo(t *testing.T) {
 	rr := mockBackupRepositoryCR()
 	rr.Spec.BackupStorageLocation = "default"
 	reconciler := mockBackupRepoReconciler(t, "PrepareRepo", rr, nil)
-	err := reconciler.Client.Create(context.TODO(), rr)
+	err := reconciler.Client.Create(t.Context(), rr)
 	require.NoError(t, err)
 	location := velerov1api.BackupStorageLocation{
 		Spec: velerov1api.BackupStorageLocationSpec{
@@ -416,7 +416,7 @@ func TestInitializeRepo(t *testing.T) {
 		},
 	}
 
-	err = reconciler.initializeRepo(context.TODO(), rr, &location, reconciler.logger)
+	err = reconciler.initializeRepo(t.Context(), rr, &location, reconciler.logger)
 	require.NoError(t, err)
 	assert.Equal(t, velerov1api.BackupRepositoryPhaseReady, rr.Status.Phase)
 }
@@ -473,9 +473,9 @@ func TestBackupRepoReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			reconciler := mockBackupRepoReconciler(t, "", test.repo, nil)
-			err := reconciler.Client.Create(context.TODO(), test.repo)
+			err := reconciler.Client.Create(t.Context(), test.repo)
 			require.NoError(t, err)
-			_, err = reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: "repo"}})
+			_, err = reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: "repo"}})
 			if test.expectNil {
 				assert.NoError(t, err)
 			} else {
@@ -765,7 +765,7 @@ func TestGetBackupRepositoryConfig(t *testing.T) {
 
 			fakeClient := fakeClientBuilder.WithRuntimeObjects(test.kubeClientObj...).Build()
 
-			result, err := getBackupRepositoryConfig(context.Background(), fakeClient, test.congiName, velerov1api.DefaultNamespace, test.repoName, test.repoType, velerotest.NewLogger())
+			result, err := getBackupRepositoryConfig(t.Context(), fakeClient, test.congiName, velerov1api.DefaultNamespace, test.repoName, test.repoType, velerotest.NewLogger())
 
 			if test.expectedErr != "" {
 				assert.EqualError(t, err, test.expectedErr)
@@ -1053,7 +1053,7 @@ func TestRecallMaintenance(t *testing.T) {
 
 			lastTm := backupRepo.Status.LastMaintenanceTime
 
-			err := r.recallMaintenance(context.TODO(), backupRepo, velerotest.NewLogger())
+			err := r.recallMaintenance(t.Context(), backupRepo, velerotest.NewLogger())
 			if test.expectedErr != "" {
 				assert.EqualError(t, err, test.expectedErr)
 			} else {
@@ -1467,7 +1467,7 @@ func TestDeleteOldMaintenanceJob(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			crClient := velerotest.NewFakeControllerRuntimeClient(t, test.repo, test.bsl)
 			for _, job := range test.maintenanceJobs {
-				require.NoError(t, crClient.Create(context.TODO(), &job))
+				require.NoError(t, crClient.Create(t.Context(), &job))
 			}
 
 			repoLocker := repository.NewRepoLocker()
@@ -1487,7 +1487,7 @@ func TestDeleteOldMaintenanceJob(t *testing.T) {
 				nil,
 			)
 
-			_, err := reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: "repo"}})
+			_, err := reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: "repo"}})
 			if test.expectNil {
 				require.NoError(t, err)
 			} else {
@@ -1496,7 +1496,7 @@ func TestDeleteOldMaintenanceJob(t *testing.T) {
 
 			if len(test.maintenanceJobs) > 0 {
 				jobList := new(batchv1api.JobList)
-				require.NoError(t, reconciler.Client.List(context.TODO(), jobList, &client.ListOptions{Namespace: "velero"}))
+				require.NoError(t, reconciler.Client.List(t.Context(), jobList, &client.ListOptions{Namespace: "velero"}))
 				assert.Len(t, jobList.Items, 1)
 			}
 		})

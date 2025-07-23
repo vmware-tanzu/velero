@@ -58,7 +58,7 @@ func TestOnDataDownloadFailed(t *testing.T) {
 	expectedEventReason := datapath.EventReasonFailed
 	expectedEventMsg := "Data path for data download fake-data-download failed, error fake-error"
 
-	go bs.OnDataDownloadFailed(context.TODO(), velerov1api.DefaultNamespace, dataDownloadName, errors.New("fake-error"))
+	go bs.OnDataDownloadFailed(t.Context(), velerov1api.DefaultNamespace, dataDownloadName, errors.New("fake-error"))
 
 	result := <-bs.resultSignal
 	require.EqualError(t, result.err, expectedErr)
@@ -82,7 +82,7 @@ func TestOnDataDownloadCancelled(t *testing.T) {
 	expectedEventReason := datapath.EventReasonCancelled
 	expectedEventMsg := "Data path for data download fake-data-download canceled"
 
-	go bs.OnDataDownloadCancelled(context.TODO(), velerov1api.DefaultNamespace, dataDownloadName)
+	go bs.OnDataDownloadCancelled(t.Context(), velerov1api.DefaultNamespace, dataDownloadName)
 
 	result := <-bs.resultSignal
 	require.EqualError(t, result.err, expectedErr)
@@ -130,7 +130,7 @@ func TestOnDataDownloadCompleted(t *testing.T) {
 
 			funcMarshal = bt.Marshal
 
-			go bs.OnDataDownloadCompleted(context.TODO(), velerov1api.DefaultNamespace, dataDownloadName, datapath.Result{})
+			go bs.OnDataDownloadCompleted(t.Context(), velerov1api.DefaultNamespace, dataDownloadName, datapath.Result{})
 
 			result := <-bs.resultSignal
 			if test.marshalErr != nil {
@@ -181,7 +181,7 @@ func TestOnDataDownloadProgress(t *testing.T) {
 
 			funcMarshal = bt.Marshal
 
-			bs.OnDataDownloadProgress(context.TODO(), velerov1api.DefaultNamespace, dataDownloadName, &uploader.Progress{})
+			bs.OnDataDownloadProgress(t.Context(), velerov1api.DefaultNamespace, dataDownloadName, &uploader.Progress{})
 
 			if test.marshalErr != nil {
 				assert.False(t, bt.withEvent)
@@ -239,7 +239,7 @@ func TestRunCancelableRestore(t *testing.T) {
 	dataDownloadName := "fake-data-download"
 	dd := builder.ForDataDownload(velerov1api.DefaultNamespace, dataDownloadName).Phase(velerov2alpha1api.DataDownloadPhaseNew).Result()
 	ddInProgress := builder.ForDataDownload(velerov1api.DefaultNamespace, dataDownloadName).Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Result()
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctxTimeout, cancel := context.WithTimeout(t.Context(), time.Second)
 
 	tests := []struct {
 		name             string
@@ -266,21 +266,21 @@ func TestRunCancelableRestore(t *testing.T) {
 		},
 		{
 			name:          "create data path fail",
-			ctx:           context.Background(),
+			ctx:           t.Context(),
 			kubeClientObj: []runtime.Object{ddInProgress},
 			dataPathMgr:   datapath.NewManager(0),
 			expectedErr:   "error to create data path: Concurrent number exceeds",
 		},
 		{
 			name:          "init data path fail",
-			ctx:           context.Background(),
+			ctx:           t.Context(),
 			kubeClientObj: []runtime.Object{ddInProgress},
 			initErr:       errors.New("fake-init-error"),
 			expectedErr:   "error to initialize data path: fake-init-error",
 		},
 		{
 			name:          "start data path fail",
-			ctx:           context.Background(),
+			ctx:           t.Context(),
 			kubeClientObj: []runtime.Object{ddInProgress},
 			startErr:      errors.New("fake-start-error"),
 			expectedErr:   "error starting data path restore: fake-start-error",
@@ -295,7 +295,7 @@ func TestRunCancelableRestore(t *testing.T) {
 		},
 		{
 			name:            "data path returns error",
-			ctx:             context.Background(),
+			ctx:             t.Context(),
 			kubeClientObj:   []runtime.Object{ddInProgress},
 			dataPathStarted: true,
 			result: &dataPathResult{
@@ -306,7 +306,7 @@ func TestRunCancelableRestore(t *testing.T) {
 		},
 		{
 			name:            "succeed",
-			ctx:             context.Background(),
+			ctx:             t.Context(),
 			kubeClientObj:   []runtime.Object{ddInProgress},
 			dataPathStarted: true,
 			result: &dataPathResult{
@@ -331,7 +331,7 @@ func TestRunCancelableRestore(t *testing.T) {
 			rs := &RestoreMicroService{
 				namespace:        velerov1api.DefaultNamespace,
 				dataDownloadName: dataDownloadName,
-				ctx:              context.Background(),
+				ctx:              t.Context(),
 				client:           fakeClient,
 				dataPathMgr:      datapath.NewManager(1),
 				eventRecorder:    bt,

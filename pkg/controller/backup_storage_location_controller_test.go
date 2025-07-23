@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -246,7 +245,7 @@ func TestEnsureSingleDefaultBSL(t *testing.T) {
 		require.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
 		t.Run(test.name, func(t *testing.T) {
 			r := &backupStorageLocationReconciler{
-				ctx:                       context.Background(),
+				ctx:                       t.Context(),
 				client:                    fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(&test.locations).Build(),
 				defaultBackupLocationInfo: test.defaultBackupInfo,
 				metrics:                   metrics.NewServerMetrics(),
@@ -291,14 +290,14 @@ func TestBSLReconcile(t *testing.T) {
 		require.NoError(t, velerov1api.AddToScheme(scheme.Scheme))
 		t.Run(test.name, func(t *testing.T) {
 			r := &backupStorageLocationReconciler{
-				ctx:              context.Background(),
+				ctx:              t.Context(),
 				client:           fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(&test.locationList).Build(),
 				newPluginManager: func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				metrics:          metrics.NewServerMetrics(),
 				log:              velerotest.NewLogger(),
 			}
 
-			result, err := r.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: velerov1api.DefaultNamespace, Name: "location-1"}})
+			result, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: velerov1api.DefaultNamespace, Name: "location-1"}})
 			assert.Equal(t, test.expectedError, err)
 			assert.Equal(t, ctrl.Result{}, result)
 		})

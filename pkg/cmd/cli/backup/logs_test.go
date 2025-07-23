@@ -17,7 +17,6 @@ limitations under the License.
 package backup
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -62,7 +61,7 @@ func TestNewLogsCommand(t *testing.T) {
 
 		kbClient := velerotest.NewFakeControllerRuntimeClient(t)
 		backup := builder.ForBackup(cmdtest.VeleroNameSpace, backupName).Result()
-		err := kbClient.Create(context.Background(), backup, &kbclient.CreateOptions{})
+		err := kbClient.Create(t.Context(), backup, &kbclient.CreateOptions{})
 		require.NoError(t, err)
 
 		f.On("Namespace").Return(cmdtest.VeleroNameSpace)
@@ -117,7 +116,7 @@ func TestNewLogsCommand(t *testing.T) {
 
 		kbClient := velerotest.NewFakeControllerRuntimeClient(t)
 		backup := builder.ForBackup(cmdtest.VeleroNameSpace, backupName).Phase(velerov1api.BackupPhaseCompleted).Result()
-		err := kbClient.Create(context.Background(), backup, &kbclient.CreateOptions{})
+		err := kbClient.Create(t.Context(), backup, &kbclient.CreateOptions{})
 		require.NoError(t, err)
 
 		f.On("Namespace").Return(cmdtest.VeleroNameSpace)

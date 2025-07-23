@@ -17,7 +17,6 @@ limitations under the License.
 package restore
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -44,7 +43,7 @@ func TestNewGetCommand(t *testing.T) {
 
 	for _, restoreName := range args {
 		restore := builder.ForRestore(cmdtest.VeleroNameSpace, restoreName).ObjectMeta(builder.WithLabels("abc", "abc")).Result()
-		err := client.Create(context.Background(), restore, &kbclient.CreateOptions{})
+		err := client.Create(t.Context(), restore, &kbclient.CreateOptions{})
 		require.NoError(t, err)
 	}
 

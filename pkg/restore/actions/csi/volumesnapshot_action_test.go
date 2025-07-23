@@ -17,7 +17,6 @@ limitations under the License.
 package csi
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -155,7 +154,7 @@ func TestVSExecute(t *testing.T) {
 					if newNS, ok := test.restore.Spec.NamespaceMapping[test.vs.Namespace]; ok {
 						test.vs.SetNamespace(newNS)
 					}
-					require.NoError(t, p.crClient.Create(context.TODO(), test.vs))
+					require.NoError(t, p.crClient.Create(t.Context(), test.vs))
 				}
 			}
 

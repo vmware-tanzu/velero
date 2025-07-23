@@ -17,7 +17,6 @@ limitations under the License.
 package actions
 
 import (
-	"context"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -148,7 +147,7 @@ func TestChangeImageRepositoryActionExecute(t *testing.T) {
 
 			// set up test data
 			if tc.configMap != nil {
-				_, err := clientset.CoreV1().ConfigMaps(tc.configMap.Namespace).Create(context.TODO(), tc.configMap, metav1.CreateOptions{})
+				_, err := clientset.CoreV1().ConfigMaps(tc.configMap.Namespace).Create(t.Context(), tc.configMap, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 

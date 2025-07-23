@@ -17,7 +17,6 @@ limitations under the License.
 package credentials
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -68,7 +67,7 @@ func TestNamespacedFileStore(t *testing.T) {
 			client := velerotest.NewFakeControllerRuntimeClient(t)
 
 			for _, secret := range tc.secrets {
-				require.NoError(t, client.Create(context.Background(), secret))
+				require.NoError(t, client.Create(t.Context(), secret))
 			}
 
 			fs := velerotest.NewFakeFileSystem()

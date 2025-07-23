@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -145,7 +144,7 @@ func TestGCReconcile(t *testing.T) {
 
 			fakeClient := velerotest.NewFakeControllerRuntimeClient(t, initObjs...)
 			reconciler := mockGCReconciler(fakeClient, fakeClock, defaultGCFrequency)
-			_, err := reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
+			_, err := reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			gotErr := err != nil
 			assert.Equal(t, test.expectError, gotErr)
 		})

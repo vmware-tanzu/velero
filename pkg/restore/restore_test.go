@@ -2308,7 +2308,7 @@ func TestShouldRestore(t *testing.T) {
 			}
 
 			for _, ns := range tc.namespaces {
-				_, err := ctx.namespaceClient.Create(context.TODO(), ns, metav1.CreateOptions{})
+				_, err := ctx.namespaceClient.Create(t.Context(), ns, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
@@ -2345,7 +2345,7 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 				client = resourceClient
 			}
 
-			res, err := client.Get(context.TODO(), item.GetName(), metav1.GetOptions{})
+			res, err := client.Get(t.Context(), item.GetName(), metav1.GetOptions{})
 			if !assert.NoError(t, err) { //nolint:testifylint // require is inappropriate
 				continue
 			}
@@ -3206,11 +3206,11 @@ func TestRestorePersistentVolumes(t *testing.T) {
 
 			// set up the VolumeSnapshotLocation client and add test data to it
 			for _, vsl := range tc.volumeSnapshotLocations {
-				require.NoError(t, h.restorer.kbClient.Create(context.Background(), vsl))
+				require.NoError(t, h.restorer.kbClient.Create(t.Context(), vsl))
 			}
 
 			if tc.dataUploadResult != nil {
-				require.NoError(t, h.restorer.kbClient.Create(context.TODO(), tc.dataUploadResult))
+				require.NoError(t, h.restorer.kbClient.Create(t.Context(), tc.dataUploadResult))
 			}
 
 			for _, r := range tc.apiResources {
@@ -3652,7 +3652,7 @@ func assertAPIContents(t *testing.T, h *harness, want map[*test.APIResource][]st
 	t.Helper()
 
 	for r, want := range want {
-		res, err := h.DynamicClient.Resource(r.GVR()).List(context.TODO(), metav1.ListOptions{})
+		res, err := h.DynamicClient.Resource(r.GVR()).List(t.Context(), metav1.ListOptions{})
 		require.NoError(t, err)
 		if err != nil {
 			continue
@@ -3743,9 +3743,9 @@ func (h *harness) AddItems(t *testing.T, resource *test.APIResource) {
 		unstructured.RemoveNestedField(unstructuredObj.Object, "status")
 
 		if resource.Namespaced {
-			_, err = h.DynamicClient.Resource(resource.GVR()).Namespace(item.GetNamespace()).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
+			_, err = h.DynamicClient.Resource(resource.GVR()).Namespace(item.GetNamespace()).Create(t.Context(), unstructuredObj, metav1.CreateOptions{})
 		} else {
-			_, err = h.DynamicClient.Resource(resource.GVR()).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
+			_, err = h.DynamicClient.Resource(resource.GVR()).Create(t.Context(), unstructuredObj, metav1.CreateOptions{})
 		}
 		require.NoError(t, err)
 	}
@@ -4134,7 +4134,7 @@ func TestHasSnapshotDataUpload(t *testing.T) {
 		}
 
 		if tc.duResult != nil {
-			require.NoError(t, ctx.kbClient.Create(context.TODO(), tc.duResult))
+			require.NoError(t, ctx.kbClient.Create(t.Context(), tc.duResult))
 		}
 
 		t.Run(tc.name, func(t *testing.T) {

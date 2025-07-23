@@ -119,7 +119,7 @@ func TestOnPvrFailed(t *testing.T) {
 	expectedEventReason := datapath.EventReasonFailed
 	expectedEventMsg := "Data path for PVR fake-pvr failed, error fake-error"
 
-	go rs.OnPvrFailed(context.TODO(), velerov1api.DefaultNamespace, pvrName, errors.New("fake-error"))
+	go rs.OnPvrFailed(t.Context(), velerov1api.DefaultNamespace, pvrName, errors.New("fake-error"))
 
 	result := <-rs.resultSignal
 	require.EqualError(t, result.err, expectedErr)
@@ -143,7 +143,7 @@ func TestPvrCancelled(t *testing.T) {
 	expectedEventReason := datapath.EventReasonCancelled
 	expectedEventMsg := "Data path for PVR fake-pvr canceled"
 
-	go rs.OnPvrCancelled(context.TODO(), velerov1api.DefaultNamespace, pvrName)
+	go rs.OnPvrCancelled(t.Context(), velerov1api.DefaultNamespace, pvrName)
 
 	result := <-rs.resultSignal
 	require.EqualError(t, result.err, expectedErr)
@@ -205,7 +205,7 @@ func TestOnPvrCompleted(t *testing.T) {
 			funcMarshal = rt.Marshal
 			funcWriteCompletionMark = rt.WriteCompletionMark
 
-			go rs.OnPvrCompleted(context.TODO(), velerov1api.DefaultNamespace, pvrName, datapath.Result{})
+			go rs.OnPvrCompleted(t.Context(), velerov1api.DefaultNamespace, pvrName, datapath.Result{})
 
 			result := <-rs.resultSignal
 			if test.marshalErr != nil {
@@ -262,7 +262,7 @@ func TestOnPvrProgress(t *testing.T) {
 
 			funcMarshal = rt.Marshal
 
-			rs.OnPvrProgress(context.TODO(), velerov1api.DefaultNamespace, pvrName, &uploader.Progress{})
+			rs.OnPvrProgress(t.Context(), velerov1api.DefaultNamespace, pvrName, &uploader.Progress{})
 
 			if test.marshalErr != nil {
 				assert.False(t, rt.withEvent)
@@ -320,7 +320,7 @@ func TestRunCancelableDataPathRestore(t *testing.T) {
 	pvrName := "fake-pvr"
 	pvr := builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, pvrName).Phase(velerov1api.PodVolumeRestorePhaseNew).Result()
 	pvrInProgress := builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, pvrName).Phase(velerov1api.PodVolumeRestorePhaseInProgress).Result()
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctxTimeout, cancel := context.WithTimeout(t.Context(), time.Second)
 
 	tests := []struct {
 		name             string
@@ -347,21 +347,21 @@ func TestRunCancelableDataPathRestore(t *testing.T) {
 		},
 		{
 			name:          "create data path fail",
-			ctx:           context.Background(),
+			ctx:           t.Context(),
 			kubeClientObj: []runtime.Object{pvrInProgress},
 			dataPathMgr:   datapath.NewManager(0),
 			expectedErr:   "error to create data path: Concurrent number exceeds",
 		},
 		{
 			name:          "init data path fail",
-			ctx:           context.Background(),
+			ctx:           t.Context(),
 			kubeClientObj: []runtime.Object{pvrInProgress},
 			initErr:       errors.New("fake-init-error"),
 			expectedErr:   "error to initialize data path: fake-init-error",
 		},
 		{
 			name:          "start data path fail",
-			ctx:           context.Background(),
+			ctx:           t.Context(),
 			kubeClientObj: []runtime.Object{pvrInProgress},
 			startErr:      errors.New("fake-start-error"),
 			expectedErr:   "error starting data path restore: fake-start-error",
@@ -376,7 +376,7 @@ func TestRunCancelableDataPathRestore(t *testing.T) {
 		},
 		{
 			name:            "data path returns error",
-			ctx:             context.Background(),
+			ctx:             t.Context(),
 			kubeClientObj:   []runtime.Object{pvrInProgress},
 			dataPathStarted: true,
 			result: &dataPathResult{
@@ -387,7 +387,7 @@ func TestRunCancelableDataPathRestore(t *testing.T) {
 		},
 		{
 			name:            "succeed",
-			ctx:             context.Background(),
+			ctx:             t.Context(),
 			kubeClientObj:   []runtime.Object{pvrInProgress},
 			dataPathStarted: true,
 			result: &dataPathResult{
@@ -412,7 +412,7 @@ func TestRunCancelableDataPathRestore(t *testing.T) {
 			rs := &RestoreMicroService{
 				namespace:     velerov1api.DefaultNamespace,
 				pvrName:       pvrName,
-				ctx:           context.Background(),
+				ctx:           t.Context(),
 				client:        fakeClient,
 				dataPathMgr:   datapath.NewManager(1),
 				eventRecorder: rt,

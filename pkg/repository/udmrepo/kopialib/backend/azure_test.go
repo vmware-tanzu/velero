@@ -17,7 +17,6 @@ limitations under the License.
 package backend
 
 import (
-	"context"
 	"testing"
 
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -43,7 +42,7 @@ func TestAzureSetup(t *testing.T) {
 		UploadBytesPerSecond: 200,
 	}
 
-	err := backend.Setup(context.Background(), flags, logger)
+	err := backend.Setup(t.Context(), flags, logger)
 	require.NoError(t, err)
 	assert.Equal(t, flags, backend.option.Config)
 	assert.Equal(t, limits, backend.option.Limits)

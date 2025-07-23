@@ -220,11 +220,11 @@ func TestPodVolumeExpose(t *testing.T) {
 				extractPodVolumeHostPath = test.funcExtractPodVolumeHostPath
 			}
 
-			err := exposer.Expose(context.Background(), ownerObject, test.exposeParam)
+			err := exposer.Expose(t.Context(), ownerObject, test.exposeParam)
 			if err == nil {
 				require.NoError(t, err)
 
-				_, err = exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(context.Background(), ownerObject.Name, metav1.GetOptions{})
+				_, err = exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(t.Context(), ownerObject.Name, metav1.GetOptions{})
 				assert.NoError(t, err)
 			} else {
 				assert.EqualError(t, err, test.err)
@@ -318,7 +318,7 @@ func TestGetPodVolumeExpose(t *testing.T) {
 				}
 			}
 
-			result, err := exposer.GetExposed(context.Background(), ownerObject, fakeClient, test.nodeName, test.Timeout)
+			result, err := exposer.GetExposed(t.Context(), ownerObject, fakeClient, test.nodeName, test.Timeout)
 			if test.err == "" {
 				require.NoError(t, err)
 
@@ -416,7 +416,7 @@ func TestPodVolumePeekExpose(t *testing.T) {
 				}
 			}
 
-			err := exposer.PeekExposed(context.Background(), ownerObject)
+			err := exposer.PeekExposed(t.Context(), ownerObject)
 			if test.err == "" {
 				assert.NoError(t, err)
 			} else {
@@ -585,7 +585,7 @@ end diagnose pod volume exposer`,
 				}
 			}
 
-			diag := e.DiagnoseExpose(context.Background(), ownerObject)
+			diag := e.DiagnoseExpose(t.Context(), ownerObject)
 			assert.Equal(t, tt.expected, diag)
 		})
 	}

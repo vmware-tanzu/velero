@@ -90,6 +90,7 @@ type Options struct {
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
 	NodeAgentDisableHostPath        bool
+	kubeletRootDir                  string
 }
 
 // BindFlags adds command line values to the options struct.
@@ -114,6 +115,8 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.NodeAgentPodMemRequest, "node-agent-pod-mem-request", o.NodeAgentPodMemRequest, `Memory request for node-agent pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.NodeAgentPodCPULimit, "node-agent-pod-cpu-limit", o.NodeAgentPodCPULimit, `CPU limit for node-agent pod. A value of "0" is treated as unbounded. Optional.`)
 	flags.StringVar(&o.NodeAgentPodMemLimit, "node-agent-pod-mem-limit", o.NodeAgentPodMemLimit, `Memory limit for node-agent pod. A value of "0" is treated as unbounded. Optional.`)
+	flags.StringVar(&o.kubeletRootDir, "kubelet-root-dir", o.kubeletRootDir, `Kubelet root directory for the node agent. Optional.`)
+
 	flags.Var(&o.BackupStorageConfig, "backup-location-config", "Configuration to use for the backup storage location. Format is key1=value1,key2=value2")
 	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "Configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flags.BoolVar(&o.UseVolumeSnapshots, "use-volume-snapshots", o.UseVolumeSnapshots, "Whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.")
@@ -220,6 +223,7 @@ func NewInstallOptions() *Options {
 		DefaultSnapshotMoveData:  false,
 		DisableInformerCache:     false,
 		ScheduleSkipImmediately:  false,
+		kubeletRootDir:           install.DefaultKubeletRootDir,
 		NodeAgentDisableHostPath: false,
 	}
 }
@@ -295,6 +299,7 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		RepoMaintenanceJobConfigMap:     o.RepoMaintenanceJobConfigMap,
 		NodeAgentConfigMap:              o.NodeAgentConfigMap,
 		ItemBlockWorkerCount:            o.ItemBlockWorkerCount,
+		KubeletRootDir:                  o.kubeletRootDir,
 		NodeAgentDisableHostPath:        o.NodeAgentDisableHostPath,
 	}, nil
 }

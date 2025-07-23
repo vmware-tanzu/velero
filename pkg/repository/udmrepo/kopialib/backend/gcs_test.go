@@ -17,7 +17,6 @@ limitations under the License.
 package backend
 
 import (
-	"context"
 	"testing"
 
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
@@ -93,7 +92,7 @@ func TestGcsSetup(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			gcsFlags := GCSBackend{}
 
-			err := gcsFlags.Setup(context.Background(), tc.flags, logger)
+			err := gcsFlags.Setup(t.Context(), tc.flags, logger)
 
 			if tc.expectedErr == "" {
 				require.NoError(t, err)

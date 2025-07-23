@@ -17,7 +17,6 @@ limitations under the License.
 package actions
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -111,7 +110,7 @@ func TestDataUploadRetrieveActionExectue(t *testing.T) {
 
 			if tc.expectedDataUploadResult != nil {
 				var cmList corev1api.ConfigMapList
-				err := fakeClient.List(context.Background(), &cmList, &client.ListOptions{
+				err := fakeClient.List(t.Context(), &cmList, &client.ListOptions{
 					LabelSelector: labels.SelectorFromSet(map[string]string{
 						velerov1.RestoreUIDLabel:       "testingUID",
 						velerov1.PVCNamespaceNameLabel: label.GetValidName(tc.dataUpload.Spec.SourceNamespace + "." + tc.dataUpload.Spec.SourcePVC),

@@ -17,7 +17,6 @@ limitations under the License.
 package backend
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -103,7 +102,7 @@ func TestSetupNewRepositoryOptions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ret := SetupNewRepositoryOptions(context.Background(), tc.flags)
+			ret := SetupNewRepositoryOptions(t.Context(), tc.flags)
 			assert.Equal(t, tc.expected, ret)
 		})
 	}
@@ -193,7 +192,7 @@ func TestSetupConnectOptions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ret := SetupConnectOptions(context.Background(), tc.repoOptions)
+			ret := SetupConnectOptions(t.Context(), tc.repoOptions)
 			assert.Equal(t, tc.expected, ret)
 		})
 	}

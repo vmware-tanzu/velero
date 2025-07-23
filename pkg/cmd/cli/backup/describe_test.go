@@ -17,7 +17,6 @@ limitations under the License.
 package backup
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -44,7 +43,7 @@ func TestNewDescribeCommand(t *testing.T) {
 
 	clientConfig := rest.Config{}
 	kbClient := test.NewFakeControllerRuntimeClient(t)
-	kbClient.Create(context.Background(), testBackup, &controllerclient.CreateOptions{})
+	kbClient.Create(t.Context(), testBackup, &controllerclient.CreateOptions{})
 
 	f.On("ClientConfig").Return(&clientConfig, nil)
 	f.On("Namespace").Return(cmdtest.VeleroNameSpace)

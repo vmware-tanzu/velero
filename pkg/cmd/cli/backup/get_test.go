@@ -17,7 +17,6 @@ limitations under the License.
 package backup
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -45,7 +44,7 @@ func TestNewGetCommand(t *testing.T) {
 
 	for _, backupName := range args {
 		backup := builder.ForBackup(cmdtest.VeleroNameSpace, backupName).ObjectMeta(builder.WithLabels("abc", "abc")).Result()
-		err := client.Create(context.Background(), backup, &kbclient.CreateOptions{})
+		err := client.Create(t.Context(), backup, &kbclient.CreateOptions{})
 		require.NoError(t, err)
 	}
 

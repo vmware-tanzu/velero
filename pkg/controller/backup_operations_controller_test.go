@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -296,12 +295,12 @@ func TestBackupOperationsReconcile(t *testing.T) {
 					}, nil)
 				pluginManager.On("GetBackupItemActionV2", operation.Spec.BackupItemAction).Return(bia, nil)
 			}
-			_, err := reconciler.Reconcile(context.TODO(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
+			_, err := reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}})
 			gotErr := err != nil
 			assert.Equal(t, test.expectError, gotErr)
 
 			backupAfter := velerov1api.Backup{}
-			err = fakeClient.Get(context.TODO(), types.NamespacedName{
+			err = fakeClient.Get(t.Context(), types.NamespacedName{
 				Namespace: test.backup.Namespace,
 				Name:      test.backup.Name,
 			}, &backupAfter)

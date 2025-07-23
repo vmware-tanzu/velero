@@ -16,7 +16,6 @@ limitations under the License.
 package client
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -125,7 +124,7 @@ func TestFactory(t *testing.T) {
 				Version: "verion_test",
 			}
 			list, e := dynamicClient.Resource(*resource).Namespace(namespace).List(
-				context.Background(),
+				t.Context(),
 				metav1.ListOptions{
 					LabelSelector: "none",
 				},

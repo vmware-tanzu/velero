@@ -479,12 +479,12 @@ func TestDataDownloadReconcile(t *testing.T) {
 			require.NoError(t, err)
 
 			if !test.notCreateDD {
-				err = r.client.Create(context.Background(), test.dd)
+				err = r.client.Create(t.Context(), test.dd)
 				require.NoError(t, err)
 			}
 
 			if test.needDelete {
-				err = r.client.Delete(context.Background(), test.dd)
+				err = r.client.Delete(t.Context(), test.dd)
 				require.NoError(t, err)
 			}
 
@@ -627,7 +627,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 
 func TestOnDataDownloadFailed(t *testing.T) {
 	for _, getErr := range []bool{true, false} {
-		ctx := context.TODO()
+		ctx := t.Context()
 		needErrs := []bool{getErr, false, false, false}
 		r, err := initDataDownloadReconciler(t, nil, needErrs...)
 		require.NoError(t, err)
@@ -653,7 +653,7 @@ func TestOnDataDownloadFailed(t *testing.T) {
 
 func TestOnDataDownloadCancelled(t *testing.T) {
 	for _, getErr := range []bool{true, false} {
-		ctx := context.TODO()
+		ctx := t.Context()
 		needErrs := []bool{getErr, false, false, false}
 		r, err := initDataDownloadReconciler(t, nil, needErrs...)
 		require.NoError(t, err)
@@ -695,7 +695,7 @@ func TestOnDataDownloadCompleted(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			needErrs := []bool{test.isGetErr, false, false, false}
 			r, err := initDataDownloadReconciler(t, nil, needErrs...)
 			r.restoreExposer = func() exposer.GenericRestoreExposer {
@@ -760,7 +760,7 @@ func TestOnDataDownloadProgress(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 
 			r, err := initDataDownloadReconciler(t, nil, test.needErrs...)
 			require.NoError(t, err)
@@ -772,7 +772,7 @@ func TestOnDataDownloadProgress(t *testing.T) {
 			namespace := dd.Namespace
 			duName := dd.Name
 			// Add the DataDownload object to the fake client
-			require.NoError(t, r.client.Create(context.Background(), dd))
+			require.NoError(t, r.client.Create(t.Context(), dd))
 
 			// Create a Progress object
 			progress := &uploader.Progress{
@@ -841,11 +841,11 @@ func TestFindDataDownloadForPod(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		assert.NoError(t, r.client.Create(ctx, test.pod))
 		assert.NoError(t, r.client.Create(ctx, test.du))
 		// Call the findSnapshotRestoreForPod function
-		requests := r.findSnapshotRestoreForPod(context.Background(), test.pod)
+		requests := r.findSnapshotRestoreForPod(t.Context(), test.pod)
 		test.checkFunc(test.du, requests)
 		r.client.Delete(ctx, test.du, &kbclient.DeleteOptions{})
 		if test.pod != nil {
@@ -881,7 +881,7 @@ func TestAcceptDataDownload(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initDataDownloadReconcilerWithError(t, nil, test.needErrs...)
 		require.NoError(t, err)
 
@@ -925,7 +925,7 @@ func TestOnDdPrepareTimeout(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initDataDownloadReconcilerWithError(t, nil, test.needErrs...)
 		require.NoError(t, err)
 
@@ -970,7 +970,7 @@ func TestTryCancelDataDownload(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		ctx := context.Background()
+		ctx := t.Context()
 		r, err := initDataDownloadReconcilerWithError(t, nil, test.needErrs...)
 		require.NoError(t, err)
 
@@ -1027,7 +1027,7 @@ func TestUpdateDataDownloadWithRetry(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			ctx, cancelFunc := context.WithTimeout(context.TODO(), time.Second*5)
+			ctx, cancelFunc := context.WithTimeout(t.Context(), time.Second*5)
 			defer cancelFunc()
 			r, err := initDataDownloadReconciler(t, nil, tc.needErrs...)
 			require.NoError(t, err)
@@ -1145,7 +1145,7 @@ func TestAttemptDataDownloadResume(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			r, err := initDataDownloadReconciler(t, nil, test.needErrs...)
 			r.nodeName = "node-1"
 			require.NoError(t, err)
@@ -1172,21 +1172,21 @@ func TestAttemptDataDownloadResume(t *testing.T) {
 				// Verify DataDownload marked as Canceled
 				for _, duName := range test.cancelledDataDownloads {
 					dataDownload := &velerov2alpha1api.DataDownload{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataDownload)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: duName}, dataDownload)
 					require.NoError(t, err)
 					assert.True(t, dataDownload.Spec.Cancel)
 				}
 				// Verify DataDownload marked as Accepted
 				for _, duName := range test.acceptedDataDownloads {
 					dataUpload := &velerov2alpha1api.DataDownload{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
 					require.NoError(t, err)
 					assert.Equal(t, velerov2alpha1api.DataDownloadPhaseAccepted, dataUpload.Status.Phase)
 				}
 				// Verify DataDownload marked as Prepared
 				for _, duName := range test.prepareddDataDownloads {
 					dataUpload := &velerov2alpha1api.DataDownload{}
-					err := r.client.Get(context.Background(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
+					err := r.client.Get(t.Context(), types.NamespacedName{Namespace: "velero", Name: duName}, dataUpload)
 					require.NoError(t, err)
 					assert.Equal(t, velerov2alpha1api.DataDownloadPhasePrepared, dataUpload.Status.Phase)
 				}
@@ -1263,7 +1263,7 @@ func TestResumeCancellableRestore(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.TODO()
+			ctx := t.Context()
 			r, err := initDataDownloadReconciler(t, nil, false)
 			r.nodeName = "node-1"
 			require.NoError(t, err)
