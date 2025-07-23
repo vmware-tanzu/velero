@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v7/clientset/versioned/typed/volumesnapshot/v1"
+	snapshotter "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned/typed/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
@@ -74,6 +74,7 @@ type DataUploadReconciler struct {
 	logger              logrus.FieldLogger
 	snapshotExposerList map[velerov2alpha1api.SnapshotType]exposer.SnapshotExposer
 	dataPathMgr         *datapath.Manager
+	vgdpCounter         *exposer.VgdpCounter
 	loadAffinity        []*kube.LoadAffinity
 	backupPVCConfig     map[string]nodeagent.BackupPVC
 	podResources        corev1api.ResourceRequirements
@@ -88,6 +89,7 @@ func NewDataUploadReconciler(
 	kubeClient kubernetes.Interface,
 	csiSnapshotClient snapshotter.SnapshotV1Interface,
 	dataPathMgr *datapath.Manager,
+	counter *exposer.VgdpCounter,
 	loadAffinity []*kube.LoadAffinity,
 	backupPVCConfig map[string]nodeagent.BackupPVC,
 	podResources corev1api.ResourceRequirements,
@@ -113,6 +115,7 @@ func NewDataUploadReconciler(
 			),
 		},
 		dataPathMgr:         dataPathMgr,
+		vgdpCounter:         counter,
 		loadAffinity:        loadAffinity,
 		backupPVCConfig:     backupPVCConfig,
 		podResources:        podResources,
@@ -241,6 +244,19 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if du.Status.Phase == "" || du.Status.Phase == velerov2alpha1api.DataUploadPhaseNew {
+		if du.Spec.Cancel {
+			log.Debugf("Data upload is canceled in Phase %s", du.Status.Phase)
+
+			r.tryCancelDataUpload(ctx, du, "")
+
+			return ctrl.Result{}, nil
+		}
+
+		if r.vgdpCounter != nil && r.vgdpCounter.IsConstrained(ctx, r.logger) {
+			log.Debug("Data path initiation is constrained, requeue later")
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
+		}
+
 		log.Info("Data upload starting")
 
 		accepted, err := r.acceptDataUpload(ctx, du)
@@ -254,11 +270,6 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		log.Info("Data upload is accepted")
-
-		if du.Spec.Cancel {
-			r.OnDataUploadCancelled(ctx, du.GetNamespace(), du.GetName())
-			return ctrl.Result{}, nil
-		}
 
 		exposeParam, err := r.setupExposeParam(du)
 		if err != nil {
@@ -330,7 +341,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			du.Name, du.Namespace, res.ByPod.HostingPod.Name, res.ByPod.HostingContainer, du.Name, callbacks, false, log)
 		if err != nil {
 			if err == datapath.ConcurrentLimitExceed {
-				log.Info("Data path instance is concurrent limited requeue later")
+				log.Debug("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 			} else {
 				return r.errorOut(ctx, du, err, "error to create data path", log)
@@ -355,6 +366,8 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			du.Status.Phase = velerov2alpha1api.DataUploadPhaseInProgress
 			du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 			du.Status.NodeOS = velerov2alpha1api.NodeOS(*res.ByPod.NodeOS)
+
+			delete(du.Labels, exposer.ExposeOnGoingLabel)
 
 			return true
 		}); err != nil {
@@ -481,6 +494,8 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 			du.Status.Message = "volume was empty so no data was upload"
 		}
 
+		delete(du.Labels, exposer.ExposeOnGoingLabel)
+
 		return true
 	}); err != nil {
 		log.WithError(err).Error("error updating DataUpload status")
@@ -531,6 +546,8 @@ func (r *DataUploadReconciler) OnDataUploadCancelled(ctx context.Context, namesp
 		}
 		du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 
+		delete(du.Labels, exposer.ExposeOnGoingLabel)
+
 		return true
 	}); err != nil {
 		log.WithError(err).Error("error updating DataUpload status")
@@ -552,6 +569,8 @@ func (r *DataUploadReconciler) tryCancelDataUpload(ctx context.Context, du *vele
 		if message != "" {
 			dataUpload.Status.Message = message
 		}
+
+		delete(dataUpload.Labels, exposer.ExposeOnGoingLabel)
 	})
 
 	if err != nil {
@@ -760,6 +779,8 @@ func (r *DataUploadReconciler) updateStatusToFailed(ctx context.Context, du *vel
 		}
 		du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 
+		delete(du.Labels, exposer.ExposeOnGoingLabel)
+
 		return true
 	}); patchErr != nil {
 		log.WithError(patchErr).Error("error updating DataUpload status")
@@ -781,6 +802,11 @@ func (r *DataUploadReconciler) acceptDataUpload(ctx context.Context, du *velerov
 		dataUpload.Status.Phase = velerov2alpha1api.DataUploadPhaseAccepted
 		dataUpload.Status.AcceptedByNode = r.nodeName
 		dataUpload.Status.AcceptedTimestamp = &metav1.Time{Time: r.Clock.Now()}
+
+		if dataUpload.Labels == nil {
+			dataUpload.Labels = make(map[string]string)
+		}
+		dataUpload.Labels[exposer.ExposeOnGoingLabel] = "true"
 	}
 
 	succeeded, err := funcExclusiveUpdateDataUpload(ctx, r.client, updated, updateFunc)
@@ -807,6 +833,8 @@ func (r *DataUploadReconciler) onPrepareTimeout(ctx context.Context, du *velerov
 	succeeded, err := funcExclusiveUpdateDataUpload(ctx, r.client, du, func(du *velerov2alpha1api.DataUpload) {
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseFailed
 		du.Status.Message = "timeout on preparing data upload"
+
+		delete(du.Labels, exposer.ExposeOnGoingLabel)
 	})
 
 	if err != nil {

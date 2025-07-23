@@ -26,7 +26,7 @@ require (
 	github.com/hashicorp/go-plugin v1.6.0
 	github.com/joho/godotenv v1.3.0
 	github.com/kopia/kopia v0.16.0
-	github.com/kubernetes-csi/external-snapshotter/client/v7 v7.0.0
+	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.2.0
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
 	github.com/petar/GoLLRB v0.0.0-20210522233825-ae3b015fd3e9
@@ -41,7 +41,6 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware-tanzu/crash-diagnostics v0.3.7
 	go.uber.org/zap v1.27.0
-	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 	golang.org/x/mod v0.24.0
 	golang.org/x/net v0.40.0
 	golang.org/x/oauth2 v0.30.0
@@ -182,6 +181,7 @@ require (
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
+	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect

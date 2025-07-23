@@ -133,3 +133,9 @@ func (b *PodVolumeRestoreBuilder) Node(node string) *PodVolumeRestoreBuilder {
 	b.object.Status.Node = node
 	return b
 }
+
+// Labels sets the PodVolumeRestoreBuilder's Labels.
+func (b *PodVolumeRestoreBuilder) Labels(label map[string]string) *PodVolumeRestoreBuilder {
+	b.object.Labels = label
+	return b
+}

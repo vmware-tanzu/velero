@@ -141,6 +141,21 @@ func RunKibishiiTests(
 
 	fmt.Printf("VeleroBackupNamespace done %s\n", time.Now().Format("2006-01-02 15:04:05"))
 
+	fmt.Printf("KibishiiVerifyAfterBackup %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	backupVolumeInfo, err := GetVolumeInfo(
+		veleroCfg.ObjectStoreProvider,
+		veleroCfg.CloudCredentialsFile,
+		veleroCfg.BSLBucket,
+		veleroCfg.BSLPrefix,
+		veleroCfg.BSLConfig,
+		backupName,
+		BackupObjectsPrefix+"/"+backupName,
+	)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get volume info for backup %s", backupName)
+	}
+	fmt.Printf("backupVolumeInfo %v\n", backupVolumeInfo)
+
 	// Checkpoint for a successful backup
 	if useVolumeSnapshots {
 		if veleroCfg.HasVspherePlugin {
@@ -150,7 +165,8 @@ func RunKibishiiTests(
 				return errors.Wrapf(err, "Error waiting for uploads to complete")
 			}
 		}
-		snapshotCheckPoint, err := GetSnapshotCheckPoint(client, veleroCfg, 2, kibishiiNamespace, backupName, KibishiiPVCNameList)
+
+		snapshotCheckPoint, err := BuildSnapshotCheckPointFromVolumeInfo(veleroCfg, backupVolumeInfo, DefaultKibishiiWorkerCounts, kibishiiNamespace, backupName, KibishiiPVCNameList)
 		if err != nil {
 			return errors.Wrap(err, "Fail to get snapshot checkpoint")
 		}
@@ -186,7 +202,7 @@ func RunKibishiiTests(
 			// wait for a period to confirm no snapshots content exist for the backup
 			time.Sleep(1 * time.Minute)
 			if strings.EqualFold(veleroFeatures, FeatureCSI) {
-				_, err = GetSnapshotCheckPoint(*veleroCfg.ClientToInstallVelero, veleroCfg, 0,
+				_, err = BuildSnapshotCheckPointFromVolumeInfo(veleroCfg, backupVolumeInfo, 0,
 					kibishiiNamespace, backupName, KibishiiPVCNameList)
 				if err != nil {
 					return errors.Wrap(err, "failed to get snapshot checkPoint")

@@ -32,24 +32,24 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
 	"golang.org/x/mod/semver"
 	"k8s.io/apimachinery/pkg/labels"
 	ver "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	. "github.com/vmware-tanzu/velero/test"
 	common "github.com/vmware-tanzu/velero/test/util/common"
-	util "github.com/vmware-tanzu/velero/test/util/csi"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -1277,20 +1277,38 @@ func GetRepositories(ctx context.Context, veleroNamespace, targetNamespace strin
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
-func GetSnapshotCheckPoint(client TestClient, veleroCfg VeleroConfig, expectCount int, namespaceBackedUp, backupName string, KibishiiPVCNameList []string) (SnapshotCheckPoint, error) {
-	var err error
+// BuildSnapshotCheckPointFromVolumeInfo pulls snapshot handles directly
+func BuildSnapshotCheckPointFromVolumeInfo(
+	veleroCfg VeleroConfig,
+	backupVolumeInfo []*volume.BackupVolumeInfo,
+	expectCount int,
+	namespaceBackedUp string,
+	backupName string,
+	KibishiiPVCNameList []string) (SnapshotCheckPoint, error) {
 	var snapshotCheckPoint SnapshotCheckPoint
 
 	snapshotCheckPoint.ExpectCount = expectCount
 	snapshotCheckPoint.NamespaceBackedUp = namespaceBackedUp
 	snapshotCheckPoint.PodName = KibishiiPVCNameList
+
 	if (veleroCfg.CloudProvider == Azure || veleroCfg.CloudProvider == AWS) && strings.EqualFold(veleroCfg.Features, FeatureCSI) {
 		snapshotCheckPoint.EnableCSI = true
 
-		if snapshotCheckPoint.SnapshotIDList, err = util.CheckVolumeSnapshotCR(client, map[string]string{"backupNameLabel": backupName}, expectCount); err != nil {
-			return snapshotCheckPoint, errors.Wrapf(err, "Fail to get Azure CSI snapshot content")
+		var VscCount = 0
+		for _, volumeInfo := range backupVolumeInfo {
+			if *volumeInfo.CSISnapshotInfo.ReadyToUse == true {
+				snapshotCheckPoint.SnapshotIDList = append(snapshotCheckPoint.SnapshotIDList, volumeInfo.CSISnapshotInfo.SnapshotHandle)
+				VscCount++
+			} else {
+				return snapshotCheckPoint, errors.New("CSI snapshot is not ready to use")
+			}
+		}
+
+		if VscCount != expectCount {
+			return snapshotCheckPoint, errors.New(fmt.Sprintf("CSI snapshot count %d is not as expected %d", VscCount, expectCount))
 		}
 	}
+
 	fmt.Printf("snapshotCheckPoint: %v \n", snapshotCheckPoint)
 	return snapshotCheckPoint, nil
 }

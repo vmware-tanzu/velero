@@ -166,12 +166,24 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupLoc
 		return err
 	}
 
+	backupVolumeInfo, err := GetVolumeInfo(
+		veleroCfg.ObjectStoreProvider,
+		veleroCfg.CloudCredentialsFile,
+		veleroCfg.BSLBucket,
+		veleroCfg.BSLPrefix,
+		veleroCfg.BSLConfig,
+		backupName,
+		BackupObjectsPrefix+"/"+backupName,
+	)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get volume info for backup %s", backupName)
+	}
 	if useVolumeSnapshots {
 		// Check for snapshots existence
 		if veleroCfg.CloudProvider == Vsphere {
 			// For vSphere, checking snapshot should base on namespace and backup name
 			for _, ns := range workloadNamespaceList {
-				snapshotCheckPoint, err = GetSnapshotCheckPoint(client, veleroCfg, DefaultKibishiiWorkerCounts, ns, backupName, KibishiiPVCNameList)
+				snapshotCheckPoint, err := BuildSnapshotCheckPointFromVolumeInfo(veleroCfg, backupVolumeInfo, DefaultKibishiiWorkerCounts, ns, backupName, KibishiiPVCNameList)
 				Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 				err = CheckSnapshotsInProvider(
 					veleroCfg,
@@ -186,7 +198,7 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupLoc
 		} else {
 			// For public cloud, When using backup name to index VolumeSnapshotContents, make sure count of VolumeSnapshotContents should including PVs in all namespace
 			// so VolumeSnapshotContents count should be equal to "namespace count" * "Kibishii worker count per namespace".
-			snapshotCheckPoint, err = GetSnapshotCheckPoint(client, veleroCfg, DefaultKibishiiWorkerCounts*nsCount, "", backupName, KibishiiPVCNameList)
+			snapshotCheckPoint, err := BuildSnapshotCheckPointFromVolumeInfo(veleroCfg, backupVolumeInfo, DefaultKibishiiWorkerCounts*nsCount, "", backupName, KibishiiPVCNameList)
 			Expect(err).NotTo(HaveOccurred(), "Fail to get Azure CSI snapshot checkpoint")
 
 			// Get all snapshots base on backup name, regardless of namespaces
