@@ -1,0 +1,1 @@
+Fix issue #9077, don't block backup deletion on list VS error
