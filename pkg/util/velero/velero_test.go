@@ -679,6 +679,63 @@ func TestGetServiceAccountFromVeleroServer(t *testing.T) {
 	}
 }
 
+func TestGetImagePullSecretsFromVeleroServer(t *testing.T) {
+	tests := []struct {
+		name   string
+		deploy *appsv1api.Deployment
+		want   []corev1api.LocalObjectReference
+	}{
+		{
+			name: "no image pull secrets",
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							ServiceAccountName: "",
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "image pull secrets",
+			deploy: &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							ImagePullSecrets: []corev1api.LocalObjectReference{
+								{
+									Name: "imagePullSecret1",
+								},
+								{
+									Name: "imagePullSecret2",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []corev1api.LocalObjectReference{
+				{
+					Name: "imagePullSecret1",
+				},
+				{
+					Name: "imagePullSecret2",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := GetImagePullSecretsFromVeleroServer(test.deploy)
+
+			require.Equal(t, test.want, got)
+		})
+	}
+}
+
 func TestGetVeleroServerImage(t *testing.T) {
 	tests := []struct {
 		name   string

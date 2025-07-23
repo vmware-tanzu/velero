@@ -558,6 +558,7 @@ func (e *genericRestoreExposer) createRestorePod(
 			DNSPolicy:                     podInfo.dnsPolicy,
 			DNSConfig:                     podInfo.dnsConfig,
 			Affinity:                      podAffinity,
+			ImagePullSecrets:              podInfo.imagePullSecrets,
 		},
 	}
 

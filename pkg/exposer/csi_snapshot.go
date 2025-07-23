@@ -687,6 +687,7 @@ func (e *csiSnapshotExposer) createBackupPod(
 			Tolerations:                   toleration,
 			DNSPolicy:                     podInfo.dnsPolicy,
 			DNSConfig:                     podInfo.dnsConfig,
+			ImagePullSecrets:              podInfo.imagePullSecrets,
 		},
 	}
 

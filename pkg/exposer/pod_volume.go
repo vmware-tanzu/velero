@@ -387,6 +387,9 @@ func (e *podVolumeExposer) createHostingPod(ctx context.Context, ownerObject cor
 			RestartPolicy:                 corev1api.RestartPolicyNever,
 			SecurityContext:               securityCtx,
 			Tolerations:                   toleration,
+			DNSPolicy:                     podInfo.dnsPolicy,
+			DNSConfig:                     podInfo.dnsConfig,
+			ImagePullSecrets:              podInfo.imagePullSecrets,
 		},
 	}
 
