@@ -407,8 +407,16 @@ func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.Backu
 	return maintenanceJob.Name, nil
 }
 
-func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, bslName string, config *JobConfigs,
-	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag) (*batchv1.Job, error) {
+func buildJob(
+	cli client.Client,
+	ctx context.Context,
+	repo *velerov1api.BackupRepository,
+	bslName string,
+	config *JobConfigs,
+	podResources kube.PodResources,
+	logLevel logrus.Level,
+	logFormat *logging.FormatFlag,
+) (*batchv1.Job, error) {
 	// Get the Velero server deployment
 	deployment := &appsv1.Deployment{}
 	err := cli.Get(ctx, types.NamespacedName{Name: "velero", Namespace: repo.Namespace}, deployment)
@@ -430,6 +438,8 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 
 	// Get the service account from the Velero server deployment
 	serviceAccount := veleroutil.GetServiceAccountFromVeleroServer(deployment)
+
+	imagePullSecrets := veleroutil.GetImagePullSecretsFromVeleroServer(deployment)
 
 	// Get image
 	image := veleroutil.GetVeleroServerImage(deployment)
@@ -520,6 +530,7 @@ func buildJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRe
 							Value:    "windows",
 						},
 					},
+					ImagePullSecrets: imagePullSecrets,
 				},
 			},
 		},

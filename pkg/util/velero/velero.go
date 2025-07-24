@@ -75,6 +75,11 @@ func GetServiceAccountFromVeleroServer(deployment *appsv1.Deployment) string {
 	return deployment.Spec.Template.Spec.ServiceAccountName
 }
 
+// GetImagePullSecretsFromVeleroServer get the image pull secrets from the Velero server deployment
+func GetImagePullSecretsFromVeleroServer(deployment *appsv1.Deployment) []v1.LocalObjectReference {
+	return deployment.Spec.Template.Spec.ImagePullSecrets
+}
+
 // getVeleroServerImage get the image of the Velero server deployment
 func GetVeleroServerImage(deployment *appsv1.Deployment) string {
 	return deployment.Spec.Template.Spec.Containers[0].Image

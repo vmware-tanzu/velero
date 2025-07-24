@@ -63,14 +63,6 @@ type FakeRestoreProgressUpdater struct {
 func (f *FakeRestoreProgressUpdater) UpdateProgress(p *uploader.Progress) {}
 
 func TestRunBackup(t *testing.T) {
-	mockBRepo := udmrepomocks.NewBackupRepo(t)
-	mockBRepo.On("GetAdvancedFeatures").Return(udmrepo.AdvancedFeatureInfo{})
-
-	var kp kopiaProvider
-	kp.log = logrus.New()
-	kp.bkRepo = mockBRepo
-	updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
-
 	testCases := []struct {
 		name           string
 		hookBackupFunc func(ctx context.Context, fsUploader kopia.SnapshotUploader, repoWriter repo.RepositoryWriter, sourcePath string, realSource string, forceFull bool, parentSnapshot string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, tags map[string]string, log logrus.FieldLogger) (*uploader.SnapshotInfo, bool, error)
@@ -102,6 +94,14 @@ func TestRunBackup(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			mockBRepo := udmrepomocks.NewBackupRepo(t)
+			mockBRepo.On("GetAdvancedFeatures").Return(udmrepo.AdvancedFeatureInfo{})
+
+			var kp kopiaProvider
+			kp.log = logrus.New()
+			kp.bkRepo = mockBRepo
+			updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
+
 			if tc.volMode == "" {
 				tc.volMode = uploader.PersistentVolumeFilesystem
 			}
@@ -117,10 +117,6 @@ func TestRunBackup(t *testing.T) {
 }
 
 func TestRunRestore(t *testing.T) {
-	var kp kopiaProvider
-	kp.log = logrus.New()
-	updater := FakeRestoreProgressUpdater{PodVolumeRestore: &velerov1api.PodVolumeRestore{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
-
 	testCases := []struct {
 		name            string
 		hookRestoreFunc func(ctx context.Context, rep repo.RepositoryWriter, progress *kopia.Progress, snapshotID, dest string, volMode uploader.PersistentVolumeMode, uploaderCfg map[string]string, log logrus.FieldLogger, cancleCh chan struct{}) (int64, int32, error)
@@ -153,6 +149,10 @@ func TestRunRestore(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			var kp kopiaProvider
+			kp.log = logrus.New()
+			updater := FakeRestoreProgressUpdater{PodVolumeRestore: &velerov1api.PodVolumeRestore{}, Log: kp.log, Ctx: context.Background(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
+
 			if tc.volMode == "" {
 				tc.volMode = uploader.PersistentVolumeFilesystem
 			}
