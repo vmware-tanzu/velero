@@ -489,16 +489,16 @@ func SetVolumeSnapshotContentDeletionPolicy(
 	vscName string,
 	crClient crclient.Client,
 	policy snapshotv1api.DeletionPolicy,
-) error {
+) (*snapshotv1api.VolumeSnapshotContent, error) {
 	vsc := new(snapshotv1api.VolumeSnapshotContent)
 	if err := crClient.Get(context.TODO(), crclient.ObjectKey{Name: vscName}, vsc); err != nil {
-		return err
+		return nil, err
 	}
 
 	originVSC := vsc.DeepCopy()
 	vsc.Spec.DeletionPolicy = policy
 
-	return crClient.Patch(context.TODO(), vsc, crclient.MergeFrom(originVSC))
+	return vsc, crClient.Patch(context.TODO(), vsc, crclient.MergeFrom(originVSC))
 }
 
 // CleanupVolumeSnapshot deletes the VolumeSnapshot and the associated VolumeSnapshotContent.  It will make sure the
@@ -523,7 +523,7 @@ func CleanupVolumeSnapshot(
 	if vs.Status != nil && vs.Status.BoundVolumeSnapshotContentName != nil {
 		// we patch the DeletionPolicy of the VolumeSnapshotContent to set it to Delete.
 		// This ensures that the volume snapshot in the storage provider is also deleted.
-		err := SetVolumeSnapshotContentDeletionPolicy(
+		_, err := SetVolumeSnapshotContentDeletionPolicy(
 			*vs.Status.BoundVolumeSnapshotContentName,
 			crClient,
 			snapshotv1api.VolumeSnapshotContentDelete,
@@ -544,7 +544,6 @@ func CleanupVolumeSnapshot(
 
 func DeleteReadyVolumeSnapshot(
 	vs snapshotv1api.VolumeSnapshot,
-	vsc snapshotv1api.VolumeSnapshotContent,
 	client crclient.Client,
 	logger logrus.FieldLogger,
 ) {
@@ -557,11 +556,15 @@ func DeleteReadyVolumeSnapshot(
 		return
 	}
 
+	var vsc *snapshotv1api.VolumeSnapshotContent
+
 	if vs.Status != nil && vs.Status.BoundVolumeSnapshotContentName != nil {
+		var err error
+
 		// Patch the DeletionPolicy of the VolumeSnapshotContent to set it to Retain.
 		// This ensures that the volume snapshot in the storage provider is kept.
-		if err := SetVolumeSnapshotContentDeletionPolicy(
-			vsc.Name,
+		if vsc, err = SetVolumeSnapshotContentDeletionPolicy(
+			*vs.Status.BoundVolumeSnapshotContentName,
 			client,
 			snapshotv1api.VolumeSnapshotContentRetain,
 		); err != nil {
@@ -570,7 +573,7 @@ func DeleteReadyVolumeSnapshot(
 			return
 		}
 
-		if err := client.Delete(context.TODO(), &vsc); err != nil {
+		if err := client.Delete(context.TODO(), vsc); err != nil {
 			logger.WithError(err).Warnf("Failed to delete the VolumeSnapshotContent %s", vsc.Name)
 		}
 	}

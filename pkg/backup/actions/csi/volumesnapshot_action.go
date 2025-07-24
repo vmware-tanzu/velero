@@ -95,6 +95,16 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 		)
 	}
 
+	if backup.Status.Phase == velerov1api.BackupPhaseFinalizing ||
+		backup.Status.Phase == velerov1api.BackupPhaseFinalizingPartiallyFailed {
+		p.log.
+			WithField("Backup", fmt.Sprintf("%s/%s", backup.Namespace, backup.Name)).
+			WithField("BackupPhase", backup.Status.Phase).Debugf("Cleaning VolumeSnapshots.")
+
+		csi.DeleteReadyVolumeSnapshot(*vs, p.crClient, p.log)
+		return item, nil, "", nil, nil
+	}
+
 	p.log.Infof("Getting VolumesnapshotContent for Volumesnapshot %s/%s",
 		vs.Namespace, vs.Name)
 
@@ -107,20 +117,6 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 	if err != nil {
 		csi.CleanupVolumeSnapshot(vs, p.crClient, p.log)
 		return nil, nil, "", nil, errors.WithStack(err)
-	}
-
-	if backup.Status.Phase == velerov1api.BackupPhaseFinalizing ||
-		backup.Status.Phase == velerov1api.BackupPhaseFinalizingPartiallyFailed {
-		p.log.
-			WithField("Backup", fmt.Sprintf("%s/%s", backup.Namespace, backup.Name)).
-			WithField("BackupPhase", backup.Status.Phase).Debugf("Cleaning VolumeSnapshots.")
-
-		if vsc == nil {
-			vsc = &snapshotv1api.VolumeSnapshotContent{}
-		}
-
-		csi.DeleteReadyVolumeSnapshot(*vs, *vsc, p.crClient, p.log)
-		return item, nil, "", nil, nil
 	}
 
 	annotations := make(map[string]string)
