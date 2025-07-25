@@ -594,6 +594,8 @@ spec:
                 description: Phase is the current state of the Backup.
                 enum:
                 - New
+                - Queued
+                - ReadyToStart
                 - FailedValidation
                 - InProgress
                 - WaitingForPluginOperations
