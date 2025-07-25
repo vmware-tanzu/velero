@@ -399,7 +399,7 @@ func describeBackupItemOperations(ctx context.Context, kbClient kbclient.Client,
 func describeBackupResourceList(ctx context.Context, kbClient kbclient.Client, d *Describer, backup *velerov1api.Backup, insecureSkipTLSVerify bool, caCertPath string) {
 	buf := new(bytes.Buffer)
 	if err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
-		if err == downloadrequest.ErrNotFound {
+		if errors.Is(err, downloadrequest.ErrNotFound) {
 			// the backup resource list could be missing if (other reasons may exist as well):
 			//	- the backup was taken prior to v1.1; or
 			//	- the backup hasn't completed yet; or
@@ -450,7 +450,7 @@ func describeBackupVolumes(
 
 	buf := new(bytes.Buffer)
 	err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeInfos, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath)
-	if err == downloadrequest.ErrNotFound {
+	if errors.Is(err, downloadrequest.ErrNotFound) {
 		nativeSnapshots, err = retrieveNativeSnapshotLegacy(ctx, kbClient, backup, insecureSkipTLSVerify, caCertPath)
 		if err != nil {
 			d.Printf("\t<error concluding native snapshot info: %v>\n", err)
@@ -907,7 +907,7 @@ func DescribeBackupResults(ctx context.Context, kbClient kbclient.Client, d *Des
 	// If err 'ErrNotFound' occurs, it means the backup bundle in the bucket has already been there before the backup-result file is introduced.
 	// We only display the count of errors and warnings in this case.
 	err := downloadrequest.Stream(ctx, kbClient, backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResults, &buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath)
-	if err == downloadrequest.ErrNotFound {
+	if errors.Is(err, downloadrequest.ErrNotFound) {
 		d.Printf("Errors:\t%d\n", backup.Status.Errors)
 		d.Printf("Warnings:\t%d\n", backup.Status.Warnings)
 		return

@@ -91,7 +91,7 @@ func (w *hookWriter) Write(p []byte) (n int, err error) {
 	buffer := make([]byte, 2048)
 	for {
 		read, err := sourceFile.Read(buffer)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return total, nil
 		}
 
