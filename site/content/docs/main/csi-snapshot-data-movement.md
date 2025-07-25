@@ -32,10 +32,11 @@ Velero built-in data mover restores both volume data and metadata, so the data m
 ### Install Velero Node Agent
 
 Velero Node Agent is a Kubernetes daemonset that hosts Velero data movement controllers and launches data mover pods. 
-If you are using Velero built-in data mover, Node Agent must be installed. To install Node Agent, use the `--use-node-agent` flag. 
+If you are using Velero built-in data mover, Node Agent must be installed. To install Node Agent, use the `--use-node-agent` flag.  
+Velero built-in data mover doesn't require the host path for pod volumes into Node Agent pods. The installation by default creates it in order to support fs-backup. If you don't use fs-backup and want to remove it from Node Agent, you can specify the `--node-agent-disable-host-path` flag.  
 
 ```
-velero install --use-node-agent
+velero install --use-node-agent --node-agent-disable-host-path
 ```
 
 ### Configure A Backup Storage Location
@@ -303,16 +304,14 @@ kubectl -n velero get datadownloads -l velero.io/restore-name=YOUR_RESTORE_NAME 
 
 ### Restart and resume
 When Velero server is restarted, if the resource backup/restore has completed, so the backup/restore has excceded `InProgress` status and is waiting for the completion of the data movements, Velero will recapture the status of the running data movements and resume the execution.  
-When node-agent is restarted, if the `DataUpload`/`DataDownload` is in `InProgress` status, Velero recaptures the status of the running data mover pod and resume the execution.  
-When node-agent is restarted, if the `DataUpload`/`DataDownload` is in `New` or `Prepared` status, the data mover pod has not started, Velero processes it as normal cases, or the restart doesn't affect the execution.  
+When node-agent is restarted, Velero tries to recapture the status of the running data movements and resume the execution; if the resume fails, the data movements are canceled.  
 
 ### Cancellation
 
 At present, Velero backup and restore doesn't support end to end cancellation that is launched by users.  
 However, Velero cancels the `DataUpload`/`DataDownload` in below scenarios automatically:
 - When Velero server is restarted and the backup/restore is in `InProgress` status
-- When node-agent is restarted and the `DataUpload`/`DataDownload` is in `Accepted` status
-- When node-agent is restarted and the resume of an existing `DataUpload`/`DataDownload` that is in `InProgress` status fails  
+- When node-agent is restarted and the resume of an existing `DataUpload`/`DataDownload` fails  
 - When an ongoing backup/restore is deleted
 - When a backup/restore does not finish before the item operation timeout (default value is `4 hours`)
 
