@@ -303,16 +303,14 @@ kubectl -n velero get datadownloads -l velero.io/restore-name=YOUR_RESTORE_NAME 
 
 ### Restart and resume
 When Velero server is restarted, if the resource backup/restore has completed, so the backup/restore has excceded `InProgress` status and is waiting for the completion of the data movements, Velero will recapture the status of the running data movements and resume the execution.  
-When node-agent is restarted, if the `DataUpload`/`DataDownload` is in `InProgress` status, Velero recaptures the status of the running data mover pod and resume the execution.  
-When node-agent is restarted, if the `DataUpload`/`DataDownload` is in `New` or `Prepared` status, the data mover pod has not started, Velero processes it as normal cases, or the restart doesn't affect the execution.  
+When node-agent is restarted, Velero tries to recapture the status of the running data movements and resume the execution; if the resume fails, the data movements are canceled.  
 
 ### Cancellation
 
 At present, Velero backup and restore doesn't support end to end cancellation that is launched by users.  
 However, Velero cancels the `DataUpload`/`DataDownload` in below scenarios automatically:
 - When Velero server is restarted and the backup/restore is in `InProgress` status
-- When node-agent is restarted and the `DataUpload`/`DataDownload` is in `Accepted` status
-- When node-agent is restarted and the resume of an existing `DataUpload`/`DataDownload` that is in `InProgress` status fails  
+- When node-agent is restarted and the resume of an existing `DataUpload`/`DataDownload` fails  
 - When an ongoing backup/restore is deleted
 - When a backup/restore does not finish before the item operation timeout (default value is `4 hours`)
 
