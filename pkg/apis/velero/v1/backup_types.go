@@ -288,13 +288,19 @@ const (
 
 // BackupPhase is a string representation of the lifecycle phase
 // of a Velero backup.
-// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Finalizing;FinalizingPartiallyFailed;Completed;PartiallyFailed;Failed;Deleting
+// +kubebuilder:validation:Enum=New;Queued;ReadyToStart;FailedValidation;InProgress;WaitingForPluginOperations;WaitingForPluginOperationsPartiallyFailed;Finalizing;FinalizingPartiallyFailed;Completed;PartiallyFailed;Failed;Deleting
 type BackupPhase string
 
 const (
 	// BackupPhaseNew means the backup has been created but not
 	// yet processed by the BackupController.
 	BackupPhaseNew BackupPhase = "New"
+
+	// BackupPhaseQueued means the backup has been added to the queue and is waiting for the Queue to move it out of the queue.
+	BackupPhaseQueued BackupPhase = "Queued"
+
+	// BackupPhaseReadyToStart means the backup has been pulled from the queue and is ready to start.
+	BackupPhaseReadyToStart BackupPhase = "ReadyToStart"
 
 	// BackupPhaseFailedValidation means the backup has failed
 	// the controller's validations and therefore will not run.
