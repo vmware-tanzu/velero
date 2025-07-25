@@ -180,17 +180,17 @@ func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, e
 	var readyObservations int32
 	err = wait.PollUntilContextTimeout(context.Background(), time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
 		unstructuredDeployment, err := c.Get("velero", metav1.GetOptions{})
+		fmt.Printf("1debug deploy not ready: %+v, err: %+v\n", unstructuredDeployment, err)
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		} else if err != nil {
 			return false, errors.Wrap(err, "error waiting for deployment to be ready")
 		}
-
 		deploy := new(appsv1api.Deployment)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredDeployment.Object, deploy); err != nil {
 			return false, errors.Wrap(err, "error converting deployment from unstructured")
 		}
-
+		fmt.Printf("2debug deploy not ready: %+v\n", deploy)
 		for _, cond := range deploy.Status.Conditions {
 			if isAvailable(cond) {
 				readyObservations++
@@ -201,6 +201,7 @@ func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, e
 			isReady = true
 			return true, nil
 		}
+		fmt.Printf("3debug deploy not ready: %+v\n", deploy)
 		return false, nil
 	})
 	return isReady, err
