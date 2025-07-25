@@ -129,6 +129,11 @@ func TestExpose(t *testing.T) {
 		},
 	}
 
+	vscObjWithLabels := vscObj
+	vscObjWithLabels.Labels = map[string]string{
+		"snapshot.storage.kubernetes.io/managed-by": "worker",
+	}
+
 	daemonSet := &appsv1api.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "velero",
@@ -365,6 +370,24 @@ func TestExpose(t *testing.T) {
 			snapshotClientObj: []runtime.Object{
 				vsObject,
 				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+		},
+		{
+			name:        "success-with-labels",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObjWithLabels,
 			},
 			kubeClientObj: []runtime.Object{
 				daemonSet,
@@ -650,6 +673,7 @@ func TestExpose(t *testing.T) {
 				assert.Equal(t, expectedVSC.Name, *expectedVS.Spec.Source.VolumeSnapshotContentName)
 
 				assert.Equal(t, expectedVSC.Annotations, vscObj.Annotations)
+				assert.Equal(t, expectedVSC.Labels, vscObj.Labels)
 				assert.Equal(t, expectedVSC.Spec.DeletionPolicy, vscObj.Spec.DeletionPolicy)
 				assert.Equal(t, expectedVSC.Spec.Driver, vscObj.Spec.Driver)
 				assert.Equal(t, *expectedVSC.Spec.VolumeSnapshotClassName, *vscObj.Spec.VolumeSnapshotClassName)
