@@ -32,10 +32,11 @@ Velero built-in data mover restores both volume data and metadata, so the data m
 ### Install Velero Node Agent
 
 Velero Node Agent is a Kubernetes daemonset that hosts Velero data movement controllers and launches data mover pods. 
-If you are using Velero built-in data mover, Node Agent must be installed. To install Node Agent, use the `--use-node-agent` flag. 
+If you are using Velero built-in data mover, Node Agent must be installed. To install Node Agent, use the `--use-node-agent` flag.  
+Velero built-in data mover doesn't require the host path for pod volumes into Node Agent pods. The installation by default creates it in order to support fs-backup. If you don't use fs-backup and want to remove it from Node Agent, you can specify the `--node-agent-disable-host-path` flag.  
 
 ```
-velero install --use-node-agent
+velero install --use-node-agent --node-agent-disable-host-path
 ```
 
 ### Configure A Backup Storage Location
