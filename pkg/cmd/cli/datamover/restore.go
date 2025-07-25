@@ -30,6 +30,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctlcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	ctlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -44,9 +46,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
-
-	ctlcache "sigs.k8s.io/controller-runtime/pkg/cache"
-	ctlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type dataMoverRestoreConfig struct {

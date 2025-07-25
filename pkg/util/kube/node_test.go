@@ -23,13 +23,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	"github.com/vmware-tanzu/velero/pkg/builder"
-
 	kubeClientFake "k8s.io/client-go/kubernetes/fake"
 	clientTesting "k8s.io/client-go/testing"
 	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
