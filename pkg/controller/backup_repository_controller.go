@@ -308,17 +308,21 @@ func (r *BackupRepoReconciler) getIdentifierByBSL(bsl *velerov1api.BackupStorage
 func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1api.BackupRepository, bsl *velerov1api.BackupStorageLocation, log logrus.FieldLogger) error {
 	log.WithField("repoConfig", r.backupRepoConfig).Info("Initializing backup repository")
 
-	// confirm the repo's BackupStorageLocation is valid
-	repoIdentifier, err := r.getIdentifierByBSL(bsl, req)
-	if err != nil {
-		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
-			rr.Status.Message = err.Error()
-			rr.Status.Phase = velerov1api.BackupRepositoryPhaseNotReady
+	var repoIdentifier string
+	// Only get restic identifier for restic repositories
+	if req.Spec.RepositoryType == "" || req.Spec.RepositoryType == velerov1api.BackupRepositoryTypeRestic {
+		var err error
+		repoIdentifier, err = r.getIdentifierByBSL(bsl, req)
+		if err != nil {
+			return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
+				rr.Status.Message = err.Error()
+				rr.Status.Phase = velerov1api.BackupRepositoryPhaseNotReady
 
-			if rr.Spec.MaintenanceFrequency.Duration <= 0 {
-				rr.Spec.MaintenanceFrequency = metav1.Duration{Duration: r.getRepositoryMaintenanceFrequency(req)}
-			}
-		})
+				if rr.Spec.MaintenanceFrequency.Duration <= 0 {
+					rr.Spec.MaintenanceFrequency = metav1.Duration{Duration: r.getRepositoryMaintenanceFrequency(req)}
+				}
+			})
+		}
 	}
 
 	config, err := getBackupRepositoryConfig(ctx, r, r.backupRepoConfig, r.namespace, req.Name, req.Spec.RepositoryType, log)
@@ -330,7 +334,10 @@ func (r *BackupRepoReconciler) initializeRepo(ctx context.Context, req *velerov1
 
 	// defaulting - if the patch fails, return an error so the item is returned to the queue
 	if err := r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
-		rr.Spec.ResticIdentifier = repoIdentifier
+		// Only set ResticIdentifier for restic repositories
+		if rr.Spec.RepositoryType == "" || rr.Spec.RepositoryType == velerov1api.BackupRepositoryTypeRestic {
+			rr.Spec.ResticIdentifier = repoIdentifier
+		}
 
 		if rr.Spec.MaintenanceFrequency.Duration <= 0 {
 			rr.Spec.MaintenanceFrequency = metav1.Duration{Duration: r.getRepositoryMaintenanceFrequency(req)}
@@ -528,16 +535,19 @@ func dueForMaintenance(req *velerov1api.BackupRepository, now time.Time) bool {
 func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *velerov1api.BackupRepository, bsl *velerov1api.BackupStorageLocation, log logrus.FieldLogger) (bool, error) {
 	log.Info("Checking backup repository for readiness")
 
-	repoIdentifier, err := r.getIdentifierByBSL(bsl, req)
-	if err != nil {
-		return false, r.patchBackupRepository(ctx, req, repoNotReady(err.Error()))
-	}
+	// Only check and update restic identifier for restic repositories
+	if req.Spec.RepositoryType == "" || req.Spec.RepositoryType == velerov1api.BackupRepositoryTypeRestic {
+		repoIdentifier, err := r.getIdentifierByBSL(bsl, req)
+		if err != nil {
+			return false, r.patchBackupRepository(ctx, req, repoNotReady(err.Error()))
+		}
 
-	if repoIdentifier != req.Spec.ResticIdentifier {
-		if err := r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
-			rr.Spec.ResticIdentifier = repoIdentifier
-		}); err != nil {
-			return false, err
+		if repoIdentifier != req.Spec.ResticIdentifier {
+			if err := r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
+				rr.Spec.ResticIdentifier = repoIdentifier
+			}); err != nil {
+				return false, err
+			}
 		}
 	}
 
@@ -546,7 +556,7 @@ func (r *BackupRepoReconciler) checkNotReadyRepo(ctx context.Context, req *veler
 	if err := ensureRepo(req, r.repositoryManager); err != nil {
 		return false, r.patchBackupRepository(ctx, req, repoNotReady(err.Error()))
 	}
-	err = r.patchBackupRepository(ctx, req, repoReady())
+	err := r.patchBackupRepository(ctx, req, repoReady())
 	if err != nil {
 		return false, err
 	}
