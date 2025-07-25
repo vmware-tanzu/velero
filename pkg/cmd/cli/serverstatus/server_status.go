@@ -69,5 +69,11 @@ func (g *DefaultServerStatusGetter) GetServerStatus(kbClient kbclient.Client) (*
 
 	wait.Until(checkFunc, 250*time.Millisecond, ctx.Done())
 
-	return created, nil
+	err := ctx.Err()
+	// context.Canceled error means we have received a processed ServerStatusRequest
+	if err == context.Canceled {
+		err = nil
+	}
+
+	return created, err
 }
