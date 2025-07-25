@@ -196,8 +196,6 @@ func BackupUpgradeRestoreTest(useVolumeSnapshots bool, veleroCLI2Version VeleroC
 							upgradeNamespace, 2)).To(Succeed())
 					})
 				}
-				var snapshotCheckPoint SnapshotCheckPoint
-				snapshotCheckPoint.NamespaceBackedUp = upgradeNamespace
 				By("Snapshot should be created in cloud object store", func() {
 					backupVolumeInfo, err := GetVolumeInfo(
 						veleroCfg.ObjectStoreProvider,
