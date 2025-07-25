@@ -112,6 +112,10 @@ type Configs struct {
 
 	// PodResources is the resource config for various types of pods launched by node-agent, i.e., data mover pods.
 	PodResources *kube.PodResources `json:"podResources,omitempty"`
+
+	// PriorityClassName is the priority class name for both the node agent daemonset
+	// and the data mover pods it creates
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 func IsRunningOnLinux(ctx context.Context, kubeClient kubernetes.Interface, namespace string) error {

@@ -17,6 +17,7 @@ limitations under the License.
 package install
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,6 +27,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -91,6 +93,8 @@ type Options struct {
 	ItemBlockWorkerCount            int
 	NodeAgentDisableHostPath        bool
 	kubeletRootDir                  string
+	ServerPriorityClassName         string
+	NodeAgentPriorityClassName      string
 }
 
 // BindFlags adds command line values to the options struct.
@@ -193,6 +197,18 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		"item-block-worker-count",
 		o.ItemBlockWorkerCount,
 		"Number of worker threads to process ItemBlocks. Default is one. Optional.",
+	)
+	flags.StringVar(
+		&o.ServerPriorityClassName,
+		"server-priority-class-name",
+		o.ServerPriorityClassName,
+		"Priority class name for the Velero server deployment. Optional.",
+	)
+	flags.StringVar(
+		&o.NodeAgentPriorityClassName,
+		"node-agent-priority-class-name",
+		o.NodeAgentPriorityClassName,
+		"Priority class name for the node agent daemonset. Optional.",
 	)
 }
 
@@ -301,6 +317,8 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		ItemBlockWorkerCount:            o.ItemBlockWorkerCount,
 		KubeletRootDir:                  o.kubeletRootDir,
 		NodeAgentDisableHostPath:        o.NodeAgentDisableHostPath,
+		ServerPriorityClassName:         o.ServerPriorityClassName,
+		NodeAgentPriorityClassName:      o.NodeAgentPriorityClassName,
 	}, nil
 }
 
@@ -389,6 +407,25 @@ func (o *Options) Run(c *cobra.Command, f client.Factory) error {
 	if err != nil {
 		return err
 	}
+
+	// Get Kubernetes client for priority class validation
+	kubeClient, err := f.KubeClient()
+	if err != nil {
+		return err
+	}
+
+	// Validate priority classes if specified
+	logger := logrus.New()
+	logger.SetOutput(os.Stdout)
+	if o.ServerPriorityClassName != "" {
+		_ = kubeutil.ValidatePriorityClass(context.Background(), kubeClient, o.ServerPriorityClassName, logger.WithField("component", "server"))
+		// For install command, we continue even if validation fails (warnings are logged)
+	}
+	if o.NodeAgentPriorityClassName != "" {
+		_ = kubeutil.ValidatePriorityClass(context.Background(), kubeClient, o.NodeAgentPriorityClassName, logger.WithField("component", "node-agent"))
+		// For install command, we continue even if validation fails (warnings are logged)
+	}
+
 	errorMsg := fmt.Sprintf("\n\nError installing Velero. Use `kubectl logs deploy/velero -n %s` to check the deploy logs", o.Namespace)
 
 	err = install.Install(dynamicFactory, kbClient, resources, os.Stdout)

@@ -51,6 +51,10 @@ spec:
         - --node-agent-config=<configMap name>
 ```
 
+### Priority Class
+
+Data mover pods will use the priorityClassName configured in the node-agent configmap. The priorityClassName for data mover pods is configured through the node-agent configmap (specified via the `--node-agent-configmap` flag), while the node-agent daemonset itself uses the priority class set by the `--node-agent-priority-class-name` flag during Velero installation.
+
 [1]: csi-snapshot-data-movement.md
 [2]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
 [3]: performance-guidance.md
