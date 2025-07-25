@@ -47,7 +47,7 @@ func NewSecretAction(logger logrus.FieldLogger, client client.Client) *SecretAct
 }
 
 // AppliesTo indicates which resources this action applies
-func (s *SecretAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*SecretAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"secrets"},
 	}, nil

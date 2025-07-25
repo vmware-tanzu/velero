@@ -208,7 +208,7 @@ func TestHasNodeWithOS(t *testing.T) {
 				{
 					verb:     "list",
 					resource: "nodes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-list-error")
 					},
 				},

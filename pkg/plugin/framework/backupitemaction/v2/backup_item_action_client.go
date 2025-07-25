@@ -185,6 +185,6 @@ func (c *BackupItemActionGRPCClient) Cancel(operationID string, backup *api.Back
 
 // This shouldn't be called on the GRPC client since the RestartableBackupItemAction won't delegate
 // this method
-func (c *BackupItemActionGRPCClient) Name() string {
+func (*BackupItemActionGRPCClient) Name() string {
 	return ""
 }

@@ -47,7 +47,7 @@ func NewDataUploadRetrieveAction(logger logrus.FieldLogger, client client.Client
 	}
 }
 
-func (d *DataUploadRetrieveAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*DataUploadRetrieveAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"datauploads.velero.io"},
 	}, nil

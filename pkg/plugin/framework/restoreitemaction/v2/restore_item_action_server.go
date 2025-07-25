@@ -55,7 +55,7 @@ func (s *RestoreItemActionGRPCServer) getImpl(name string) (riav2.RestoreItemAct
 	return itemAction, nil
 }
 
-func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *protoriav2.RestoreItemActionAppliesToRequest) (response *protoriav2.RestoreItemActionAppliesToResponse, err error) {
+func (s *RestoreItemActionGRPCServer) AppliesTo(_ context.Context, req *protoriav2.RestoreItemActionAppliesToRequest) (response *protoriav2.RestoreItemActionAppliesToResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -83,7 +83,7 @@ func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *protor
 	}, nil
 }
 
-func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *protoriav2.RestoreItemActionExecuteRequest) (response *protoriav2.RestoreItemActionExecuteResponse, err error) {
+func (s *RestoreItemActionGRPCServer) Execute(_ context.Context, req *protoriav2.RestoreItemActionExecuteRequest) (response *protoriav2.RestoreItemActionExecuteResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -149,7 +149,7 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *protoria
 	return res, nil
 }
 
-func (s *RestoreItemActionGRPCServer) Progress(ctx context.Context, req *protoriav2.RestoreItemActionProgressRequest) (
+func (s *RestoreItemActionGRPCServer) Progress(_ context.Context, req *protoriav2.RestoreItemActionProgressRequest) (
 	response *protoriav2.RestoreItemActionProgressResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
@@ -188,7 +188,7 @@ func (s *RestoreItemActionGRPCServer) Progress(ctx context.Context, req *protori
 }
 
 func (s *RestoreItemActionGRPCServer) Cancel(
-	ctx context.Context, req *protoriav2.RestoreItemActionCancelRequest) (
+	_ context.Context, req *protoriav2.RestoreItemActionCancelRequest) (
 	response *emptypb.Empty, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
@@ -214,7 +214,7 @@ func (s *RestoreItemActionGRPCServer) Cancel(
 	return &emptypb.Empty{}, nil
 }
 
-func (s *RestoreItemActionGRPCServer) AreAdditionalItemsReady(ctx context.Context, req *protoriav2.RestoreItemActionItemsReadyRequest) (
+func (s *RestoreItemActionGRPCServer) AreAdditionalItemsReady(_ context.Context, req *protoriav2.RestoreItemActionItemsReadyRequest) (
 	response *protoriav2.RestoreItemActionItemsReadyResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
@@ -266,6 +266,6 @@ func restoreResourceIdentifierToProto(id velero.ResourceIdentifier) *proto.Resou
 
 // This shouldn't be called on the GRPC server since the server won't ever receive this request, as
 // the RestartableRestoreItemAction in Velero won't delegate this to the server
-func (s *RestoreItemActionGRPCServer) Name() string {
+func (*RestoreItemActionGRPCServer) Name() string {
 	return ""
 }

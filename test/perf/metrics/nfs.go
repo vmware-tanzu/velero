@@ -46,6 +46,6 @@ func (n *NFSMetrics) GetMetrics() map[string]string {
 	return n.Metrics
 }
 
-func (n *NFSMetrics) GetMetricsName() string {
+func (*NFSMetrics) GetMetricsName() string {
 	return NFSDesc
 }

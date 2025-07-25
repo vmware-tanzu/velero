@@ -46,6 +46,6 @@ func (m *MinioMetrics) GetMetrics() map[string]string {
 	return m.Metrics
 }
 
-func (m *MinioMetrics) GetMetricsName() string {
+func (*MinioMetrics) GetMetricsName() string {
 	return MinioDesc
 }

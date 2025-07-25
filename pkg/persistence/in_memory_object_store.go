@@ -152,7 +152,7 @@ func (o *inMemoryObjectStore) DeleteObject(bucket, key string) error {
 	return nil
 }
 
-func (o *inMemoryObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+func (o *inMemoryObjectStore) CreateSignedURL(bucket, key string, _ time.Duration) (string, error) {
 	bucketData, ok := o.Data[bucket]
 	if !ok {
 		return "", errors.New("bucket not found")

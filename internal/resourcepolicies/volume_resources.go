@@ -106,7 +106,7 @@ func (c *pvcLabelsCondition) match(v *structuredVolume) bool {
 	return selector.Matches(labels.Set(v.pvcLabels))
 }
 
-func (c *pvcLabelsCondition) validate() error {
+func (*pvcLabelsCondition) validate() error {
 	return nil
 }
 

@@ -53,7 +53,7 @@ func NewPauseCommand(f client.Factory, use string) *cobra.Command {
 
   # Pause all schedules.
   velero schedule pause --all`,
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args))
 			cmd.CheckError(o.Validate())
 			cmd.CheckError(runPause(f, o, true, pauseOpts.SkipOptions.SkipImmediately.Value))

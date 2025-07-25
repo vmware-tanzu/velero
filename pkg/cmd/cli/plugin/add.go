@@ -51,7 +51,7 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 		Use:   "add IMAGE",
 		Short: "Add a plugin",
 		Args:  cobra.ExactArgs(1),
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, args []string) {
 			if !o.Confirm && !confirm.GetConfirmation("velero plugin add may cause the Velero server pod restart, so it is a dangerous operation",
 				"once Velero server restarts, all the ongoing jobs will fail.") {
 				// Don't do anything unless we get confirmation

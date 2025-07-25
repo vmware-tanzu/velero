@@ -62,10 +62,10 @@ func (t *TimeMetrics) End(name string) {
 	t.TimeInfo[name] = timeSpan
 }
 
-func (t *TimeMetrics) Update() error {
+func (*TimeMetrics) Update() error {
 	return nil
 }
 
-func (t *TimeMetrics) GetMetricsName() string {
+func (*TimeMetrics) GetMetricsName() string {
 	return TimeCaseDesc
 }

@@ -178,7 +178,7 @@ func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, e
 	// declare this variable out of scope so we can return it
 	var isReady bool
 	var readyObservations int32
-	err = wait.PollUntilContextTimeout(context.Background(), time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, 3*time.Minute, true, func(context.Context) (bool, error) {
 		unstructuredDeployment, err := c.Get("velero", metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return false, nil
@@ -234,7 +234,7 @@ func daemonSetIsReady(factory client.DynamicFactory, namespace string, name stri
 	var isReady bool
 	var readyObservations int32
 
-	err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute, true, func(context.Context) (bool, error) {
 		unstructuredDaemonSet, err := c.Get(name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return false, nil

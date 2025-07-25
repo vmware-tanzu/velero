@@ -87,6 +87,6 @@ func (p *Priorities) Set(s string) error {
 }
 
 // Type specifies the flag type
-func (p *Priorities) Type() string {
+func (*Priorities) Type() string {
 	return "stringArray"
 }

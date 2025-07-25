@@ -38,7 +38,7 @@ func NewAdmissionWebhookConfigurationAction(logger logrus.FieldLogger) *Admissio
 }
 
 // AppliesTo implements the RestoreItemAction plugin interface method.
-func (a *AdmissionWebhookConfigurationAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*AdmissionWebhookConfigurationAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"mutatingwebhookconfigurations", "validatingwebhookconfigurations"},
 	}, nil

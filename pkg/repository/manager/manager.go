@@ -181,7 +181,7 @@ func (m *manager) UnlockRepo(repo *velerov1api.BackupRepository) error {
 	return prd.EnsureUnlockRepo(context.Background(), param)
 }
 
-func (m *manager) Forget(ctx context.Context, repo *velerov1api.BackupRepository, snapshot string) error {
+func (m *manager) Forget(_ context.Context, repo *velerov1api.BackupRepository, snapshot string) error {
 	m.repoLocker.LockExclusive(repo.Name)
 	defer m.repoLocker.UnlockExclusive(repo.Name)
 
@@ -201,7 +201,7 @@ func (m *manager) Forget(ctx context.Context, repo *velerov1api.BackupRepository
 	return prd.Forget(context.Background(), snapshot, param)
 }
 
-func (m *manager) BatchForget(ctx context.Context, repo *velerov1api.BackupRepository, snapshots []string) []error {
+func (m *manager) BatchForget(_ context.Context, repo *velerov1api.BackupRepository, snapshots []string) []error {
 	m.repoLocker.LockExclusive(repo.Name)
 	defer m.repoLocker.UnlockExclusive(repo.Name)
 
