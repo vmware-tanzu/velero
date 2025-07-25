@@ -157,9 +157,8 @@ func getStorageAccountKey(credentialsFile, accountName, subscriptionID, resource
 	if os.Getenv(resourceGroupEnvVar) == "" {
 		if resourceGroupCfg == "" {
 			return "", errors.New("Credential file should contain AZURE_RESOURCE_GROUP or AZURE_STORAGE_ACCOUNT_ACCESS_KEY")
-		} else {
-			resourceGroup = resourceGroupCfg
 		}
+		resourceGroup = resourceGroupCfg
 	} else {
 		resourceGroup = os.Getenv(resourceGroupEnvVar)
 	}
@@ -405,10 +404,9 @@ func (s AzureStorage) IsSnapshotExisted(cloudCredentialsFile, bslConfig, backupN
 	}
 	if snapshotCountFound != snapshotCheck.ExpectCount {
 		return errors.New(fmt.Sprintf("Snapshot count %d is not as expected %d\n", snapshotCountFound, snapshotCheck.ExpectCount))
-	} else {
-		fmt.Printf("Snapshot count %d is as expected %d\n", snapshotCountFound, snapshotCheck.ExpectCount)
-		return nil
 	}
+	fmt.Printf("Snapshot count %d is as expected %d\n", snapshotCountFound, snapshotCheck.ExpectCount)
+	return nil
 }
 
 func (s AzureStorage) GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, objectKey string) (io.ReadCloser, error) {
