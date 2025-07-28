@@ -23,14 +23,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
+	storagev1api "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-
-	corev1api "k8s.io/api/core/v1"
-	storagev1api "k8s.io/api/storage/v1"
-
 	clientTesting "k8s.io/client-go/testing"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"

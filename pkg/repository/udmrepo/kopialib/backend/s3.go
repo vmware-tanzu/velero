@@ -19,10 +19,9 @@ package backend
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/kopia/kopia/repo/blob"
 	"github.com/kopia/kopia/repo/blob/s3"
+	"github.com/sirupsen/logrus"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 )

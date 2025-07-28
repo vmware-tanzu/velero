@@ -22,15 +22,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	appsv1api "k8s.io/api/apps/v1"
-	corev1api "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestGetInheritedPodInfo(t *testing.T) {
