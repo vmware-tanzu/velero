@@ -73,6 +73,267 @@ By creating a `NamespaceIncludesExcludesInterface` with these methods, we can:
 - **Memory overhead:** Minimal (resolved namespace list stored once per backup request)
 - **Concurrency:** Full concurrent read access to cached results
 
+## Namespace Discovery Timing and Behavior
+
+### Snapshot Timing
+**Wildcard patterns are resolved at backup start time** and remain fixed for the entire backup duration. This provides:
+- **Consistent behavior**: All resources in a backup come from the same namespace set
+- **Predictable results**: Backup contents don't change mid-execution
+- **Performance**: No repeated namespace enumeration during backup processing
+
+### Runtime Namespace Changes
+When namespaces are created or deleted during backup execution:
+
+**Newly Created Namespaces:**
+- If `prod-new` is created after backup starts, it will **NOT** be included even if it matches `prod-*`
+- The resolved namespace list is fixed at backup start time
+
+**Deleted Namespaces:**
+- If a namespace matching the pattern is deleted during backup, the backup continues
+- Resources already processed from that namespace remain in the backup
+- Subsequent resource enumeration for that namespace may result in "not found" errors (handled gracefully)
+  - This should ideally fail so  that the user can re-run it without a namespace being deleted while a backup is started which is rare.
+
+**User Expectations:**
+This behavior should be explicitly documented with examples:
+```
+# At backup start: namespaces [prod-app, prod-db] exist
+velero backup create --include-namespaces "prod-*"
+
+# During backup: prod-cache namespace is created
+# Result: prod-cache is NOT included in this backup
+# Recommendation: Run another backup to capture newly created namespaces
+```
+
+## Pattern Complexity and Validation
+
+### Supported Patterns
+**Basic Wildcard Support (`*` only):**
+- `prefix-*` - Matches namespaces starting with "prefix-"
+- `*-suffix` - Matches namespaces ending with "-suffix"
+- `*-middle-*` - Matches namespaces containing "-middle-"
+- `*` - Special case: matches all namespaces (preserves current behavior)
+
+### Unsupported Patterns
+**Not supported in initial implementation:**
+- `?` for single character matching (e.g., `prod-?-app`)
+- Character classes (e.g., `prod-[abc]-app`)
+- Regex patterns (e.g., `prod-\d+-app`)
+
+### Pattern Validation
+**Creation-time validation:**
+- Invalid patterns containing unsupported characters will be rejected at backup creation
+- Validation occurs in CLI and API server admission controller
+- Clear error messages guide users to supported patterns
+
+**Example validation errors:**
+```bash
+# Unsupported pattern
+velero backup create --include-namespaces "prod-?-app"
+# Error: Pattern 'prod-?-app' contains unsupported character '?'. Only '*' wildcards are supported.
+
+# Valid patterns
+velero backup create --include-namespaces "prod-*,*-staging"
+# Success: Patterns validated successfully
+```
+
+## Error Handling
+
+### Kubernetes API Failures
+**Namespace enumeration failures:**
+- If initial namespace list API call fails → backup fails with clear error message
+- Transient failures are retried using standard Kubernetes client retry logic
+- No fallback to cached/partial data to ensure consistent behavior
+
+**Error response example:**
+```
+Error: Failed to enumerate namespaces for wildcard resolution: unable to connect to Kubernetes API
+Backup creation aborted. Please verify cluster connectivity and try again.
+```
+
+### Zero Namespace Matches
+**When wildcard patterns match no namespaces:**
+- **Behavior**: Warning logged, backup proceeds with empty namespace set
+- **User notification**: Warning in backup status and logs
+- **Rationale**: Allows for valid scenarios (e.g., temporary namespace absence)
+
+**Warning example:**
+```
+Warning: Wildcard pattern 'prod-*' matched 0 namespaces. Backup will include no namespaces from this pattern.
+```
+
+### Dry-Run Support
+**Preview functionality:**
+```bash
+# New flag to preview wildcard resolution
+velero backup create my-backup --include-namespaces "prod-*" --dry-run=wildcards
+
+# Output:
+Wildcard pattern 'prod-*' would include namespaces: [prod-app, prod-db, prod-cache]
+Wildcard pattern '*-staging' would include namespaces: [app-staging, db-staging]
+Total namespaces: 5
+```
+
+## Restore Operations
+
+### Wildcard Behavior During Restore
+**Restore uses namespaces captured at backup time:**
+- Wildcard patterns in backup specs are **not** re-evaluated during restore
+- Restore operates on the concrete namespace list that was resolved during backup
+- This ensures restore consistency even if cluster namespace state has changed
+
+**Implementation approach:**
+1. **Backup metadata storage**: Store both original patterns and resolved namespace lists
+2. **Restore processing**: Use resolved namespace lists, ignore original patterns
+3. **Audit trail**: Both patterns and resolved lists visible in backup metadata
+
+**Example scenario:**
+```yaml
+# Original backup spec
+includedNamespaces: ["prod-*"]
+
+# Stored in backup metadata
+resolvedNamespaces: ["prod-app", "prod-db"] 
+originalPatterns: ["prod-*"]
+
+# During restore (even if prod-cache now exists)
+# Only prod-app and prod-db are restored
+```
+
+### Disaster Recovery Scenarios
+**Cross-cluster restore behavior:**
+- Restore attempts to create resources in target namespaces
+- If target namespaces don't exist, Velero creates them (existing behavior)
+- Wildcard patterns are not re-evaluated against target cluster
+
+## Scheduled Backups
+
+### Namespace State Changes Between Runs
+**Each scheduled backup run performs fresh wildcard resolution:**
+- Pattern `prod-*` may include different namespaces in each backup run
+- This allows scheduled backups to automatically capture newly created namespaces
+- **Trade-off**: Backup contents may vary between runs vs. automatic inclusion of new resources
+
+**Storage implications:**
+- Varying namespace sets between runs may affect deduplication efficiency
+- Each backup stores its own resolved namespace list independently
+
+**Example behavior:**
+```
+# Monday backup: prod-* matches [prod-app, prod-db]
+# Tuesday: prod-cache namespace created
+# Tuesday backup: prod-* matches [prod-app, prod-db, prod-cache]
+```
+
+**User expectations:**
+- Document that scheduled backups automatically include newly matching namespaces
+- Provide guidance on namespace naming conventions for predictable backup behavior
+
+## Testing Strategy
+
+### Unit Tests
+**Pattern matching tests:**
+```go
+func TestWildcardPatterns(t *testing.T) {
+    tests := []struct {
+        pattern   string
+        namespace string
+        expected  bool
+    }{
+        {"prod-*", "prod-app", true},
+        {"prod-*", "staging-app", false},
+        {"*-staging", "app-staging", true},
+        {"*-test-*", "app-test-db", true},
+    }
+    // ... test implementation
+}
+```
+
+**Edge cases:**
+- Empty pattern list
+- Pattern with no matches
+- Pattern matching single namespace
+- Multiple overlapping patterns
+- Special case lone `*` behavior
+
+### Integration Tests
+**Kubernetes cluster scenarios:**
+- Create namespaces, verify wildcard resolution
+- Test namespace creation/deletion during backup
+- Verify thread safety with concurrent backup operations
+- Error scenarios (API failures, network issues)
+
+**Concurrency testing:**
+- Multiple concurrent `ShouldInclude()` calls
+- Thread safety verification
+- Cache hit ratio measurement
+
+## Example Usage
+
+### CLI Usage
+```bash
+# Single wildcard pattern
+velero backup create prod-backup --include-namespaces "prod-*"
+
+# Multiple patterns
+velero backup create env-backup --include-namespaces "prod-*,staging-*,dev-*"
+
+# Mixed literal and wildcard
+velero backup create mixed-backup --include-namespaces "prod-*,kube-system,monitoring"
+
+# Exclude patterns
+velero backup create no-test --include-namespaces "*" --exclude-namespaces "*-test,*-temp"
+
+# Preview before creating
+velero backup create my-backup --include-namespaces "prod-*" --dry-run=wildcards
+```
+
+### Backup Specification YAML
+```yaml
+apiVersion: velero.io/v1
+kind: Backup
+metadata:
+  name: production-backup
+  namespace: velero
+spec:
+  # Wildcard patterns in includedNamespaces
+  includedNamespaces:
+  - "prod-*"           # All namespaces starting with "prod-"
+  - "production-*"     # All namespaces starting with "production-"
+  - "critical-app"     # Literal namespace (mixed with wildcards)
+  
+  # Wildcard patterns in excludedNamespaces  
+  excludedNamespaces:
+  - "*-test"           # Exclude any test namespaces
+  - "*-temp"           # Exclude any temporary namespaces
+  
+  # Other backup configuration
+  storageLocation: default
+  volumeSnapshotLocations:
+  - default
+  includeClusterResources: false
+```
+
+### Stored Backup Metadata
+```yaml
+# What gets stored in backup metadata
+apiVersion: velero.io/v1
+kind: Backup
+metadata:
+  name: production-backup
+status:
+  # Original user patterns preserved for audit
+  originalIncludePatterns: ["prod-*", "production-*", "critical-app"]
+  originalExcludePatterns: ["*-test", "*-temp"]
+  
+  # Resolved concrete namespace lists (used for restore)
+  resolvedIncludedNamespaces: ["prod-app", "prod-db", "production-web", "critical-app"]
+  resolvedExcludedNamespaces: ["prod-app-test", "staging-temp"]
+  
+  # Resolution timestamp
+  namespaceResolutionTime: "2024-01-15T10:30:00Z"
+```
+
 ## Alternatives Considered
 
 ### CLI-Level Resolution
