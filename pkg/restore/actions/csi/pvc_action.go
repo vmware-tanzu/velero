@@ -21,11 +21,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,6 +36,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/client"
+	kuberesource "github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	plugincommon "github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -63,39 +64,6 @@ func (p *pvcRestoreItemAction) AppliesTo() (velero.ResourceSelector, error) {
 		IncludedResources: []string{"persistentvolumeclaims"},
 		//TODO: add label selector volumeSnapshotLabel
 	}, nil
-}
-
-func resetPVCSpec(pvc *corev1api.PersistentVolumeClaim, vsName string) {
-	// Restore operation for the PVC will use the VolumeSnapshot as the data source.
-	// So clear out the volume name, which is a ref to the PV
-	pvc.Spec.VolumeName = ""
-	dataSource := &corev1api.TypedLocalObjectReference{
-		APIGroup: &snapshotv1api.SchemeGroupVersion.Group,
-		Kind:     "VolumeSnapshot",
-		Name:     vsName,
-	}
-	pvc.Spec.DataSource = dataSource
-	pvc.Spec.DataSourceRef = nil
-}
-
-func setPVCStorageResourceRequest(
-	pvc *corev1api.PersistentVolumeClaim,
-	restoreSize resource.Quantity,
-	log logrus.FieldLogger,
-) {
-	{
-		if pvc.Spec.Resources.Requests == nil {
-			pvc.Spec.Resources.Requests = corev1api.ResourceList{}
-		}
-
-		storageReq, exists := pvc.Spec.Resources.Requests[corev1api.ResourceStorage]
-		if !exists || storageReq.Cmp(restoreSize) < 0 {
-			pvc.Spec.Resources.Requests[corev1api.ResourceStorage] = restoreSize
-			rs := pvc.Spec.Resources.Requests[corev1api.ResourceStorage]
-			log.Infof("Resetting storage requests for PVC %s/%s to %s",
-				pvc.Namespace, pvc.Name, rs.String())
-		}
-	}
 }
 
 // Execute modifies the PVC's spec to use the VolumeSnapshot object as the
@@ -139,6 +107,7 @@ func (p *pvcRestoreItemAction) Execute(
 
 	operationID := ""
 
+	additionalItems := []velero.ResourceIdentifier{}
 	if boolptr.IsSetToFalse(input.Restore.Spec.RestorePVs) {
 		logger.Info("Restore did not request for PVs to be restored from snapshot")
 		pvc.Spec.VolumeName = ""
@@ -186,24 +155,27 @@ func (p *pvcRestoreItemAction) Execute(
 			logger.Infof("DataDownload %s/%s is created successfully.",
 				dataDownload.Namespace, dataDownload.Name)
 		} else {
-			targetVSName := ""
-			if vsName, nameOK := pvcFromBackup.Annotations[velerov1api.VolumeSnapshotLabel]; nameOK {
-				targetVSName = util.GenerateSha256FromRestoreUIDAndVsName(string(input.Restore.UID), vsName)
-			} else {
-				logger.Info("Skipping PVCRestoreItemAction for PVC,",
-					"PVC does not have a CSI VolumeSnapshot.")
-				// Make no change in the input PVC.
+			//CSI restore
+			vsName, nameOK := pvcFromBackup.Annotations[velerov1api.VolumeSnapshotLabel]
+			if !nameOK {
+				logger.Info("Skipping PVCRestoreItemAction for PVC, PVC does not have a CSI VolumeSnapshot.")
 				return &velero.RestoreItemActionExecuteOutput{
 					UpdatedItem: input.Item,
 				}, nil
 			}
 
-			if err := restoreFromVolumeSnapshot(
-				&pvc, newNamespace, p.crClient, targetVSName, logger,
-			); err != nil {
-				logger.Errorf("Failed to restore PVC from VolumeSnapshot.")
-				return nil, errors.WithStack(err)
-			}
+			//To avoid confilcs, vs and vsc get a new uniq name based in restore UID
+			// and vs name old name
+			newVSName := util.GenerateSha256FromRestoreUIDAndVsName(string(input.Restore.UID), vsName)
+
+			p.log.Debugf("Setting PVC source to VolumeSnapshot new name: %s", newVSName)
+			resetPVCSourceToVolumeSnapshot(&pvc, newVSName)
+
+			additionalItems = append(additionalItems, velero.ResourceIdentifier{
+				GroupResource: kuberesource.VolumeSnapshots,
+				Name:          vsName,
+				Namespace:     pvc.Namespace,
+			})
 		}
 	}
 
@@ -214,9 +186,23 @@ func (p *pvcRestoreItemAction) Execute(
 	logger.Info("Returning from PVCRestoreItemAction for PVC")
 
 	return &velero.RestoreItemActionExecuteOutput{
-		UpdatedItem: &unstructured.Unstructured{Object: pvcMap},
-		OperationID: operationID,
+		UpdatedItem:     &unstructured.Unstructured{Object: pvcMap},
+		OperationID:     operationID,
+		AdditionalItems: additionalItems,
 	}, nil
+}
+
+func resetPVCSourceToVolumeSnapshot(pvc *corev1api.PersistentVolumeClaim, vsName string) {
+	// Restore operation for the PVC will use the VolumeSnapshot as the data source.
+	// So clear out the volume name, which is a ref to the PV
+	pvc.Spec.VolumeName = ""
+	dataSource := &corev1api.TypedLocalObjectReference{
+		APIGroup: &snapshotv1api.SchemeGroupVersion.Group,
+		Kind:     "VolumeSnapshot",
+		Name:     vsName,
+	}
+	pvc.Spec.DataSource = dataSource
+	pvc.Spec.DataSourceRef = nil
 }
 
 func (p *pvcRestoreItemAction) Name() string {
@@ -454,50 +440,6 @@ func newDataDownload(
 		dataDownload.Spec.DataMoverConfig = uploaderUtil.StoreRestoreConfig(restore.Spec.UploaderConfig)
 	}
 	return dataDownload
-}
-
-func restoreFromVolumeSnapshot(
-	pvc *corev1api.PersistentVolumeClaim,
-	newNamespace string,
-	crClient crclient.Client,
-	volumeSnapshotName string,
-	logger logrus.FieldLogger,
-) error {
-	vs := new(snapshotv1api.VolumeSnapshot)
-	if err := crClient.Get(context.TODO(),
-		crclient.ObjectKey{
-			Namespace: newNamespace,
-			Name:      volumeSnapshotName,
-		},
-		vs,
-	); err != nil {
-		return errors.Wrapf(err, "Failed to get Volumesnapshot %s/%s to restore PVC %s/%s",
-			newNamespace, volumeSnapshotName, newNamespace, pvc.Name)
-	}
-
-	if _, exists := vs.Annotations[velerov1api.VolumeSnapshotRestoreSize]; exists {
-		restoreSize, err := resource.ParseQuantity(
-			vs.Annotations[velerov1api.VolumeSnapshotRestoreSize])
-		if err != nil {
-			return errors.Wrapf(err,
-				"Failed to parse %s from annotation on Volumesnapshot %s/%s into restore size",
-				vs.Annotations[velerov1api.VolumeSnapshotRestoreSize], vs.Namespace, vs.Name)
-		}
-		// It is possible that the volume provider allocated a larger
-		// capacity volume than what was requested in the backed up PVC.
-		// In this scenario the volumesnapshot of the PVC will end being
-		// larger than its requested storage size.  Such a PVC, on restore
-		// as-is, will be stuck attempting to use a VolumeSnapshot as a
-		// data source for a PVC that is not large enough.
-		// To counter that, here we set the storage request on the PVC
-		// to the larger of the PVC's storage request and the size of the
-		// VolumeSnapshot
-		setPVCStorageResourceRequest(pvc, restoreSize, logger)
-	}
-
-	resetPVCSpec(pvc, volumeSnapshotName)
-
-	return nil
 }
 
 func restoreFromDataUploadResult(
