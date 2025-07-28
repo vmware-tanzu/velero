@@ -629,6 +629,7 @@ However, if you run a backup which aborts halfway(some internal snapshots are th
 
 ### Parallelism
 By default, one `PodVolumeBackup`/`PodVolumeRestore` request is handled in a node at a time. You can configure more parallelism per node by [node-agent Concurrency Configuration][19].  
+By the meantime, one data mover pod is created for each volume to be backed up/restored, if there is no available concurrency quota, the data mover pod has to wait there. To make a control of the data mover pods, you can configure the [node-agent Prepare Queue Length][20].  
 
 ### Restart and resume
 When Velero server is restarted, the running backups/restores will be marked as `Failed`. The corresponding `PodVolumeBackup`/`PodVolumeRestore` will be canceled.   
@@ -760,3 +761,4 @@ Velero still effectively manage restic repository, though you cannot write any n
 [17]: https://github.com/vmware-tanzu/velero/blob/main/GOVERNANCE.md#deprecation-policy
 [18]: backup-repository-configuration.md
 [19]: node-agent-concurrency.md
+[20]: node-agent-prepare-queue-length.md
