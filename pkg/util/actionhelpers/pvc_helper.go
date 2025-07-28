@@ -24,7 +24,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
-func RelatedItemsForPVC(pvc *corev1api.PersistentVolumeClaim, log logrus.FieldLogger) []velero.ResourceIdentifier {
+func RelatedItemsForPVC(pvc *corev1api.PersistentVolumeClaim, _ logrus.FieldLogger) []velero.ResourceIdentifier {
 	return []velero.ResourceIdentifier{
 		{
 			GroupResource: kuberesource.PersistentVolumes,

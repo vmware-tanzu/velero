@@ -39,7 +39,7 @@ func NewCRDV1PreserveUnknownFieldsAction(logger logrus.FieldLogger) *CRDV1Preser
 	return &CRDV1PreserveUnknownFieldsAction{logger: logger}
 }
 
-func (c *CRDV1PreserveUnknownFieldsAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*CRDV1PreserveUnknownFieldsAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"customresourcedefinition.apiextensions.k8s.io"},
 	}, nil

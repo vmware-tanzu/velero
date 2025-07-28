@@ -88,6 +88,6 @@ func (r *RestoreTest) Restore() error {
 
 	return r.TestCase.Restore()
 }
-func (r *RestoreTest) Destroy() error {
+func (*RestoreTest) Destroy() error {
 	return nil
 }

@@ -696,7 +696,7 @@ type logHook struct {
 	entry *logrus.Entry
 }
 
-func (l *logHook) Levels() []logrus.Level {
+func (*logHook) Levels() []logrus.Level {
 	return []logrus.Level{logrus.ErrorLevel}
 }
 func (l *logHook) Fire(entry *logrus.Entry) error {

@@ -55,7 +55,7 @@ func (s *BackupItemActionGRPCServer) getImpl(name string) (biav2.BackupItemActio
 }
 
 func (s *BackupItemActionGRPCServer) AppliesTo(
-	ctx context.Context, req *protobiav2.BackupItemActionAppliesToRequest) (
+	_ context.Context, req *protobiav2.BackupItemActionAppliesToRequest) (
 	response *protobiav2.BackupItemActionAppliesToResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
@@ -85,7 +85,7 @@ func (s *BackupItemActionGRPCServer) AppliesTo(
 }
 
 func (s *BackupItemActionGRPCServer) Execute(
-	ctx context.Context, req *protobiav2.ExecuteRequest) (response *protobiav2.ExecuteResponse, err error) {
+	_ context.Context, req *protobiav2.ExecuteRequest) (response *protobiav2.ExecuteResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -140,7 +140,7 @@ func (s *BackupItemActionGRPCServer) Execute(
 }
 
 func (s *BackupItemActionGRPCServer) Progress(
-	ctx context.Context, req *protobiav2.BackupItemActionProgressRequest) (
+	_ context.Context, req *protobiav2.BackupItemActionProgressRequest) (
 	response *protobiav2.BackupItemActionProgressResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
@@ -179,7 +179,7 @@ func (s *BackupItemActionGRPCServer) Progress(
 }
 
 func (s *BackupItemActionGRPCServer) Cancel(
-	ctx context.Context, req *protobiav2.BackupItemActionCancelRequest) (
+	_ context.Context, req *protobiav2.BackupItemActionCancelRequest) (
 	response *emptypb.Empty, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
@@ -216,6 +216,6 @@ func backupResourceIdentifierToProto(id velero.ResourceIdentifier) *proto.Resour
 
 // This shouldn't be called on the GRPC server since the server won't ever receive this request, as
 // the RestartableBackupItemAction in Velero won't delegate this to the server
-func (s *BackupItemActionGRPCServer) Name() string {
+func (*BackupItemActionGRPCServer) Name() string {
 	return ""
 }

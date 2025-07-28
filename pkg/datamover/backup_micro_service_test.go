@@ -72,9 +72,9 @@ func (bt *backupMsTestHelper) EndingEvent(_ runtime.Object, _ bool, reason strin
 	bt.eventReason = reason
 	bt.eventMsg = fmt.Sprintf(message, a...)
 }
-func (bt *backupMsTestHelper) Shutdown() {}
+func (*backupMsTestHelper) Shutdown() {}
 
-func (bt *backupMsTestHelper) Marshal(v any) ([]byte, error) {
+func (bt *backupMsTestHelper) Marshal(any) ([]byte, error) {
 	if bt.marshalErr != nil {
 		return nil, bt.marshalErr
 	}

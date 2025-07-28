@@ -43,7 +43,7 @@ func (c *AzureBackend) Setup(ctx context.Context, flags map[string]string, logge
 	return nil
 }
 
-func (c *AzureBackend) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
+func (c *AzureBackend) Connect(ctx context.Context, _ bool, logger logrus.FieldLogger) (blob.Storage, error) {
 	c.option.Logger = logger
 	return azure.NewStorage(ctx, &c.option, false)
 }

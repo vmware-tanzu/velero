@@ -207,7 +207,7 @@ func (ks *kopiaRepoService) Maintain(ctx context.Context, repoOption udmrepo.Rep
 	return nil
 }
 
-func (ks *kopiaRepoService) DefaultMaintenanceFrequency() time.Duration {
+func (*kopiaRepoService) DefaultMaintenanceFrequency() time.Duration {
 	return defaultMaintainCheckPeriod
 }
 
@@ -373,7 +373,7 @@ func (kr *kopiaRepository) Flush(ctx context.Context) error {
 	return nil
 }
 
-func (kr *kopiaRepository) GetAdvancedFeatures() udmrepo.AdvancedFeatureInfo {
+func (*kopiaRepository) GetAdvancedFeatures() udmrepo.AdvancedFeatureInfo {
 	return udmrepo.AdvancedFeatureInfo{
 		MultiPartBackup: true,
 	}
@@ -470,7 +470,7 @@ func (kow *kopiaObjectWriter) Write(p []byte) (int, error) {
 	return kow.rawWriter.Write(p)
 }
 
-func (kow *kopiaObjectWriter) Seek(offset int64, whence int) (int64, error) {
+func (*kopiaObjectWriter) Seek(int64, int) (int64, error) {
 	return -1, errors.New("not supported")
 }
 

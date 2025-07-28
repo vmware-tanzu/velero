@@ -105,11 +105,11 @@ func (t *TestCase) Init() error {
 	return nil
 }
 
-func (t *TestCase) GenerateUUID() string {
+func (*TestCase) GenerateUUID() string {
 	return fmt.Sprintf("%08d", rand.IntN(100000000))
 }
 
-func (t *TestCase) CreateResources() error {
+func (*TestCase) CreateResources() error {
 	return nil
 }
 
@@ -161,7 +161,7 @@ func (t *TestCase) Restore() error {
 	return nil
 }
 
-func (t *TestCase) Verify() error {
+func (*TestCase) Verify() error {
 	return nil
 }
 

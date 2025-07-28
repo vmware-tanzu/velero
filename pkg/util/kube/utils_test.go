@@ -41,7 +41,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestNamespaceAndName(t *testing.T) {
+func TestNamespaceAndName(_ *testing.T) {
 	//TODO
 }
 

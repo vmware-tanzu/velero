@@ -108,12 +108,12 @@ func (t *TestCase) Init() error {
 	return nil
 }
 
-func (t *TestCase) GenerateUUID() string {
+func (*TestCase) GenerateUUID() string {
 	rand.Seed(time.Now().UnixNano())
 	return fmt.Sprintf("%08d", rand.Intn(100000000))
 }
 
-func (t *TestCase) CreateResources() error {
+func (*TestCase) CreateResources() error {
 	return nil
 }
 
@@ -156,7 +156,7 @@ func (t *TestCase) Restore() error {
 	return nil
 }
 
-func (t *TestCase) Verify() error {
+func (*TestCase) Verify() error {
 	return nil
 }
 

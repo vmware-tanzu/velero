@@ -50,7 +50,7 @@ func (s *RestoreItemActionGRPCServer) getImpl(name string) (riav1.RestoreItemAct
 	return itemAction, nil
 }
 
-func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.RestoreItemActionAppliesToRequest) (response *proto.RestoreItemActionAppliesToResponse, err error) {
+func (s *RestoreItemActionGRPCServer) AppliesTo(_ context.Context, req *proto.RestoreItemActionAppliesToRequest) (response *proto.RestoreItemActionAppliesToResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -78,7 +78,7 @@ func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.
 	}, nil
 }
 
-func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.RestoreItemActionExecuteRequest) (response *proto.RestoreItemActionExecuteResponse, err error) {
+func (s *RestoreItemActionGRPCServer) Execute(_ context.Context, req *proto.RestoreItemActionExecuteRequest) (response *proto.RestoreItemActionExecuteResponse, err error) {
 	defer func() {
 		if recoveredErr := common.HandlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr

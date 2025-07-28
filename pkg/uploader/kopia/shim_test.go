@@ -50,7 +50,7 @@ func TestShimRepo(t *testing.T) {
 	shim.PrefetchObjects(ctx, []object.ID{}, "hint")
 	shim.UpdateDescription("desc")
 	shim.NewWriter(ctx, repo.WriteSessionOptions{})
-	shim.OnSuccessfulFlush(func(ctx context.Context, w repo.RepositoryWriter) error { return nil })
+	shim.OnSuccessfulFlush(func(context.Context, repo.RepositoryWriter) error { return nil })
 
 	backupRepo.On("Close", mock.Anything).Return(nil)
 	NewShimRepo(backupRepo).Close(ctx)
@@ -160,7 +160,7 @@ func TestFindManifests(t *testing.T) {
 	}
 }
 
-func TestShimObjReader(t *testing.T) {
+func TestShimObjReader(_ *testing.T) {
 	reader := new(shimObjectReader)
 	objReader := &mocks.ObjectReader{}
 	reader.repoReader = objReader
@@ -179,7 +179,7 @@ func TestShimObjReader(t *testing.T) {
 	reader.Length()
 }
 
-func TestShimObjWriter(t *testing.T) {
+func TestShimObjWriter(_ *testing.T) {
 	writer := new(shimObjectWriter)
 	objWriter := &mocks.ObjectWriter{}
 	writer.repoWriter = objWriter

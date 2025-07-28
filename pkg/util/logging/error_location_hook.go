@@ -37,11 +37,11 @@ const (
 // typically do).
 type ErrorLocationHook struct{}
 
-func (h *ErrorLocationHook) Levels() []logrus.Level {
+func (*ErrorLocationHook) Levels() []logrus.Level {
 	return logrus.AllLevels
 }
 
-func (h *ErrorLocationHook) Fire(entry *logrus.Entry) error {
+func (*ErrorLocationHook) Fire(entry *logrus.Entry) error {
 	errObj, ok := entry.Data[logrus.ErrorKey]
 	if !ok {
 		return nil

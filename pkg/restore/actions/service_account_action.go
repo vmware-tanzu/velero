@@ -37,7 +37,7 @@ func NewServiceAccountAction(logger logrus.FieldLogger) *ServiceAccountAction {
 	return &ServiceAccountAction{logger: logger}
 }
 
-func (a *ServiceAccountAction) AppliesTo() (velero.ResourceSelector, error) {
+func (*ServiceAccountAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"serviceaccounts"},
 	}, nil
