@@ -471,8 +471,8 @@ func (e *csiSnapshotExposer) createBackupVSC(ctx context.Context, ownerObject co
 		https://github.com/kubernetes-csi/external-snapshotter/tree/4cedb3f45790ac593ebfa3324c490abedf739477?tab=readme-ov-file#distributed-snapshotting
 		https://github.com/kubernetes-csi/external-snapshotter/blob/4cedb3f45790ac593ebfa3324c490abedf739477/pkg/utils/util.go#L158
 	*/
-	if manager, ok := snapshotVSC.Labels["snapshot.storage.kubernetes.io/managed-by"]; ok {
-		vsc.ObjectMeta.Labels["snapshot.storage.kubernetes.io/managed-by"] = manager
+	if manager, ok := snapshotVSC.Labels[kube.VolumeSnapshotContentManagedByLabel]; ok {
+		vsc.ObjectMeta.Labels[kube.VolumeSnapshotContentManagedByLabel] = manager
 	}
 
 	return e.csiSnapshotClient.VolumeSnapshotContents().Create(ctx, vsc, metav1.CreateOptions{})
