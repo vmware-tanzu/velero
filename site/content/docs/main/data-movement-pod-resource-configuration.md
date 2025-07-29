@@ -3,9 +3,11 @@ title: "Data Movement Pod Resource Configuration"
 layout: docs
 ---
 
-During [CSI Snapshot Data Movement][1], Velero built-in data mover launches data mover pods to to run the data transfer. While the data transfer is a time and resource consuming activity.  
+During [CSI Snapshot Data Movement][1], Velero built-in data mover launches data mover pods to run the data transfer.  
+During [fs-backup][2], Velero also launches data mover pods to run the data transfer.  
+The data transfer is a time and resource consuming activity.  
 
-Velero built-in data mover by default uses the [BestEffort QoS][2] for the data mover pods, which guarantees the best performance of the data movement activities. On the other hand, it may take lots of cluster resource, i.e., CPU, memory, and how many resources are taken is decided by the concurrency and the scale of data to be moved.  
+Velero by default uses the [BestEffort QoS][2] for the data mover pods, which guarantees the best performance of the data movement activities. On the other hand, it may take lots of cluster resource, i.e., CPU, memory, and how many resources are taken is decided by the concurrency and the scale of data to be moved.  
 
 If the cluster nodes don't have sufficient resource, Velero also allows you to customize the resources for the data mover pods.    
 Note: If less resources are assigned to data mover pods, the data movement activities may take longer time; or the data mover pods may be OOM killed if the assigned memory resource doesn't meet the requirements. Consequently, the dataUpload/dataDownload may run longer or fail.  
@@ -52,5 +54,6 @@ spec:
 ```
 
 [1]: csi-snapshot-data-movement.md
-[2]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
-[3]: performance-guidance.md
+[2]: file-system-backup.md
+[3]: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/
+[4]: performance-guidance.md

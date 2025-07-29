@@ -290,7 +290,9 @@ In which manner the `DataUpload`/`DataDownload` CRs are processed is totally dec
 
 For Velero built-in data mover, it uses Kubernetes' scheduler to mount a snapshot volume/restore volume associated to a `DataUpload`/`DataDownload` CR into a specific node, and then the `DataUpload`/`DataDownload` controller (in node-agent daemonset) in that node will handle the `DataUpload`/`DataDownload`.  
 By default, a `DataUpload`/`DataDownload` controller in one node handles one request at a time. You can configure more parallelism per node by [node-agent Concurrency Configuration][14].  
-That is to say, the snapshot volumes/restore volumes may spread in different nodes, then their associated `DataUpload`/`DataDownload` CRs will be processed in parallel; while for the snapshot volumes/restore volumes in the same node, by default, their associated `DataUpload`/`DataDownload` CRs are processed sequentially and can be processed concurrently according to your [node-agent Concurrency Configuration][14].    
+That is to say, the snapshot volumes/restore volumes may spread in different nodes, then their associated `DataUpload`/`DataDownload` CRs will be processed in parallel; while for the snapshot volumes/restore volumes in the same node, by default, their associated `DataUpload`/`DataDownload` CRs are processed sequentially and can be processed concurrently according to your [node-agent Concurrency Configuration][14].  
+
+The prepare process of mounting the snapshot volume/restore volume may generate multiple intermediate objects, to make a control of the intermediate objects, you can configure the [node-agent Prepare Queue Length][20].  
 
 You can check in which node the `DataUpload`/`DataDownload` CRs are processed and their parallelism by watching the `DataUpload`/`DataDownload` CRs:
 
@@ -404,4 +406,5 @@ Sometimes, `RestorePVC` needs to be configured to increase the performance of re
 [17]: backup-repository-configuration.md
 [18]: https://github.com/vmware-tanzu/velero/pull/7576
 [19]: data-movement-restore-pvc-configuration.md
+[20]: node-agent-prepare-queue-length.md
 
