@@ -72,6 +72,20 @@ func NewIncludesExcludes() *IncludesExcludes {
 	}
 }
 
+// SetIncludes sets the includes list to the given list
+func (ie *IncludesExcludes) SetIncludes(includes []string) *IncludesExcludes {
+	ie.includes = newGlobStringSet()
+	ie.includes.Insert(includes...)
+	return ie
+}
+
+// SetExcludes sets the excludes list to the given list
+func (ie *IncludesExcludes) SetExcludes(excludes []string) *IncludesExcludes {
+	ie.excludes = newGlobStringSet()
+	ie.excludes.Insert(excludes...)
+	return ie
+}
+
 // Includes adds items to the includes list. '*' is a wildcard
 // value meaning "include everything".
 func (ie *IncludesExcludes) Includes(includes ...string) *IncludesExcludes {
