@@ -40,6 +40,16 @@ By default, `velero install` does not enable the use of File System Backup (FSB)
 
 If you are planning to only use FSB for volume backups, you can run the `velero install` command with the `--default-volumes-to-fs-backup` flag. This will default all pod volumes backups to use FSB without having to apply annotations to pods. Note that when this flag is set during install, Velero will always try to use FSB to perform the backup, even want an individual backup to use volume snapshots, by setting the `--snapshot-volumes` flag in the `backup create` command. Alternatively, you can set the  `--default-volumes-to-fs-backup` on an individual backup to to make sure Velero uses FSB for each volume being backed up.
 
+## Upgrade an existing installation
+
+By default, the `velero install` command creates new resources in your cluster. If you're upgrading an existing Velero installation, you can use the `--upgrade` flag to apply changes to existing resources instead of attempting to create new ones:
+
+```bash
+velero install --upgrade
+```
+
+When the `--upgrade` flag is specified, Velero uses apply to update existing resources. This is particularly useful when upgrading Velero to a new version or when modifying your installation configuration.
+
 ## Enable features
 
 New features in Velero will be released as beta features behind feature flags which are not enabled by default. A full listing of Velero feature flags can be found [here][11].

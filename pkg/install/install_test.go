@@ -53,7 +53,7 @@ func TestInstall(t *testing.T) {
 	require.NoError(t, appendUnstructured(resources, v1crds.CRDs[0]))
 	require.NoError(t, appendUnstructured(resources, Namespace("velero")))
 
-	assert.NoError(t, Install(factory, c, resources, os.Stdout))
+	assert.NoError(t, Install(factory, c, resources, os.Stdout, false))
 }
 
 func Test_crdsAreReady(t *testing.T) {
@@ -167,4 +167,65 @@ func TestNodeAgentWindowsIsReady(t *testing.T) {
 	ready, err := NodeAgentWindowsIsReady(factory, "velero")
 	require.NoError(t, err)
 	assert.True(t, ready)
+}
+
+func TestInstallWithUpgradeFlag(t *testing.T) {
+	// Create a test resource
+	testResource := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]interface{}{
+				"name":      "test-configmap",
+				"namespace": "velero",
+			},
+			"data": map[string]interface{}{
+				"key1": "value1",
+			},
+		},
+	}
+
+	resources := &unstructured.UnstructuredList{
+		Items: []unstructured.Unstructured{*testResource},
+	}
+
+	// Test case 1: Without upgrade flag (create)
+	{
+		dc := &test.FakeDynamicClient{}
+		// Expect Create to be called
+		dc.On("Create", mock.Anything).Return(testResource, nil)
+		// Apply should not be called
+
+		factory := &test.FakeDynamicFactory{}
+		factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
+
+		c := fake.NewClientBuilder().Build()
+
+		err := Install(factory, c, resources, os.Stdout, false)
+		assert.NoError(t, err)
+
+		// Verify that Create was called and Apply was not
+		dc.AssertCalled(t, "Create", mock.Anything)
+		dc.AssertNotCalled(t, "Apply", mock.Anything, mock.Anything, mock.Anything)
+	}
+
+	// Test case 2: With upgrade flag (apply)
+	{
+		dc := &test.FakeDynamicClient{}
+		// Create should not be called
+		// Expect Apply to be called
+		dc.On("Apply", mock.Anything, mock.Anything, mock.Anything).Return(testResource, nil)
+
+		factory := &test.FakeDynamicFactory{}
+		factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
+
+		c := fake.NewClientBuilder().Build()
+
+		err := Install(factory, c, resources, os.Stdout, true)
+		assert.NoError(t, err)
+
+		// Verify that Apply was called and Create was not
+		dc.AssertCalled(t, "Apply", mock.Anything, mock.Anything, mock.Anything)
+		dc.AssertNotCalled(t, "Create", mock.Anything)
+	}
 }
