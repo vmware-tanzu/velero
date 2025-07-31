@@ -58,6 +58,9 @@ type JobConfigs struct {
 
 	// PodResources is the config for the CPU and memory resources setting.
 	PodResources *kube.PodResources `json:"podResources,omitempty"`
+
+	// KeepLatestMaintenanceJobs is the number of latest maintenance jobs to keep for the repository.
+	KeepLatestMaintenanceJobs *int `json:"keepLatestMaintenanceJobs,omitempty"`
 }
 
 func GenerateJobName(repo string) string {
@@ -271,9 +274,39 @@ func getJobConfig(
 		if len(result.LoadAffinities) == 0 {
 			result.LoadAffinities = globalResult.LoadAffinities
 		}
+
+		if result.KeepLatestMaintenanceJobs == nil && globalResult.KeepLatestMaintenanceJobs != nil {
+			result.KeepLatestMaintenanceJobs = globalResult.KeepLatestMaintenanceJobs
+		}
 	}
 
 	return result, nil
+}
+
+// GetKeepLatestMaintenanceJobs returns the configured number of maintenance jobs to keep from the JobConfigs.
+// If not configured in the ConfigMap, it returns 0 to indicate using the fallback value.
+func GetKeepLatestMaintenanceJobs(
+	ctx context.Context,
+	client client.Client,
+	logger logrus.FieldLogger,
+	veleroNamespace string,
+	repoMaintenanceJobConfig string,
+	repo *velerov1api.BackupRepository,
+) (int, error) {
+	if repoMaintenanceJobConfig == "" {
+		return 0, nil
+	}
+
+	config, err := getJobConfig(ctx, client, logger, veleroNamespace, repoMaintenanceJobConfig, repo)
+	if err != nil {
+		return 0, err
+	}
+
+	if config != nil && config.KeepLatestMaintenanceJobs != nil {
+		return *config.KeepLatestMaintenanceJobs, nil
+	}
+
+	return 0, nil
 }
 
 // WaitJobComplete waits the completion of the specified maintenance job and return the BackupRepositoryMaintenanceStatus
