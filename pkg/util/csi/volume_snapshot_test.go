@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned/fake"
 	"github.com/sirupsen/logrus"
@@ -36,6 +38,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/test"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
@@ -1878,6 +1881,60 @@ func TestDiagnoseVSC(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			diag := DiagnoseVSC(tc.vsc)
 			assert.Equal(t, tc.expected, diag)
+		})
+	}
+}
+
+func TestGetVSCForVS(t *testing.T) {
+	testCases := []struct {
+		name        string
+		vs          *snapshotv1api.VolumeSnapshot
+		vsc         *snapshotv1api.VolumeSnapshotContent
+		expectedErr string
+		expectedVSC *snapshotv1api.VolumeSnapshotContent
+	}{
+		{
+			name:        "vs has no status",
+			vs:          builder.ForVolumeSnapshot("ns1", "vs1").Result(),
+			expectedErr: "invalid snapshot info in volume snapshot vs1",
+		},
+		{
+			name:        "vs has no bound vsc",
+			vs:          builder.ForVolumeSnapshot("ns1", "vs1").Status().Result(),
+			expectedErr: "invalid snapshot info in volume snapshot vs1",
+		},
+		{
+			name:        "vs bound vsc cannot be found",
+			vs:          builder.ForVolumeSnapshot("ns1", "vs1").Status().BoundVolumeSnapshotContentName("vsc1").Result(),
+			expectedErr: "error getting volume snapshot content from API: volumesnapshotcontents.snapshot.storage.k8s.io \"vsc1\" not found",
+		},
+		{
+			name:        "normal case",
+			vs:          builder.ForVolumeSnapshot("ns1", "vs1").Status().BoundVolumeSnapshotContentName("vsc1").Result(),
+			vsc:         builder.ForVolumeSnapshotContent("vsc1").Result(),
+			expectedVSC: builder.ForVolumeSnapshotContent("vsc1").Result(),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			objs := []runtime.Object{tc.vs}
+			if tc.vsc != nil {
+				objs = append(objs, tc.vsc)
+			}
+
+			client := test.NewFakeControllerRuntimeClient(t, objs...)
+			vsc, err := GetVSCForVS(t.Context(), tc.vs, client)
+
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			if tc.expectedVSC != nil {
+				require.True(t, cmp.Equal(tc.expectedVSC, vsc, cmpopts.IgnoreFields(snapshotv1api.VolumeSnapshotContent{}, "ResourceVersion")))
+			}
 		})
 	}
 }
