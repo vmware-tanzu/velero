@@ -40,6 +40,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	"github.com/vmware-tanzu/velero/pkg/util/wildcard"
 )
 
 // itemCollector collects items from the Kubernetes API according to
@@ -242,6 +243,38 @@ func (r *itemCollector) getItems(
 	}
 
 	return resources
+}
+
+// getActiveNamespaces gets the active namespaces from the cluster
+// This is used to expand wildcard includes/excludes
+func (r *itemCollector) getActiveNamespaces() ([]string, error) {
+	resourceClient, err := r.dynamicFactory.ClientForGroupVersionResource(
+		schema.GroupVersion{Group: "", Version: "v1"},
+		metav1.APIResource{Name: "namespaces", Kind: "Namespace"},
+		"",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	unstructuredList, err := resourceClient.List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter for only active namespaces
+	var activeNamespaces []string
+	for _, namespace := range unstructuredList.Items {
+		ns := new(corev1api.Namespace)
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(namespace.UnstructuredContent(), ns); err != nil {
+			continue
+		}
+		if ns.Status.Phase == corev1api.NamespaceActive {
+			activeNamespaces = append(activeNamespaces, namespace.GetName())
+		}
+	}
+
+	return activeNamespaces, nil
 }
 
 // getGroupItems collects all relevant items from a single API group.
@@ -462,7 +495,11 @@ func (r *itemCollector) getResourceItems(
 	}
 
 	clusterScoped := !resource.Namespaced
-	namespacesToList := getNamespacesToList(r.backupRequest.NamespaceIncludesExcludes)
+	namespacesToList, err := r.getNamespacesToList()
+	if err != nil {
+		log.WithError(err).Error("Error getting namespaces to list")
+		return nil, err
+	}
 
 	// If we get here, we're backing up something other than namespaces
 	if clusterScoped {
@@ -635,14 +672,47 @@ func coreGroupResourcePriority(resource string) int {
 // getNamespacesToList examines ie and resolves the includes and excludes to a full list of
 // namespaces to list. If ie is nil or it includes *, the result is just "" (list across all
 // namespaces). Otherwise, the result is a list of every included namespace minus all excluded ones.
-func getNamespacesToList(ie *collections.IncludesExcludes) []string {
+func (r *itemCollector) getNamespacesToList() ([]string, error) {
+
+	ie := r.backupRequest.NamespaceIncludesExcludes
+
 	if ie == nil {
-		return []string{""}
+		return []string{""}, nil
 	}
 
 	if ie.ShouldInclude("*") {
 		// "" means all namespaces
-		return []string{""}
+		return []string{""}, nil
+	}
+
+	// Check wildcard expansion here since * is a special case
+	// Even if * is mixed in with other patterns, it will be caught by the above blocks
+	// We can safely expand the wildcard here since from this point forward, the list is non-trivial
+
+	if wildcard.ShouldExpandWildcards(ie.GetIncludes(), ie.GetExcludes()) {
+
+		r.log.Info("Expanding wildcard includes/excludes")
+	
+		// Record the pre-expansion wildcard includes/excludes in the request status
+		r.backupRequest.Status.WildcardIncludedNamespaces = ie.GetIncludes()
+		r.backupRequest.Status.WildcardExcludedNamespaces = ie.GetExcludes()
+		
+		activeNamespaces, err := r.getActiveNamespaces()
+		if err != nil {
+			// If we fail to use the K8s API to get the active namespaces, we should raise failure
+			r.log.WithError(err).Error("Error getting active namespaces from K8s API")
+			return []string{""}, err
+		}
+
+		expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(activeNamespaces, ie.GetIncludes(), ie.GetExcludes())
+		if err != nil {
+			r.log.WithError(err).Error("Error expanding wildcard includes/excludes")
+			return []string{""}, err
+		}
+
+		ie.SetIncludes(expandedIncludes)
+		ie.SetExcludes(expandedExcludes)
+
 	}
 
 	var list []string
@@ -652,7 +722,7 @@ func getNamespacesToList(ie *collections.IncludesExcludes) []string {
 		}
 	}
 
-	return list
+	return list, nil
 }
 
 type cohabitatingResource struct {
