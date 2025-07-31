@@ -989,7 +989,7 @@ func TestPodVolumeRestoreReconcile(t *testing.T) {
 					r.exposer = nil
 				} else {
 					r.exposer = func() exposer.PodVolumeExposer {
-						ep := exposermockes.NewPodVolumeExposer(t)
+						ep := exposermockes.NewMockPodVolumeExposer(t)
 						if test.mockExposeErr != nil {
 							if boolptr.IsSetToTrue(test.mockExposeErr) {
 								ep.On("Expose", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("Error to expose restore exposer"))
@@ -1156,7 +1156,7 @@ func TestOnPodVolumeRestoreCompleted(t *testing.T) {
 			needErrs := []bool{test.isGetErr, false, false, false}
 			r, err := initPodVolumeRestoreReconciler(nil, []client.Object{}, needErrs...)
 			r.exposer = func() exposer.PodVolumeExposer {
-				ep := exposermockes.NewPodVolumeExposer(t)
+				ep := exposermockes.NewMockPodVolumeExposer(t)
 				ep.On("CleanUp", mock.Anything, mock.Anything).Return()
 				return ep
 			}()

@@ -68,7 +68,7 @@ type GenericRestoreExposeParam struct {
 	RestorePVCConfig nodeagent.RestorePVC
 
 	// LoadAffinity specifies the node affinity of the backup pod
-	LoadAffinity *kube.LoadAffinity
+	LoadAffinity []*kube.LoadAffinity
 }
 
 // GenericRestoreExposer is the interfaces for a generic restore exposer
@@ -136,6 +136,14 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1ap
 		return errors.Errorf("Target PVC %s/%s has already been bound, abort", param.TargetNamespace, param.TargetPVCName)
 	}
 
+	// Data mover allows the StorageClass name not set for PVC.
+	storageClassName := ""
+	if targetPVC.Spec.StorageClassName != nil {
+		storageClassName = *targetPVC.Spec.StorageClassName
+	}
+
+	affinity := kube.GetLoadAffinityByStorageClass(param.LoadAffinity, storageClassName, curLog)
+
 	restorePod, err := e.createRestorePod(
 		ctx,
 		ownerObject,
@@ -147,7 +155,7 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1ap
 		selectedNode,
 		param.Resources,
 		param.NodeOS,
-		param.LoadAffinity,
+		affinity,
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error to create restore pod")

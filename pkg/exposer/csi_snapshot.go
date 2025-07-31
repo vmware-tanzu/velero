@@ -72,7 +72,7 @@ type CSISnapshotExposeParam struct {
 	VolumeSize resource.Quantity
 
 	// Affinity specifies the node affinity of the backup pod
-	Affinity *kube.LoadAffinity
+	Affinity []*kube.LoadAffinity
 
 	// BackupPVCConfig is the config for backupPVC (intermediate PVC) of snapshot data movement
 	BackupPVCConfig map[string]nodeagent.BackupPVC
@@ -211,6 +211,8 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 		}
 	}()
 
+	affinity := kube.GetLoadAffinityByStorageClass(csiExposeParam.Affinity, backupPVCStorageClass, curLog)
+
 	backupPod, err := e.createBackupPod(
 		ctx,
 		ownerObject,
@@ -219,7 +221,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 		csiExposeParam.HostingPodLabels,
 		csiExposeParam.HostingPodAnnotations,
 		csiExposeParam.HostingPodTolerations,
-		csiExposeParam.Affinity,
+		affinity,
 		csiExposeParam.Resources,
 		backupPVCReadOnly,
 		spcNoRelabeling,

@@ -878,8 +878,6 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		}
 	}
 
-	affinity := kube.GetLoadAffinityByStorageClass(r.loadAffinity, dd.Spec.BackupStorageLocation, log)
-
 	return exposer.GenericRestoreExposeParam{
 		TargetPVCName:         dd.Spec.TargetVolume.PVC,
 		TargetNamespace:       dd.Spec.TargetVolume.Namespace,
@@ -891,7 +889,7 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		ExposeTimeout:         r.preparingTimeout,
 		NodeOS:                nodeOS,
 		RestorePVCConfig:      r.restorePVCConfig,
-		LoadAffinity:          affinity,
+		LoadAffinity:          r.loadAffinity,
 	}, nil
 }
 
