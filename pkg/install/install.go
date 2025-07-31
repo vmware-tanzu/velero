@@ -285,9 +285,8 @@ func createOrApplyResource(r *unstructured.Unstructured, factory client.DynamicF
 	id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
 
 	// Helper to reduce boilerplate message about the same object
-	log := func(f string, a ...any) {
-		format := strings.Join([]string{id, ": ", f, "\n"}, "")
-		fmt.Fprintf(w, format, a...)
+	log := func(f string) {
+		fmt.Fprintf(w, "%s: %s\n", id, f)
 	}
 
 	c, err := CreateClient(r, factory, w)
