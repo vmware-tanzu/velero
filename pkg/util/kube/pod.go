@@ -317,7 +317,7 @@ func GetLoadAffinityByStorageClass(
 
 	for _, affinity := range affinityList {
 		if affinity.StorageClass == scName {
-			logger.WithField("StorageClass", scName).Info("Found backup pod's affinity setting per StorageClass.")
+			logger.WithField("StorageClass", scName).Info("Found pod's affinity setting per StorageClass.")
 			return affinity
 		}
 
@@ -327,9 +327,9 @@ func GetLoadAffinityByStorageClass(
 	}
 
 	if globalAffinity != nil {
-		logger.Info("Use the Global affinity for backup pod.")
+		logger.Info("Use the Global affinity for pod.")
 	} else {
-		logger.Info("No Affinity is found for backup pod.")
+		logger.Info("No Affinity is found for pod.")
 	}
 
 	return globalAffinity

@@ -878,7 +878,15 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		}
 	}
 
-	affinity := kube.GetLoadAffinityByStorageClass(r.loadAffinity, dd.Spec.BackupStorageLocation, log)
+	targetPVC, err := r.getTargetPVC(context.Background(), dd)
+	if err != nil {
+		return exposer.GenericRestoreExposeParam{}, fmt.Errorf("fail to get targetPVC %s: %w", dd.Spec.TargetVolume.PVC, err)
+	}
+	if targetPVC.Spec.StorageClassName == nil {
+		return exposer.GenericRestoreExposeParam{}, fmt.Errorf("targetPVC's StorageClass is nil")
+	}
+
+	affinity := kube.GetLoadAffinityByStorageClass(r.loadAffinity, *targetPVC.Spec.StorageClassName, log)
 
 	return exposer.GenericRestoreExposeParam{
 		TargetPVCName:         dd.Spec.TargetVolume.PVC,
