@@ -691,12 +691,15 @@ func (r *itemCollector) getNamespacesToList() ([]string, error) {
 
 	if wildcard.ShouldExpandWildcards(ie.GetIncludes(), ie.GetExcludes()) {
 
-		r.log.Info("Expanding wildcard includes/excludes")
-	
+		r.log.WithFields(logrus.Fields{
+			"originalIncludes": ie.GetIncludes(),
+			"originalExcludes": ie.GetExcludes(),
+		}).Info("Expanding wildcard includes/excludes")
+
 		// Record the pre-expansion wildcard includes/excludes in the request status
 		r.backupRequest.Status.WildcardIncludedNamespaces = ie.GetIncludes()
 		r.backupRequest.Status.WildcardExcludedNamespaces = ie.GetExcludes()
-		
+
 		activeNamespaces, err := r.getActiveNamespaces()
 		if err != nil {
 			// If we fail to use the K8s API to get the active namespaces, we should raise failure

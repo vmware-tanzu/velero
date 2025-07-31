@@ -18,6 +18,12 @@ func ShouldExpandWildcards(includes []string, excludes []string) bool {
 		}
 	}
 
+	for _, exclude := range excludes {
+        if strings.Contains(exclude, "*") {
+            return true
+        }
+    }
+
 	return false
 }
 
@@ -36,6 +42,7 @@ func ExpandWildcards(activeNamespaces []string, includes []string, excludes []st
 	return expandedIncludes, expandedExcludes, nil
 }
 
+// expands wildcard patterns into a list of namespaces, while normally passing non-wildcard patterns
 func expandWildcards(patterns []string, activeNamespaces []string) ([]string, error) {
 	if len(patterns) == 0 {
 		return nil, nil
@@ -45,10 +52,17 @@ func expandWildcards(patterns []string, activeNamespaces []string) ([]string, er
 
 	for _, pattern := range patterns {
 		// Special case "*" to match all namespaces
+		// This case should never happen since it is handled by the caller
 		if pattern == "*" {
 			for _, ns := range activeNamespaces {
 				matchedSet[ns] = struct{}{}
 			}
+			continue
+		}
+
+		// If the pattern is a non-wildcard pattern, we can just add it to the result
+		if !strings.Contains(pattern, "*") {
+			matchedSet[pattern] = struct{}{}
 			continue
 		}
 
