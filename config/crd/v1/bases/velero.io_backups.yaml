@@ -561,6 +561,20 @@ spec:
                   execution of the backup.  The actual errors are in the backup's log
                   file in object storage.
                 type: integer
+              expandedExcludedNamespaces:
+                description: ExpandedExcludedNamespaces records the expanded exclude
+                  wildcard namespaces
+                items:
+                  type: string
+                nullable: true
+                type: array
+              expandedIncludedNamespaces:
+                description: ExpandedIncludedNamespaces records the expanded include
+                  wildcard namespaces
+                items:
+                  type: string
+                nullable: true
+                type: array
               expiration:
                 description: Expiration is when this Backup is eligible for garbage-collection.
                 format: date-time
@@ -663,20 +677,6 @@ spec:
                   execution of the backup. The actual warnings are in the backup's log
                   file in object storage.
                 type: integer
-              wildcardExpandedExcludedNamespaces:
-                description: WildcardExcludedNamespaces records the expanded exclude
-                  wildcard namespaces
-                items:
-                  type: string
-                nullable: true
-                type: array
-              wildcardExpandedIncludedNamespaces:
-                description: WildcardIncludedNamespaces records the expanded include
-                  wildcard namespaces
-                items:
-                  type: string
-                nullable: true
-                type: array
             type: object
         type: object
     served: true

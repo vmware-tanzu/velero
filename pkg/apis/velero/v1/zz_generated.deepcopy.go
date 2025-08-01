@@ -446,13 +446,13 @@ func (in *BackupStatus) DeepCopyInto(out *BackupStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.WildcardExpandedIncludedNamespaces != nil {
-		in, out := &in.WildcardExpandedIncludedNamespaces, &out.WildcardExpandedIncludedNamespaces
+	if in.ExpandedIncludedNamespaces != nil {
+		in, out := &in.ExpandedIncludedNamespaces, &out.ExpandedIncludedNamespaces
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.WildcardExpandedExcludedNamespaces != nil {
-		in, out := &in.WildcardExpandedExcludedNamespaces, &out.WildcardExpandedExcludedNamespaces
+	if in.ExpandedExcludedNamespaces != nil {
+		in, out := &in.ExpandedExcludedNamespaces, &out.ExpandedExcludedNamespaces
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
