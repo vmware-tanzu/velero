@@ -663,16 +663,16 @@ spec:
                   execution of the backup. The actual warnings are in the backup's log
                   file in object storage.
                 type: integer
-              wildcardExcludedNamespaces:
-                description: WildcardExcludedNamespaces records the original namespace
-                  exclude patterns (may contain wildcards) that the user supplied.
+              wildcardExpandedExcludedNamespaces:
+                description: WildcardExcludedNamespaces records the expanded exclude
+                  wildcard namespaces
                 items:
                   type: string
                 nullable: true
                 type: array
-              wildcardIncludedNamespaces:
-                description: WildcardIncludedNamespaces records the original namespace
-                  include patterns (may contain wildcards) that the user supplied.
+              wildcardExpandedIncludedNamespaces:
+                description: WildcardIncludedNamespaces records the expanded include
+                  wildcard namespaces
                 items:
                   type: string
                 nullable: true
