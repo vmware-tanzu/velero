@@ -777,36 +777,13 @@ func (r *itemCollector) collectNamespaces(
 		return nil, errors.WithStack(err)
 	}
 
-	// If just * exists, skip the wildcard expansion
-	// If * exists in either of the include lists, continue the wildcard expansion
-	if wildcard.ShouldExpandWildcards(r.backupRequest.NamespaceIncludesExcludes.GetIncludes(), r.backupRequest.NamespaceIncludesExcludes.GetExcludes()) {
-
-		ie := r.backupRequest.NamespaceIncludesExcludes
-
-		r.log.WithFields(logrus.Fields{
-			"originalIncludes": ie.GetIncludes(),
-			"originalExcludes": ie.GetExcludes(),
-		}).Info("Expanding wildcard includes/excludes - Start")
-
-		expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(activeNamespacesList, ie.GetIncludes(), ie.GetExcludes())
-		if err != nil {
-			r.log.WithError(errors.WithStack(err)).Error("Error expanding wildcard includes/excludes")
-			return nil, errors.WithStack(err)
+	// Expand wildcard patterns in namespace includes/excludes if needed
+	// Skip expansion for simple "*" (match all) patterns
+	namespaceSelector := r.backupRequest.NamespaceIncludesExcludes
+	if wildcard.ShouldExpandWildcards(namespaceSelector.GetIncludes(), namespaceSelector.GetExcludes()) {
+		if err := r.expandNamespaceWildcards(activeNamespacesList, namespaceSelector); err != nil {
+			return nil, errors.WithMessage(err, "failed to expand namespace wildcard patterns")
 		}
-
-		r.log.WithFields(logrus.Fields{
-			"Expanded Includes": expandedIncludes,
-			"Expanded Excludes": expandedExcludes,
-		}).Info("Expanding wildcard includes/excludes - Done")
-
-		// Update the request's includes/excludes with the expanded values
-		r.backupRequest.NamespaceIncludesExcludes.SetIncludes(expandedIncludes)
-		r.backupRequest.NamespaceIncludesExcludes.SetExcludes(expandedExcludes)
-
-		// Record the expanded wildcard includes/excludes in the request status
-		r.backupRequest.Status.ExpandedIncludedNamespaces = expandedIncludes
-		r.backupRequest.Status.ExpandedExcludedNamespaces = expandedExcludes
-
 	}
 
 	for _, includedNSName := range r.backupRequest.Backup.Spec.IncludedNamespaces {
@@ -881,4 +858,44 @@ func (r *itemCollector) collectNamespaces(
 	}
 
 	return items, nil
+}
+
+// expandNamespaceWildcards expands wildcard patterns in namespace includes/excludes
+// and updates the backup request with the expanded values
+func (r *itemCollector) expandNamespaceWildcards(activeNamespaces []string, namespaceSelector *collections.IncludesExcludes) error {
+	originalIncludes := namespaceSelector.GetIncludes()
+	originalExcludes := namespaceSelector.GetExcludes()
+
+	r.log.WithFields(logrus.Fields{
+		"originalIncludes":    originalIncludes,
+		"originalExcludes":    originalExcludes,
+		"availableNamespaces": len(activeNamespaces),
+	}).Info("Starting wildcard expansion for namespace patterns")
+
+	expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(activeNamespaces, originalIncludes, originalExcludes)
+	if err != nil {
+		r.log.WithFields(logrus.Fields{
+			"originalIncludes": originalIncludes,
+			"originalExcludes": originalExcludes,
+			"error":            err.Error(),
+		}).Error("Failed to expand wildcard patterns")
+		return errors.WithStack(err)
+	}
+
+	// Update the request's includes/excludes with the expanded values
+	namespaceSelector.SetIncludes(expandedIncludes)
+	namespaceSelector.SetExcludes(expandedExcludes)
+
+	// Record the expanded wildcard includes/excludes in the request status
+	r.backupRequest.Status.ExpandedIncludedNamespaces = expandedIncludes
+	r.backupRequest.Status.ExpandedExcludedNamespaces = expandedExcludes
+
+	r.log.WithFields(logrus.Fields{
+		"expandedIncludes": expandedIncludes,
+		"expandedExcludes": expandedExcludes,
+		"includedCount":    len(expandedIncludes),
+		"excludedCount":    len(expandedExcludes),
+	}).Info("Successfully expanded wildcard patterns")
+
+	return nil
 }
