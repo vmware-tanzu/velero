@@ -13,6 +13,8 @@ Velero data movement backup and restore support to constrain the nodes where it 
 
 Velero introduces a new section in the node-agent ConfigMap, called ```loadAffinity```, through which users can specify the nodes to/not to run data movement, in the affinity and anti-affinity flavors.
 
+**Important**: Currently, only the first element in the `loadAffinity` array is used. Any additional elements after the first one will be ignored. If you need to specify multiple conditions, combine them within a single `loadAffinity` element using both `matchLabels` and `matchExpressions`.
+
 If it is not there, a ConfigMap should be created manually. The ConfigMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one ConfigMap in each namespace which applies to node-agent in that namespace only. The name of the ConfigMap should be specified in the node-agent server parameter ```--node-agent-configmap```.
 The node-agent server checks these configurations at startup time. Therefore, users could edit this ConfigMap any time, but in order to make the changes effective, node-agent server needs to be restarted.
 
@@ -85,9 +87,9 @@ Here is a sample of the ConfigMap with ```loadAffinity```:
 }
 ```
 
-This example demonstrates how to use both `matchLabels` and `matchExpressions` in the same single LoadAffinity element.
+This example demonstrates how to use both `matchLabels` and `matchExpressions` in the same single LoadAffinity element. This is the recommended approach since only the first element in the array is processed.
 
-### LoadAffinity interacts with LoadAffinityPerStorageClass
+### LoadAffinity with StorageClass (Note: Only First Element Used)
 
 ``` json
 {
@@ -117,9 +119,7 @@ This example demonstrates how to use both `matchLabels` and `matchExpressions` i
 }
 ```
 
-This sample demonstrates how the `loadAffinity` elements with `StorageClass` field and without `StorageClass` field setting work together. If the VGDP mounting volume is created from StorageClass `kibishii-storage-class`, its pod will run Linux nodes.
-
-The other VGDP instances will run on nodes, which instance type is `Standard_B4ms`.
+**Warning**: In the above example, only the first element (selecting nodes with instance type `Standard_B4ms`) will be applied. The second element with the Linux OS selector and storage class specification will be ignored due to the current limitation where only the first array element is processed.
 
 ### LoadAffinity interacts with BackupPVC
 
@@ -153,7 +153,7 @@ The other VGDP instances will run on nodes, which instance type is `Standard_B4m
 
 Velero data mover supports to use different StorageClass to create backupPVC by [design](https://github.com/vmware-tanzu/velero/pull/7982).
 
-In this example, if the backup target PVC's StorageClass is `kibishii-storage-class`, its backupPVC should use StorageClass `worker-storagepolicy`. Because the final StorageClass is `worker-storagepolicy`, the backupPod uses the loadAffinity specified by `loadAffinity`'s elements with `StorageClass` field set to `worker-storagepolicy`. backupPod will be assigned to nodes, which instance type is `Standard_B2ms`.
+**Warning**: Due to the current limitation where only the first element in the `loadAffinity` array is processed, only the first selector (nodes with instance type `Standard_B4ms` and storage class `kibishii-storage-class`) will be applied. The second element will be ignored. To work around this limitation, you would need to combine all necessary conditions into a single loadAffinity element.
 
 ### LoadAffinity interacts with RestorePVC
 
