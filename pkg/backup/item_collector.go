@@ -245,38 +245,6 @@ func (r *itemCollector) getItems(
 	return resources
 }
 
-// getActiveNamespaces gets the active namespaces from the cluster
-// This is used to expand wildcard includes/excludes
-func (r *itemCollector) getActiveNamespaces() ([]string, error) {
-	resourceClient, err := r.dynamicFactory.ClientForGroupVersionResource(
-		schema.GroupVersion{Group: "", Version: "v1"},
-		metav1.APIResource{Name: "namespaces", Kind: "Namespace"},
-		"",
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	unstructuredList, err := resourceClient.List(metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	// Filter for only active namespaces
-	var activeNamespaces []string
-	for _, namespace := range unstructuredList.Items {
-		ns := new(corev1api.Namespace)
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(namespace.UnstructuredContent(), ns); err != nil {
-			continue
-		}
-		if ns.Status.Phase == corev1api.NamespaceActive {
-			activeNamespaces = append(activeNamespaces, namespace.GetName())
-		}
-	}
-
-	return activeNamespaces, nil
-}
-
 // getGroupItems collects all relevant items from a single API group.
 // If resourceIDsMap is supplied, then only those items are returned,
 // with GVR/APIResource metadata supplied.
@@ -809,12 +777,8 @@ func (r *itemCollector) collectNamespaces(
 		return nil, errors.WithStack(err)
 	}
 
-	// Introduce the wildcard check here.
-
-	// Check wildcard expansion here since * is a special case
-	// Even if * is mixed in with other patterns, it will be caught by the above blocks
-	// We can safely expand the wildcard here since from this point forward, the list is non-trivial
-
+	// If just * exists, skip the wildcard expansion
+	// If * exists in either of the include lists, continue the wildcard expansion
 	if wildcard.ShouldExpandWildcards(r.backupRequest.NamespaceIncludesExcludes.GetIncludes(), r.backupRequest.NamespaceIncludesExcludes.GetExcludes()) {
 
 		ie := r.backupRequest.NamespaceIncludesExcludes
@@ -822,7 +786,7 @@ func (r *itemCollector) collectNamespaces(
 		r.log.WithFields(logrus.Fields{
 			"originalIncludes": ie.GetIncludes(),
 			"originalExcludes": ie.GetExcludes(),
-		}).Info("Expanding wildcard includes/excludes")
+		}).Info("Expanding wildcard includes/excludes - Start")
 
 		expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(activeNamespacesList, ie.GetIncludes(), ie.GetExcludes())
 		if err != nil {
@@ -830,12 +794,18 @@ func (r *itemCollector) collectNamespaces(
 			return nil, errors.WithStack(err)
 		}
 
+		r.log.WithFields(logrus.Fields{
+			"Expanded Includes": expandedIncludes,
+			"Expanded Excludes": expandedExcludes,
+		}).Info("Expanding wildcard includes/excludes - Done")
+
+		// Update the request's includes/excludes with the expanded values
 		r.backupRequest.NamespaceIncludesExcludes.SetIncludes(expandedIncludes)
 		r.backupRequest.NamespaceIncludesExcludes.SetExcludes(expandedExcludes)
 
 		// Record the expanded wildcard includes/excludes in the request status
-		r.backupRequest.Status.WildcardExpandedIncludedNamespaces = ie.GetIncludes()
-		r.backupRequest.Status.WildcardExpandedExcludedNamespaces = ie.GetExcludes()
+		r.backupRequest.Status.ExpandedIncludedNamespaces = expandedIncludes
+		r.backupRequest.Status.ExpandedExcludedNamespaces = expandedExcludes
 
 	}
 
