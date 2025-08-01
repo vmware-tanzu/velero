@@ -19,10 +19,10 @@ func ShouldExpandWildcards(includes []string, excludes []string) bool {
 	}
 
 	for _, exclude := range excludes {
-        if strings.Contains(exclude, "*") {
-            return true
-        }
-    }
+		if strings.Contains(exclude, "*") {
+			return true
+		}
+	}
 
 	return false
 }

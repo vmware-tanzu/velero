@@ -685,39 +685,6 @@ func (r *itemCollector) getNamespacesToList() ([]string, error) {
 		return []string{""}, nil
 	}
 
-	// Check wildcard expansion here since * is a special case
-	// Even if * is mixed in with other patterns, it will be caught by the above blocks
-	// We can safely expand the wildcard here since from this point forward, the list is non-trivial
-
-	if wildcard.ShouldExpandWildcards(ie.GetIncludes(), ie.GetExcludes()) {
-
-		r.log.WithFields(logrus.Fields{
-			"originalIncludes": ie.GetIncludes(),
-			"originalExcludes": ie.GetExcludes(),
-		}).Info("Expanding wildcard includes/excludes")
-
-		// Record the pre-expansion wildcard includes/excludes in the request status
-		r.backupRequest.Status.WildcardIncludedNamespaces = ie.GetIncludes()
-		r.backupRequest.Status.WildcardExcludedNamespaces = ie.GetExcludes()
-
-		activeNamespaces, err := r.getActiveNamespaces()
-		if err != nil {
-			// If we fail to use the K8s API to get the active namespaces, we should raise failure
-			r.log.WithError(err).Error("Error getting active namespaces from K8s API")
-			return []string{""}, err
-		}
-
-		expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(activeNamespaces, ie.GetIncludes(), ie.GetExcludes())
-		if err != nil {
-			r.log.WithError(err).Error("Error expanding wildcard includes/excludes")
-			return []string{""}, err
-		}
-
-		ie.SetIncludes(expandedIncludes)
-		ie.SetExcludes(expandedExcludes)
-
-	}
-
 	var list []string
 	for _, i := range ie.GetIncludes() {
 		if ie.ShouldInclude(i) {
@@ -826,9 +793,50 @@ func (r *itemCollector) collectNamespaces(
 	}
 
 	unstructuredList, err := resourceClient.List(metav1.ListOptions{})
+
+	activeNamespacesHashSet := make(map[string]bool)
+	for _, namespace := range unstructuredList.Items {
+		activeNamespacesHashSet[namespace.GetName()] = true
+	}
+
+	activeNamespacesList := make([]string, 0)
+	for namespace := range activeNamespacesHashSet {
+		activeNamespacesList = append(activeNamespacesList, namespace)
+	}
+
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Error("error list namespaces")
 		return nil, errors.WithStack(err)
+	}
+
+	// Introduce the wildcard check here.
+
+	// Check wildcard expansion here since * is a special case
+	// Even if * is mixed in with other patterns, it will be caught by the above blocks
+	// We can safely expand the wildcard here since from this point forward, the list is non-trivial
+
+	if wildcard.ShouldExpandWildcards(r.backupRequest.NamespaceIncludesExcludes.GetIncludes(), r.backupRequest.NamespaceIncludesExcludes.GetExcludes()) {
+
+		ie := r.backupRequest.NamespaceIncludesExcludes
+
+		r.log.WithFields(logrus.Fields{
+			"originalIncludes": ie.GetIncludes(),
+			"originalExcludes": ie.GetExcludes(),
+		}).Info("Expanding wildcard includes/excludes")
+
+		expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(activeNamespacesList, ie.GetIncludes(), ie.GetExcludes())
+		if err != nil {
+			r.log.WithError(errors.WithStack(err)).Error("Error expanding wildcard includes/excludes")
+			return nil, errors.WithStack(err)
+		}
+
+		r.backupRequest.NamespaceIncludesExcludes.SetIncludes(expandedIncludes)
+		r.backupRequest.NamespaceIncludesExcludes.SetExcludes(expandedExcludes)
+
+		// Record the expanded wildcard includes/excludes in the request status
+		r.backupRequest.Status.WildcardExpandedIncludedNamespaces = ie.GetIncludes()
+		r.backupRequest.Status.WildcardExpandedExcludedNamespaces = ie.GetExcludes()
+
 	}
 
 	for _, includedNSName := range r.backupRequest.Backup.Spec.IncludedNamespaces {
@@ -837,10 +845,14 @@ func (r *itemCollector) collectNamespaces(
 		if includedNSName == "*" {
 			continue
 		}
-		for _, unstructuredNS := range unstructuredList.Items {
-			if unstructuredNS.GetName() == includedNSName {
-				nsExists = true
-			}
+
+		// Skip checking the namespace existing when it's a wildcard.
+		if strings.Contains(includedNSName, "*") {
+			continue
+		}
+
+		if _, ok := activeNamespacesHashSet[includedNSName]; ok {
+			nsExists = true
 		}
 
 		if !nsExists {
