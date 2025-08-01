@@ -3,9 +3,9 @@
 
 ## Abstract
 
-Velero currently does not support wildcard characters in namespace specifications, requiring all namespaces to be specified as string literals. The only exception is the standalone "*" character, which includes all namespaces and ignores excludes.
+Velero currently does not support wildcard characters in namespace specifications, requiring all namespaces to be specified as string literals. The only exception is the standalone `*` character, which includes all namespaces and ignores excludes.
 
-This document details the approach to implementing wildcard namespace support for `--include-namespaces` and `--exclude-namespaces` flags, while preserving the existing "*" behavior for backward compatibility.
+This document details the approach to implementing wildcard namespace support for `--include-namespaces` and `--exclude-namespaces` flags, while preserving the existing `*` behavior for backward compatibility.
 
 ## Background
 
@@ -14,11 +14,11 @@ This feature was requested in Issue [#1874](https://github.com/vmware-tanzu/vele
 ## Goals
 
 - Add support for wildcard patterns in `--include-namespaces` and `--exclude-namespaces` flags
-- Ensure legacy "*" behavior remains unchanged for backward compatibility
+- Ensure legacy `*` behavior remains unchanged for backward compatibility
 
 ## Non-Goals
 
-- Completely rethinking the way "*" is treated and allowing it to work with wildcard excludes
+- Completely rethinking the way `*` is treated and allowing it to work with wildcard excludes
 - Supporting complex regex patterns beyond basic glob patterns
 
 
@@ -141,14 +141,14 @@ This feature does not introduce any security vulnerabilities as it only affects 
 ### Backward Compatibility
 
 The implementation maintains full backward compatibility with existing behavior:
-- The standalone "*" character continues to work as before (include all namespaces, ignore excludes)
+- The standalone `*` character continues to work as before (include all namespaces, ignore excludes)
 - Existing backup configurations remain unaffected
 
 ### Known Limitations
 
-1. **Mixed "*" and wildcard usage**: When using the standalone "*" in includes, the legacy implementation takes precedence and wildcard expansion is skipped. This means you cannot combine "*" (all namespaces) in includes with wildcard patterns in excludes.
+1. **Mixed `*` and wildcard usage**: When using the standalone `*` in includes, the legacy implementation takes precedence and wildcard expansion is skipped. This means you cannot combine "*" (all namespaces) in includes with wildcard patterns in excludes.
 
-2. **Selective exclusion limitation**: The current design does not support selective pattern-based exclusion when including all namespaces via "*".
+2. **Selective exclusion limitation**: The current design does not support selective pattern-based exclusion when including all namespaces via `*`.
 
 ## Implementation
 
