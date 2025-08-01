@@ -377,15 +377,15 @@ type BackupStatus struct {
 	// +nullable
 	ValidationErrors []string `json:"validationErrors,omitempty"`
 
-	// WildcardIncludedNamespaces records the expanded include wildcard namespaces
+	// ExpandedIncludedNamespaces records the expanded include wildcard namespaces
 	// +optional
 	// +nullable
-	WildcardExpandedIncludedNamespaces []string `json:"wildcardExpandedIncludedNamespaces,omitempty"`
+	ExpandedIncludedNamespaces []string `json:"expandedIncludedNamespaces,omitempty"`
 
-	// WildcardExcludedNamespaces records the expanded exclude wildcard namespaces
+	// ExpandedExcludedNamespaces records the expanded exclude wildcard namespaces
 	// +optional
 	// +nullable
-	WildcardExpandedExcludedNamespaces []string `json:"wildcardExpandedExcludedNamespaces,omitempty"`
+	ExpandedExcludedNamespaces []string `json:"expandedExcludedNamespaces,omitempty"`
 
 	// StartTimestamp records the time a backup was started.
 	// Separate from CreationTimestamp, since that value changes

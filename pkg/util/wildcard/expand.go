@@ -8,7 +8,6 @@ import (
 
 func ShouldExpandWildcards(includes []string, excludes []string) bool {
 	for _, include := range includes {
-		// Should never hit this case, but just in case
 		if include == "*" {
 			return false
 		}
