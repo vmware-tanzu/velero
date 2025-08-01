@@ -31,18 +31,18 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
-func NewRepositoryService(store credentials.FileStore, fs filesystem.Interface, log logrus.FieldLogger) *RepositoryService {
+func NewRepositoryService(credGetter credentials.CredentialGetter, fs filesystem.Interface, log logrus.FieldLogger) *RepositoryService {
 	return &RepositoryService{
-		credentialsFileStore: store,
-		fileSystem:           fs,
-		log:                  log,
+		credGetter: credGetter,
+		fileSystem: fs,
+		log:        log,
 	}
 }
 
 type RepositoryService struct {
-	credentialsFileStore credentials.FileStore
-	fileSystem           filesystem.Interface
-	log                  logrus.FieldLogger
+	credGetter credentials.CredentialGetter
+	fileSystem filesystem.Interface
+	log        logrus.FieldLogger
 }
 
 func (r *RepositoryService) InitRepo(bsl *velerov1api.BackupStorageLocation, repo *velerov1api.BackupRepository) error {
@@ -77,7 +77,7 @@ func (r *RepositoryService) DefaultMaintenanceFrequency() time.Duration {
 }
 
 func (r *RepositoryService) exec(cmd *restic.Command, bsl *velerov1api.BackupStorageLocation) error {
-	file, err := r.credentialsFileStore.Path(repokey.RepoKeySelector())
+	file, err := r.credGetter.FromFile.Path(repokey.RepoKeySelector())
 	if err != nil {
 		return err
 	}
@@ -88,17 +88,32 @@ func (r *RepositoryService) exec(cmd *restic.Command, bsl *velerov1api.BackupSto
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
 	var caCertFile string
-	if bsl.Spec.ObjectStorage != nil && bsl.Spec.ObjectStorage.CACert != nil {
-		caCertFile, err = restic.TempCACertFile(bsl.Spec.ObjectStorage.CACert, bsl.Name, r.fileSystem)
-		if err != nil {
-			return errors.Wrap(err, "error creating temp cacert file")
+	if bsl.Spec.ObjectStorage != nil {
+		var caCertData []byte
+
+		// Try CACertRef first (new method), then fall back to CACert (deprecated)
+		if bsl.Spec.ObjectStorage.CACertRef != nil {
+			caCertString, err := r.credGetter.FromSecret.Get(bsl.Spec.ObjectStorage.CACertRef)
+			if err != nil {
+				return errors.Wrap(err, "error getting CA certificate from secret")
+			}
+			caCertData = []byte(caCertString)
+		} else if bsl.Spec.ObjectStorage.CACert != nil {
+			caCertData = bsl.Spec.ObjectStorage.CACert
 		}
-		// ignore error since there's nothing we can do and it's a temp file.
-		defer os.Remove(caCertFile)
+
+		if caCertData != nil {
+			caCertFile, err = restic.TempCACertFile(caCertData, bsl.Name, r.fileSystem)
+			if err != nil {
+				return errors.Wrap(err, "error creating temp cacert file")
+			}
+			// ignore error since there's nothing we can do and it's a temp file.
+			defer os.Remove(caCertFile)
+		}
 	}
 	cmd.CACertFile = caCertFile
 
-	env, err := restic.CmdEnv(bsl, r.credentialsFileStore)
+	env, err := restic.CmdEnv(bsl, r.credGetter.FromFile)
 	if err != nil {
 		return err
 	}
