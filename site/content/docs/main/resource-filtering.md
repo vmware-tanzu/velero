@@ -223,17 +223,90 @@ Kubernetes namespace resources to exclude from the backup, formatted as resource
   ```
 
 ## Resource policies
-Velero provides resource policies to filter resources to do backup or restore.
 
-### Supported VolumePolicy actions
+Velero provides resource policies to filter resources to do backup or restore. Resource policies are configured through a ConfigMap that can be referenced when creating backups, avoiding the need to specify filters repeatedly for each backup operation.
+
+### Include/Exclude Policies
+
+The `includeExcludePolicy` feature allows you to define reusable include and exclude filters for resources in a ConfigMap. This provides fine-grained control over resource selection without having to specify filters in each backup specification.
+
+#### Configuration Structure
+
+The include/exclude policy uses four fields to control resource filtering:
+
+* `includedClusterScopedResources`: List of cluster-scoped resources to include
+* `excludedClusterScopedResources`: List of cluster-scoped resources to exclude
+* `includedNamespaceScopedResources`: List of namespace-scoped resources to include
+* `excludedNamespaceScopedResources`: List of namespace-scoped resources to exclude
+
+#### Include/Exclude Policy Example
+
+Create a ConfigMap with your resource policy configuration:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: resource-policies
+  namespace: velero
+data:
+  resource-policies.yaml: |
+    version: v1
+    includeExcludePolicy:
+      includedClusterScopedResources:
+        - "customresource"
+        - "customresourcedefinition"
+        - "persistentvolume"
+      excludedClusterScopedResources:
+        - "volumegroupsnapshotclass"
+        - "ingressclass"
+      includedNamespaceScopedResources:
+        - "pod"
+        - "service"
+        - "deployment"
+        - "persistentvolumeclaim"
+      excludedNamespaceScopedResources:
+        - "configmap"
+```
+
+To use this policy when creating a backup:
+
+```bash
+velero backup create my-backup --resource-policies-configmap resource-policies
+```
+
+#### Priority and Precedence
+
+When filters are specified in both the backup specification and the resource policy ConfigMap:
+
+1. **Both sets of filters are applied** - The filters from the backup specification and the resource policy are combined
+2. **Backup specification takes precedence** - If there's a conflict between filters, the backup specification overrides the resource policy
+
+For example, if a resource is:
+* Included in the backup specification's `includedNamespaceScopedResources`
+* Excluded in the resource policy's `excludedNamespaceScopedResources`
+
+The resource **will be included** in the backup because the backup specification takes precedence.
+
+#### Compatibility Notes
+
+The include/exclude policy is designed to work with Velero's scoped include/exclude filters. It is **not compatible** with the older resource filter format.
+
+If a backup references a resource policy ConfigMap containing `includeExcludePolicy` and also specifies legacy filters (`includedResources`, `excludedResources`, or `includeClusterResources`) in the backup specification, the backup will fail with a validation error.
+
+### Volume Policies
+
+Volume policies control how volumes are backed up (skip, snapshot, or fs-backup).
+
+#### Supported VolumePolicy actions
 There are three actions supported via the VolumePolicy feature:
 * skip: don't back up the action matching volume's data.
 * snapshot: back up the action matching volume's data by the snapshot way.
 * fs-backup: back up the action matching volumes' data by the fs-backup way.
 
-### Creating resource policies
+#### Creating resource policies
 
-Below is the two-step of using resource policies to skip backup of volume:
+Below is the two-step process of using resource policies:
 1. Creating resource policies configmap
 
    Users need to create one configmap in Velero install namespace from a YAML file that defined resource policies. The creating command would be like the below:
@@ -248,13 +321,14 @@ Below is the two-step of using resource policies to skip backup of volume:
    ```
    This flag could also be combined with the other include and exclude filters above
 
-### YAML template
-The policies YAML config file would look like this:
-- Yaml template:
-    ```yaml
-    # currently only supports v1 version
-    version: v1
-    volumePolicies:
+#### Volume Policy YAML template
+
+The policies YAML config file for volume policies would look like this:
+
+```yaml
+# currently only supports v1 version
+version: v1
+volumePolicies:
     # each policy consists of a list of conditions and an action
     # we could have lots of policies, but if the resource matched the first policy, the latter will be ignored
     # each key in the object is one condition, and one policy will apply to resources that meet ALL conditions
