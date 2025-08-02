@@ -956,8 +956,6 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			}
 		}
 
-		affinity := kube.GetLoadAffinityByStorageClass(r.loadAffinity, du.Spec.CSISnapshot.SnapshotClass, log)
-
 		return &exposer.CSISnapshotExposeParam{
 			SnapshotName:          du.Spec.CSISnapshot.VolumeSnapshot,
 			SourceNamespace:       du.Spec.SourceNamespace,
@@ -969,7 +967,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 			OperationTimeout:      du.Spec.OperationTimeout.Duration,
 			ExposeTimeout:         r.preparingTimeout,
 			VolumeSize:            pvc.Spec.Resources.Requests[corev1api.ResourceStorage],
-			Affinity:              affinity,
+			Affinity:              r.loadAffinity,
 			BackupPVCConfig:       r.backupPVCConfig,
 			Resources:             r.podResources,
 			NodeOS:                nodeOS,
