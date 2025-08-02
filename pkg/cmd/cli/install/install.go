@@ -91,6 +91,7 @@ type Options struct {
 	ItemBlockWorkerCount            int
 	NodeAgentDisableHostPath        bool
 	kubeletRootDir                  string
+	Upgrade                         bool
 }
 
 // BindFlags adds command line values to the options struct.
@@ -99,6 +100,7 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.BucketName, "bucket", o.BucketName, "Name of the object storage bucket where backups should be stored")
 	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "File containing credentials for backup and volume provider. If not specified, --no-secret must be used for confirmation. Optional.")
 	flags.BoolVar(&o.NoSecret, "no-secret", o.NoSecret, "Flag indicating if a secret should be created. Must be used as confirmation if --secret-file is not provided. Optional.")
+	flags.BoolVar(&o.Upgrade, "upgrade", o.Upgrade, "Flag indicating if this is an upgrade operation. If set, resources will be applied instead of created.")
 	flags.BoolVar(&o.NoDefaultBackupLocation, "no-default-backup-location", o.NoDefaultBackupLocation, "Flag indicating if a default backup location should be created. Must be used as confirmation if --bucket or --provider are not provided. Optional.")
 	flags.StringVar(&o.Image, "image", o.Image, "Image to use for the Velero and node agent pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "Prefix under which all Velero data should be stored within the bucket. Optional.")
@@ -391,7 +393,7 @@ func (o *Options) Run(c *cobra.Command, f client.Factory) error {
 	}
 	errorMsg := fmt.Sprintf("\n\nError installing Velero. Use `kubectl logs deploy/velero -n %s` to check the deploy logs", o.Namespace)
 
-	err = install.Install(dynamicFactory, kbClient, resources, os.Stdout)
+	err = install.Install(dynamicFactory, kbClient, resources, os.Stdout, o.Upgrade)
 	if err != nil {
 		return errors.Wrap(err, errorMsg)
 	}
