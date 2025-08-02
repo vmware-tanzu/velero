@@ -149,12 +149,11 @@ func CheckVolumeSnapshotCR(client TestClient, index map[string]string, expectedC
 		return nil, errors.New("Fail to get APIVersion")
 	}
 
-	if apiVersion[0] == "v1" {
-		if snapshotContentNameList, err = GetCsiSnapshotHandle(client, apiVersion[0], index); err != nil {
-			return nil, errors.Wrap(err, "Fail to get CSI snapshot content")
-		}
-	} else {
+	if apiVersion[0] != "v1" {
 		return nil, errors.New("API version is invalid")
+	}
+	if snapshotContentNameList, err = GetCsiSnapshotHandle(client, apiVersion[0], index); err != nil {
+		return nil, errors.Wrap(err, "Fail to get CSI snapshot content")
 	}
 	if expectedCount >= 0 {
 		if len(snapshotContentNameList) != expectedCount {
