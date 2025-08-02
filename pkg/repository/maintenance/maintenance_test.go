@@ -1162,3 +1162,141 @@ func TestBuildJob(t *testing.T) {
 		})
 	}
 }
+
+func TestGetKeepLatestMaintenanceJobs(t *testing.T) {
+	tests := []struct {
+		name                     string
+		repoMaintenanceJobConfig string
+		configMap                *corev1api.ConfigMap
+		repo                     *velerov1api.BackupRepository
+		expectedValue            int
+		expectError              bool
+	}{
+		{
+			name:                     "no config map name provided",
+			repoMaintenanceJobConfig: "",
+			configMap:                nil,
+			repo:                     mockBackupRepo(),
+			expectedValue:            0,
+			expectError:              false,
+		},
+		{
+			name:                     "config map not found",
+			repoMaintenanceJobConfig: "non-existent-config",
+			configMap:                nil,
+			repo:                     mockBackupRepo(),
+			expectedValue:            0,
+			expectError:              false,
+		},
+		{
+			name:                     "config map with global keepLatestMaintenanceJobs",
+			repoMaintenanceJobConfig: "repo-job-config",
+			configMap: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "repo-job-config",
+				},
+				Data: map[string]string{
+					"global": `{"keepLatestMaintenanceJobs": 5}`,
+				},
+			},
+			repo:          mockBackupRepo(),
+			expectedValue: 5,
+			expectError:   false,
+		},
+		{
+			name:                     "config map with specific repo keepLatestMaintenanceJobs overriding global",
+			repoMaintenanceJobConfig: "repo-job-config",
+			configMap: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "repo-job-config",
+				},
+				Data: map[string]string{
+					"global":                `{"keepLatestMaintenanceJobs": 5}`,
+					"test-ns-default-kopia": `{"keepLatestMaintenanceJobs": 10}`,
+				},
+			},
+			repo:          mockBackupRepo(),
+			expectedValue: 10,
+			expectError:   false,
+		},
+		{
+			name:                     "config map with no keepLatestMaintenanceJobs specified",
+			repoMaintenanceJobConfig: "repo-job-config",
+			configMap: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "repo-job-config",
+				},
+				Data: map[string]string{
+					"global": `{"podResources": {"cpuRequest": "100m"}}`,
+				},
+			},
+			repo:          mockBackupRepo(),
+			expectedValue: 0,
+			expectError:   false,
+		},
+		{
+			name:                     "config map with invalid JSON",
+			repoMaintenanceJobConfig: "repo-job-config",
+			configMap: &corev1api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "velero",
+					Name:      "repo-job-config",
+				},
+				Data: map[string]string{
+					"global": `{"keepLatestMaintenanceJobs": invalid}`,
+				},
+			},
+			repo:          mockBackupRepo(),
+			expectedValue: 0,
+			expectError:   true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			corev1api.AddToScheme(scheme)
+
+			var objects []runtime.Object
+			if test.configMap != nil {
+				objects = append(objects, test.configMap)
+			}
+
+			client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objects...).Build()
+			logger := velerotest.NewLogger()
+
+			result, err := GetKeepLatestMaintenanceJobs(
+				t.Context(),
+				client,
+				logger,
+				"velero",
+				test.repoMaintenanceJobConfig,
+				test.repo,
+			)
+
+			if test.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, test.expectedValue, result)
+			}
+		})
+	}
+}
+
+func mockBackupRepo() *velerov1api.BackupRepository {
+	return &velerov1api.BackupRepository{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "velero",
+			Name:      "test-repo",
+		},
+		Spec: velerov1api.BackupRepositorySpec{
+			VolumeNamespace:       "test-ns",
+			BackupStorageLocation: "default",
+			RepositoryType:        "kopia",
+		},
+	}
+}

@@ -275,7 +275,15 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, errors.Wrap(err, "error check and run repo maintenance jobs")
 		}
 
-		if err := maintenance.DeleteOldJobs(r.Client, req.Name, r.keepLatestMaintenanceJobs); err != nil {
+		// Get the configured number of maintenance jobs to keep from ConfigMap, fallback to CLI parameter
+		keepJobs := r.keepLatestMaintenanceJobs
+		if configuredKeep, err := maintenance.GetKeepLatestMaintenanceJobs(ctx, r.Client, log, r.namespace, r.repoMaintenanceConfig, backupRepo); err != nil {
+			log.WithError(err).Warn("Failed to get keepLatestMaintenanceJobs from ConfigMap, using CLI parameter value")
+		} else if configuredKeep > 0 {
+			keepJobs = configuredKeep
+		}
+
+		if err := maintenance.DeleteOldJobs(r.Client, req.Name, keepJobs); err != nil {
 			log.WithError(err).Warn("Failed to delete old maintenance jobs")
 		}
 	}
@@ -397,8 +405,12 @@ func (r *BackupRepoReconciler) recallMaintenance(ctx context.Context, req *veler
 	log.Warn("Updating backup repository because of unrecorded histories")
 
 	return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {
-		if lastMaintenanceTime.After(rr.Status.LastMaintenanceTime.Time) {
-			log.Warnf("Updating backup repository last maintenance time (%v) from history (%v)", rr.Status.LastMaintenanceTime.Time, lastMaintenanceTime.Time)
+		if lastMaintenanceTime != nil && (rr.Status.LastMaintenanceTime == nil || lastMaintenanceTime.After(rr.Status.LastMaintenanceTime.Time)) {
+			if rr.Status.LastMaintenanceTime != nil {
+				log.Warnf("Updating backup repository last maintenance time (%v) from history (%v)", rr.Status.LastMaintenanceTime.Time, lastMaintenanceTime.Time)
+			} else {
+				log.Warnf("Setting backup repository last maintenance time from history (%v)", lastMaintenanceTime.Time)
+			}
 			rr.Status.LastMaintenanceTime = lastMaintenanceTime
 		}
 
