@@ -23,6 +23,43 @@ velero install \
 Velero will then automatically use the provided CA bundle to verify TLS connections to
 that storage provider when backing up and restoring.
 
+## Trusting a self-signed certificate using Kubernetes Secrets (Recommended)
+
+The recommended approach for managing CA certificates is to store them in a Kubernetes Secret and reference them in the BackupStorageLocation using `caCertRef`. This provides better security and easier certificate management:
+
+1. Create a Secret containing your CA certificate:
+
+```bash
+kubectl create secret generic storage-ca-cert \
+  --from-file=ca-bundle.crt=<PATH_TO_CA_BUNDLE> \
+  -n velero
+```
+
+2. Create or update your BackupStorageLocation to reference the Secret:
+
+```yaml
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+spec:
+  provider: <YOUR_PROVIDER>
+  objectStorage:
+    bucket: <YOUR_BUCKET>
+    caCertRef:
+      name: storage-ca-cert
+      key: ca-bundle.crt
+  # ... other configuration
+```
+
+### Benefits of using Secrets
+
+- **Security**: Certificates are stored encrypted in etcd
+- **Certificate Rotation**: Update the Secret to rotate certificates without modifying the BackupStorageLocation
+- **RBAC**: Control access to certificates using Kubernetes RBAC
+- **Separation of Concerns**: Keep sensitive certificate data separate from configuration
+
 ## Trusting a self-signed certificate with the Velero client
 
 To use the describe, download, or logs commands to access a backup or restore contained
