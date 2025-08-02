@@ -19,6 +19,8 @@ package archive
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/sha256"
+	"fmt"
 	"io"
 	"path/filepath"
 
@@ -42,11 +44,11 @@ func NewExtractor(log logrus.FieldLogger, fs filesystem.Interface) *Extractor {
 }
 
 // UnzipAndExtractBackup extracts a reader on a gzipped tarball to a local temp directory
-func (e *Extractor) UnzipAndExtractBackup(src io.Reader) (string, error) {
+func (e *Extractor) UnzipAndExtractBackup(src io.Reader) (string, map[string]string, error) {
 	gzr, err := gzip.NewReader(src)
 	if err != nil {
 		e.log.Infof("error creating gzip reader: %v", err)
-		return "", err
+		return "", nil, err
 	}
 	defer gzr.Close()
 
@@ -66,13 +68,18 @@ func (e *Extractor) writeFile(target string, tarRdr *tar.Reader) error {
 	return nil
 }
 
-func (e *Extractor) readBackup(tarRdr *tar.Reader) (string, error) {
+// 255 is common limit for file names.
+// -5 to account for .json extension
+const maxPathLength = 250
+
+// returns tempfir containing backup contents, map[sha256]longNames, error
+func (e *Extractor) readBackup(tarRdr *tar.Reader) (string, map[string]string, error) {
 	dir, err := e.fs.TempDir("", "")
 	if err != nil {
 		e.log.Infof("error creating temp dir: %v", err)
-		return "", err
+		return "", nil, err
 	}
-
+	longNames := make(map[string]string)
 	for {
 		header, err := tarRdr.Next()
 
@@ -81,17 +88,23 @@ func (e *Extractor) readBackup(tarRdr *tar.Reader) (string, error) {
 		}
 		if err != nil {
 			e.log.Infof("error reading tar: %v", err)
-			return "", err
+			return "", nil, err
 		}
 
 		target := filepath.Join(dir, header.Name) //nolint:gosec // Internal usage. No need to check.
-
+		// If the target is longer than maxPathLength, we'll use the sha256 of the header name as the filename.
+		// https://github.com/vmware-tanzu/velero/issues/8434
+		if len(target) > maxPathLength {
+			shortSha256Name := fmt.Sprintf("%x", sha256.Sum256([]byte(header.Name))) // sha256 name is 64 characters
+			longNames[shortSha256Name] = header.Name
+			target = filepath.Join(dir, shortSha256Name)
+		}
 		switch header.Typeflag {
 		case tar.TypeDir:
 			err := e.fs.MkdirAll(target, header.FileInfo().Mode())
 			if err != nil {
 				e.log.Infof("mkdirall error: %v", err)
-				return "", err
+				return "", nil, err
 			}
 
 		case tar.TypeReg:
@@ -99,16 +112,15 @@ func (e *Extractor) readBackup(tarRdr *tar.Reader) (string, error) {
 			err := e.fs.MkdirAll(filepath.Dir(target), header.FileInfo().Mode())
 			if err != nil {
 				e.log.Infof("mkdirall error: %v", err)
-				return "", err
+				return "", nil, err
 			}
 
 			// create the file
 			if err := e.writeFile(target, tarRdr); err != nil {
 				e.log.Infof("error copying: %v", err)
-				return "", err
+				return "", nil, err
 			}
 		}
 	}
-
-	return dir, nil
+	return dir, longNames, nil
 }
