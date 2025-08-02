@@ -1238,7 +1238,19 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 			// When the PV data is skipped from backup, it's BackupVolumeInfo BackupMethod
 			// is not set, and it will fall into the default case.
 			default:
-				if hasDeleteReclaimPolicy(obj.Object) {
+				hasDisabledStorageClass, err := hasDisabledPVReprovisioningStorageClass(obj, ctx)
+				if err != nil {
+					errs.Add(namespace, err)
+					return warnings, errs, itemExists
+				}
+
+				if hasDisabledStorageClass {
+					obj, err = ctx.handleSkippedPVHasDisabledReprovisioningStorageClass(obj, restoreLogger)
+					if err != nil {
+						errs.Add(namespace, err)
+						return warnings, errs, itemExists
+					}
+				} else if hasDeleteReclaimPolicy(obj.Object) {
 					restoreLogger.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
 					ctx.pvsToProvision.Insert(backupResourceName)
 
@@ -2591,4 +2603,37 @@ func determineRestoreStatus(
 		kube.NamespaceAndName(obj), shouldRestoreStatus, annotationExists, shouldRestoreStatus)
 
 	return shouldRestoreStatus
+}
+
+func hasDisabledPVReprovisioningStorageClass(unstructuredPV *unstructured.Unstructured, ctx *restoreContext) (bool, error) {
+	disabledStorageClasses := ctx.restore.Spec.DisabledPVReprovisioningStorageClasses
+
+	// Converting Unstructured to PV object.
+	pv := new(corev1api.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.Object, pv); err != nil {
+		return false, errors.Wrapf(err, "error converting persistent volume to structured")
+	}
+
+	// Checking if PV StorageClass is in the DisabledPVReprovisioningStorageClasses list.
+	for _, disabledStorageClass := range disabledStorageClasses {
+		if disabledStorageClass == pv.Spec.StorageClassName {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (ctx *restoreContext) handleSkippedPVHasDisabledReprovisioningStorageClass(
+	obj *unstructured.Unstructured,
+	logger logrus.FieldLogger,
+) (*unstructured.Unstructured, error) {
+	logger.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and restore has storage class re-provisionning disabled.")
+
+	// Check to see if the claimRef.namespace field needs to be remapped, and do so if necessary.
+	if _, err := remapClaimRefNS(ctx, obj); err != nil {
+		return nil, err
+	}
+
+	obj = resetVolumeBindingInfo(obj)
+	return obj, nil
 }
