@@ -469,6 +469,20 @@ spec:
                   Errors is a count of all error messages that were generated during
                   execution of the restore. The actual errors are stored in object storage.
                 type: integer
+              expandedExcludedNamespaces:
+                description: ExpandedExcludedNamespaces records the expanded exclude
+                  wildcard namespaces
+                items:
+                  type: string
+                nullable: true
+                type: array
+              expandedIncludedNamespaces:
+                description: ExpandedIncludedNamespaces records the expanded include
+                  wildcard namespaces
+                items:
+                  type: string
+                nullable: true
+                type: array
               failureReason:
                 description: FailureReason is an error that caused the entire restore
                   to fail.

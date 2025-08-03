@@ -77,6 +77,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/results"
+	"github.com/vmware-tanzu/velero/pkg/util/wildcard"
 )
 
 const ObjectStatusRestoreAnnotationKey = "velero.io/restore-status"
@@ -472,6 +473,27 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 	if err != nil {
 		errs.AddVeleroError(errors.Wrap(err, "error parsing backup contents"))
 		return warnings, errs
+	}
+
+	// Expand wildcard patterns in namespace includes/excludes if needed
+	if wildcard.ShouldExpandWildcards(ctx.restore.Spec.IncludedNamespaces, ctx.restore.Spec.ExcludedNamespaces) {
+		availableNamespaces := extractNamespacesFromBackup(backupResources)
+		expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(
+			availableNamespaces,
+			ctx.restore.Spec.IncludedNamespaces,
+			ctx.restore.Spec.ExcludedNamespaces,
+		)
+		if err != nil {
+			errs.AddVeleroError(errors.Wrap(err, "error expanding wildcard patterns in namespace includes/excludes"))
+			return warnings, errs
+		}
+
+		// Update namespace includes/excludes with expanded patterns
+		ctx.namespaceIncludesExcludes = collections.NewIncludesExcludes().
+			Includes(expandedIncludes...).
+			Excludes(expandedExcludes...)
+
+		ctx.log.Infof("Expanded namespace wildcards - includes: %v, excludes: %v", expandedIncludes, expandedExcludes)
 	}
 
 	// TODO: Remove outer feature flag check to make this feature a default in Velero.
@@ -2376,6 +2398,24 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource string, original
 		restorable.totalItems++
 	}
 	return restorable, warnings, errs
+}
+
+// extractNamespacesFromBackup extracts all available namespaces from backup resources
+func extractNamespacesFromBackup(backupResources map[string]*archive.ResourceItems) []string {
+	namespaceSet := make(map[string]struct{})
+	for _, resource := range backupResources {
+		for namespace := range resource.ItemsByNamespace {
+			if namespace != "" { // Skip cluster-scoped resources (empty namespace)
+				namespaceSet[namespace] = struct{}{}
+			}
+		}
+	}
+
+	namespaces := make([]string, 0, len(namespaceSet))
+	for ns := range namespaceSet {
+		namespaces = append(namespaces, ns)
+	}
+	return namespaces
 }
 
 // removeRestoreLabels removes the restore name and the
