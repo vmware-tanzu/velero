@@ -886,9 +886,12 @@ func (r *itemCollector) expandNamespaceWildcards(activeNamespaces []string, name
 	namespaceSelector.SetIncludes(expandedIncludes)
 	namespaceSelector.SetExcludes(expandedExcludes)
 
+	selectedNamespaces := wildcard.GetWildcardResult(expandedIncludes, expandedExcludes)
+
 	// Record the expanded wildcard includes/excludes in the request status
-	r.backupRequest.Status.ExpandedIncludedNamespaces = expandedIncludes
-	r.backupRequest.Status.ExpandedExcludedNamespaces = expandedExcludes
+	r.backupRequest.Status.IncludeWildcardMatches = expandedIncludes
+	r.backupRequest.Status.ExcludeWildcardMatches = expandedExcludes
+	r.backupRequest.Status.WildcardResult = selectedNamespaces
 
 	r.log.WithFields(logrus.Fields{
 		"expandedIncludes": expandedIncludes,

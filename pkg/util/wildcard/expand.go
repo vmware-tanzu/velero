@@ -6,6 +6,7 @@ import (
 	"unicode"
 
 	"github.com/gobwas/glob"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func ShouldExpandWildcards(includes []string, excludes []string) bool {
@@ -164,4 +165,20 @@ func expandWildcards(patterns []string, activeNamespaces []string) ([]string, er
 	}
 
 	return result, nil
+}
+
+// GetWildcardResult returns the final list of namespaces after applying wildcard include/exclude logic
+func GetWildcardResult(expandedIncludes []string, expandedExcludes []string) []string {
+	// Set check: set of expandedIncludes - set of expandedExcludes
+	expandedIncludesSet := sets.New[string](expandedIncludes...)
+	expandedExcludesSet := sets.New[string](expandedExcludes...)
+	selectedNamespacesSet := expandedIncludesSet.Difference(expandedExcludesSet)
+
+	// Convert the set to a slice
+	selectedNamespaces := make([]string, 0, selectedNamespacesSet.Len())
+	for ns := range selectedNamespacesSet {
+		selectedNamespaces = append(selectedNamespaces, ns)
+	}
+
+	return selectedNamespaces
 }

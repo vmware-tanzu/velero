@@ -493,7 +493,14 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 			Includes(expandedIncludes...).
 			Excludes(expandedExcludes...)
 
-		ctx.log.Infof("Expanded namespace wildcards - includes: %v, excludes: %v", expandedIncludes, expandedExcludes)
+		selectedNamespaces := wildcard.GetWildcardResult(expandedIncludes, expandedExcludes)
+
+		// Record the expanded wildcard includes/excludes and final processed namespaces in the restore status
+		ctx.restore.Status.IncludeWildcardMatches = expandedIncludes
+		ctx.restore.Status.ExcludeWildcardMatches = expandedExcludes
+		ctx.restore.Status.WildcardResult = selectedNamespaces
+
+		ctx.log.Infof("Expanded namespace wildcards - includes: %v, excludes: %v, final: %v", expandedIncludes, expandedExcludes, selectedNamespaces)
 	}
 
 	// TODO: Remove outer feature flag check to make this feature a default in Velero.
