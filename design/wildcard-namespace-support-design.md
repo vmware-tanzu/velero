@@ -226,3 +226,6 @@ The implementation follows the detailed design outlined above, with the followin
 **Restore Integration**: Restore operations are completely decoupled from backup wildcard specifications and work safely with wildcard-created backups. The restore process reads the actual tar file contents to determine available namespaces, not the original backup spec. Since the tar file contains real, materialized namespaces (e.g., `test01`, `test02`) rather than wildcard patterns (e.g., `test*`), restore operations work with concrete namespace names.
 
 When wildcard patterns are specified in restore operations, they are expanded against the namespaces that actually exist in the backup tar file. This ensures that restore wildcard expansion is based on what was actually backed up, not what was originally intended to be backed up.
+
+**Crucially, restore does not treat `*` as a catch all case**. 
+This means that if `*` is mentioned in restore, wildcard expansion is skipped owing to how it's treated in backup.
