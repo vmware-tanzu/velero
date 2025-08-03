@@ -446,13 +446,18 @@ func (in *BackupStatus) DeepCopyInto(out *BackupStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.ExpandedIncludedNamespaces != nil {
-		in, out := &in.ExpandedIncludedNamespaces, &out.ExpandedIncludedNamespaces
+	if in.IncludeWildcardMatches != nil {
+		in, out := &in.IncludeWildcardMatches, &out.IncludeWildcardMatches
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.ExpandedExcludedNamespaces != nil {
-		in, out := &in.ExpandedExcludedNamespaces, &out.ExpandedExcludedNamespaces
+	if in.ExcludeWildcardMatches != nil {
+		in, out := &in.ExcludeWildcardMatches, &out.ExcludeWildcardMatches
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.WildcardResult != nil {
+		in, out := &in.WildcardResult, &out.WildcardResult
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
@@ -1445,13 +1450,18 @@ func (in *RestoreStatus) DeepCopyInto(out *RestoreStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.ExpandedIncludedNamespaces != nil {
-		in, out := &in.ExpandedIncludedNamespaces, &out.ExpandedIncludedNamespaces
+	if in.IncludeWildcardMatches != nil {
+		in, out := &in.IncludeWildcardMatches, &out.IncludeWildcardMatches
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.ExpandedExcludedNamespaces != nil {
-		in, out := &in.ExpandedExcludedNamespaces, &out.ExpandedExcludedNamespaces
+	if in.ExcludeWildcardMatches != nil {
+		in, out := &in.ExcludeWildcardMatches, &out.ExcludeWildcardMatches
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.WildcardResult != nil {
+		in, out := &in.WildcardResult, &out.WildcardResult
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
