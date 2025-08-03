@@ -327,15 +327,20 @@ type RestoreStatus struct {
 	// +nullable
 	ValidationErrors []string `json:"validationErrors,omitempty"`
 
-	// ExpandedIncludedNamespaces records the expanded include wildcard namespaces
+	// IncludeWildcardMatches records the namespaces that matched include wildcard patterns
 	// +optional
 	// +nullable
-	ExpandedIncludedNamespaces []string `json:"expandedIncludedNamespaces,omitempty"`
+	IncludeWildcardMatches []string `json:"includeWildcardMatches,omitempty"`
 
-	// ExpandedExcludedNamespaces records the expanded exclude wildcard namespaces
+	// ExcludeWildcardMatches records the namespaces that matched exclude wildcard patterns
 	// +optional
 	// +nullable
-	ExpandedExcludedNamespaces []string `json:"expandedExcludedNamespaces,omitempty"`
+	ExcludeWildcardMatches []string `json:"excludeWildcardMatches,omitempty"`
+
+	// WildcardResult records the final namespaces after applying wildcard include/exclude logic
+	// +optional
+	// +nullable
+	WildcardResult []string `json:"wildcardResult,omitempty"`
 
 	// Warnings is a count of all warning messages that were generated during
 	// execution of the restore. The actual warnings are stored in object storage.
