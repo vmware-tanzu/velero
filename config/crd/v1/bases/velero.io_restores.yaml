@@ -469,16 +469,9 @@ spec:
                   Errors is a count of all error messages that were generated during
                   execution of the restore. The actual errors are stored in object storage.
                 type: integer
-              expandedExcludedNamespaces:
-                description: ExpandedExcludedNamespaces records the expanded exclude
-                  wildcard namespaces
-                items:
-                  type: string
-                nullable: true
-                type: array
-              expandedIncludedNamespaces:
-                description: ExpandedIncludedNamespaces records the expanded include
-                  wildcard namespaces
+              excludeWildcardMatches:
+                description: ExcludeWildcardMatches records the namespaces that matched
+                  exclude wildcard patterns
                 items:
                   type: string
                 nullable: true
@@ -503,6 +496,13 @@ spec:
                       with an error
                     type: integer
                 type: object
+              includeWildcardMatches:
+                description: IncludeWildcardMatches records the namespaces that matched
+                  include wildcard patterns
+                items:
+                  type: string
+                nullable: true
+                type: array
               phase:
                 description: Phase is the current state of the Restore
                 enum:
@@ -570,6 +570,13 @@ spec:
                   Warnings is a count of all warning messages that were generated during
                   execution of the restore. The actual warnings are stored in object storage.
                 type: integer
+              wildcardResult:
+                description: WildcardResult records the final namespaces after applying
+                  wildcard include/exclude logic
+                items:
+                  type: string
+                nullable: true
+                type: array
             type: object
         type: object
     served: true
