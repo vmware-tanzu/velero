@@ -25,6 +25,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -2404,6 +2405,11 @@ func extractNamespacesFromBackup(backupResources map[string]*archive.ResourceIte
 func (ctx *restoreContext) expandNamespaceWildcards(backupResources map[string]*archive.ResourceItems) error {
 	if !wildcard.ShouldExpandWildcards(ctx.restore.Spec.IncludedNamespaces, ctx.restore.Spec.ExcludedNamespaces) {
 		return nil
+	}
+
+	// If `*` is mentioned in restore exludes, something is wrong
+	if slices.Contains(ctx.restore.Spec.ExcludedNamespaces, "*") {
+		return errors.New("wildcard '*' is not allowed in restore excludes")
 	}
 
 	availableNamespaces := extractNamespacesFromBackup(backupResources)
