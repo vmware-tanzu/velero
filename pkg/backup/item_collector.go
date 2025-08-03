@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -871,6 +872,11 @@ func (r *itemCollector) expandNamespaceWildcards(activeNamespaces []string, name
 		"originalExcludes":    originalExcludes,
 		"availableNamespaces": len(activeNamespaces),
 	}).Info("Starting wildcard expansion for namespace patterns")
+
+	// If `*` is mentioned in originalExcludes, something is wrong
+	if slices.Contains(originalExcludes, "*") {
+		return errors.New("wildcard '*' is not allowed in backup excludes")
+	}
 
 	expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(activeNamespaces, originalIncludes, originalExcludes)
 	if err != nil {
