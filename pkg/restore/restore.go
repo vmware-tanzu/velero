@@ -476,31 +476,9 @@ func (ctx *restoreContext) execute() (results.Result, results.Result) {
 	}
 
 	// Expand wildcard patterns in namespace includes/excludes if needed
-	if wildcard.ShouldExpandWildcards(ctx.restore.Spec.IncludedNamespaces, ctx.restore.Spec.ExcludedNamespaces) {
-		availableNamespaces := extractNamespacesFromBackup(backupResources)
-		expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(
-			availableNamespaces,
-			ctx.restore.Spec.IncludedNamespaces,
-			ctx.restore.Spec.ExcludedNamespaces,
-		)
-		if err != nil {
-			errs.AddVeleroError(errors.Wrap(err, "error expanding wildcard patterns in namespace includes/excludes"))
-			return warnings, errs
-		}
-
-		// Update namespace includes/excludes with expanded patterns
-		ctx.namespaceIncludesExcludes = collections.NewIncludesExcludes().
-			Includes(expandedIncludes...).
-			Excludes(expandedExcludes...)
-
-		selectedNamespaces := wildcard.GetWildcardResult(expandedIncludes, expandedExcludes)
-
-		// Record the expanded wildcard includes/excludes and final processed namespaces in the restore status
-		ctx.restore.Status.IncludeWildcardMatches = expandedIncludes
-		ctx.restore.Status.ExcludeWildcardMatches = expandedExcludes
-		ctx.restore.Status.WildcardResult = selectedNamespaces
-
-		ctx.log.Infof("Expanded namespace wildcards - includes: %v, excludes: %v, final: %v", expandedIncludes, expandedExcludes, selectedNamespaces)
+	if err := ctx.expandNamespaceWildcards(backupResources); err != nil {
+		errs.AddVeleroError(err)
+		return warnings, errs
 	}
 
 	// TODO: Remove outer feature flag check to make this feature a default in Velero.
@@ -2423,6 +2401,41 @@ func extractNamespacesFromBackup(backupResources map[string]*archive.ResourceIte
 		namespaces = append(namespaces, ns)
 	}
 	return namespaces
+}
+
+// expandNamespaceWildcards expands wildcard patterns in namespace includes/excludes
+// and updates the restore context with the expanded patterns and status
+func (ctx *restoreContext) expandNamespaceWildcards(backupResources map[string]*archive.ResourceItems) error {
+	if !wildcard.ShouldExpandWildcards(ctx.restore.Spec.IncludedNamespaces, ctx.restore.Spec.ExcludedNamespaces) {
+		return nil
+	}
+
+	availableNamespaces := extractNamespacesFromBackup(backupResources)
+	expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(
+		availableNamespaces,
+		ctx.restore.Spec.IncludedNamespaces,
+		ctx.restore.Spec.ExcludedNamespaces,
+	)
+	if err != nil {
+		return errors.Wrap(err, "error expanding wildcard patterns in namespace includes/excludes")
+	}
+
+	// Update namespace includes/excludes with expanded patterns
+	ctx.namespaceIncludesExcludes = collections.NewIncludesExcludes().
+		Includes(expandedIncludes...).
+		Excludes(expandedExcludes...)
+
+	selectedNamespaces := wildcard.GetWildcardResult(expandedIncludes, expandedExcludes)
+
+	// Record the expanded wildcard includes/excludes and final processed namespaces in the restore status
+	ctx.restore.Status.IncludeWildcardMatches = expandedIncludes
+	ctx.restore.Status.ExcludeWildcardMatches = expandedExcludes
+	ctx.restore.Status.WildcardResult = selectedNamespaces
+
+	ctx.log.Infof("Expanded namespace wildcards - includes: %v, excludes: %v, final: %v",
+		expandedIncludes, expandedExcludes, selectedNamespaces)
+
+	return nil
 }
 
 // removeRestoreLabels removes the restore name and the
