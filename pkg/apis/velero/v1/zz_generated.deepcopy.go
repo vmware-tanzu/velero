@@ -1445,6 +1445,16 @@ func (in *RestoreStatus) DeepCopyInto(out *RestoreStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExpandedIncludedNamespaces != nil {
+		in, out := &in.ExpandedIncludedNamespaces, &out.ExpandedIncludedNamespaces
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.ExpandedExcludedNamespaces != nil {
+		in, out := &in.ExpandedExcludedNamespaces, &out.ExpandedExcludedNamespaces
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.StartTimestamp != nil {
 		in, out := &in.StartTimestamp, &out.StartTimestamp
 		*out = (*in).DeepCopy()
