@@ -25,19 +25,39 @@ that storage provider when backing up and restoring.
 
 ## Trusting a self-signed certificate with the Velero client
 
-To use the describe, download, or logs commands to access a backup or restore contained
-in storage secured by a self-signed certificate as in the above example, you must use
-the `--cacert` flag to provide a path to the certificate to be trusted.
+When using Velero client commands like describe, download, or logs to access backups or restores
+in storage secured by a self-signed certificate, the CA certificate can be configured in two ways:
 
-```bash
-velero backup describe my-backup --cacert <PATH_TO_CA_BUNDLE>
-```
+1. **Using the `--cacert` flag** (legacy method):
+
+   ```bash
+   velero backup describe my-backup --cacert <PATH_TO_CA_BUNDLE>
+   ```
+
+2. **Configuring the CA certificate in the BackupStorageLocation**:
+
+   ```yaml
+   apiVersion: velero.io/v1
+   kind: BackupStorageLocation
+   metadata:
+     name: default
+     namespace: velero
+   spec:
+     provider: aws
+     objectStorage:
+       bucket: velero-backups
+       caCert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCi4uLiAoYmFzZTY0IGVuY29kZWQgY2VydGlmaWNhdGUgY29udGVudCkgLi4uCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+     config:
+       region: us-east-1
+   ```
+
+When the CA certificate is configured in the BackupStorageLocation, Velero client commands will automatically use it without requiring the `--cacert` flag.
 
 ## Error with client certificate with custom S3 server
 
 In case you are using a custom S3-compatible server, you may encounter that the backup fails with an error similar to one below.
 
-```
+```text
 rpc error: code = Unknown desc = RequestError: send request failed caused by:
 Get https://minio.com:3000/k8s-backup-bucket?delimiter=%2F&list-type=2&prefix=: remote error: tls: alert(116)
 ```
@@ -46,7 +66,6 @@ Error 116 represents certificate required as seen here in [error codes](https://
 Velero as a client does not include its certificate while performing SSL handshake with the server.
 From [TLS 1.3 spec](https://tools.ietf.org/html/rfc8446), verifying client certificate is optional on the server.
 You will need to change this setting on the server to make it work.
-
 
 ## Skipping TLS verification
 
