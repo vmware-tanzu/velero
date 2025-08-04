@@ -1209,6 +1209,12 @@ func TestGetLoadAffinityByStorageClass(t *testing.T) {
 			scName:           "storage-class-01",
 			expectedAffinity: nil,
 		},
+		{
+			name:             "affinityList is nil",
+			affinityList:     nil,
+			scName:           "storage-class-01",
+			expectedAffinity: nil,
+		},
 	}
 
 	for _, test := range tests {
