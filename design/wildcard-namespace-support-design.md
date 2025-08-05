@@ -158,9 +158,11 @@ The restore expansion occurs after parsing the backup tar contents, using `extra
 
 ```go
 // Record the expanded wildcard includes/excludes in the request status
-r.backupRequest.Status.IncludeWildcardMatches = expandedIncludes
-r.backupRequest.Status.ExcludeWildcardMatches = expandedExcludes
-r.backupRequest.Status.WildcardResult = wildcardResult
+r.backupRequest.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
+	IncludeWildcardMatches: expandedIncludes,
+	ExcludeWildcardMatches: expandedExcludes,
+	WildcardResult:         wildcardResult,
+}
 ```
 
 #### Restore Status Fields
@@ -169,9 +171,11 @@ r.backupRequest.Status.WildcardResult = wildcardResult
 
 ```go
 // Record the expanded wildcard includes/excludes in the restore status
-ctx.restore.Status.IncludeWildcardMatches = expandedIncludes
-ctx.restore.Status.ExcludeWildcardMatches = expandedExcludes
-ctx.restore.Status.WildcardResult = wildcardResult
+ctx.restore.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
+	IncludeWildcardMatches: expandedIncludes,
+	ExcludeWildcardMatches: expandedExcludes,
+	WildcardResult:         wildcardResult,
+}
 ```
 
 The status fields are populated immediately after successful wildcard expansion, providing visibility into which namespaces were actually matched by the wildcard patterns and the final list of namespaces that will be processed.
