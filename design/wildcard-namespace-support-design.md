@@ -60,31 +60,75 @@ The implementation involves four main components that can be developed increment
 
 ### Add new status fields to the backup and restore CRDs to store expanded wildcard namespaces
 
+#### Backup
+
 ```go
-// BackupStatus captures the current status of a Velero backup.
-type BackupStatus struct {
-    // ... existing fields ...
-    
-    // IncludeWildcardMatches records the expanded include wildcard namespaces
+// WildcardNamespaceStatus contains information about wildcard namespace matching results
+type WildcardNamespaceStatus struct {
+    // IncludeWildcardMatches records the namespaces that matched include wildcard patterns
     // +optional
     // +nullable
     IncludeWildcardMatches []string `json:"includeWildcardMatches,omitempty"`
 
-    // ExcludeWildcardMatches records the expanded exclude wildcard namespaces
+    // ExcludeWildcardMatches records the namespaces that matched exclude wildcard patterns
     // +optional
     // +nullable
     ExcludeWildcardMatches []string `json:"excludeWildcardMatches,omitempty"`
 
     // WildcardResult records the final namespaces after applying wildcard include/exclude logic
-	// +optional
-	// +nullable
-	WildcardResult []string `json:"wildcardResult,omitempty"`
+    // +optional
+    // +nullable
+    WildcardResult []string `json:"wildcardResult,omitempty"`
+}
+
+// BackupStatus captures the current status of a Velero backup.
+type BackupStatus struct {
+    // ... existing fields ...
+    
+    // WildcardNamespaces contains information about wildcard namespace processing
+    // +optional
+    // +nullable
+    WildcardNamespaces *WildcardNamespaceStatus `json:"wildcardNamespaces,omitempty"`
     
     // ... other fields ...
 }
 ```
 
-**Implementation**: Added status fields `IncludeWildcardMatches`, `ExcludeWildcardMatches`, and `WildcardResult` to `pkg/apis/velero/v1/backup_types.go` and `pkg/apis/velero/v1/restore_types.go` to track the resolved namespace lists after wildcard expansion.
+#### Restore
+
+```go
+// WildcardNamespaceStatus contains information about wildcard namespace matching results
+type WildcardNamespaceStatus struct {
+    // IncludeWildcardMatches records the namespaces that matched include wildcard patterns
+    // +optional
+    // +nullable
+    IncludeWildcardMatches []string `json:"includeWildcardMatches,omitempty"`
+
+    // ExcludeWildcardMatches records the namespaces that matched exclude wildcard patterns
+    // +optional
+    // +nullable
+    ExcludeWildcardMatches []string `json:"excludeWildcardMatches,omitempty"`
+
+    // WildcardResult records the final namespaces after applying wildcard include/exclude logic
+    // +optional
+    // +nullable
+    WildcardResult []string `json:"wildcardResult,omitempty"`
+}
+
+// RestoreStatus captures the current status of a Velero restore.
+type RestoreStatus struct {
+    // ... existing fields ...
+    
+    // WildcardNamespaces contains information about wildcard namespace processing
+    // +optional
+    // +nullable
+    WildcardNamespaces *WildcardNamespaceStatus `json:"wildcardNamespaces,omitempty"`
+    
+    // ... other fields ...
+}
+```
+
+**Implementation**: Added a structured `WildcardNamespaceStatus` type and `WildcardNamespaces` field to `pkg/apis/velero/v1/backup_types.go` and `pkg/apis/velero/v1/restore_types.go` to track the resolved namespace lists after wildcard expansion in a well-organized manner.
 
 ### Create a util package for wildcard expansion
 
