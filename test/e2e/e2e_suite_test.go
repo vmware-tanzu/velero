@@ -398,25 +398,25 @@ var _ = Describe(
 // Test backup and restore of Kibishii using restic
 var _ = Describe(
 	"Velero tests on cluster using the plugin provider for object storage and Restic for volume backups",
-	Label("Basic", "Restic"),
+	Label("Basic", "Restic", "AdditionalBSL"),
 	BackupRestoreWithRestic,
 )
 
 var _ = Describe(
 	"Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups",
-	Label("Basic", "Snapshot", "SkipVanillaZfs"),
+	Label("Basic", "Snapshot", "SkipVanillaZfs", "AdditionalBSL"),
 	BackupRestoreWithSnapshots,
 )
 
 var _ = Describe(
 	"Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups",
-	Label("Basic", "Snapshot", "RetainPV"),
+	Label("Basic", "Snapshot", "RetainPV", "AdditionalBSL"),
 	BackupRestoreRetainedPVWithSnapshots,
 )
 
 var _ = Describe(
 	"Velero tests on cluster using the plugin provider for object storage and snapshots for volume backups",
-	Label("Basic", "Restic", "RetainPV"),
+	Label("Basic", "Restic", "RetainPV", "AdditionalBSL"),
 	BackupRestoreRetainedPVWithRestic,
 )
 
@@ -597,12 +597,12 @@ var _ = Describe(
 
 var _ = Describe(
 	"Local backups will be deleted once the corresponding backup storage location is deleted",
-	Label("BSL", "Deletion", "Snapshot", "SkipVanillaZfs"),
+	Label("BSL", "Deletion", "Snapshot", "SkipVanillaZfs", "AdditionalBSL"),
 	BslDeletionWithSnapshots,
 )
 var _ = Describe(
 	"Local backups and Restic repos will be deleted once the corresponding backup storage location is deleted",
-	Label("BSL", "Deletion", "Restic"),
+	Label("BSL", "Deletion", "Restic", "AdditionalBSL"),
 	BslDeletionWithRestic,
 )
 
