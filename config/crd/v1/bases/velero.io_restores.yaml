@@ -46,6 +46,15 @@ spec:
                   BackupName is the unique name of the Velero backup to restore
                   from.
                 type: string
+              disabledPVReprovisioningStorageClasses:
+                description: |-
+                  DisabledPVReprovisioningStorageClasses is a slice of StorageClasses names.
+                  PV without snapshot and having one of these StorageClass will not be
+                  re-provisionned (even when ReclaimPolicy is Delete).
+                items:
+                  type: string
+                nullable: true
+                type: array
               excludedNamespaces:
                 description: |-
                   ExcludedNamespaces contains a list of namespaces that are not
