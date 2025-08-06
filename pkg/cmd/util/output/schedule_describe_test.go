@@ -32,9 +32,10 @@ Backup Template:
     Excluded:  <none>
   
   Resources:
-    Included:        *
-    Excluded:        <none>
-    Cluster-scoped:  auto
+    Included cluster-scoped:    <none>
+    Excluded cluster-scoped:    <none>
+    Included namespace-scoped:  *
+    Excluded namespace-scoped:  <none>
   
   Label selector:  <none>
   
@@ -81,9 +82,10 @@ Backup Template:
     Excluded:  <none>
   
   Resources:
-    Included:        *
-    Excluded:        <none>
-    Cluster-scoped:  auto
+    Included cluster-scoped:    <none>
+    Excluded cluster-scoped:    <none>
+    Included namespace-scoped:  *
+    Excluded namespace-scoped:  <none>
   
   Label selector:  <none>
   
@@ -127,9 +129,10 @@ Backup Template:
     Excluded:  <none>
   
   Resources:
-    Included:        *
-    Excluded:        <none>
-    Cluster-scoped:  auto
+    Included cluster-scoped:    <none>
+    Excluded cluster-scoped:    <none>
+    Included namespace-scoped:  *
+    Excluded namespace-scoped:  <none>
   
   Label selector:  <none>
   
@@ -174,9 +177,10 @@ Backup Template:
     Excluded:  <none>
   
   Resources:
-    Included:        *
-    Excluded:        <none>
-    Cluster-scoped:  auto
+    Included cluster-scoped:    <none>
+    Excluded cluster-scoped:    <none>
+    Included namespace-scoped:  *
+    Excluded namespace-scoped:  <none>
   
   Label selector:  <none>
   
