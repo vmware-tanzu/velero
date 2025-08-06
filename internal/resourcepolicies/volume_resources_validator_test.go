@@ -453,6 +453,102 @@ func TestValidate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: " '*' in the filters of include exclude policy - 1",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]any{
+							"pvcLabels": map[string]string{
+								"environment": "production",
+								"app":         "database",
+							},
+						},
+					},
+				},
+				IncludeExcludePolicy: &IncludeExcludePolicy{
+					IncludedClusterScopedResources:   []string{"*"},
+					ExcludedClusterScopedResources:   []string{"crds"},
+					IncludedNamespaceScopedResources: []string{"pods"},
+					ExcludedNamespaceScopedResources: []string{"secrets"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: " '*' in the filters of include exclude policy - 2",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]any{
+							"pvcLabels": map[string]string{
+								"environment": "production",
+								"app":         "database",
+							},
+						},
+					},
+				},
+				IncludeExcludePolicy: &IncludeExcludePolicy{
+					IncludedClusterScopedResources:   []string{"persistentvolumes"},
+					ExcludedClusterScopedResources:   []string{"crds"},
+					IncludedNamespaceScopedResources: []string{"pods"},
+					ExcludedNamespaceScopedResources: []string{"*"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: " dup item in both the include and exclude filters of include exclude policy",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]any{
+							"pvcLabels": map[string]string{
+								"environment": "production",
+								"app":         "database",
+							},
+						},
+					},
+				},
+				IncludeExcludePolicy: &IncludeExcludePolicy{
+					IncludedClusterScopedResources:   []string{"persistentvolumes"},
+					ExcludedClusterScopedResources:   []string{"crds"},
+					IncludedNamespaceScopedResources: []string{"pods", "configmaps"},
+					ExcludedNamespaceScopedResources: []string{"secrets", "pods"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: " valid volume policies and valid include/exclude policy",
+			res: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action: Action{Type: "skip"},
+						Conditions: map[string]any{
+							"pvcLabels": map[string]string{
+								"environment": "production",
+								"app":         "database",
+							},
+						},
+					},
+				},
+				IncludeExcludePolicy: &IncludeExcludePolicy{
+					IncludedClusterScopedResources:   []string{"persistentvolumes"},
+					ExcludedClusterScopedResources:   []string{"crds"},
+					IncludedNamespaceScopedResources: []string{"pods", "configmaps"},
+					ExcludedNamespaceScopedResources: []string{"secrets"},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
