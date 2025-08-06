@@ -92,6 +92,8 @@ type Options struct {
 	NodeAgentDisableHostPath        bool
 	kubeletRootDir                  string
 	Upgrade                         bool
+	ServerPriorityClassName         string
+	NodeAgentPriorityClassName      string
 }
 
 // BindFlags adds command line values to the options struct.
@@ -195,6 +197,18 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		"item-block-worker-count",
 		o.ItemBlockWorkerCount,
 		"Number of worker threads to process ItemBlocks. Default is one. Optional.",
+	)
+	flags.StringVar(
+		&o.ServerPriorityClassName,
+		"server-priority-class-name",
+		o.ServerPriorityClassName,
+		"Priority class name for the Velero server deployment. Optional.",
+	)
+	flags.StringVar(
+		&o.NodeAgentPriorityClassName,
+		"node-agent-priority-class-name",
+		o.NodeAgentPriorityClassName,
+		"Priority class name for the node agent daemonset. Optional.",
 	)
 }
 
@@ -303,6 +317,8 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		ItemBlockWorkerCount:            o.ItemBlockWorkerCount,
 		KubeletRootDir:                  o.kubeletRootDir,
 		NodeAgentDisableHostPath:        o.NodeAgentDisableHostPath,
+		ServerPriorityClassName:         o.ServerPriorityClassName,
+		NodeAgentPriorityClassName:      o.NodeAgentPriorityClassName,
 	}, nil
 }
 
@@ -391,6 +407,7 @@ func (o *Options) Run(c *cobra.Command, f client.Factory) error {
 	if err != nil {
 		return err
 	}
+
 	errorMsg := fmt.Sprintf("\n\nError installing Velero. Use `kubectl logs deploy/velero -n %s` to check the deploy logs", o.Namespace)
 
 	err = install.Install(dynamicFactory, kbClient, resources, os.Stdout, o.Upgrade)

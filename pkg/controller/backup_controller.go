@@ -558,8 +558,11 @@ func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logg
 	if err != nil {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, err.Error())
 	}
+	if resourcePolicies != nil && resourcePolicies.GetIncludeExcludePolicy() != nil && collections.UseOldResourceFilters(request.Spec) {
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, "include-resources, exclude-resources and include-cluster-resources are old filter parameters.\n"+
+			"They cannot be used with include-exclude policies.")
+	}
 	request.ResPolicies = resourcePolicies
-
 	return request
 }
 
@@ -812,7 +815,6 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 			fatalErrs = append(fatalErrs, errs...)
 		}
 	}
-
 	b.logger.WithField(constant.ControllerBackup, kubeutil.NamespaceAndName(backup)).Infof("Initial backup processing complete, moving to %s", backup.Status.Phase)
 
 	// if we return a non-nil error, the calling function will update

@@ -501,17 +501,19 @@ func TestExpose(t *testing.T) {
 				AccessMode:       AccessModeFileSystem,
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
-				Affinity: &kube.LoadAffinity{
-					NodeSelector: metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "kubernetes.io/os",
-								Operator: metav1.LabelSelectorOpIn,
-								Values:   []string{"Linux"},
+				Affinity: []*kube.LoadAffinity{
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "kubernetes.io/os",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"Linux"},
+								},
 							},
 						},
+						StorageClass: "fake-sc",
 					},
-					StorageClass: "fake-sc",
 				},
 			},
 			snapshotClientObj: []runtime.Object{
@@ -554,17 +556,19 @@ func TestExpose(t *testing.T) {
 						StorageClass: "fake-sc-read-only",
 					},
 				},
-				Affinity: &kube.LoadAffinity{
-					NodeSelector: metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "kubernetes.io/arch",
-								Operator: metav1.LabelSelectorOpIn,
-								Values:   []string{"amd64"},
+				Affinity: []*kube.LoadAffinity{
+					{
+						NodeSelector: metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "kubernetes.io/arch",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"amd64"},
+								},
 							},
 						},
+						StorageClass: "fake-sc-read-only",
 					},
-					StorageClass: "fake-sc-read-only",
 				},
 			},
 			snapshotClientObj: []runtime.Object{

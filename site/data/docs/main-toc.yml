@@ -49,6 +49,8 @@ toc:
         url: /file-system-backup        
       - page: CSI Support
         url: /csi
+      - page: Volume Group Snapshots
+        url: /volume-group-snapshots
       - page: Backup Repository Configuration
         url: /backup-repository-configuration
       - page: Verifying Self-signed Certificates
