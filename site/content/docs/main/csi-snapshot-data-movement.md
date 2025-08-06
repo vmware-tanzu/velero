@@ -18,7 +18,11 @@ On the other hand, there are quite some cases that CSI snapshot is not available
 
 CSI Snapshot Data Movement supports both built-in data mover and customized data movers. For the details of how Velero works with customized data movers, check the [Volume Snapshot Data Movement design][1]. Velero provides a built-in data mover which uses Velero built-in uploaders (at present the available uploader is Kopia uploader) to read the snapshot data and write to the Unified Repository (by default implemented by Kopia repository).    
 
-Velero built-in data mover restores both volume data and metadata, so the data mover pods need to run as root user.  
+Velero built-in data mover restores both volume data and metadata, so the data mover pods need to run as root user.
+
+### Priority Class Configuration
+
+For Velero built-in data mover, data mover pods launched during CSI snapshot data movement will use the priority class name configured in the node-agent configmap. The node-agent daemonset itself gets its priority class from the `--node-agent-priority-class-name` flag during Velero installation. This can help ensure proper scheduling behavior in resource-constrained environments. For more details on configuring data mover pod resources, see [Data Movement Pod Resource Configuration][11].
 
 ## Setup CSI Snapshot Data Movement
 
@@ -364,7 +368,7 @@ At present, Velero doesn't allow to set `ReadOnlyRootFileSystem` parameter to da
 Both the uploader and repository consume remarkable CPU/memory during the backup/restore, especially for massive small files or large backup size cases.  
 
 For Velero built-in data mover, Velero uses [BestEffort as the QoS][13] for data mover pods (so no CPU/memory request/limit is set), so that backups/restores wouldn't fail due to resource throttling in any cases.  
-If you want to constraint the CPU/memory usage, you need to [Customize Data Mover Pod Resource Limits][11]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][12] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.   
+If you want to constraint the CPU/memory usage, you need to [Customize Data Mover Pod Resource Limits][11]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][12] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.  
 
 During the restore, the repository may also cache data/metadata so as to reduce the network footprint and speed up the restore. The repository uses its own policy to store and clean up the cache.  
 For Kopia repository, the cache is stored in the data mover pod's root file system. Velero allows you to configure a limit of the cache size so that the data mover pod won't be evicted due to running out of the ephemeral storage. For more details, check [Backup Repository Configuration][17]. 

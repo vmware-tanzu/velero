@@ -151,6 +151,7 @@ func initPVBReconcilerWithError(needError ...error) (*PodVolumeBackupReconciler,
 		corev1api.ResourceRequirements{},
 		metrics.NewServerMetrics(),
 		velerotest.NewLogger(),
+		"", // dataMovePriorityClass
 	), nil
 }
 
