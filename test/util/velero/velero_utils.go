@@ -1528,35 +1528,30 @@ func ListVeleroPods(ctx context.Context, veleroNamespace string) ([]string, erro
 	return common.GetListByCmdPipes(ctx, cmds)
 }
 
-func GetVeleroResource(ctx context.Context, veleroNamespace, namespace, resourceName string) ([]string, error) {
-	cmds := []*common.OsCommandLine{}
-	cmd := &common.OsCommandLine{
-		Cmd:  "kubectl",
-		Args: []string{"get", resourceName, "-n", veleroNamespace},
-	}
-	cmds = append(cmds, cmd)
+func BackupPVBNum(ctx context.Context, veleroNamespace, backupName string) (int, error) {
+	outputList, err := common.GetResourceWithLabel(
+		ctx,
+		veleroNamespace,
+		"PodVolumeBackup",
+		map[string]string{
+			velerov1api.BackupNameLabel: backupName,
+		},
+	)
 
-	cmd = &common.OsCommandLine{
-		Cmd:  "grep",
-		Args: []string{namespace},
-	}
-	cmds = append(cmds, cmd)
-
-	cmd = &common.OsCommandLine{
-		Cmd:  "awk",
-		Args: []string{"{print $1}"},
-	}
-	cmds = append(cmds, cmd)
-
-	return common.GetListByCmdPipes(ctx, cmds)
+	return len(outputList), err
 }
 
-func GetPVB(ctx context.Context, veleroNamespace, namespace string) ([]string, error) {
-	return GetVeleroResource(ctx, veleroNamespace, namespace, "podvolumebackup")
-}
+func RestorePVRNum(ctx context.Context, veleroNamespace, restoreName string) (int, error) {
+	outputList, err := common.GetResourceWithLabel(
+		ctx,
+		veleroNamespace,
+		"PodVolumeRestore",
+		map[string]string{
+			velerov1api.RestoreNameLabel: restoreName,
+		},
+	)
 
-func GetPVR(ctx context.Context, veleroNamespace, namespace string) ([]string, error) {
-	return GetVeleroResource(ctx, veleroNamespace, namespace, "podvolumerestore")
+	return len(outputList), err
 }
 
 func IsSupportUploaderType(version string) (bool, error) {
