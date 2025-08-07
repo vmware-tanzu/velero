@@ -272,6 +272,8 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	io.VeleroPodMemRequest = veleroCfg.VeleroPodMemRequest
 	io.DisableInformerCache = veleroCfg.DisableInformerCache
 	io.ItemBlockWorkerCount = veleroCfg.ItemBlockWorkerCount
+	io.ServerPriorityClassName = veleroCfg.ServerPriorityClassName
+	io.NodeAgentPriorityClassName = veleroCfg.NodeAgentPriorityClassName
 
 	return io, nil
 }

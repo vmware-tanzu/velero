@@ -81,3 +81,37 @@ func TestDaemonSet(t *testing.T) {
 	assert.Equal(t, (*corev1api.PodSecurityContext)(nil), ds.Spec.Template.Spec.SecurityContext)
 	assert.Equal(t, (*corev1api.SecurityContext)(nil), ds.Spec.Template.Spec.Containers[0].SecurityContext)
 }
+
+func TestDaemonSetWithPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		name              string
+		priorityClassName string
+		expectedValue     string
+	}{
+		{
+			name:              "with priority class name",
+			priorityClassName: "high-priority",
+			expectedValue:     "high-priority",
+		},
+		{
+			name:              "without priority class name",
+			priorityClassName: "",
+			expectedValue:     "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a daemonset with the priority class name option
+			var opts []podTemplateOption
+			if tc.priorityClassName != "" {
+				opts = append(opts, WithPriorityClassName(tc.priorityClassName))
+			}
+
+			daemonset := DaemonSet("velero", opts...)
+
+			// Verify the priority class name is set correctly
+			assert.Equal(t, tc.expectedValue, daemonset.Spec.Template.Spec.PriorityClassName)
+		})
+	}
+}

@@ -27,7 +27,8 @@ Here is a sample of the configMap with ```podResources```:
         "cpuLimit": "1000m",
         "memoryRequest": "512Mi",
         "memoryLimit": "1Gi"        
-    }
+    },
+    "priorityClassName": "high-priority"
 }
 ```
 
@@ -52,6 +53,75 @@ spec:
       - args:
         - --node-agent-config=<configMap name>
 ```
+
+### Priority Class
+
+Data mover pods will use the priorityClassName configured in the node-agent configmap. The priorityClassName for data mover pods is configured through the node-agent configmap (specified via the `--node-agent-configmap` flag), while the node-agent daemonset itself uses the priority class set by the `--node-agent-priority-class-name` flag during Velero installation.
+
+#### When to Use Priority Classes
+
+**Higher Priority Classes** (e.g., `system-cluster-critical`, `system-node-critical`, or custom high-priority):
+- When you have dedicated nodes for backup operations
+- When backup/restore operations are time-critical
+- When you want to ensure data mover pods are scheduled even during high cluster utilization
+- For disaster recovery scenarios where restore speed is critical
+
+**Lower Priority Classes** (e.g., `low-priority` or negative values):
+- When you want to protect production workload performance
+- When backup operations can be delayed during peak hours
+- When cluster resources are limited and production workloads take precedence
+- For non-critical backup operations that can tolerate delays
+
+#### Consequences of Priority Class Settings
+
+**High Priority**:
+- ✅ Data mover pods are more likely to be scheduled quickly
+- ✅ Less likely to be preempted by other workloads
+- ❌ May cause resource pressure on production workloads
+- ❌ Could lead to production pod evictions in extreme cases
+
+**Low Priority**:
+- ✅ Production workloads are protected from resource competition
+- ✅ Cluster stability is maintained during backup operations
+- ❌ Backup/restore operations may take longer to start
+- ❌ Data mover pods may be preempted, causing backup failures
+- ❌ In resource-constrained clusters, backups might not run at all
+
+#### Example Configuration
+
+To configure priority class for data mover pods, include it in your node-agent configmap:
+
+```json
+{
+    "podResources": {
+        "cpuRequest": "1000m",
+        "cpuLimit": "2000m",
+        "memoryRequest": "1Gi",
+        "memoryLimit": "4Gi"
+    },
+    "priorityClassName": "backup-priority"
+}
+```
+
+First, create the priority class in your cluster:
+
+```yaml
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: backup-priority
+value: 1000
+globalDefault: false
+description: "Priority class for Velero data mover pods"
+```
+
+Then create or update the node-agent configmap:
+
+```bash
+kubectl create cm node-agent-config -n velero --from-file=node-agent-config.json
+```
+
+**Note**: If the specified priority class doesn't exist in the cluster when data mover pods are created, the pods will fail to schedule. Velero validates the priority class at startup and logs a warning if it doesn't exist, but the pods will still attempt to use it.
 
 [1]: csi-snapshot-data-movement.md
 [2]: file-system-backup.md
