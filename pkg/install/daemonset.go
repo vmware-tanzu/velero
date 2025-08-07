@@ -244,6 +244,12 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 				Effect:   "NoSchedule",
 				Value:    "windows",
 			},
+			{
+				Key:      "os",
+				Operator: "Equal",
+				Effect:   "NoExecute",
+				Value:    "windows",
+			},
 		}
 	} else {
 		daemonSet.Spec.Template.Spec.NodeSelector = map[string]string{
