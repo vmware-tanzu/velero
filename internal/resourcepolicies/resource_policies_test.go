@@ -983,6 +983,69 @@ volumePolicies:
 			},
 			skip: false,
 		},
+		{
+			name: "PVC phase matching - Pending phase should skip",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+   pvcPhase: ["Pending"]
+  action:
+    type: skip`,
+			vol:    nil,
+			podVol: nil,
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-pending",
+				},
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimPending,
+				},
+			},
+			skip: true,
+		},
+		{
+			name: "PVC phase matching - Bound phase should not skip",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+   pvcPhase: ["Pending"]
+  action:
+    type: skip`,
+			vol:    nil,
+			podVol: nil,
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-bound",
+				},
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimBound,
+				},
+			},
+			skip: false,
+		},
+		{
+			name: "PVC phase matching - Multiple phases (Pending, Lost)",
+			yamlData: `version: v1
+volumePolicies:
+- conditions:
+   pvcPhase: ["Pending", "Lost"]
+  action:
+    type: skip`,
+			vol:    nil,
+			podVol: nil,
+			pvc: &corev1api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pvc-lost",
+				},
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimLost,
+				},
+			},
+			skip: true,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1059,32 +1122,53 @@ func TestParsePVC(t *testing.T) {
 		name           string
 		pvc            *corev1api.PersistentVolumeClaim
 		expectedLabels map[string]string
+		expectedPhase  string
 		expectErr      bool
 	}{
 		{
-			name: "valid PVC with labels",
+			name: "valid PVC with labels and Pending phase",
 			pvc: &corev1api.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"env": "prod"},
 				},
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimPending,
+				},
 			},
 			expectedLabels: map[string]string{"env": "prod"},
+			expectedPhase:  "Pending",
 			expectErr:      false,
 		},
 		{
-			name: "valid PVC with empty labels",
+			name: "valid PVC with Bound phase",
 			pvc: &corev1api.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{},
 				},
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimBound,
+				},
 			},
 			expectedLabels: nil,
+			expectedPhase:  "Bound",
+			expectErr:      false,
+		},
+		{
+			name: "valid PVC with Lost phase",
+			pvc: &corev1api.PersistentVolumeClaim{
+				Status: corev1api.PersistentVolumeClaimStatus{
+					Phase: corev1api.ClaimLost,
+				},
+			},
+			expectedLabels: nil,
+			expectedPhase:  "Lost",
 			expectErr:      false,
 		},
 		{
 			name:           "nil PVC pointer",
 			pvc:            (*corev1api.PersistentVolumeClaim)(nil),
 			expectedLabels: nil,
+			expectedPhase:  "",
 			expectErr:      false,
 		},
 	}
@@ -1095,6 +1179,66 @@ func TestParsePVC(t *testing.T) {
 			s.parsePVC(tc.pvc)
 
 			assert.Equal(t, tc.expectedLabels, s.pvcLabels)
+			assert.Equal(t, tc.expectedPhase, s.pvcPhase)
+		})
+	}
+}
+
+func TestPVCPhaseMatch(t *testing.T) {
+	tests := []struct {
+		name          string
+		condition     *pvcPhaseCondition
+		volume        *structuredVolume
+		expectedMatch bool
+	}{
+		{
+			name:          "match Pending phase",
+			condition:     &pvcPhaseCondition{phases: []string{"Pending"}},
+			volume:        &structuredVolume{pvcPhase: "Pending"},
+			expectedMatch: true,
+		},
+		{
+			name:          "match multiple phases - Pending matches",
+			condition:     &pvcPhaseCondition{phases: []string{"Pending", "Bound"}},
+			volume:        &structuredVolume{pvcPhase: "Pending"},
+			expectedMatch: true,
+		},
+		{
+			name:          "match multiple phases - Bound matches",
+			condition:     &pvcPhaseCondition{phases: []string{"Pending", "Bound"}},
+			volume:        &structuredVolume{pvcPhase: "Bound"},
+			expectedMatch: true,
+		},
+		{
+			name:          "no match for different phase",
+			condition:     &pvcPhaseCondition{phases: []string{"Pending"}},
+			volume:        &structuredVolume{pvcPhase: "Bound"},
+			expectedMatch: false,
+		},
+		{
+			name:          "no match for empty phase",
+			condition:     &pvcPhaseCondition{phases: []string{"Pending"}},
+			volume:        &structuredVolume{pvcPhase: ""},
+			expectedMatch: false,
+		},
+		{
+			name:          "match with empty phases list (always match)",
+			condition:     &pvcPhaseCondition{phases: []string{}},
+			volume:        &structuredVolume{pvcPhase: "Pending"},
+			expectedMatch: true,
+		},
+		{
+			name:          "match with nil phases list (always match)",
+			condition:     &pvcPhaseCondition{phases: nil},
+			volume:        &structuredVolume{pvcPhase: "Pending"},
+			expectedMatch: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.condition.match(tc.volume)
+			assert.Equal(t, tc.expectedMatch, result)
 		})
 	}
 }
