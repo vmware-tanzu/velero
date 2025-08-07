@@ -653,7 +653,12 @@ func VeleroCreateBackupLocation(ctx context.Context,
 	if secretName != "" && secretKey != "" {
 		args = append(args, "--credential", fmt.Sprintf("%s=%s", secretName, secretKey))
 	}
-	return VeleroCmdExec(ctx, veleroCLI, args)
+
+	if err := VeleroCmdExec(ctx, veleroCLI, args); err != nil {
+		return err
+	}
+
+	return CheckBSL(ctx, veleroNamespace, name)
 }
 
 func VeleroVersion(ctx context.Context, veleroCLI, veleroNamespace string) error {
