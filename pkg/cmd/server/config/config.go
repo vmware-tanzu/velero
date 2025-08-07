@@ -47,6 +47,7 @@ const (
 	defaultDisableInformerCache        = false
 
 	DefaultItemBlockWorkerCount = 1
+	DefaultConcurrentBackups    = 1
 )
 
 var (
@@ -174,6 +175,7 @@ type Config struct {
 	BackupRepoConfig               string
 	RepoMaintenanceJobConfig       string
 	ItemBlockWorkerCount           int
+	ConcurrentBackups              int
 }
 
 func GetDefaultConfig() *Config {
@@ -206,6 +208,7 @@ func GetDefaultConfig() *Config {
 		ScheduleSkipImmediately:        false,
 		CredentialsDirectory:           credentials.DefaultStoreDirectory(),
 		ItemBlockWorkerCount:           DefaultItemBlockWorkerCount,
+		ConcurrentBackups:              DefaultConcurrentBackups,
 	}
 
 	return config
@@ -260,5 +263,11 @@ func (c *Config) BindFlags(flags *pflag.FlagSet) {
 		"item-block-worker-count",
 		c.ItemBlockWorkerCount,
 		"Number of worker threads to process ItemBlocks. Default is one. Optional.",
+	)
+	flags.IntVar(
+		&c.ConcurrentBackups,
+		"concurrent-backups",
+		c.ConcurrentBackups,
+		"Number of backups to process concurrently. Default is one. Optional.",
 	)
 }
