@@ -271,6 +271,7 @@ type VeleroOptions struct {
 	RepoMaintenanceJobConfigMap     string
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
+	ConcurrentBackups               int
 	KubeletRootDir                  string
 	NodeAgentDisableHostPath        bool
 	ServerPriorityClassName         string
@@ -362,6 +363,7 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		WithPodResources(o.PodResources),
 		WithKeepLatestMaintenanceJobs(o.KeepLatestMaintenanceJobs),
 		WithItemBlockWorkerCount(o.ItemBlockWorkerCount),
+		WithConcurrentBackups(o.ConcurrentBackups),
 	}
 
 	if o.ServerPriorityClassName != "" {

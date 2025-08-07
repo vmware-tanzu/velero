@@ -59,6 +59,7 @@ type podTemplateConfig struct {
 	repoMaintenanceJobConfigMap     string
 	nodeAgentConfigMap              string
 	itemBlockWorkerCount            int
+	concurrentBackups               int
 	forWindows                      bool
 	kubeletRootDir                  string
 	nodeAgentDisableHostPath        bool
@@ -224,6 +225,12 @@ func WithItemBlockWorkerCount(itemBlockWorkerCount int) podTemplateOption {
 	}
 }
 
+func WithConcurrentBackups(concurrentBackups int) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.concurrentBackups = concurrentBackups
+	}
+}
+
 func WithPriorityClassName(priorityClassName string) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.priorityClassName = priorityClassName
@@ -335,6 +342,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1api.Deployme
 
 	if c.itemBlockWorkerCount > 0 {
 		args = append(args, fmt.Sprintf("--item-block-worker-count=%d", c.itemBlockWorkerCount))
+	}
+
+	if c.concurrentBackups > 0 {
+		args = append(args, fmt.Sprintf("--concurrent-backups=%d", c.concurrentBackups))
 	}
 
 	deployment := &appsv1api.Deployment{
