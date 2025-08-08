@@ -48,11 +48,14 @@ func (c *S3Backend) Setup(ctx context.Context, flags map[string]string, logger l
 	c.options.SessionToken = optionalHaveString(udmrepo.StoreOptionS3Token, flags)
 	c.options.RootCA = optionalHaveBase64(ctx, udmrepo.StoreOptionCACert, flags)
 
+	ctx = udmrepo.WithLogger(ctx, logger)
+
 	c.options.Limits = setupLimits(ctx, flags)
 
 	return nil
 }
 
 func (c *S3Backend) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
+	ctx = udmrepo.WithLogger(ctx, logger)
 	return s3.New(ctx, &c.options, false)
 }

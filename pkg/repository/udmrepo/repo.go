@@ -20,6 +20,8 @@ import (
 	"context"
 	"io"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 type ID string
@@ -155,4 +157,19 @@ type ObjectWriter interface {
 	// Result waits for the completion of the object write.
 	// Result returns the object's unified identifier after the write completes.
 	Result() (ID, error)
+}
+
+type ctxKeyLogger struct{}
+
+// WithLogger returns a new context with the provided logger.
+func WithLogger(ctx context.Context, logger logrus.FieldLogger) context.Context {
+	return context.WithValue(ctx, ctxKeyLogger{}, logger)
+}
+
+// LoggerFromContext retrieves the logger from the context, or returns a default logger if none found.
+func LoggerFromContext(ctx context.Context) logrus.FieldLogger {
+	if logger, ok := ctx.Value(ctxKeyLogger{}).(logrus.FieldLogger); ok && logger != nil {
+		return logger
+	}
+	return logrus.New()
 }

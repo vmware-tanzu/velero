@@ -19,8 +19,6 @@ package azure
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/kopia/kopia/repo/blob"
 	"github.com/kopia/kopia/repo/blob/azure"
 	"github.com/kopia/kopia/repo/blob/throttling"
@@ -34,13 +32,12 @@ const (
 )
 
 func init() {
-	blob.AddSupportedStorage(storageType, Option{Logger: logrus.New()}, NewStorage)
+	blob.AddSupportedStorage(storageType, Option{}, NewStorage)
 }
 
 type Option struct {
 	Config map[string]string `json:"config"     kopia:"sensitive"`
 	Limits throttling.Limits
-	Logger logrus.FieldLogger
 }
 
 type Storage struct {
@@ -58,7 +55,10 @@ func (s *Storage) ConnectionInfo() blob.ConnectionInfo {
 func NewStorage(ctx context.Context, option *Option, isCreate bool) (blob.Storage, error) {
 	cfg := option.Config
 
-	client, _, err := azureutil.NewStorageClient(option.Logger, cfg)
+	// Get logger from context
+	logger := udmrepo.LoggerFromContext(ctx)
+
+	client, _, err := azureutil.NewStorageClient(logger, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +72,8 @@ func NewStorage(ctx context.Context, option *Option, isCreate bool) (blob.Storag
 	if err != nil {
 		return nil, err
 	}
+
+	logger.Info("Successfully created Azure storage backend")
 
 	return &Storage{
 		Option:  option,
