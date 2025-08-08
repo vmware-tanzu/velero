@@ -46,11 +46,14 @@ func (c *GCSBackend) Setup(ctx context.Context, flags map[string]string, logger 
 	c.options.Prefix = optionalHaveString(udmrepo.StoreOptionPrefix, flags)
 	c.options.ReadOnly = optionalHaveBool(ctx, udmrepo.StoreOptionGcsReadonly, flags)
 
+	ctx = udmrepo.WithLogger(ctx, logger)
+
 	c.options.Limits = setupLimits(ctx, flags)
 
 	return nil
 }
 
 func (c *GCSBackend) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
+	ctx = udmrepo.WithLogger(ctx, logger)
 	return gcs.New(ctx, &c.options, false)
 }

@@ -50,6 +50,8 @@ func (c *FsBackend) Setup(ctx context.Context, flags map[string]string, logger l
 	c.options.FileMode = defaultFileMode
 	c.options.DirectoryMode = defaultDirMode
 
+	ctx = udmrepo.WithLogger(ctx, logger)
+
 	c.options.Limits = setupLimits(ctx, flags)
 
 	return nil
@@ -59,6 +61,7 @@ func (c *FsBackend) Connect(ctx context.Context, isCreate bool, logger logrus.Fi
 	if !filepath.IsAbs(c.options.Path) {
 		return nil, errors.Errorf("filesystem repository path is not absolute, path: %s", c.options.Path)
 	}
+	ctx = udmrepo.WithLogger(ctx, logger)
 
 	return filesystem.New(ctx, &c.options, isCreate)
 }
