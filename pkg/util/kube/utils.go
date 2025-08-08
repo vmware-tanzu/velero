@@ -158,7 +158,7 @@ func GetVolumeDirectory(ctx context.Context, log logrus.FieldLogger, pod *corev1
 		// This case implies the administrator created the PV and attached it directly, without PVC.
 		// Note that only one VolumeSource can be populated per Volume on a pod
 		if err == ErrorPodVolumeIsNotPVC {
-			if volume.VolumeSource.CSI != nil {
+			if volume.CSI != nil {
 				return volume.Name + "/mount", nil
 			}
 			return volume.Name, nil
@@ -217,11 +217,11 @@ func GetPodPVCVolume(ctx context.Context, log logrus.FieldLogger, pod *corev1api
 		return nil, nil, nil, errors.New("volume not found in pod")
 	}
 
-	if volume.VolumeSource.PersistentVolumeClaim == nil {
+	if volume.PersistentVolumeClaim == nil {
 		return nil, nil, volume, ErrorPodVolumeIsNotPVC // There is a pod volume but it is not a PVC
 	}
 
-	pvc, err := kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(ctx, volume.VolumeSource.PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
+	pvc, err := kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(ctx, volume.PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, nil, errors.WithStack(err)
 	}

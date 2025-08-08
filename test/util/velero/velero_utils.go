@@ -827,12 +827,12 @@ func GetVsphereSnapshotIDs(ctx context.Context, timeout time.Duration, namespace
 		fmt.Print(stderr)
 		return nil, errors.Wrap(err, "Failed to get vSphere snapshot ID list from snapshots.backupdriver.cnsdp.vmware.com")
 	}
-	stdout = strings.Replace(stdout, "'", "", -1)
+	stdout = strings.ReplaceAll(stdout, "'", "")
 	lines := strings.Split(stdout, "\n")
 	var result []string
 	for _, curLine := range lines {
 		fmt.Println("curLine:" + curLine)
-		curLine = strings.Replace(curLine, "\n", "", -1)
+		curLine = strings.ReplaceAll(curLine, "\n", "")
 		if len(curLine) == 0 {
 			continue
 		}
@@ -869,7 +869,7 @@ func GetVeleroVersion(ctx context.Context, veleroCLI string, clientOnly bool) (s
 		return "", errors.Wrapf(err, "failed to get velero version, stdout=%s, stderr=%s", stdout, stderr)
 	}
 
-	output := strings.Replace(stdout, "\n", " ", -1)
+	output := strings.ReplaceAll(stdout, "\n", " ")
 	fmt.Println("Version:" + output)
 	resultCount := 3
 	regexpRule := `(?i)client\s*:\s*version\s*:\s*(\S+).+server\s*:\s*version\s*:\s*(\S+)`
@@ -971,7 +971,7 @@ func DeleteBackup(ctx context.Context, backupName string, velerocfg *VeleroConfi
 		return errors.Wrapf(err, "Fail to get delete backup, stdout=%s, stderr=%s", stdout, stderr)
 	}
 
-	output := strings.Replace(stdout, "\n", " ", -1)
+	output := strings.ReplaceAll(stdout, "\n", " ")
 	fmt.Println("Backup delete command output:" + output)
 
 	args = []string{"--namespace", velerocfg.VeleroNamespace, "backup", "get", backupName}
@@ -1210,7 +1210,7 @@ func DeleteBslResource(ctx context.Context, veleroCLI string, bslName string) er
 		return errors.Wrapf(err, "Fail to get delete location, stdout=%s, stderr=%s", stdout, stderr)
 	}
 
-	output := strings.Replace(stdout, "\n", " ", -1)
+	output := strings.ReplaceAll(stdout, "\n", " ")
 	fmt.Println("Backup location delete command output:" + output)
 
 	fmt.Println(stdout)
@@ -1229,7 +1229,7 @@ func SnapshotCRsCountShouldBe(ctx context.Context, namespace, backupName string,
 		return errors.Wrap(err, fmt.Sprintf("Failed getting snapshot CR of backup %s in namespace %d", backupName, expectedCount))
 	}
 	count := 0
-	stdout = strings.Replace(stdout, "'", "", -1)
+	stdout = strings.ReplaceAll(stdout, "'", "")
 	arr := strings.Split(stdout, "\n")
 	for _, bn := range arr {
 		fmt.Println("Snapshot CR:" + bn)

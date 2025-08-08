@@ -86,7 +86,7 @@ func (r *backupStorageLocationReconciler) Reconcile(ctx context.Context, req ctr
 	var unavailableErrors []string
 	var location velerov1api.BackupStorageLocation
 
-	log := r.log.WithField("controller", constant.ControllerBackupStorageLocation).WithField(constant.ControllerBackupStorageLocation, req.NamespacedName.String())
+	log := r.log.WithField("controller", constant.ControllerBackupStorageLocation).WithField(constant.ControllerBackupStorageLocation, req.String())
 	log.Debug("Validating availability of BackupStorageLocation")
 
 	locationList, err := storage.ListBackupStorageLocations(r.ctx, r.client, req.Namespace)

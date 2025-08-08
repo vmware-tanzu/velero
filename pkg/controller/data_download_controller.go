@@ -225,7 +225,8 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	if dd.Status.Phase == "" || dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseNew {
+	switch dd.Status.Phase {
+	case "", velerov2alpha1api.DataDownloadPhaseNew:
 		if dd.Spec.Cancel {
 			log.Debugf("Data download is canceled in Phase %s", dd.Status.Phase)
 
@@ -273,7 +274,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Info("Restore is exposed")
 
 		return ctrl.Result{}, nil
-	} else if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseAccepted {
+	case velerov2alpha1api.DataDownloadPhaseAccepted:
 		if peekErr := r.restoreExposer.PeekExposed(ctx, getDataDownloadOwnerObject(dd)); peekErr != nil {
 			r.tryCancelDataDownload(ctx, dd, fmt.Sprintf("found a datadownload %s/%s with expose error: %s. mark it as cancel", dd.Namespace, dd.Name, peekErr))
 			log.Errorf("Cancel dd %s/%s because of expose error %s", dd.Namespace, dd.Name, peekErr)
@@ -284,7 +285,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 
 		return ctrl.Result{}, nil
-	} else if dd.Status.Phase == velerov2alpha1api.DataDownloadPhasePrepared {
+	case velerov2alpha1api.DataDownloadPhasePrepared:
 		log.Infof("Data download is prepared and should be processed by %s (%s)", dd.Status.Node, r.nodeName)
 
 		if dd.Status.Node != r.nodeName {
@@ -376,7 +377,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 
 		return ctrl.Result{}, nil
-	} else if dd.Status.Phase == velerov2alpha1api.DataDownloadPhaseInProgress {
+	case velerov2alpha1api.DataDownloadPhaseInProgress:
 		if dd.Spec.Cancel {
 			if dd.Status.Node != r.nodeName {
 				return ctrl.Result{}, nil
