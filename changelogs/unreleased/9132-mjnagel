@@ -1,0 +1,1 @@
+Add `--upgrade` flag to `install` command, allowing upgrades of existing installs
