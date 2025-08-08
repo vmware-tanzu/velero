@@ -738,9 +738,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.repoManager,
 			s.config.RepoMaintenanceFrequency,
 			s.config.BackupRepoConfig,
-			s.config.KeepLatestMaintenanceJobs,
 			s.config.RepoMaintenanceJobConfig,
-			s.config.PodResources,
 			s.logLevel,
 			s.config.LogFormat,
 		).SetupWithManager(s.mgr); err != nil {

@@ -39,7 +39,6 @@ import (
 	repomokes "github.com/vmware-tanzu/velero/pkg/repository/mocks"
 	repotypes "github.com/vmware-tanzu/velero/pkg/repository/types"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,9 +62,7 @@ func mockBackupRepoReconciler(t *testing.T, mockOn string, arg any, ret ...any) 
 		mgr,
 		testMaintenanceFrequency,
 		"fake-repo-config",
-		3,
 		"",
-		kube.PodResources{},
 		logrus.InfoLevel,
 		nil,
 	)
@@ -176,11 +173,11 @@ func TestCheckNotReadyRepo(t *testing.T) {
 	})
 }
 
-func startMaintenanceJobFail(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
+func startMaintenanceJobFail(client.Client, context.Context, *velerov1api.BackupRepository, string, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
 	return "", errors.New("fake-start-error")
 }
 
-func startMaintenanceJobSucceed(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
+func startMaintenanceJobSucceed(client.Client, context.Context, *velerov1api.BackupRepository, string, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error) {
 	return "fake-job-name", nil
 }
 
@@ -243,7 +240,7 @@ func TestRunMaintenanceIfDue(t *testing.T) {
 	tests := []struct {
 		name                    string
 		repo                    *velerov1api.BackupRepository
-		startJobFunc            func(client.Client, context.Context, *velerov1api.BackupRepository, string, kube.PodResources, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error)
+		startJobFunc            func(client.Client, context.Context, *velerov1api.BackupRepository, string, logrus.Level, *logging.FormatFlag, logrus.FieldLogger) (string, error)
 		waitJobFunc             func(client.Client, context.Context, string, string, logrus.FieldLogger) (velerov1api.BackupRepositoryMaintenanceStatus, error)
 		expectedMaintenanceTime time.Time
 		expectedHistory         []velerov1api.BackupRepositoryMaintenanceStatus
@@ -584,9 +581,7 @@ func TestGetRepositoryMaintenanceFrequency(t *testing.T) {
 				&mgr,
 				test.userDefinedFreq,
 				"",
-				3,
 				"",
-				kube.PodResources{},
 				logrus.InfoLevel,
 				nil,
 			)
@@ -718,11 +713,10 @@ func TestNeedInvalidBackupRepo(t *testing.T) {
 				nil,
 				time.Duration(0),
 				"",
-				3,
 				"",
-				kube.PodResources{},
 				logrus.InfoLevel,
-				nil)
+				nil,
+			)
 
 			need := reconciler.needInvalidBackupRepo(test.oldBSL, test.newBSL)
 			assert.Equal(t, test.expect, need)
@@ -1474,96 +1468,10 @@ func TestGetLastMaintenanceTimeFromHistory(t *testing.T) {
 	}
 }
 
-// This test verify the BackupRepository controller will keep no more jobs
-// than the number of test case's keptJobNumber.
-func TestDeleteOldMaintenanceJob(t *testing.T) {
-	now := time.Now().Round(time.Second)
-
-	tests := []struct {
-		name            string
-		repo            *velerov1api.BackupRepository
-		keptJobNumber   int // The BackupRepository controller's keepLatestMaintenanceJobs parameter
-		expectNil       bool
-		maintenanceJobs []batchv1api.Job
-		bsl             *velerov1api.BackupStorageLocation
-	}{
-		{
-			name: "test maintenance job cleaning when repo is ready",
-			repo: &velerov1api.BackupRepository{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: velerov1api.DefaultNamespace,
-					Name:      "repo",
-				},
-				Spec: velerov1api.BackupRepositorySpec{
-					MaintenanceFrequency:  metav1.Duration{Duration: testMaintenanceFrequency},
-					BackupStorageLocation: "default",
-				},
-				Status: velerov1api.BackupRepositoryStatus{
-					LastMaintenanceTime: &metav1.Time{Time: time.Now()},
-					RecentMaintenance: []velerov1api.BackupRepositoryMaintenanceStatus{
-						{
-							StartTimestamp:    &metav1.Time{Time: now.Add(-time.Minute)},
-							CompleteTimestamp: &metav1.Time{Time: now},
-							Result:            velerov1api.BackupRepositoryMaintenanceSucceeded,
-						},
-					}, Phase: velerov1api.BackupRepositoryPhaseReady,
-				},
-			},
-			keptJobNumber: 1,
-			expectNil:     true,
-			maintenanceJobs: []batchv1api.Job{
-				*builder.ForJob("velero", "job-01").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
-				*builder.ForJob("velero", "job-02").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
-			},
-			bsl: builder.ForBackupStorageLocation("velero", "default").Result(),
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			crClient := velerotest.NewFakeControllerRuntimeClient(t, test.repo, test.bsl)
-			for _, job := range test.maintenanceJobs {
-				require.NoError(t, crClient.Create(t.Context(), &job))
-			}
-
-			repoLocker := repository.NewRepoLocker()
-			mgr := repomanager.NewManager("", crClient, repoLocker, nil, nil, nil)
-
-			reconciler := NewBackupRepoReconciler(
-				velerov1api.DefaultNamespace,
-				velerotest.NewLogger(),
-				crClient,
-				mgr,
-				time.Duration(0),
-				"",
-				test.keptJobNumber,
-				"",
-				kube.PodResources{},
-				logrus.InfoLevel,
-				nil,
-			)
-
-			_, err := reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.repo.Namespace, Name: "repo"}})
-			if test.expectNil {
-				require.NoError(t, err)
-			} else {
-				require.Error(t, err)
-			}
-
-			if len(test.maintenanceJobs) > 0 {
-				jobList := new(batchv1api.JobList)
-				require.NoError(t, reconciler.Client.List(t.Context(), jobList, &client.ListOptions{Namespace: "velero"}))
-				assert.Len(t, jobList.Items, 1)
-			}
-		})
-	}
-}
-
 func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 	tests := []struct {
 		name               string
 		repo               *velerov1api.BackupRepository
-		serverKeepJobs     int
 		expectedKeptJobs   int
 		maintenanceJobs    []batchv1api.Job
 		bsl                *velerov1api.BackupStorageLocation
@@ -1586,7 +1494,6 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 					Phase: velerov1api.BackupRepositoryPhaseReady,
 				},
 			},
-			serverKeepJobs:   3,
 			expectedKeptJobs: 5,
 			maintenanceJobs: []batchv1api.Job{
 				*builder.ForJob("velero", "job-01").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
@@ -1624,7 +1531,6 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 					Phase: velerov1api.BackupRepositoryPhaseReady,
 				},
 			},
-			serverKeepJobs:   3,
 			expectedKeptJobs: 2,
 			maintenanceJobs: []batchv1api.Job{
 				*builder.ForJob("velero", "job-01").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
@@ -1642,34 +1548,6 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 					"test-ns-default-restic": `{"keepLatestMaintenanceJobs": 2}`,
 				},
 			},
-		},
-		{
-			name: "test fallback to CLI parameter when no ConfigMap",
-			repo: &velerov1api.BackupRepository{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: velerov1api.DefaultNamespace,
-					Name:      "repo",
-				},
-				Spec: velerov1api.BackupRepositorySpec{
-					MaintenanceFrequency:  metav1.Duration{Duration: testMaintenanceFrequency},
-					BackupStorageLocation: "default",
-					VolumeNamespace:       "test-ns",
-					RepositoryType:        "restic",
-				},
-				Status: velerov1api.BackupRepositoryStatus{
-					Phase: velerov1api.BackupRepositoryPhaseReady,
-				},
-			},
-			serverKeepJobs:   2,
-			expectedKeptJobs: 2,
-			maintenanceJobs: []batchv1api.Job{
-				*builder.ForJob("velero", "job-01").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
-				*builder.ForJob("velero", "job-02").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
-				*builder.ForJob("velero", "job-03").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
-				*builder.ForJob("velero", "job-04").ObjectMeta(builder.WithLabels(repomaintenance.RepositoryNameLabel, "repo")).Succeeded(1).Result(),
-			},
-			bsl:                builder.ForBackupStorageLocation("velero", "default").Result(),
-			repoMaintenanceJob: nil, // No ConfigMap
 		},
 	}
 
@@ -1700,9 +1578,7 @@ func TestDeleteOldMaintenanceJobWithConfigMap(t *testing.T) {
 				mgr,
 				time.Duration(0),
 				"",
-				test.serverKeepJobs,
 				repoMaintenanceConfigName,
-				kube.PodResources{},
 				logrus.InfoLevel,
 				nil,
 			)
@@ -1759,9 +1635,7 @@ func TestInitializeRepoWithRepositoryTypes(t *testing.T) {
 			mgr,
 			testMaintenanceFrequency,
 			"",
-			3,
 			"",
-			kube.PodResources{},
 			logrus.InfoLevel,
 			nil,
 		)
@@ -1812,9 +1686,7 @@ func TestInitializeRepoWithRepositoryTypes(t *testing.T) {
 			mgr,
 			testMaintenanceFrequency,
 			"",
-			3,
 			"",
-			kube.PodResources{},
 			logrus.InfoLevel,
 			nil,
 		)
@@ -1864,9 +1736,7 @@ func TestInitializeRepoWithRepositoryTypes(t *testing.T) {
 			mgr,
 			testMaintenanceFrequency,
 			"",
-			3,
 			"",
-			kube.PodResources{},
 			logrus.InfoLevel,
 			nil,
 		)

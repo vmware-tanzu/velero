@@ -50,6 +50,12 @@ const (
 	RepositoryNameLabel              = "velero.io/repo-name"
 	GlobalKeyForRepoMaintenanceJobCM = "global"
 	TerminationLogIndicator          = "Repo maintenance error: "
+
+	DefaultKeepLatestMaintenanceJobs = 3
+	DefaultMaintenanceJobCPURequest  = "0"
+	DefaultMaintenanceJobCPULimit    = "0"
+	DefaultMaintenanceJobMemRequest  = "0"
+	DefaultMaintenanceJobMemLimit    = "0"
 )
 
 type JobConfigs struct {
@@ -79,7 +85,8 @@ func GenerateJobName(repo string) string {
 }
 
 // DeleteOldJobs deletes old maintenance jobs and keeps the latest N jobs
-func DeleteOldJobs(cli client.Client, repo string, keep int) error {
+func DeleteOldJobs(cli client.Client, repo string, keep int, logger logrus.FieldLogger) error {
+	logger.Infof("Start to delete old maintenance jobs. %d jobs will be kept.", keep)
 	// Get the maintenance job list by label
 	jobList := &batchv1api.JobList{}
 	err := cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
@@ -289,11 +296,14 @@ func getJobConfig(
 		}
 	}
 
+	logger.Debugf("Didn't find content for repository %s in cm %s", repo.Name, repoMaintenanceJobConfig)
+
 	return result, nil
 }
 
 // GetKeepLatestMaintenanceJobs returns the configured number of maintenance jobs to keep from the JobConfigs.
-// If not configured in the ConfigMap, it returns 0 to indicate using the fallback value.
+// Because the CLI configured Job kept number is deprecated,
+// if not configured in the ConfigMap, it returns default value to indicate using the fallback value.
 func GetKeepLatestMaintenanceJobs(
 	ctx context.Context,
 	client client.Client,
@@ -303,19 +313,19 @@ func GetKeepLatestMaintenanceJobs(
 	repo *velerov1api.BackupRepository,
 ) (int, error) {
 	if repoMaintenanceJobConfig == "" {
-		return 0, nil
+		return DefaultKeepLatestMaintenanceJobs, nil
 	}
 
 	config, err := getJobConfig(ctx, client, logger, veleroNamespace, repoMaintenanceJobConfig, repo)
 	if err != nil {
-		return 0, err
+		return DefaultKeepLatestMaintenanceJobs, err
 	}
 
 	if config != nil && config.KeepLatestMaintenanceJobs != nil {
 		return *config.KeepLatestMaintenanceJobs, nil
 	}
 
-	return 0, nil
+	return DefaultKeepLatestMaintenanceJobs, nil
 }
 
 // WaitJobComplete waits the completion of the specified maintenance job and return the BackupRepositoryMaintenanceStatus
@@ -402,8 +412,15 @@ func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1a
 }
 
 // StartNewJob creates a new maintenance job
-func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.BackupRepository, repoMaintenanceJobConfig string,
-	podResources kube.PodResources, logLevel logrus.Level, logFormat *logging.FormatFlag, logger logrus.FieldLogger) (string, error) {
+func StartNewJob(
+	cli client.Client,
+	ctx context.Context,
+	repo *velerov1api.BackupRepository,
+	repoMaintenanceJobConfig string,
+	logLevel logrus.Level,
+	logFormat *logging.FormatFlag,
+	logger logrus.FieldLogger,
+) (string, error) {
 	bsl := &velerov1api.BackupStorageLocation{}
 	if err := cli.Get(ctx, client.ObjectKey{Namespace: repo.Namespace, Name: repo.Spec.BackupStorageLocation}, bsl); err != nil {
 		return "", errors.WithStack(err)
@@ -433,7 +450,7 @@ func StartNewJob(cli client.Client, ctx context.Context, repo *velerov1api.Backu
 
 	log.Info("Starting maintenance repo")
 
-	maintenanceJob, err := buildJob(cli, ctx, repo, bsl.Name, jobConfig, podResources, logLevel, logFormat, log)
+	maintenanceJob, err := buildJob(cli, ctx, repo, bsl.Name, jobConfig, logLevel, logFormat, log)
 	if err != nil {
 		return "", errors.Wrap(err, "error to build maintenance job")
 	}
@@ -475,7 +492,6 @@ func buildJob(
 	repo *velerov1api.BackupRepository,
 	bslName string,
 	config *JobConfigs,
-	podResources kube.PodResources,
 	logLevel logrus.Level,
 	logFormat *logging.FormatFlag,
 	logger logrus.FieldLogger,
@@ -514,10 +530,10 @@ func buildJob(
 	image := veleroutil.GetVeleroServerImage(deployment)
 
 	// Set resource limits and requests
-	cpuRequest := podResources.CPURequest
-	memRequest := podResources.MemoryRequest
-	cpuLimit := podResources.CPULimit
-	memLimit := podResources.MemoryLimit
+	cpuRequest := DefaultMaintenanceJobCPURequest
+	memRequest := DefaultMaintenanceJobMemRequest
+	cpuLimit := DefaultMaintenanceJobCPULimit
+	memLimit := DefaultMaintenanceJobMemLimit
 	if config != nil && config.PodResources != nil {
 		cpuRequest = config.PodResources.CPURequest
 		memRequest = config.PodResources.MemoryRequest

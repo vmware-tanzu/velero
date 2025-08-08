@@ -9,11 +9,11 @@ import (
 
 func TestGetDefaultConfig(t *testing.T) {
 	config := GetDefaultConfig()
-	assert.Equal(t, "0", config.PodResources.CPULimit)
+	assert.Equal(t, 1, config.ItemBlockWorkerCount)
 }
 
 func TestBindFlags(t *testing.T) {
 	config := GetDefaultConfig()
 	config.BindFlags(pflag.CommandLine)
-	assert.Equal(t, "0", config.PodResources.CPULimit)
+	assert.Equal(t, 1, config.ItemBlockWorkerCount)
 }
