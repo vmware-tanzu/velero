@@ -60,47 +60,63 @@ This can be done by adding multiple entries in the `LoadAffinity` array.
 
 The sample of the ```repo-maintenance-job-configmap``` ConfigMap for the above scenario is as below:
 ``` bash
-cat <<EOF > repo-maintenance-job-config.json
-{
-    "global": {
-        "podResources": {
-            "cpuRequest": "100m",
-            "cpuLimit": "200m",
-            "memoryRequest": "100Mi",
-            "memoryLimit": "200Mi"
+cat <<EOF > repo-maintenance-job-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: repo-maintenance-job-config
+  namespace: velero
+data:
+  global: |
+    {
+      "podResources": {
+        "cpuRequest": "100m",
+        "cpuLimit": "200m",
+        "memoryRequest": "100Mi",
+        "memoryLimit": "200Mi"
+      },
+      "keepLatestMaintenanceJobs": 1,
+      "loadAffinity": [
+        {
+          "nodeSelector": {
+            "matchExpressions": [
+              {
+                "key": "cloud.google.com/machine-family",
+                "operator": "In",
+                "values": [
+                  "e2"
+                ]
+              }
+            ]
+          }
         },
-        "loadAffinity": [
-            {
-                "nodeSelector": {
-                    "matchExpressions": [
-                        {
-                            "key": "cloud.google.com/machine-family",
-                            "operator": "In",
-                            "values": [
-                                "e2"
-                            ]
-                        }
-                    ]          
-                }
-            },
-            {
-                "nodeSelector": {
-                    "matchExpressions": [
-                        {
-                            "key": "topology.kubernetes.io/zone",
-                            "operator": "In",
-                            "values": [
-                                "us-central1-a",
-                                "us-central1-b",
-                                "us-central1-c"
-                            ]
-                        }
-                    ]          
-                }
-            }
-        ]
+        {
+          "nodeSelector": {
+            "matchExpressions": [
+              {
+                "key": "topology.kubernetes.io/zone",
+                "operator": "In",
+                "values": [
+                  "us-central1-a",
+                  "us-central1-b",
+                  "us-central1-c"
+                ]
+              }
+            ]
+          }
+        }
+      ]
     }
-}
+  kibishii-default-kopia: |
+    {
+      "podResources": {
+        "cpuRequest": "200m",
+        "cpuLimit": "400m",
+        "memoryRequest": "200Mi",
+        "memoryLimit": "400Mi"
+      },
+      "keepLatestMaintenanceJobs": 2
+    }
 EOF
 ```
 This sample showcases two affinity configurations:
@@ -110,7 +126,7 @@ The nodes matching one of the two conditions are selected.
 
 To create the configMap, users need to save something like the above sample to a json file and then run below command:
 ```
-kubectl create cm repo-maintenance-job-config -n velero --from-file=repo-maintenance-job-config.json
+kubectl apply -f repo-maintenance-job-config.yaml
 ```
 
 ### Log
