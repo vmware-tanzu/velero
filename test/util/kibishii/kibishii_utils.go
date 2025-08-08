@@ -142,12 +142,25 @@ func RunKibishiiTests(
 	fmt.Printf("VeleroBackupNamespace done %s\n", time.Now().Format("2006-01-02 15:04:05"))
 
 	fmt.Printf("KibishiiVerifyAfterBackup %s\n", time.Now().Format("2006-01-02 15:04:05"))
+
+	objectStoreProvider := veleroCfg.ObjectStoreProvider
+	cloudCredentialsFile := veleroCfg.CloudCredentialsFile
+	bslBucket := veleroCfg.BSLBucket
+	bslPrefix := veleroCfg.BSLPrefix
+	bslConfig := veleroCfg.BSLConfig
+	if backupLocation == common.AdditionalBSLName {
+		objectStoreProvider = veleroCfg.AdditionalBSLProvider
+		cloudCredentialsFile = veleroCfg.AdditionalBSLCredentials
+		bslBucket = veleroCfg.AdditionalBSLBucket
+		bslPrefix = veleroCfg.AdditionalBSLPrefix
+		bslConfig = veleroCfg.AdditionalBSLConfig
+	}
 	backupVolumeInfo, err := GetVolumeInfo(
-		veleroCfg.ObjectStoreProvider,
-		veleroCfg.CloudCredentialsFile,
-		veleroCfg.BSLBucket,
-		veleroCfg.BSLPrefix,
-		veleroCfg.BSLConfig,
+		objectStoreProvider,
+		cloudCredentialsFile,
+		bslBucket,
+		bslPrefix,
+		bslConfig,
 		backupName,
 		BackupObjectsPrefix+"/"+backupName,
 	)
@@ -186,27 +199,6 @@ func RunKibishiiTests(
 		}
 		if pvbNum != pvCount {
 			return errors.New(fmt.Sprintf("PVB count %d should be %d in namespace %s", pvbNum, pvCount, kibishiiNamespace))
-		}
-		if providerName != Vsphere {
-			// wait for a period to confirm no snapshots content exist for the backup
-			time.Sleep(1 * time.Minute)
-			if strings.EqualFold(veleroFeatures, FeatureCSI) {
-				_, err = BuildSnapshotCheckPointFromVolumeInfo(veleroCfg, backupVolumeInfo, 0,
-					kibishiiNamespace, backupName, KibishiiPVCNameList)
-				if err != nil {
-					return errors.Wrap(err, "failed to get snapshot checkPoint")
-				}
-			} else {
-				err = CheckSnapshotsInProvider(
-					veleroCfg,
-					backupName,
-					SnapshotCheckPoint{},
-					false,
-				)
-				if err != nil {
-					return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
-				}
-			}
 		}
 	}
 

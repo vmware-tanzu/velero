@@ -17,6 +17,11 @@ const (
 	WorkerOSWindows string = "windows"
 )
 
+const (
+	DefaultBSLName    string = "default"
+	AdditionalBSLName string = "add-bsl"
+)
+
 type OsCommandLine struct {
 	Cmd  string
 	Args []string
