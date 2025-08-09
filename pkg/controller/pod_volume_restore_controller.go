@@ -56,38 +56,40 @@ import (
 
 func NewPodVolumeRestoreReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
 	counter *exposer.VgdpCounter, nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, podResources corev1api.ResourceRequirements,
-	logger logrus.FieldLogger) *PodVolumeRestoreReconciler {
+	logger logrus.FieldLogger, dataMovePriorityClass string) *PodVolumeRestoreReconciler {
 	return &PodVolumeRestoreReconciler{
-		client:           client,
-		mgr:              mgr,
-		kubeClient:       kubeClient,
-		logger:           logger.WithField("controller", "PodVolumeRestore"),
-		nodeName:         nodeName,
-		clock:            &clocks.RealClock{},
-		podResources:     podResources,
-		dataPathMgr:      dataPathMgr,
-		vgdpCounter:      counter,
-		preparingTimeout: preparingTimeout,
-		resourceTimeout:  resourceTimeout,
-		exposer:          exposer.NewPodVolumeExposer(kubeClient, logger),
-		cancelledPVR:     make(map[string]time.Time),
+		client:                client,
+		mgr:                   mgr,
+		kubeClient:            kubeClient,
+		logger:                logger.WithField("controller", "PodVolumeRestore"),
+		nodeName:              nodeName,
+		clock:                 &clocks.RealClock{},
+		podResources:          podResources,
+		dataPathMgr:           dataPathMgr,
+		vgdpCounter:           counter,
+		preparingTimeout:      preparingTimeout,
+		resourceTimeout:       resourceTimeout,
+		exposer:               exposer.NewPodVolumeExposer(kubeClient, logger),
+		cancelledPVR:          make(map[string]time.Time),
+		dataMovePriorityClass: dataMovePriorityClass,
 	}
 }
 
 type PodVolumeRestoreReconciler struct {
-	client           client.Client
-	mgr              manager.Manager
-	kubeClient       kubernetes.Interface
-	logger           logrus.FieldLogger
-	nodeName         string
-	clock            clocks.WithTickerAndDelayedExecution
-	podResources     corev1api.ResourceRequirements
-	exposer          exposer.PodVolumeExposer
-	dataPathMgr      *datapath.Manager
-	vgdpCounter      *exposer.VgdpCounter
-	preparingTimeout time.Duration
-	resourceTimeout  time.Duration
-	cancelledPVR     map[string]time.Time
+	client                client.Client
+	mgr                   manager.Manager
+	kubeClient            kubernetes.Interface
+	logger                logrus.FieldLogger
+	nodeName              string
+	clock                 clocks.WithTickerAndDelayedExecution
+	podResources          corev1api.ResourceRequirements
+	exposer               exposer.PodVolumeExposer
+	dataPathMgr           *datapath.Manager
+	vgdpCounter           *exposer.VgdpCounter
+	preparingTimeout      time.Duration
+	resourceTimeout       time.Duration
+	cancelledPVR          map[string]time.Time
+	dataMovePriorityClass string
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumerestores,verbs=get;list;watch;create;update;patch;delete
@@ -892,6 +894,8 @@ func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolume
 		HostingPodTolerations: hostingPodTolerations,
 		OperationTimeout:      r.resourceTimeout,
 		Resources:             r.podResources,
+		// Priority class name for the data mover pod, retrieved from node-agent-configmap
+		PriorityClassName: r.dataMovePriorityClass,
 	}
 }
 

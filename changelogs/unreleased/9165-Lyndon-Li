@@ -1,0 +1,1 @@
+Fix issue #9140, add os=windows:NoSchedule toleration for Windows pods

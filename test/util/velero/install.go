@@ -418,11 +418,27 @@ func installVeleroServer(
 		args = append(args, "--sa-annotations", options.ServiceAccountAnnotations.String())
 	}
 
+	if options.ServerPriorityClassName != "" {
+		args = append(args, "--server-priority-class-name", options.ServerPriorityClassName)
+	}
+
+	if options.NodeAgentPriorityClassName != "" {
+		args = append(args, "--node-agent-priority-class-name", options.NodeAgentPriorityClassName)
+	}
+
 	// Only version no older than v1.15 support --backup-repository-configmap.
 	if options.BackupRepoConfigMap != "" &&
 		(semver.Compare(version, "v1.15") >= 0 || version == "main") {
 		fmt.Println("Associate backup repository ConfigMap. The Velero version is ", version)
 		args = append(args, fmt.Sprintf("--backup-repository-configmap=%s", options.BackupRepoConfigMap))
+	}
+
+	if options.RepoMaintenanceJobConfigMap != "" {
+		args = append(args, fmt.Sprintf("--repo-maintenance-job-configmap=%s", options.RepoMaintenanceJobConfigMap))
+	}
+
+	if options.NodeAgentConfigMap != "" {
+		args = append(args, fmt.Sprintf("--node-agent-configmap=%s", options.NodeAgentConfigMap))
 	}
 
 	if err := createVeleroResources(ctx, cli, namespace, args, options); err != nil {

@@ -31,11 +31,15 @@ velero install \
     [--maintenance-job-cpu-request <CPU_REQUEST>] \
     [--maintenance-job-mem-request <MEMORY_REQUEST>] \
     [--maintenance-job-cpu-limit <CPU_LIMIT>] \
-    [--maintenance-job-mem-limit <MEMORY_LIMIT>]
+    [--maintenance-job-mem-limit <MEMORY_LIMIT>] \
+    [--server-priority-class-name <PRIORITY_CLASS_NAME>] \
+    [--node-agent-priority-class-name <PRIORITY_CLASS_NAME>]
 ```
 
 The values for the resource requests and limits flags follow the same format as [Kubernetes resource requirements][3]
 For plugin container images, please refer to our [supported providers][2] page.
+
+The `--server-priority-class-name` and `--node-agent-priority-class-name` flags allow you to set priority classes for the Velero server deployment and node agent daemonset respectively. This can help ensure proper scheduling and eviction behavior in resource-constrained environments. Note that you must create the priority class before installing Velero.
 
 ## Examples
 

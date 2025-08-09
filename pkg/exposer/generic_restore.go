@@ -68,7 +68,10 @@ type GenericRestoreExposeParam struct {
 	RestorePVCConfig nodeagent.RestorePVC
 
 	// LoadAffinity specifies the node affinity of the backup pod
-	LoadAffinity *kube.LoadAffinity
+	LoadAffinity []*kube.LoadAffinity
+
+	// PriorityClassName is the priority class name for the data mover pod
+	PriorityClassName string
 }
 
 // GenericRestoreExposer is the interfaces for a generic restore exposer
@@ -136,6 +139,14 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1ap
 		return errors.Errorf("Target PVC %s/%s has already been bound, abort", param.TargetNamespace, param.TargetPVCName)
 	}
 
+	// Data mover allows the StorageClass name not set for PVC.
+	storageClassName := ""
+	if targetPVC.Spec.StorageClassName != nil {
+		storageClassName = *targetPVC.Spec.StorageClassName
+	}
+
+	affinity := kube.GetLoadAffinityByStorageClass(param.LoadAffinity, storageClassName, curLog)
+
 	restorePod, err := e.createRestorePod(
 		ctx,
 		ownerObject,
@@ -147,7 +158,8 @@ func (e *genericRestoreExposer) Expose(ctx context.Context, ownerObject corev1ap
 		selectedNode,
 		param.Resources,
 		param.NodeOS,
-		param.LoadAffinity,
+		affinity,
+		param.PriorityClassName,
 	)
 	if err != nil {
 		return errors.Wrapf(err, "error to create restore pod")
@@ -414,6 +426,7 @@ func (e *genericRestoreExposer) createRestorePod(
 	resources corev1api.ResourceRequirements,
 	nodeOS string,
 	affinity *kube.LoadAffinity,
+	priorityClassName string,
 ) (*corev1api.Pod, error) {
 	restorePodName := ownerObject.Name
 	restorePVCName := ownerObject.Name
@@ -433,6 +446,11 @@ func (e *genericRestoreExposer) createRestorePod(
 	podInfo, err := getInheritedPodInfo(ctx, e.kubeClient, ownerObject.Namespace, nodeOS)
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get inherited pod info from node-agent")
+	}
+
+	// Log the priority class if it's set
+	if priorityClassName != "" {
+		e.log.Debugf("Setting priority class %q for data mover pod %s", priorityClassName, restorePodName)
 	}
 
 	var gracePeriod int64
@@ -483,12 +501,20 @@ func (e *genericRestoreExposer) createRestorePod(
 		nodeSelector[kube.NodeOSLabel] = kube.NodeOSWindows
 		podOS.Name = kube.NodeOSWindows
 
-		toleration = append(toleration, corev1api.Toleration{
-			Key:      "os",
-			Operator: "Equal",
-			Effect:   "NoSchedule",
-			Value:    "windows",
-		})
+		toleration = append(toleration, []corev1api.Toleration{
+			{
+				Key:      "os",
+				Operator: "Equal",
+				Effect:   "NoSchedule",
+				Value:    "windows",
+			},
+			{
+				Key:      "os",
+				Operator: "Equal",
+				Effect:   "NoExecute",
+				Value:    "windows",
+			},
+		}...)
 	} else {
 		userID := int64(0)
 		securityCtx = &corev1api.PodSecurityContext{
@@ -548,6 +574,7 @@ func (e *genericRestoreExposer) createRestorePod(
 					Resources:     resources,
 				},
 			},
+			PriorityClassName:             priorityClassName,
 			ServiceAccountName:            podInfo.serviceAccount,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Volumes:                       volumes,

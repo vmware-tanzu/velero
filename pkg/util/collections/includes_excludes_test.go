@@ -19,6 +19,8 @@ package collections
 import (
 	"testing"
 
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -741,6 +743,100 @@ func TestGetScopedResourceIncludesExcludes(t *testing.T) {
 	}
 }
 
+func TestScopeIncludesExcludes_CombineWithPolicy(t *testing.T) {
+	apiResources := []*test.APIResource{test.Deployments(), test.Pods(), test.ConfigMaps(), test.Secrets(), test.PVs(), test.CRDs(), test.ServiceAccounts()}
+	tests := []struct {
+		name                    string
+		namespaceScopedIncludes []string
+		namespaceScopedExcludes []string
+		clusterScopedIncludes   []string
+		clusterScopedExcludes   []string
+		policy                  *resourcepolicies.IncludeExcludePolicy
+		verify                  func(sie ScopeIncludesExcludes) bool
+	}{
+		{
+			name:                    "When policy is nil, the original includes excludes filters should not change",
+			namespaceScopedIncludes: []string{"deployments", "pods"},
+			namespaceScopedExcludes: []string{"configmaps"},
+			clusterScopedIncludes:   []string{"persistentvolumes"},
+			clusterScopedExcludes:   []string{"crds"},
+			policy:                  nil,
+			verify: func(sie ScopeIncludesExcludes) bool {
+				return sie.clusterScopedResourceFilter.ShouldInclude("persistentvolumes") &&
+					!sie.clusterScopedResourceFilter.ShouldInclude("crds") &&
+					sie.namespaceScopedResourceFilter.ShouldInclude("deployments") &&
+					!sie.namespaceScopedResourceFilter.ShouldInclude("configmaps")
+			},
+		},
+		{
+			name:                    "policy includes excludes should be merged to the original includes excludes when there's no conflict",
+			namespaceScopedIncludes: []string{"pods"},
+			namespaceScopedExcludes: []string{"configmaps"},
+			clusterScopedIncludes:   []string{},
+			clusterScopedExcludes:   []string{"crds"},
+			policy: &resourcepolicies.IncludeExcludePolicy{
+				IncludedNamespaceScopedResources: []string{"deployments"},
+				ExcludedNamespaceScopedResources: []string{"secrets"},
+				IncludedClusterScopedResources:   []string{"persistentvolumes"},
+				ExcludedClusterScopedResources:   []string{},
+			},
+			verify: func(sie ScopeIncludesExcludes) bool {
+				return sie.clusterScopedResourceFilter.ShouldInclude("persistentvolumes") &&
+					!sie.clusterScopedResourceFilter.ShouldInclude("crds") &&
+					sie.namespaceScopedResourceFilter.ShouldInclude("deployments") &&
+					!sie.namespaceScopedResourceFilter.ShouldInclude("configmaps") &&
+					!sie.namespaceScopedResourceFilter.ShouldInclude("secrets")
+			},
+		},
+		{
+			name:                    "when there are conflicts, the existing includes excludes filters have higher priorities",
+			namespaceScopedIncludes: []string{"pods", "deployments"},
+			namespaceScopedExcludes: []string{"configmaps"},
+			clusterScopedIncludes:   []string{"crds"},
+			clusterScopedExcludes:   []string{"persistentvolumes"},
+			policy: &resourcepolicies.IncludeExcludePolicy{
+				IncludedNamespaceScopedResources: []string{"configmaps"},
+				ExcludedNamespaceScopedResources: []string{"pods", "secrets"},
+				IncludedClusterScopedResources:   []string{"persistentvolumes"},
+				ExcludedClusterScopedResources:   []string{"crds"},
+			},
+			verify: func(sie ScopeIncludesExcludes) bool {
+				return sie.clusterScopedResourceFilter.ShouldInclude("crds") &&
+					!sie.clusterScopedResourceFilter.ShouldInclude("persistentvolumes") &&
+					sie.namespaceScopedResourceFilter.ShouldInclude("pods") &&
+					!sie.namespaceScopedResourceFilter.ShouldInclude("configmaps") &&
+					!sie.namespaceScopedResourceFilter.ShouldInclude("secrets")
+			},
+		},
+		{
+			name:                    "verify the case when there's '*' in the original include filter",
+			namespaceScopedIncludes: []string{"*"},
+			namespaceScopedExcludes: []string{},
+			clusterScopedIncludes:   []string{},
+			clusterScopedExcludes:   []string{},
+			policy: &resourcepolicies.IncludeExcludePolicy{
+				IncludedNamespaceScopedResources: []string{"deployments", "pods"},
+				ExcludedNamespaceScopedResources: []string{"configmaps", "secrets"},
+				IncludedClusterScopedResources:   []string{},
+				ExcludedClusterScopedResources:   []string{},
+			},
+			verify: func(sie ScopeIncludesExcludes) bool {
+				return sie.namespaceScopedResourceFilter.ShouldInclude("configmaps") &&
+					sie.namespaceScopedResourceFilter.ShouldInclude("secrets")
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := logrus.StandardLogger()
+			discoveryHelper := setupDiscoveryClientWithResources(apiResources)
+			sie := GetScopeResourceIncludesExcludes(discoveryHelper, logger, tc.namespaceScopedIncludes, tc.namespaceScopedExcludes, tc.clusterScopedIncludes, tc.clusterScopedExcludes, *NewIncludesExcludes())
+			sie.CombineWithPolicy(tc.policy)
+			assert.True(t, tc.verify(*sie))
+		})
+	}
+}
+
 func TestUseOldResourceFilters(t *testing.T) {
 	tests := []struct {
 		name                  string
@@ -748,9 +844,9 @@ func TestUseOldResourceFilters(t *testing.T) {
 		useOldResourceFilters bool
 	}{
 		{
-			name:                  "backup with no filters should use old filters",
+			name:                  "backup with no filters should use new filters",
 			backup:                *defaultBackup().Result(),
-			useOldResourceFilters: true,
+			useOldResourceFilters: false,
 		},
 		{
 			name:                  "backup with only old filters should use old filters",

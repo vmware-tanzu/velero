@@ -130,19 +130,7 @@ func initDataDownloadReconcilerWithError(t *testing.T, objects []any, needError 
 
 	dataPathMgr := datapath.NewManager(1)
 
-	return NewDataDownloadReconciler(
-		&fakeClient,
-		nil,
-		fakeKubeClient,
-		dataPathMgr,
-		nil,
-		nil,
-		nodeagent.RestorePVC{},
-		corev1api.ResourceRequirements{},
-		"test-node",
-		time.Minute*5,
-		velerotest.NewLogger(),
-		metrics.NewServerMetrics()), nil
+	return NewDataDownloadReconciler(&fakeClient, nil, fakeKubeClient, dataPathMgr, nil, nil, nodeagent.RestorePVC{}, corev1api.ResourceRequirements{}, "test-node", time.Minute*5, velerotest.NewLogger(), metrics.NewServerMetrics(), ""), nil
 }
 
 func TestDataDownloadReconcile(t *testing.T) {
@@ -334,7 +322,7 @@ func TestDataDownloadReconcile(t *testing.T) {
 		{
 			name:        "dd expose failed",
 			dd:          dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
-			targetPVC:   builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			targetPVC:   builder.ForPersistentVolumeClaim("test-ns", "test-pvc").StorageClass("test-sc").Result(),
 			isExposeErr: true,
 			expected:    dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataDownloadPhaseFailed).Message("error to expose snapshot").Result(),
 			expectedErr: "Error to expose restore exposer",
@@ -465,6 +453,12 @@ func TestDataDownloadReconcile(t *testing.T) {
 			expectDataPath:     true,
 			expectCancelRecord: true,
 		},
+		{
+			name:      "pvc StorageClass is nil",
+			dd:        dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Result(),
+			targetPVC: builder.ForPersistentVolumeClaim("test-ns", "test-pvc").Result(),
+			expected:  dataDownloadBuilder().Finalizers([]string{DataUploadDownloadFinalizer}).Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
+		},
 	}
 
 	for _, test := range tests {
@@ -536,9 +530,9 @@ func TestDataDownloadReconcile(t *testing.T) {
 					r.restoreExposer = nil
 				} else {
 					r.restoreExposer = func() exposer.GenericRestoreExposer {
-						ep := exposermockes.NewGenericRestoreExposer(t)
+						ep := exposermockes.NewMockGenericRestoreExposer(t)
 						if test.isExposeErr {
-							ep.On("Expose", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("Error to expose restore exposer"))
+							ep.On("Expose", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("Error to expose restore exposer"))
 						} else if test.notNilExpose {
 							hostingPod := builder.ForPod("test-ns", "test-name").Volumes(&corev1api.Volume{Name: "test-pvc"}).Result()
 							hostingPod.ObjectMeta.SetUID("test-uid")
@@ -699,7 +693,7 @@ func TestOnDataDownloadCompleted(t *testing.T) {
 			needErrs := []bool{test.isGetErr, false, false, false}
 			r, err := initDataDownloadReconciler(t, nil, needErrs...)
 			r.restoreExposer = func() exposer.GenericRestoreExposer {
-				ep := exposermockes.NewGenericRestoreExposer(t)
+				ep := exposermockes.NewMockGenericRestoreExposer(t)
 				if test.rebindVolumeErr {
 					ep.On("RebindVolume", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("Error to rebind volume"))
 				} else {

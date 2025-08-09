@@ -108,12 +108,9 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 	p.log.Infof("Getting VolumesnapshotContent for Volumesnapshot %s/%s",
 		vs.Namespace, vs.Name)
 
-	vsc, err := csi.WaitUntilVSCHandleIsReady(
-		vs,
-		p.crClient,
-		p.log,
-		backup.Spec.CSISnapshotTimeout.Duration,
-	)
+	ctx := context.TODO()
+
+	vsc, err := csi.GetVSCForVS(ctx, vs, p.crClient)
 	if err != nil {
 		csi.CleanupVolumeSnapshot(vs, p.crClient, p.log)
 		return nil, nil, "", nil, errors.WithStack(err)

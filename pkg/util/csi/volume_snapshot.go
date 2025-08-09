@@ -731,3 +731,28 @@ func DiagnoseVSC(vsc *snapshotv1api.VolumeSnapshotContent) string {
 
 	return diag
 }
+
+// GetVSCForVS returns the VolumeSnapshotContent object associated with the VolumeSnapshot.
+func GetVSCForVS(
+	ctx context.Context,
+	vs *snapshotv1api.VolumeSnapshot,
+	client crclient.Client,
+) (*snapshotv1api.VolumeSnapshotContent, error) {
+	if vs.Status == nil || vs.Status.BoundVolumeSnapshotContentName == nil {
+		return nil, errors.Errorf("invalid snapshot info in volume snapshot %s", vs.Name)
+	}
+
+	vsc := new(snapshotv1api.VolumeSnapshotContent)
+
+	if err := client.Get(
+		ctx,
+		crclient.ObjectKey{
+			Name: *vs.Status.BoundVolumeSnapshotContentName,
+		},
+		vsc,
+	); err != nil {
+		return nil, errors.Wrap(err, "error getting volume snapshot content from API")
+	}
+
+	return vsc, nil
+}

@@ -60,41 +60,43 @@ const (
 // NewPodVolumeBackupReconciler creates the PodVolumeBackupReconciler instance
 func NewPodVolumeBackupReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
 	counter *exposer.VgdpCounter, nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, podResources corev1api.ResourceRequirements,
-	metrics *metrics.ServerMetrics, logger logrus.FieldLogger) *PodVolumeBackupReconciler {
+	metrics *metrics.ServerMetrics, logger logrus.FieldLogger, dataMovePriorityClass string) *PodVolumeBackupReconciler {
 	return &PodVolumeBackupReconciler{
-		client:           client,
-		mgr:              mgr,
-		kubeClient:       kubeClient,
-		logger:           logger.WithField("controller", "PodVolumeBackup"),
-		nodeName:         nodeName,
-		clock:            &clocks.RealClock{},
-		metrics:          metrics,
-		podResources:     podResources,
-		dataPathMgr:      dataPathMgr,
-		vgdpCounter:      counter,
-		preparingTimeout: preparingTimeout,
-		resourceTimeout:  resourceTimeout,
-		exposer:          exposer.NewPodVolumeExposer(kubeClient, logger),
-		cancelledPVB:     make(map[string]time.Time),
+		client:                client,
+		mgr:                   mgr,
+		kubeClient:            kubeClient,
+		logger:                logger.WithField("controller", "PodVolumeBackup"),
+		nodeName:              nodeName,
+		clock:                 &clocks.RealClock{},
+		metrics:               metrics,
+		podResources:          podResources,
+		dataPathMgr:           dataPathMgr,
+		vgdpCounter:           counter,
+		preparingTimeout:      preparingTimeout,
+		resourceTimeout:       resourceTimeout,
+		exposer:               exposer.NewPodVolumeExposer(kubeClient, logger),
+		cancelledPVB:          make(map[string]time.Time),
+		dataMovePriorityClass: dataMovePriorityClass,
 	}
 }
 
 // PodVolumeBackupReconciler reconciles a PodVolumeBackup object
 type PodVolumeBackupReconciler struct {
-	client           client.Client
-	mgr              manager.Manager
-	kubeClient       kubernetes.Interface
-	clock            clocks.WithTickerAndDelayedExecution
-	exposer          exposer.PodVolumeExposer
-	metrics          *metrics.ServerMetrics
-	nodeName         string
-	logger           logrus.FieldLogger
-	podResources     corev1api.ResourceRequirements
-	dataPathMgr      *datapath.Manager
-	vgdpCounter      *exposer.VgdpCounter
-	preparingTimeout time.Duration
-	resourceTimeout  time.Duration
-	cancelledPVB     map[string]time.Time
+	client                client.Client
+	mgr                   manager.Manager
+	kubeClient            kubernetes.Interface
+	clock                 clocks.WithTickerAndDelayedExecution
+	exposer               exposer.PodVolumeExposer
+	metrics               *metrics.ServerMetrics
+	nodeName              string
+	logger                logrus.FieldLogger
+	podResources          corev1api.ResourceRequirements
+	dataPathMgr           *datapath.Manager
+	vgdpCounter           *exposer.VgdpCounter
+	preparingTimeout      time.Duration
+	resourceTimeout       time.Duration
+	cancelledPVB          map[string]time.Time
+	dataMovePriorityClass string
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumebackups,verbs=get;list;watch;create;update;patch;delete
@@ -833,6 +835,8 @@ func (r *PodVolumeBackupReconciler) setupExposeParam(pvb *velerov1api.PodVolumeB
 		HostingPodTolerations: hostingPodTolerations,
 		OperationTimeout:      r.resourceTimeout,
 		Resources:             r.podResources,
+		// Priority class name for the data mover pod, retrieved from node-agent-configmap
+		PriorityClassName: r.dataMovePriorityClass,
 	}
 }
 

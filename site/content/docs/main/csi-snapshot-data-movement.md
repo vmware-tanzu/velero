@@ -18,7 +18,11 @@ On the other hand, there are quite some cases that CSI snapshot is not available
 
 CSI Snapshot Data Movement supports both built-in data mover and customized data movers. For the details of how Velero works with customized data movers, check the [Volume Snapshot Data Movement design][1]. Velero provides a built-in data mover which uses Velero built-in uploaders (at present the available uploader is Kopia uploader) to read the snapshot data and write to the Unified Repository (by default implemented by Kopia repository).    
 
-Velero built-in data mover restores both volume data and metadata, so the data mover pods need to run as root user.  
+Velero built-in data mover restores both volume data and metadata, so the data mover pods need to run as root user.
+
+### Priority Class Configuration
+
+For Velero built-in data mover, data mover pods launched during CSI snapshot data movement will use the priority class name configured in the node-agent configmap. The node-agent daemonset itself gets its priority class from the `--node-agent-priority-class-name` flag during Velero installation. This can help ensure proper scheduling behavior in resource-constrained environments. For more details on configuring data mover pod resources, see [Data Movement Pod Resource Configuration][11].
 
 ## Setup CSI Snapshot Data Movement
 
@@ -32,10 +36,11 @@ Velero built-in data mover restores both volume data and metadata, so the data m
 ### Install Velero Node Agent
 
 Velero Node Agent is a Kubernetes daemonset that hosts Velero data movement controllers and launches data mover pods. 
-If you are using Velero built-in data mover, Node Agent must be installed. To install Node Agent, use the `--use-node-agent` flag. 
+If you are using Velero built-in data mover, Node Agent must be installed. To install Node Agent, use the `--use-node-agent` flag.  
+Velero built-in data mover doesn't require the host path for pod volumes into Node Agent pods. The installation by default creates it in order to support fs-backup. If you don't use fs-backup and want to remove it from Node Agent, you can specify the `--node-agent-disable-host-path` flag.  
 
 ```
-velero install --use-node-agent
+velero install --use-node-agent --node-agent-disable-host-path
 ```
 
 ### Configure A Backup Storage Location
@@ -289,7 +294,9 @@ In which manner the `DataUpload`/`DataDownload` CRs are processed is totally dec
 
 For Velero built-in data mover, it uses Kubernetes' scheduler to mount a snapshot volume/restore volume associated to a `DataUpload`/`DataDownload` CR into a specific node, and then the `DataUpload`/`DataDownload` controller (in node-agent daemonset) in that node will handle the `DataUpload`/`DataDownload`.  
 By default, a `DataUpload`/`DataDownload` controller in one node handles one request at a time. You can configure more parallelism per node by [node-agent Concurrency Configuration][14].  
-That is to say, the snapshot volumes/restore volumes may spread in different nodes, then their associated `DataUpload`/`DataDownload` CRs will be processed in parallel; while for the snapshot volumes/restore volumes in the same node, by default, their associated `DataUpload`/`DataDownload` CRs are processed sequentially and can be processed concurrently according to your [node-agent Concurrency Configuration][14].    
+That is to say, the snapshot volumes/restore volumes may spread in different nodes, then their associated `DataUpload`/`DataDownload` CRs will be processed in parallel; while for the snapshot volumes/restore volumes in the same node, by default, their associated `DataUpload`/`DataDownload` CRs are processed sequentially and can be processed concurrently according to your [node-agent Concurrency Configuration][14].  
+
+The prepare process of mounting the snapshot volume/restore volume may generate multiple intermediate objects, to make a control of the intermediate objects, you can configure the [node-agent Prepare Queue Length][20].  
 
 You can check in which node the `DataUpload`/`DataDownload` CRs are processed and their parallelism by watching the `DataUpload`/`DataDownload` CRs:
 
@@ -303,16 +310,14 @@ kubectl -n velero get datadownloads -l velero.io/restore-name=YOUR_RESTORE_NAME 
 
 ### Restart and resume
 When Velero server is restarted, if the resource backup/restore has completed, so the backup/restore has excceded `InProgress` status and is waiting for the completion of the data movements, Velero will recapture the status of the running data movements and resume the execution.  
-When node-agent is restarted, if the `DataUpload`/`DataDownload` is in `InProgress` status, Velero recaptures the status of the running data mover pod and resume the execution.  
-When node-agent is restarted, if the `DataUpload`/`DataDownload` is in `New` or `Prepared` status, the data mover pod has not started, Velero processes it as normal cases, or the restart doesn't affect the execution.  
+When node-agent is restarted, Velero tries to recapture the status of the running data movements and resume the execution; if the resume fails, the data movements are canceled.  
 
 ### Cancellation
 
 At present, Velero backup and restore doesn't support end to end cancellation that is launched by users.  
 However, Velero cancels the `DataUpload`/`DataDownload` in below scenarios automatically:
 - When Velero server is restarted and the backup/restore is in `InProgress` status
-- When node-agent is restarted and the `DataUpload`/`DataDownload` is in `Accepted` status
-- When node-agent is restarted and the resume of an existing `DataUpload`/`DataDownload` that is in `InProgress` status fails  
+- When node-agent is restarted and the resume of an existing `DataUpload`/`DataDownload` fails  
 - When an ongoing backup/restore is deleted
 - When a backup/restore does not finish before the item operation timeout (default value is `4 hours`)
 
@@ -363,7 +368,7 @@ At present, Velero doesn't allow to set `ReadOnlyRootFileSystem` parameter to da
 Both the uploader and repository consume remarkable CPU/memory during the backup/restore, especially for massive small files or large backup size cases.  
 
 For Velero built-in data mover, Velero uses [BestEffort as the QoS][13] for data mover pods (so no CPU/memory request/limit is set), so that backups/restores wouldn't fail due to resource throttling in any cases.  
-If you want to constraint the CPU/memory usage, you need to [Customize Data Mover Pod Resource Limits][11]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][12] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.   
+If you want to constraint the CPU/memory usage, you need to [Customize Data Mover Pod Resource Limits][11]. The CPU/memory consumption is always related to the scale of data to be backed up/restored, refer to [Performance Guidance][12] for more details, so it is highly recommended that you perform your own testing to find the best resource limits for your data.  
 
 During the restore, the repository may also cache data/metadata so as to reduce the network footprint and speed up the restore. The repository uses its own policy to store and clean up the cache.  
 For Kopia repository, the cache is stored in the data mover pod's root file system. Velero allows you to configure a limit of the cache size so that the data mover pod won't be evicted due to running out of the ephemeral storage. For more details, check [Backup Repository Configuration][17]. 
@@ -405,4 +410,5 @@ Sometimes, `RestorePVC` needs to be configured to increase the performance of re
 [17]: backup-repository-configuration.md
 [18]: https://github.com/vmware-tanzu/velero/pull/7576
 [19]: data-movement-restore-pvc-configuration.md
+[20]: node-agent-prepare-queue-length.md
 

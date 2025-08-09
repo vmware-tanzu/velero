@@ -169,7 +169,7 @@ data:
   # class name.
   <old-storage-class>: <new-storage-class>
 ```
-### Changing Pod/Deployment/StatefulSet/DaemonSet/ReplicaSet/ReplicationController/Job/CronJob Image Repositories  
+### Changing Image Repositories  
 Velero can change the image name of pod/deployment/statefulsets/daemonset/replicaset/replicationcontroller/job/cronjob during restores. To configure a image name mapping, create a config map in the Velero namespace like the following:
 
 ```yaml
@@ -213,9 +213,15 @@ data:
   # this will avoid unexpected replacement to the second "dev".
 ```
 
-### Changing PVC selected-node
+### PVC selected-node
 
-Velero can update the selected-node annotation of persistent volume claim during restores, if selected-node doesn't exist in the cluster then it will remove the selected-node annotation from PersistentVolumeClaim. To configure a node mapping, create a config map in the Velero namespace like the following:
+Velero by default removes PVC's `volume.kubernetes.io/selected-node` annotation during restore, so that the restored PVC could be provisioned appropriately according to ```WaitForFirstConsumer``` rules, storage topologies and the restored pod's schedule result, etc.  
+
+For more information of how this selected-node annotation matters to PVC restore, see issue https://github.com/vmware-tanzu/velero/issues/9053.
+
+As an expectation, when you provide the selected-node configuration, Velero sets the annotation to the node in the configuration, if the node doesn't exist in the cluster then the annotation will also be removed.  
+Note: This feature is under deprecation as of Velero 1.15, following Velero deprecation policy. This feature is primarily used to remedy some problems in old Kubernetes versions as described [here](https://github.com/vmware-tanzu/velero/pull/2377). It may not work with the new features of Kubernetes and Velero. For more information, see issue https://github.com/vmware-tanzu/velero/issues/9053 for more information.  
+To configure a selected-node, create a config map in the Velero namespace like the following:
 
 ```yaml
 apiVersion: v1
@@ -239,9 +245,7 @@ data:
   # add 1+ key-value pairs here, where the key is the old
   # node name and the value is the new node name.
   <old-node-name>: <new-node-name>
-```
-
-Note: This feature is deprecated as of Velero 1.15, following Velero deprecation policy. This feature is primarily used to remedy some problems in old Kubernetes versions as described [here](https://github.com/vmware-tanzu/velero/pull/2377). It may not work with the new features of Kubernetes and Velero. E.g., it doesn't work for PVCs with ```WaitForFirstConsumer``` as the ```volumeBindingMode```. These kind of PVCs won't be bound until the pod is scheduled and the scheduler will overwrite the selected-node annotation to the node where the pod is scheduled to.  
+``` 
 
 ## Restoring into a different namespace
 

@@ -13,6 +13,54 @@ Velero data movement backup and restore support to constrain the nodes where it 
 
 Velero introduces a new section in the node-agent ConfigMap, called ```loadAffinity```, through which users can specify the nodes to/not to run data movement, in the affinity and anti-affinity flavors.
 
+**Important**: Currently, only the first element in the `loadAffinity` array is used. Any additional elements after the first one will be ignored. If you need to specify multiple conditions, combine them within a single `loadAffinity` element using both `matchLabels` and `matchExpressions`.
+
+### Example of Incorrect Usage (Multiple Array Elements)
+
+The following configuration will NOT work as intended:
+
+```json
+{
+    "loadAffinity": [
+        {
+            "nodeSelector": {
+                "matchLabels": {
+                    "environment": "production"
+                }
+            }
+        },
+        {
+            "nodeSelector": {
+                "matchLabels": {
+                    "disk-type": "ssd"
+                }
+            }
+        }
+    ]
+}
+```
+
+In this example, you might expect data movement to run only on nodes that are BOTH in production AND have SSD disks. However, **only the first condition (environment=production) will be applied**. The second array element will be completely ignored.
+
+### Correct Usage (Combined Conditions)
+
+To achieve the intended behavior, combine all conditions into a single array element:
+
+```json
+{
+    "loadAffinity": [
+        {
+            "nodeSelector": {
+                "matchLabels": {
+                    "environment": "production",
+                    "disk-type": "ssd"
+                }
+            }
+        }
+    ]
+}
+```
+
 If it is not there, a ConfigMap should be created manually. The ConfigMap should be in the same namespace where Velero is installed. If multiple Velero instances are installed in different namespaces, there should be one ConfigMap in each namespace which applies to node-agent in that namespace only. The name of the ConfigMap should be specified in the node-agent server parameter ```--node-agent-configmap```.
 The node-agent server checks these configurations at startup time. Therefore, users could edit this ConfigMap any time, but in order to make the changes effective, node-agent server needs to be restarted.
 
@@ -87,7 +135,7 @@ Here is a sample of the ConfigMap with ```loadAffinity```:
 
 This example demonstrates how to use both `matchLabels` and `matchExpressions` in the same single LoadAffinity element.
 
-### LoadAffinity interacts with LoadAffinityPerStorageClass
+### LoadAffinity with StorageClass (Note: Only First Element Used)
 
 ``` json
 {

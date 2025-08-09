@@ -96,6 +96,53 @@ Note that if you specify `--colorized=true` as a CLI option it will override
 the config file setting.
 
 
+## Set priority class names for Velero components
+
+You can set priority class names for different Velero components during installation. This allows you to influence the scheduling and eviction behavior of Velero pods, which can be useful in clusters where resource contention is high.
+
+### Priority class configuration options:
+
+1. **Velero server deployment**: Use the `--server-priority-class-name` flag
+2. **Node agent daemonset**: Use the `--node-agent-priority-class-name` flag
+3. **Data mover pods**: Configure through the node-agent configmap (see below)
+4. **Maintenance jobs**: Configure through the repository maintenance job configmap (see below)
+
+```bash
+velero install \
+    --server-priority-class-name=<SERVER_PRIORITY_CLASS> \
+    --node-agent-priority-class-name=<NODE_AGENT_PRIORITY_CLASS>
+```
+
+### Configuring priority classes for data mover pods and maintenance jobs
+
+For data mover pods and maintenance jobs, priority classes are configured through ConfigMaps that must be created before installation:
+
+**Data mover pods** (via node-agent configmap):
+```bash
+kubectl create configmap node-agent-config -n velero --from-file=config.json=/dev/stdin <<EOF
+{
+    "priorityClassName": "low-priority"
+}
+EOF
+
+velero install --node-agent-configmap node-agent-config # ... other flags
+```
+
+**Maintenance jobs** (via repository maintenance job configmap):
+```bash
+kubectl create configmap repo-maintenance-job-config -n velero --from-file=config.json=/dev/stdin <<EOF
+{
+    "global": {
+        "priorityClassName": "low-priority"
+    }
+}
+EOF
+
+velero install --repo-maintenance-job-configmap repo-maintenance-job-config # ... other flags
+```
+
+Note that you need to create the priority classes before installing Velero. For more information on priority classes, see the [Kubernetes documentation on Pod Priority and Preemption](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/).
+
 ## Customize resource requests and limits
 
 At installation, You could set resource requests and limits for the Velero pod, the node-agent pod and the [repository maintenance job][14], if you are using the [File System Backup][3] or [CSI Snapshot Data Movement][12].  

@@ -13,14 +13,12 @@ toc:
         url: /basic-install
       - page: Customize Installation
         url: /customize-installation
-      - page: Upgrade to 1.15
-        url: /upgrade-to-1.15
+      - page: Upgrade to 1.17
+        url: /upgrade-to-1.17
       - page: Supported providers
         url: /supported-providers
       - page: Evaluation install
         url: /contributions/minio
-      - page: File system backup
-        url: /file-system-backup
       - page: Examples
         url: /examples
       - page: Uninstalling
@@ -47,8 +45,12 @@ toc:
         url: /restore-resource-modifiers
       - page: Run in any namespace
         url: /namespace
+      - page: File system backup
+        url: /file-system-backup        
       - page: CSI Support
         url: /csi
+      - page: Volume Group Snapshots
+        url: /volume-group-snapshots
       - page: Backup Repository Configuration
         url: /backup-repository-configuration
       - page: Verifying Self-signed Certificates

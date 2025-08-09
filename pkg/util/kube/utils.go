@@ -53,6 +53,11 @@ const (
 	KubeAnnSelectedNode           = "volume.kubernetes.io/selected-node"
 )
 
+// VolumeSnapshotContentManagedByLabel is applied by the snapshot controller
+// to the VolumeSnapshotContent object in case distributed snapshotting is enabled.
+// The value contains the name of the node that handles the snapshot for the volume local to that node.
+const VolumeSnapshotContentManagedByLabel = "snapshot.storage.kubernetes.io/managed-by"
+
 var ErrorPodVolumeIsNotPVC = errors.New("pod volume is not a PVC")
 
 // NamespaceAndName returns a string in the format <namespace>/<name>

@@ -83,7 +83,7 @@ func RunKibishiiTests(
 ) error {
 	pvCount := len(KibishiiPVCNameList)
 	client := *veleroCfg.ClientToInstallVelero
-	oneHourTimeout, ctxCancel := context.WithTimeout(context.Background(), time.Minute*60)
+	timeOutContext, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer ctxCancel()
 	veleroCLI := veleroCfg.VeleroCLI
 	providerName := veleroCfg.CloudProvider
@@ -97,7 +97,7 @@ func RunKibishiiTests(
 			fmt.Println(errors.Wrapf(err, "failed to delete the namespace %q", kibishiiNamespace))
 		}
 	}
-	if err := CreateNamespace(oneHourTimeout, client, kibishiiNamespace); err != nil {
+	if err := CreateNamespace(timeOutContext, client, kibishiiNamespace); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s to install Kibishii workload", kibishiiNamespace)
 	}
 	defer func() {
@@ -109,7 +109,7 @@ func RunKibishiiTests(
 	}()
 	fmt.Printf("KibishiiPrepareBeforeBackup %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if err := KibishiiPrepareBeforeBackup(
-		oneHourTimeout,
+		timeOutContext,
 		client,
 		providerName,
 		kibishiiNamespace,
@@ -134,7 +134,7 @@ func RunKibishiiTests(
 	BackupCfg.ProvideSnapshotsVolumeParam = veleroCfg.ProvideSnapshotsVolumeParam
 
 	fmt.Printf("VeleroBackupNamespace %s\n", time.Now().Format("2006-01-02 15:04:05"))
-	if err := VeleroBackupNamespace(oneHourTimeout, veleroCLI, veleroNamespace, BackupCfg); err != nil {
+	if err := VeleroBackupNamespace(timeOutContext, veleroCLI, veleroNamespace, BackupCfg); err != nil {
 		RunDebug(context.Background(), veleroCLI, veleroNamespace, backupName, "")
 		return errors.Wrapf(err, "Failed to backup kibishii namespace %s", kibishiiNamespace)
 	}
@@ -161,7 +161,7 @@ func RunKibishiiTests(
 		if veleroCfg.HasVspherePlugin {
 			// Wait for uploads started by the Velero Plugin for vSphere to complete
 			fmt.Println("Waiting for vSphere uploads to complete")
-			if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace, 2); err != nil {
+			if err := WaitForVSphereUploadCompletion(timeOutContext, time.Hour, kibishiiNamespace, 2); err != nil {
 				return errors.Wrapf(err, "Error waiting for uploads to complete")
 			}
 		}
@@ -180,25 +180,14 @@ func RunKibishiiTests(
 			return errors.Wrap(err, "exceed waiting for snapshot created in cloud")
 		}
 	} else {
-		pvbs, err := GetPVB(oneHourTimeout, veleroCfg.VeleroNamespace, kibishiiNamespace)
+		pvbNum, err := BackupPVBNum(timeOutContext, veleroCfg.VeleroNamespace, backupName)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get PVB for namespace %s", kibishiiNamespace)
 		}
-		if len(pvbs) != pvCount {
-			return errors.New(fmt.Sprintf("PVB count %d should be %d in namespace %s", len(pvbs), pvCount, kibishiiNamespace))
+		if pvbNum != pvCount {
+			return errors.New(fmt.Sprintf("PVB count %d should be %d in namespace %s", pvbNum, pvCount, kibishiiNamespace))
 		}
-		if providerName == Vsphere {
-			// Wait for uploads started by the Velero Plugin for vSphere to complete
-			// TODO - remove after upload progress monitoring is implemented
-
-			// TODO[High] - uncomment code block below when vSphere plugin PR #500 is included in release version.
-			//   https://github.com/vmware-tanzu/velero-plugin-for-vsphere/pull/500/
-
-			// fmt.Println("Make sure no vSphere snapshot uploads created")
-			// if err := WaitForVSphereUploadCompletion(oneHourTimeout, time.Hour, kibishiiNamespace, 0); err != nil {
-			// 	return errors.Wrapf(err, "Error get vSphere snapshot uploads")
-			// }
-		} else {
+		if providerName != Vsphere {
 			// wait for a period to confirm no snapshots content exist for the backup
 			time.Sleep(1 * time.Minute)
 			if strings.EqualFold(veleroFeatures, FeatureCSI) {
@@ -227,11 +216,11 @@ func RunKibishiiTests(
 	fmt.Printf("Re-populate volume  %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	for _, pod := range KibishiiPodNameList {
 		// To ensure Kibishii verification result is accurate
-		ClearKibishiiData(oneHourTimeout, kibishiiNamespace, pod, "kibishii", "data")
+		ClearKibishiiData(timeOutContext, kibishiiNamespace, pod, "kibishii", "data")
 
 		CreateFileContent := fileBaseContent + pod
 		err := CreateFileToPod(
-			oneHourTimeout,
+			timeOutContext,
 			kibishiiNamespace,
 			pod,
 			"kibishii",
@@ -244,13 +233,13 @@ func RunKibishiiTests(
 			return errors.Wrapf(err, "failed to create file %s", fileName)
 		}
 	}
-	fmt.Printf("Re-poulate volume done %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Printf("Re-populate volume done %s\n", time.Now().Format("2006-01-02 15:04:05"))
 
 	pvList := []string{}
 	if strings.Contains(veleroCfg.KibishiiDirectory, "sc-reclaim-policy") {
 		// Get leftover PV list for PV cleanup
 		for _, pvc := range KibishiiPVCNameList {
-			pv, err := GetPvName(oneHourTimeout, client, pvc, kibishiiNamespace)
+			pv, err := GetPvName(timeOutContext, client, pvc, kibishiiNamespace)
 			if err != nil {
 				errors.Wrapf(err, "failed to delete namespace %s", kibishiiNamespace)
 			}
@@ -259,7 +248,7 @@ func RunKibishiiTests(
 	}
 
 	fmt.Printf("Simulating a disaster by removing namespace %s %s\n", kibishiiNamespace, time.Now().Format("2006-01-02 15:04:05"))
-	if err := DeleteNamespace(oneHourTimeout, client, kibishiiNamespace, true); err != nil {
+	if err := DeleteNamespace(timeOutContext, client, kibishiiNamespace, true); err != nil {
 		return errors.Wrapf(err, "failed to delete namespace %s", kibishiiNamespace)
 	}
 
@@ -267,35 +256,35 @@ func RunKibishiiTests(
 		// In scenario of CSI PV-retain-policy test, to restore PV of the backed up resource, we should make sure
 		// there are no PVs of the same name left, because in previous test step, PV's reclaim policy is retain,
 		// so PVs are not deleted although workload namespace is destroyed.
-		if err := DeletePVs(oneHourTimeout, *veleroCfg.ClientToInstallVelero, pvList); err != nil {
+		if err := DeletePVs(timeOutContext, *veleroCfg.ClientToInstallVelero, pvList); err != nil {
 			return errors.Wrapf(err, "failed to delete PVs %v", pvList)
 		}
 	}
 
 	if useVolumeSnapshots {
-		// the snapshots of AWS may be still in pending status when do the restore, wait for a while
-		// to avoid this https://github.com/vmware-tanzu/velero/issues/1799
-		// TODO remove this after https://github.com/vmware-tanzu/velero/issues/3533 is fixed
-		fmt.Println("Waiting 5 minutes to make sure the snapshots are ready...")
-		time.Sleep(5 * time.Minute)
+		// NativeSnapshot is not the focus of Velero roadmap now,
+		// and AWS EBS is not covered by E2E test.
+		// Don't need to wait up to 5 minutes.
+		fmt.Println("Waiting 30 seconds to make sure the snapshots are ready...")
+		time.Sleep(30 * time.Second)
 	}
 
 	fmt.Printf("VeleroRestore %s\n", time.Now().Format("2006-01-02 15:04:05"))
-	if err := VeleroRestore(oneHourTimeout, veleroCLI, veleroNamespace, restoreName, backupName, ""); err != nil {
+	if err := VeleroRestore(timeOutContext, veleroCLI, veleroNamespace, restoreName, backupName, ""); err != nil {
 		RunDebug(context.Background(), veleroCLI, veleroNamespace, "", restoreName)
 		return errors.Wrapf(err, "Restore %s failed from backup %s", restoreName, backupName)
 	}
 	if !useVolumeSnapshots && providerName != Vsphere {
-		pvrs, err := GetPVR(oneHourTimeout, veleroCfg.VeleroNamespace, kibishiiNamespace)
+		pvrNum, err := RestorePVRNum(timeOutContext, veleroCfg.VeleroNamespace, restoreName)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get PVR for namespace %s", kibishiiNamespace)
-		} else if len(pvrs) != pvCount {
-			return errors.New(fmt.Sprintf("PVR count %d is not as expected %d", len(pvrs), pvCount))
+		} else if pvrNum != pvCount {
+			return errors.New(fmt.Sprintf("PVR count %d is not as expected %d", pvrNum, pvCount))
 		}
 	}
 
 	fmt.Printf("KibishiiVerifyAfterRestore %s\n", time.Now().Format("2006-01-02 15:04:05"))
-	if err := KibishiiVerifyAfterRestore(client, kibishiiNamespace, oneHourTimeout, DefaultKibishiiData, fileName, veleroCfg.WorkerOS); err != nil {
+	if err := KibishiiVerifyAfterRestore(client, kibishiiNamespace, timeOutContext, DefaultKibishiiData, fileName, veleroCfg.WorkerOS); err != nil {
 		return errors.Wrapf(err, "Error verifying kibishii after restore")
 	}
 
@@ -329,19 +318,13 @@ func installKibishii(
 			return errors.New("vSphere needs to download the Kibishii repository first because it needs to inject some image patch file to work.")
 		}
 
-		// TODO: blackpiglet debug
-		fmt.Printf("targetKustomizeDir %s, workerOS: %s, WorkerOSWindows: %s.\n", targetKustomizeDir, workerOS, common.WorkerOSWindows)
-
 		if workerOS == common.WorkerOSWindows {
 			targetKustomizeDir += "-windows"
-
-			// TODO: blackpiglet debug
-			fmt.Printf("targetKustomizeDir for windows %s\n", targetKustomizeDir)
 		}
 		fmt.Printf("The installed Kibishii Kustomize package directory is %s.\n", targetKustomizeDir)
 	}
 
-	// update kibishi images with image registry proxy if it is set
+	// update kibishii images with image registry proxy if it is set
 	baseDir := resolveBasePath(kibishiiDirectory)
 	fmt.Printf("Using image registry proxy %s to patch Kibishii images. Base Dir: %s\n", imageRegistryProxy, baseDir)
 
