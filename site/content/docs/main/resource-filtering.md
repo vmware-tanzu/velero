@@ -223,17 +223,11 @@ Kubernetes namespace resources to exclude from the backup, formatted as resource
   ```
 
 ## Resource policies
-Velero provides resource policies to filter resources to do backup or restore.
-
-### Supported VolumePolicy actions
-There are three actions supported via the VolumePolicy feature:
-* skip: don't back up the action matching volume's data.
-* snapshot: back up the action matching volume's data by the snapshot way.
-* fs-backup: back up the action matching volumes' data by the fs-backup way.
+Velero provides resource policies to filter resources to do backup, which may contain `includeExcludePolicy` and `volumePolicies`.
 
 ### Creating resource policies
 
-Below is the two-step of using resource policies to skip backup of volume:
+Below is the two-step of using resource policies in backup:
 1. Creating resource policies configmap
 
    Users need to create one configmap in Velero install namespace from a YAML file that defined resource policies. The creating command would be like the below:
@@ -254,6 +248,21 @@ The policies YAML config file would look like this:
     ```yaml
     # currently only supports v1 version
     version: v1
+    # The filters in includeExcludePolicy work the same as the scoped resources filters in the Spec of a Backup 
+    # NOTE: similar to scoped filters in Backup Spec, the includeExcludePolicy does not work with --include-resources, --exclude-resources and --include-cluster-resources filters in Backup.
+    includeExcludePolicy:
+      includedClusterScopedResources:
+        - "crd"
+        - "pv"
+      excludedClusterScopedResources: []
+      includedNamespaceScopedResources:
+        - "pod"
+        - "service"
+        - "deployment"
+        - "pvc"
+      excludedNamespaceScopedResources:
+        - "configmap"
+        - "secret"
     volumePolicies:
     # each policy consists of a list of conditions and an action
     # we could have lots of policies, but if the resource matched the first policy, the latter will be ignored
@@ -303,8 +312,55 @@ The policies YAML config file would look like this:
       action:
         type: skip
     ```
+### IncludeExcludePolicy
+The `includeExcludePolicy` is used to filter resources based on the namespace-scoped and cluster-scoped resources. User can use it 
+to define a group of filters and reuse them across different backups.
 
-### Supported conditions
+For example, user can configmap `my-policy` of resource policies with following content:
+```yaml
+version: v1
+includeExcludePolicy:
+  includedClusterScopedResources:
+    - "crd"
+  excludedClusterScopedResources: []
+  includedNamespaceScopedResources: []
+  excludedNamespaceScopedResources:
+    - "configmap"
+    - "event"
+```
+If the user creates a backup via command like
+```bash
+velero backup create <backup-name> --resource-policies-configmap my-policy --include-namespaces my-workload-ns
+```
+The backup will include all resources in namespace `my-workload-ns` except for `configmap` and `event`, and all CRDs in the cluster.
+
+#### Limitations 
+The `includeExcludePolicy` does not work with `--include-resources`, `--exclude-resources` and `--include-cluster-resources` filters in Backup.
+If the user create the backup with command like `velero backup create my-backup --include-cluster-resources --include-namespaces workload-ns --resource-policies-configmap my-policy`
+the backup will fail with status `FailedValidation`
+
+The filters in `includeExcludePolicy` cannot include `*`.  Only specific resources can be set in the filters.
+
+#### "includeExcludePolicy" .vs. filters in Backup Spec
+User can use the includeExcludePolicy with other _scoped filters_ when creating a backup.  velero will combine the filters
+when it's collecting the resources during the backup.  During this process the filters in the Backup Spec have higher priority.
+For example, if the user use this command to create a backup, reusing the resource policies created in the previous example:
+```bash
+velero backup create <backup-name> --resource-policies-configmap my-policy --include-namespace-scoped-resources * --include-cluster-scoped-resources -apiservices --include-namespaces my-workload-ns
+```
+The backup will include all resources in namespace `my-workload-ns`, including `configmap` and `event`, and all CRDs and
+`apiservices` in the cluster.
+
+### VolumePolicy
+VolumePolicy is a data structure to control how velero handle the volumes matching certain conditions.
+
+#### Supported VolumePolicy actions
+There are three actions supported via the VolumePolicy feature:
+* skip: don't back up the action matching volume's data.
+* snapshot: back up the action matching volume's data by the snapshot way.
+* fs-backup: back up the action matching volumes' data by the fs-backup way.
+
+#### Supported conditions
 
 Currently, Velero supports the volume attributes listed below:
 - capacity: matching volumes have the capacity that falls within this `capacity` range. The capacity value should include the lower value and upper value concatenated by commas, the unit of each value in capacity could be `Ti`, `Gi`, `Mi`, `Ki` etc, which is a standard storage unit in Kubernetes. And it has several combinations below:
@@ -406,11 +462,9 @@ Velero supported conditions and format listed below:
           type: skip
       ```
 
-
-
-### Resource policies rules
-- Velero already has lots of include or exclude filters. the resource policies are the final filters after others include or exclude filters in one backup processing workflow. So if use a defined similar filter like the opt-in approach to backup one pod volume but skip backup of the same pod volume in resource policies, as resource policies are the final filters that are applied, the volume will not be backed up.
-- If volume resource policies conflict with themselves the first matched policy will be respected when many policies are defined.
+#### VolumePolicies rules
+- Velero already has lots of include or exclude filters. the volume policies are the final filters after others include or exclude filters in one backup processing workflow. So if use a defined similar filter like the opt-in approach to backup one pod volume but skip backup of the same pod volume in volume policies, as volume policies are the final filters that are applied, the volume will not be backed up.
+- If volume policies conflict with themselves the first matched policy will be respected when many policies are defined.
 
 #### VolumePolicy priority with existing filters
 * [Includes filters](#includes) and [Excludes filters](#excludes) have the highest priority. The filtered-out resources by them cannot reach to the VolumePolicy.
@@ -419,7 +473,7 @@ Velero supported conditions and format listed below:
 * The `backup.Spec.SnapshotVolumes` has the fourth priority.
 
 #### Support for `fs-backup` and `snapshot` actions via volume policy feature
-- Starting from velero 1.14, the resource policy/volume policy feature has been extended to support more actions like `fs-backup` and `snapshot`.
+- Starting from velero 1.14, the volume policy feature has been extended to support more actions like `fs-backup` and `snapshot`.
 - This feature only extends the action aspect of volume policy and not criteria aspect, the criteria components as described above remain the same.
 - When we are using the volume policy approach for backing up the volumes then the volume policy criteria and action need to be specific and explicit, 
 there is no default behaviour, if a volume matches fs-backup action then fs-backup method will be used for that volume and similarly if the volume matches
