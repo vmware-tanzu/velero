@@ -1,0 +1,6 @@
+### Enhanced Logging Support for UDM Repositories
+
+- Introduced context-based logger utilities (`WithLogger` and `LoggerFromContext`) in `pkg/repository/udmrepo/logging/context.go` to allow passing and retrieving loggers via context.
+- Refactored backend implementations (Azure, GCS, S3, and Filesystem) to use context-based logging instead of passing loggers directly through options or arguments
+
+**PR:** [#9168](https://github.com/vmware-tanzu/velero/pull/9168) - Add context logger utilities for enhanced logging support

@@ -24,6 +24,7 @@ import (
 	"github.com/kopia/kopia/repo/blob/throttling"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/logging"
 	azureutil "github.com/vmware-tanzu/velero/pkg/util/azure"
 )
 
@@ -56,7 +57,7 @@ func NewStorage(ctx context.Context, option *Option, isCreate bool) (blob.Storag
 	cfg := option.Config
 
 	// Get logger from context
-	logger := udmrepo.LoggerFromContext(ctx)
+	logger := logging.LoggerFromContext(ctx)
 
 	client, _, err := azureutil.NewStorageClient(logger, cfg)
 	if err != nil {

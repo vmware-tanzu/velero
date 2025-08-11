@@ -25,6 +25,7 @@ import (
 	"github.com/kopia/kopia/repo/blob/gcs"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/logging"
 )
 
 type GCSBackend struct {
@@ -46,7 +47,7 @@ func (c *GCSBackend) Setup(ctx context.Context, flags map[string]string, logger 
 	c.options.Prefix = optionalHaveString(udmrepo.StoreOptionPrefix, flags)
 	c.options.ReadOnly = optionalHaveBool(ctx, udmrepo.StoreOptionGcsReadonly, flags)
 
-	ctx = udmrepo.WithLogger(ctx, logger)
+	ctx = logging.WithLogger(ctx, logger)
 
 	c.options.Limits = setupLimits(ctx, flags)
 
@@ -54,6 +55,6 @@ func (c *GCSBackend) Setup(ctx context.Context, flags map[string]string, logger 
 }
 
 func (c *GCSBackend) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
-	ctx = udmrepo.WithLogger(ctx, logger)
+	ctx = logging.WithLogger(ctx, logger)
 	return gcs.New(ctx, &c.options, false)
 }
