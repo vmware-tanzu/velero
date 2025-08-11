@@ -156,5 +156,3 @@ type ObjectWriter interface {
 	// Result returns the object's unified identifier after the write completes.
 	Result() (ID, error)
 }
-
-
