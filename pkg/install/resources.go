@@ -272,6 +272,7 @@ type VeleroOptions struct {
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
 	ConcurrentBackups               int
+	PVCForTmp                       string
 	KubeletRootDir                  string
 	NodeAgentDisableHostPath        bool
 	ServerPriorityClassName         string
@@ -364,6 +365,10 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		WithKeepLatestMaintenanceJobs(o.KeepLatestMaintenanceJobs),
 		WithItemBlockWorkerCount(o.ItemBlockWorkerCount),
 		WithConcurrentBackups(o.ConcurrentBackups),
+	}
+
+	if o.PVCForTmp != "" {
+		deployOpts = append(deployOpts, WithPVCForTmp(o.PVCForTmp))
 	}
 
 	if o.ServerPriorityClassName != "" {
