@@ -53,6 +53,7 @@ const (
 var (
 	// DisableableControllers is a list of controllers that can be disabled
 	DisableableControllers = []string{
+		"backup-queue",
 		constant.ControllerBackup,
 		constant.ControllerBackupOperations,
 		constant.ControllerBackupDeletion,
