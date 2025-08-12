@@ -627,6 +627,11 @@ spec:
                       filters that happen as items are processed.
                     type: integer
                 type: object
+              queuePosition:
+                description: |-
+                  QueuePosition is the position of the backup in the queue.
+                  Only relevant when Phase is "Queued"
+                type: integer
               startTimestamp:
                 description: |-
                   StartTimestamp records the time a backup was started.
