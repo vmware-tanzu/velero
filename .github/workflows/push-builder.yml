@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         # The default value is "1" which fetches only a single commit. If we merge PR without squash or rebase,
         # there are at least two commits: the first one is the merge commit and the second one is the real commit
