@@ -581,6 +581,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		constant.ControllerSchedule:            {},
 		constant.ControllerServerStatusRequest: {},
 		constant.ControllerRestoreFinalizer:    {},
+		constant.ControllerBackupQueue:         {},
 	}
 
 	if s.config.RestoreOnly {
@@ -906,6 +907,16 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.ResourceTimeout,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerRestoreFinalizer)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[constant.ControllerBackupQueue]; ok {
+		if err := controller.NewBackupQueueReconciler(
+			s.mgr.GetClient(),
+			s.mgr.GetScheme(),
+			s.logger,
+		).SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupQueue)
 		}
 	}
 
