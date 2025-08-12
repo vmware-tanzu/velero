@@ -1,6 +1,7 @@
 package constant
 
 const (
+	ControllerBackupQueue           = "backup-queue"
 	ControllerBackup                = "backup"
 	ControllerBackupOperations      = "backup-operations"
 	ControllerBackupDeletion        = "backup-deletion"
