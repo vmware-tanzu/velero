@@ -1001,8 +1001,9 @@ func Test_csiSnapshotExposer_createBackupPVC(t *testing.T) {
 
 	backupPVC := corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: velerov1.DefaultNamespace,
-			Name:      "fake-backup",
+			Namespace:   velerov1.DefaultNamespace,
+			Name:        "fake-backup",
+			Annotations: map[string]string{},
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: backup.APIVersion,
@@ -1031,8 +1032,9 @@ func Test_csiSnapshotExposer_createBackupPVC(t *testing.T) {
 
 	backupPVCReadOnly := corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: velerov1.DefaultNamespace,
-			Name:      "fake-backup",
+			Namespace:   velerov1.DefaultNamespace,
+			Name:        "fake-backup",
+			Annotations: map[string]string{},
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: backup.APIVersion,
