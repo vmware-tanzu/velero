@@ -378,6 +378,7 @@ type BackupStatus struct {
 	Phase BackupPhase `json:"phase,omitempty"`
 
 	// QueuePosition is the position of the backup in the queue.
+	// Only relevant when Phase is "Queued"
 	// +optional
 	QueuePosition int `json:"queuePosition,omitempty"`
 
