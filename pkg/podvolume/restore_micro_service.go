@@ -221,7 +221,7 @@ func (r *RestoreMicroService) Shutdown() {
 
 var funcWriteCompletionMark = writeCompletionMark
 
-func (r *RestoreMicroService) OnPvrCompleted(ctx context.Context, namespace string, pvrName string, result datapath.Result) {
+func (r *RestoreMicroService) OnPvrCompleted(_ context.Context, _ string, pvrName string, result datapath.Result) {
 	log := r.logger.WithField("PVR", pvrName)
 
 	err := funcWriteCompletionMark(r.pvr, result.Restore, log)
@@ -251,14 +251,14 @@ func (r *RestoreMicroService) recordPvrFailed(msg string, err error) {
 	}
 }
 
-func (r *RestoreMicroService) OnPvrFailed(ctx context.Context, namespace string, pvrName string, err error) {
+func (r *RestoreMicroService) OnPvrFailed(_ context.Context, _ string, pvrName string, err error) {
 	log := r.logger.WithField("PVR", pvrName)
 	log.WithError(err).Error("Async fs restore data path failed")
 
 	r.recordPvrFailed(fmt.Sprintf("Data path for PVR %s failed", pvrName), err)
 }
 
-func (r *RestoreMicroService) OnPvrCancelled(ctx context.Context, namespace string, pvrName string) {
+func (r *RestoreMicroService) OnPvrCancelled(_ context.Context, _ string, pvrName string) {
 	log := r.logger.WithField("PVR", pvrName)
 	log.Warn("Async fs restore data path canceled")
 
@@ -268,7 +268,7 @@ func (r *RestoreMicroService) OnPvrCancelled(ctx context.Context, namespace stri
 	}
 }
 
-func (r *RestoreMicroService) OnPvrProgress(ctx context.Context, namespace string, pvrName string, progress *uploader.Progress) {
+func (r *RestoreMicroService) OnPvrProgress(_ context.Context, _ string, pvrName string, progress *uploader.Progress) {
 	log := r.logger.WithFields(logrus.Fields{
 		"PVR": pvrName,
 	})

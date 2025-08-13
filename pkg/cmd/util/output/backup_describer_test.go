@@ -460,7 +460,7 @@ func TestDescribeNativeSnapshots(t *testing.T) {
 			d.out.Init(d.buf, 0, 8, 2, ' ', 0)
 			describeNativeSnapshots(d, tc.inputDetails, tc.volumeInfo)
 			d.out.Flush()
-			assert.Equal(t, tc.expect, d.buf.String())
+			assert.Equal(tt, tc.expect, d.buf.String())
 		})
 	}
 }
@@ -628,7 +628,7 @@ func TestCSISnapshots(t *testing.T) {
 			d.out.Init(d.buf, 0, 8, 2, ' ', 0)
 			describeCSISnapshots(d, tc.inputDetails, tc.volumeInfo, tc.legacyInfoSource)
 			d.out.Flush()
-			assert.Equal(t, tc.expect, d.buf.String())
+			assert.Equal(tt, tc.expect, d.buf.String())
 		})
 	}
 }

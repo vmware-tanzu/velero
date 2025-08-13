@@ -790,7 +790,7 @@ func CheckBSL(ctx context.Context, ns string, bslName string) error {
 	return err
 }
 
-func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroConfig) error {
+func PrepareVelero(_ context.Context, caseName string, veleroCfg test.VeleroConfig) error {
 	ready, err := IsVeleroReady(context.Background(), &veleroCfg)
 	if err != nil {
 		fmt.Printf("error in checking velero status with %v", err)

@@ -211,7 +211,7 @@ func TestExpose(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "volumesnapshots",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-delete-error")
 					},
 				},
@@ -235,7 +235,7 @@ func TestExpose(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "volumesnapshotcontents",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-delete-error")
 					},
 				},
@@ -259,7 +259,7 @@ func TestExpose(t *testing.T) {
 				{
 					verb:     "create",
 					resource: "volumesnapshots",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-create-error")
 					},
 				},
@@ -283,7 +283,7 @@ func TestExpose(t *testing.T) {
 				{
 					verb:     "create",
 					resource: "volumesnapshotcontents",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-create-error")
 					},
 				},
@@ -322,7 +322,7 @@ func TestExpose(t *testing.T) {
 				{
 					verb:     "create",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-create-error")
 					},
 				},
@@ -350,7 +350,7 @@ func TestExpose(t *testing.T) {
 				{
 					verb:     "create",
 					resource: "pods",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-create-error")
 					},
 				},

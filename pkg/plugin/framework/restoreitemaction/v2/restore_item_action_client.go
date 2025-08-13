@@ -202,6 +202,6 @@ func (c *RestoreItemActionGRPCClient) AreAdditionalItemsReady(additionalItems []
 
 // This shouldn't be called on the GRPC client since the RestartableRestoreItemAction won't delegate
 // this method
-func (c *RestoreItemActionGRPCClient) Name() string {
+func (*RestoreItemActionGRPCClient) Name() string {
 	return ""
 }

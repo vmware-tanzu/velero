@@ -223,7 +223,7 @@ func TestNewLogsCommand(t *testing.T) {
 		assert.Equal(t, expectedCACert, cacertValue, "BSL cacert should be retrieved correctly")
 
 		// Create a mock HTTP server to serve the log content
-		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			// For logs, we need to gzip the content
 			gzipWriter := gzip.NewWriter(w)
 			defer gzipWriter.Close()

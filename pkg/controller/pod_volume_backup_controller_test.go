@@ -168,7 +168,7 @@ type fakePvbExposer struct {
 	getNil     bool
 }
 
-func (f *fakePvbExposer) Expose(ctx context.Context, ownerObject corev1api.ObjectReference, param exposer.PodVolumeExposeParam) error {
+func (f *fakePvbExposer) Expose(context.Context, corev1api.ObjectReference, exposer.PodVolumeExposeParam) error {
 	if f.exposeErr != nil {
 		return f.exposeErr
 	}
@@ -193,15 +193,15 @@ func (f *fakePvbExposer) GetExposed(context.Context, corev1api.ObjectReference, 
 	return &exposer.ExposeResult{ByPod: exposer.ExposeByPod{HostingPod: pod, VolumeName: pvbName, NodeOS: pNodeOS}}, nil
 }
 
-func (f *fakePvbExposer) PeekExposed(ctx context.Context, ownerObject corev1api.ObjectReference) error {
+func (f *fakePvbExposer) PeekExposed(context.Context, corev1api.ObjectReference) error {
 	return f.peekErr
 }
 
-func (f *fakePvbExposer) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
+func (*fakePvbExposer) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (f *fakePvbExposer) CleanUp(context.Context, corev1api.ObjectReference) {
+func (*fakePvbExposer) CleanUp(context.Context, corev1api.ObjectReference) {
 }
 
 func TestPVBReconcile(t *testing.T) {
@@ -720,7 +720,7 @@ func TestFindPvbForPod(t *testing.T) {
 			name: "no selected label found for pod",
 			pvb:  pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, pvbName).Result(),
-			checkFunc: func(pvb *velerov1api.PodVolumeBackup, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov1api.PodVolumeBackup, requests []reconcile.Request) {
 				// Assert that the function returns a single request
 				assert.Empty(t, requests)
 			},
@@ -728,7 +728,7 @@ func TestFindPvbForPod(t *testing.T) {
 			name: "no matched pod",
 			pvb:  pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, pvbName).Labels(map[string]string{velerov1api.PVBLabel: "non-existing-pvb"}).Result(),
-			checkFunc: func(pvb *velerov1api.PodVolumeBackup, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov1api.PodVolumeBackup, requests []reconcile.Request) {
 				assert.Empty(t, requests)
 			},
 		},
@@ -736,7 +736,7 @@ func TestFindPvbForPod(t *testing.T) {
 			name: "pvb not accepte",
 			pvb:  pvbBuilder().Phase(velerov1api.PodVolumeBackupPhaseInProgress).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, pvbName).Labels(map[string]string{velerov1api.PVBLabel: pvbName}).Result(),
-			checkFunc: func(pvb *velerov1api.PodVolumeBackup, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov1api.PodVolumeBackup, requests []reconcile.Request) {
 				assert.Empty(t, requests)
 			},
 		},
@@ -955,7 +955,7 @@ func (dt *pvbResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler
 	return dt.resumeErr
 }
 
-func (dt *pvbResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, exposer.PodVolumeExposeParam) error {
+func (*pvbResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, exposer.PodVolumeExposeParam) error {
 	return nil
 }
 
@@ -963,15 +963,15 @@ func (dt *pvbResumeTestHelper) GetExposed(context.Context, corev1api.ObjectRefer
 	return dt.exposeResult, dt.getExposeErr
 }
 
-func (dt *pvbResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
+func (*pvbResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
 	return nil
 }
 
-func (dt *pvbResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
+func (*pvbResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (dt *pvbResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference) {}
+func (*pvbResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference) {}
 
 func (dt *pvbResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
 	datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {

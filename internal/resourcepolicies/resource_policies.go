@@ -69,7 +69,7 @@ func (p *IncludeExcludePolicy) Validate() error {
 	return p.validateIncludeExclude(p.IncludedNamespaceScopedResources, p.ExcludedNamespaceScopedResources)
 }
 
-func (p *IncludeExcludePolicy) validateIncludeExclude(includesList, excludesList []string) error {
+func (*IncludeExcludePolicy) validateIncludeExclude(includesList, excludesList []string) error {
 	includes := sets.NewString(includesList...)
 	excludes := sets.NewString(excludesList...)
 

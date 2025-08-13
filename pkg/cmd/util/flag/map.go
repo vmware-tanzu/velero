@@ -94,7 +94,7 @@ func (m *Map) Set(s string) error {
 
 // Type returns a string representation of the
 // Map type.
-func (m *Map) Type() string {
+func (*Map) Type() string {
 	return "mapStringString"
 }
 

@@ -40,7 +40,7 @@ type volumeSnapshotClassBackupItemAction struct {
 // AppliesTo returns information indicating that the
 // VolumeSnapshotClassBackupItemAction action should be invoked
 // to backup VolumeSnapshotClass.
-func (p *volumeSnapshotClassBackupItemAction) AppliesTo() (
+func (*volumeSnapshotClassBackupItemAction) AppliesTo() (
 	velero.ResourceSelector,
 	error,
 ) {
@@ -53,7 +53,7 @@ func (p *volumeSnapshotClassBackupItemAction) AppliesTo() (
 // items any snapshot lister secret that may be referenced in its annotations.
 func (p *volumeSnapshotClassBackupItemAction) Execute(
 	item runtime.Unstructured,
-	backup *velerov1api.Backup,
+	_ *velerov1api.Backup,
 ) (
 	runtime.Unstructured,
 	[]velero.ResourceIdentifier,
@@ -97,22 +97,22 @@ func (p *volumeSnapshotClassBackupItemAction) Execute(
 }
 
 // Name returns the plugin's name.
-func (p *volumeSnapshotClassBackupItemAction) Name() string {
+func (*volumeSnapshotClassBackupItemAction) Name() string {
 	return "VolumeSnapshotClassBackupItemAction"
 }
 
 // Progress is not implemented for VolumeSnapshotClassBackupItemAction
-func (p *volumeSnapshotClassBackupItemAction) Progress(
-	operationID string,
-	backup *velerov1api.Backup,
+func (*volumeSnapshotClassBackupItemAction) Progress(
+	string,
+	*velerov1api.Backup,
 ) (velero.OperationProgress, error) {
 	return velero.OperationProgress{}, nil
 }
 
 // Cancel is not implemented for VolumeSnapshotClassBackupItemAction
-func (p *volumeSnapshotClassBackupItemAction) Cancel(
-	operationID string,
-	backup *velerov1api.Backup,
+func (*volumeSnapshotClassBackupItemAction) Cancel(
+	string,
+	*velerov1api.Backup,
 ) error {
 	return nil
 }

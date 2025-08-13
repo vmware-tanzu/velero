@@ -72,7 +72,7 @@ func (v *volumeTypeCondition) match(s *structuredVolume) bool {
 	return false
 }
 
-func (v *volumeTypeCondition) validate() error {
+func (*volumeTypeCondition) validate() error {
 	// validate by yamlv3
 	return nil
 }

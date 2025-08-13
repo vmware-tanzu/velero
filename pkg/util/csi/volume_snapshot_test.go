@@ -337,7 +337,7 @@ func TestEnsureDeleteVS(t *testing.T) {
 				{
 					verb:     "get",
 					resource: "volumesnapshots",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-get-error")
 					},
 				},
@@ -353,7 +353,7 @@ func TestEnsureDeleteVS(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "volumesnapshots",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, nil
 					},
 				},
@@ -369,7 +369,7 @@ func TestEnsureDeleteVS(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "volumesnapshots",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, nil
 					},
 				},
@@ -435,7 +435,7 @@ func TestEnsureDeleteVSC(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "volumesnapshotcontents",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-delete-error")
 					},
 				},
@@ -450,7 +450,7 @@ func TestEnsureDeleteVSC(t *testing.T) {
 				{
 					verb:     "get",
 					resource: "volumesnapshotcontents",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-get-error")
 					},
 				},
@@ -465,7 +465,7 @@ func TestEnsureDeleteVSC(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "volumesnapshotcontents",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, nil
 					},
 				},
@@ -480,7 +480,7 @@ func TestEnsureDeleteVSC(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "volumesnapshotcontents",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, nil
 					},
 				},
@@ -535,7 +535,7 @@ func TestDeleteVolumeSnapshotContentIfAny(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "volumesnapshotcontents",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-delete-error")
 					},
 				},
@@ -599,7 +599,7 @@ func TestDeleteVolumeSnapshotIfAny(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "volumesnapshots",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-delete-error")
 					},
 				},
@@ -685,7 +685,7 @@ func TestRetainVSC(t *testing.T) {
 				{
 					verb:     "patch",
 					resource: "volumesnapshotcontents",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-patch-error")
 					},
 				},
@@ -769,7 +769,7 @@ func TestRemoveVSCProtect(t *testing.T) {
 				{
 					verb:     "update",
 					resource: "volumesnapshotcontents",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-update-error")
 					},
 				},
@@ -784,7 +784,7 @@ func TestRemoveVSCProtect(t *testing.T) {
 				{
 					verb:     "update",
 					resource: "volumesnapshotcontents",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, &apierrors.StatusError{ErrStatus: metav1.Status{
 							Reason: metav1.StatusReasonConflict,
 						}}

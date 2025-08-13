@@ -81,7 +81,7 @@ func (p *PodMetrics) GetMetrics() map[string]string {
 	return tmpMetrics
 }
 
-func (p *PodMetrics) GetMetricsName() string {
+func (*PodMetrics) GetMetricsName() string {
 	return PodResourceDesc
 }
 

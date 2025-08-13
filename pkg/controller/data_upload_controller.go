@@ -432,7 +432,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{}, nil
 }
 
-func (r *DataUploadReconciler) initCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, res *exposer.ExposeResult, log logrus.FieldLogger) error {
+func (*DataUploadReconciler) initCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, res *exposer.ExposeResult, log logrus.FieldLogger) error {
 	log.Info("Init cancelable dataUpload")
 
 	if err := asyncBR.Init(ctx, nil); err != nil {
@@ -444,7 +444,7 @@ func (r *DataUploadReconciler) initCancelableDataPath(ctx context.Context, async
 	return nil
 }
 
-func (r *DataUploadReconciler) startCancelableDataPath(asyncBR datapath.AsyncBR, du *velerov2alpha1api.DataUpload, res *exposer.ExposeResult, log logrus.FieldLogger) error {
+func (*DataUploadReconciler) startCancelableDataPath(asyncBR datapath.AsyncBR, du *velerov2alpha1api.DataUpload, res *exposer.ExposeResult, log logrus.FieldLogger) error {
 	log.Info("Start cancelable dataUpload")
 
 	if err := asyncBR.StartBackup(datapath.AccessPoint{
@@ -666,17 +666,17 @@ func (r *DataUploadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				CreateFunc: func(event.CreateEvent) bool {
 					return false
 				},
-				DeleteFunc: func(de event.DeleteEvent) bool {
+				DeleteFunc: func(event.DeleteEvent) bool {
 					return false
 				},
-				GenericFunc: func(ge event.GenericEvent) bool {
+				GenericFunc: func(event.GenericEvent) bool {
 					return false
 				},
 			})).
 		Complete(r)
 }
 
-func (r *DataUploadReconciler) findDataUploadForPod(ctx context.Context, podObj client.Object) []reconcile.Request {
+func (r *DataUploadReconciler) findDataUploadForPod(_ context.Context, podObj client.Object) []reconcile.Request {
 	pod := podObj.(*corev1api.Pod)
 	du, err := findDataUploadByPod(r.client, *pod)
 	log := r.logger.WithFields(logrus.Fields{

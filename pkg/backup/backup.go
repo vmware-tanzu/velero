@@ -763,7 +763,7 @@ func (kb *kubernetesBackupper) backupItemBlock(itemBlock *BackupItemBlock) []sch
 	return grList
 }
 
-func (kb *kubernetesBackupper) getItemKey(item itemblock.ItemBlockItem) (itemKey, error) {
+func (*kubernetesBackupper) getItemKey(item itemblock.ItemBlockItem) (itemKey, error) {
 	metadata, err := meta.Accessor(item.Item)
 	if err != nil {
 		return itemKey{}, err
@@ -776,7 +776,7 @@ func (kb *kubernetesBackupper) getItemKey(item itemblock.ItemBlockItem) (itemKey
 	return key, nil
 }
 
-func (kb *kubernetesBackupper) handleItemBlockPreHooks(itemBlock *BackupItemBlock, hookPods []itemblock.ItemBlockItem) ([]itemblock.ItemBlockItem, []itemblock.ItemBlockItem, []error) {
+func (*kubernetesBackupper) handleItemBlockPreHooks(itemBlock *BackupItemBlock, hookPods []itemblock.ItemBlockItem) ([]itemblock.ItemBlockItem, []itemblock.ItemBlockItem, []error) {
 	var successPods []itemblock.ItemBlockItem
 	var failedPods []itemblock.ItemBlockItem
 	var errs []error
@@ -811,7 +811,7 @@ func (kb *kubernetesBackupper) handleItemBlockPostHooks(itemBlock *BackupItemBlo
 }
 
 // wait all PVBs of the item block pods to be processed
-func (kb *kubernetesBackupper) waitUntilPVBsProcessed(ctx context.Context, log logrus.FieldLogger, itemBlock *BackupItemBlock, pods []itemblock.ItemBlockItem) error {
+func (*kubernetesBackupper) waitUntilPVBsProcessed(ctx context.Context, log logrus.FieldLogger, itemBlock *BackupItemBlock, pods []itemblock.ItemBlockItem) error {
 	pvbMap := map[*velerov1api.PodVolumeBackup]bool{}
 	for _, pod := range pods {
 		namespace, name := pod.Item.GetNamespace(), pod.Item.GetName()
@@ -853,7 +853,7 @@ func (kb *kubernetesBackupper) waitUntilPVBsProcessed(ctx context.Context, log l
 	return wait.PollUntilContextCancel(ctx, 5*time.Second, true, checkFunc)
 }
 
-func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper, unstructured *unstructured.Unstructured, preferredGVR schema.GroupVersionResource, itemBlock *BackupItemBlock) bool {
+func (*kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper, unstructured *unstructured.Unstructured, preferredGVR schema.GroupVersionResource, itemBlock *BackupItemBlock) bool {
 	backedUpItem, _, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR, false, false, itemBlock)
 	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
 		log.WithField("name", unstructured.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
@@ -872,7 +872,7 @@ func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.Grou
 	return backedUpItem
 }
 
-func (kb *kubernetesBackupper) finalizeItem(
+func (*kubernetesBackupper) finalizeItem(
 	log logrus.FieldLogger,
 	gr schema.GroupResource,
 	itemBackupper *itemBackupper,
@@ -936,7 +936,7 @@ func (kb *kubernetesBackupper) backupCRD(log logrus.FieldLogger, gr schema.Group
 	kb.backupItem(log, gvr.GroupResource(), itemBackupper, unstructured, gvr, nil)
 }
 
-func (kb *kubernetesBackupper) writeBackupVersion(tw tarWriter) error {
+func (*kubernetesBackupper) writeBackupVersion(tw tarWriter) error {
 	versionFile := filepath.Join(velerov1api.MetadataDir, "version")
 	versionString := fmt.Sprintf("%s\n", BackupFormatVersion)
 

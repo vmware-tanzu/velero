@@ -139,7 +139,7 @@ func TestRestoreExpose(t *testing.T) {
 				{
 					verb:     "create",
 					resource: "pods",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-create-error")
 					},
 				},
@@ -160,7 +160,7 @@ func TestRestoreExpose(t *testing.T) {
 				{
 					verb:     "create",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-create-error")
 					},
 				},
@@ -298,7 +298,7 @@ func TestRebindVolume(t *testing.T) {
 				{
 					verb:     "patch",
 					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-patch-error")
 					},
 				},
@@ -320,7 +320,7 @@ func TestRebindVolume(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "pods",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-delete-error")
 					},
 				},
@@ -342,7 +342,7 @@ func TestRebindVolume(t *testing.T) {
 				{
 					verb:     "delete",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-delete-error")
 					},
 				},
@@ -364,7 +364,7 @@ func TestRebindVolume(t *testing.T) {
 				{
 					verb:     "patch",
 					resource: "persistentvolumeclaims",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						return true, nil, errors.New("fake-patch-error")
 					},
 				},
@@ -386,7 +386,7 @@ func TestRebindVolume(t *testing.T) {
 				{
 					verb:     "patch",
 					resource: "persistentvolumes",
-					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+					reactorFunc: func(clientTesting.Action) (handled bool, ret runtime.Object, err error) {
 						if hookCount == 0 {
 							hookCount++
 							return false, nil, nil

@@ -475,7 +475,7 @@ func (r *PodVolumeRestoreReconciler) onPrepareTimeout(ctx context.Context, pvr *
 	log.Info("PVR has been cleaned up")
 }
 
-func (r *PodVolumeRestoreReconciler) initCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, res *exposer.ExposeResult, log logrus.FieldLogger) error {
+func (*PodVolumeRestoreReconciler) initCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, res *exposer.ExposeResult, log logrus.FieldLogger) error {
 	log.Info("Init cancelable PVR")
 
 	if err := asyncBR.Init(ctx, nil); err != nil {
@@ -487,7 +487,7 @@ func (r *PodVolumeRestoreReconciler) initCancelableDataPath(ctx context.Context,
 	return nil
 }
 
-func (r *PodVolumeRestoreReconciler) startCancelableDataPath(asyncBR datapath.AsyncBR, pvr *velerov1api.PodVolumeRestore, res *exposer.ExposeResult, log logrus.FieldLogger) error {
+func (*PodVolumeRestoreReconciler) startCancelableDataPath(asyncBR datapath.AsyncBR, pvr *velerov1api.PodVolumeRestore, res *exposer.ExposeResult, log logrus.FieldLogger) error {
 	log.Info("Start cancelable PVR")
 
 	if err := asyncBR.StartRestore(pvr.Spec.SnapshotID, datapath.AccessPoint{
@@ -506,7 +506,7 @@ func (r *PodVolumeRestoreReconciler) errorOut(ctx context.Context, pvr *velerov1
 	return ctrl.Result{}, UpdatePVRStatusToFailed(ctx, r.client, pvr, err, msg, r.clock.Now(), log)
 }
 
-func UpdatePVRStatusToFailed(ctx context.Context, c client.Client, pvr *velerov1api.PodVolumeRestore, err error, msg string, time time.Time, log logrus.FieldLogger) error {
+func UpdatePVRStatusToFailed(_ context.Context, c client.Client, pvr *velerov1api.PodVolumeRestore, err error, msg string, time time.Time, log logrus.FieldLogger) error {
 	log.Info("update PVR status to Failed")
 
 	if patchErr := UpdatePVRWithRetry(context.Background(), c, types.NamespacedName{Namespace: pvr.Namespace, Name: pvr.Name}, log,
@@ -617,17 +617,17 @@ func (r *PodVolumeRestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				CreateFunc: func(event.CreateEvent) bool {
 					return false
 				},
-				DeleteFunc: func(de event.DeleteEvent) bool {
+				DeleteFunc: func(_ event.DeleteEvent) bool {
 					return false
 				},
-				GenericFunc: func(ge event.GenericEvent) bool {
+				GenericFunc: func(_ event.GenericEvent) bool {
 					return false
 				},
 			})).
 		Complete(r)
 }
 
-func (r *PodVolumeRestoreReconciler) findPVRForTargetPod(ctx context.Context, pod client.Object) []reconcile.Request {
+func (r *PodVolumeRestoreReconciler) findPVRForTargetPod(_ context.Context, pod client.Object) []reconcile.Request {
 	list := &velerov1api.PodVolumeRestoreList{}
 	options := &client.ListOptions{
 		LabelSelector: labels.Set(map[string]string{
@@ -656,7 +656,7 @@ func (r *PodVolumeRestoreReconciler) findPVRForTargetPod(ctx context.Context, po
 	return requests
 }
 
-func (r *PodVolumeRestoreReconciler) findPVRForRestorePod(ctx context.Context, podObj client.Object) []reconcile.Request {
+func (r *PodVolumeRestoreReconciler) findPVRForRestorePod(_ context.Context, podObj client.Object) []reconcile.Request {
 	pod := podObj.(*corev1api.Pod)
 	pvr, err := findPVRByRestorePod(r.client, *pod)
 

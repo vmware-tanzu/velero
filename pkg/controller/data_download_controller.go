@@ -414,7 +414,7 @@ func (r *DataDownloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func (r *DataDownloadReconciler) initCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, res *exposer.ExposeResult, log logrus.FieldLogger) error {
+func (*DataDownloadReconciler) initCancelableDataPath(ctx context.Context, asyncBR datapath.AsyncBR, res *exposer.ExposeResult, log logrus.FieldLogger) error {
 	log.Info("Init cancelable dataDownload")
 
 	if err := asyncBR.Init(ctx, nil); err != nil {
@@ -426,7 +426,7 @@ func (r *DataDownloadReconciler) initCancelableDataPath(ctx context.Context, asy
 	return nil
 }
 
-func (r *DataDownloadReconciler) startCancelableDataPath(asyncBR datapath.AsyncBR, dd *velerov2alpha1api.DataDownload, res *exposer.ExposeResult, log logrus.FieldLogger) error {
+func (*DataDownloadReconciler) startCancelableDataPath(asyncBR datapath.AsyncBR, dd *velerov2alpha1api.DataDownload, res *exposer.ExposeResult, log logrus.FieldLogger) error {
 	log.Info("Start cancelable dataDownload")
 
 	if err := asyncBR.StartRestore(dd.Spec.SnapshotID, datapath.AccessPoint{
@@ -439,7 +439,7 @@ func (r *DataDownloadReconciler) startCancelableDataPath(asyncBR datapath.AsyncB
 	return nil
 }
 
-func (r *DataDownloadReconciler) OnDataDownloadCompleted(ctx context.Context, namespace string, ddName string, result datapath.Result) {
+func (r *DataDownloadReconciler) OnDataDownloadCompleted(ctx context.Context, namespace string, ddName string, _ datapath.Result) {
 	defer r.dataPathMgr.RemoveAsyncBR(ddName)
 
 	log := r.logger.WithField("datadownload", ddName)
@@ -623,17 +623,17 @@ func (r *DataDownloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				CreateFunc: func(event.CreateEvent) bool {
 					return false
 				},
-				DeleteFunc: func(de event.DeleteEvent) bool {
+				DeleteFunc: func(event.DeleteEvent) bool {
 					return false
 				},
-				GenericFunc: func(ge event.GenericEvent) bool {
+				GenericFunc: func(event.GenericEvent) bool {
 					return false
 				},
 			})).
 		Complete(r)
 }
 
-func (r *DataDownloadReconciler) findSnapshotRestoreForPod(ctx context.Context, podObj client.Object) []reconcile.Request {
+func (r *DataDownloadReconciler) findSnapshotRestoreForPod(_ context.Context, podObj client.Object) []reconcile.Request {
 	pod := podObj.(*corev1api.Pod)
 	dd, err := findDataDownloadByPod(r.client, *pod)
 

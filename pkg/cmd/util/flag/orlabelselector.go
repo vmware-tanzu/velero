@@ -56,6 +56,6 @@ func (ls *OrLabelSelector) Set(s string) error {
 
 // Type returns a string representation of the
 // OrLabelSelector type.
-func (ls *OrLabelSelector) Type() string {
+func (*OrLabelSelector) Type() string {
 	return "orLabelSelector"
 }

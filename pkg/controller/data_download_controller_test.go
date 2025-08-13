@@ -813,7 +813,7 @@ func TestFindDataDownloadForPod(t *testing.T) {
 			name: "no selected label found for pod",
 			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Result(),
-			checkFunc: func(du *velerov2alpha1api.DataDownload, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov2alpha1api.DataDownload, requests []reconcile.Request) {
 				// Assert that the function returns a single request
 				assert.Empty(t, requests)
 			},
@@ -821,7 +821,7 @@ func TestFindDataDownloadForPod(t *testing.T) {
 			name: "no matched pod",
 			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseAccepted).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: "non-existing-datadownload"}).Result(),
-			checkFunc: func(du *velerov2alpha1api.DataDownload, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov2alpha1api.DataDownload, requests []reconcile.Request) {
 				assert.Empty(t, requests)
 			},
 		},
@@ -829,7 +829,7 @@ func TestFindDataDownloadForPod(t *testing.T) {
 			name: "dataDownload not accept",
 			du:   dataDownloadBuilder().Phase(velerov2alpha1api.DataDownloadPhaseInProgress).Result(),
 			pod:  builder.ForPod(velerov1api.DefaultNamespace, dataDownloadName).Labels(map[string]string{velerov1api.DataDownloadLabel: dataDownloadName}).Result(),
-			checkFunc: func(du *velerov2alpha1api.DataDownload, requests []reconcile.Request) {
+			checkFunc: func(_ *velerov2alpha1api.DataDownload, requests []reconcile.Request) {
 				assert.Empty(t, requests)
 			},
 		},
@@ -1057,7 +1057,7 @@ func (dt *ddResumeTestHelper) resumeCancellableDataPath(_ *DataUploadReconciler,
 	return dt.resumeErr
 }
 
-func (dt *ddResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, exposer.GenericRestoreExposeParam) error {
+func (*ddResumeTestHelper) Expose(context.Context, corev1api.ObjectReference, exposer.GenericRestoreExposeParam) error {
 	return nil
 }
 
@@ -1065,19 +1065,19 @@ func (dt *ddResumeTestHelper) GetExposed(context.Context, corev1api.ObjectRefere
 	return dt.exposeResult, dt.getExposeErr
 }
 
-func (dt *ddResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
+func (*ddResumeTestHelper) PeekExposed(context.Context, corev1api.ObjectReference) error {
 	return nil
 }
 
-func (dt *ddResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
+func (*ddResumeTestHelper) DiagnoseExpose(context.Context, corev1api.ObjectReference) string {
 	return ""
 }
 
-func (dt *ddResumeTestHelper) RebindVolume(context.Context, corev1api.ObjectReference, string, string, time.Duration) error {
+func (*ddResumeTestHelper) RebindVolume(context.Context, corev1api.ObjectReference, string, string, time.Duration) error {
 	return nil
 }
 
-func (dt *ddResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference) {}
+func (*ddResumeTestHelper) CleanUp(context.Context, corev1api.ObjectReference) {}
 
 func (dt *ddResumeTestHelper) newMicroServiceBRWatcher(kbclient.Client, kubernetes.Interface, manager.Manager, string, string, string, string, string, string,
 	datapath.Callbacks, logrus.FieldLogger) datapath.AsyncBR {

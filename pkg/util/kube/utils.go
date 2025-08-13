@@ -202,7 +202,7 @@ func GetVolumeMode(ctx context.Context, log logrus.FieldLogger, pod *corev1api.P
 
 // GetPodPVCVolume gets the PVC, PV and volume for a pod volume name.
 // Returns pod volume in case of ErrorPodVolumeIsNotPVC error
-func GetPodPVCVolume(ctx context.Context, log logrus.FieldLogger, pod *corev1api.Pod, volumeName string, kubeClient kubernetes.Interface) (
+func GetPodPVCVolume(ctx context.Context, _ logrus.FieldLogger, pod *corev1api.Pod, volumeName string, kubeClient kubernetes.Interface) (
 	*corev1api.PersistentVolumeClaim, *corev1api.PersistentVolume, *corev1api.Volume, error) {
 	var volume *corev1api.Volume
 
