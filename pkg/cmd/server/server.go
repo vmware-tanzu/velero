@@ -669,6 +669,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.config.MaxConcurrentK8SConnections,
 			s.config.DefaultSnapshotMoveData,
 			s.config.ItemBlockWorkerCount,
+			s.config.ConcurrentBackups,
 			s.crClient,
 		).SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackup)
