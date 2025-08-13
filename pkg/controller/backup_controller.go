@@ -105,6 +105,7 @@ type backupReconciler struct {
 	defaultSnapshotMoveData     bool
 	globalCRClient              kbclient.Client
 	itemBlockWorkerCount        int
+	concurrentBackups           int
 	workerPool                  *pkgbackup.ItemBlockWorkerPool
 }
 
@@ -132,6 +133,7 @@ func NewBackupReconciler(
 	maxConcurrentK8SConnections int,
 	defaultSnapshotMoveData bool,
 	itemBlockWorkerCount int,
+	concurrentBackups int,
 	globalCRClient kbclient.Client,
 ) *backupReconciler {
 	b := &backupReconciler{
@@ -159,6 +161,7 @@ func NewBackupReconciler(
 		maxConcurrentK8SConnections: maxConcurrentK8SConnections,
 		defaultSnapshotMoveData:     defaultSnapshotMoveData,
 		itemBlockWorkerCount:        itemBlockWorkerCount,
+		concurrentBackups:           concurrentBackups,
 		globalCRClient:              globalCRClient,
 		workerPool:                  pkgbackup.StartItemBlockWorkerPool(ctx, itemBlockWorkerCount, logger),
 	}
