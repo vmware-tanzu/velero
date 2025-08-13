@@ -30,8 +30,9 @@ import (
 // backupQueueReconciler reconciles a Backup object
 type backupQueueReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	logger logrus.FieldLogger
+	Scheme            *runtime.Scheme
+	logger            logrus.FieldLogger
+	concurrentBackups int
 }
 
 // NewBackupQueueReconciler returns a new backupQueueReconciler
@@ -39,11 +40,13 @@ func NewBackupQueueReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
 	logger logrus.FieldLogger,
+	concurrentBackups int,
 ) *backupQueueReconciler {
 	return &backupQueueReconciler{
-		Client: client,
-		Scheme: scheme,
-		logger: logger,
+		Client:            client,
+		Scheme:            scheme,
+		logger:            logger,
+		concurrentBackups: concurrentBackups,
 	}
 }
 

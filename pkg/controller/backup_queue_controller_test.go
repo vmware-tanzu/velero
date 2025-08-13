@@ -47,7 +47,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 	logger := logrus.New()
 	log := logger.WithField("controller", "backup-queue-test")
 
-	r := NewBackupQueueReconciler(fakeClient, scheme, log)
+	r := NewBackupQueueReconciler(fakeClient, scheme, log, 1)
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: "velero",
