@@ -118,7 +118,7 @@ func TestDeleteOldJobs(t *testing.T) {
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	// Call the function
-	err := DeleteOldJobs(cli, repo, keep)
+	err := DeleteOldJobs(cli, repo, keep, velerotest.NewLogger())
 	require.NoError(t, err)
 
 	// Get the remaining jobs
@@ -388,6 +388,7 @@ func TestGetResultFromJob(t *testing.T) {
 }
 
 func TestGetJobConfig(t *testing.T) {
+	keepLatestMaintenanceJobs := 1
 	ctx := t.Context()
 	logger := logrus.New()
 	veleroNamespace := "velero"
@@ -505,11 +506,12 @@ func TestGetJobConfig(t *testing.T) {
 					Name:      repoMaintenanceJobConfig,
 				},
 				Data: map[string]string{
-					GlobalKeyForRepoMaintenanceJobCM: "{\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
+					GlobalKeyForRepoMaintenanceJobCM: "{\"keepLatestMaintenanceJobs\":1,\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
 					"test-default-kopia":             "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}]}",
 				},
 			},
 			expectedConfig: &JobConfigs{
+				KeepLatestMaintenanceJobs: &keepLatestMaintenanceJobs,
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					CPULimit:      "200m",
@@ -1099,7 +1101,6 @@ func TestBuildJob(t *testing.T) {
 				param.BackupRepo,
 				param.BackupLocation.Name,
 				tc.m,
-				*tc.m.PodResources,
 				tc.logLevel,
 				tc.logFormat,
 				logrus.New(),
@@ -1179,7 +1180,7 @@ func TestGetKeepLatestMaintenanceJobs(t *testing.T) {
 			repoMaintenanceJobConfig: "",
 			configMap:                nil,
 			repo:                     mockBackupRepo(),
-			expectedValue:            0,
+			expectedValue:            3,
 			expectError:              false,
 		},
 		{
@@ -1187,7 +1188,7 @@ func TestGetKeepLatestMaintenanceJobs(t *testing.T) {
 			repoMaintenanceJobConfig: "non-existent-config",
 			configMap:                nil,
 			repo:                     mockBackupRepo(),
-			expectedValue:            0,
+			expectedValue:            3,
 			expectError:              false,
 		},
 		{
@@ -1236,7 +1237,7 @@ func TestGetKeepLatestMaintenanceJobs(t *testing.T) {
 				},
 			},
 			repo:          mockBackupRepo(),
-			expectedValue: 0,
+			expectedValue: 3,
 			expectError:   false,
 		},
 		{
@@ -1252,7 +1253,7 @@ func TestGetKeepLatestMaintenanceJobs(t *testing.T) {
 				},
 			},
 			repo:          mockBackupRepo(),
-			expectedValue: 0,
+			expectedValue: 3,
 			expectError:   true,
 		},
 	}
@@ -1467,18 +1468,12 @@ func TestBuildJobWithPriorityClassName(t *testing.T) {
 			jobConfig := &JobConfigs{
 				PriorityClassName: tc.priorityClassName,
 			}
-			podResources := kube.PodResources{
-				CPURequest:    "100m",
-				MemoryRequest: "128Mi",
-				CPULimit:      "200m",
-				MemoryLimit:   "256Mi",
-			}
 			logLevel := logrus.InfoLevel
 			logFormat := logging.NewFormatFlag()
 			logFormat.Set("text")
 
 			// Call buildJob
-			job, err := buildJob(client, t.Context(), repo, "default", jobConfig, podResources, logLevel, logFormat, logrus.New())
+			job, err := buildJob(client, t.Context(), repo, "default", jobConfig, logLevel, logFormat, logrus.New())
 			require.NoError(t, err)
 
 			// Verify the priority class name is set correctly

@@ -340,12 +340,20 @@ func (e *podVolumeExposer) createHostingPod(ctx context.Context, ownerObject cor
 		nodeSelector[kube.NodeOSLabel] = kube.NodeOSWindows
 		podOS.Name = kube.NodeOSWindows
 
-		toleration = append(toleration, corev1api.Toleration{
-			Key:      "os",
-			Operator: "Equal",
-			Effect:   "NoSchedule",
-			Value:    "windows",
-		})
+		toleration = append(toleration, []corev1api.Toleration{
+			{
+				Key:      "os",
+				Operator: "Equal",
+				Effect:   "NoSchedule",
+				Value:    "windows",
+			},
+			{
+				Key:      "os",
+				Operator: "Equal",
+				Effect:   "NoExecute",
+				Value:    "windows",
+			},
+		}...)
 	} else {
 		userID := int64(0)
 		securityCtx = &corev1api.PodSecurityContext{
