@@ -289,6 +289,10 @@ type BackupVolumesInformation struct {
 	PodVolumeBackups       []*velerov1api.PodVolumeBackup
 	BackupOperations       []*itemoperation.BackupOperation
 	BackupName             string
+
+	// Cache for pod-to-PVC mappings to avoid O(N*M) performance issues
+	// Format: namespace -> podName -> []pvcNames
+	podToPVCCache map[string]map[string][]string
 }
 
 type pvcPvInfo struct {
@@ -302,6 +306,7 @@ func (v *BackupVolumesInformation) Init() {
 		data: make(map[string]pvcPvInfo),
 	}
 	v.volumeInfos = make([]*BackupVolumeInfo, 0)
+	v.podToPVCCache = make(map[string]map[string][]string)
 }
 
 func (v *BackupVolumesInformation) InsertPVMap(pv corev1api.PersistentVolume, pvcName, pvcNamespace string) {
@@ -309,6 +314,72 @@ func (v *BackupVolumesInformation) InsertPVMap(pv corev1api.PersistentVolume, pv
 		v.Init()
 	}
 	v.pvMap.insert(pv, pvcName, pvcNamespace)
+}
+
+// BuildPodToPVCCache builds a cache of pod-to-PVC mappings for the given namespaces
+// to avoid O(N*M) performance issues when checking volume policies.
+func (v *BackupVolumesInformation) BuildPodToPVCCache(ctx context.Context, namespaces []string) error {
+	if v.podToPVCCache == nil {
+		v.podToPVCCache = make(map[string]map[string][]string)
+	}
+
+	for _, namespace := range namespaces {
+		podList := &corev1api.PodList{}
+		if err := v.crClient.List(ctx, podList, &kbclient.ListOptions{Namespace: namespace}); err != nil {
+			return errors.Wrapf(err, "failed to list pods in namespace %s", namespace)
+		}
+
+		nsCache := make(map[string][]string)
+		for _, pod := range podList.Items {
+			pvcNames := make([]string, 0)
+			for _, volume := range pod.Spec.Volumes {
+				if volume.PersistentVolumeClaim != nil {
+					pvcNames = append(pvcNames, volume.PersistentVolumeClaim.ClaimName)
+				}
+			}
+			if len(pvcNames) > 0 {
+				nsCache[pod.Name] = pvcNames
+			}
+		}
+		v.podToPVCCache[namespace] = nsCache
+	}
+
+	return nil
+}
+
+// GetPodsUsingPVCFromCache returns pods that use the specified PVC using the cached data.
+// This avoids the O(N*M) performance issue of repeatedly listing all pods.
+func (v *BackupVolumesInformation) GetPodsUsingPVCFromCache(pvcNamespace, pvcName string) ([]corev1api.Pod, error) {
+	nsCache, exists := v.podToPVCCache[pvcNamespace]
+	if !exists {
+		return nil, errors.Errorf("pod cache not built for namespace %s", pvcNamespace)
+	}
+
+	var podsUsingPVC []corev1api.Pod
+	for podName, pvcNames := range nsCache {
+		for _, cachedPVCName := range pvcNames {
+			if cachedPVCName == pvcName {
+				// We need to get the actual pod object
+				pod := &corev1api.Pod{}
+				if err := v.crClient.Get(context.TODO(), kbclient.ObjectKey{
+					Namespace: pvcNamespace,
+					Name:      podName,
+				}, pod); err != nil {
+					v.logger.WithError(err).Warnf("failed to get pod %s/%s from cache", pvcNamespace, podName)
+					continue
+				}
+				podsUsingPVC = append(podsUsingPVC, *pod)
+				break
+			}
+		}
+	}
+
+	return podsUsingPVC, nil
+}
+
+// GetPodToPVCCache returns the pod-to-PVC cache for performance optimization
+func (v *BackupVolumesInformation) GetPodToPVCCache() map[string]map[string][]string {
+	return v.podToPVCCache
 }
 
 func (v *BackupVolumesInformation) Result(

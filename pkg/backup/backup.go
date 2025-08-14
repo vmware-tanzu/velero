@@ -358,6 +358,18 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(items)}
 
+	volumeHelper := volumehelper.NewVolumeHelperImpl(
+		backupRequest.ResPolicies,
+		backupRequest.Spec.SnapshotVolumes,
+		log,
+		kb.kbClient,
+		boolptr.IsSetToTrue(backupRequest.Spec.DefaultVolumesToFsBackup),
+		!backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()),
+	)
+
+	// Set the pod-to-PVC cache for performance optimization
+	volumeHelper.SetPodToPVCCache(backupRequest.VolumesInformation.GetPodToPVCCache())
+
 	itemBackupper := &itemBackupper{
 		backupRequest:            backupRequest,
 		tarWriter:                tw,
@@ -370,15 +382,8 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		itemHookHandler: &hook.DefaultItemHookHandler{
 			PodCommandExecutor: kb.podCommandExecutor,
 		},
-		hookTracker: hook.NewHookTracker(),
-		volumeHelperImpl: volumehelper.NewVolumeHelperImpl(
-			backupRequest.ResPolicies,
-			backupRequest.Spec.SnapshotVolumes,
-			log,
-			kb.kbClient,
-			boolptr.IsSetToTrue(backupRequest.Spec.DefaultVolumesToFsBackup),
-			!backupRequest.ResourceIncludesExcludes.ShouldInclude(kuberesource.PersistentVolumeClaims.String()),
-		),
+		hookTracker:         hook.NewHookTracker(),
+		volumeHelperImpl:    volumeHelper,
 		kubernetesBackupper: kb,
 	}
 
