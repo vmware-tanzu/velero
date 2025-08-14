@@ -24,7 +24,7 @@ import (
 	"github.com/kopia/kopia/repo/blob/throttling"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/logging"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/logging"
 	azureutil "github.com/vmware-tanzu/velero/pkg/util/azure"
 )
 

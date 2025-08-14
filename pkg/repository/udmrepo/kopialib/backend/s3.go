@@ -25,7 +25,7 @@ import (
 	"github.com/kopia/kopia/repo/blob/s3"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/logging"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/logging"
 )
 
 type S3Backend struct {

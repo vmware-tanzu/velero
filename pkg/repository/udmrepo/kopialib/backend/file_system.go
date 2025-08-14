@@ -27,7 +27,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/logging"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/logging"
 )
 
 type FsBackend struct {
