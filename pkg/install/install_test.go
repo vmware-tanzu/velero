@@ -270,7 +270,7 @@ func TestCreateOrApplyResourceApplyError(t *testing.T) {
 	factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
 
 	var buf bytes.Buffer
-	err := createOrApplyResource(r, factory, &buf, true) // true for upgrade flag to use Apply
+	err := createOrApplyResource(r, factory, &buf, true) // true for apply flag to use Apply
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), expectedErr.Error())
@@ -342,7 +342,7 @@ func TestInstallErrorOnCRDResource(t *testing.T) {
 	require.Contains(t, err.Error(), expectedErr.Error())
 }
 
-func TestInstallWithUpgradeFlag(t *testing.T) {
+func TestInstallWithApplyFlag(t *testing.T) {
 	// Create a test resource
 	testResource := &unstructured.Unstructured{
 		Object: map[string]any{
@@ -362,7 +362,7 @@ func TestInstallWithUpgradeFlag(t *testing.T) {
 		Items: []unstructured.Unstructured{*testResource},
 	}
 
-	// Test case 1: Without upgrade flag (create)
+	// Test case 1: Without apply flag (create)
 	{
 		dc := &test.FakeDynamicClient{}
 		// Expect Create to be called
@@ -382,7 +382,7 @@ func TestInstallWithUpgradeFlag(t *testing.T) {
 		dc.AssertNotCalled(t, "Apply", mock.Anything, mock.Anything, mock.Anything)
 	}
 
-	// Test case 2: With upgrade flag (apply)
+	// Test case 2: With apply flag
 	{
 		dc := &test.FakeDynamicClient{}
 		// Create should not be called

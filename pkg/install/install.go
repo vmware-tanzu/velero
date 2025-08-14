@@ -279,9 +279,9 @@ func GroupResources(resources *unstructured.UnstructuredList) *ResourceGroup {
 }
 
 // createOrApplyResource attempts to create or apply a resource in the cluster.
-// If upgrade is true, it uses server-side apply to update existing resources.
-// If upgrade is false and the resource already exists in the cluster, it's merely logged.
-func createOrApplyResource(r *unstructured.Unstructured, factory client.DynamicFactory, w io.Writer, upgrade bool) error {
+// If apply is true, it uses server-side apply to update existing resources.
+// If apply is false and the resource already exists in the cluster, it's merely logged.
+func createOrApplyResource(r *unstructured.Unstructured, factory client.DynamicFactory, w io.Writer, apply bool) error {
 	id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
 
 	// Helper to reduce boilerplate message about the same object
@@ -294,7 +294,7 @@ func createOrApplyResource(r *unstructured.Unstructured, factory client.DynamicF
 		return err
 	}
 
-	if upgrade {
+	if apply {
 		log("attempting to apply resource")
 		// Set field manager for server-side apply and force to override conflicts
 		applyOpts := metav1.ApplyOptions{
@@ -350,14 +350,14 @@ func CreateClient(r *unstructured.Unstructured, factory client.DynamicFactory, w
 // An unstructured list of resources is sent, one at a time, to the server. These are assumed to be in the preferred order already.
 // Resources will be sorted into CustomResourceDefinitions and any other resource type, and the function will wait up to 1 minute
 // for CRDs to be ready before proceeding.
-// If upgrade is true, it uses server-side apply to update existing resources.
+// If apply is true, it uses server-side apply to update existing resources.
 // An io.Writer can be used to output to a log or the console.
-func Install(dynamicFactory client.DynamicFactory, kbClient kbclient.Client, resources *unstructured.UnstructuredList, w io.Writer, upgrade bool) error {
+func Install(dynamicFactory client.DynamicFactory, kbClient kbclient.Client, resources *unstructured.UnstructuredList, w io.Writer, apply bool) error {
 	rg := GroupResources(resources)
 
 	//Install CRDs first
 	for _, r := range rg.CRDResources {
-		if err := createOrApplyResource(r, dynamicFactory, w, upgrade); err != nil {
+		if err := createOrApplyResource(r, dynamicFactory, w, apply); err != nil {
 			return err
 		}
 	}
@@ -373,7 +373,7 @@ func Install(dynamicFactory client.DynamicFactory, kbClient kbclient.Client, res
 
 	// Install all other resources
 	for _, r := range rg.OtherResources {
-		if err = createOrApplyResource(r, dynamicFactory, w, upgrade); err != nil {
+		if err = createOrApplyResource(r, dynamicFactory, w, apply); err != nil {
 			return err
 		}
 	}
