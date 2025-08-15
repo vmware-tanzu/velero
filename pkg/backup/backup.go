@@ -855,7 +855,8 @@ func (kb *kubernetesBackupper) waitUntilPVBsProcessed(ctx context.Context, log l
 
 func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper, unstructured *unstructured.Unstructured, preferredGVR schema.GroupVersionResource, itemBlock *BackupItemBlock) bool {
 	backedUpItem, _, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR, false, false, itemBlock)
-	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
+	var aggregate kubeerrs.Aggregate
+	if errors.As(err, &aggregate) {
 		log.WithField("name", unstructured.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
 		// log each error separately so we get error location info in the log, and an
 		// accurate count of errors
@@ -880,7 +881,8 @@ func (kb *kubernetesBackupper) finalizeItem(
 	preferredGVR schema.GroupVersionResource,
 ) (bool, []FileForArchive) {
 	backedUpItem, updateFiles, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR, true, true, nil)
-	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
+	var aggregate kubeerrs.Aggregate
+	if errors.As(err, &aggregate) {
 		log.WithField("name", unstructured.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
 		// log each error separately so we get error location info in the log, and an
 		// accurate count of errors
