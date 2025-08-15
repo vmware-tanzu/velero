@@ -1262,3 +1262,148 @@ func TestGetVolumeSnapshotClasses(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []snapshotv1api.VolumeSnapshotClass{*class}, result)
 }
+
+func TestBuildPodToPVCCache(t *testing.T) {
+	objs := []runtime.Object{
+		&corev1api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod1",
+				Namespace: "default",
+			},
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
+					{
+						Name: "vol1",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc1",
+							},
+						},
+					},
+					{
+						Name: "vol2",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc2",
+							},
+						},
+					},
+				},
+			},
+		},
+		&corev1api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod2",
+				Namespace: "default",
+			},
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
+					{
+						Name: "vol3",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc3",
+							},
+						},
+					},
+				},
+			},
+		},
+		&corev1api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod3",
+				Namespace: "other",
+			},
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
+					{
+						Name: "vol4",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc4",
+							},
+						},
+					},
+				},
+			},
+		},
+		&corev1api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-no-pvc",
+				Namespace: "default",
+			},
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
+					{
+						Name: "vol5",
+						VolumeSource: corev1api.VolumeSource{
+							ConfigMap: &corev1api.ConfigMapVolumeSource{
+								LocalObjectReference: corev1api.LocalObjectReference{
+									Name: "configmap1",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
+
+	volumesInfo := &BackupVolumesInformation{
+		crClient: fakeClient,
+		logger:   logging.DefaultLogger(logrus.DebugLevel, logging.FormatJSON),
+	}
+	volumesInfo.Init()
+
+	namespaces := []string{"default", "other"}
+	err := volumesInfo.BuildPodToPVCCache(t.Context(), namespaces)
+	require.NoError(t, err)
+
+	cache := volumesInfo.GetPodToPVCCache()
+
+	// Verify cache structure
+	require.Contains(t, cache, "default")
+	require.Contains(t, cache, "other")
+
+	// Verify default namespace cache
+	defaultCache := cache["default"]
+	require.Contains(t, defaultCache, "pod1")
+	require.Contains(t, defaultCache, "pod2")
+	require.NotContains(t, defaultCache, "pod-no-pvc") // Should not include pods without PVCs
+
+	// Verify pod1 has the correct PVCs
+	pod1PVCs := defaultCache["pod1"]
+	require.Len(t, pod1PVCs, 2)
+	require.Contains(t, pod1PVCs, "pvc1")
+	require.Contains(t, pod1PVCs, "pvc2")
+
+	// Verify pod2 has the correct PVC
+	pod2PVCs := defaultCache["pod2"]
+	require.Len(t, pod2PVCs, 1)
+	require.Contains(t, pod2PVCs, "pvc3")
+
+	// Verify other namespace cache
+	otherCache := cache["other"]
+	require.Contains(t, otherCache, "pod3")
+	pod3PVCs := otherCache["pod3"]
+	require.Len(t, pod3PVCs, 1)
+	require.Contains(t, pod3PVCs, "pvc4")
+
+	// Test GetPodsUsingPVCFromCache using the built cache
+	pods, err := volumesInfo.GetPodsUsingPVCFromCache("default", "pvc1")
+	require.NoError(t, err)
+	require.Len(t, pods, 1)
+	require.Equal(t, "pod1", pods[0].Name)
+
+	pods, err = volumesInfo.GetPodsUsingPVCFromCache("other", "pvc4")
+	require.NoError(t, err)
+	require.Len(t, pods, 1)
+	require.Equal(t, "pod3", pods[0].Name)
+
+	// Test with non-existent PVC
+	pods, err = volumesInfo.GetPodsUsingPVCFromCache("default", "nonexistent")
+	require.NoError(t, err)
+	require.Empty(t, pods)
+}

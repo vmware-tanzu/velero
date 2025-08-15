@@ -165,6 +165,44 @@ func GetPodsUsingPVC(
 	return podsUsingPVC, nil
 }
 
+// GetPodsUsingPVCWithCache returns pods that use the specified PVC using cached data
+// to avoid O(N*M) performance issues. If cache is not available or incomplete, falls back
+// to the original GetPodsUsingPVC function.
+func GetPodsUsingPVCWithCache(
+	pvcNamespace, pvcName string,
+	crClient crclient.Client,
+	podToPVCCache map[string]map[string][]string,
+) ([]corev1api.Pod, error) {
+	// Try to use cache first
+	if podToPVCCache != nil {
+		nsCache, exists := podToPVCCache[pvcNamespace]
+		if exists {
+			var podsUsingPVC []corev1api.Pod
+			for podName, pvcNames := range nsCache {
+				for _, cachedPVCName := range pvcNames {
+					if cachedPVCName == pvcName {
+						// Get the actual pod object
+						pod := &corev1api.Pod{}
+						if err := crClient.Get(context.TODO(), crclient.ObjectKey{
+							Namespace: pvcNamespace,
+							Name:      podName,
+						}, pod); err != nil {
+							// If we can't get the pod, skip it but continue with others
+							continue
+						}
+						podsUsingPVC = append(podsUsingPVC, *pod)
+						break
+					}
+				}
+			}
+			return podsUsingPVC, nil
+		}
+	}
+
+	// Fallback to original implementation if cache is not available
+	return GetPodsUsingPVC(pvcNamespace, pvcName, crClient)
+}
+
 func GetVolumesToProcess(volumes []corev1api.Volume, volsToProcessByLegacyApproach []string) []corev1api.Volume {
 	volsToProcess := make([]corev1api.Volume, 0)
 

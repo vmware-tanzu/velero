@@ -727,6 +727,42 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	backupItemActionsResolver := framework.NewBackupItemActionResolverV2(actions)
 	itemBlockActionResolver := framework.NewItemBlockActionResolver(ibActions)
 
+	// Build pod-to-PVC cache for performance optimization to avoid O(N*M) issues
+	backupLog.Info("Building pod-to-PVC cache for performance optimization")
+	namespaces := []string{}
+	if backup.Spec.IncludedNamespaces != nil {
+		namespaces = backup.Spec.IncludedNamespaces
+	} else {
+		// If no specific namespaces are included, we need to get all namespaces
+		// This could be optimized further by only getting namespaces with PVCs
+		namespaceList := &corev1api.NamespaceList{}
+		if err := b.kbClient.List(context.Background(), namespaceList); err != nil {
+			backupLog.WithError(err).Warn("Failed to list namespaces for pod-to-PVC cache, falling back to non-cached operation")
+		} else {
+			for _, ns := range namespaceList.Items {
+				// Skip excluded namespaces
+				excluded := false
+				if backup.Spec.ExcludedNamespaces != nil {
+					for _, excludedNS := range backup.Spec.ExcludedNamespaces {
+						if ns.Name == excludedNS {
+							excluded = true
+							break
+						}
+					}
+				}
+				if !excluded {
+					namespaces = append(namespaces, ns.Name)
+				}
+			}
+		}
+	}
+
+	if err := backup.VolumesInformation.BuildPodToPVCCache(context.Background(), namespaces); err != nil {
+		backupLog.WithError(err).Warn("Failed to build pod-to-PVC cache, falling back to non-cached operation")
+	} else {
+		backupLog.Infof("Successfully built pod-to-PVC cache for %d namespaces", len(namespaces))
+	}
+
 	var fatalErrs []error
 	if err := b.backupper.BackupWithResolvers(backupLog, backup, backupFile, backupItemActionsResolver, itemBlockActionResolver, pluginManager); err != nil {
 		fatalErrs = append(fatalErrs, err)

@@ -886,3 +886,123 @@ func TestGetVolumesToProcess(t *testing.T) {
 		})
 	}
 }
+
+func TestGetPodsUsingPVCWithCache(t *testing.T) {
+	objs := []runtime.Object{
+		&corev1api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod1",
+				Namespace: "default",
+			},
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
+					{
+						Name: "vol1",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc1",
+							},
+						},
+					},
+				},
+			},
+		},
+		&corev1api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod2",
+				Namespace: "default",
+			},
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
+					{
+						Name: "vol2",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc2",
+							},
+						},
+					},
+				},
+			},
+		},
+		&corev1api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod3",
+				Namespace: "different",
+			},
+			Spec: corev1api.PodSpec{
+				Volumes: []corev1api.Volume{
+					{
+						Name: "vol3",
+						VolumeSource: corev1api.VolumeSource{
+							PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc1",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := velerotest.NewFakeControllerRuntimeClient(t, objs...)
+
+	testCases := []struct {
+		name             string
+		pvcNamespace     string
+		pvcName          string
+		cache            map[string]map[string][]string
+		expectedPodCount int
+	}{
+		{
+			name:         "with cache - pod found using PVC",
+			pvcNamespace: "default",
+			pvcName:      "pvc1",
+			cache: map[string]map[string][]string{
+				"default": {
+					"pod1": {"pvc1"},
+					"pod2": {"pvc2"},
+				},
+			},
+			expectedPodCount: 1,
+		},
+		{
+			name:         "with cache - no pods found using PVC",
+			pvcNamespace: "default",
+			pvcName:      "nonexistent",
+			cache: map[string]map[string][]string{
+				"default": {
+					"pod1": {"pvc1"},
+					"pod2": {"pvc2"},
+				},
+			},
+			expectedPodCount: 0,
+		},
+		{
+			name:             "without cache - fallback to original function",
+			pvcNamespace:     "default",
+			pvcName:          "pvc1",
+			cache:            nil,
+			expectedPodCount: 1,
+		},
+		{
+			name:         "cache missing namespace - fallback to original function",
+			pvcNamespace: "missing",
+			pvcName:      "pvc1",
+			cache: map[string]map[string][]string{
+				"default": {
+					"pod1": {"pvc1"},
+				},
+			},
+			expectedPodCount: 0, // No pods in "missing" namespace
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actualPods, err := GetPodsUsingPVCWithCache(tc.pvcNamespace, tc.pvcName, fakeClient, tc.cache)
+			require.NoErrorf(t, err, "Want error=nil; Got error=%v", err)
+			assert.Lenf(t, actualPods, tc.expectedPodCount, "unexpected number of pods in result; Want: %d; Got: %d", tc.expectedPodCount, len(actualPods))
+		})
+	}
+}
