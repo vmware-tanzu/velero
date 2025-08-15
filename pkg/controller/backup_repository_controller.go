@@ -57,17 +57,15 @@ const (
 
 type BackupRepoReconciler struct {
 	client.Client
-	namespace                 string
-	logger                    logrus.FieldLogger
-	clock                     clocks.WithTickerAndDelayedExecution
-	maintenanceFrequency      time.Duration
-	backupRepoConfig          string
-	repositoryManager         repomanager.Manager
-	keepLatestMaintenanceJobs int
-	repoMaintenanceConfig     string
-	maintenanceJobResources   kube.PodResources
-	logLevel                  logrus.Level
-	logFormat                 *logging.FormatFlag
+	namespace             string
+	logger                logrus.FieldLogger
+	clock                 clocks.WithTickerAndDelayedExecution
+	maintenanceFrequency  time.Duration
+	backupRepoConfig      string
+	repositoryManager     repomanager.Manager
+	repoMaintenanceConfig string
+	logLevel              logrus.Level
+	logFormat             *logging.FormatFlag
 }
 
 func NewBackupRepoReconciler(
@@ -77,9 +75,7 @@ func NewBackupRepoReconciler(
 	repositoryManager repomanager.Manager,
 	maintenanceFrequency time.Duration,
 	backupRepoConfig string,
-	keepLatestMaintenanceJobs int,
 	repoMaintenanceConfig string,
-	maintenanceJobResources kube.PodResources,
 	logLevel logrus.Level,
 	logFormat *logging.FormatFlag,
 ) *BackupRepoReconciler {
@@ -91,9 +87,7 @@ func NewBackupRepoReconciler(
 		maintenanceFrequency,
 		backupRepoConfig,
 		repositoryManager,
-		keepLatestMaintenanceJobs,
 		repoMaintenanceConfig,
-		maintenanceJobResources,
 		logLevel,
 		logFormat,
 	}
@@ -275,15 +269,13 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, errors.Wrap(err, "error check and run repo maintenance jobs")
 		}
 
-		// Get the configured number of maintenance jobs to keep from ConfigMap, fallback to CLI parameter
-		keepJobs := r.keepLatestMaintenanceJobs
-		if configuredKeep, err := maintenance.GetKeepLatestMaintenanceJobs(ctx, r.Client, log, r.namespace, r.repoMaintenanceConfig, backupRepo); err != nil {
+		// Get the configured number of maintenance jobs to keep from ConfigMap
+		keepJobs, err := maintenance.GetKeepLatestMaintenanceJobs(ctx, r.Client, log, r.namespace, r.repoMaintenanceConfig, backupRepo)
+		if err != nil {
 			log.WithError(err).Warn("Failed to get keepLatestMaintenanceJobs from ConfigMap, using CLI parameter value")
-		} else if configuredKeep > 0 {
-			keepJobs = configuredKeep
 		}
 
-		if err := maintenance.DeleteOldJobs(r.Client, req.Name, keepJobs); err != nil {
+		if err := maintenance.DeleteOldJobs(r.Client, req.Name, keepJobs, log); err != nil {
 			log.WithError(err).Warn("Failed to delete old maintenance jobs")
 		}
 	}
@@ -496,7 +488,7 @@ func (r *BackupRepoReconciler) runMaintenanceIfDue(ctx context.Context, req *vel
 
 	log.Info("Running maintenance on backup repository")
 
-	job, err := funcStartMaintenanceJob(r.Client, ctx, req, r.repoMaintenanceConfig, r.maintenanceJobResources, r.logLevel, r.logFormat, log)
+	job, err := funcStartMaintenanceJob(r.Client, ctx, req, r.repoMaintenanceConfig, r.logLevel, r.logFormat, log)
 	if err != nil {
 		log.WithError(err).Warn("Starting repo maintenance failed")
 		return r.patchBackupRepository(ctx, req, func(rr *velerov1api.BackupRepository) {

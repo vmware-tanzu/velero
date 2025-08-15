@@ -1,0 +1,1 @@
+Introduced context-based logger for backend implementations (Azure, GCS, S3, and Filesystem)

@@ -103,3 +103,37 @@ func TestDeployment(t *testing.T) {
 	assert.Equal(t, "linux", deploy.Spec.Template.Spec.NodeSelector["kubernetes.io/os"])
 	assert.Equal(t, "linux", string(deploy.Spec.Template.Spec.OS.Name))
 }
+
+func TestDeploymentWithPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		name              string
+		priorityClassName string
+		expectedValue     string
+	}{
+		{
+			name:              "with priority class name",
+			priorityClassName: "high-priority",
+			expectedValue:     "high-priority",
+		},
+		{
+			name:              "without priority class name",
+			priorityClassName: "",
+			expectedValue:     "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a deployment with the priority class name option
+			var opts []podTemplateOption
+			if tc.priorityClassName != "" {
+				opts = append(opts, WithPriorityClassName(tc.priorityClassName))
+			}
+
+			deployment := Deployment("velero", opts...)
+
+			// Verify the priority class name is set correctly
+			assert.Equal(t, tc.expectedValue, deployment.Spec.Template.Spec.PriorityClassName)
+		})
+	}
+}

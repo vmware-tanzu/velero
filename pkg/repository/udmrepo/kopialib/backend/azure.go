@@ -25,6 +25,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/azure"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/logging"
 )
 
 type AzureBackend struct {
@@ -38,12 +39,11 @@ func (c *AzureBackend) Setup(ctx context.Context, flags map[string]string, logge
 	c.option = azure.Option{
 		Config: flags,
 		Limits: setupLimits(ctx, flags),
-		Logger: logger,
 	}
 	return nil
 }
 
 func (c *AzureBackend) Connect(ctx context.Context, isCreate bool, logger logrus.FieldLogger) (blob.Storage, error) {
-	c.option.Logger = logger
+	ctx = logging.WithLogger(ctx, logger)
 	return azure.NewStorage(ctx, &c.option, false)
 }

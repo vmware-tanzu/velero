@@ -187,10 +187,15 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 			WorkerOS:                         veleroCfg.WorkerOS,
 		},
 	); err != nil {
-		time.Sleep(1 * time.Minute)
-		RunDebug(context.Background(), veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
+		RunDebug(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
 		return errors.WithMessagef(err, "Failed to install Velero in the cluster")
 	}
+
+	if err := CheckBSL(ctx, veleroCfg.VeleroNamespace, common.DefaultBSLName); err != nil {
+		RunDebug(ctx, veleroCfg.VeleroCLI, veleroCfg.VeleroNamespace, "", "")
+		return fmt.Errorf("fail to wait BSL default till ready: %w", err)
+	}
+
 	fmt.Printf("Finish velero install %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	return nil
 }
@@ -418,11 +423,27 @@ func installVeleroServer(
 		args = append(args, "--sa-annotations", options.ServiceAccountAnnotations.String())
 	}
 
+	if options.ServerPriorityClassName != "" {
+		args = append(args, "--server-priority-class-name", options.ServerPriorityClassName)
+	}
+
+	if options.NodeAgentPriorityClassName != "" {
+		args = append(args, "--node-agent-priority-class-name", options.NodeAgentPriorityClassName)
+	}
+
 	// Only version no older than v1.15 support --backup-repository-configmap.
 	if options.BackupRepoConfigMap != "" &&
 		(semver.Compare(version, "v1.15") >= 0 || version == "main") {
 		fmt.Println("Associate backup repository ConfigMap. The Velero version is ", version)
 		args = append(args, fmt.Sprintf("--backup-repository-configmap=%s", options.BackupRepoConfigMap))
+	}
+
+	if options.RepoMaintenanceJobConfigMap != "" {
+		args = append(args, fmt.Sprintf("--repo-maintenance-job-configmap=%s", options.RepoMaintenanceJobConfigMap))
+	}
+
+	if options.NodeAgentConfigMap != "" {
+		args = append(args, fmt.Sprintf("--node-agent-configmap=%s", options.NodeAgentConfigMap))
 	}
 
 	if err := createVeleroResources(ctx, cli, namespace, args, options); err != nil {
@@ -738,32 +759,35 @@ func IsVeleroReady(ctx context.Context, veleroCfg *test.VeleroConfig) (bool, err
 		}
 	}
 
-	// Check BSL with poll
-	err = wait.PollUntilContextTimeout(ctx, k8s.PollInterval, time.Minute, true, func(ctx context.Context) (bool, error) {
-		return checkBSL(ctx, veleroCfg) == nil, nil
-	})
-	if err != nil {
-		return false, errors.Wrap(err, "failed to check the bsl")
+	if err := CheckBSL(ctx, namespace, common.DefaultBSLName); err != nil {
+		return false, err
 	}
+
 	return true, nil
 }
 
-func checkBSL(ctx context.Context, veleroCfg *test.VeleroConfig) error {
-	namespace := veleroCfg.VeleroNamespace
-	stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "bsl", "default",
-		"-o", "json", "-n", namespace))
-	if err != nil {
-		return errors.Wrapf(err, "failed to get bsl %s stdout=%s, stderr=%s", veleroCfg.BSLBucket, stdout, stderr)
-	} else {
-		bsl := &velerov1api.BackupStorageLocation{}
-		if err = json.Unmarshal([]byte(stdout), bsl); err != nil {
-			return errors.Wrapf(err, "failed to unmarshal the velero bsl")
+func CheckBSL(ctx context.Context, ns string, bslName string) error {
+	// Check BSL with poll
+	err := wait.PollUntilContextTimeout(ctx, k8s.PollInterval, time.Minute, true, func(ctx context.Context) (bool, error) {
+		stdout, stderr, err := velerexec.RunCommand(exec.CommandContext(ctx, "kubectl", "get", "bsl", bslName,
+			"-o", "json", "-n", ns))
+		if err != nil {
+			return false, errors.Wrapf(err, "failed to get bsl %s stdout=%s, stderr=%s", bslName, stdout, stderr)
+		} else {
+			bsl := &velerov1api.BackupStorageLocation{}
+			if err = json.Unmarshal([]byte(stdout), bsl); err != nil {
+				return false, errors.Wrapf(err, "failed to unmarshal the velero bsl")
+			}
+			if bsl.Status.Phase != velerov1api.BackupStorageLocationPhaseAvailable {
+				// BSL is not ready. Continue polling till timeout.
+				return false, nil
+			}
 		}
-		if bsl.Status.Phase != velerov1api.BackupStorageLocationPhaseAvailable {
-			return fmt.Errorf("current bsl %s is not available", veleroCfg.BSLBucket)
-		}
-	}
-	return nil
+
+		return true, nil
+	})
+
+	return err
 }
 
 func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroConfig) error {

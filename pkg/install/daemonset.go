@@ -179,6 +179,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 							Resources: c.resources,
 						},
 					},
+					PriorityClassName: c.priorityClassName,
 				},
 			},
 		},
@@ -241,6 +242,12 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1api.DaemonSet
 				Key:      "os",
 				Operator: "Equal",
 				Effect:   "NoSchedule",
+				Value:    "windows",
+			},
+			{
+				Key:      "os",
+				Operator: "Equal",
+				Effect:   "NoExecute",
 				Value:    "windows",
 			},
 		}

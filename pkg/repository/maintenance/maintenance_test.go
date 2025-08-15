@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	batchv1api "k8s.io/api/batch/v1"
 	corev1api "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -117,7 +118,7 @@ func TestDeleteOldJobs(t *testing.T) {
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	// Call the function
-	err := DeleteOldJobs(cli, repo, keep)
+	err := DeleteOldJobs(cli, repo, keep, velerotest.NewLogger())
 	require.NoError(t, err)
 
 	// Get the remaining jobs
@@ -387,6 +388,7 @@ func TestGetResultFromJob(t *testing.T) {
 }
 
 func TestGetJobConfig(t *testing.T) {
+	keepLatestMaintenanceJobs := 1
 	ctx := t.Context()
 	logger := logrus.New()
 	veleroNamespace := "velero"
@@ -504,11 +506,12 @@ func TestGetJobConfig(t *testing.T) {
 					Name:      repoMaintenanceJobConfig,
 				},
 				Data: map[string]string{
-					GlobalKeyForRepoMaintenanceJobCM: "{\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
+					GlobalKeyForRepoMaintenanceJobCM: "{\"keepLatestMaintenanceJobs\":1,\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
 					"test-default-kopia":             "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}]}",
 				},
 			},
 			expectedConfig: &JobConfigs{
+				KeepLatestMaintenanceJobs: &keepLatestMaintenanceJobs,
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					CPULimit:      "200m",
@@ -1098,9 +1101,9 @@ func TestBuildJob(t *testing.T) {
 				param.BackupRepo,
 				param.BackupLocation.Name,
 				tc.m,
-				*tc.m.PodResources,
 				tc.logLevel,
 				tc.logFormat,
+				logrus.New(),
 			)
 
 			// Check the error
@@ -1177,7 +1180,7 @@ func TestGetKeepLatestMaintenanceJobs(t *testing.T) {
 			repoMaintenanceJobConfig: "",
 			configMap:                nil,
 			repo:                     mockBackupRepo(),
-			expectedValue:            0,
+			expectedValue:            3,
 			expectError:              false,
 		},
 		{
@@ -1185,7 +1188,7 @@ func TestGetKeepLatestMaintenanceJobs(t *testing.T) {
 			repoMaintenanceJobConfig: "non-existent-config",
 			configMap:                nil,
 			repo:                     mockBackupRepo(),
-			expectedValue:            0,
+			expectedValue:            3,
 			expectError:              false,
 		},
 		{
@@ -1234,7 +1237,7 @@ func TestGetKeepLatestMaintenanceJobs(t *testing.T) {
 				},
 			},
 			repo:          mockBackupRepo(),
-			expectedValue: 0,
+			expectedValue: 3,
 			expectError:   false,
 		},
 		{
@@ -1250,7 +1253,7 @@ func TestGetKeepLatestMaintenanceJobs(t *testing.T) {
 				},
 			},
 			repo:          mockBackupRepo(),
-			expectedValue: 0,
+			expectedValue: 3,
 			expectError:   true,
 		},
 	}
@@ -1298,5 +1301,183 @@ func mockBackupRepo() *velerov1api.BackupRepository {
 			BackupStorageLocation: "default",
 			RepositoryType:        "kopia",
 		},
+	}
+}
+
+func TestGetPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		name                string
+		config              *JobConfigs
+		priorityClassExists bool
+		expectedValue       string
+		expectedLogContains string
+		expectedLogLevel    string
+	}{
+		{
+			name:                "empty priority class name should return empty string",
+			config:              &JobConfigs{PriorityClassName: ""},
+			expectedValue:       "",
+			expectedLogContains: "",
+		},
+		{
+			name:                "nil config should return empty string",
+			config:              nil,
+			expectedValue:       "",
+			expectedLogContains: "",
+		},
+		{
+			name:                "existing priority class should log info and return name",
+			config:              &JobConfigs{PriorityClassName: "high-priority"},
+			priorityClassExists: true,
+			expectedValue:       "high-priority",
+			expectedLogContains: "Validated priority class \\\"high-priority\\\" exists in cluster",
+			expectedLogLevel:    "info",
+		},
+		{
+			name:                "non-existing priority class should log warning and still return name",
+			config:              &JobConfigs{PriorityClassName: "missing-priority"},
+			priorityClassExists: false,
+			expectedValue:       "missing-priority",
+			expectedLogContains: "Priority class \\\"missing-priority\\\" not found in cluster",
+			expectedLogLevel:    "warning",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a new scheme and add necessary API types
+			localScheme := runtime.NewScheme()
+			err := schedulingv1.AddToScheme(localScheme)
+			require.NoError(t, err)
+
+			// Create fake client builder
+			clientBuilder := fake.NewClientBuilder().WithScheme(localScheme)
+
+			// Add priority class if it should exist
+			if tc.priorityClassExists {
+				priorityClass := &schedulingv1.PriorityClass{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: tc.config.PriorityClassName,
+					},
+					Value: 1000,
+				}
+				clientBuilder = clientBuilder.WithObjects(priorityClass)
+			}
+
+			client := clientBuilder.Build()
+
+			// Capture logs
+			var logBuffer strings.Builder
+			logger := logrus.New()
+			logger.SetOutput(&logBuffer)
+			logger.SetLevel(logrus.InfoLevel)
+
+			// Call the function
+			result := getPriorityClassName(t.Context(), client, tc.config, logger)
+
+			// Verify the result
+			assert.Equal(t, tc.expectedValue, result)
+
+			// Verify log output
+			logOutput := logBuffer.String()
+			if tc.expectedLogContains != "" {
+				assert.Contains(t, logOutput, tc.expectedLogContains)
+			}
+
+			// Verify log level
+			if tc.expectedLogLevel == "warning" {
+				assert.Contains(t, logOutput, "level=warning")
+			} else if tc.expectedLogLevel == "info" {
+				assert.Contains(t, logOutput, "level=info")
+			}
+		})
+	}
+}
+
+func TestBuildJobWithPriorityClassName(t *testing.T) {
+	testCases := []struct {
+		name              string
+		priorityClassName string
+		expectedValue     string
+	}{
+		{
+			name:              "with priority class name",
+			priorityClassName: "high-priority",
+			expectedValue:     "high-priority",
+		},
+		{
+			name:              "without priority class name",
+			priorityClassName: "",
+			expectedValue:     "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a new scheme and add necessary API types
+			localScheme := runtime.NewScheme()
+			err := velerov1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			err = appsv1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			err = batchv1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			err = schedulingv1.AddToScheme(localScheme)
+			require.NoError(t, err)
+			// Create a fake client
+			client := fake.NewClientBuilder().WithScheme(localScheme).Build()
+
+			// Create a deployment with the specified priority class name
+			deployment := &appsv1api.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "velero",
+					Namespace: "velero",
+				},
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
+								{
+									Name:  "velero",
+									Image: "velero/velero:latest",
+								},
+							},
+							PriorityClassName: tc.priorityClassName,
+						},
+					},
+				},
+			}
+
+			// Create a backup repository
+			repo := &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-repo",
+					Namespace: "velero",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					VolumeNamespace:       "velero",
+					BackupStorageLocation: "default",
+				},
+			}
+
+			// Create the deployment in the fake client
+			err = client.Create(t.Context(), deployment)
+			require.NoError(t, err)
+
+			// Create minimal job configs and resources
+			jobConfig := &JobConfigs{
+				PriorityClassName: tc.priorityClassName,
+			}
+			logLevel := logrus.InfoLevel
+			logFormat := logging.NewFormatFlag()
+			logFormat.Set("text")
+
+			// Call buildJob
+			job, err := buildJob(client, t.Context(), repo, "default", jobConfig, logLevel, logFormat, logrus.New())
+			require.NoError(t, err)
+
+			// Verify the priority class name is set correctly
+			assert.Equal(t, tc.expectedValue, job.Spec.Template.Spec.PriorityClassName)
+		})
 	}
 }

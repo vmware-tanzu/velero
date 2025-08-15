@@ -4,7 +4,7 @@ layout: docs
 ---
 
 Use this doc to get a basic installation of Velero.
-Refer [this document](customize-installation.md) to customize your installation.
+Refer [this document](customize-installation.md) to customize your installation, including setting priority classes for Velero components.
 
 ## Prerequisites
 

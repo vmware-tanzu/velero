@@ -71,6 +71,7 @@ type DataDownloadReconciler struct {
 	preparingTimeout      time.Duration
 	metrics               *metrics.ServerMetrics
 	cancelledDataDownload map[string]time.Time
+	dataMovePriorityClass string
 }
 
 func NewDataDownloadReconciler(
@@ -86,6 +87,7 @@ func NewDataDownloadReconciler(
 	preparingTimeout time.Duration,
 	logger logrus.FieldLogger,
 	metrics *metrics.ServerMetrics,
+	dataMovePriorityClass string,
 ) *DataDownloadReconciler {
 	return &DataDownloadReconciler{
 		client:                client,
@@ -103,6 +105,7 @@ func NewDataDownloadReconciler(
 		preparingTimeout:      preparingTimeout,
 		metrics:               metrics,
 		cancelledDataDownload: make(map[string]time.Time),
+		dataMovePriorityClass: dataMovePriorityClass,
 	}
 }
 
@@ -890,6 +893,7 @@ func (r *DataDownloadReconciler) setupExposeParam(dd *velerov2alpha1api.DataDown
 		NodeOS:                nodeOS,
 		RestorePVCConfig:      r.restorePVCConfig,
 		LoadAffinity:          r.loadAffinity,
+		PriorityClassName:     r.dataMovePriorityClass,
 	}, nil
 }
 

@@ -43,7 +43,6 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/volume"
 	"github.com/vmware-tanzu/velero/internal/volumehelper"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -270,13 +269,17 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 			backupRequest.Spec.IncludeClusterResources,
 			*backupRequest.NamespaceIncludesExcludes)
 	} else {
-		backupRequest.ResourceIncludesExcludes = collections.GetScopeResourceIncludesExcludes(kb.discoveryHelper, log,
+		srie := collections.GetScopeResourceIncludesExcludes(kb.discoveryHelper, log,
 			backupRequest.Spec.IncludedNamespaceScopedResources,
 			backupRequest.Spec.ExcludedNamespaceScopedResources,
 			backupRequest.Spec.IncludedClusterScopedResources,
 			backupRequest.Spec.ExcludedClusterScopedResources,
 			*backupRequest.NamespaceIncludesExcludes,
 		)
+		if backupRequest.ResPolicies != nil {
+			srie.CombineWithPolicy(backupRequest.ResPolicies.GetIncludeExcludePolicy())
+		}
+		backupRequest.ResourceIncludesExcludes = srie
 	}
 
 	log.Infof("Backing up all volumes using pod volume backup: %t", boolptr.IsSetToTrue(backupRequest.Backup.Spec.DefaultVolumesToFsBackup))
@@ -355,11 +358,6 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(items)}
 
-	var resourcePolicy *resourcepolicies.Policies
-	if backupRequest.ResPolicies != nil {
-		resourcePolicy = backupRequest.ResPolicies
-	}
-
 	itemBackupper := &itemBackupper{
 		backupRequest:            backupRequest,
 		tarWriter:                tw,
@@ -374,7 +372,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		},
 		hookTracker: hook.NewHookTracker(),
 		volumeHelperImpl: volumehelper.NewVolumeHelperImpl(
-			resourcePolicy,
+			backupRequest.ResPolicies,
 			backupRequest.Spec.SnapshotVolumes,
 			log,
 			kb.kbClient,

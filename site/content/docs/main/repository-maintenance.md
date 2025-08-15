@@ -60,47 +60,63 @@ This can be done by adding multiple entries in the `LoadAffinity` array.
 
 The sample of the ```repo-maintenance-job-configmap``` ConfigMap for the above scenario is as below:
 ``` bash
-cat <<EOF > repo-maintenance-job-config.json
-{
-    "global": {
-        "podResources": {
-            "cpuRequest": "100m",
-            "cpuLimit": "200m",
-            "memoryRequest": "100Mi",
-            "memoryLimit": "200Mi"
+cat <<EOF > repo-maintenance-job-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: repo-maintenance-job-config
+  namespace: velero
+data:
+  global: |
+    {
+      "podResources": {
+        "cpuRequest": "100m",
+        "cpuLimit": "200m",
+        "memoryRequest": "100Mi",
+        "memoryLimit": "200Mi"
+      },
+      "keepLatestMaintenanceJobs": 1,
+      "loadAffinity": [
+        {
+          "nodeSelector": {
+            "matchExpressions": [
+              {
+                "key": "cloud.google.com/machine-family",
+                "operator": "In",
+                "values": [
+                  "e2"
+                ]
+              }
+            ]
+          }
         },
-        "loadAffinity": [
-            {
-                "nodeSelector": {
-                    "matchExpressions": [
-                        {
-                            "key": "cloud.google.com/machine-family",
-                            "operator": "In",
-                            "values": [
-                                "e2"
-                            ]
-                        }
-                    ]          
-                }
-            },
-            {
-                "nodeSelector": {
-                    "matchExpressions": [
-                        {
-                            "key": "topology.kubernetes.io/zone",
-                            "operator": "In",
-                            "values": [
-                                "us-central1-a",
-                                "us-central1-b",
-                                "us-central1-c"
-                            ]
-                        }
-                    ]          
-                }
-            }
-        ]
+        {
+          "nodeSelector": {
+            "matchExpressions": [
+              {
+                "key": "topology.kubernetes.io/zone",
+                "operator": "In",
+                "values": [
+                  "us-central1-a",
+                  "us-central1-b",
+                  "us-central1-c"
+                ]
+              }
+            ]
+          }
+        }
+      ]
     }
-}
+  kibishii-default-kopia: |
+    {
+      "podResources": {
+        "cpuRequest": "200m",
+        "cpuLimit": "400m",
+        "memoryRequest": "200Mi",
+        "memoryLimit": "400Mi"
+      },
+      "keepLatestMaintenanceJobs": 2
+    }
 EOF
 ```
 This sample showcases two affinity configurations:
@@ -110,7 +126,7 @@ The nodes matching one of the two conditions are selected.
 
 To create the configMap, users need to save something like the above sample to a json file and then run below command:
 ```
-kubectl create cm repo-maintenance-job-config -n velero --from-file=repo-maintenance-job-config.json
+kubectl apply -f repo-maintenance-job-config.yaml
 ```
 
 ### Log
@@ -155,7 +171,7 @@ Status:
 - `Recent Maintenance` keeps the status of the recent 3 maintenance jobs, including its start time, result (succeeded/failed), completion time (if the maintenance job succeeded), or error message (if the maintenance failed)
 
 ### Others
-Maintenance jobs will inherit toleration, nodeSelector, service account, image, environment variables, cloud-credentials etc. from Velero deployment.
+Maintenance jobs will inherit toleration, nodeSelector, service account, image, environment variables, cloud-credentials, priorityClassName etc. from Velero deployment.
 
 For labels and annotations, maintenance jobs do NOT inherit all labels and annotations from the Velero deployment. Instead, they include:
 
@@ -171,7 +187,24 @@ For labels and annotations, maintenance jobs do NOT inherit all labels and annot
   * `iam.amazonaws.com/role`
 
 **Important:** Other labels and annotations from the Velero deployment are NOT inherited by maintenance jobs. This is by design to ensure only specific labels and annotations required for cloud provider identity systems are propagated.
-Maintenance jobs will not run for backup repositories whose backup storage location is set as readOnly.  
+Maintenance jobs will not run for backup repositories whose backup storage location is set as readOnly.
+
+#### Priority Class Configuration
+Maintenance jobs can be configured with a specific priority class through the repository maintenance job ConfigMap. The priority class name should be specified in the global configuration section:
+
+```json
+{
+    "global": {
+        "priorityClassName": "low-priority",
+        "podResources": {
+            "cpuRequest": "100m",
+            "memoryRequest": "128Mi"
+        }
+    }
+}
+```
+
+Note that priority class configuration is only read from the global configuration section, ensuring all maintenance jobs use the same priority class regardless of which repository they are maintaining.
 
 [1]: velero-install.md#usage
 [2]: node-agent-concurrency.md

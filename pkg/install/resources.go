@@ -273,6 +273,8 @@ type VeleroOptions struct {
 	ItemBlockWorkerCount            int
 	KubeletRootDir                  string
 	NodeAgentDisableHostPath        bool
+	ServerPriorityClassName         string
+	NodeAgentPriorityClassName      string
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -362,6 +364,10 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 		WithItemBlockWorkerCount(o.ItemBlockWorkerCount),
 	}
 
+	if o.ServerPriorityClassName != "" {
+		deployOpts = append(deployOpts, WithPriorityClassName(o.ServerPriorityClassName))
+	}
+
 	if len(o.Features) > 0 {
 		deployOpts = append(deployOpts, WithFeatures(o.Features))
 	}
@@ -422,6 +428,10 @@ func AllResources(o *VeleroOptions) *unstructured.UnstructuredList {
 
 		if len(o.KubeletRootDir) > 0 {
 			dsOpts = append(dsOpts, WithKubeletRootDir(o.KubeletRootDir))
+		}
+
+		if o.NodeAgentPriorityClassName != "" {
+			dsOpts = append(dsOpts, WithPriorityClassName(o.NodeAgentPriorityClassName))
 		}
 
 		if o.UseNodeAgent {
