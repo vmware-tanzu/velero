@@ -419,13 +419,6 @@ func (s AWSStorage) GetMinioBucketSize(cloudCredentialsFile, bslBucket, bslPrefi
 func (s AWSStorage) GetObject(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig, objectKey string) (io.ReadCloser, error) {
 	config := flag.NewMap()
 	config.Set(bslConfig)
-	objectsInput := s3.ListObjectsV2Input{}
-	objectsInput.Bucket = aws.String(bslBucket)
-	objectsInput.Delimiter = aws.String("/")
-
-	if bslPrefix != "" {
-		objectsInput.Prefix = aws.String(bslPrefix)
-	}
 
 	var err error
 	var s3Config aws.Config
