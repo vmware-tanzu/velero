@@ -292,7 +292,7 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// store ref to just-updated item for creating patch
-	original = request.Backup.DeepCopy()
+	original = request.DeepCopy()
 
 	b.backupTracker.Add(request.Namespace, request.Name)
 	defer func() {
@@ -342,7 +342,7 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// BackupPhaseFinalizingPartiallyFailed -> backup_finalizer_controller.go will now reconcile
 	// BackupPhaseFailed
 	if err := kubeutil.PatchResourceWithRetriesOnErrors(b.resourceTimeout, original, request.Backup, b.kbClient); err != nil {
-		log.WithError(err).Errorf("error updating backup's status from %v to %v", original.Status.Phase, request.Backup.Status.Phase)
+		log.WithError(err).Errorf("error updating backup's status from %v to %v", original.Status.Phase, request.Status.Phase)
 	}
 	return ctrl.Result{}, nil
 }
@@ -714,7 +714,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 		return err
 	}
 
-	exists, err := backupStore.BackupExists(backup.StorageLocation.Spec.StorageType.ObjectStorage.Bucket, backup.Name)
+	exists, err := backupStore.BackupExists(backup.StorageLocation.Spec.ObjectStorage.Bucket, backup.Name)
 	if exists || err != nil {
 		backup.Status.Phase = velerov1api.BackupPhaseFailed
 		backup.Status.CompletionTimestamp = &metav1.Time{Time: b.clock.Now()}
@@ -836,7 +836,7 @@ func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, bac
 	}
 
 	if backup.Status.CompletionTimestamp != nil {
-		backupDuration := backup.Status.CompletionTimestamp.Time.Sub(backup.Status.StartTimestamp.Time)
+		backupDuration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time)
 		backupDurationSeconds := float64(backupDuration / time.Second)
 		serverMetrics.RegisterBackupDuration(backupScheduleName, backupDurationSeconds)
 	}

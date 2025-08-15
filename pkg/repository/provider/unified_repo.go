@@ -534,7 +534,8 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 
 	region := config["region"]
 
-	if backendType == repoconfig.AWSBackend {
+	switch backendType {
+	case repoconfig.AWSBackend:
 		s3URL := config["s3Url"]
 		disableTLS := false
 
@@ -566,7 +567,7 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 		result[udmrepo.StoreOptionS3Endpoint] = strings.Trim(s3URL, "/")
 		result[udmrepo.StoreOptionS3DisableTLSVerify] = config["insecureSkipTLSVerify"]
 		result[udmrepo.StoreOptionS3DisableTLS] = strconv.FormatBool(disableTLS)
-	} else if backendType == repoconfig.AzureBackend {
+	case repoconfig.AzureBackend:
 		for k, v := range config {
 			result[k] = v
 		}
