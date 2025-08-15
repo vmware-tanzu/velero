@@ -355,11 +355,7 @@ func (s *server) run() error {
 		return err
 	}
 
-	if err := s.runControllers(s.config.DefaultVolumeSnapshotLocations.Data()); err != nil {
-		return err
-	}
-
-	return nil
+	return s.runControllers(s.config.DefaultVolumeSnapshotLocations.Data())
 }
 
 // setupBeforeControllerRun do any setup that needs to happen before the controllers are started.
@@ -372,10 +368,7 @@ func (s *server) setupBeforeControllerRun() error {
 
 	markInProgressCRsFailed(s.ctx, client, s.namespace, s.logger)
 
-	if err := setDefaultBackupLocation(s.ctx, client, s.namespace, s.config.DefaultBackupLocation, s.logger); err != nil {
-		return err
-	}
-	return nil
+	return setDefaultBackupLocation(s.ctx, client, s.namespace, s.config.DefaultBackupLocation, s.logger)
 }
 
 // setDefaultBackupLocation set the BSL that matches the "velero server --default-backup-storage-location"
@@ -390,9 +383,8 @@ func setDefaultBackupLocation(ctx context.Context, client ctrlclient.Client, nam
 		if apierrors.IsNotFound(err) {
 			logger.WithField("backupStorageLocation", defaultBackupLocation).WithError(err).Warn("Failed to set default backup storage location at server start")
 			return nil
-		} else {
-			return errors.WithStack(err)
 		}
+		return errors.WithStack(err)
 	}
 
 	if !backupLocation.Spec.Default {
@@ -907,13 +899,12 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 // wasn't found and it returns an error.
 func removeControllers(disabledControllers []string, enabledRuntimeControllers map[string]struct{}, logger logrus.FieldLogger) error {
 	for _, controllerName := range disabledControllers {
-		if _, ok := enabledRuntimeControllers[controllerName]; ok {
-			logger.Infof("Disabling controller: %s", controllerName)
-			delete(enabledRuntimeControllers, controllerName)
-		} else {
+		if _, ok := enabledRuntimeControllers[controllerName]; !ok {
 			msg := fmt.Sprintf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(config.DisableableControllers, ","))
 			return errors.New(msg)
 		}
+		logger.Infof("Disabling controller: %s", controllerName)
+		delete(enabledRuntimeControllers, controllerName)
 	}
 	return nil
 }

@@ -305,9 +305,8 @@ func runBackupDeletionTests(client TestClient, veleroCfg VeleroConfig, backupLoc
 	err = DeleteBackup(context.Background(), backupName, &veleroCfg)
 	if err != nil {
 		return errors.Wrapf(err, "|| UNEXPECTED || - Failed to delete backup %q", backupName)
-	} else {
-		fmt.Printf("|| EXPECTED || - Success to delete backup %s locally\n", backupName)
 	}
+	fmt.Printf("|| EXPECTED || - Success to delete backup %s locally\n", backupName)
 	fmt.Printf("|| EXPECTED || - Backup deletion test completed successfully\n")
 	return nil
 }

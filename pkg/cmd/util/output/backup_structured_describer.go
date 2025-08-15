@@ -499,12 +499,11 @@ func describePodVolumeBackupsInSF(backups []velerov1api.PodVolumeBackup, details
 	// Get the type of pod volume uploader. Since the uploader only comes from a single source, we can
 	// take the uploader type from the first element of the array.
 	var uploaderType string
-	if len(backups) > 0 {
-		uploaderType = backups[0].Spec.UploaderType
-	} else {
+	if len(backups) == 0 {
 		backupVolumes["podVolumeBackups"] = "<none included>"
 		return
 	}
+	uploaderType = backups[0].Spec.UploaderType
 	// type display the type of pod volume backups
 	podVolumeBackupsInfo["uploderType"] = uploaderType
 

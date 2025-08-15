@@ -130,9 +130,8 @@ func isRunning(ctx context.Context, kubeClient kubernetes.Interface, namespace s
 		return ErrDaemonSetNotFound
 	} else if err != nil {
 		return err
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // KbClientIsRunningInNode checks if the node agent pod is running properly in a specified node through kube client. If not, return the error found

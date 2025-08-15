@@ -532,11 +532,7 @@ spec:
 		return err
 	}
 
-	if err := patchTemplate.Execute(file, patchImageData{Image: kibishiiImage}); err != nil {
-		return err
-	}
-
-	return nil
+	return patchTemplate.Execute(file, patchImageData{Image: kibishiiImage})
 }
 
 func generateJumpPadPatch(jumpPadImage string, patchDirectory string) error {
@@ -561,11 +557,7 @@ spec:
 		return err
 	}
 
-	if err := patchTemplate.Execute(file, patchImageData{Image: jumpPadImage}); err != nil {
-		return err
-	}
-
-	return nil
+	return patchTemplate.Execute(file, patchImageData{Image: jumpPadImage})
 }
 
 func generateEtcdImagePatch(etcdImage string, patchPath string) error {
@@ -609,11 +601,7 @@ spec:
 		return err
 	}
 
-	if err := patchTemplate.Execute(file, patchImageData{Image: etcdImage}); err != nil {
-		return err
-	}
-
-	return nil
+	return patchTemplate.Execute(file, patchImageData{Image: etcdImage})
 }
 
 func generateData(ctx context.Context, namespace string, kibishiiData *KibishiiData) error {
