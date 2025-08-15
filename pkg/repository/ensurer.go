@@ -23,13 +23,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // Ensurer ensures that backup repositories are created and ready.

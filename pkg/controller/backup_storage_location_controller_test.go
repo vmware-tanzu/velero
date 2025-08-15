@@ -20,24 +20,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vmware-tanzu/velero/pkg/metrics"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
-
 	"github.com/vmware-tanzu/velero/internal/storage"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
 	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"

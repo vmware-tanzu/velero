@@ -21,15 +21,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
-	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
-
 	"github.com/kopia/kopia/repo"
 	"github.com/kopia/kopia/repo/content"
 	"github.com/kopia/kopia/repo/content/index"
 	"github.com/kopia/kopia/repo/manifest"
 	"github.com/kopia/kopia/repo/object"
+	"github.com/pkg/errors"
+
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 )
 
 // shimRepository which is one adapter for unified repo and kopia.

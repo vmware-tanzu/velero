@@ -46,13 +46,12 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/datapath"
 	datapathmockes "github.com/vmware-tanzu/velero/pkg/datapath/mocks"
 	"github.com/vmware-tanzu/velero/pkg/exposer"
+	exposermockes "github.com/vmware-tanzu/velero/pkg/exposer/mocks"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	exposermockes "github.com/vmware-tanzu/velero/pkg/exposer/mocks"
 )
 
 const dataDownloadName string = "datadownload-1"

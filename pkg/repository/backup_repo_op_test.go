@@ -18,16 +18,13 @@ package repository
 
 import (
 	"fmt"
-
-	"github.com/stretchr/testify/assert"
-
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
