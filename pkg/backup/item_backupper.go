@@ -714,6 +714,13 @@ func (ib *itemBackupper) getMatchAction(obj runtime.Unstructured, groupResource 
 
 		pvName := pvc.Spec.VolumeName
 		if pvName == "" {
+			// For unbound PVCs, check if there's a volume policy that applies
+			vfd := resourcepolicies.NewVolumeFilterData(nil, nil, pvc)
+			if action, err := ib.backupRequest.ResPolicies.GetMatchAction(vfd); err != nil {
+				return nil, errors.WithStack(err)
+			} else if action != nil {
+				return action, nil
+			}
 			return nil, errors.Errorf("PVC has no volume backing this claim")
 		}
 
