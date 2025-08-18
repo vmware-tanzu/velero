@@ -26,6 +26,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -83,12 +84,28 @@ func (e *ExcludeFromBackup) CreateResources() error {
 		velerov1api.ExcludeFromBackupLabel: "false",
 	}
 	fmt.Printf("Creating resources in namespace ...%s\n", namespace)
-	if err := CreateNamespace(e.Ctx, e.Client, namespace); err != nil {
+
+	nsLabels := make(map[string]string)
+	if e.VeleroCfg.WorkerOS == common.WorkerOSWindows {
+		nsLabels = map[string]string{
+			"pod-security.kubernetes.io/enforce":         "privileged",
+			"pod-security.kubernetes.io/enforce-version": "latest",
+		}
+	}
+
+	if err := CreateNamespaceWithLabel(e.Ctx, e.Client, namespace, nsLabels); err != nil {
 		return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 	}
 	//Create deployment: to be included
 	fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
-	deployment := NewDeployment(e.CaseBaseName, namespace, e.replica, label2, e.VeleroCfg.ImageRegistryProxy).Result()
+	deployment := NewDeployment(
+		e.CaseBaseName,
+		namespace,
+		e.replica,
+		label2,
+		e.VeleroCfg.ImageRegistryProxy,
+		e.VeleroCfg.WorkerOS,
+	).Result()
 	deployment, err := CreateDeployment(e.Client.ClientGo, namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))

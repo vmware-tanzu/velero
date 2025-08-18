@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -11,6 +12,7 @@ import (
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
@@ -65,7 +67,14 @@ func (p *PVBackupFiltering) Init() error {
 func (p *PVBackupFiltering) CreateResources() error {
 	for _, ns := range *p.NSIncluded {
 		By(fmt.Sprintf("Create namespaces %s for workload\n", ns), func() {
-			Expect(CreateNamespace(p.Ctx, p.Client, ns)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
+			labels := make(map[string]string)
+			if p.VeleroCfg.WorkerOS == common.WorkerOSWindows {
+				labels = map[string]string{
+					"pod-security.kubernetes.io/enforce":         "privileged",
+					"pod-security.kubernetes.io/enforce-version": "latest",
+				}
+			}
+			Expect(CreateNamespaceWithLabel(p.Ctx, p.Client, ns, labels)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", ns))
 		})
 		var pods []string
 		By(fmt.Sprintf("Deploy a few pods with several PVs in namespace %s", ns), func() {
@@ -87,8 +96,18 @@ func (p *PVBackupFiltering) CreateResources() error {
 				podName := fmt.Sprintf("pod-%d", i)
 				pods = append(pods, podName)
 				By(fmt.Sprintf("Create pod %s in namespace %s", podName, ns), func() {
-					pod, err := CreatePod(p.Client, ns, podName, StorageClassName, "",
-						volumes, nil, nil, p.VeleroCfg.ImageRegistryProxy)
+					pod, err := CreatePod(
+						p.Client,
+						ns,
+						podName,
+						StorageClassName,
+						"",
+						volumes,
+						nil,
+						nil,
+						p.VeleroCfg.ImageRegistryProxy,
+						p.VeleroCfg.WorkerOS,
+					)
 					Expect(err).To(Succeed())
 					ann := map[string]string{
 						p.annotation: volumesToAnnotation,
@@ -116,7 +135,6 @@ func (p *PVBackupFiltering) CreateResources() error {
 				for i, pod := range p.podsList[index] {
 					for j := range p.volumesList[i] {
 						Expect(CreateFileToPod(
-							p.Ctx,
 							ns,
 							pod,
 							pod,
@@ -207,16 +225,20 @@ func fileExist(
 	volume string,
 	workerOS string,
 ) error {
-	c, _, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME, workerOS)
+	c, _, err := ReadFileFromPodVolume(namespace, podName, podName, volume, FILE_NAME, workerOS)
 	if err != nil {
+		fmt.Printf("Fail to read file %s from volume %s of pod %s in %s: %s",
+			FILE_NAME, volume, podName, namespace, err.Error(),
+		)
 		return errors.Wrap(err, fmt.Sprintf("Fail to read file %s from volume %s of pod %s in %s ",
 			FILE_NAME, volume, podName, namespace))
 	}
-	c = strings.Replace(c, "\n", "", -1)
-	origin_content := strings.Replace(CreateFileContent(namespace, podName, volume), "\n", "", -1)
+	c = strings.TrimRightFunc(c, unicode.IsSpace)
+	origin_content := strings.TrimRightFunc(CreateFileContent(namespace, podName, volume), unicode.IsSpace)
 	if c == origin_content {
 		return nil
 	} else {
+		fmt.Printf("Content not match: \n origin: %s\n result: %s\n", origin_content, c)
 		return errors.New(fmt.Sprintf("UNEXPECTED: File %s does not exist in volume %s of pod %s in namespace %s.",
 			FILE_NAME, volume, podName, namespace))
 	}
@@ -228,7 +250,7 @@ func fileNotExist(
 	volume string,
 	workerOS string,
 ) error {
-	_, _, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME, workerOS)
+	_, _, err := ReadFileFromPodVolume(namespace, podName, podName, volume, FILE_NAME, workerOS)
 	if err != nil {
 		return nil
 	} else {

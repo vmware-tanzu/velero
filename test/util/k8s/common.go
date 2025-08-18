@@ -323,7 +323,6 @@ func WriteRandomDataToFileInPod(ctx context.Context, namespace, podName, contain
 }
 
 func CreateFileToPod(
-	ctx context.Context,
 	namespace string,
 	podName string,
 	containerName string,
@@ -345,8 +344,9 @@ func CreateFileToPod(
 	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", shell, shellParameter, fmt.Sprintf("echo ns-%s pod-%s volume-%s  > %s", namespace, podName, volume, filePath)}
 
-	cmd := exec.CommandContext(ctx, "kubectl", arg...)
+	cmd := exec.CommandContext(context.Background(), "kubectl", arg...)
 	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
+
 	return cmd.Run()
 }
 
@@ -359,9 +359,9 @@ func FileExistInPV(
 	filename string,
 	workerOS string,
 ) (bool, error) {
-	stdout, stderr, err := ReadFileFromPodVolume(ctx, namespace, podName, containerName, volume, filename, workerOS)
+	stdout, stderr, err := ReadFileFromPodVolume(namespace, podName, containerName, volume, filename, workerOS)
 
-	output := fmt.Sprintf("%s:%s", stdout, stderr)
+	output := fmt.Sprintf("%s:%s:%s", stdout, stderr, err)
 
 	if workerOS == common.WorkerOSWindows {
 		if strings.Contains(output, "The system cannot find the file specified") {
@@ -380,8 +380,8 @@ func FileExistInPV(
 			filename, volume, podName, namespace))
 	}
 }
+
 func ReadFileFromPodVolume(
-	ctx context.Context,
 	namespace string,
 	podName string,
 	containerName string,
@@ -391,16 +391,20 @@ func ReadFileFromPodVolume(
 ) (string, string, error) {
 	arg := []string{"exec", "-n", namespace, "-c", containerName, podName,
 		"--", "cat", fmt.Sprintf("/%s/%s", volume, filename)}
+
 	if workerOS == common.WorkerOSWindows {
 		arg = []string{"exec", "-n", namespace, "-c", containerName, podName,
-			"--", "cmd", "/c", fmt.Sprintf("type C:\\%s\\%s", volume, filename)}
+			"--", "cmd", "/c", "type", fmt.Sprintf("C:\\%s\\%s", volume, filename)}
 	}
 
-	cmd := exec.CommandContext(ctx, "kubectl", arg...)
-	fmt.Printf("Kubectl exec cmd =%v\n", cmd)
+	cmd := exec.CommandContext(context.Background(), "kubectl", arg...)
+	fmt.Printf("kubectl exec cmd =%v\n", cmd)
+
 	stdout, stderr, err := veleroexec.RunCommand(cmd)
 	fmt.Printf("stdout: %s\n", stdout)
 	fmt.Printf("stderr: %s\n", stderr)
+	fmt.Printf("err: %v\n", err)
+
 	return stdout, stderr, err
 }
 
