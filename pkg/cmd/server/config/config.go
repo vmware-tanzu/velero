@@ -117,6 +117,7 @@ var (
 			"secrets",
 			"configmaps",
 			"limitranges",
+			"priorityclasses",
 			"pods",
 			// we fully qualify replicasets.apps because prior to Kubernetes 1.16, replicasets also
 			// existed in the extensions API group, but we back up replicasets from "apps" so we want
