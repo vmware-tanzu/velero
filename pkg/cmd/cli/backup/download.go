@@ -89,11 +89,7 @@ func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Fac
 	cmd.CheckError(err)
 
 	backup := new(velerov1api.Backup)
-	if err := kbClient.Get(context.Background(), controllerclient.ObjectKey{Namespace: f.Namespace(), Name: o.Name}, backup); err != nil {
-		return err
-	}
-
-	return nil
+	return kbClient.Get(context.Background(), controllerclient.ObjectKey{Namespace: f.Namespace(), Name: o.Name}, backup)
 }
 
 func (o *DownloadOptions) Complete(args []string) error {

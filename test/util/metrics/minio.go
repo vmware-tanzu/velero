@@ -27,7 +27,6 @@ func GetMinioDiskUsage(cloudCredentialsFile string, bslBucket string, bslPrefix 
 	toatalSize, err := aws.GetMinioBucketSize(cloudCredentialsFile, bslBucket, bslPrefix, bslConfig)
 	if err != nil {
 		return 0, errors.Errorf("a Failed to get minio bucket size with err %v", err)
-	} else {
-		return toatalSize, nil
 	}
+	return toatalSize, nil
 }

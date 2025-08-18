@@ -75,11 +75,7 @@ func StreamWithBSLCACert(
 		return err
 	}
 
-	if err := download(ctx, downloadURL, kind, w, insecureSkipTLSVerify, caCertFile, bslCACert); err != nil {
-		return err
-	}
-
-	return nil
+	return download(ctx, downloadURL, kind, w, insecureSkipTLSVerify, caCertFile, bslCACert)
 }
 
 func getDownloadURL(

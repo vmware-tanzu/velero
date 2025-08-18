@@ -1245,12 +1245,11 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 					// Return early because we don't want to restore the PV itself, we
 					// want to dynamically re-provision it.
 					return warnings, errs, itemExists
-				} else {
-					obj, err = ctx.handleSkippedPVHasRetainPolicy(obj, restoreLogger)
-					if err != nil {
-						errs.Add(namespace, err)
-						return warnings, errs, itemExists
-					}
+				}
+				obj, err = ctx.handleSkippedPVHasRetainPolicy(obj, restoreLogger)
+				if err != nil {
+					errs.Add(namespace, err)
+					return warnings, errs, itemExists
 				}
 			}
 		} else {

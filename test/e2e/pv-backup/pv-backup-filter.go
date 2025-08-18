@@ -216,10 +216,9 @@ func fileExist(
 	origin_content := strings.Replace(CreateFileContent(namespace, podName, volume), "\n", "", -1)
 	if c == origin_content {
 		return nil
-	} else {
-		return errors.New(fmt.Sprintf("UNEXPECTED: File %s does not exist in volume %s of pod %s in namespace %s.",
-			FILE_NAME, volume, podName, namespace))
 	}
+	return errors.New(fmt.Sprintf("UNEXPECTED: File %s does not exist in volume %s of pod %s in namespace %s.",
+		FILE_NAME, volume, podName, namespace))
 }
 func fileNotExist(
 	ctx context.Context,
@@ -231,8 +230,7 @@ func fileNotExist(
 	_, _, err := ReadFileFromPodVolume(ctx, namespace, podName, podName, volume, FILE_NAME, workerOS)
 	if err != nil {
 		return nil
-	} else {
-		return errors.New(fmt.Sprintf("UNEXPECTED: File %s exist in volume %s of pod %s in namespace %s.",
-			FILE_NAME, volume, podName, namespace))
 	}
+	return errors.New(fmt.Sprintf("UNEXPECTED: File %s exist in volume %s of pod %s in namespace %s.",
+		FILE_NAME, volume, podName, namespace))
 }

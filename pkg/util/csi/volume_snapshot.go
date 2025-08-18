@@ -185,9 +185,8 @@ func EnsureDeleteVS(ctx context.Context, snapshotClient snapshotter.SnapshotV1In
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return errors.Errorf("timeout to assure VolumeSnapshot %s is deleted, finalizers in VS %v", vsName, updated.Finalizers)
-		} else {
-			return errors.Wrapf(err, "error to assure VolumeSnapshot is deleted, %s", vsName)
 		}
+		return errors.Wrapf(err, "error to assure VolumeSnapshot is deleted, %s", vsName)
 	}
 
 	return nil
@@ -244,9 +243,8 @@ func EnsureDeleteVSC(ctx context.Context, snapshotClient snapshotter.SnapshotV1I
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return errors.Errorf("timeout to assure VolumeSnapshotContent %s is deleted, finalizers in VSC %v", vscName, updated.Finalizers)
-		} else {
-			return errors.Wrapf(err, "error to assure VolumeSnapshotContent is deleted, %s", vscName)
 		}
+		return errors.Wrapf(err, "error to assure VolumeSnapshotContent is deleted, %s", vscName)
 	}
 
 	return nil
@@ -672,11 +670,10 @@ func WaitUntilVSCHandleIsReady(
 				return nil,
 					errors.Errorf("CSI got timed out with error: %v",
 						*vsc.Status.Error.Message)
-			} else {
-				log.Errorf(
-					"Timed out awaiting reconciliation of volumesnapshot %s/%s",
-					volSnap.Namespace, volSnap.Name)
 			}
+			log.Errorf(
+				"Timed out awaiting reconciliation of volumesnapshot %s/%s",
+				volSnap.Namespace, volSnap.Name)
 		}
 		return nil, err
 	}
