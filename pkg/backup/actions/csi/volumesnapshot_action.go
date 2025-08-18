@@ -210,7 +210,7 @@ func (p *volumeSnapshotBackupItemAction) Execute(
 	p.log.Infof("Returning from VolumeSnapshotBackupItemAction with %d additionalItems to backup",
 		len(additionalItems))
 	for _, ai := range additionalItems {
-		p.log.Debugf("%s: %s", ai.GroupResource.String(), ai.Name)
+		p.log.Debugf("%s: %s", ai.String(), ai.Name)
 	}
 
 	operationID := ""

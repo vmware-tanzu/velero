@@ -191,14 +191,14 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 	// Nothing Selector, i.e. a selector that matches nothing. We want
 	// a selector that matches everything. This can be accomplished by
 	// passing a non-nil empty LabelSelector.
-	ls := req.Restore.Spec.LabelSelector
+	ls := req.Spec.LabelSelector
 	if ls == nil {
 		ls = &metav1.LabelSelector{}
 	}
 
 	var OrSelectors []labels.Selector
-	if req.Restore.Spec.OrLabelSelectors != nil {
-		for _, s := range req.Restore.Spec.OrLabelSelectors {
+	if req.Spec.OrLabelSelectors != nil {
+		for _, s := range req.Spec.OrLabelSelectors {
 			labelAsSelector, err := metav1.LabelSelectorAsSelector(s)
 			if err != nil {
 				return results.Result{}, results.Result{Velero: []string{err.Error()}}
@@ -215,25 +215,25 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 	// Get resource includes-excludes.
 	resourceIncludesExcludes := collections.GetResourceIncludesExcludes(
 		kr.discoveryHelper,
-		req.Restore.Spec.IncludedResources,
-		req.Restore.Spec.ExcludedResources,
+		req.Spec.IncludedResources,
+		req.Spec.ExcludedResources,
 	)
 
 	// Get resource status includes-excludes. Defaults to excluding all resources
 	var restoreStatusIncludesExcludes *collections.IncludesExcludes
 
-	if req.Restore.Spec.RestoreStatus != nil {
+	if req.Spec.RestoreStatus != nil {
 		restoreStatusIncludesExcludes = collections.GetResourceIncludesExcludes(
 			kr.discoveryHelper,
-			req.Restore.Spec.RestoreStatus.IncludedResources,
-			req.Restore.Spec.RestoreStatus.ExcludedResources,
+			req.Spec.RestoreStatus.IncludedResources,
+			req.Spec.RestoreStatus.ExcludedResources,
 		)
 	}
 
 	// Get namespace includes-excludes.
 	namespaceIncludesExcludes := collections.NewIncludesExcludes().
 		Includes(req.Restore.Spec.IncludedNamespaces...).
-		Excludes(req.Restore.Spec.ExcludedNamespaces...)
+		Excludes(req.Spec.ExcludedNamespaces...)
 
 	resolvedActions, err := restoreItemActionResolver.ResolveActions(kr.discoveryHelper, kr.logger)
 	if err != nil {
@@ -241,7 +241,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 	}
 
 	podVolumeTimeout := kr.podVolumeTimeout
-	if val := req.Restore.Annotations[velerov1api.PodVolumeOperationTimeoutAnnotation]; val != "" {
+	if val := req.Annotations[velerov1api.PodVolumeOperationTimeoutAnnotation]; val != "" {
 		parsed, err := time.ParseDuration(val)
 		if err != nil {
 			req.Log.WithError(errors.WithStack(err)).Errorf(
@@ -280,7 +280,7 @@ func (kr *kubernetesRestorer) RestoreWithResolvers(
 	pvRestorer := &pvRestorer{
 		logger:                  req.Log,
 		backup:                  req.Backup,
-		restorePVs:              req.Restore.Spec.RestorePVs,
+		restorePVs:              req.Spec.RestorePVs,
 		volumeSnapshots:         req.VolumeSnapshots,
 		volumeSnapshotterGetter: volumeSnapshotterGetter,
 		kbclient:                kr.kbClient,
@@ -759,7 +759,7 @@ func (ctx *restoreContext) processSelectedResource(
 					selectedItem.targetNamespace,
 					fmt.Errorf(
 						"error decoding %q: %v",
-						strings.Replace(selectedItem.path, ctx.restoreDir+"/", "", -1),
+						strings.ReplaceAll(selectedItem.path, ctx.restoreDir+"/", ""),
 						err,
 					),
 				)
@@ -1324,7 +1324,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		}
 
 		restoreLogger.Infof("Executing item action for %v", &groupResource)
-		executeOutput, err := action.RestoreItemAction.Execute(&velero.RestoreItemActionExecuteInput{
+		executeOutput, err := action.Execute(&velero.RestoreItemActionExecuteInput{
 			Item:           obj,
 			ItemFromBackup: itemFromBackup,
 			Restore:        ctx.restore,
@@ -1346,7 +1346,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				Spec: itemoperation.RestoreOperationSpec{
 					RestoreName:        ctx.restore.Name,
 					RestoreUID:         string(ctx.restore.UID),
-					RestoreItemAction:  action.RestoreItemAction.Name(),
+					RestoreItemAction:  action.Name(),
 					ResourceIdentifier: resourceIdentifier,
 					OperationID:        executeOutput.OperationID,
 				},
@@ -1372,7 +1372,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 
 		var filteredAdditionalItems []velero.ResourceIdentifier
 		for _, additionalItem := range executeOutput.AdditionalItems {
-			itemPath := archive.GetItemFilePath(ctx.restoreDir, additionalItem.GroupResource.String(), additionalItem.Namespace, additionalItem.Name)
+			itemPath := archive.GetItemFilePath(ctx.restoreDir, additionalItem.String(), additionalItem.Namespace, additionalItem.Name)
 
 			if _, err := ctx.fileSystem.Stat(itemPath); err != nil {
 				restoreLogger.WithError(err).WithFields(logrus.Fields{
@@ -1606,12 +1606,13 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 					restoreLogger.Infof("restore API has resource policy defined %s, executing restore workflow accordingly for changed resource %s %s", resourcePolicy, fromCluster.GroupVersionKind().Kind, kube.NamespaceAndName(fromCluster))
 
 					// existingResourcePolicy is set as none, add warning
-					if resourcePolicy == velerov1api.PolicyTypeNone {
+					switch resourcePolicy {
+					case velerov1api.PolicyTypeNone:
 						e := errors.Errorf("could not restore, %s %q already exists. Warning: the in-cluster version is different than the backed-up version",
 							obj.GetKind(), obj.GetName())
 						warnings.Add(namespace, e)
 						// existingResourcePolicy is set as update, attempt patch on the resource and add warning if it fails
-					} else if resourcePolicy == velerov1api.PolicyTypeUpdate {
+					case velerov1api.PolicyTypeUpdate:
 						// processing update as existingResourcePolicy
 						warningsFromUpdateRP, errsFromUpdateRP := ctx.processUpdateResourcePolicy(fromCluster, fromClusterWithLabels, obj, namespace, resourceClient)
 						if warningsFromUpdateRP.IsEmpty() && errsFromUpdateRP.IsEmpty() {
@@ -2327,7 +2328,7 @@ func (ctx *restoreContext) getSelectedRestoreableItems(resource string, original
 				targetNamespace,
 				fmt.Errorf(
 					"error decoding %q: %v",
-					strings.Replace(itemPath, ctx.restoreDir+"/", "", -1),
+					strings.ReplaceAll(itemPath, ctx.restoreDir+"/", ""),
 					err,
 				),
 			)
