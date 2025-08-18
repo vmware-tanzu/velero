@@ -123,7 +123,7 @@ func (p *PVBackupFiltering) CreateResources() error {
 							p.volumesList[i][j],
 							FILE_NAME,
 							CreateFileContent(ns, pod, p.volumesList[i][j]),
-							WorkerOSLinux,
+							p.VeleroCfg.WorkerOS,
 						)).To(Succeed())
 					}
 				}
