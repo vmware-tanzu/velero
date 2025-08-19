@@ -3,6 +3,8 @@ title: "Node-agent Concurrency"
 layout: docs
 ---
 
+> **📖 For a comprehensive guide** covering all node-agent configuration options, see [Node-agent Configuration](node-agent-config.md).
+
 Velero node-agent is a daemonset hosting modules to complete the concrete tasks of backups/restores, i.e., file system backup/restore, CSI snapshot data movement.  
 Varying from the data size, data complexity, resource availability, the tasks may take a long time and remarkable resources (CPU, memory, network bandwidth, etc.). These tasks make the loads of node-agent.
 
@@ -23,7 +25,7 @@ You can specify different concurrent number per node, for example, you can set 3
 The range of Per-node concurrent number is the same with Global concurrent number. Per-node concurrent number is preferable to Global concurrent number, so it will overwrite the Global concurrent number for that node.
 
 Per-node concurrent number is implemented through ```perNodeConfig``` field in ```loadConcurrency```.
-```perNodeConfig``` is a list of ```RuledConfigs``` each item of which matches one or more nodes by label selectors and specify the concurrent number for the matched nodes.  
+`perNodeConfig` is a list of `RuledConfigs` each item of which matches one or more nodes by label selectors and specify the concurrent number for the matched nodes.  
 Here is an example of the ```perNodeConfig``:
 ```
 "nodeSelector: kubernetes.io/hostname=node1; number: 3"
@@ -79,3 +81,11 @@ spec:
       - args:
         - --node-agent-configmap=<ConfigMap name>
 ```
+
+## Related Documentation
+
+- [Node-agent Configuration](node-agent-config.md) - Complete reference for all configuration options
+- [Node Selection for Data Movement](data-movement-node-selection.md) - Configure which nodes run data movement
+- [Data Movement Pod Resource Configuration](data-movement-pod-resource-configuration.md) - Configure pod resources
+- [BackupPVC Configuration](data-movement-backup-pvc-configuration.md) - Configure backup storage
+- [RestorePVC Configuration](data-movement-restore-pvc-configuration.md) - Configure restore storage

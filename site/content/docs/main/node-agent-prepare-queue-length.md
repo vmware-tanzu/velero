@@ -3,6 +3,8 @@ title: "Node-agent Prepare Queue Length"
 layout: docs
 ---
 
+> **📖 For a comprehensive guide** covering all node-agent configuration options, see [Node-agent Configuration](node-agent-config.md).
+
 During [CSI Snapshot Data Movement][1], Velero built-in data mover launches data mover pods to run the data transfer.  
 During [fs-backup][2], Velero also launches data mover pods to run the data transfer.  
 Other intermediate resources may also be created along with the data mover pods, i.e., PVCs, VolumeSnapshots, VolumeSnapshotContents, etc.  
@@ -41,6 +43,15 @@ spec:
       - args:
         - --node-agent-config=<configMap name>
 ```
+
+## Related Documentation
+
+- [Node-agent Configuration](node-agent-config.md) - Complete reference for all configuration options
+- [Node-agent Concurrency](node-agent-concurrency.md) - Configure concurrent operations per node
+- [Node Selection for Data Movement](data-movement-node-selection.md) - Configure which nodes run data movement
+- [Data Movement Pod Resource Configuration](data-movement-pod-resource-configuration.md) - Configure pod resources
+- [BackupPVC Configuration](data-movement-backup-pvc-configuration.md) - Configure backup storage
+- [RestorePVC Configuration](data-movement-restore-pvc-configuration.md) - Configure restore storage
 
 [1]: csi-snapshot-data-movement.md
 [2]: file-system-backup.md

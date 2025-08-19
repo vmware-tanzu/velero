@@ -3,6 +3,8 @@ title: "Data Movement Pod Resource Configuration"
 layout: docs
 ---
 
+> **📖 For a comprehensive guide** covering all node-agent configuration options, see [Node-agent Configuration](node-agent-config.md).
+
 During [CSI Snapshot Data Movement][1], Velero built-in data mover launches data mover pods to run the data transfer.  
 During [fs-backup][2], Velero also launches data mover pods to run the data transfer.  
 The data transfer is a time and resource consuming activity.  
@@ -122,6 +124,14 @@ kubectl create cm node-agent-config -n velero --from-file=node-agent-config.json
 ```
 
 **Note**: If the specified priority class doesn't exist in the cluster when data mover pods are created, the pods will fail to schedule. Velero validates the priority class at startup and logs a warning if it doesn't exist, but the pods will still attempt to use it.
+
+## Related Documentation
+
+- [Node-agent Configuration](node-agent-config.md) - Complete reference for all configuration options
+- [Node-agent Concurrency](node-agent-concurrency.md) - Configure concurrent operations per node
+- [Node Selection for Data Movement](data-movement-node-selection.md) - Configure which nodes run data movement
+- [BackupPVC Configuration](data-movement-backup-pvc-configuration.md) - Configure backup storage
+- [RestorePVC Configuration](data-movement-restore-pvc-configuration.md) - Configure restore storage
 
 [1]: csi-snapshot-data-movement.md
 [2]: file-system-backup.md

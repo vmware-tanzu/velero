@@ -3,6 +3,8 @@ title: "BackupPVC Configuration for Data Movement Backup"
 layout: docs
 ---
 
+> **📖 For a comprehensive guide** covering all node-agent configuration options, see [Node-agent Configuration](node-agent-config.md).
+
 `BackupPVC`  is an intermediate PVC to access data from during the data movement backup operation.
 
 In some scenarios users may need to configure some advanced options of the backupPVC so that the data movement backup
@@ -69,3 +71,11 @@ timeout (data movement prepare timeout value is 30m by default).
 if the volume is not readOnly.
 - If any of the above problems occur, then the DataUpload CR is `canceled` after timeout, and the backupPod and backupPVC will be deleted, and the backup
 will be marked as `PartiallyFailed`.
+
+## Related Documentation
+
+- [Node-agent Configuration](node-agent-config.md) - Complete reference for all configuration options
+- [Node-agent Concurrency](node-agent-concurrency.md) - Configure concurrent operations per node
+- [Node Selection for Data Movement](data-movement-node-selection.md) - Configure which nodes run data movement
+- [Data Movement Pod Resource Configuration](data-movement-pod-resource-configuration.md) - Configure pod resources
+- [RestorePVC Configuration](data-movement-restore-pvc-configuration.md) - Configure restore storage
