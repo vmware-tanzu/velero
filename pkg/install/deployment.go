@@ -60,7 +60,6 @@ type podTemplateConfig struct {
 	nodeAgentConfigMap              string
 	itemBlockWorkerCount            int
 	concurrentBackups               int
-	pvcForTmp                       string
 	forWindows                      bool
 	kubeletRootDir                  string
 	nodeAgentDisableHostPath        bool
@@ -229,12 +228,6 @@ func WithItemBlockWorkerCount(itemBlockWorkerCount int) podTemplateOption {
 func WithConcurrentBackups(concurrentBackups int) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.concurrentBackups = concurrentBackups
-	}
-}
-
-func WithPVCForTmp(pvcForTmp string) podTemplateOption {
-	return func(c *podTemplateConfig) {
-		c.pvcForTmp = pvcForTmp
 	}
 }
 
@@ -436,28 +429,6 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1api.Deployme
 				},
 			},
 		},
-	}
-
-	if c.pvcForTmp != "" {
-		deployment.Spec.Template.Spec.Volumes = append(
-			deployment.Spec.Template.Spec.Volumes,
-			corev1api.Volume{
-				Name: "tmp",
-				VolumeSource: corev1api.VolumeSource{
-					PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
-						ClaimName: c.pvcForTmp,
-					},
-				},
-			},
-		)
-
-		deployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(
-			deployment.Spec.Template.Spec.Containers[0].VolumeMounts,
-			corev1api.VolumeMount{
-				Name:      "tmp",
-				MountPath: "/tmp",
-			},
-		)
 	}
 
 	if c.withSecret {
