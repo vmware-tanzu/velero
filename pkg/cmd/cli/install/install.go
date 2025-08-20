@@ -90,7 +90,6 @@ type Options struct {
 	NodeAgentConfigMap              string
 	ItemBlockWorkerCount            int
 	ConcurrentBackups               int
-	PVCForTmp                       string
 	NodeAgentDisableHostPath        bool
 	kubeletRootDir                  string
 	ServerPriorityClassName         string
@@ -191,12 +190,6 @@ func (o *Options) BindFlags(flags *pflag.FlagSet) {
 		"node-agent-configmap",
 		o.NodeAgentConfigMap,
 		"The name of ConfigMap containing node-agent configurations.",
-	)
-	flags.StringVar(
-		&o.PVCForTmp,
-		"pvc-for-tmp",
-		o.PVCForTmp,
-		"The name of PVC to be used as /tmp dir of Velero server pod. Optional.",
 	)
 	flags.IntVar(
 		&o.ItemBlockWorkerCount,
@@ -328,7 +321,6 @@ func (o *Options) AsVeleroOptions() (*install.VeleroOptions, error) {
 		NodeAgentConfigMap:              o.NodeAgentConfigMap,
 		ItemBlockWorkerCount:            o.ItemBlockWorkerCount,
 		ConcurrentBackups:               o.ConcurrentBackups,
-		PVCForTmp:                       o.PVCForTmp,
 		KubeletRootDir:                  o.kubeletRootDir,
 		NodeAgentDisableHostPath:        o.NodeAgentDisableHostPath,
 		ServerPriorityClassName:         o.ServerPriorityClassName,
