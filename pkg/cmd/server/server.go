@@ -26,9 +26,8 @@ import (
 	"strings"
 	"time"
 
-	volumegroupsnapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumegroupsnapshot/v1beta1"
-
 	logrusr "github.com/bombsimon/logrusr/v3"
+	volumegroupsnapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumegroupsnapshot/v1beta1"
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -83,6 +82,7 @@ import (
 	repokey "github.com/vmware-tanzu/velero/pkg/repository/keys"
 	repomanager "github.com/vmware-tanzu/velero/pkg/repository/manager"
 	"github.com/vmware-tanzu/velero/pkg/restore"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -208,6 +208,21 @@ func newServer(f client.Factory, config *config.Config, logger *logrus.Logger) (
 	// That, in turn, causes the velero server to halt when the first informer tries to use it.
 	// Therefore, we must explicitly call it on the error paths in this function.
 	ctx, cancelFunc := context.WithCancel(context.Background())
+
+	if len(config.BackupRepoConfig) > 0 {
+		repoConfig := make(map[string]any)
+		if err := kube.VerifyJSONConfigs(ctx, f.Namespace(), crClient, config.BackupRepoConfig, &repoConfig); err != nil {
+			cancelFunc()
+			return nil, err
+		}
+	}
+
+	if len(config.RepoMaintenanceJobConfig) > 0 {
+		if err := kube.VerifyJSONConfigs(ctx, f.Namespace(), crClient, config.RepoMaintenanceJobConfig, &velerotypes.JobConfigs{}); err != nil {
+			cancelFunc()
+			return nil, err
+		}
+	}
 
 	clientConfig, err := f.ClientConfig()
 	if err != nil {

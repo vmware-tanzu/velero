@@ -22,8 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vmware-tanzu/velero/pkg/nodeagent"
-
 	snapshotv1api "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	snapshotFake "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned/fake"
 	"github.com/pkg/errors"
@@ -56,6 +54,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -242,7 +241,7 @@ func initDataUploaderReconcilerWithError(needError ...error) (*DataUploadReconci
 		dataPathMgr,
 		nil,
 		nil,
-		map[string]nodeagent.BackupPVC{},
+		map[string]velerotypes.BackupPVC{},
 		corev1api.ResourceRequirements{},
 		testclocks.NewFakeClock(now),
 		"test-node",

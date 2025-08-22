@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/csi"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -75,7 +76,7 @@ type CSISnapshotExposeParam struct {
 	Affinity []*kube.LoadAffinity
 
 	// BackupPVCConfig is the config for backupPVC (intermediate PVC) of snapshot data movement
-	BackupPVCConfig map[string]nodeagent.BackupPVC
+	BackupPVCConfig map[string]velerotypes.BackupPVC
 
 	// Resources defines the resource requirements of the hosting pod
 	Resources corev1api.ResourceRequirements
