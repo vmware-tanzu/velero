@@ -24,6 +24,7 @@ import (
 
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -81,13 +82,31 @@ func (p *ParallelFilesUpload) Init() error {
 
 func (p *ParallelFilesUpload) CreateResources() error {
 	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
-		Expect(CreateNamespace(p.Ctx, p.Client, p.namespace)).To(Succeed(),
+		labels := make(map[string]string)
+		if p.VeleroCfg.WorkerOS == common.WorkerOSWindows {
+			labels = map[string]string{
+				"pod-security.kubernetes.io/enforce":         "privileged",
+				"pod-security.kubernetes.io/enforce-version": "latest",
+			}
+		}
+
+		Expect(CreateNamespaceWithLabel(p.Ctx, p.Client, p.namespace, labels)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", p.namespace))
 	})
 
 	By(fmt.Sprintf("Create pod %s in namespace %s", p.pod, p.namespace), func() {
-		_, err := CreatePod(p.Client, p.namespace, p.pod, StorageClassName, p.pvc,
-			[]string{p.volume}, nil, nil, p.VeleroCfg.ImageRegistryProxy)
+		_, err := CreatePod(
+			p.Client,
+			p.namespace,
+			p.pod,
+			StorageClassName,
+			p.pvc,
+			[]string{p.volume},
+			nil,
+			nil,
+			p.VeleroCfg.ImageRegistryProxy,
+			p.VeleroCfg.WorkerOS,
+		)
 		Expect(err).To(Succeed())
 		err = WaitForPods(p.Ctx, p.Client, p.namespace, []string{p.pod})
 		Expect(err).To(Succeed())
