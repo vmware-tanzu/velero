@@ -286,7 +286,7 @@ func (r *PodVolumeBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		asyncBR, err = r.dataPathMgr.CreateMicroServiceBRWatcher(ctx, r.client, r.kubeClient, r.mgr, datapath.TaskTypeBackup,
 			pvb.Name, pvb.Namespace, res.ByPod.HostingPod.Name, res.ByPod.HostingContainer, pvb.Name, callbacks, false, log)
 		if err != nil {
-			if err == datapath.ConcurrentLimitExceed {
+			if errors.Is(err, datapath.ConcurrentLimitExceed) {
 				log.Debug("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 			} else {
@@ -753,7 +753,8 @@ func UpdatePVBStatusToFailed(ctx context.Context, c client.Client, pvb *velerov1
 
 			pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
 			pvb.Status.CompletionTimestamp = &metav1.Time{Time: time}
-			if dataPathError, ok := errOut.(datapath.DataPathError); ok {
+			var dataPathError datapath.DataPathError
+			if errors.As(errOut, &dataPathError) {
 				pvb.Status.SnapshotID = dataPathError.GetSnapshotID()
 			}
 			if len(strings.TrimSpace(msg)) == 0 {
@@ -795,7 +796,7 @@ func (r *PodVolumeBackupReconciler) setupExposeParam(pvb *velerov1api.PodVolumeB
 	hostingPodLabels := map[string]string{velerov1api.PVBLabel: pvb.Name}
 	for _, k := range util.ThirdPartyLabels {
 		if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
-			if err != nodeagent.ErrNodeAgentLabelNotFound {
+			if !errors.Is(err, nodeagent.ErrNodeAgentLabelNotFound) {
 				log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
 			}
 		} else {
@@ -806,7 +807,7 @@ func (r *PodVolumeBackupReconciler) setupExposeParam(pvb *velerov1api.PodVolumeB
 	hostingPodAnnotation := map[string]string{}
 	for _, k := range util.ThirdPartyAnnotations {
 		if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
-			if err != nodeagent.ErrNodeAgentAnnotationNotFound {
+			if !errors.Is(err, nodeagent.ErrNodeAgentAnnotationNotFound) {
 				log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
 			}
 		} else {
@@ -817,7 +818,7 @@ func (r *PodVolumeBackupReconciler) setupExposeParam(pvb *velerov1api.PodVolumeB
 	hostingPodTolerations := []corev1api.Toleration{}
 	for _, k := range util.ThirdPartyTolerations {
 		if v, err := nodeagent.GetToleration(context.Background(), r.kubeClient, pvb.Namespace, k, nodeOS); err != nil {
-			if err != nodeagent.ErrNodeAgentTolerationNotFound {
+			if !errors.Is(err, nodeagent.ErrNodeAgentTolerationNotFound) {
 				log.WithError(err).Warnf("Failed to check node-agent toleration, skip adding host pod toleration %s", k)
 			}
 		} else {

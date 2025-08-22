@@ -67,7 +67,7 @@ func AddAnnotationToPersistentVolume(ctx context.Context, client TestClient, nam
 func ClearClaimRefForFailedPVs(ctx context.Context, client TestClient) error {
 	pvList, err := client.ClientGo.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list PVs: %v", err)
+		return fmt.Errorf("failed to list PVs: %w", err)
 	}
 
 	for _, pv := range pvList.Items {
@@ -77,14 +77,14 @@ func ClearClaimRefForFailedPVs(ctx context.Context, client TestClient) error {
 			retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				pv, getErr := client.ClientGo.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 				if getErr != nil {
-					return fmt.Errorf("failed to get PV %s: %v", pvName, getErr)
+					return fmt.Errorf("failed to get PV %s: %w", pvName, getErr)
 				}
 				pv.Spec.ClaimRef = nil
 				_, updateErr := client.ClientGo.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
 				return updateErr
 			})
 			if retryErr != nil {
-				return fmt.Errorf("failed to clear claimRef for PV %s: %v", pvName, retryErr)
+				return fmt.Errorf("failed to clear claimRef for PV %s: %w", pvName, retryErr)
 			}
 		}
 	}

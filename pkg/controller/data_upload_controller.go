@@ -343,7 +343,7 @@ func (r *DataUploadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		asyncBR, err = r.dataPathMgr.CreateMicroServiceBRWatcher(ctx, r.client, r.kubeClient, r.mgr, datapath.TaskTypeBackup,
 			du.Name, du.Namespace, res.ByPod.HostingPod.Name, res.ByPod.HostingContainer, du.Name, callbacks, false, log)
 		if err != nil {
-			if err == datapath.ConcurrentLimitExceed {
+			if errors.Is(err, datapath.ConcurrentLimitExceed) {
 				log.Debug("Data path instance is concurrent limited requeue later")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 			} else {
@@ -777,7 +777,8 @@ func (r *DataUploadReconciler) updateStatusToFailed(ctx context.Context, du *vel
 			du.Status.StartTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		}
 
-		if dataPathError, ok := err.(datapath.DataPathError); ok {
+		var dataPathError datapath.DataPathError
+		if errors.As(err, &dataPathError) {
 			du.Status.SnapshotID = dataPathError.GetSnapshotID()
 		}
 		du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
@@ -929,7 +930,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 		hostingPodLabels := map[string]string{velerov1api.DataUploadLabel: du.Name}
 		for _, k := range util.ThirdPartyLabels {
 			if v, err := nodeagent.GetLabelValue(context.Background(), r.kubeClient, du.Namespace, k, nodeOS); err != nil {
-				if err != nodeagent.ErrNodeAgentLabelNotFound {
+				if !errors.Is(err, nodeagent.ErrNodeAgentLabelNotFound) {
 					log.WithError(err).Warnf("Failed to check node-agent label, skip adding host pod label %s", k)
 				}
 			} else {
@@ -940,7 +941,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 		hostingPodAnnotation := map[string]string{}
 		for _, k := range util.ThirdPartyAnnotations {
 			if v, err := nodeagent.GetAnnotationValue(context.Background(), r.kubeClient, du.Namespace, k, nodeOS); err != nil {
-				if err != nodeagent.ErrNodeAgentAnnotationNotFound {
+				if !errors.Is(err, nodeagent.ErrNodeAgentAnnotationNotFound) {
 					log.WithError(err).Warnf("Failed to check node-agent annotation, skip adding host pod annotation %s", k)
 				}
 			} else {
@@ -951,7 +952,7 @@ func (r *DataUploadReconciler) setupExposeParam(du *velerov2alpha1api.DataUpload
 		hostingPodTolerations := []corev1api.Toleration{}
 		for _, k := range util.ThirdPartyTolerations {
 			if v, err := nodeagent.GetToleration(context.Background(), r.kubeClient, du.Namespace, k, nodeOS); err != nil {
-				if err != nodeagent.ErrNodeAgentTolerationNotFound {
+				if !errors.Is(err, nodeagent.ErrNodeAgentTolerationNotFound) {
 					log.WithError(err).Warnf("Failed to check node-agent toleration, skip adding host pod toleration %s", k)
 				}
 			} else {

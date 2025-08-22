@@ -481,7 +481,7 @@ func (s *server) veleroResourcesExist() error {
 func (s *server) checkNodeAgent() {
 	// warn if node agent does not exist
 	if kube.WithLinuxNode(s.ctx, s.crClient, s.logger) {
-		if err := nodeagent.IsRunningOnLinux(s.ctx, s.kubeClient, s.namespace); err == nodeagent.ErrDaemonSetNotFound {
+		if err := nodeagent.IsRunningOnLinux(s.ctx, s.kubeClient, s.namespace); errors.Is(err, nodeagent.ErrDaemonSetNotFound) {
 			s.logger.Warn("Velero node agent not found for linux nodes; pod volume backups/restores and data mover backups/restores will not work until it's created")
 		} else if err != nil {
 			s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero node agent for linux nodes")
@@ -489,7 +489,7 @@ func (s *server) checkNodeAgent() {
 	}
 
 	if kube.WithWindowsNode(s.ctx, s.crClient, s.logger) {
-		if err := nodeagent.IsRunningOnWindows(s.ctx, s.kubeClient, s.namespace); err == nodeagent.ErrDaemonSetNotFound {
+		if err := nodeagent.IsRunningOnWindows(s.ctx, s.kubeClient, s.namespace); errors.Is(err, nodeagent.ErrDaemonSetNotFound) {
 			s.logger.Warn("Velero node agent not found for Windows nodes; pod volume backups/restores and data mover backups/restores will not work until it's created")
 		} else if err != nil {
 			s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero node agent for Windows nodes")
