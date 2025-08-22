@@ -120,7 +120,8 @@ func (fs *fileSystemBR) Init(ctx context.Context, param any) error {
 	fs.uploaderProv, err = provider.NewUploaderProvider(ctx, fs.client, initParam.UploaderType, fs.requestorType, initParam.RepoIdentifier,
 		fs.backupLocation, fs.backupRepo, initParam.CredentialGetter, repokey.RepoKeySelector(), fs.log)
 	if err != nil {
-		return errors.Wrapf(err, "error creating uploader %s", initParam.UploaderType)
+		fs.log.Warn("Could not fetch repository credentials secret; filesystem-level backups will not work. If you intentionally disabled secret creation, this is expected.")
+		return errors.Wrapf(err, "error creating uploader %s: repository credentials secret missing or invalid", initParam.UploaderType)
 	}
 
 	fs.initialized = true
