@@ -31,6 +31,7 @@ import (
 	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
@@ -254,7 +255,7 @@ func TestGetConfigs(t *testing.T) {
 		kubeClientObj []runtime.Object
 		namespace     string
 		kubeReactors  []reactor
-		expectResult  *Configs
+		expectResult  *velerotypes.NodeAgentConfigs
 		expectErr     string
 	}{
 		{
@@ -293,7 +294,7 @@ func TestGetConfigs(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				cmWithoutCocurrentData,
 			},
-			expectResult: &Configs{},
+			expectResult: &velerotypes.NodeAgentConfigs{},
 		},
 		{
 			name:      "success",
@@ -301,8 +302,8 @@ func TestGetConfigs(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				cmWithValidData,
 			},
-			expectResult: &Configs{
-				LoadConcurrency: &LoadConcurrency{
+			expectResult: &velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: 5,
 				},
 			},
@@ -313,7 +314,7 @@ func TestGetConfigs(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				cmWithPriorityClass,
 			},
-			expectResult: &Configs{
+			expectResult: &velerotypes.NodeAgentConfigs{
 				PriorityClassName: "high-priority",
 			},
 		},
@@ -323,9 +324,9 @@ func TestGetConfigs(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				cmWithPriorityClassAndOther,
 			},
-			expectResult: &Configs{
+			expectResult: &velerotypes.NodeAgentConfigs{
 				PriorityClassName: "low-priority",
-				LoadConcurrency: &LoadConcurrency{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: 3,
 				},
 			},

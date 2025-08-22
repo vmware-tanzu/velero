@@ -37,8 +37,8 @@ import (
 	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -423,7 +423,7 @@ func TestExpose(t *testing.T) {
 				AccessMode:       AccessModeFileSystem,
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
-				BackupPVCConfig: map[string]nodeagent.BackupPVC{
+				BackupPVCConfig: map[string]velerotypes.BackupPVC{
 					"fake-sc": {
 						StorageClass: "fake-sc-read-only",
 						ReadOnly:     true,
@@ -449,7 +449,7 @@ func TestExpose(t *testing.T) {
 				AccessMode:       AccessModeFileSystem,
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
-				BackupPVCConfig: map[string]nodeagent.BackupPVC{
+				BackupPVCConfig: map[string]velerotypes.BackupPVC{
 					"fake-sc": {
 						StorageClass: "fake-sc-read-only",
 						ReadOnly:     true,
@@ -476,7 +476,7 @@ func TestExpose(t *testing.T) {
 				AccessMode:       AccessModeFileSystem,
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
-				BackupPVCConfig: map[string]nodeagent.BackupPVC{
+				BackupPVCConfig: map[string]velerotypes.BackupPVC{
 					"fake-sc": {
 						StorageClass: "fake-sc-read-only",
 					},
@@ -551,7 +551,7 @@ func TestExpose(t *testing.T) {
 				AccessMode:       AccessModeFileSystem,
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
-				BackupPVCConfig: map[string]nodeagent.BackupPVC{
+				BackupPVCConfig: map[string]velerotypes.BackupPVC{
 					"fake-sc": {
 						StorageClass: "fake-sc-read-only",
 					},
@@ -607,7 +607,7 @@ func TestExpose(t *testing.T) {
 				AccessMode:       AccessModeFileSystem,
 				OperationTimeout: time.Millisecond,
 				ExposeTimeout:    time.Millisecond,
-				BackupPVCConfig: map[string]nodeagent.BackupPVC{
+				BackupPVCConfig: map[string]velerotypes.BackupPVC{
 					"fake-sc": {
 						StorageClass: "fake-sc-read-only",
 					},

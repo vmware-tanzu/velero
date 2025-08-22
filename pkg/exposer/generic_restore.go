@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -65,7 +66,7 @@ type GenericRestoreExposeParam struct {
 	NodeOS string
 
 	// RestorePVCConfig is the config for restorePVC (intermediate PVC) of generic restore
-	RestorePVCConfig nodeagent.RestorePVC
+	RestorePVCConfig velerotypes.RestorePVC
 
 	// LoadAffinity specifies the node affinity of the backup pod
 	LoadAffinity []*kube.LoadAffinity

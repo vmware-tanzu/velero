@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/bombsimon/logrusr/v3"
+	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -39,14 +40,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
+	cacheutil "k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-
-	snapshotv1client "github.com/kubernetes-csi/external-snapshotter/client/v8/clientset/versioned"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
@@ -60,11 +60,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
-
-	cacheutil "k8s.io/client-go/tools/cache"
 )
 
 var (
@@ -140,7 +139,7 @@ type nodeAgentServer struct {
 	kubeClient        kubernetes.Interface
 	csiSnapshotClient *snapshotv1client.Clientset
 	dataPathMgr       *datapath.Manager
-	dataPathConfigs   *nodeagent.Configs
+	dataPathConfigs   *velerotypes.NodeAgentConfigs
 	vgdpCounter       *exposer.VgdpCounter
 }
 
@@ -252,7 +251,9 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 		return nil, err
 	}
 
-	s.getDataPathConfigs()
+	if err := s.getDataPathConfigs(); err != nil {
+		return nil, err
+	}
 	s.dataPathMgr = datapath.NewManager(s.getDataPathConcurrentNum(defaultDataPathConcurrentNum))
 
 	return s, nil
@@ -301,7 +302,7 @@ func (s *nodeAgentServer) run() {
 		s.logger.Infof("Using customized loadAffinity %v", loadAffinity)
 	}
 
-	var backupPVCConfig map[string]nodeagent.BackupPVC
+	var backupPVCConfig map[string]velerotypes.BackupPVC
 	if s.dataPathConfigs != nil && s.dataPathConfigs.BackupPVCConfig != nil {
 		backupPVCConfig = s.dataPathConfigs.BackupPVCConfig
 		s.logger.Infof("Using customized backupPVC config %v", backupPVCConfig)
@@ -361,7 +362,7 @@ func (s *nodeAgentServer) run() {
 		s.logger.WithError(err).Fatal("Unable to create the data upload controller")
 	}
 
-	var restorePVCConfig nodeagent.RestorePVC
+	var restorePVCConfig velerotypes.RestorePVC
 	if s.dataPathConfigs != nil && s.dataPathConfigs.RestorePVCConfig != nil {
 		restorePVCConfig = *s.dataPathConfigs.RestorePVCConfig
 		s.logger.Infof("Using customized restorePVC config %v", restorePVCConfig)
@@ -546,19 +547,20 @@ func (s *nodeAgentServer) markLegacyPVRsFailed(client ctrlclient.Client) {
 
 var getConfigsFunc = nodeagent.GetConfigs
 
-func (s *nodeAgentServer) getDataPathConfigs() {
+func (s *nodeAgentServer) getDataPathConfigs() error {
 	if s.config.nodeAgentConfig == "" {
 		s.logger.Info("No node-agent configMap is specified")
-		return
+		return nil
 	}
 
 	configs, err := getConfigsFunc(s.ctx, s.namespace, s.kubeClient, s.config.nodeAgentConfig)
 	if err != nil {
-		s.logger.WithError(err).Warnf("Failed to get node agent configs from configMap %s, ignore it", s.config.nodeAgentConfig)
-		return
+		s.logger.WithError(err).Errorf("Failed to get node agent configs from configMap %s, ignore it", s.config.nodeAgentConfig)
+		return err
 	}
 
 	s.dataPathConfigs = configs
+	return nil
 }
 
 func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {

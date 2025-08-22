@@ -27,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1api "k8s.io/api/apps/v1"
 	batchv1api "k8s.io/api/batch/v1"
 	corev1api "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -41,11 +42,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/repository/provider"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
-
-	appsv1api "k8s.io/api/apps/v1"
 )
 
 func TestGenerateJobName1(t *testing.T) {
@@ -408,7 +408,7 @@ func TestGetJobConfig(t *testing.T) {
 	testCases := []struct {
 		name           string
 		repoJobConfig  *corev1api.ConfigMap
-		expectedConfig *JobConfigs
+		expectedConfig *velerotypes.JobConfigs
 		expectedError  error
 	}{
 		{
@@ -441,7 +441,7 @@ func TestGetJobConfig(t *testing.T) {
 					"test-default-kopia": "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}]}",
 				},
 			},
-			expectedConfig: &JobConfigs{
+			expectedConfig: &velerotypes.JobConfigs{
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					CPULimit:      "200m",
@@ -475,7 +475,7 @@ func TestGetJobConfig(t *testing.T) {
 					GlobalKeyForRepoMaintenanceJobCM: "{\"podResources\":{\"cpuRequest\":\"50m\",\"cpuLimit\":\"100m\",\"memoryRequest\":\"50Mi\",\"memoryLimit\":\"100Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"n2\"]}]}}]}",
 				},
 			},
-			expectedConfig: &JobConfigs{
+			expectedConfig: &velerotypes.JobConfigs{
 				PodResources: &kube.PodResources{
 					CPURequest:    "50m",
 					CPULimit:      "100m",
@@ -510,7 +510,7 @@ func TestGetJobConfig(t *testing.T) {
 					"test-default-kopia":             "{\"podResources\":{\"cpuRequest\":\"100m\",\"cpuLimit\":\"200m\",\"memoryRequest\":\"100Mi\",\"memoryLimit\":\"200Mi\"},\"loadAffinity\":[{\"nodeSelector\":{\"matchExpressions\":[{\"key\":\"cloud.google.com/machine-family\",\"operator\":\"In\",\"values\":[\"e2\"]}]}}]}",
 				},
 			},
-			expectedConfig: &JobConfigs{
+			expectedConfig: &velerotypes.JobConfigs{
 				KeepLatestMaintenanceJobs: &keepLatestMaintenanceJobs,
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
@@ -930,7 +930,7 @@ func TestBuildJob(t *testing.T) {
 
 	testCases := []struct {
 		name                       string
-		m                          *JobConfigs
+		m                          *velerotypes.JobConfigs
 		deploy                     *appsv1api.Deployment
 		logLevel                   logrus.Level
 		logFormat                  *logging.FormatFlag
@@ -946,7 +946,7 @@ func TestBuildJob(t *testing.T) {
 	}{
 		{
 			name: "Valid maintenance job without third party labels",
-			m: &JobConfigs{
+			m: &velerotypes.JobConfigs{
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					MemoryRequest: "128Mi",
@@ -998,7 +998,7 @@ func TestBuildJob(t *testing.T) {
 		},
 		{
 			name: "Valid maintenance job with third party labels",
-			m: &JobConfigs{
+			m: &velerotypes.JobConfigs{
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					MemoryRequest: "128Mi",
@@ -1047,7 +1047,7 @@ func TestBuildJob(t *testing.T) {
 		},
 		{
 			name: "Error getting Velero server deployment",
-			m: &JobConfigs{
+			m: &velerotypes.JobConfigs{
 				PodResources: &kube.PodResources{
 					CPURequest:    "100m",
 					MemoryRequest: "128Mi",
@@ -1307,7 +1307,7 @@ func mockBackupRepo() *velerov1api.BackupRepository {
 func TestGetPriorityClassName(t *testing.T) {
 	testCases := []struct {
 		name                string
-		config              *JobConfigs
+		config              *velerotypes.JobConfigs
 		priorityClassExists bool
 		expectedValue       string
 		expectedLogContains string
@@ -1315,7 +1315,7 @@ func TestGetPriorityClassName(t *testing.T) {
 	}{
 		{
 			name:                "empty priority class name should return empty string",
-			config:              &JobConfigs{PriorityClassName: ""},
+			config:              &velerotypes.JobConfigs{PriorityClassName: ""},
 			expectedValue:       "",
 			expectedLogContains: "",
 		},
@@ -1327,7 +1327,7 @@ func TestGetPriorityClassName(t *testing.T) {
 		},
 		{
 			name:                "existing priority class should log info and return name",
-			config:              &JobConfigs{PriorityClassName: "high-priority"},
+			config:              &velerotypes.JobConfigs{PriorityClassName: "high-priority"},
 			priorityClassExists: true,
 			expectedValue:       "high-priority",
 			expectedLogContains: "Validated priority class \\\"high-priority\\\" exists in cluster",
@@ -1335,7 +1335,7 @@ func TestGetPriorityClassName(t *testing.T) {
 		},
 		{
 			name:                "non-existing priority class should log warning and still return name",
-			config:              &JobConfigs{PriorityClassName: "missing-priority"},
+			config:              &velerotypes.JobConfigs{PriorityClassName: "missing-priority"},
 			priorityClassExists: false,
 			expectedValue:       "missing-priority",
 			expectedLogContains: "Priority class \\\"missing-priority\\\" not found in cluster",
@@ -1465,7 +1465,7 @@ func TestBuildJobWithPriorityClassName(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create minimal job configs and resources
-			jobConfig := &JobConfigs{
+			jobConfig := &velerotypes.JobConfigs{
 				PriorityClassName: tc.priorityClassName,
 			}
 			logLevel := logrus.InfoLevel

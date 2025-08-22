@@ -27,6 +27,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	appsv1api "k8s.io/api/apps/v1"
 	batchv1api "k8s.io/api/batch/v1"
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,14 +37,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-
-	appsv1api "k8s.io/api/apps/v1"
-
-	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
-
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	veleroutil "github.com/vmware-tanzu/velero/pkg/util/velero"
 )
 
 const (
@@ -57,21 +55,6 @@ const (
 	DefaultMaintenanceJobMemRequest  = "0"
 	DefaultMaintenanceJobMemLimit    = "0"
 )
-
-type JobConfigs struct {
-	// LoadAffinities is the config for repository maintenance job load affinity.
-	LoadAffinities []*kube.LoadAffinity `json:"loadAffinity,omitempty"`
-
-	// PodResources is the config for the CPU and memory resources setting.
-	PodResources *kube.PodResources `json:"podResources,omitempty"`
-
-	// KeepLatestMaintenanceJobs is the number of latest maintenance jobs to keep for the repository.
-	KeepLatestMaintenanceJobs *int `json:"keepLatestMaintenanceJobs,omitempty"`
-
-	// PriorityClassName is the priority class name for the maintenance job pod
-	// Note: This is only read from the global configuration, not per-repository
-	PriorityClassName string `json:"priorityClassName,omitempty"`
-}
 
 func GenerateJobName(repo string) string {
 	millisecond := time.Now().UTC().UnixMilli() // millisecond
@@ -215,7 +198,7 @@ func getJobConfig(
 	veleroNamespace string,
 	repoMaintenanceJobConfig string,
 	repo *velerov1api.BackupRepository,
-) (*JobConfigs, error) {
+) (*velerotypes.JobConfigs, error) {
 	var cm corev1api.ConfigMap
 	if err := client.Get(
 		ctx,
@@ -248,10 +231,10 @@ func getJobConfig(
 	repoJobConfigKey := repo.Spec.VolumeNamespace + "-" +
 		repo.Spec.BackupStorageLocation + "-" + repo.Spec.RepositoryType
 
-	var result *JobConfigs
+	var result *velerotypes.JobConfigs
 	if _, ok := cm.Data[repoJobConfigKey]; ok {
 		logger.Debugf("Find the repo maintenance config %s for repo %s", repoJobConfigKey, repo.Name)
-		result = new(JobConfigs)
+		result = new(velerotypes.JobConfigs)
 		if err := json.Unmarshal([]byte(cm.Data[repoJobConfigKey]), result); err != nil {
 			return nil, errors.Wrapf(
 				err,
@@ -265,10 +248,10 @@ func getJobConfig(
 		logger.Debugf("Find the global repo maintenance config for repo %s", repo.Name)
 
 		if result == nil {
-			result = new(JobConfigs)
+			result = new(velerotypes.JobConfigs)
 		}
 
-		globalResult := new(JobConfigs)
+		globalResult := new(velerotypes.JobConfigs)
 
 		if err := json.Unmarshal([]byte(cm.Data[GlobalKeyForRepoMaintenanceJobCM]), globalResult); err != nil {
 			return nil, errors.Wrapf(
@@ -466,7 +449,7 @@ func StartNewJob(
 	return maintenanceJob.Name, nil
 }
 
-func getPriorityClassName(ctx context.Context, cli client.Client, config *JobConfigs, logger logrus.FieldLogger) string {
+func getPriorityClassName(ctx context.Context, cli client.Client, config *velerotypes.JobConfigs, logger logrus.FieldLogger) string {
 	// Use the priority class name from the global job configuration if available
 	// Note: Priority class is only read from global config, not per-repository
 	if config != nil && config.PriorityClassName != "" {
@@ -491,7 +474,7 @@ func buildJob(
 	ctx context.Context,
 	repo *velerov1api.BackupRepository,
 	bslName string,
-	config *JobConfigs,
+	config *velerotypes.JobConfigs,
 	logLevel logrus.Level,
 	logFormat *logging.FormatFlag,
 	logger logrus.FieldLogger,

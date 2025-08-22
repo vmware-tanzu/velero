@@ -33,6 +33,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client/mocks"
 	"github.com/vmware-tanzu/velero/pkg/cmd/server/config"
 	"github.com/vmware-tanzu/velero/pkg/constant"
@@ -242,7 +243,28 @@ func Test_newServer(t *testing.T) {
 		ClientBurst:    1,
 		ClientPageSize: 100,
 	}, logger)
-	assert.Error(t, err)
+	require.Error(t, err)
+
+	invalidCM := builder.ForConfigMap("velero", "invalid").Data("invalid", "{\"a\": \"b}").Result()
+	crClient := velerotest.NewFakeControllerRuntimeClient(t, invalidCM)
+
+	factory.On("KubeClient").Return(crClient, nil).
+		On("Client").Return(nil, nil).
+		On("DynamicClient").Return(nil, errors.New("error"))
+	_, err = newServer(factory, &config.Config{
+		UploaderType:     uploader.KopiaType,
+		BackupRepoConfig: "invalid",
+	}, logger)
+	require.Error(t, err)
+
+	factory.On("KubeClient").Return(crClient, nil).
+		On("Client").Return(nil, nil).
+		On("DynamicClient").Return(nil, errors.New("error"))
+	_, err = newServer(factory, &config.Config{
+		UploaderType:             uploader.KopiaType,
+		RepoMaintenanceJobConfig: "invalid",
+	}, logger)
+	require.Error(t, err)
 }
 
 func Test_namespaceExists(t *testing.T) {

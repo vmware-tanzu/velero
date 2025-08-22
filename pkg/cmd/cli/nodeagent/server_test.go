@@ -33,6 +33,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	testutil "github.com/vmware-tanzu/velero/pkg/test"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 )
 
 func Test_validatePodVolumesHostPath(t *testing.T) {
@@ -130,17 +131,17 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 }
 
 func Test_getDataPathConfigs(t *testing.T) {
-	configs := &nodeagent.Configs{
-		LoadConcurrency: &nodeagent.LoadConcurrency{
+	configs := &velerotypes.NodeAgentConfigs{
+		LoadConcurrency: &velerotypes.LoadConcurrency{
 			GlobalConfig: -1,
 		},
 	}
 
 	tests := []struct {
 		name          string
-		getFunc       func(context.Context, string, kubernetes.Interface, string) (*nodeagent.Configs, error)
+		getFunc       func(context.Context, string, kubernetes.Interface, string) (*velerotypes.NodeAgentConfigs, error)
 		configMapName string
-		expectConfigs *nodeagent.Configs
+		expectConfigs *velerotypes.NodeAgentConfigs
 		expectLog     string
 	}{
 		{
@@ -150,7 +151,7 @@ func Test_getDataPathConfigs(t *testing.T) {
 		{
 			name:          "failed to get configs",
 			configMapName: "node-agent-config",
-			getFunc: func(context.Context, string, kubernetes.Interface, string) (*nodeagent.Configs, error) {
+			getFunc: func(context.Context, string, kubernetes.Interface, string) (*velerotypes.NodeAgentConfigs, error) {
 				return nil, errors.New("fake-get-error")
 			},
 			expectLog: "Failed to get node agent configs from configMap node-agent-config, ignore it",
@@ -158,7 +159,7 @@ func Test_getDataPathConfigs(t *testing.T) {
 		{
 			name:          "configs cm not found",
 			configMapName: "node-agent-config",
-			getFunc: func(context.Context, string, kubernetes.Interface, string) (*nodeagent.Configs, error) {
+			getFunc: func(context.Context, string, kubernetes.Interface, string) (*velerotypes.NodeAgentConfigs, error) {
 				return nil, errors.New("fake-not-found-error")
 			},
 			expectLog: "Failed to get node agent configs from configMap node-agent-config, ignore it",
@@ -167,7 +168,7 @@ func Test_getDataPathConfigs(t *testing.T) {
 		{
 			name:          "succeed",
 			configMapName: "node-agent-config",
-			getFunc: func(context.Context, string, kubernetes.Interface, string) (*nodeagent.Configs, error) {
+			getFunc: func(context.Context, string, kubernetes.Interface, string) (*velerotypes.NodeAgentConfigs, error) {
 				return configs, nil
 			},
 			expectConfigs: configs,
@@ -226,7 +227,7 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		configs       nodeagent.Configs
+		configs       velerotypes.NodeAgentConfigs
 		setKubeClient bool
 		kubeClientObj []runtime.Object
 		expectNum     int
@@ -239,8 +240,8 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "global number is invalid",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: -1,
 				},
 			},
@@ -249,8 +250,8 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "global number is valid",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
 				},
 			},
@@ -258,10 +259,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "node is not found",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							Number: 100,
 						},
@@ -274,10 +275,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "failed to get selector",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							NodeSelector: invalidLabelSelector,
 							Number:       100,
@@ -292,10 +293,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "rule number is invalid",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							NodeSelector: validLabelSelector1,
 							Number:       -1,
@@ -310,10 +311,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "label doesn't match",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							NodeSelector: validLabelSelector1,
 							Number:       -1,
@@ -328,10 +329,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "match one rule",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							NodeSelector: validLabelSelector1,
 							Number:       66,
@@ -346,10 +347,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "match multiple rules",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							NodeSelector: validLabelSelector1,
 							Number:       66,
@@ -368,10 +369,10 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 		},
 		{
 			name: "match multiple rules 2",
-			configs: nodeagent.Configs{
-				LoadConcurrency: &nodeagent.LoadConcurrency{
+			configs: velerotypes.NodeAgentConfigs{
+				LoadConcurrency: &velerotypes.LoadConcurrency{
 					GlobalConfig: globalNum,
-					PerNodeConfig: []nodeagent.RuledConfigs{
+					PerNodeConfig: []velerotypes.RuledConfigs{
 						{
 							NodeSelector: validLabelSelector1,
 							Number:       36,
