@@ -90,7 +90,9 @@ import (
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
-	config := config.GetDefaultConfig()
+       config := config.GetDefaultConfig()
+
+	var disableRepoCredentialsSecret bool
 
 	var command = &cobra.Command{
 		Use:    "server",
@@ -125,9 +127,13 @@ func NewCommand(f client.Factory) *cobra.Command {
 			s, err := newServer(f, config, logger)
 			cmd.CheckError(err)
 
+			s.disableRepoCredentialsSecret = disableRepoCredentialsSecret
+
 			cmd.CheckError(s.run())
 		},
 	}
+
+	command.Flags().BoolVar(&disableRepoCredentialsSecret, "disable-repo-credentials-secret", false, "If set, do not create the velero-repo-credentials secret (can also be set with DISABLE_REPO_CREDENTIALS_SECRET env var)")
 
 	config.BindFlags(command.Flags())
 
@@ -160,6 +166,7 @@ type server struct {
 	mgr                   manager.Manager
 	credentialFileStore   credentials.FileStore
 	credentialSecretStore credentials.SecretStore
+	disableRepoCredentialsSecret bool
 }
 
 func newServer(f client.Factory, config *config.Config, logger *logrus.Logger) (*server, error) {
@@ -499,7 +506,7 @@ func (s *server) checkNodeAgent() {
 
 func (s *server) initRepoManager() error {
 	// ensure the repo key secret is set up
-	if err := repokey.EnsureCommonRepositoryKey(s.kubeClient.CoreV1(), s.namespace); err != nil {
+	if err := repokey.EnsureCommonRepositoryKey(s.kubeClient.CoreV1(), s.namespace, s.disableRepoCredentialsSecret); err != nil {
 		return err
 	}
 
