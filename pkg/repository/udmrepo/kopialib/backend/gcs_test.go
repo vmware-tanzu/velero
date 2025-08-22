@@ -19,13 +19,12 @@ package backend
 import (
 	"testing"
 
-	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-
 	"github.com/kopia/kopia/repo/blob/gcs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestGcsSetup(t *testing.T) {

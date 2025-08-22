@@ -27,15 +27,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
+	storagev1api "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	crclient "sigs.k8s.io/controller-runtime/pkg/client"
-
-	storagev1api "k8s.io/api/storage/v1"
 	storagev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (

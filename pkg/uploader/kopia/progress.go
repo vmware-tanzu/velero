@@ -20,11 +20,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kopia/kopia/snapshot/upload"
 	"github.com/sirupsen/logrus"
 
 	"github.com/vmware-tanzu/velero/pkg/uploader"
-
-	"github.com/kopia/kopia/snapshot/upload"
 )
 
 // Throttle throttles controlle the interval of output result

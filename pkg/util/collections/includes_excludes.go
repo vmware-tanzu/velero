@@ -19,8 +19,6 @@ package collections
 import (
 	"strings"
 
-	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
-
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -28,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
