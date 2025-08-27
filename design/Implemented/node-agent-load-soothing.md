@@ -114,8 +114,8 @@ In either case, because step 2~3 is short in time, it is less likely to reach th
 
 
 
-[1]: Implemented/unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
-[2]: Implemented/node-agent-concurrency.md
-[3]: Implemented/volume-snapshot-data-movement/volume-snapshot-data-movement.md
-[4]: Implemented/vgdp-micro-service/vgdp-micro-service.md
+[1]: unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
+[2]: node-agent-concurrency.md
+[3]: volume-snapshot-data-movement/volume-snapshot-data-movement.md
+[4]: vgdp-micro-service/vgdp-micro-service.md
 [5]: vgdp-micro-service-for-fs-backup/vgdp-micro-service-for-fs-backup.md
