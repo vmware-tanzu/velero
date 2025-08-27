@@ -650,10 +650,10 @@ CLI is not changed.
 
 
 
-[1]: ../Implemented/unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
-[2]: ../Implemented/volume-snapshot-data-movement/volume-snapshot-data-movement.md
-[3]: ../Implemented/vgdp-micro-service/vgdp-micro-service.md
-[4]: ../Implemented/node-agent-concurrency.md
+[1]: ../unified-repo-and-kopia-integration/unified-repo-and-kopia-integration.md
+[2]: ../volume-snapshot-data-movement/volume-snapshot-data-movement.md
+[3]: ../vgdp-micro-service/vgdp-micro-service.md
+[4]: ../node-agent-concurrency.md
 [5]: https://github.com/vmware-tanzu/velero/issues/8955
 [6]: https://github.com/vmware-tanzu/velero/issues/8956
 [7]: https://github.com/vmware-tanzu/velero/issues/8289
