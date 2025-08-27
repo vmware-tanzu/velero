@@ -26,11 +26,11 @@ In v1.17, Velero fs-backup supports to backup/restore Windows workloads. By leve
 Check design https://github.com/vmware-tanzu/velero/blob/main/design/vgdp-micro-service-for-fs-backup/vgdp-micro-service-for-fs-backup.md for more details.  
 
 #### Volume group snapshot support
-In v1.17, Velero supports volume group snapshots which is a beta feature in Kubernetes upstream (https://kubernetes.io/blog/2024/12/18/kubernetes-1-32-volume-group-snapshot-beta/), for both CSI snapshot backup and CSI snapshot data movement. This allows a snapshot to be taken from multiple volumes at the same point-in-time to achieve write order consistency, which is helpful to achieve better data consistency when multiple volumes being backed up are correlated.  
+In v1.17, Velero supports [volume group snapshots](https://kubernetes.io/blog/2024/12/18/kubernetes-1-32-volume-group-snapshot-beta/) which is a beta feature in Kubernetes upstream, for both CSI snapshot backup and CSI snapshot data movement. This allows a snapshot to be taken from multiple volumes at the same point-in-time to achieve write order consistency, which is helpful to achieve better data consistency when multiple volumes being backed up are correlated.  
 Check the document https://velero.io/docs/main/volume-group-snapshots/ for more details.  
 
 #### Priority class support
-In v1.17, Kubernete priority class (https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass) is supported for all modules across Velero. Specifically, users are allowed to configure priority class to Velero server, node-agent, data mover pods, backup repository maintenance jobs separately.  
+In v1.17, [Kubernetes priority class](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass) is supported for all modules across Velero. Specifically, users are allowed to configure priority class to Velero server, node-agent, data mover pods, backup repository maintenance jobs separately.  
 Check design https://github.com/vmware-tanzu/velero/blob/main/design/Implemented/priority-class-name-support_design.md for more details.  
 
 #### Scalability and Resiliency improvements of data movers
@@ -46,6 +46,10 @@ Check issue https://github.com/vmware-tanzu/velero/issues/8534 for more details.
 In v1.17, CSI snapshot data movement restore acquires the same node-selection capability as backup, that is, users could specify which nodes can/cannot run data mover pods for both backup and restore now. And users are also allowed to configure the node-selection per storage class, which is particularly helpful to the environments where a storage class are not usable by all cluster nodes.  
 Check issue https://github.com/vmware-tanzu/velero/issues/8186 and https://github.com/vmware-tanzu/velero/issues/8223 for more details.  
 
+#### Include/exclude policy support for resource policy
+In v1.17, Velero resource policy supports `includeExcludePolicy` besides the existing `volumePolicy`. This allows users to set include/exclude filters for resources in a resource policy configmap, so that these filters are reusable among multiple backups.  
+Check the document https://velero.io/docs/main/resource-filtering/#creating-resource-policies:~:text=resources%3D%22*%22-,Resource%20policies,-Velero%20provides%20resource for more details.  
+
 ### Runtime and dependencies
 Golang runtime: 1.24.6  
 kopia: 0.21.1  
@@ -54,7 +58,7 @@ kopia: 0.21.1
 
 ### Breaking changes
 #### Deprecation of Restic
-According to [Velero deprecation policy][https://github.com/vmware-tanzu/velero/blob/main/GOVERNANCE.md#deprecation-policy], backup of fs-backup under Restic path is removed in v1.17, so `--uploader-type=restic` is not a valid installation configuration anymore. This means you cannot create a backup under Restic path, but you can still restore from the previous backups under Restic path until v1.19.  
+According to [Velero deprecation policy](https://github.com/vmware-tanzu/velero/blob/main/GOVERNANCE.md#deprecation-policy), backup of fs-backup under Restic path is removed in v1.17, so `--uploader-type=restic` is not a valid installation configuration anymore. This means you cannot create a backup under Restic path, but you can still restore from the previous backups under Restic path until v1.19.  
 
 #### Repository maintenance job configurations are removed from Velero server parameter
 Since the repository maintenance job configurations are moved to repository maintenance job configMap, in v1.17 below Velero sever parameters are removed:
