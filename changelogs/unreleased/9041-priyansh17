@@ -1,1 +1,0 @@
-Removed username/password credential handling from newConfigCredential as azidentity.UsernamePasswordCredentialOptions is reported as deprecated.
