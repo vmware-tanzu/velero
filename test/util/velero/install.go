@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
@@ -56,7 +57,17 @@ type installOptions struct {
 	WorkerOS                         string
 }
 
-func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyCluster bool) error {
+/*
+VeleroInstall is used to install Velero for E2E test
+
+params:
+
+	ctx:              The context
+	veleroCfg:        Velero E2E case configuration
+	isStandbyCluster: Whether Velero is installed on standby cluster
+	objects:          The objects are installed in Velero installed namespace, e.g. the ConfigMaps.
+*/
+func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyCluster bool, objects ...client.Object) error {
 	fmt.Printf("Velero install %s\n", time.Now().Format("2006-01-02 15:04:05"))
 
 	// veleroCfg struct including a set of BSL params and a set of additional BSL params,
@@ -151,6 +162,14 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 			test.BackupRepositoryConfigName,
 			veleroCfg.VeleroNamespace,
 		)
+	}
+
+	// Install the passed-in objects in Velero installed namespace
+	for _, obj := range objects {
+		if err := veleroCfg.ClientToInstallVelero.Kubebuilder.Create(ctx, obj); err != nil {
+			fmt.Printf("fail to create object %s in namespace %s: %s\n", obj.GetName(), obj.GetNamespace(), err.Error())
+			return fmt.Errorf("fail to create object %s in namespace %s: %w", obj.GetName(), obj.GetNamespace(), err)
+		}
 	}
 
 	// For AWS IRSA credential test, AWS IAM service account is required, so if ServiceAccountName and EKSPolicyARN
@@ -790,7 +809,7 @@ func CheckBSL(ctx context.Context, ns string, bslName string) error {
 	return err
 }
 
-func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroConfig) error {
+func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroConfig, objects ...client.Object) error {
 	ready, err := IsVeleroReady(context.Background(), &veleroCfg)
 	if err != nil {
 		fmt.Printf("error in checking velero status with %v", err)
@@ -804,7 +823,7 @@ func PrepareVelero(ctx context.Context, caseName string, veleroCfg test.VeleroCo
 		return nil
 	}
 	fmt.Printf("need to install velero for case %s \n", caseName)
-	return VeleroInstall(context.Background(), &veleroCfg, false)
+	return VeleroInstall(context.Background(), &veleroCfg, false, objects...)
 }
 
 func VeleroUninstall(ctx context.Context, veleroCfg test.VeleroConfig) error {

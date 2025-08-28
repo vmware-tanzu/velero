@@ -342,6 +342,12 @@ func (m *migrationE2E) Restore() error {
 		Expect(veleroutil.InstallStorageClasses(
 			m.VeleroCfg.StandbyClusterCloudProvider)).To(Succeed())
 
+		// Create the needed PriorityClasses
+		Expect(veleroutil.CreatePriorityClasses(
+			context.Background(),
+			test.VeleroCfg.StandbyClient.Kubebuilder,
+		)).To(Succeed())
+
 		if strings.EqualFold(m.VeleroCfg.Features, test.FeatureCSI) &&
 			m.VeleroCfg.UseVolumeSnapshots {
 			By("Install VolumeSnapshotClass for E2E.")
