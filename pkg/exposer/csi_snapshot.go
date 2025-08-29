@@ -188,6 +188,7 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 	backupPVCStorageClass := csiExposeParam.StorageClass
 	backupPVCReadOnly := false
 	spcNoRelabeling := false
+	backupPVCAnnotations := map[string]string{}
 	if value, exists := csiExposeParam.BackupPVCConfig[csiExposeParam.StorageClass]; exists {
 		if value.StorageClass != "" {
 			backupPVCStorageClass = value.StorageClass
@@ -201,9 +202,13 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 				curLog.WithField("vs name", volumeSnapshot.Name).Warn("Ignoring spcNoRelabling for read-write volume")
 			}
 		}
+
+		if len(value.Annotations) > 0 {
+			backupPVCAnnotations = value.Annotations
+		}
 	}
 
-	backupPVC, err := e.createBackupPVC(ctx, ownerObject, backupVS.Name, backupPVCStorageClass, csiExposeParam.AccessMode, volumeSize, backupPVCReadOnly)
+	backupPVC, err := e.createBackupPVC(ctx, ownerObject, backupVS.Name, backupPVCStorageClass, csiExposeParam.AccessMode, volumeSize, backupPVCReadOnly, backupPVCAnnotations)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup pvc")
 	}
@@ -485,7 +490,7 @@ func (e *csiSnapshotExposer) createBackupVSC(ctx context.Context, ownerObject co
 	return e.csiSnapshotClient.VolumeSnapshotContents().Create(ctx, vsc, metav1.CreateOptions{})
 }
 
-func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject corev1api.ObjectReference, backupVS, storageClass, accessMode string, resource resource.Quantity, readOnly bool) (*corev1api.PersistentVolumeClaim, error) {
+func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject corev1api.ObjectReference, backupVS, storageClass, accessMode string, resource resource.Quantity, readOnly bool, annotations map[string]string) (*corev1api.PersistentVolumeClaim, error) {
 	backupPVCName := ownerObject.Name
 
 	volumeMode, err := getVolumeModeByAccessMode(accessMode)
@@ -507,8 +512,9 @@ func (e *csiSnapshotExposer) createBackupPVC(ctx context.Context, ownerObject co
 
 	pvc := &corev1api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ownerObject.Namespace,
-			Name:      backupPVCName,
+			Namespace:   ownerObject.Namespace,
+			Name:        backupPVCName,
+			Annotations: annotations,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: ownerObject.APIVersion,

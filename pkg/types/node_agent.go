@@ -56,6 +56,9 @@ type BackupPVC struct {
 	// SPCNoRelabeling sets Spec.SecurityContext.SELinux.Type to "spc_t" for the pod mounting the backupPVC
 	// ignored if ReadOnly is false
 	SPCNoRelabeling bool `json:"spcNoRelabeling,omitempty"`
+
+	// Annotations permits setting annotations for the backupPVC
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type RestorePVC struct {
