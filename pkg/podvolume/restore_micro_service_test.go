@@ -523,6 +523,26 @@ func TestWriteCompletionMark(t *testing.T) {
 			expectedErr: "error creating .velero directory for done file: fake-mk-dir-error",
 		},
 		{
+			name: "mkdir fail with disk space error",
+			result: datapath.RestoreResult{
+				Target: datapath.AccessPoint{
+					ByPath: "fake-volume-path",
+				},
+			},
+			pvr: builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, "fake-pvr").OwnerReference([]metav1.OwnerReference{
+				{
+					UID: "fake-uid",
+				},
+			}).Result(),
+			funcRemoveAll: func(string) error {
+				return nil
+			},
+			funcMkdirAll: func(string, os.FileMode) error {
+				return errors.New("mkdir: cannot create directory: no space left on device")
+			},
+			expectedErr: "error creating .velero directory for done file: mkdir: cannot create directory: no space left on device. Consider using the --write-sparse-files flag during restore to optimize disk usage. See https://velero.io/docs/main/restore-reference/#write-sparse-files for more details",
+		},
+		{
 			name: "write file fail",
 			result: datapath.RestoreResult{
 				Target: datapath.AccessPoint{
@@ -544,6 +564,29 @@ func TestWriteCompletionMark(t *testing.T) {
 				return errors.New("fake-write-file-error")
 			},
 			expectedErr: "error writing done file: fake-write-file-error",
+		},
+		{
+			name: "write file fail with disk space error",
+			result: datapath.RestoreResult{
+				Target: datapath.AccessPoint{
+					ByPath: "fake-volume-path",
+				},
+			},
+			pvr: builder.ForPodVolumeRestore(velerov1api.DefaultNamespace, "fake-pvr").OwnerReference([]metav1.OwnerReference{
+				{
+					UID: "fake-uid",
+				},
+			}).Result(),
+			funcRemoveAll: func(string) error {
+				return nil
+			},
+			funcMkdirAll: func(string, os.FileMode) error {
+				return nil
+			},
+			funcWriteFile: func(string, []byte, os.FileMode) error {
+				return errors.New("write: no space left on device")
+			},
+			expectedErr: "error writing done file: write: no space left on device. Consider using the --write-sparse-files flag during restore to optimize disk usage. See https://velero.io/docs/main/restore-reference/#write-sparse-files for more details",
 		},
 		{
 			name: "succeed",
