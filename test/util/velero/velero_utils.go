@@ -38,6 +38,8 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/mod/semver"
+	schedulingv1api "k8s.io/api/scheduling/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	ver "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -45,9 +47,11 @@ import (
 
 	"github.com/vmware-tanzu/velero/internal/volume"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	cliinstall "github.com/vmware-tanzu/velero/pkg/cmd/cli/install"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
+	"github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test"
 	common "github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
@@ -274,6 +278,9 @@ func getProviderVeleroInstallOptions(veleroCfg *VeleroConfig,
 	io.ItemBlockWorkerCount = veleroCfg.ItemBlockWorkerCount
 	io.ServerPriorityClassName = veleroCfg.ServerPriorityClassName
 	io.NodeAgentPriorityClassName = veleroCfg.NodeAgentPriorityClassName
+	io.RepoMaintenanceJobConfigMap = veleroCfg.RepoMaintenanceJobConfigMap
+	io.BackupRepoConfigMap = veleroCfg.BackupRepoConfigMap
+	io.NodeAgentConfigMap = veleroCfg.NodeAgentConfigMap
 
 	return io, nil
 }
@@ -1811,4 +1818,44 @@ func KubectlGetAllDeleteBackupRequest(ctx context.Context, backupName, veleroNam
 	cmds = append(cmds, cmd)
 
 	return common.GetListByCmdPipes(ctx, cmds)
+}
+
+func CreatePriorityClasses(ctx context.Context, client kbclient.Client) error {
+	dataMoverPriorityClass := builder.ForPriorityClass(test.PriorityClassNameForDataMover).
+		Value(90000).PreemptionPolicy("Never").Result()
+	if err := client.Create(ctx, dataMoverPriorityClass); err != nil {
+		fmt.Printf("Fail to create PriorityClass %s: %s\n", test.PriorityClassNameForDataMover, err.Error())
+		return fmt.Errorf("fail to create PriorityClass %s: %w", test.PriorityClassNameForDataMover, err)
+	}
+
+	repoMaintenancePriorityClass := builder.ForPriorityClass(test.PriorityClassNameForRepoMaintenance).
+		Value(80000).PreemptionPolicy("Never").Result()
+	if err := client.Create(ctx, repoMaintenancePriorityClass); err != nil {
+		fmt.Printf("Fail to create PriorityClass %s: %s\n", test.PriorityClassNameForRepoMaintenance, err.Error())
+		return fmt.Errorf("fail to create PriorityClass %s: %w", test.PriorityClassNameForRepoMaintenance, err)
+	}
+
+	return nil
+}
+
+func DeletePriorityClasses(ctx context.Context, client kbclient.Client) error {
+	priorityClassDataMover := &schedulingv1api.PriorityClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: test.PriorityClassNameForDataMover,
+		},
+	}
+	if err := client.Delete(ctx, priorityClassDataMover); err != nil {
+		return err
+	}
+
+	priorityClassRepoMaintenance := &schedulingv1api.PriorityClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: test.PriorityClassNameForRepoMaintenance,
+		},
+	}
+	if err := client.Delete(ctx, priorityClassRepoMaintenance); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -43,6 +43,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/parallelfilesupload"
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/pv-backup"
+	. "github.com/vmware-tanzu/velero/test/e2e/repomaintenance"
 	. "github.com/vmware-tanzu/velero/test/e2e/resource-filtering"
 	. "github.com/vmware-tanzu/velero/test/e2e/resourcemodifiers"
 	. "github.com/vmware-tanzu/velero/test/e2e/resourcepolicies"
@@ -660,6 +661,18 @@ var _ = Describe(
 	ParallelFilesDownloadTest,
 )
 
+var _ = Describe(
+	"Test Repository Maintenance Job Configuration's global part",
+	Label("RepoMaintenance", "LongTime"),
+	GlobalRepoMaintenanceTest,
+)
+
+var _ = Describe(
+	"Test Repository Maintenance Job Configuration's specific part",
+	Label("RepoMaintenance", "LongTime"),
+	SpecificRepoMaintenanceTest,
+)
+
 func GetKubeConfigContext() error {
 	var err error
 	var tcDefault, tcStandby k8s.TestClient
@@ -740,6 +753,12 @@ var _ = BeforeSuite(func() {
 		).To(Succeed())
 	}
 
+	// Create the needed PriorityClasses
+	Expect(veleroutil.CreatePriorityClasses(
+		context.Background(),
+		test.VeleroCfg.ClientToInstallVelero.Kubebuilder,
+	)).To(Succeed())
+
 	if test.InstallVelero {
 		By("Install test resources before testing")
 		Expect(
@@ -782,6 +801,11 @@ var _ = AfterSuite(func() {
 			),
 		).To(Succeed())
 	}
+
+	Expect(veleroutil.DeletePriorityClasses(
+		ctx,
+		test.VeleroCfg.ClientToInstallVelero.Kubebuilder,
+	)).To(Succeed())
 
 	// If the Velero is installed during test, and the FailFast is not enabled,
 	// uninstall Velero. If not, either Velero is not installed, or kept it for debug on failure.
