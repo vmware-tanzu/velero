@@ -105,6 +105,7 @@ func (c *PodVolumeRestoreReconciler) updateRestoreStatusConfigMap(ctx context.Co
                     "velero.io/type":        "restore-status",
                 },
                 // Set owner reference to the pod so ConfigMap is cleaned up
+                // if the init container fails to delete it
                 OwnerReferences: []metav1.OwnerReference{
                     {
                         APIVersion: "v1",
@@ -248,6 +249,10 @@ func waitForConfigMapCompletion(client kubernetes.Interface, restoreUID string) 
                 fmt.Printf("WARNING: %d volume restore(s) failed\n", failedCount)
             }
             fmt.Println("All PodVolumeRestores processed")
+            
+            // Clean up the ConfigMap since we're done with it
+            cleanupConfigMap(client, namespace, cmName)
+            
             cleanup()
             return
         }
@@ -289,6 +294,22 @@ func waitForDoneFiles(restoreUID string) {
     }
 }
 
+func cleanupConfigMap(client kubernetes.Interface, namespace, name string) {
+    // Delete the ConfigMap to clean up resources
+    err := client.CoreV1().ConfigMaps(namespace).Delete(
+        context.TODO(),
+        name,
+        metav1.DeleteOptions{},
+    )
+    
+    if err != nil {
+        fmt.Printf("Failed to delete ConfigMap %s: %v\n", name, err)
+        // Don't fail if we can't delete - it will be cleaned up by owner reference
+    } else {
+        fmt.Printf("Cleaned up ConfigMap %s\n", name)
+    }
+}
+
 func cleanup() {
     // Clean up /restores directory as before
     os.RemoveAll("/restores")
@@ -297,13 +318,36 @@ func cleanup() {
 
 ### RBAC Configuration
 
-The init container only needs minimal permissions in its own namespace:
+The init container needs minimal permissions in its own namespace:
 
 ```yaml
-# No additional RBAC required for init containers
-# Init containers run with the pod's service account and only need:
-# - Read access to ConfigMaps in their own namespace
-# This is typically available by default or through existing pod service accounts
+# Init containers need to read and delete ConfigMaps in their own namespace
+# This can be granted to the pod's service account via a Role/RoleBinding
+# in the user's namespace, or through existing RBAC if available
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: velero-restore-helper
+  namespace: <user-namespace>
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: velero-restore-helper
+  namespace: <user-namespace>
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: velero-restore-helper
+subjects:
+- kind: ServiceAccount
+  name: default  # or the specific service account used by the pod
+  namespace: <user-namespace>
 
 # The PodVolumeRestore controller needs permission to create ConfigMaps in user namespaces:
 apiVersion: rbac.authorization.k8s.io/v1
@@ -317,7 +361,7 @@ rules:
   verbs: ["create", "update", "get", "list"]
 ```
 
-No cross-namespace permissions are required for user workloads. The init container reads ConfigMaps in its own namespace using the pod's service account.
+No cross-namespace permissions are required for user workloads. The init container only needs to read and delete ConfigMaps in its own namespace using the pod's service account. The delete permission ensures proper cleanup of the status ConfigMap after restoration completes.
 
 ### PodVolumeRestoreAction Changes
 
@@ -388,11 +432,13 @@ The design maintains backward compatibility through:
 
 ## Security Considerations
 
-- **No cross-namespace access required**: Init containers only read ConfigMaps in their own namespace
+- **No cross-namespace access required**: Init containers only read and delete ConfigMaps in their own namespace
 - **Principle of least privilege**: User workloads don't need access to velero namespace resources
-- **Automatic cleanup**: ConfigMaps have owner references to pods, ensuring cleanup when pods are deleted
+- **Dual cleanup mechanisms**: 
+  - Primary: Init container deletes ConfigMap after successful consumption
+  - Fallback: ConfigMaps have owner references to pods, ensuring cleanup if init container fails to delete
 - **Controller permissions**: Only the PodVolumeRestore controller (running in velero namespace) needs permission to create ConfigMaps in user namespaces
-- **No elevated permissions for user workloads**: Pods use their default service accounts with standard namespace-scoped permissions
+- **Minimal permissions for user workloads**: Pods only need read and delete permissions for ConfigMaps in their own namespace
 
 ## Performance Implications
 
