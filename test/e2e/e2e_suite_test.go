@@ -39,6 +39,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
 	. "github.com/vmware-tanzu/velero/test/e2e/bsl-mgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/migration"
+	. "github.com/vmware-tanzu/velero/test/e2e/nodeagentconfig"
 	. "github.com/vmware-tanzu/velero/test/e2e/parallelfilesdownload"
 	. "github.com/vmware-tanzu/velero/test/e2e/parallelfilesupload"
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
@@ -671,6 +672,12 @@ var _ = Describe(
 	"Test Repository Maintenance Job Configuration's specific part",
 	Label("RepoMaintenance", "LongTime"),
 	SpecificRepoMaintenanceTest,
+)
+
+var _ = Describe(
+	"Test node agent config's LoadAffinity part",
+	Label("NodeAgentConfig", "LoadAffinity"),
+	LoadAffinities,
 )
 
 func GetKubeConfigContext() error {
