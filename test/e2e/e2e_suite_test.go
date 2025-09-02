@@ -39,6 +39,7 @@ import (
 	. "github.com/vmware-tanzu/velero/test/e2e/basic/resources-check"
 	. "github.com/vmware-tanzu/velero/test/e2e/bsl-mgmt"
 	. "github.com/vmware-tanzu/velero/test/e2e/migration"
+	. "github.com/vmware-tanzu/velero/test/e2e/nodeagentconfig"
 	. "github.com/vmware-tanzu/velero/test/e2e/parallelfilesdownload"
 	. "github.com/vmware-tanzu/velero/test/e2e/parallelfilesupload"
 	. "github.com/vmware-tanzu/velero/test/e2e/privilegesmgmt"
@@ -673,6 +674,12 @@ var _ = Describe(
 	SpecificRepoMaintenanceTest,
 )
 
+var _ = Describe(
+	"Test node agent config's LoadAffinity part",
+	Label("NodeAgentConfig", "LoadAffinity"),
+	LoadAffinities,
+)
+
 func GetKubeConfigContext() error {
 	var err error
 	var tcDefault, tcStandby k8s.TestClient
@@ -753,7 +760,7 @@ var _ = BeforeSuite(func() {
 		).To(Succeed())
 	}
 
-	// Create the needed PriorityClasses
+	By("Install PriorityClasses for E2E.")
 	Expect(veleroutil.CreatePriorityClasses(
 		context.Background(),
 		test.VeleroCfg.ClientToInstallVelero.Kubebuilder,
@@ -783,6 +790,8 @@ var _ = AfterSuite(func() {
 			test.StorageClassName,
 		),
 	).To(Succeed())
+
+	By("Delete PriorityClasses created by E2E")
 	Expect(
 		k8s.DeleteStorageClass(
 			ctx,
