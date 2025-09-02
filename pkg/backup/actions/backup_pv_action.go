@@ -85,6 +85,37 @@ func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 		}
 	}
 
+	// Clean stale Velero labels from main metadata
+	if pvc.Labels != nil {
+		for k, v := range pvc.Labels {
+			if strings.HasPrefix(k, "velero.io/") {
+				// Only remove labels that are clearly stale from previous operations
+				shouldRemove := false
+
+				// Always remove restore-name labels as these are from previous restores
+				if k == "velero.io/restore-name" {
+					shouldRemove = true
+				}
+
+				// Remove backup-name labels that don't match current backup
+				if k == "velero.io/backup-name" && v != backup.Name {
+					shouldRemove = true
+				}
+
+				// Remove volume-snapshot-name labels from previous CSI backups
+				// Note: If this backup creates new CSI snapshots, the CSI action will add them back
+				if k == "velero.io/volume-snapshot-name" {
+					shouldRemove = true
+				}
+
+				if shouldRemove {
+					a.log.Infof("Deleting stale Velero label %s=%s from PVC %s", k, v, pvc.Name)
+					delete(pvc.Labels, k)
+				}
+			}
+		}
+	}
+
 	pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pvc)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to convert pvc to unstructured item")
