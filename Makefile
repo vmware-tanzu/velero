@@ -21,7 +21,7 @@ BIN ?= velero
 PKG := github.com/vmware-tanzu/velero
 
 # Where to push the docker image.
-REGISTRY ?= velero
+REGISTRY ?= quay.io/rh_ee_jvaikath/velero-play
 # In order to push images to an insecure registry, follow the two steps:
 #   1. Set "INSECURE_REGISTRY=true" 
 #   2. Provide your own buildx builder instance by setting "BUILDX_INSTANCE=your-own-builder-instance"
