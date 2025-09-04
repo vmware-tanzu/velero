@@ -259,30 +259,16 @@ Label selector functionality leverages existing Kubernetes APIs.
 
 ## Implementation
 
-### Development Phases
+### Implementation Plan
 
-**Phase 1: Core Logic Implementation**
 - Modify `nsTracker` behavior in `item_collector.go`
-- Update namespace selection algorithm
-- Add comprehensive unit tests
-- Timeline: 2 weeks
-
-**Phase 2: Full Kubernetes Label Selector Support**
+- Update namespace selection algorithm with full Kubernetes label selector support
 - Implement support for all operator types (`In`, `NotIn`, `Exists`, `DoesNotExist`)
-- Add validation for complex selectors
-- Timeline: 1 week
-
-**Phase 3: Enhanced Logging and Observability**
-- Add detailed namespace selection logging
+- Add detailed namespace selection logging and validation warnings
 - Update backup status reporting
-- Add validation warnings
-- Timeline: 1 week
-
-**Phase 4: Documentation and Testing**
-- Update user documentation with examples
-- Add integration and E2E tests
-- Create migration guide
-- Timeline: 2 weeks
+- Add comprehensive unit, integration, and E2E tests
+- Update user documentation with examples and migration guide
+- Timeline: 6 weeks
 
 ### Testing Strategy
 
