@@ -76,10 +76,25 @@ func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 		pvc.Spec.Selector = nil
 	}
 
-	// remove label selectors with "velero.io/" prefixing in the key which is left by Velero restore
+	// Clean stale Velero labels from PVC metadata and selector
+	a.cleanupStaleVeleroLabels(pvc, backup)
+
+	pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pvc)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "unable to convert pvc to unstructured item")
+	}
+
+	return &unstructured.Unstructured{Object: pvcMap}, actionhelpers.RelatedItemsForPVC(pvc, a.log), nil
+}
+
+// cleanupStaleVeleroLabels removes stale Velero labels from both the PVC metadata
+// and the selector's match labels to ensure clean backups
+func (a *PVCAction) cleanupStaleVeleroLabels(pvc *corev1api.PersistentVolumeClaim, backup *v1.Backup) {
+	// Clean stale Velero labels from selector match labels
 	if pvc.Spec.Selector != nil && pvc.Spec.Selector.MatchLabels != nil {
 		for k := range pvc.Spec.Selector.MatchLabels {
 			if strings.HasPrefix(k, "velero.io/") {
+				a.log.Infof("Deleting stale Velero label %s from PVC %s selector", k, pvc.Name)
 				delete(pvc.Spec.Selector.MatchLabels, k)
 			}
 		}
@@ -115,11 +130,4 @@ func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 			}
 		}
 	}
-
-	pvcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pvc)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to convert pvc to unstructured item")
-	}
-
-	return &unstructured.Unstructured{Object: pvcMap}, actionhelpers.RelatedItemsForPVC(pvc, a.log), nil
 }
