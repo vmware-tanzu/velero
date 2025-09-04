@@ -56,6 +56,7 @@ The primary change occurs in `pkg/backup/item_collector.go` in the `nsTracker.in
 Currently, this method tracks namespaces for filtering but doesn't change the fundamental inclusion behavior.
 
 **Current behavior:**
+
 ```go
 // Namespace matches selector -> track for resource filtering only
 if nt.singleLabelSelector != nil && nt.singleLabelSelector.Matches(labels.Set(namespace.GetLabels())) {
@@ -64,6 +65,7 @@ if nt.singleLabelSelector != nil && nt.singleLabelSelector.Matches(labels.Set(na
 ```
 
 **New behavior:**
+
 ```go
 // Namespace matches selector -> track AND include all resources in namespace
 if nt.singleLabelSelector != nil && nt.singleLabelSelector.Matches(labels.Set(namespace.GetLabels())) {
@@ -77,16 +79,19 @@ if nt.singleLabelSelector != nil && nt.singleLabelSelector.Matches(labels.Set(na
 Full Kubernetes label selector support including:
 
 **Equality-based requirements:**
+
 - `key=value` (equality)
 - `key!=value` (inequality)
 
 **Set-based requirements:**
+
 - `key in (value1,value2)` (set inclusion)
 - `key notin (value1,value2)` (set exclusion)
 - `key` (key exists)
 - `!key` (key does not exist)
 
 **MatchExpressions support:**
+
 ```yaml
 labelSelector:
   matchLabels:
@@ -102,6 +107,7 @@ labelSelector:
 ### API Schema (No Changes Required)
 
 The existing `BackupSpec` already supports the required fields:
+
 ```go
 type BackupSpec struct {
     // ... existing fields ...
@@ -113,6 +119,7 @@ type BackupSpec struct {
 ### Example Usage Scenarios
 
 #### Scenario 1: Basic Environment-Based Backup
+
 ```yaml
 apiVersion: velero.io/v1
 kind: Backup
@@ -123,9 +130,11 @@ spec:
     matchLabels:
       environment: production
 ```
+
 Result: All namespaces with `environment=production` are completely backed up.
 
 #### Scenario 2: Complex Selection with Exclusions
+
 ```yaml
 spec:
   includedNamespaces: ["critical-ns"]
@@ -138,9 +147,11 @@ spec:
       operator: DoesNotExist
   excludedNamespaces: ["temp-ns"]
 ```
+
 Result: `critical-ns` + (namespaces with `backup-tier` in daily/weekly AND no `deprecated` label) - `temp-ns`.
 
 #### Scenario 3: OrLabelSelectors Usage
+
 ```yaml
 spec:
   orLabelSelectors:
@@ -150,13 +161,14 @@ spec:
       critical: "true"
       environment: "production"
 ```
+
 Result: Namespaces with `backup=true` OR (`critical=true` AND `environment=production`).
 
 ### Logging and Observability
 
 Enhanced logging will provide clear visibility into namespace selection:
 
-```
+```sh
 INFO Backup namespace selection:
   Explicitly included: [ns1, ns2]
   Selected by labelSelector 'environment=production': [ns3, ns4]
@@ -166,6 +178,7 @@ INFO Backup namespace selection:
 ```
 
 Backup status will include selected namespace information:
+
 ```yaml
 status:
   phase: Completed
@@ -179,6 +192,7 @@ status:
 ### Validation and Warnings
 
 Warning messages for potentially confusing configurations:
+
 - "Namespace 'ns2' is both explicitly included and excluded - exclusion takes precedence"
 - "Using both labelSelector and orLabelSelectors - both will be evaluated"
 - "Complex label selectors may select unexpected namespaces - verify selection before running"
@@ -186,11 +200,13 @@ Warning messages for potentially confusing configurations:
 ### Breaking Change Considerations
 
 This is a **breaking change** from current behavior:
+
 - Existing backups using `labelSelector` will include more resources
 - Backup size and duration may increase
 - Current behavior has limited practical value, reducing migration impact
 
 Migration considerations:
+
 - Document change prominently in release notes
 - Provide before/after examples
 - Consider deprecation warning in prior version
@@ -198,24 +214,29 @@ Migration considerations:
 ## Alternatives Considered
 
 ### Alternative 1: New NamespaceSelector Field
+
 ```go
 type BackupSpec struct {
     NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
 }
 ```
+
 **Pros:** No breaking changes, clear separation of concerns
 **Cons:** Adds API complexity, community feedback against new fields
 
 ### Alternative 2: Boolean Flag to Change Behavior
+
 ```go
 type BackupSpec struct {
     IncludeResourcesInLabeledNamespaces *bool `json:"includeResourcesInLabeledNamespaces,omitempty"`
 }
 ```
+
 **Pros:** Backward compatible, explicit opt-in
 **Cons:** Complex configuration, confusing API surface
 
 ### Alternative 3: Separate Namespace and Resource Selectors
+
 Keep existing `labelSelector` for resources, add `namespaceSelector` for namespaces.
 **Cons:** Most complex option, unclear interaction patterns
 
@@ -224,36 +245,44 @@ Keep existing `labelSelector` for resources, add `namespaceSelector` for namespa
 ## Security Considerations
 
 ### RBAC Implications
+
 Users with permission to modify backup specs can now potentially backup additional namespaces through label manipulation.
 Existing RBAC controls on backup resources remain the primary security boundary.
 
 ### Label-based Access Control
+
 Organizations using label-based policies should ensure backup service accounts have appropriate namespace and resource access.
 No additional privileges are required beyond current backup operations.
 
 ### Sensitive Data Exposure
+
 The expanded scope of backups may include additional sensitive data.
 Users should audit namespace labels and exclusion rules to prevent unintended data exposure.
 
 ## Compatibility
 
 ### Backward Compatibility
+
 **Breaking Change:** Existing backups using `labelSelector` will behave differently.
 Impact assessment:
+
 - Current `labelSelector` usage is limited due to reduced utility
 - Most users already avoid this pattern in favor of explicit namespace listing
 - Change aligns behavior with user expectations
 
 ### API Compatibility
+
 No API schema changes required.
 Existing backup configurations remain syntactically valid but may produce different results.
 
 ### Velero Version Compatibility
+
 - Backups created with new behavior remain compatible with older Velero versions for restore
 - Backup metadata format unchanged
 - No changes to backup storage format
 
 ### Kubernetes Version Compatibility
+
 No changes to Kubernetes version requirements.
 Label selector functionality leverages existing Kubernetes APIs.
 
@@ -273,44 +302,29 @@ Label selector functionality leverages existing Kubernetes APIs.
 ### Testing Strategy
 
 **Unit Tests:**
+
 - Namespace selection algorithm with all operator combinations
 - Precedence rules with various include/exclude patterns
 - Edge cases (empty selectors, wildcard usage, non-existent namespaces)
 
 **Integration Tests:**
+
 - Backup creation with namespace selectors
 - Verification of complete namespace resource inclusion
 - Backup status and logging validation
 
 **E2E Tests:**
+
 - Multi-namespace backup/restore scenarios
 - Cross-cluster restore operations
-- Performance testing with large namespace counts
-
-### Resources
-
-- **Primary Developer:** Tiger Kaovilai (@kaovilai)
-- **Reviewers:** Daniel Jiang, blackpiglet, shubham-pampattiwar
-- **Target Release:** Velero v1.18
-- **Estimated Effort:** 6 weeks total development + testing
 
 ## Open Issues
 
 ### Issue 1: Performance Impact with Large Cluster
+
 Large clusters with many namespaces may experience performance degradation during label selector evaluation.
 **Potential Solution:** Implement caching for namespace label queries, optimize selector evaluation.
 
-### Issue 2: Label Change Detection
-Currently, Velero doesn't re-evaluate namespace selection if labels change between backup creation and execution.
-**Potential Solution:** Document current behavior, consider future enhancement for dynamic re-evaluation.
+### Issue 2: Complex Selector User Education
 
-### Issue 3: Complex Selector User Education
 Users may create overly complex selectors that are difficult to understand or maintain.
-**Potential Solution:** Provide comprehensive documentation, examples, and possibly a selector validation tool.
-
-### Issue 4: Interaction with Other Velero Features
-Need to verify behavior interaction with:
-- Resource policies
-- Item actions and plugins
-- Hooks and pre/post backup operations
-**Status:** Requires additional analysis and testing during implementation.
