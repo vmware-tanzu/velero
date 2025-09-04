@@ -524,6 +524,37 @@ If you get an error like `complete:13: command not found: compdef`, then add the
   compinit
   ```
 
+## Advanced configuration through external ConfigMaps
+
+Velero supports to configure its some advanced behaviors by external ConfigMaps.
+Velero itself isn't responsible for creating and maintaining these ConfigMaps, instead the users should do that.
+
+By far, `velero install` supports the following parameters to specify the external ConfigMap names:
+* --backup-repository-configmap: [backup repository configuration document][15]
+* --node-agent-configmap: [node-agent concurrency configuration document][16], and there are some other documents specify other parts of node-agent-config.
+* --repo-maintenance-job-configmap: [repository maintenance configuration document][17]
+
+From v1.17, Velero adds verification for the ConfigMaps in CLI and server side, which means `velero install` CLI will fail and velero server and node-agent pod will exit if the specified ConfigMaps don't exist or are invalid.
+
+The change's aim is validating the ConfigMaps and fail early instead of finding the ConfigMaps are not valid during running data mover pod or repository maintenance job.
+
+However, there means the user cannot just running `velero install` CLI then get a working environment, when the external ConfigMaps are involved.
+
+The new workflow is:
+* Create the needed namespace: `kubectl create ns velero`
+* Add PSA labels to the namespace: `kubectl label ns velero pod-security.velero.io/enforce=privileged`
+* Create the needed ConfigMaps.
+* Run the `velero install` CLI:
+  ``` bash
+  velero install \
+    --provider aws \
+    ......
+    --backup-repository-configmap=... \
+    --node-agent-configmap=... \
+    --repo-maintenance-job-configmap=...
+  ```
+
+
 [1]: https://github.com/vmware-tanzu/velero/releases/latest
 [2]: namespace.md
 [3]: file-system-backup.md
@@ -537,3 +568,6 @@ If you get an error like `complete:13: command not found: compdef`, then add the
 [12]: csi-snapshot-data-movement.md
 [13]: performance-guidance.md
 [14]: repository-maintenance.md
+[15]: backup-repository-configuration.md
+[16]: node-agent-concurrency.md
+[17]: repository-maintenance.md

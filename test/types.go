@@ -57,6 +57,11 @@ const (
 	BackupRepositoryConfigName    = "backup-repository-config"
 )
 
+const (
+	PriorityClassNameForDataMover       = "data-mover"
+	PriorityClassNameForRepoMaintenance = "repo-maintenance"
+)
+
 var PublicCloudProviders = []string{AWS, Azure, GCP, Vsphere}
 var LocalCloudProviders = []string{Kind, VanillaZFS}
 var CloudProviders = append(PublicCloudProviders, LocalCloudProviders...)

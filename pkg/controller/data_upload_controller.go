@@ -50,6 +50,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -76,7 +77,7 @@ type DataUploadReconciler struct {
 	dataPathMgr           *datapath.Manager
 	vgdpCounter           *exposer.VgdpCounter
 	loadAffinity          []*kube.LoadAffinity
-	backupPVCConfig       map[string]nodeagent.BackupPVC
+	backupPVCConfig       map[string]velerotypes.BackupPVC
 	podResources          corev1api.ResourceRequirements
 	preparingTimeout      time.Duration
 	metrics               *metrics.ServerMetrics
@@ -92,7 +93,7 @@ func NewDataUploadReconciler(
 	dataPathMgr *datapath.Manager,
 	counter *exposer.VgdpCounter,
 	loadAffinity []*kube.LoadAffinity,
-	backupPVCConfig map[string]nodeagent.BackupPVC,
+	backupPVCConfig map[string]velerotypes.BackupPVC,
 	podResources corev1api.ResourceRequirements,
 	clock clocks.WithTickerAndDelayedExecution,
 	nodeName string,

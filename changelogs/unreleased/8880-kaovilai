@@ -1,7 +1,0 @@
-Fix Velero adding restore-wait init container when not needed
-
-When restoring pods with volumes that were backed up using native datamover or CSI, 
-Velero was unnecessarily adding the restore-wait init container. This container is 
-only needed for file system restores. Now Velero checks if any volumes actually need 
-file system restores and removes the init container if it's not needed, rather than 
-just skipping its addition.
