@@ -39,6 +39,8 @@ import (
 type PVCAction struct {
 	log      logrus.FieldLogger
 	crClient crclient.Client
+	// map[namespace]->[map[podName]->[]pvcVolumes]
+	nsPods map[string]map[string][]string
 }
 
 func NewPVCAction(f client.Factory) plugincommon.HandlerInitializer {
@@ -78,28 +80,20 @@ func (a *PVCAction) GetRelatedItems(item runtime.Unstructured, backup *v1.Backup
 
 	// Adds pods mounting this PVC to ensure that multiple pods mounting the same RWX
 	// volume get backed up together.
-	pods := new(corev1api.PodList)
-	err := a.crClient.List(context.Background(), pods, crclient.InNamespace(pvc.Namespace))
+	pods, err := a.getPodList(pvc.Namespace)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list pods")
+		return nil, err
 	}
 
-	for i := range pods.Items {
-		for _, volume := range pods.Items[i].Spec.Volumes {
-			if volume.VolumeSource.PersistentVolumeClaim == nil {
-				continue
-			}
-			if volume.PersistentVolumeClaim.ClaimName == pvc.Name {
-				if kube.IsPodRunning(&pods.Items[i]) != nil {
-					a.log.Infof("Related pod %s is not running, not adding to ItemBlock for PVC %s", pods.Items[i].Name, pvc.Name)
-				} else {
-					a.log.Infof("Adding related Pod %s to PVC %s", pods.Items[i].Name, pvc.Name)
-					relatedItems = append(relatedItems, velero.ResourceIdentifier{
-						GroupResource: kuberesource.Pods,
-						Namespace:     pods.Items[i].Namespace,
-						Name:          pods.Items[i].Name,
-					})
-				}
+	for pod, vols := range pods {
+		for _, volume := range vols {
+			if volume == pvc.Name {
+				a.log.Infof("Adding related Pod %s to PVC %s", pod, pvc.Name)
+				relatedItems = append(relatedItems, velero.ResourceIdentifier{
+					GroupResource: kuberesource.Pods,
+					Namespace:     pvc.Namespace,
+					Name:          pod,
+				})
 				break
 			}
 		}
@@ -115,6 +109,37 @@ func (a *PVCAction) GetRelatedItems(item runtime.Unstructured, backup *v1.Backup
 	relatedItems = append(relatedItems, groupedPVCs...)
 
 	return relatedItems, nil
+}
+
+func (a *PVCAction) getPodList(ns string) (map[string][]string, error) {
+	if a.nsPods == nil {
+		a.nsPods = make(map[string]map[string][]string)
+	}
+	podList, ok := a.nsPods[ns]
+	if ok {
+		return podList, nil
+	}
+	podList = make(map[string][]string)
+	pods := new(corev1api.PodList)
+	err := a.crClient.List(context.Background(), pods, crclient.InNamespace(ns))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list pods")
+	}
+	for i := range pods.Items {
+		if kube.IsPodRunning(&pods.Items[i]) != nil {
+			a.log.Debugf("Pod %s is not running, not adding to Pod list for PVC IBA plugin", pods.Items[i].Name)
+			continue
+		}
+		podVolumes := []string{}
+		for _, volume := range pods.Items[i].Spec.Volumes {
+			if volume.VolumeSource.PersistentVolumeClaim != nil {
+				podVolumes = append(podVolumes, volume.VolumeSource.PersistentVolumeClaim.ClaimName)
+			}
+		}
+		podList[pods.Items[i].Name] = podVolumes
+	}
+	a.nsPods[ns] = podList
+	return podList, nil
 }
 
 func (a *PVCAction) Name() string {
