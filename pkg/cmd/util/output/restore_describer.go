@@ -197,7 +197,7 @@ func DescribeRestore(
 			} else {
 				describeCSISnapshotsRestores(d, restoreVolInfo, details)
 			}
-		} else if err != nil && !errors.Is(err, downloadrequest.ErrNotFound) {
+		} else if !errors.Is(err, downloadrequest.ErrNotFound) {
 			// For the restores by older versions of velero, it will see NotFound Error when downloading the volume info.
 			// In that case, no errors will be printed.
 			d.Printf("\t<error getting restore volume info: %v>\n", err)
