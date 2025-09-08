@@ -152,10 +152,10 @@ func TestBackupPVAction(t *testing.T) {
 
 func TestCleanupStaleVeleroLabels(t *testing.T) {
 	tests := []struct {
-		name            string
-		inputPVC        *corev1api.PersistentVolumeClaim
-		backup          *v1.Backup
-		expectedLabels  map[string]string
+		name             string
+		inputPVC         *corev1api.PersistentVolumeClaim
+		backup           *v1.Backup
+		expectedLabels   map[string]string
 		expectedSelector *metav1.LabelSelector
 	}{
 		{
@@ -239,7 +239,7 @@ func TestCleanupStaleVeleroLabels(t *testing.T) {
 					},
 				},
 			},
-			backup: &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "current-backup"}},
+			backup:         &v1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "current-backup"}},
 			expectedLabels: nil,
 			expectedSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -311,10 +311,10 @@ func TestCleanupStaleVeleroLabels(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			action := NewPVCAction(velerotest.NewLogger())
-			
+
 			// Create a copy of the input PVC to avoid modifying the test case
 			pvcCopy := tc.inputPVC.DeepCopy()
-			
+
 			action.cleanupStaleVeleroLabels(pvcCopy, tc.backup)
 
 			assert.Equal(t, tc.expectedLabels, pvcCopy.Labels, "Labels should match expected values")
