@@ -73,7 +73,7 @@ RUN mkdir -p /output/usr/bin && \
     go clean -modcache -cache
 
 # Velero image packing section
-FROM paketobuildpacks/run-jammy-tiny:latest
+FROM paketobuildpacks/run-jammy-tiny:0.2.73
 
 LABEL maintainer="Xun Jiang <jxun@vmware.com>"
 
