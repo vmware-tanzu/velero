@@ -54,6 +54,16 @@ const (
 	// RepositoryTypeLabel is the label key used to identify the type of a repository
 	RepositoryTypeLabel = "velero.io/repository-type"
 
+	// BSL configuration annotations for BackupRepository to detect changes on startup
+	// BSLBucketAnnotation stores the BSL bucket configuration
+	BSLBucketAnnotation = "velero.io/bsl-bucket"
+	// BSLPrefixAnnotation stores the BSL prefix configuration
+	BSLPrefixAnnotation = "velero.io/bsl-prefix"
+	// BSLCACertAnnotation stores the BSL CA certificate
+	BSLCACertAnnotation = "velero.io/bsl-cacert"
+	// BSLConfigAnnotation stores the BSL config map as JSON
+	BSLConfigAnnotation = "velero.io/bsl-config"
+
 	// DataUploadLabel is the label key used to identify the dataupload for snapshot backup pod
 	DataUploadLabel = "velero.io/data-upload"
 
