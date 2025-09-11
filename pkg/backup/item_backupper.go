@@ -673,6 +673,8 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 		snapshot.Status.Phase = volume.SnapshotPhaseCompleted
 		snapshot.Status.ProviderSnapshotID = snapshotID
 	}
+	ib.backupRequest.requestLock.Lock()
+	defer ib.backupRequest.requestLock.Unlock()
 	ib.backupRequest.VolumeSnapshots = append(ib.backupRequest.VolumeSnapshots, snapshot)
 
 	// nil errors are automatically removed
