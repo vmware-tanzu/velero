@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1api "k8s.io/api/apps/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -176,6 +177,25 @@ func BackupRepositoryStartupValidation() {
 					}
 					return d.Status.ReadyReplicas
 				}, 2*time.Minute, 5*time.Second).Should(Equal(int32(0)))
+
+				// Ensure no Velero pods are running
+				Eventually(func() int {
+					podList := &corev1api.PodList{}
+					err := veleroCfg.ClientToInstallVelero.Kubebuilder.List(oneHourTimeout, podList,
+						client.InNamespace(veleroCfg.VeleroNamespace),
+						client.MatchingLabels{"deploy": "velero"})
+					if err != nil {
+						return -1
+					}
+					runningCount := 0
+					for _, pod := range podList.Items {
+						if pod.Status.Phase == corev1api.PodRunning {
+							runningCount++
+						}
+					}
+					fmt.Printf("Velero pods running: %d\n", runningCount)
+					return runningCount
+				}, 30*time.Second, 2*time.Second).Should(Equal(0), "Velero pods should be fully terminated")
 			})
 
 			By("Modify BSL configuration (change prefix)", func() {
@@ -219,8 +239,28 @@ func BackupRepositoryStartupValidation() {
 					return d.Status.ReadyReplicas
 				}, 2*time.Minute, 5*time.Second).Should(Equal(int32(1)))
 
-				// Wait a bit for controller to start
-				time.Sleep(5 * time.Second)
+				// Ensure Velero pod is fully running and ready
+				Eventually(func() bool {
+					podList := &corev1api.PodList{}
+					err := veleroCfg.ClientToInstallVelero.Kubebuilder.List(oneHourTimeout, podList,
+						client.InNamespace(veleroCfg.VeleroNamespace),
+						client.MatchingLabels{"deploy": "velero"})
+					if err != nil || len(podList.Items) != 1 {
+						return false
+					}
+					pod := podList.Items[0]
+					if pod.Status.Phase != corev1api.PodRunning {
+						return false
+					}
+					// Check all containers are ready
+					for _, condition := range pod.Status.Conditions {
+						if condition.Type == corev1api.PodConditionType("Ready") && condition.Status == corev1api.ConditionTrue {
+							fmt.Println("Velero pod is fully ready")
+							return true
+						}
+					}
+					return false
+				}, 1*time.Minute, 2*time.Second).Should(BeTrue(), "Velero pod should be ready")
 
 				// Force a reconciliation by adding/updating a label on the repository
 				// This ensures the startup validation runs
