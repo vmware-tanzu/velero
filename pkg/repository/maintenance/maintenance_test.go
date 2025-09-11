@@ -698,7 +698,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 		{
 			name:          "list job error",
 			runtimeScheme: schemeFail,
-			expectedError: "error listing maintenance job for repo fake-repo: no kind is registered for the type v1.JobList in scheme \"pkg/runtime/scheme.go:100\"",
+			expectedError: "error listing maintenance job for repo fake-repo: no kind is registered for the type v1.JobList in scheme",
 		},
 		{
 			name:          "job not exist",
@@ -847,7 +847,7 @@ func TestWaitAllJobsComplete(t *testing.T) {
 			history, err := WaitAllJobsComplete(test.ctx, fakeClient, repo, 3, velerotest.NewLogger())
 
 			if test.expectedError != "" {
-				require.EqualError(t, err, test.expectedError)
+				require.ErrorContains(t, err, test.expectedError)
 			} else {
 				require.NoError(t, err)
 			}
