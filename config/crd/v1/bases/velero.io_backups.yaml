@@ -561,13 +561,6 @@ spec:
                   execution of the backup.  The actual errors are in the backup's log
                   file in object storage.
                 type: integer
-              excludeWildcardMatches:
-                description: ExcludeWildcardMatches records the namespaces that matched
-                  exclude wildcard patterns
-                items:
-                  type: string
-                nullable: true
-                type: array
               expiration:
                 description: Expiration is when this Backup is eligible for garbage-collection.
                 format: date-time
@@ -597,13 +590,6 @@ spec:
                       with an error
                     type: integer
                 type: object
-              includeWildcardMatches:
-                description: IncludeWildcardMatches records the namespaces that matched
-                  include wildcard patterns
-                items:
-                  type: string
-                nullable: true
-                type: array
               phase:
                 description: Phase is the current state of the Backup.
                 enum:
@@ -677,13 +663,33 @@ spec:
                   execution of the backup. The actual warnings are in the backup's log
                   file in object storage.
                 type: integer
-              wildcardResult:
-                description: WildcardResult records the final namespaces after applying
-                  wildcard include/exclude logic
-                items:
-                  type: string
+              wildcardNamespaces:
+                description: WildcardNamespaces contains information about wildcard
+                  namespace processing
                 nullable: true
-                type: array
+                properties:
+                  excludeWildcardMatches:
+                    description: ExcludeWildcardMatches records the namespaces that
+                      matched exclude wildcard patterns
+                    items:
+                      type: string
+                    nullable: true
+                    type: array
+                  includeWildcardMatches:
+                    description: IncludeWildcardMatches records the namespaces that
+                      matched include wildcard patterns
+                    items:
+                      type: string
+                    nullable: true
+                    type: array
+                  wildcardResult:
+                    description: WildcardResult records the final namespaces after
+                      applying wildcard include/exclude logic
+                    items:
+                      type: string
+                    nullable: true
+                    type: array
+                type: object
             type: object
         type: object
     served: true
