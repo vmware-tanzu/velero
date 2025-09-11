@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/pager"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
@@ -895,9 +896,11 @@ func (r *itemCollector) expandNamespaceWildcards(activeNamespaces []string, name
 	selectedNamespaces := wildcard.GetWildcardResult(expandedIncludes, expandedExcludes)
 
 	// Record the expanded wildcard includes/excludes in the request status
-	r.backupRequest.Status.IncludeWildcardMatches = expandedIncludes
-	r.backupRequest.Status.ExcludeWildcardMatches = expandedExcludes
-	r.backupRequest.Status.WildcardResult = selectedNamespaces
+	r.backupRequest.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
+		IncludeWildcardMatches: expandedIncludes,
+		ExcludeWildcardMatches: expandedExcludes,
+		WildcardResult:         selectedNamespaces,
+	}
 
 	r.log.WithFields(logrus.Fields{
 		"expandedIncludes": expandedIncludes,
