@@ -315,18 +315,8 @@ const (
 	PolicyTypeUpdate PolicyType = "update"
 )
 
-// RestoreStatus captures the current status of a Velero restore
-type RestoreStatus struct {
-	// Phase is the current state of the Restore
-	// +optional
-	Phase RestorePhase `json:"phase,omitempty"`
-
-	// ValidationErrors is a slice of all validation errors (if
-	// applicable)
-	// +optional
-	// +nullable
-	ValidationErrors []string `json:"validationErrors,omitempty"`
-
+// WildcardNamespaceStatus contains information about wildcard namespace matching results
+type WildcardNamespaceStatus struct {
 	// IncludeWildcardMatches records the namespaces that matched include wildcard patterns
 	// +optional
 	// +nullable
@@ -341,6 +331,24 @@ type RestoreStatus struct {
 	// +optional
 	// +nullable
 	WildcardResult []string `json:"wildcardResult,omitempty"`
+}
+
+// RestoreStatus captures the current status of a Velero restore
+type RestoreStatus struct {
+	// Phase is the current state of the Restore
+	// +optional
+	Phase RestorePhase `json:"phase,omitempty"`
+
+	// ValidationErrors is a slice of all validation errors (if
+	// applicable)
+	// +optional
+	// +nullable
+	ValidationErrors []string `json:"validationErrors,omitempty"`
+
+	// WildcardNamespaces contains information about wildcard namespace processing
+	// +optional
+	// +nullable
+	WildcardNamespaces *WildcardNamespaceStatus `json:"wildcardNamespaces,omitempty"`
 
 	// Warnings is a count of all warning messages that were generated during
 	// execution of the restore. The actual warnings are stored in object storage.
