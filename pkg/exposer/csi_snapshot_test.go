@@ -197,6 +197,7 @@ func TestExpose(t *testing.T) {
 		expectedReadOnlyPVC           bool
 		expectedBackupPVCStorageClass string
 		expectedAffinity              *corev1api.Affinity
+		expectedPVCAnnotation         map[string]string
 	}{
 		{
 			name:        "wait vs ready fail",
@@ -686,7 +687,8 @@ func TestExpose(t *testing.T) {
 					},
 				},
 			},
-			expectedAffinity: nil,
+			expectedAffinity:      nil,
+			expectedPVCAnnotation: nil,
 		},
 		{
 			name:        "IntolerateSourceNode, get empty source node",
@@ -713,7 +715,8 @@ func TestExpose(t *testing.T) {
 			kubeClientObj: []runtime.Object{
 				daemonSet,
 			},
-			expectedAffinity: nil,
+			expectedAffinity:      nil,
+			expectedPVCAnnotation: map[string]string{util.VSphereCNSFastCloneAnno: "true"},
 		},
 		{
 			name:        "IntolerateSourceNode, get source nodes",
@@ -759,6 +762,7 @@ func TestExpose(t *testing.T) {
 					},
 				},
 			},
+			expectedPVCAnnotation: map[string]string{util.VSphereCNSFastCloneAnno: "true"},
 		},
 	}
 
@@ -840,6 +844,12 @@ func TestExpose(t *testing.T) {
 
 				if test.expectedAffinity != nil {
 					assert.Equal(t, test.expectedAffinity, backupPod.Spec.Affinity)
+				}
+
+				if test.expectedPVCAnnotation != nil {
+					assert.Equal(t, test.expectedPVCAnnotation, backupPVC.Annotations)
+				} else {
+					assert.Empty(t, backupPVC.Annotations)
 				}
 			} else {
 				assert.EqualError(t, err, test.err)

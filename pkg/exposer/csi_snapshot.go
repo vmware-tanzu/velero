@@ -52,7 +52,7 @@ type CSISnapshotExposeParam struct {
 	// SourcePVCName is the original name of the PVC that the snapshot is taken for
 	SourcePVCName string
 
-	// SourcePVCName is the name of PV for SourcePVC
+	// SourcePVName is the name of PV for SourcePVC
 	SourcePVName string
 
 	// AccessMode defines the mode to access the snapshot
@@ -217,7 +217,8 @@ func (e *csiSnapshotExposer) Expose(ctx context.Context, ownerObject corev1api.O
 
 		if _, found := backupPVCAnnotations[util.VSphereCNSFastCloneAnno]; found {
 			if n, err := kube.GetPVAttachedNodes(ctx, csiExposeParam.SourcePVName, e.kubeClient.StorageV1()); err != nil {
-				curLog.WithField("source PV", csiExposeParam.SourcePVName).WithError(err).Warn("Failed to get attached node for source PV, ignore intolerable nodes")
+				curLog.WithField("source PV", csiExposeParam.SourcePVName).WithError(err).Warnf("Failed to get attached node for source PV, ignore %s annotation", util.VSphereCNSFastCloneAnno)
+				delete(backupPVCAnnotations, util.VSphereCNSFastCloneAnno)
 			} else {
 				intoleratableNodes = n
 			}
