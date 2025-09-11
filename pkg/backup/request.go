@@ -17,6 +17,8 @@ limitations under the License.
 package backup
 
 import (
+	"sync"
+
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
 	"github.com/vmware-tanzu/velero/internal/volume"
@@ -36,7 +38,7 @@ type itemKey struct {
 // materialized (e.g. backup/snapshot locations, includes/excludes, etc.)
 type Request struct {
 	*velerov1api.Backup
-
+	requestLock               sync.Mutex
 	StorageLocation           *velerov1api.BackupStorageLocation
 	SnapshotLocations         []*velerov1api.VolumeSnapshotLocation
 	NamespaceIncludesExcludes *collections.IncludesExcludes
