@@ -16,10 +16,35 @@ jobs:
     steps:
       - name: Check out the code
         uses: actions/checkout@v5
-      - name: Set up Go
+
+      - name: Extract Go version from go.mod if target branch is main
+        id: main-go-version
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # Extract the version (e.g. 1.24.0, or 1.24)
+          originVersion=$(grep '^go ' go.mod | awk '{print $2}')
+
+          # Only keep the major and minor version (1.24)
+          version=$(echo "$originVersion" | cut -d. -f1-2)
+
+          echo "version=$version"
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Set up Go for main branch
+        if: github.ref == 'refs/heads/main'
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version: ${{ steps.main-go-version.outputs.version }}
+
+      - name: Set up Go for released branches
+        if: github.ref != 'refs/heads/main'
+        uses: actions/setup-go@v5
+        with: 
+            go-version-file: go.mod
+
+      # Display the setup Go version
+      - run: go version
+
       - name: Set up QEMU
         id: qemu
         uses: docker/setup-qemu-action@v3
