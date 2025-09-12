@@ -449,6 +449,35 @@ func StartNewJob(
 	return maintenanceJob.Name, nil
 }
 
+// buildTolerationsForMaintenanceJob builds the tolerations for maintenance jobs.
+// It includes the required Windows toleration for backward compatibility and filters
+// tolerations from the Velero deployment to only include those with keys that are
+// in the ThirdPartyTolerations allowlist, following the same pattern as labels and annotations.
+func buildTolerationsForMaintenanceJob(deployment *appsv1api.Deployment) []corev1api.Toleration {
+	// Start with the Windows toleration for backward compatibility
+	windowsToleration := corev1api.Toleration{
+		Key:      "os",
+		Operator: "Equal",
+		Effect:   "NoSchedule",
+		Value:    "windows",
+	}
+	result := []corev1api.Toleration{windowsToleration}
+
+	// Filter tolerations from the Velero deployment to only include allowed ones
+	// Only tolerations that exist on the deployment AND have keys in the allowlist are inherited
+	deploymentTolerations := veleroutil.GetTolerationsFromVeleroServer(deployment)
+	for _, k := range util.ThirdPartyTolerations {
+		for _, toleration := range deploymentTolerations {
+			if toleration.Key == k {
+				result = append(result, toleration)
+				break // Only add the first matching toleration for each allowed key
+			}
+		}
+	}
+
+	return result
+}
+
 func getPriorityClassName(ctx context.Context, cli client.Client, config *velerotypes.JobConfigs, logger logrus.FieldLogger) string {
 	// Use the priority class name from the global job configuration if available
 	// Note: Priority class is only read from global config, not per-repository
@@ -593,15 +622,8 @@ func buildJob(
 					SecurityContext:    podSecurityContext,
 					Volumes:            volumes,
 					ServiceAccountName: serviceAccount,
-					Tolerations: []corev1api.Toleration{
-						{
-							Key:      "os",
-							Operator: "Equal",
-							Effect:   "NoSchedule",
-							Value:    "windows",
-						},
-					},
-					ImagePullSecrets: imagePullSecrets,
+					Tolerations:        buildTolerationsForMaintenanceJob(deployment),
+					ImagePullSecrets:   imagePullSecrets,
 				},
 			},
 		},
