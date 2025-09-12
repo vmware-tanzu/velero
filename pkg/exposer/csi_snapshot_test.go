@@ -39,8 +39,11 @@ import (
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
+	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+
+	storagev1api "k8s.io/api/storage/v1"
 )
 
 type reactor struct {
@@ -156,6 +159,31 @@ func TestExpose(t *testing.T) {
 		},
 	}
 
+	pvName := "pv-1"
+	volumeAttachement1 := &storagev1api.VolumeAttachment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "va1",
+		},
+		Spec: storagev1api.VolumeAttachmentSpec{
+			Source: storagev1api.VolumeAttachmentSource{
+				PersistentVolumeName: &pvName,
+			},
+			NodeName: "node-1",
+		},
+	}
+
+	volumeAttachement2 := &storagev1api.VolumeAttachment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "va2",
+		},
+		Spec: storagev1api.VolumeAttachmentSpec{
+			Source: storagev1api.VolumeAttachmentSource{
+				PersistentVolumeName: &pvName,
+			},
+			NodeName: "node-2",
+		},
+	}
+
 	tests := []struct {
 		name                          string
 		snapshotClientObj             []runtime.Object
@@ -169,6 +197,7 @@ func TestExpose(t *testing.T) {
 		expectedReadOnlyPVC           bool
 		expectedBackupPVCStorageClass string
 		expectedAffinity              *corev1api.Affinity
+		expectedPVCAnnotation         map[string]string
 	}{
 		{
 			name:        "wait vs ready fail",
@@ -624,6 +653,117 @@ func TestExpose(t *testing.T) {
 			expectedBackupPVCStorageClass: "fake-sc-read-only",
 			expectedAffinity:              nil,
 		},
+		{
+			name:        "IntolerateSourceNode, get source node fail",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				SourcePVName:     pvName,
+				StorageClass:     "fake-sc",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				BackupPVCConfig: map[string]velerotypes.BackupPVC{
+					"fake-sc": {
+						Annotations: map[string]string{util.VSphereCNSFastCloneAnno: "true"},
+					},
+				},
+				Affinity: nil,
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			kubeReactors: []reactor{
+				{
+					verb:     "list",
+					resource: "volumeattachments",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-create-error")
+					},
+				},
+			},
+			expectedAffinity:      nil,
+			expectedPVCAnnotation: nil,
+		},
+		{
+			name:        "IntolerateSourceNode, get empty source node",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				SourcePVName:     pvName,
+				StorageClass:     "fake-sc",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				BackupPVCConfig: map[string]velerotypes.BackupPVC{
+					"fake-sc": {
+						Annotations: map[string]string{util.VSphereCNSFastCloneAnno: "true"},
+					},
+				},
+				Affinity: nil,
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+			},
+			expectedAffinity:      nil,
+			expectedPVCAnnotation: map[string]string{util.VSphereCNSFastCloneAnno: "true"},
+		},
+		{
+			name:        "IntolerateSourceNode, get source nodes",
+			ownerBackup: backup,
+			exposeParam: CSISnapshotExposeParam{
+				SnapshotName:     "fake-vs",
+				SourceNamespace:  "fake-ns",
+				SourcePVName:     pvName,
+				StorageClass:     "fake-sc",
+				AccessMode:       AccessModeFileSystem,
+				OperationTimeout: time.Millisecond,
+				ExposeTimeout:    time.Millisecond,
+				BackupPVCConfig: map[string]velerotypes.BackupPVC{
+					"fake-sc": {
+						Annotations: map[string]string{util.VSphereCNSFastCloneAnno: "true"},
+					},
+				},
+				Affinity: nil,
+			},
+			snapshotClientObj: []runtime.Object{
+				vsObject,
+				vscObj,
+			},
+			kubeClientObj: []runtime.Object{
+				daemonSet,
+				volumeAttachement1,
+				volumeAttachement2,
+			},
+			expectedAffinity: &corev1api.Affinity{
+				NodeAffinity: &corev1api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+						NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1api.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/hostname",
+										Operator: corev1api.NodeSelectorOpNotIn,
+										Values:   []string{"node-1", "node-2"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedPVCAnnotation: map[string]string{util.VSphereCNSFastCloneAnno: "true"},
+		},
 	}
 
 	for _, test := range tests {
@@ -704,6 +844,12 @@ func TestExpose(t *testing.T) {
 
 				if test.expectedAffinity != nil {
 					assert.Equal(t, test.expectedAffinity, backupPod.Spec.Affinity)
+				}
+
+				if test.expectedPVCAnnotation != nil {
+					assert.Equal(t, test.expectedPVCAnnotation, backupPVC.Annotations)
+				} else {
+					assert.Empty(t, backupPVC.Annotations)
 				}
 			} else {
 				assert.EqualError(t, err, test.err)
