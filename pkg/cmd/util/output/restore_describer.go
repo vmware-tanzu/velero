@@ -498,7 +498,7 @@ func describeRestoreResourceList(ctx context.Context, kbClient kbclient.Client, 
 
 	buf := new(bytes.Buffer)
 	if err := downloadrequest.StreamWithBSLCACert(ctx, kbClient, restore.Namespace, restore.Name, velerov1api.DownloadTargetKindRestoreResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath, bslCACert); err != nil {
-		if err == downloadrequest.ErrNotFound {
+		if errors.Is(err, downloadrequest.ErrNotFound) {
 			d.Println("Resource List:\t<restore resource list not found>")
 		} else {
 			d.Printf("Resource List:\t<error getting restore resource list: %v>\n", err)
