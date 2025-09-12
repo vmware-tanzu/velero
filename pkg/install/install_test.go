@@ -1,6 +1,8 @@
 package install
 
 import (
+	"bytes"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -12,9 +14,11 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	v1crds "github.com/vmware-tanzu/velero/config/crd/v1/crds"
@@ -53,7 +57,7 @@ func TestInstall(t *testing.T) {
 	require.NoError(t, appendUnstructured(resources, v1crds.CRDs[0]))
 	require.NoError(t, appendUnstructured(resources, Namespace("velero")))
 
-	assert.NoError(t, Install(factory, c, resources, os.Stdout))
+	assert.NoError(t, Install(factory, c, resources, os.Stdout, false))
 }
 
 func Test_crdsAreReady(t *testing.T) {
@@ -167,4 +171,234 @@ func TestNodeAgentWindowsIsReady(t *testing.T) {
 	ready, err := NodeAgentWindowsIsReady(factory, "velero")
 	require.NoError(t, err)
 	assert.True(t, ready)
+}
+
+func TestCreateOrApplyResourceError(t *testing.T) {
+	r := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]any{
+				"name":      "test-configmap",
+				"namespace": "velero",
+			},
+		},
+	}
+
+	dc := &test.FakeDynamicClient{}
+	expectedErr := errors.New("create error")
+	dc.On("Create", mock.Anything).Return(&unstructured.Unstructured{}, expectedErr)
+
+	factory := &test.FakeDynamicFactory{}
+	factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
+
+	var buf bytes.Buffer
+	err := createOrApplyResource(r, factory, &buf, false)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), expectedErr.Error())
+}
+
+func TestCreateOrApplyResourceAlreadyExists(t *testing.T) {
+	r := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]any{
+				"name":      "test-configmap",
+				"namespace": "velero",
+			},
+		},
+	}
+
+	dc := &test.FakeDynamicClient{}
+	alreadyExistsErr := apierrors.NewAlreadyExists(schema.GroupResource{Resource: "configmaps"}, "test-configmap")
+	// We need to return a non-nil unstructured object even though it's not used
+	dc.On("Create", mock.Anything).Return(&unstructured.Unstructured{}, alreadyExistsErr)
+
+	factory := &test.FakeDynamicFactory{}
+	factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
+
+	var buf bytes.Buffer
+	err := createOrApplyResource(r, factory, &buf, false)
+
+	require.NoError(t, err)
+}
+
+func TestCreateOrApplyResourceClientError(t *testing.T) {
+	r := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]any{
+				"name":      "test-configmap",
+				"namespace": "velero",
+			},
+		},
+	}
+
+	factory := &test.FakeDynamicFactory{}
+	expectedErr := errors.New("client creation error")
+	// Return error from ClientForGroupVersionResource
+	factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(&test.FakeDynamicClient{}, expectedErr)
+
+	var buf bytes.Buffer
+	err := createOrApplyResource(r, factory, &buf, false)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), expectedErr.Error())
+}
+
+func TestCreateOrApplyResourceApplyError(t *testing.T) {
+	r := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]any{
+				"name":      "test-configmap",
+				"namespace": "velero",
+			},
+		},
+	}
+
+	dc := &test.FakeDynamicClient{}
+	expectedErr := errors.New("apply error")
+	// Mock Apply to return an error
+	dc.On("Apply", mock.Anything, mock.Anything, mock.Anything).Return(&unstructured.Unstructured{}, expectedErr)
+
+	factory := &test.FakeDynamicFactory{}
+	factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
+
+	var buf bytes.Buffer
+	err := createOrApplyResource(r, factory, &buf, true) // true for apply flag to use Apply
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), expectedErr.Error())
+}
+
+func TestInstallErrorAfterCreateClient(t *testing.T) {
+	// Create a test non-CRD resource
+	nonCRDResource := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]any{
+				"name": "test-configmap",
+			},
+		},
+	}
+
+	resources := &unstructured.UnstructuredList{
+		Items: []unstructured.Unstructured{*nonCRDResource},
+	}
+
+	// Mock the factory to return a client that will succeed on ClientForGroupVersionResource
+	// but fail on Create
+	dc := &test.FakeDynamicClient{}
+	expectedErr := errors.New("create error after successful client creation")
+	dc.On("Create", mock.Anything).Return(&unstructured.Unstructured{}, expectedErr)
+
+	factory := &test.FakeDynamicFactory{}
+	factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
+
+	c := fake.NewClientBuilder().Build()
+
+	var buf bytes.Buffer
+	err := Install(factory, c, resources, &buf, false)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), expectedErr.Error())
+}
+
+func TestInstallErrorOnCRDResource(t *testing.T) {
+	crdResource := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "apiextensions.k8s.io/v1",
+			"kind":       "CustomResourceDefinition",
+			"metadata": map[string]any{
+				"name": "test-crd",
+			},
+		},
+	}
+
+	resources := &unstructured.UnstructuredList{
+		Items: []unstructured.Unstructured{*crdResource},
+	}
+
+	dc := &test.FakeDynamicClient{}
+	expectedErr := errors.New("error creating CRD resource")
+	// We need to return a non-nil unstructured object even though it's not used
+	dc.On("Create", mock.Anything).Return(&unstructured.Unstructured{}, expectedErr)
+
+	factory := &test.FakeDynamicFactory{}
+	factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
+
+	c := fake.NewClientBuilder().Build()
+
+	var buf bytes.Buffer
+	err := Install(factory, c, resources, &buf, false)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), expectedErr.Error())
+}
+
+func TestInstallWithApplyFlag(t *testing.T) {
+	// Create a test resource
+	testResource := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]any{
+				"name":      "test-configmap",
+				"namespace": "velero",
+			},
+			"data": map[string]any{
+				"key1": "value1",
+			},
+		},
+	}
+
+	resources := &unstructured.UnstructuredList{
+		Items: []unstructured.Unstructured{*testResource},
+	}
+
+	// Test case 1: Without apply flag (create)
+	{
+		dc := &test.FakeDynamicClient{}
+		// Expect Create to be called
+		dc.On("Create", mock.Anything).Return(testResource, nil)
+		// Apply should not be called
+
+		factory := &test.FakeDynamicFactory{}
+		factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
+
+		c := fake.NewClientBuilder().Build()
+
+		err := Install(factory, c, resources, os.Stdout, false)
+		require.NoError(t, err)
+
+		// Verify that Create was called and Apply was not
+		dc.AssertCalled(t, "Create", mock.Anything)
+		dc.AssertNotCalled(t, "Apply", mock.Anything, mock.Anything, mock.Anything)
+	}
+
+	// Test case 2: With apply flag
+	{
+		dc := &test.FakeDynamicClient{}
+		// Create should not be called
+		// Expect Apply to be called
+		dc.On("Apply", mock.Anything, mock.Anything, mock.Anything).Return(testResource, nil)
+
+		factory := &test.FakeDynamicFactory{}
+		factory.On("ClientForGroupVersionResource", mock.Anything, mock.Anything, mock.Anything).Return(dc, nil)
+
+		c := fake.NewClientBuilder().Build()
+
+		err := Install(factory, c, resources, os.Stdout, true)
+		require.NoError(t, err)
+
+		// Verify that Apply was called and Create was not
+		dc.AssertCalled(t, "Apply", mock.Anything, mock.Anything, mock.Anything)
+		dc.AssertNotCalled(t, "Create", mock.Anything)
+	}
 }
