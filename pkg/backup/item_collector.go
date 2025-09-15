@@ -71,7 +71,7 @@ type itemCollector struct {
 type nsTracker struct {
 	singleLabelSelector labels.Selector
 	orLabelSelector     []labels.Selector
-	namespaceFilter     *collections.IncludesExcludes
+	namespaceFilter     *collections.NamespaceIncludesExcludes
 	logger              logrus.FieldLogger
 
 	namespaceMap map[string]bool
@@ -103,7 +103,7 @@ func (nt *nsTracker) init(
 	unstructuredNSs []unstructured.Unstructured,
 	singleLabelSelector labels.Selector,
 	orLabelSelector []labels.Selector,
-	namespaceFilter *collections.IncludesExcludes,
+	namespaceFilter *collections.NamespaceIncludesExcludes,
 	logger logrus.FieldLogger,
 ) {
 	if nt.namespaceMap == nil {
@@ -635,7 +635,7 @@ func coreGroupResourcePriority(resource string) int {
 // getNamespacesToList examines ie and resolves the includes and excludes to a full list of
 // namespaces to list. If ie is nil or it includes *, the result is just "" (list across all
 // namespaces). Otherwise, the result is a list of every included namespace minus all excluded ones.
-func getNamespacesToList(ie *collections.IncludesExcludes) []string {
+func getNamespacesToList(ie *collections.NamespaceIncludesExcludes) []string {
 	if ie == nil {
 		return []string{""}
 	}
