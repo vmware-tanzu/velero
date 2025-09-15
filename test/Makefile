@@ -184,7 +184,7 @@ ginkgo: ${GOBIN}/ginkgo
 
 # This target does not run if ginkgo is already in $GOBIN
 ${GOBIN}/ginkgo:
-	GOBIN=${GOBIN} go install github.com/onsi/ginkgo/v2/ginkgo@v2.19.0
+	GOBIN=${GOBIN} go install github.com/onsi/ginkgo/v2/ginkgo@v2.22.0
 
 .PHONY: run-e2e
 run-e2e: ginkgo
