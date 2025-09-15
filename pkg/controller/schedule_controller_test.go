@@ -149,6 +149,13 @@ func TestReconcileOfSchedule(t *testing.T) {
 			expectedPhase: string(velerov1.SchedulePhaseEnabled),
 			backup:        builder.ForBackup("ns", "name-20220905120000").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "name")).Phase(velerov1.BackupPhaseNew).Result(),
 		},
+		{
+			name:          "schedule already has backup with empty phase (not yet reconciled).",
+			schedule:      newScheduleBuilder(velerov1.SchedulePhaseEnabled).CronSchedule("@every 5m").LastBackupTime("2000-01-01 00:00:00").Result(),
+			fakeClockTime: "2017-01-01 12:00:00",
+			expectedPhase: string(velerov1.SchedulePhaseEnabled),
+			backup:        builder.ForBackup("ns", "name-20220905120000").ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "name")).Phase("").Result(),
+		},
 	}
 
 	for _, test := range tests {
@@ -215,10 +222,10 @@ func TestReconcileOfSchedule(t *testing.T) {
 			backups := &velerov1.BackupList{}
 			require.NoError(t, client.List(ctx, backups))
 
-			// If backup associated with schedule's status is in New or InProgress,
+			// If backup associated with schedule's status is in New or InProgress or empty phase,
 			// new backup shouldn't be submitted.
 			if test.backup != nil &&
-				(test.backup.Status.Phase == velerov1.BackupPhaseNew || test.backup.Status.Phase == velerov1.BackupPhaseInProgress) {
+				(test.backup.Status.Phase == "" || test.backup.Status.Phase == velerov1.BackupPhaseNew || test.backup.Status.Phase == velerov1.BackupPhaseInProgress) {
 				assert.Len(t, backups.Items, 1)
 				require.NoError(t, client.Delete(ctx, test.backup))
 			}
@@ -475,6 +482,21 @@ func TestCheckIfBackupInNewOrProgress(t *testing.T) {
 		Phase(velerov1.BackupPhaseInProgress).Result()
 	err = client.Create(ctx, inProgressBackup)
 	require.NoError(t, err, "fail to create backup in InProgress phase in TestCheckIfBackupInNewOrProgress: %v", err)
+
+	reconciler = NewScheduleReconciler("namespace", logger, client, metrics.NewServerMetrics(), false)
+	result = reconciler.checkIfBackupInNewOrProgress(testSchedule)
+	assert.True(t, result)
+
+	// Clean backup in InProgress phase.
+	err = client.Delete(ctx, inProgressBackup)
+	require.NoError(t, err, "fail to delete backup in InProgress phase in TestCheckIfBackupInNewOrProgress: %v", err)
+
+	// Create backup with empty phase (not yet reconciled).
+	emptyPhaseBackup := builder.ForBackup("ns", "backup-3").
+		ObjectMeta(builder.WithLabels(velerov1.ScheduleNameLabel, "name")).
+		Phase("").Result()
+	err = client.Create(ctx, emptyPhaseBackup)
+	require.NoError(t, err, "fail to create backup with empty phase in TestCheckIfBackupInNewOrProgress: %v", err)
 
 	reconciler = NewScheduleReconciler("namespace", logger, client, metrics.NewServerMetrics(), false)
 	result = reconciler.checkIfBackupInNewOrProgress(testSchedule)
