@@ -74,7 +74,7 @@ type itemCollector struct {
 type nsTracker struct {
 	singleLabelSelector labels.Selector
 	orLabelSelector     []labels.Selector
-	namespaceFilter     *collections.IncludesExcludes
+	namespaceFilter     *collections.NamespaceIncludesExcludes
 	logger              logrus.FieldLogger
 
 	namespaceMap map[string]bool
@@ -106,7 +106,7 @@ func (nt *nsTracker) init(
 	unstructuredNSs []unstructured.Unstructured,
 	singleLabelSelector labels.Selector,
 	orLabelSelector []labels.Selector,
-	namespaceFilter *collections.IncludesExcludes,
+	namespaceFilter *collections.NamespaceIncludesExcludes,
 	logger logrus.FieldLogger,
 ) {
 	if nt.namespaceMap == nil {
@@ -465,11 +465,7 @@ func (r *itemCollector) getResourceItems(
 	}
 
 	clusterScoped := !resource.Namespaced
-	namespacesToList, err := r.getNamespacesToList()
-	if err != nil {
-		log.WithError(err).Error("Error getting namespaces to list")
-		return nil, err
-	}
+	namespacesToList := getNamespacesToList(r.backupRequest.NamespaceIncludesExcludes)
 
 	// If we get here, we're backing up something other than namespaces
 	if clusterScoped {
@@ -642,17 +638,14 @@ func coreGroupResourcePriority(resource string) int {
 // getNamespacesToList examines ie and resolves the includes and excludes to a full list of
 // namespaces to list. If ie is nil or it includes *, the result is just "" (list across all
 // namespaces). Otherwise, the result is a list of every included namespace minus all excluded ones.
-func (r *itemCollector) getNamespacesToList() ([]string, error) {
-
-	ie := r.backupRequest.NamespaceIncludesExcludes
-
+func getNamespacesToList(ie *collections.NamespaceIncludesExcludes) []string {
 	if ie == nil {
-		return []string{""}, nil
+		return []string{""}
 	}
 
 	if ie.ShouldInclude("*") {
 		// "" means all namespaces
-		return []string{""}, nil
+		return []string{""}
 	}
 
 	var list []string
@@ -662,7 +655,7 @@ func (r *itemCollector) getNamespacesToList() ([]string, error) {
 		}
 	}
 
-	return list, nil
+	return list
 }
 
 type cohabitatingResource struct {
