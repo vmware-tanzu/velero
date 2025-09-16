@@ -34,11 +34,27 @@ type itemKey struct {
 	name      string
 }
 
+type SynchronizedVSList struct {
+	sync.Mutex
+	VolumeSnapshotList []*volume.Snapshot
+}
+
+func (s *SynchronizedVSList) Add(vs *volume.Snapshot) {
+	s.Lock()
+	defer s.Unlock()
+	s.VolumeSnapshotList = append(s.VolumeSnapshotList, vs)
+}
+
+func (s *SynchronizedVSList) Get() []*volume.Snapshot {
+	s.Lock()
+	defer s.Unlock()
+	return s.VolumeSnapshotList
+}
+
 // Request is a request for a backup, with all references to other objects
 // materialized (e.g. backup/snapshot locations, includes/excludes, etc.)
 type Request struct {
 	*velerov1api.Backup
-	requestLock               sync.Mutex
 	StorageLocation           *velerov1api.BackupStorageLocation
 	SnapshotLocations         []*velerov1api.VolumeSnapshotLocation
 	NamespaceIncludesExcludes *collections.IncludesExcludes
@@ -46,7 +62,7 @@ type Request struct {
 	ResourceHooks             []hook.ResourceHook
 	ResolvedActions           []framework.BackupItemResolvedActionV2
 	ResolvedItemBlockActions  []framework.ItemBlockResolvedAction
-	VolumeSnapshots           []*volume.Snapshot
+	VolumeSnapshots           SynchronizedVSList
 	PodVolumeBackups          []*velerov1api.PodVolumeBackup
 	BackedUpItems             *backedUpItemsMap
 	itemOperationsList        *[]*itemoperation.BackupOperation
@@ -82,7 +98,7 @@ func (r *Request) FillVolumesInformation() {
 	}
 
 	r.VolumesInformation.SkippedPVs = skippedPVMap
-	r.VolumesInformation.NativeSnapshots = r.VolumeSnapshots
+	r.VolumesInformation.NativeSnapshots = r.VolumeSnapshots.Get()
 	r.VolumesInformation.PodVolumeBackups = r.PodVolumeBackups
 	r.VolumesInformation.BackupOperations = *r.GetItemOperationsList()
 	r.VolumesInformation.BackupName = r.Backup.Name
