@@ -149,6 +149,9 @@ func (a *PodVolumeRestoreAction) Execute(input *velero.RestoreItemActionExecuteI
 	}
 
 	image := getImage(log, config, a.veleroImage)
+	if image == "" {
+		return nil, errors.New("could not determine image for restore init container")
+	}
 	log.Infof("Using image %q", image)
 
 	cpuRequest, memRequest := getResourceRequests(log, config)
