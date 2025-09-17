@@ -198,7 +198,10 @@ func (kp *kopiaProvider) GetPassword(param any) (string, error) {
 	}
 	rawPass, err := kp.credGetter.FromSecret.Get(repokeys.RepoKeySelector())
 	if err != nil {
-		return "", errors.Wrap(err, "error to get password")
+		if kp.log != nil {
+			kp.log.Warn("Could not fetch repository credentials secret; filesystem-level backups will not work. If you intentionally disabled secret creation, this is expected.")
+		}
+		return "", errors.Wrap(err, "Could not fetch repository credentials secret; filesystem-level backups will not work. If you intentionally disabled secret creation, this is expected.")
 	}
 
 	return strings.TrimSpace(rawPass), nil
