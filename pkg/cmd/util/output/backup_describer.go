@@ -75,6 +75,7 @@ func DescribeBackup(
 		case velerov1api.BackupPhaseFinalizing, velerov1api.BackupPhaseFinalizingPartiallyFailed:
 		case velerov1api.BackupPhaseInProgress:
 		case velerov1api.BackupPhaseNew:
+		case velerov1api.BackupPhaseQueued, velerov1api.BackupPhaseReadyToStart:
 		}
 
 		logsNote := ""
@@ -83,6 +84,9 @@ func DescribeBackup(
 		}
 
 		d.Printf("Phase:\t%s%s\n", phaseString, logsNote)
+		if phase == velerov1api.BackupPhaseQueued {
+			d.Printf("Queue position:\t%v\n", backup.Status.QueuePosition)
+		}
 
 		if backup.Spec.ResourcePolicy != nil {
 			d.Println()
