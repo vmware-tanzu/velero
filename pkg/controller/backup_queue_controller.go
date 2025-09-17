@@ -64,7 +64,7 @@ func NewBackupQueueReconciler(
 		Client:            client,
 		Scheme:            scheme,
 		logger:            logger,
-		concurrentBackups: concurrentBackups,
+		concurrentBackups: max(concurrentBackups, 1),
 		frequency:         defaultQueuedBackupRecheckFrequency,
 	}
 }

@@ -95,7 +95,11 @@ func (b *fakeBackupper) FinalizeBackup(
 }
 
 func defaultBackup() *builder.BackupBuilder {
-	return builder.ForBackup(velerov1api.DefaultNamespace, "backup-1")
+	return builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").Phase(velerov1api.BackupPhaseReadyToStart)
+}
+
+func namedBackup(name string) *builder.BackupBuilder {
+	return builder.ForBackup(velerov1api.DefaultNamespace, name).Phase(velerov1api.BackupPhaseReadyToStart)
 }
 
 func TestProcessBackupNonProcessedItems(t *testing.T) {
@@ -104,6 +108,16 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 		key    string
 		backup *velerov1api.Backup
 	}{
+		{
+			name:   "New backup is not processed",
+			key:    "velero/backup-1",
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).Result(),
+		},
+		{
+			name:   "Queued backup is not processed",
+			key:    "velero/backup-1",
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseQueued).Result(),
+		},
 		{
 			name:   "FailedValidation backup is not processed",
 			key:    "velero/backup-1",
@@ -331,7 +345,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 	}{
 		{
 			name:                             "BackupLocation is specified in backup CR'spec and it can be found in ApiServer",
-			backup:                           builder.ForBackup("velero", "backup-1").Result(),
+			backup:                           defaultBackup().Result(),
 			backupLocationNameInBackup:       "test-backup-location",
 			backupLocationInAPIServer:        builder.ForBackupStorageLocation("velero", "test-backup-location").Result(),
 			defaultBackupLocationInAPIServer: builder.ForBackupStorageLocation("velero", "default-location").Result(),
@@ -340,7 +354,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 		},
 		{
 			name:                             "BackupLocation is specified in backup CR'spec and it can't be found in ApiServer",
-			backup:                           builder.ForBackup("velero", "backup-1").Result(),
+			backup:                           defaultBackup().Result(),
 			backupLocationNameInBackup:       "test-backup-location",
 			backupLocationInAPIServer:        nil,
 			defaultBackupLocationInAPIServer: nil,
@@ -349,7 +363,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 		},
 		{
 			name:                             "Using default BackupLocation and it can be found in ApiServer",
-			backup:                           builder.ForBackup("velero", "backup-1").Result(),
+			backup:                           defaultBackup().Result(),
 			backupLocationNameInBackup:       "",
 			backupLocationInAPIServer:        builder.ForBackupStorageLocation("velero", "test-backup-location").Result(),
 			defaultBackupLocationInAPIServer: builder.ForBackupStorageLocation("velero", "default-location").Result(),
@@ -358,7 +372,7 @@ func Test_prepareBackupRequest_BackupStorageLocation(t *testing.T) {
 		},
 		{
 			name:                             "Using default BackupLocation and it can't be found in ApiServer",
-			backup:                           builder.ForBackup("velero", "backup-1").Result(),
+			backup:                           defaultBackup().Result(),
 			backupLocationNameInBackup:       "",
 			backupLocationInAPIServer:        nil,
 			defaultBackupLocationInAPIServer: nil,
@@ -497,7 +511,7 @@ func TestPrepareBackupRequest_SetsVGSLabelKey(t *testing.T) {
 	}{
 		{
 			name: "backup with spec label key set",
-			backup: builder.ForBackup("velero", "backup-1").
+			backup: defaultBackup().
 				VolumeGroupSnapshotLabelKey("spec-key").
 				Result(),
 			serverFlagKey:    "server-key",
@@ -505,13 +519,13 @@ func TestPrepareBackupRequest_SetsVGSLabelKey(t *testing.T) {
 		},
 		{
 			name:             "backup with no spec key, uses server flag",
-			backup:           builder.ForBackup("velero", "backup-2").Result(),
+			backup:           namedBackup("backup-2").Result(),
 			serverFlagKey:    "server-key",
 			expectedLabelKey: "server-key",
 		},
 		{
 			name:             "backup with no spec or server flag, uses default",
-			backup:           builder.ForBackup("velero", "backup-3").Result(),
+			backup:           namedBackup("backup-3").Result(),
 			serverFlagKey:    velerov1api.DefaultVGSLabelKey,
 			expectedLabelKey: velerov1api.DefaultVGSLabelKey,
 		},
@@ -1390,7 +1404,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		},
 		{
 			name: "backup with namespace-scoped and cluster-scoped resource filters",
-			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").
+			backup: defaultBackup().
 				ExcludedClusterScopedResources("clusterroles").
 				IncludedClusterScopedResources("storageclasses").
 				ExcludedNamespaceScopedResources("secrets").
@@ -1439,7 +1453,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		},
 		{
 			name: "backup's include filter overlap with default exclude resources",
-			backup: builder.ForBackup(velerov1api.DefaultNamespace, "backup-1").
+			backup: defaultBackup().
 				ExcludedClusterScopedResources("clusterroles").
 				IncludedClusterScopedResources("storageclasses", "volumesnapshotcontents.snapshot.storage.k8s.io").
 				ExcludedNamespaceScopedResources("secrets").

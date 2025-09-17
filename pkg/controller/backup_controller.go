@@ -36,7 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/vmware-tanzu/velero/internal/credentials"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
@@ -161,7 +165,7 @@ func NewBackupReconciler(
 		maxConcurrentK8SConnections: maxConcurrentK8SConnections,
 		defaultSnapshotMoveData:     defaultSnapshotMoveData,
 		itemBlockWorkerCount:        itemBlockWorkerCount,
-		concurrentBackups:           concurrentBackups,
+		concurrentBackups:           max(concurrentBackups, 1),
 		globalCRClient:              globalCRClient,
 		workerPool:                  pkgbackup.StartItemBlockWorkerPool(ctx, itemBlockWorkerCount, logger),
 	}
@@ -171,7 +175,24 @@ func NewBackupReconciler(
 
 func (b *backupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&velerov1api.Backup{}).
+		For(&velerov1api.Backup{}, builder.WithPredicates(predicate.Funcs{
+			UpdateFunc: func(ue event.UpdateEvent) bool {
+				backup := ue.ObjectNew.(*velerov1api.Backup)
+				return backup.Status.Phase == velerov1api.BackupPhaseReadyToStart
+			},
+			CreateFunc: func(ce event.CreateEvent) bool {
+				return false
+			},
+			DeleteFunc: func(de event.DeleteEvent) bool {
+				return false
+			},
+			GenericFunc: func(ge event.GenericEvent) bool {
+				return false
+			},
+		})).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: b.concurrentBackups,
+		}).
 		Named(constant.ControllerBackup).
 		Complete(b)
 }
@@ -257,8 +278,8 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// InProgress, we still need this check so we can return nil to indicate we've finished processing
 	// this key (even though it was a no-op).
 	switch original.Status.Phase {
-	case "", velerov1api.BackupPhaseNew:
-		// only process new backups
+	case velerov1api.BackupPhaseReadyToStart:
+		// only process ReadytToStart backups
 	default:
 		b.logger.WithFields(logrus.Fields{
 			"backup": kubeutil.NamespaceAndName(original),
