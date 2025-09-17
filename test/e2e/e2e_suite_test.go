@@ -555,6 +555,24 @@ var _ = Describe(
 )
 
 var _ = Describe(
+	"Velero test on PVC size modification with resource modifiers for CSI Snapshot",
+	Label("ResourceModifier", "PVCSize", "CSI", "Snapshot", "SkipVanillaZfs"),
+	CSISnapshotPVCSizeModifierTest,
+)
+
+var _ = Describe(
+	"Velero test on PVC size modification with resource modifiers for FileSystem Backup",
+	Label("ResourceModifier", "PVCSize", "FSB", "Restic"),
+	KopiaFSBackupPVCSizeModifierTest,
+)
+
+var _ = Describe(
+	"Velero test on PVC size modification with resource modifiers for CSI DataMover",
+	Label("ResourceModifier", "PVCSize", "CSI", "DataMover", "SnapshotDataMover"),
+	CSIDataMoverPVCSizeModifierTest,
+)
+
+var _ = Describe(
 	"Velero tests of Restic backup deletion",
 	Label("Backups", "Deletion", "Restic"),
 	BackupDeletionWithRestic,
