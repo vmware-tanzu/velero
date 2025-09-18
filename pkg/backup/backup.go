@@ -366,7 +366,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		discoveryHelper:          kb.discoveryHelper,
 		podVolumeBackupper:       podVolumeBackupper,
 		podVolumeSnapshotTracker: podvolume.NewTracker(),
-		volumeSnapshotterGetter:  volumeSnapshotterGetter,
+		volumeSnapshotterCache:   NewVolumeSnapshotterCache(volumeSnapshotterGetter),
 		itemHookHandler: &hook.DefaultItemHookHandler{
 			PodCommandExecutor: kb.podCommandExecutor,
 		},
