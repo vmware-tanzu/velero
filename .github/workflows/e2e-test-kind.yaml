@@ -17,7 +17,7 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v5
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
       # Look for a CLI that's made for this PR
@@ -105,7 +105,7 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v5
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
       # Fetch the pre-built MinIO image from the build job
