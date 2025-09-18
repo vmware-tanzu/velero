@@ -300,10 +300,10 @@ func (r *backupQueueReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			// error is logged in getMaxQueuePosition func
 			return ctrl.Result{}, nil
 		}
-		log.Debug("Queueing backup")
 		original := backup.DeepCopy()
 		backup.Status.Phase = velerov1api.BackupPhaseQueued
 		backup.Status.QueuePosition = maxQueuePosition + 1
+		log.Infof("Queueing backup %v, queue position %v", backup.Name, backup.Status.QueuePosition)
 		if err := kube.PatchResource(original, backup, r.Client); err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "error updating Backup status to %s", backup.Status.Phase)
 		}
@@ -325,15 +325,15 @@ func (r *backupQueueReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, nil
 		}
 		if foundConflict {
-			log.Debugf("Backup has namespace conflict with %v, leaving %v queued", conflictBackup, backup.Name)
+			log.Infof("Backup %v has namespace conflict with %v, leaving queued", backup.Name, conflictBackup)
 			return ctrl.Result{}, nil
 		}
 		foundEarlierRunnable, earlierRunnable := r.checkForEarlierRunnableBackups(ctx, backup, earlierBackups, clusterNamespaces)
 		if foundEarlierRunnable {
-			log.Debugf("Earlier queued backup %v is runnable, leaving %v queued", earlierRunnable, backup.Name)
+			log.Infof("Earlier queued backup %v is runnable, leaving %v queued", earlierRunnable, backup.Name)
 			return ctrl.Result{}, nil
 		}
-		log.Debug("Moving backup to ReadyToStart")
+		log.Infof("Dequeueing backup %v, moving to ReadyToStart", backup.Name)
 		original := backup.DeepCopy()
 		backup.Status.Phase = velerov1api.BackupPhaseReadyToStart
 		backup.Status.QueuePosition = 0
