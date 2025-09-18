@@ -512,6 +512,12 @@ To understand which backup method was used for your volumes:
 
 **Note:** A volume appearing in the "skipped PVs" summary doesn't mean it wasn't backed up - it may have been backed up via volume snapshot instead.
 
+### Disk space issues during restore
+
+If restores fail due to insufficient disk space or when restoring to volumes that are nearly full, you can use the `--write-sparse-files` option. This helps optimize disk usage during the restore process.
+
+For more information, see [Write Sparse files](restore-reference.md#write-sparse-files) in the restore documentation.
+
 ## Backup Method Decision Flow
 
 When Velero encounters a volume during backup, it follows this decision flow:
