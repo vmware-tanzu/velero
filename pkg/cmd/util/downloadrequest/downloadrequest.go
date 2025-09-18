@@ -180,10 +180,10 @@ func download(
 
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
-		if urlErr, ok := err.(*url.Error); ok {
-			if _, ok := urlErr.Err.(x509.UnknownAuthorityError); ok {
-				return fmt.Errorf("%s\n\nThe --insecure-skip-tls-verify flag can also be used to accept any TLS certificate for the download, but it is susceptible to man-in-the-middle attacks", err.Error())
-			}
+		var urlErr *url.Error
+		var unknownAuthorityErr *x509.UnknownAuthorityError
+		if errors.As(err, &urlErr) && errors.As(urlErr.Err, &unknownAuthorityErr) {
+			return fmt.Errorf("%s\n\nThe --insecure-skip-tls-verify flag can also be used to accept any TLS certificate for the download, but it is susceptible to man-in-the-middle attacks", err.Error())
 		}
 		return err
 	}
