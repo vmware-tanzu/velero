@@ -148,3 +148,7 @@ Implementation will be done incrementally in the following phases:
 - Testing if slowdowns occur due to the frequency of checking `backup.Cancel` spec field
 - Documentation and user guide updates
 
+**Future Work**:
+
+- Replacing logic that blocks deletion of in-progress backups with the cancellation flow, followed by usual deletion for a terminal phase (Cancelled)
+
