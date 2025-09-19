@@ -26,6 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -764,7 +765,37 @@ func (r *itemCollector) collectNamespaces(
 		return nil, errors.WithStack(err)
 	}
 
-	for _, includedNSName := range r.backupRequest.Backup.Spec.IncludedNamespaces {
+	// This func runs to run wildcard expansion if needed
+	// Do we even need resolvedNamespaces?
+	_, wildcardExpansion, err := r.backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList()
+
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Error("error resolving namespace list")
+		return nil, errors.WithStack(err)
+	}
+
+	if wildcardExpansion {
+		log.Info("Wildcard expansion occurred")
+
+		expandedIncludes := r.backupRequest.NamespaceIncludesExcludes.GetIncludes()
+		expandedExcludes := r.backupRequest.NamespaceIncludesExcludes.GetExcludes()
+
+		// Record the expanded wildcard includes/excludes in the request status
+		r.backupRequest.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
+			IncludeWildcardMatches: expandedIncludes,
+			ExcludeWildcardMatches: expandedExcludes,
+		}
+
+		r.log.WithFields(logrus.Fields{
+			"expandedIncludes": expandedIncludes,
+			"expandedExcludes": expandedExcludes,
+			"includedCount":    len(expandedIncludes),
+			"excludedCount":    len(expandedExcludes),
+		}).Info("Successfully expanded wildcard patterns")
+	}
+
+	// Now takes the resolved includes from NamespaceIncludesExcludes
+	for _, includedNSName := range r.backupRequest.NamespaceIncludesExcludes.GetIncludes() {
 		nsExists := false
 		// Skip checking the namespace existing when it's "*".
 		if includedNSName == "*" {
