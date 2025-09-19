@@ -170,8 +170,8 @@ func expandWildcards(patterns []string, activeNamespaces []string) ([]string, er
 // GetWildcardResult returns the final list of namespaces after applying wildcard include/exclude logic
 func GetWildcardResult(expandedIncludes []string, expandedExcludes []string) []string {
 	// Set check: set of expandedIncludes - set of expandedExcludes
-	expandedIncludesSet := sets.New[string](expandedIncludes...)
-	expandedExcludesSet := sets.New[string](expandedExcludes...)
+	expandedIncludesSet := sets.New(expandedIncludes...)
+	expandedExcludesSet := sets.New(expandedExcludes...)
 	selectedNamespacesSet := expandedIncludesSet.Difference(expandedExcludesSet)
 
 	// Convert the set to a slice
