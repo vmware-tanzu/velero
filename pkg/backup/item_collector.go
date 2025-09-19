@@ -857,7 +857,7 @@ func (r *itemCollector) collectNamespaces(
 
 // expandNamespaceWildcards expands wildcard patterns in namespace includes/excludes
 // and updates the backup request with the expanded values
-func (r *itemCollector) expandNamespaceWildcards(activeNamespaces []string, namespaceSelector *collections.IncludesExcludes) error {
+func (r *itemCollector) expandNamespaceWildcards(activeNamespaces []string, namespaceSelector *collections.NamespaceIncludesExcludes) error {
 	originalIncludes := namespaceSelector.GetIncludes()
 	originalExcludes := namespaceSelector.GetExcludes()
 
