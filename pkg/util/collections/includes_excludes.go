@@ -91,6 +91,24 @@ func (nie *NamespaceIncludesExcludes) GetIncludes() []string {
 	return nie.includesExcludes.GetIncludes()
 }
 
+func (nie *NamespaceIncludesExcludes) GetExcludes() []string {
+	return nie.includesExcludes.GetExcludes()
+}
+
+// SetIncludes sets the includes list to the given list
+func (nie *NamespaceIncludesExcludes) SetIncludes(includes []string) *NamespaceIncludesExcludes {
+	nie.includesExcludes.includes = newGlobStringSet()
+	nie.includesExcludes.includes.Insert(includes...)
+	return nie
+}
+
+// SetExcludes sets the excludes list to the given list
+func (nie *NamespaceIncludesExcludes) SetExcludes(excludes []string) *NamespaceIncludesExcludes {
+	nie.includesExcludes.excludes = newGlobStringSet()
+	nie.includesExcludes.excludes.Insert(excludes...)
+	return nie
+}
+
 // IncludesString returns a string containing all of the includes, separated by commas, or * if the
 // list is empty.
 func (nie *NamespaceIncludesExcludes) IncludesString() string {
@@ -149,20 +167,6 @@ func NewIncludesExcludes() *IncludesExcludes {
 		includes: newGlobStringSet(),
 		excludes: newGlobStringSet(),
 	}
-}
-
-// SetIncludes sets the includes list to the given list
-func (ie *IncludesExcludes) SetIncludes(includes []string) *IncludesExcludes {
-	ie.includes = newGlobStringSet()
-	ie.includes.Insert(includes...)
-	return ie
-}
-
-// SetExcludes sets the excludes list to the given list
-func (ie *IncludesExcludes) SetExcludes(excludes []string) *IncludesExcludes {
-	ie.excludes = newGlobStringSet()
-	ie.excludes.Insert(excludes...)
-	return ie
 }
 
 // Includes adds items to the includes list. '*' is a wildcard
@@ -347,8 +351,8 @@ func GetGlobalResourceIncludesExcludes(helper discovery.Helper, logger logrus.Fi
 }
 
 type ScopeIncludesExcludes struct {
-	namespaceScopedResourceFilter IncludesExcludes // namespace-scoped resource filter
-	clusterScopedResourceFilter   IncludesExcludes // cluster-scoped resource filter
+	namespaceScopedResourceFilter IncludesExcludes          // namespace-scoped resource filter
+	clusterScopedResourceFilter   IncludesExcludes          // cluster-scoped resource filter
 	namespaceFilter               NamespaceIncludesExcludes // namespace filter
 
 	helper discovery.Helper
