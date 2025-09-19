@@ -177,3 +177,125 @@ func TestGetS3CredentialsCorrectlyUseProfile(t *testing.T) {
 		})
 	}
 }
+
+func TestGetS3CredentialsWithMultipleProfiles(t *testing.T) {
+	// Create a credentials file with multiple profiles
+	credentialsContent := `[default]
+aws_access_key_id = default-access-key
+aws_secret_access_key = default-secret-key
+
+[profileone]
+aws_access_key_id = profileone-access-key
+aws_secret_access_key = profileone-secret-key
+
+[profiletwo]
+aws_access_key_id = profiletwo-access-key
+aws_secret_access_key = profiletwo-secret-key
+`
+
+	// Create a temporary file for the credentials
+	tmpFile, err := os.CreateTemp("", "velero-test-aws-multiple-profiles")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// Write the credentials content to the file
+	if _, err := tmpFile.WriteString(credentialsContent); err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Failed to close temp file: %v", err)
+	}
+
+	// Clear environment variables that might interfere with the test
+	t.Setenv("AWS_ACCESS_KEY_ID", "")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "")
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", "")
+	t.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", "")
+	t.Setenv("AWS_ROLE_ARN", "")
+
+	testCases := []struct {
+		name          string
+		config        map[string]string
+		expected      *aws.Credentials
+		wantErr       bool
+		wantErrString string
+	}{
+		{
+			name: "default profile",
+			config: map[string]string{
+				"credentialsFile": tmpFile.Name(),
+				// No profile specified, should use default
+			},
+			expected: &aws.Credentials{
+				AccessKeyID:     "default-access-key",
+				SecretAccessKey: "default-secret-key",
+			},
+			wantErr:       false,
+			wantErrString: "",
+		},
+		{
+			name: "profileone",
+			config: map[string]string{
+				"credentialsFile": tmpFile.Name(),
+				"profile":         "profileone",
+			},
+			expected: &aws.Credentials{
+				AccessKeyID:     "profileone-access-key",
+				SecretAccessKey: "profileone-secret-key",
+			},
+			wantErr:       false,
+			wantErrString: "",
+		},
+		{
+			name: "profiletwo",
+			config: map[string]string{
+				"credentialsFile": tmpFile.Name(),
+				"profile":         "profiletwo",
+			},
+			expected: &aws.Credentials{
+				AccessKeyID:     "profiletwo-access-key",
+				SecretAccessKey: "profiletwo-secret-key",
+			},
+			wantErr:       false,
+			wantErrString: "",
+		},
+		{
+			name: "non-existent profile",
+			config: map[string]string{
+				"credentialsFile": tmpFile.Name(),
+				"profile":         "nonexistentprofile",
+			},
+			expected:      nil,
+			wantErr:       true,
+			wantErrString: "failed to get shared config profile",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Call GetS3Credentials with the config
+			got, err := GetS3Credentials(tc.config)
+
+			// Check for errors
+			if tc.wantErr {
+				require.Error(t, err, "GetS3Credentials should return an error for non-existent profile")
+				if tc.wantErrString != "" {
+					require.Contains(t, err.Error(), tc.wantErrString, "Error should contain the expected error string")
+				}
+			} else {
+				require.NoError(t, err, "GetS3Credentials should not return an error")
+				require.NotNil(t, got, "GetS3Credentials should return credentials")
+
+				// Verify the credentials match what we expect
+				if got.AccessKeyID != tc.expected.AccessKeyID {
+					t.Errorf("AccessKeyID = %v, want %v", got.AccessKeyID, tc.expected.AccessKeyID)
+				}
+				if got.SecretAccessKey != tc.expected.SecretAccessKey {
+					t.Errorf("SecretAccessKey = %v, want %v", got.SecretAccessKey, tc.expected.SecretAccessKey)
+				}
+			}
+		})
+	}
+}
