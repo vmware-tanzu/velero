@@ -11,11 +11,13 @@ jobs:
   # Build the Velero CLI and image once for all Kubernetes versions, and cache it so the fan-out workers can get it.
   build:
     runs-on: ubuntu-latest
+    outputs:
+      minio-dockerfile-sha: ${{ steps.minio-version.outputs.dockerfile_sha }}
     steps:
       - name: Check out the code
         uses: actions/checkout@v5
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
       # Look for a CLI that's made for this PR
@@ -44,6 +46,26 @@ jobs:
         run: |
           IMAGE=velero VERSION=pr-test BUILD_OUTPUT_TYPE=docker make container
           docker save velero:pr-test-linux-amd64 -o ./velero.tar
+      # Check and build MinIO image once for all e2e tests
+      - name: Check Bitnami MinIO Dockerfile version
+        id: minio-version
+        run: |
+          DOCKERFILE_SHA=$(curl -s https://api.github.com/repos/bitnami/containers/commits?path=bitnami/minio/2025/debian-12/Dockerfile\&per_page=1 | jq -r '.[0].sha')
+          echo "dockerfile_sha=${DOCKERFILE_SHA}" >> $GITHUB_OUTPUT
+      - name: Cache MinIO Image
+        uses: actions/cache@v4
+        id: minio-cache
+        with:
+          path: ./minio-image.tar
+          key: minio-bitnami-${{ steps.minio-version.outputs.dockerfile_sha }}
+      - name: Build MinIO Image from Bitnami Dockerfile
+        if: steps.minio-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "Building MinIO image from Bitnami Dockerfile..."
+          git clone --depth 1 https://github.com/bitnami/containers.git /tmp/bitnami-containers
+          cd /tmp/bitnami-containers/bitnami/minio/2025/debian-12
+          docker build -t bitnami/minio:local .
+          docker save bitnami/minio:local > ${{ github.workspace }}/minio-image.tar
   # Create json of k8s versions to test
   # from guide: https://stackoverflow.com/a/65094398/4590470
   setup-test-matrix:
@@ -83,12 +105,23 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v5
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
+      # Fetch the pre-built MinIO image from the build job
+      - name: Fetch built MinIO Image
+        uses: actions/cache@v4
+        id: minio-cache
+        with:
+          path: ./minio-image.tar
+          key: minio-bitnami-${{ needs.build.outputs.minio-dockerfile-sha }}
+      - name: Load MinIO Image
+        run: |
+          echo "Loading MinIO image..."
+          docker load < ./minio-image.tar
       - name: Install MinIO
-        run:
-          docker run -d --rm -p 9000:9000 -e "MINIO_ACCESS_KEY=minio" -e "MINIO_SECRET_KEY=minio123" -e "MINIO_DEFAULT_BUCKETS=bucket,additional-bucket" bitnami/minio:2021.6.17-debian-10-r7
+        run: |
+          docker run -d --rm -p 9000:9000 -e "MINIO_ROOT_USER=minio" -e "MINIO_ROOT_PASSWORD=minio123" -e "MINIO_DEFAULT_BUCKETS=bucket,additional-bucket" bitnami/minio:local
       - uses: engineerd/setup-kind@v0.6.2
         with:
           skipClusterLogsExport: true
