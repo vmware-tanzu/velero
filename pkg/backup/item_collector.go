@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"slices"
 	"sort"
 	"strings"
 
@@ -36,13 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/pager"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
-	"github.com/vmware-tanzu/velero/pkg/util/wildcard"
 )
 
 // itemCollector collects items from the Kubernetes API according to
@@ -762,23 +759,9 @@ func (r *itemCollector) collectNamespaces(
 		activeNamespacesHashSet[namespace.GetName()] = true
 	}
 
-	activeNamespacesList := make([]string, 0)
-	for namespace := range activeNamespacesHashSet {
-		activeNamespacesList = append(activeNamespacesList, namespace)
-	}
-
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Error("error list namespaces")
 		return nil, errors.WithStack(err)
-	}
-
-	// Expand wildcard patterns in namespace includes/excludes if needed
-	// Skip expansion for simple "*" (match all) patterns
-	namespaceSelector := r.backupRequest.NamespaceIncludesExcludes
-	if wildcard.ShouldExpandWildcards(namespaceSelector.GetIncludes(), namespaceSelector.GetExcludes()) {
-		if err := r.expandNamespaceWildcards(activeNamespacesList, namespaceSelector); err != nil {
-			return nil, errors.WithMessage(err, "failed to expand namespace wildcard patterns")
-		}
 	}
 
 	for _, includedNSName := range r.backupRequest.Backup.Spec.IncludedNamespaces {
@@ -853,54 +836,4 @@ func (r *itemCollector) collectNamespaces(
 	}
 
 	return items, nil
-}
-
-// expandNamespaceWildcards expands wildcard patterns in namespace includes/excludes
-// and updates the backup request with the expanded values
-func (r *itemCollector) expandNamespaceWildcards(activeNamespaces []string, namespaceSelector *collections.NamespaceIncludesExcludes) error {
-	originalIncludes := namespaceSelector.GetIncludes()
-	originalExcludes := namespaceSelector.GetExcludes()
-
-	r.log.WithFields(logrus.Fields{
-		"originalIncludes":    originalIncludes,
-		"originalExcludes":    originalExcludes,
-		"availableNamespaces": len(activeNamespaces),
-	}).Info("Starting wildcard expansion for namespace patterns")
-
-	// If `*` is mentioned in originalExcludes, something is wrong
-	if slices.Contains(originalExcludes, "*") {
-		return errors.New("wildcard '*' is not allowed in backup excludes")
-	}
-
-	expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(activeNamespaces, originalIncludes, originalExcludes)
-	if err != nil {
-		r.log.WithFields(logrus.Fields{
-			"originalIncludes": originalIncludes,
-			"originalExcludes": originalExcludes,
-			"error":            err.Error(),
-		}).Error("Failed to expand wildcard patterns")
-		return errors.WithStack(err)
-	}
-
-	// Update the request's includes/excludes with the expanded values
-	namespaceSelector.SetIncludes(expandedIncludes)
-	namespaceSelector.SetExcludes(expandedExcludes)
-
-	selectedNamespaces := wildcard.GetWildcardResult(expandedIncludes, expandedExcludes)
-
-	// Record the expanded wildcard includes/excludes in the request status
-	r.backupRequest.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
-		IncludeWildcardMatches: expandedIncludes,
-		ExcludeWildcardMatches: expandedExcludes,
-		WildcardResult:         selectedNamespaces,
-	}
-
-	r.log.WithFields(logrus.Fields{
-		"expandedIncludes": expandedIncludes,
-		"expandedExcludes": expandedExcludes,
-		"includedCount":    len(expandedIncludes),
-		"excludedCount":    len(expandedExcludes),
-	}).Info("Successfully expanded wildcard patterns")
-
-	return nil
 }
