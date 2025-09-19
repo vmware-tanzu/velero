@@ -1142,6 +1142,7 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
+			UID:       "fake-pod-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: backup.APIVersion,
@@ -1167,6 +1168,7 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
+			UID:       "fake-pod-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: backup.APIVersion,
@@ -1195,6 +1197,7 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
+			UID:       "fake-pvc-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: backup.APIVersion,
@@ -1213,6 +1216,7 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
+			UID:       "fake-pvc-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: backup.APIVersion,
@@ -1258,6 +1262,7 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
+			UID:       "fake-vs-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: backup.APIVersion,
@@ -1273,6 +1278,7 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
+			UID:       "fake-vs-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: backup.APIVersion,
@@ -1290,6 +1296,7 @@ func Test_csiSnapshotExposer_DiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
+			UID:       "fake-vs-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: backup.APIVersion,
@@ -1486,6 +1493,74 @@ Pod condition Initialized, status True, reason , message fake-pod-message
 PVC velero/fake-backup, phase Pending, binding to fake-pv
 PV fake-pv, phase Pending, reason , message fake-pv-message
 VS velero/fake-backup, bind to fake-vsc, readyToUse false, errMessage fake-vs-message
+VSC fake-vsc, readyToUse false, errMessage fake-vsc-message, handle 
+end diagnose CSI exposer`,
+		},
+		{
+			name:        "with events",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				&backupPodWithNodeName,
+				&backupPVCWithVolumeName,
+				&backupPV,
+				&nodeAgentPod,
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: velerov1.DefaultNamespace, Name: "event-1"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-uid-1"},
+					Reason:         "reason-1",
+					Message:        "message-1",
+				},
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: velerov1.DefaultNamespace, Name: "event-2"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Reason:         "reason-2",
+					Message:        "message-2",
+				},
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: velerov1.DefaultNamespace, Name: "event-3"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pvc-uid"},
+					Reason:         "reason-3",
+					Message:        "message-3",
+				},
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: velerov1.DefaultNamespace, Name: "event-4"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-vs-uid"},
+					Reason:         "reason-4",
+					Message:        "message-4",
+				},
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: "other-namespace", Name: "event-5"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Reason:         "reason-5",
+					Message:        "message-5",
+				},
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: velerov1.DefaultNamespace, Name: "event-6"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Reason:         "reason-6",
+					Message:        "message-6",
+				},
+			},
+			snapshotClientObj: []runtime.Object{
+				&backupVSWithVSC,
+				&backupVSC,
+			},
+			expected: `begin diagnose CSI exposer
+Pod velero/fake-backup, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+Pod event reason reason-2, message message-2
+Pod event reason reason-6, message message-6
+PVC velero/fake-backup, phase Pending, binding to fake-pv
+PVC event reason reason-3, message message-3
+PV fake-pv, phase Pending, reason , message fake-pv-message
+VS velero/fake-backup, bind to fake-vsc, readyToUse false, errMessage fake-vs-message
+VS event reason reason-4, message message-4
 VSC fake-vsc, readyToUse false, errMessage fake-vsc-message, handle 
 end diagnose CSI exposer`,
 		},

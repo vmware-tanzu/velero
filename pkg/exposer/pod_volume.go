@@ -248,8 +248,13 @@ func (e *podVolumeExposer) DiagnoseExpose(ctx context.Context, ownerObject corev
 		diag += fmt.Sprintf("error getting hosting pod %s, err: %v\n", hostingPodName, err)
 	}
 
+	events, err := e.kubeClient.CoreV1().Events(ownerObject.Namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		diag += fmt.Sprintf("error listing events, err: %v\n", err)
+	}
+
 	if pod != nil {
-		diag += kube.DiagnosePod(pod)
+		diag += kube.DiagnosePod(pod, events)
 
 		if pod.Spec.NodeName != "" {
 			if err := nodeagent.KbClientIsRunningInNode(ctx, ownerObject.Namespace, pod.Spec.NodeName, e.kubeClient); err != nil {
