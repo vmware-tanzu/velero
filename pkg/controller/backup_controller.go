@@ -734,8 +734,8 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 
 	// native snapshots phase will either be failed or completed right away
 	// https://github.com/vmware-tanzu/velero/blob/de3ea52f0cc478e99efa7b9524c7f353514261a4/pkg/backup/item_backupper.go#L632-L639
-	backup.Status.VolumeSnapshotsAttempted = len(backup.VolumeSnapshots)
-	for _, snap := range backup.VolumeSnapshots {
+	backup.Status.VolumeSnapshotsAttempted = len(backup.VolumeSnapshots.Get())
+	for _, snap := range backup.VolumeSnapshots.Get() {
 		if snap.Status.Phase == volume.SnapshotPhaseCompleted {
 			backup.Status.VolumeSnapshotsCompleted++
 		}
@@ -882,7 +882,7 @@ func persistBackup(backup *pkgbackup.Request,
 	}
 
 	// Velero-native volume snapshots (as opposed to CSI ones)
-	nativeVolumeSnapshots, errs := encode.ToJSONGzip(backup.VolumeSnapshots, "native volumesnapshots list")
+	nativeVolumeSnapshots, errs := encode.ToJSONGzip(backup.VolumeSnapshots.Get(), "native volumesnapshots list")
 	if errs != nil {
 		persistErrs = append(persistErrs, errs...)
 	}
