@@ -143,7 +143,7 @@ func (nie *NamespaceIncludesExcludes) IncludeEverything() bool {
 }
 
 // ResolveNamespaceList returns a list of all namespaces which will be backed up.
-func (nie *NamespaceIncludesExcludes) ResolveNamespaceList() ([]string, bool,error) {
+func (nie *NamespaceIncludesExcludes) ResolveNamespaceList() ([]string, bool, error) {
 	includes := nie.GetIncludes()
 	excludes := nie.GetExcludes()
 	wildcardExpansion := false

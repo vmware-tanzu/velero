@@ -182,8 +182,8 @@ func getNamespaceIncludesExcludes(backup *velerov1api.Backup, kbClient kbclient.
 		activeNamespaces = append(activeNamespaces, ns.Name)
 		nsLabels := ns.GetLabels()
 		if len(nsLabels[ArgoCDManagedByNamespaceLabel]) > 0 && includesExcludes.ShouldInclude(ns.Name) {
-                        nsManagedByArgoCD = append(nsManagedByArgoCD, ns.Name)
-                }
+			nsManagedByArgoCD = append(nsManagedByArgoCD, ns.Name)
+		}
 
 	}
 	return includesExcludes.ActiveNamespaces(activeNamespaces), nsManagedByArgoCD, nil
@@ -618,6 +618,11 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 	updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed = itemBackupper.hookTracker.Stat()
 	log.Debugf("hookAttempted: %d, hookFailed: %d", updated.Status.HookStatus.HooksAttempted, updated.Status.HookStatus.HooksFailed)
+
+	// Add wildcard namespace status if it was set during item collection
+	if backupRequest.Status.WildcardNamespaces != nil {
+		updated.Status.WildcardNamespaces = backupRequest.Status.WildcardNamespaces
+	}
 
 	if err := kube.PatchResource(backupRequest.Backup, updated, kb.kbClient); err != nil {
 		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress and hook status")
