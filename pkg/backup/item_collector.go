@@ -766,7 +766,7 @@ func (r *itemCollector) collectNamespaces(
 	}
 
 	// This func runs to run wildcard expansion if needed
-	// Do we even need resolvedNamespaces?
+	// Returns the list of namespaces that are needed to be backed up
 	_, wildcardExpansion, err := r.backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList()
 
 	if err != nil {
@@ -796,6 +796,7 @@ func (r *itemCollector) collectNamespaces(
 
 	// Now takes the resolved includes from NamespaceIncludesExcludes
 	for _, includedNSName := range r.backupRequest.NamespaceIncludesExcludes.GetIncludes() {
+
 		nsExists := false
 		// Skip checking the namespace existing when it's "*".
 		if includedNSName == "*" {
