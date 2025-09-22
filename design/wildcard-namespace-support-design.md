@@ -1,11 +1,13 @@
 
-# Wildcard Namespace Includes/Excludes Support for Backups and Restores
+# Wildcard (*) support for Include/Exclude Namespaces
 
 ## Abstract
 
-Velero currently does not support wildcard characters in namespace specifications, requiring all namespaces to be specified as string literals. The only exception is the standalone "*" character, which includes all namespaces and ignores excludes.
+- Velero currently does **not** support wildcard characters in namespace specifications, they must be specified as string literals 
+- The only exception is the standalone `*` character, which includes all namespaces and ignores excludes
 
-This document details the approach to implementing wildcard namespace support for `--include-namespaces` and `--exclude-namespaces` flags, while preserving the existing "*" behavior for backward compatibility.
+ - This design details an approach to implementing wildcard namespace support for `--include-namespaces` and `--exclude-namespaces` flags
+- Preserves standalone `*` for backwards compatibility
 
 ## Background
 
@@ -14,32 +16,33 @@ This feature was requested in Issue [#1874](https://github.com/vmware-tanzu/vele
 ## Goals
 
 - Add support for wildcard patterns in `--include-namespaces` and `--exclude-namespaces` flags for both backup and restore
-- Ensure legacy "*" behavior remains unchanged for backward compatibility
+- Ensure existing `*` behavior remains unchanged for backward compatibility
 
 ## Non-Goals
 
 - Completely rethinking the way "*" is treated and allowing it to work with wildcard excludes
-- Supporting complex regex patterns beyond basic glob patterns
+- Supporting complex regex patterns beyond basic glob patterns: this could be explored later
 
 
 ## High-Level Design
 
-## Backup
+### NamespaceIncludesExcludes struct
 
-The wildcard expansion implementation focuses on two key functions in `pkg/backup/item_collector.go`:
+- `NamespaceIncludesExcludes` is a wrapper around `IncludesExcludes`
+- It has a field `activeNamespaces`, which will be used by the wildcard expansion logic to run the expansion
 
-- [`collectNamespaces`](https://github.com/vmware-tanzu/velero/blob/1535afb45e33a3d3820088e4189800a21ba55293/pkg/backup/item_collector.go#L742) - Retrieves all active namespaces and processes include/exclude filters
-- [`getNamespacesToList`](https://github.com/vmware-tanzu/velero/blob/1535afb45e33a3d3820088e4189800a21ba55293/pkg/backup/item_collector.go#L638) - Resolves namespace includes/excludes to final list
+### Backup
 
-The `collectNamespaces` function is the ideal integration point because it:
-- Already retrieves all active namespaces from the cluster
-- Processes the user-specified namespace filters
-- Can expand wildcard patterns against the complete namespace list
-- Stores the resolved namespaces in new backup status fields for visibility
+The wildcard expansion implementation focuses on 
 
-This approach ensures wildcard namespaces are handled consistently with the existing "*" behavior, bypassing individual namespace existence checks.
+- [`getNamespacesToList`](https://github.com/vmware-tanzu/velero/blob/1535afb45e33a3d3820088e4189800a21ba55293/pkg/backup/item_collector.go#L638) - Resolves namespace includes/excludes to final list.
 
-## Restore
+- Wildcard expansion is conditionally run when the `NamespaceIncludesExcludes.ResolveNamespaceList()` func is run. 
+    - It overwrites the `NamespaceIncludeExclude` struct's `Includes` and `Excludes` with the expanded string literal namespaces
+    - If there are no candidate strings for expansion, it proceeds normally 
+
+
+### Restore
 
 The wildcard expansion implementation for restore operations focuses on the main execution flow in `pkg/restore/restore.go`:
 
@@ -154,14 +157,6 @@ type RestoreStatus struct {
 
 **Implementation**: In `pkg/backup/item_collector.go`:
 
-```go
-// collectNamespaces function (line 748-803)
-if wildcard.ShouldExpandWildcards(namespaceSelector.GetIncludes(), namespaceSelector.GetExcludes()) {
-    if err := r.expandNamespaceWildcards(activeNamespacesList, namespaceSelector); err != nil {
-        return nil, errors.WithMessage(err, "failed to expand namespace wildcard patterns")
-    }
-}
-```
 
 The expansion occurs when collecting namespaces, after retrieving all active namespaces from the cluster. The `expandNamespaceWildcards` method:
 - Calls `wildcard.ExpandWildcards()` with active namespaces and original patterns
