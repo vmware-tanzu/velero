@@ -60,7 +60,7 @@ const (
 // NewPodVolumeBackupReconciler creates the PodVolumeBackupReconciler instance
 func NewPodVolumeBackupReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
 	counter *exposer.VgdpCounter, nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, podResources corev1api.ResourceRequirements,
-	metrics *metrics.ServerMetrics, logger logrus.FieldLogger, dataMovePriorityClass string) *PodVolumeBackupReconciler {
+	metrics *metrics.ServerMetrics, logger logrus.FieldLogger, dataMovePriorityClass string, privileged bool) *PodVolumeBackupReconciler {
 	return &PodVolumeBackupReconciler{
 		client:                client,
 		mgr:                   mgr,
@@ -77,6 +77,7 @@ func NewPodVolumeBackupReconciler(client client.Client, mgr manager.Manager, kub
 		exposer:               exposer.NewPodVolumeExposer(kubeClient, logger),
 		cancelledPVB:          make(map[string]time.Time),
 		dataMovePriorityClass: dataMovePriorityClass,
+		privileged:            privileged,
 	}
 }
 
@@ -97,6 +98,7 @@ type PodVolumeBackupReconciler struct {
 	resourceTimeout       time.Duration
 	cancelledPVB          map[string]time.Time
 	dataMovePriorityClass string
+	privileged            bool
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumebackups,verbs=get;list;watch;create;update;patch;delete
@@ -837,6 +839,7 @@ func (r *PodVolumeBackupReconciler) setupExposeParam(pvb *velerov1api.PodVolumeB
 		Resources:             r.podResources,
 		// Priority class name for the data mover pod, retrieved from node-agent-configmap
 		PriorityClassName: r.dataMovePriorityClass,
+		Privileged:        r.privileged,
 	}
 }
 
