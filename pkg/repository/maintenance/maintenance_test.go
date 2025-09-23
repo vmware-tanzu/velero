@@ -1481,3 +1481,291 @@ func TestBuildJobWithPriorityClassName(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildTolerationsForMaintenanceJob(t *testing.T) {
+	windowsToleration := corev1api.Toleration{
+		Key:      "os",
+		Operator: "Equal",
+		Effect:   "NoSchedule",
+		Value:    "windows",
+	}
+
+	testCases := []struct {
+		name                  string
+		deploymentTolerations []corev1api.Toleration
+		expectedTolerations   []corev1api.Toleration
+	}{
+		{
+			name:                  "no tolerations should only include Windows toleration",
+			deploymentTolerations: nil,
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+			},
+		},
+		{
+			name:                  "empty tolerations should only include Windows toleration",
+			deploymentTolerations: []corev1api.Toleration{},
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+			},
+		},
+		{
+			name: "non-allowed toleration should not be inherited",
+			deploymentTolerations: []corev1api.Toleration{
+				{
+					Key:      "vng-ondemand",
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "amd64",
+				},
+			},
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+			},
+		},
+		{
+			name: "allowed toleration should be inherited",
+			deploymentTolerations: []corev1api.Toleration{
+				{
+					Key:      "kubernetes.azure.com/scalesetpriority",
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "spot",
+				},
+			},
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+				{
+					Key:      "kubernetes.azure.com/scalesetpriority",
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "spot",
+				},
+			},
+		},
+		{
+			name: "mixed allowed and non-allowed tolerations should only inherit allowed",
+			deploymentTolerations: []corev1api.Toleration{
+				{
+					Key:      "vng-ondemand", // not in allowlist
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "amd64",
+				},
+				{
+					Key:      "CriticalAddonsOnly", // in allowlist
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+				{
+					Key:      "custom-key", // not in allowlist
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "custom-value",
+				},
+			},
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+				{
+					Key:      "CriticalAddonsOnly",
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+			},
+		},
+		{
+			name: "multiple allowed tolerations should all be inherited",
+			deploymentTolerations: []corev1api.Toleration{
+				{
+					Key:      "kubernetes.azure.com/scalesetpriority",
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "spot",
+				},
+				{
+					Key:      "CriticalAddonsOnly",
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+			},
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+				{
+					Key:      "kubernetes.azure.com/scalesetpriority",
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "spot",
+				},
+				{
+					Key:      "CriticalAddonsOnly",
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a deployment with the specified tolerations
+			deployment := &appsv1api.Deployment{
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Tolerations: tc.deploymentTolerations,
+						},
+					},
+				},
+			}
+
+			result := buildTolerationsForMaintenanceJob(deployment)
+			assert.Equal(t, tc.expectedTolerations, result)
+		})
+	}
+}
+
+func TestBuildJobWithTolerationsInheritance(t *testing.T) {
+	// Define allowed tolerations that would be set on Velero deployment
+	allowedTolerations := []corev1api.Toleration{
+		{
+			Key:      "kubernetes.azure.com/scalesetpriority",
+			Operator: "Equal",
+			Effect:   "NoSchedule",
+			Value:    "spot",
+		},
+		{
+			Key:      "CriticalAddonsOnly",
+			Operator: "Exists",
+			Effect:   "NoSchedule",
+		},
+	}
+
+	// Mixed tolerations (allowed and non-allowed)
+	mixedTolerations := []corev1api.Toleration{
+		{
+			Key:      "vng-ondemand", // not in allowlist
+			Operator: "Equal",
+			Effect:   "NoSchedule",
+			Value:    "amd64",
+		},
+		{
+			Key:      "CriticalAddonsOnly", // in allowlist
+			Operator: "Exists",
+			Effect:   "NoSchedule",
+		},
+	}
+
+	// Windows toleration that should always be present
+	windowsToleration := corev1api.Toleration{
+		Key:      "os",
+		Operator: "Equal",
+		Effect:   "NoSchedule",
+		Value:    "windows",
+	}
+
+	testCases := []struct {
+		name                  string
+		deploymentTolerations []corev1api.Toleration
+		expectedTolerations   []corev1api.Toleration
+	}{
+		{
+			name:                  "no tolerations on deployment should only have Windows toleration",
+			deploymentTolerations: nil,
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+			},
+		},
+		{
+			name:                  "allowed tolerations should be inherited along with Windows toleration",
+			deploymentTolerations: allowedTolerations,
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+				{
+					Key:      "kubernetes.azure.com/scalesetpriority",
+					Operator: "Equal",
+					Effect:   "NoSchedule",
+					Value:    "spot",
+				},
+				{
+					Key:      "CriticalAddonsOnly",
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+			},
+		},
+		{
+			name:                  "mixed tolerations should only inherit allowed ones",
+			deploymentTolerations: mixedTolerations,
+			expectedTolerations: []corev1api.Toleration{
+				windowsToleration,
+				{
+					Key:      "CriticalAddonsOnly",
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a new scheme and add necessary API types
+			localScheme := runtime.NewScheme()
+			err := velerov1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			err = appsv1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+			err = batchv1api.AddToScheme(localScheme)
+			require.NoError(t, err)
+
+			// Create a deployment with the specified tolerations
+			deployment := &appsv1api.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "velero",
+					Namespace: "velero",
+				},
+				Spec: appsv1api.DeploymentSpec{
+					Template: corev1api.PodTemplateSpec{
+						Spec: corev1api.PodSpec{
+							Containers: []corev1api.Container{
+								{
+									Name:  "velero",
+									Image: "velero/velero:latest",
+								},
+							},
+							Tolerations: tc.deploymentTolerations,
+						},
+					},
+				},
+			}
+
+			// Create a backup repository
+			repo := &velerov1api.BackupRepository{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-repo",
+					Namespace: "velero",
+				},
+				Spec: velerov1api.BackupRepositorySpec{
+					VolumeNamespace:       "velero",
+					BackupStorageLocation: "default",
+				},
+			}
+
+			// Create fake client and add the deployment
+			client := fake.NewClientBuilder().WithScheme(localScheme).WithObjects(deployment).Build()
+
+			// Create minimal job configs and resources
+			jobConfig := &velerotypes.JobConfigs{}
+			logLevel := logrus.InfoLevel
+			logFormat := logging.NewFormatFlag()
+			logFormat.Set("text")
+
+			// Call buildJob
+			job, err := buildJob(client, t.Context(), repo, "default", jobConfig, logLevel, logFormat, logrus.New())
+			require.NoError(t, err)
+
+			// Verify the tolerations are set correctly
+			assert.Equal(t, tc.expectedTolerations, job.Spec.Template.Spec.Tolerations)
+		})
+	}
+}
