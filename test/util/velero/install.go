@@ -163,6 +163,7 @@ func VeleroInstall(ctx context.Context, veleroCfg *test.VeleroConfig, isStandbyC
 			veleroCfg.VeleroNamespace,
 		)
 	}
+	veleroCfg.BackupRepoConfigMap = test.BackupRepositoryConfigName
 
 	// Install the passed-in objects in Velero installed namespace
 	for _, obj := range objects {
@@ -654,7 +655,7 @@ func patchResources(resources *unstructured.UnstructuredList, namespace string, 
 				APIVersion: corev1api.SchemeGroupVersion.String(),
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "restic-restore-action-config",
+				Name:      "fs-restore-action-config",
 				Namespace: namespace,
 				Labels: map[string]string{
 					"velero.io/plugin-config":      "",
@@ -671,7 +672,7 @@ func patchResources(resources *unstructured.UnstructuredList, namespace string, 
 			return errors.Wrapf(err, "failed to convert restore action config to unstructure")
 		}
 		resources.Items = append(resources.Items, un)
-		fmt.Printf("the restic restore helper image is set by the configmap %q \n", "restic-restore-action-config")
+		fmt.Printf("the restic restore helper image is set by the configmap %q \n", "fs-restore-action-config")
 	}
 
 	return nil
