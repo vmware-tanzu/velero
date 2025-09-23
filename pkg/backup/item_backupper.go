@@ -673,7 +673,7 @@ func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.Fie
 		snapshot.Status.Phase = volume.SnapshotPhaseCompleted
 		snapshot.Status.ProviderSnapshotID = snapshotID
 	}
-	ib.backupRequest.VolumeSnapshots = append(ib.backupRequest.VolumeSnapshots, snapshot)
+	ib.backupRequest.VolumeSnapshots.Add(snapshot)
 
 	// nil errors are automatically removed
 	return kubeerrs.NewAggregate(errs)
