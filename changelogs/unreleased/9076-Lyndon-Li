@@ -1,1 +1,0 @@
-Fix issue #9053, Always remove selected-node annotation during PVC restore when no node mapping exists. Breaking change: Previously, the annotation was preserved if the node existed.

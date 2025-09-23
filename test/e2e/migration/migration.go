@@ -342,6 +342,12 @@ func (m *migrationE2E) Restore() error {
 		Expect(veleroutil.InstallStorageClasses(
 			m.VeleroCfg.StandbyClusterCloudProvider)).To(Succeed())
 
+		By("Install PriorityClass for E2E.")
+		Expect(veleroutil.CreatePriorityClasses(
+			context.Background(),
+			test.VeleroCfg.StandbyClient.Kubebuilder,
+		)).To(Succeed())
+
 		if strings.EqualFold(m.VeleroCfg.Features, test.FeatureCSI) &&
 			m.VeleroCfg.UseVolumeSnapshots {
 			By("Install VolumeSnapshotClass for E2E.")
@@ -447,6 +453,7 @@ func (m *migrationE2E) Clean() error {
 
 		Expect(k8sutil.KubectlConfigUseContext(
 			m.Ctx, m.VeleroCfg.StandbyClusterContext)).To(Succeed())
+
 		m.VeleroCfg.ClientToInstallVelero = m.VeleroCfg.StandbyClient
 		m.VeleroCfg.ClusterToInstallVelero = m.VeleroCfg.StandbyClusterName
 
@@ -459,7 +466,6 @@ func (m *migrationE2E) Clean() error {
 			fmt.Println("Fail to delete StorageClass1: ", err)
 			return
 		}
-
 		if err := k8sutil.DeleteStorageClass(
 			m.Ctx,
 			*m.VeleroCfg.ClientToInstallVelero,
@@ -468,6 +474,12 @@ func (m *migrationE2E) Clean() error {
 			fmt.Println("Fail to delete StorageClass2: ", err)
 			return
 		}
+
+		By("Delete PriorityClasses created by E2E")
+		Expect(veleroutil.DeletePriorityClasses(
+			m.Ctx,
+			m.VeleroCfg.ClientToInstallVelero.Kubebuilder,
+		)).To(Succeed())
 
 		if strings.EqualFold(m.VeleroCfg.Features, test.FeatureCSI) &&
 			m.VeleroCfg.UseVolumeSnapshots {

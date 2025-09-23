@@ -41,6 +41,7 @@ depends on your test patterns.
 */
 type VeleroBackupRestoreTest interface {
 	Init() error
+	InstallVelero() error
 	CreateResources() error
 	Backup() error
 	Destroy() error
@@ -107,6 +108,10 @@ func (t *TestCase) Init() error {
 
 func (t *TestCase) GenerateUUID() string {
 	return fmt.Sprintf("%08d", rand.IntN(100000000))
+}
+
+func (t *TestCase) InstallVelero() error {
+	return PrepareVelero(context.Background(), t.GetTestCase().CaseBaseName, t.GetTestCase().VeleroCfg)
 }
 
 func (t *TestCase) CreateResources() error {
@@ -221,7 +226,8 @@ func RunTestCase(test VeleroBackupRestoreTest) error {
 	fmt.Printf("Running test case %s %s\n", test.GetTestMsg().Desc, time.Now().Format("2006-01-02 15:04:05"))
 
 	if InstallVelero {
-		Expect(PrepareVelero(context.Background(), test.GetTestCase().CaseBaseName, test.GetTestCase().VeleroCfg)).To(Succeed())
+		fmt.Printf("Install Velero for test case %s: %s", test.GetTestCase().CaseBaseName, time.Now().Format("2006-01-02 15:04:05"))
+		Expect(test.InstallVelero()).To(Succeed())
 	}
 
 	defer test.Clean()

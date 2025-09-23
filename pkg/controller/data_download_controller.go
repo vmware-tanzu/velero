@@ -49,6 +49,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/exposer"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
+	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/uploader"
 	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -66,7 +67,7 @@ type DataDownloadReconciler struct {
 	dataPathMgr           *datapath.Manager
 	vgdpCounter           *exposer.VgdpCounter
 	loadAffinity          []*kube.LoadAffinity
-	restorePVCConfig      nodeagent.RestorePVC
+	restorePVCConfig      velerotypes.RestorePVC
 	podResources          corev1api.ResourceRequirements
 	preparingTimeout      time.Duration
 	metrics               *metrics.ServerMetrics
@@ -81,7 +82,7 @@ func NewDataDownloadReconciler(
 	dataPathMgr *datapath.Manager,
 	counter *exposer.VgdpCounter,
 	loadAffinity []*kube.LoadAffinity,
-	restorePVCConfig nodeagent.RestorePVC,
+	restorePVCConfig velerotypes.RestorePVC,
 	podResources corev1api.ResourceRequirements,
 	nodeName string,
 	preparingTimeout time.Duration,
