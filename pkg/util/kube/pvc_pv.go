@@ -554,3 +554,19 @@ func GetPVAttachedNode(ctx context.Context, pv string, storageClient storagev1.S
 
 	return "", nil
 }
+
+func GetPVAttachedNodes(ctx context.Context, pv string, storageClient storagev1.StorageV1Interface) ([]string, error) {
+	vaList, err := storageClient.VolumeAttachments().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error listing volumeattachment")
+	}
+
+	nodes := []string{}
+	for _, va := range vaList.Items {
+		if va.Spec.Source.PersistentVolumeName != nil && *va.Spec.Source.PersistentVolumeName == pv {
+			nodes = append(nodes, va.Spec.NodeName)
+		}
+	}
+
+	return nodes, nil
+}
