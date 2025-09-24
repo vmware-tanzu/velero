@@ -794,26 +794,23 @@ func (r *itemCollector) collectNamespaces(
 		}).Info("Successfully expanded wildcard patterns")
 	}
 
-	// Now takes the resolved includes from NamespaceIncludesExcludes
-	for _, includedNSName := range r.backupRequest.NamespaceIncludesExcludes.GetIncludes() {
+	// This check could be skipped if wildcard expansion is performed: wildcard expansion works on the complete list of namespaces
+	if !wildcardExpansion {
+		for _, includedNSName := range r.backupRequest.Spec.IncludedNamespaces {
 
-		nsExists := false
-		// Skip checking the namespace existing when it's "*".
-		if includedNSName == "*" {
-			continue
-		}
+			nsExists := false
+			// Skip checking the namespace existing when it's "*".
+			if includedNSName == "*" {
+				continue
+			}
 
-		// Skip checking the namespace existing when it's a wildcard.
-		if strings.Contains(includedNSName, "*") {
-			continue
-		}
+			if _, ok := activeNamespacesHashSet[includedNSName]; ok {
+				nsExists = true
+			}
 
-		if _, ok := activeNamespacesHashSet[includedNSName]; ok {
-			nsExists = true
-		}
-
-		if !nsExists {
-			log.Errorf("fail to get the namespace %s specified in backup.Spec.IncludedNamespaces", includedNSName)
+			if !nsExists {
+				log.Errorf("fail to get the namespace %s specified in backup.Spec.IncludedNamespaces", includedNSName)
+			}
 		}
 	}
 

@@ -17,6 +17,7 @@ limitations under the License.
 package collections
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
@@ -143,32 +144,27 @@ func (nie *NamespaceIncludesExcludes) IncludeEverything() bool {
 }
 
 // ResolveNamespaceList returns a list of all namespaces which will be backed up.
+// The second return value indicates whether wildcard expansion was performed.
 func (nie *NamespaceIncludesExcludes) ResolveNamespaceList() ([]string, bool, error) {
 	includes := nie.GetIncludes()
 	excludes := nie.GetExcludes()
-	wildcardExpansion := false
 
 	// Check if we should use wildcard expansion
 	if wildcard.ShouldExpandWildcards(includes, excludes) {
-		wildcardExpansion = true
 		expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(
 			nie.activeNamespaces, includes, excludes)
 		if err != nil {
-			// Log error and fall back to traditional logic
-			logrus.WithError(err).Error("Error expanding wildcard patterns in namespace includes/excludes")
-			// (or return error - needs decision)
-			return nil, wildcardExpansion, err
+			return nil, false, fmt.Errorf("failed to expand wildcard patterns in namespace includes/excludes: %w", err)
 		}
-		// Set the includes and excludes
+
 		nie.SetIncludes(expandedIncludes)
 		nie.SetExcludes(expandedExcludes)
 
+		return nie.resolveNamespaceListTraditional(), true, nil
 	}
 
-	// This logic is called regardless of whether wildcard expansion is needed,
-	// because we update the includes and excludes in the previous step
-	// if wildcard expansion has occured
-	return nie.resolveNamespaceListTraditional(), wildcardExpansion, nil
+	// Use traditional resolution when no wildcard expansion is needed
+	return nie.resolveNamespaceListTraditional(), false, nil
 }
 
 // resolveNamespaceListTraditional is a helper method to resolve namespaces using the old glob-based logic.
