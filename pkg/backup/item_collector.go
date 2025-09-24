@@ -449,6 +449,33 @@ func (r *itemCollector) getResourceItems(
 		}
 	}
 
+	// Call ResolveNamespaceList to get the list of namespaces to backup
+	_, wildcardExpansion, err := r.backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList()
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Error("error resolving namespace list")
+		return nil, errors.WithStack(err)
+	}
+
+	if wildcardExpansion {
+		log.Info("Wildcard expansion occurred")
+
+		expandedIncludes := r.backupRequest.NamespaceIncludesExcludes.GetIncludes()
+		expandedExcludes := r.backupRequest.NamespaceIncludesExcludes.GetExcludes()
+
+		// Record the expanded wildcard includes/excludes in the request status
+		r.backupRequest.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
+			IncludeWildcardMatches: expandedIncludes,
+			ExcludeWildcardMatches: expandedExcludes,
+		}
+
+		r.log.WithFields(logrus.Fields{
+			"expandedIncludes": expandedIncludes,
+			"expandedExcludes": expandedExcludes,
+			"includedCount":    len(expandedIncludes),
+			"excludedCount":    len(expandedExcludes),
+		}).Info("Successfully expanded wildcard patterns")
+	}
+
 	// Handle namespace resource here.
 	// Namespace are filtered by namespace include/exclude filters,
 	// backup LabelSelectors and OrLabelSelectors are checked too.
@@ -765,52 +792,22 @@ func (r *itemCollector) collectNamespaces(
 		return nil, errors.WithStack(err)
 	}
 
-	// This func runs to run wildcard expansion if needed
-	// Returns the list of namespaces that are needed to be backed up
-	_, wildcardExpansion, err := r.backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList()
+	// Change to look at the struct includes/excludes
+	// In case wildcards are expanded, we need to look at the struct includes/excludes
+	for _, includedNSName := range r.backupRequest.NamespaceIncludesExcludes.GetIncludes() {
 
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("error resolving namespace list")
-		return nil, errors.WithStack(err)
-	}
-
-	if wildcardExpansion {
-		log.Info("Wildcard expansion occurred")
-
-		expandedIncludes := r.backupRequest.NamespaceIncludesExcludes.GetIncludes()
-		expandedExcludes := r.backupRequest.NamespaceIncludesExcludes.GetExcludes()
-
-		// Record the expanded wildcard includes/excludes in the request status
-		r.backupRequest.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
-			IncludeWildcardMatches: expandedIncludes,
-			ExcludeWildcardMatches: expandedExcludes,
+		nsExists := false
+		// Skip checking the namespace existing when it's "*".
+		if includedNSName == "*" {
+			continue
 		}
 
-		r.log.WithFields(logrus.Fields{
-			"expandedIncludes": expandedIncludes,
-			"expandedExcludes": expandedExcludes,
-			"includedCount":    len(expandedIncludes),
-			"excludedCount":    len(expandedExcludes),
-		}).Info("Successfully expanded wildcard patterns")
-	}
+		if _, ok := activeNamespacesHashSet[includedNSName]; ok {
+			nsExists = true
+		}
 
-	// This check could be skipped if wildcard expansion is performed: wildcard expansion works on the complete list of namespaces
-	if !wildcardExpansion {
-		for _, includedNSName := range r.backupRequest.Spec.IncludedNamespaces {
-
-			nsExists := false
-			// Skip checking the namespace existing when it's "*".
-			if includedNSName == "*" {
-				continue
-			}
-
-			if _, ok := activeNamespacesHashSet[includedNSName]; ok {
-				nsExists = true
-			}
-
-			if !nsExists {
-				log.Errorf("fail to get the namespace %s specified in backup.Spec.IncludedNamespaces", includedNSName)
-			}
+		if !nsExists {
+			log.Errorf("fail to get the namespace %s specified in backup.Spec.IncludedNamespaces", includedNSName)
 		}
 	}
 
