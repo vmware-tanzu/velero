@@ -29,17 +29,25 @@ This feature was requested in Issue [#1874](https://github.com/vmware-tanzu/vele
 ### NamespaceIncludesExcludes struct
 
 - `NamespaceIncludesExcludes` is a wrapper around `IncludesExcludes`
-- It has a field `activeNamespaces`, which will be used by the wildcard expansion logic to run the expansion
+- It has a field `activeNamespaces`, which will be used to match wildcard patterns against active namespaces
 
 ### Backup
 
-The wildcard expansion implementation focuses on 
+The wildcard expansion implementation expands the patterns before the normal flow. It focuses on two key functions in `pkg/backup/item_collector.go`:
 
-- [`getNamespacesToList`](https://github.com/vmware-tanzu/velero/blob/1535afb45e33a3d3820088e4189800a21ba55293/pkg/backup/item_collector.go#L638) - Resolves namespace includes/excludes to final list.
+- [`getResourceItems`](https://github.com/vmware-tanzu/velero/blob/main/pkg/backup/item_collector.go#L356) - Integration point
+- [`collectNamespaces`](https://github.com/vmware-tanzu/velero/blob/main/pkg/backup/item_collector.go#L742) 
+- [`getNamespacesToList`](https://github.com/vmware-tanzu/velero/blob/main/pkg/backup/item_collector.go#L638)
 
-- Wildcard expansion is conditionally run when the `NamespaceIncludesExcludes.ResolveNamespaceList()` func is run. 
-    - It overwrites the `NamespaceIncludeExclude` struct's `Includes` and `Excludes` with the expanded string literal namespaces
-    - If there are no candidate strings for expansion, it proceeds normally 
+The `getResourceItems` function is the ideal integration point, as the other two funcs depend on it
+
+Wildcard expansion is conditionally run when the [`NamespaceIncludesExcludes.ResolveNamespaceList()`](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/collections/includes_excludes.go#L146) function is called:
+- It calls [`wildcard.ShouldExpandWildcards()`](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/wildcard/wildcard.go) to determine if expansion is needed
+- If wildcards are detected, it uses [`wildcard.ExpandWildcards()`](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/wildcard/wildcard.go) to resolve them against active namespaces
+- It overwrites the `NamespaceIncludesExcludes` struct's `Includes` and `Excludes` with the expanded literal namespaces using [`SetIncludes()`](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/collections/includes_excludes.go#L100) and [`SetExcludes()`](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/collections/includes_excludes.go#L107)
+- If no wildcard patterns are found, it proceeds with normal glob-based processing via [`resolveNamespaceListTraditional()`](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/collections/includes_excludes.go#L170)
+
+This approach ensures wildcard namespaces are handled consistently with the existing "*" behavior, bypassing individual namespace existence checks. 
 
 
 ### Restore
