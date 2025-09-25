@@ -3,11 +3,8 @@
 
 ## Abstract
 
-- Velero currently does **not** support wildcard characters in namespace specifications, they must be specified as string literals 
-- The only exception is the standalone `*` character, which includes all namespaces and ignores excludes
-
- - This design details an approach to implementing wildcard namespace support for `--include-namespaces` and `--exclude-namespaces` flags
-- Preserves standalone `*` for backwards compatibility
+- Velero currently does **not** support wildcard characters in namespace include/exclude specs, they must be specified as string literals 
+- This design details an approach to implementing wildcard namespace support
 
 ## Background
 
@@ -20,7 +17,6 @@ This feature was requested in Issue [#1874](https://github.com/vmware-tanzu/vele
 
 ## Non-Goals
 
-- Completely rethinking the way "*" is treated and allowing it to work with wildcard excludes
 - Supporting complex regex patterns beyond basic glob patterns: this could be explored later
 
 
@@ -33,21 +29,28 @@ This feature was requested in Issue [#1874](https://github.com/vmware-tanzu/vele
 
 ### Backup
 
-The wildcard expansion implementation expands the patterns before the normal flow. It focuses on two key functions in `pkg/backup/item_collector.go`:
+The wildcard expansion implementation expands the patterns before the normal execution of the backup. 
+The goal here is ensuring wildcard namespaces are expanded before they're required.
+It focuses on two key functions in `pkg/backup/item_collector.go`:
 
-- [`getResourceItems`](https://github.com/vmware-tanzu/velero/blob/main/pkg/backup/item_collector.go#L356) - Integration point
 - [`collectNamespaces`](https://github.com/vmware-tanzu/velero/blob/main/pkg/backup/item_collector.go#L742) 
 - [`getNamespacesToList`](https://github.com/vmware-tanzu/velero/blob/main/pkg/backup/item_collector.go#L638)
 
-The `getResourceItems` function is the ideal integration point, as the other two funcs depend on it
+Call to expand wildcards is made at:
+- [`getResourceItems`](https://github.com/vmware-tanzu/velero/blob/main/pkg/backup/item_collector.go#L356) - Integration point
+
 
 Wildcard expansion is conditionally run when the [`NamespaceIncludesExcludes.ResolveNamespaceList()`](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/collections/includes_excludes.go#L146) function is called:
+
+unc (nie *NamespaceIncludesExcludes) ResolveNamespaceList() ([]string, bool, error) {
+
 - It calls [`wildcard.ShouldExpandWildcards()`](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/wildcard/wildcard.go) to determine if expansion is needed
 - If wildcards are detected, it uses [`wildcard.ExpandWildcards()`](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/wildcard/wildcard.go) to resolve them against active namespaces
 - It overwrites the `NamespaceIncludesExcludes` struct's `Includes` and `Excludes` with the expanded literal namespaces using [`SetIncludes()`](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/collections/includes_excludes.go#L100) and [`SetExcludes()`](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/collections/includes_excludes.go#L107)
-- If no wildcard patterns are found, it proceeds with normal glob-based processing via [`resolveNamespaceListTraditional()`](https://github.com/vmware-tanzu/velero/blob/main/pkg/util/collections/includes_excludes.go#L170)
+- It returns the effective list of namespaces to be backed up and a bool indicating whether wildcard expansion occured
 
-This approach ensures wildcard namespaces are handled consistently with the existing "*" behavior, bypassing individual namespace existence checks. 
+
+
 
 
 ### Restore
@@ -231,12 +234,11 @@ The status fields are populated immediately after successful wildcard expansion,
 
 Several implementation approaches were considered for the wildcard expansion logic:
 
-### 1. Wildcard expansion in `getNamespacesToList`
+### 1. Wildcard expansion in `getNamespacesToList` or `collectNamespaces`
 
 This approach was ruled out because:
-- The `collectNamespaces` function encounters wildcard patterns first in the processing flow
-- `collectNamespaces` already has access to the complete list of active namespaces, eliminating the need for additional API calls
-- Placing the logic in `getNamespacesToList` would require redundant namespace retrieval
+- Both funcs expect non-wildcard namespaces in the NamespaceIncludesExcludes struct
+- Calling it at a higher level within getResourceItems is ideal
 
 ### 2. Client-side wildcard expansion
 
@@ -254,29 +256,16 @@ This feature does not introduce any security vulnerabilities as it only affects 
 ### Backward Compatibility
 
 The implementation maintains full backward compatibility with existing behavior:
-- The standalone "*" character continues to work as before (include all namespaces, ignore excludes)
-- Existing backup configurations remain unaffected
+- The standalone "*" character continues to work as before
 
 ### Known Limitations
 
-1. **Mixed "*" and wildcard usage**: When using the standalone "*" in includes, the legacy implementation takes precedence and wildcard expansion is skipped. This means you cannot combine "*" (all namespaces) in includes with wildcard patterns in excludes.
-
-2. **Selective exclusion limitation**: The current design does not support selective pattern-based exclusion when including all namespaces via "*".
+N/A
 
 ## Implementation
 
-The implementation follows the detailed design outlined above, with the following timeline:
-
-1. **Phase 1**: Add backup CRD status fields for expanded namespaces
-2. **Phase 2**: Implement wildcard utility package with validation
-3. **Phase 3**: Integrate expansion logic into backup item collection
-4. **Phase 4**: Add status field population and logging
+Aiming for 1.18
 
 ## Open Issues
 
-**Restore Integration**: Restore operations are completely decoupled from backup wildcard specifications and work safely with wildcard-created backups. The restore process reads the actual tar file contents to determine available namespaces, not the original backup spec. Since the tar file contains real, materialized namespaces (e.g., `test01`, `test02`) rather than wildcard patterns (e.g., `test*`), restore operations work with concrete namespace names.
-
-When wildcard patterns are specified in restore operations, they are expanded against the namespaces that actually exist in the backup tar file. This ensures that restore wildcard expansion is based on what was actually backed up, not what was originally intended to be backed up.
-
-**Crucially, restore does not treat `*` as a catch all case**. 
-This means that if `*` is mentioned in restore, wildcard expansion is skipped owing to how it's treated in backup.
+N/A
