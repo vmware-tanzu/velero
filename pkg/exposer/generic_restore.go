@@ -287,8 +287,13 @@ func (e *genericRestoreExposer) DiagnoseExpose(ctx context.Context, ownerObject 
 		diag += fmt.Sprintf("error getting restore pvc %s, err: %v\n", restorePVCName, err)
 	}
 
+	events, err := e.kubeClient.CoreV1().Events(ownerObject.Namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		diag += fmt.Sprintf("error listing events, err: %v\n", err)
+	}
+
 	if pod != nil {
-		diag += kube.DiagnosePod(pod)
+		diag += kube.DiagnosePod(pod, events)
 
 		if pod.Spec.NodeName != "" {
 			if err := nodeagent.KbClientIsRunningInNode(ctx, ownerObject.Namespace, pod.Spec.NodeName, e.kubeClient); err != nil {
@@ -298,7 +303,7 @@ func (e *genericRestoreExposer) DiagnoseExpose(ctx context.Context, ownerObject 
 	}
 
 	if pvc != nil {
-		diag += kube.DiagnosePVC(pvc)
+		diag += kube.DiagnosePVC(pvc, events)
 
 		if pvc.Spec.VolumeName != "" {
 			if pv, err := e.kubeClient.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{}); err != nil {

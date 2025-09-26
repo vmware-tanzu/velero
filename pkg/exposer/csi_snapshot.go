@@ -381,8 +381,13 @@ func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject cor
 		diag += fmt.Sprintf("error getting backup vs %s, err: %v\n", backupVSName, err)
 	}
 
+	events, err := e.kubeClient.CoreV1().Events(ownerObject.Namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		diag += fmt.Sprintf("error listing events, err: %v\n", err)
+	}
+
 	if pod != nil {
-		diag += kube.DiagnosePod(pod)
+		diag += kube.DiagnosePod(pod, events)
 
 		if pod.Spec.NodeName != "" {
 			if err := nodeagent.KbClientIsRunningInNode(ctx, ownerObject.Namespace, pod.Spec.NodeName, e.kubeClient); err != nil {
@@ -392,7 +397,7 @@ func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject cor
 	}
 
 	if pvc != nil {
-		diag += kube.DiagnosePVC(pvc)
+		diag += kube.DiagnosePVC(pvc, events)
 
 		if pvc.Spec.VolumeName != "" {
 			if pv, err := e.kubeClient.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{}); err != nil {
@@ -404,7 +409,7 @@ func (e *csiSnapshotExposer) DiagnoseExpose(ctx context.Context, ownerObject cor
 	}
 
 	if vs != nil {
-		diag += csi.DiagnoseVS(vs)
+		diag += csi.DiagnoseVS(vs, events)
 
 		if vs.Status != nil && vs.Status.BoundVolumeSnapshotContentName != nil && *vs.Status.BoundVolumeSnapshotContentName != "" {
 			if vsc, err := e.csiSnapshotClient.VolumeSnapshotContents().Get(ctx, *vs.Status.BoundVolumeSnapshotContentName, metav1.GetOptions{}); err != nil {
