@@ -73,6 +73,9 @@ type PodVolumeExposeParam struct {
 
 	// PriorityClassName is the priority class name for the data mover pod
 	PriorityClassName string
+
+	// Privileged indicates whether to create the pod with a privileged container
+	Privileged bool
 }
 
 // PodVolumeExposer is the interfaces for a pod volume exposer
@@ -153,7 +156,7 @@ func (e *podVolumeExposer) Expose(ctx context.Context, ownerObject corev1api.Obj
 
 	curLog.WithField("path", path).Infof("Host path is retrieved for pod %s, volume %s", param.ClientPodName, param.ClientPodVolume)
 
-	hostingPod, err := e.createHostingPod(ctx, ownerObject, param.Type, path.ByPath, param.OperationTimeout, param.HostingPodLabels, param.HostingPodAnnotations, param.HostingPodTolerations, pod.Spec.NodeName, param.Resources, nodeOS, param.PriorityClassName)
+	hostingPod, err := e.createHostingPod(ctx, ownerObject, param.Type, path.ByPath, param.OperationTimeout, param.HostingPodLabels, param.HostingPodAnnotations, param.HostingPodTolerations, pod.Spec.NodeName, param.Resources, nodeOS, param.PriorityClassName, param.Privileged)
 	if err != nil {
 		return errors.Wrapf(err, "error to create hosting pod")
 	}
@@ -274,7 +277,7 @@ func (e *podVolumeExposer) CleanUp(ctx context.Context, ownerObject corev1api.Ob
 }
 
 func (e *podVolumeExposer) createHostingPod(ctx context.Context, ownerObject corev1api.ObjectReference, exposeType string, hostPath string,
-	operationTimeout time.Duration, label map[string]string, annotation map[string]string, toleration []corev1api.Toleration, selectedNode string, resources corev1api.ResourceRequirements, nodeOS string, priorityClassName string) (*corev1api.Pod, error) {
+	operationTimeout time.Duration, label map[string]string, annotation map[string]string, toleration []corev1api.Toleration, selectedNode string, resources corev1api.ResourceRequirements, nodeOS string, priorityClassName string, privileged bool) (*corev1api.Pod, error) {
 	hostingPodName := ownerObject.Name
 
 	containerName := string(ownerObject.UID)
@@ -332,6 +335,7 @@ func (e *podVolumeExposer) createHostingPod(ctx context.Context, ownerObject cor
 	args = append(args, podInfo.logLevelArgs...)
 
 	var securityCtx *corev1api.PodSecurityContext
+	var containerSecurityCtx *corev1api.SecurityContext
 	nodeSelector := map[string]string{}
 	podOS := corev1api.PodOS{}
 	if nodeOS == kube.NodeOSWindows {
@@ -363,6 +367,9 @@ func (e *podVolumeExposer) createHostingPod(ctx context.Context, ownerObject cor
 		userID := int64(0)
 		securityCtx = &corev1api.PodSecurityContext{
 			RunAsUser: &userID,
+		}
+		containerSecurityCtx = &corev1api.SecurityContext{
+			Privileged: &privileged,
 		}
 
 		nodeSelector[kube.NodeOSLabel] = kube.NodeOSLinux
@@ -399,6 +406,7 @@ func (e *podVolumeExposer) createHostingPod(ctx context.Context, ownerObject cor
 					Env:             podInfo.env,
 					EnvFrom:         podInfo.envFrom,
 					Resources:       resources,
+					SecurityContext: containerSecurityCtx,
 				},
 			},
 			PriorityClassName:             priorityClassName,
