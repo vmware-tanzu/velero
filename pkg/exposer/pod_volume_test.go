@@ -190,6 +190,29 @@ func TestPodVolumeExpose(t *testing.T) {
 				return "/var/lib/kubelet/pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount", nil
 			},
 		},
+		{
+			name:        "succeed with privileged pod",
+			ownerBackup: backup,
+			exposeParam: PodVolumeExposeParam{
+				ClientNamespace: "fake-ns",
+				ClientPodName:   "fake-client-pod",
+				ClientPodVolume: "fake-client-volume",
+				Privileged:      true,
+			},
+			kubeClientObj: []runtime.Object{
+				podWithNode,
+				node,
+				daemonSet,
+			},
+			funcGetPodVolumeHostPath: func(context.Context, *corev1api.Pod, string, kubernetes.Interface, filesystem.Interface, logrus.FieldLogger) (datapath.AccessPoint, error) {
+				return datapath.AccessPoint{
+					ByPath: "/host_pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount",
+				}, nil
+			},
+			funcExtractPodVolumeHostPath: func(context.Context, string, kubernetes.Interface, string, string) (string, error) {
+				return "/var/lib/kubelet/pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount", nil
+			},
+		},
 	}
 
 	for _, test := range tests {

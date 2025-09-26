@@ -84,4 +84,7 @@ type NodeAgentConfigs struct {
 
 	// PriorityClassName is the priority class name for data mover pods created by the node agent
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// PrivilegedFsBackup determines whether to create fs-backup pods as privileged pods
+	PrivilegedFsBackup bool `json:"privilegedFsBackup,omitempty"`
 }
