@@ -8,18 +8,26 @@ on:
       - "design/**"
       - "**/*.md"
 jobs:
+  get-go-version:
+    uses: ./.github/workflows/get-go-version.yaml
+    with:
+      ref: ${{ github.event.pull_request.base.ref }}
+
   # Build the Velero CLI and image once for all Kubernetes versions, and cache it so the fan-out workers can get it.
   build:
     runs-on: ubuntu-latest
+    needs: get-go-version
     outputs:
       minio-dockerfile-sha: ${{ steps.minio-version.outputs.dockerfile_sha }}
     steps:
       - name: Check out the code
         uses: actions/checkout@v5
-      - name: Set up Go
+      
+      - name: Set up Go version
         uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
+          go-version: ${{ needs.get-go-version.outputs.version }}
+
       # Look for a CLI that's made for this PR
       - name: Fetch built CLI
         id: cli-cache
@@ -97,6 +105,7 @@ jobs:
     needs:
       - build
       - setup-test-matrix
+      - get-go-version
     runs-on: ubuntu-latest
     strategy:
       matrix: ${{fromJson(needs.setup-test-matrix.outputs.matrix)}}
@@ -104,10 +113,12 @@ jobs:
     steps:
       - name: Check out the code
         uses: actions/checkout@v5
-      - name: Set up Go
+
+      - name: Set up Go version
         uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
+          go-version: ${{ needs.get-go-version.outputs.version }}
+
       # Fetch the pre-built MinIO image from the build job
       - name: Fetch built MinIO Image
         uses: actions/cache@v4
