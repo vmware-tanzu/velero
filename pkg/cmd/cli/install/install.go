@@ -545,24 +545,22 @@ func (o *Options) Validate(c *cobra.Command, args []string, f client.Factory) er
 		return fmt.Errorf("fail to create go-client %w", err)
 	}
 
-	// If either Linux or Windows node-agent is installed, and the node-agent-configmap
-	// is specified, need to validate the ConfigMap.
-	if (o.UseNodeAgent || o.UseNodeAgentWindows) && len(o.NodeAgentConfigMap) > 0 {
+	if len(o.NodeAgentConfigMap) > 0 {
 		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.NodeAgentConfigMap, &velerotypes.NodeAgentConfigs{}); err != nil {
-			return fmt.Errorf("--node-agent-configmap specified ConfigMap %s is invalid", o.NodeAgentConfigMap)
+			return fmt.Errorf("--node-agent-configmap specified ConfigMap %s is invalid: %w", o.NodeAgentConfigMap, err)
 		}
 	}
 
 	if len(o.RepoMaintenanceJobConfigMap) > 0 {
 		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.RepoMaintenanceJobConfigMap, &velerotypes.JobConfigs{}); err != nil {
-			return fmt.Errorf("--repo-maintenance-job-configmap specified ConfigMap %s is invalid", o.RepoMaintenanceJobConfigMap)
+			return fmt.Errorf("--repo-maintenance-job-configmap specified ConfigMap %s is invalid: %w", o.RepoMaintenanceJobConfigMap, err)
 		}
 	}
 
 	if len(o.BackupRepoConfigMap) > 0 {
 		config := make(map[string]any)
 		if err := kubeutil.VerifyJSONConfigs(c.Context(), o.Namespace, crClient, o.BackupRepoConfigMap, &config); err != nil {
-			return fmt.Errorf("--backup-repository-configmap specified ConfigMap %s is invalid", o.BackupRepoConfigMap)
+			return fmt.Errorf("--backup-repository-configmap specified ConfigMap %s is invalid: %w", o.BackupRepoConfigMap, err)
 		}
 	}
 
