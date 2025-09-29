@@ -79,7 +79,7 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
 		BackedUpItems:    NewBackedUpItemsMap(),
-		ItemBlockChannel: h.itemBlockPool.GetInputChannel(),
+		WorkerPool:       &h.itemBlockPool,
 	}
 
 	backupFile := bytes.NewBuffer([]byte{})
@@ -141,7 +141,7 @@ func TestBackupProgressIsUpdated(t *testing.T) {
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
 		BackedUpItems:    NewBackedUpItemsMap(),
-		ItemBlockChannel: h.itemBlockPool.GetInputChannel(),
+		WorkerPool:       &h.itemBlockPool,
 	}
 	backupFile := bytes.NewBuffer([]byte{})
 
@@ -881,7 +881,7 @@ func TestBackupOldResourceFiltering(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1062,7 +1062,7 @@ func TestCRDInclusion(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1161,7 +1161,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1190,7 +1190,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
 		BackedUpItems:    NewBackedUpItemsMap(),
-		ItemBlockChannel: h.itemBlockPool.GetInputChannel(),
+		WorkerPool:       &h.itemBlockPool,
 	}
 	backup1File := bytes.NewBuffer([]byte{})
 
@@ -1206,7 +1206,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		Backup:           defaultBackup().Result(),
 		SkippedPVTracker: NewSkipPVTracker(),
 		BackedUpItems:    NewBackedUpItemsMap(),
-		ItemBlockChannel: h.itemBlockPool.GetInputChannel(),
+		WorkerPool:       &h.itemBlockPool,
 	}
 	backup2File := bytes.NewBuffer([]byte{})
 
@@ -1260,7 +1260,7 @@ func TestBackupResourceOrdering(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1381,7 +1381,7 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 				Backup:           defaultBackup().SnapshotVolumes(false).Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			resPolicies: &resourcepolicies.ResourcePolicies{
 				Version: "v1",
@@ -1429,7 +1429,7 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 					includedPVs: map[string]struct{}{},
 				},
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.PVCs(
@@ -1679,7 +1679,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1764,7 +1764,7 @@ func TestBackupWithInvalidActions(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -1918,7 +1918,7 @@ func TestBackupActionModifications(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2178,7 +2178,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2439,7 +2439,7 @@ func TestItemBlockActionsRunForCorrectItems(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2524,7 +2524,7 @@ func TestBackupWithInvalidItemBlockActions(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2780,7 +2780,7 @@ func TestItemBlockActionRelatedItems(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -2948,7 +2948,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -2984,7 +2984,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3021,7 +3021,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3058,7 +3058,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3095,7 +3095,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3130,7 +3130,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3148,7 +3148,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				Backup:           defaultBackup().Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3169,7 +3169,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3188,7 +3188,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3210,7 +3210,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 				},
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -3344,7 +3344,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 				Backup:           defaultBackup().Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -3376,7 +3376,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 				Backup:           defaultBackup().Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -3408,7 +3408,7 @@ func TestBackupWithAsyncOperations(t *testing.T) {
 				Backup:           defaultBackup().Result(),
 				SkippedPVTracker: NewSkipPVTracker(),
 				BackedUpItems:    NewBackedUpItemsMap(),
-				ItemBlockChannel: itemBlockPool.GetInputChannel(),
+				WorkerPool:       itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -3494,7 +3494,7 @@ func TestBackupWithInvalidHooks(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -3968,7 +3968,7 @@ func TestBackupWithHooks(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile         = bytes.NewBuffer([]byte{})
 				podCommandExecutor = new(test.MockPodCommandExecutor)
@@ -4193,7 +4193,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 					SnapshotLocations: []*velerov1.VolumeSnapshotLocation{tc.vsl},
 					SkippedPVTracker:  NewSkipPVTracker(),
 					BackedUpItems:     NewBackedUpItemsMap(),
-					ItemBlockChannel:  itemBlockPool.GetInputChannel(),
+					WorkerPool:        itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -5312,7 +5312,7 @@ func TestBackupNewResourceFiltering(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
@@ -5477,7 +5477,7 @@ func TestBackupNamespaces(t *testing.T) {
 					Backup:           tc.backup,
 					SkippedPVTracker: NewSkipPVTracker(),
 					BackedUpItems:    NewBackedUpItemsMap(),
-					ItemBlockChannel: itemBlockPool.GetInputChannel(),
+					WorkerPool:       itemBlockPool,
 				}
 				backupFile = bytes.NewBuffer([]byte{})
 			)
