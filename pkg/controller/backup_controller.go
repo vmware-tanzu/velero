@@ -110,7 +110,6 @@ type backupReconciler struct {
 	globalCRClient              kbclient.Client
 	itemBlockWorkerCount        int
 	concurrentBackups           int
-	workerPool                  *pkgbackup.ItemBlockWorkerPool
 }
 
 func NewBackupReconciler(
@@ -167,7 +166,6 @@ func NewBackupReconciler(
 		itemBlockWorkerCount:        itemBlockWorkerCount,
 		concurrentBackups:           max(concurrentBackups, 1),
 		globalCRClient:              globalCRClient,
-		workerPool:                  pkgbackup.StartItemBlockWorkerPool(ctx, itemBlockWorkerCount, logger),
 	}
 	b.updateTotalBackupMetric()
 	return b
@@ -289,7 +287,9 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	log.Debug("Preparing backup request")
-	request := b.prepareBackupRequest(original, log)
+	request := b.prepareBackupRequest(ctx, original, log)
+	// delete worker pool after reconcile
+	defer request.WorkerPool.Stop()
 	if len(request.Status.ValidationErrors) > 0 {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
@@ -371,12 +371,12 @@ func (b *backupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, nil
 }
 
-func (b *backupReconciler) prepareBackupRequest(backup *velerov1api.Backup, logger logrus.FieldLogger) *pkgbackup.Request {
+func (b *backupReconciler) prepareBackupRequest(ctx context.Context, backup *velerov1api.Backup, logger logrus.FieldLogger) *pkgbackup.Request {
 	request := &pkgbackup.Request{
 		Backup:           backup.DeepCopy(), // don't modify items in the cache
 		SkippedPVTracker: pkgbackup.NewSkipPVTracker(),
 		BackedUpItems:    pkgbackup.NewBackedUpItemsMap(),
-		ItemBlockChannel: b.workerPool.GetInputChannel(),
+		WorkerPool:       pkgbackup.StartItemBlockWorkerPool(ctx, b.itemBlockWorkerCount, logger),
 	}
 	request.VolumesInformation.Init()
 
