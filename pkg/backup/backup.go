@@ -561,7 +561,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 			log.Infof("Backing Up Item Block including %s %s/%s (%v items in block)", items[i].groupResource.String(), items[i].namespace, items[i].name, len(itemBlock.Items))
 
 			wg.Add(1)
-			backupRequest.ItemBlockChannel <- ItemBlockInput{
+			backupRequest.WorkerPool.GetInputChannel() <- ItemBlockInput{
 				itemBlock:  itemBlock,
 				returnChan: itemBlockReturn,
 			}
