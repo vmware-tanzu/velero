@@ -16,6 +16,11 @@ jobs:
       outputs:
         version: ${{ steps.pick-version.outputs.version }}
       steps:
+        - name: Dump github context
+          env:
+            GITHUB_CONTEXT: ${{ toJson(github) }}
+          run: echo "$GITHUB_CONTEXT"
+
         - name: Check out the code
           uses: actions/checkout@v5
 
