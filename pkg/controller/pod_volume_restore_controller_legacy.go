@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -281,7 +282,12 @@ func (c *PodVolumeRestoreReconcilerLegacy) OnDataPathCompleted(ctx context.Conte
 	// Create the .velero directory within the volume dir so we can write a done file
 	// for this restore.
 	if err := os.MkdirAll(filepath.Join(volumePath, ".velero"), 0755); err != nil {
-		_, _ = c.errorOut(ctx, &pvr, err, "error creating .velero directory for done file", log)
+		errMsg := "error creating .velero directory for done file"
+		if strings.Contains(err.Error(), "no space left on device") {
+			errMsg = fmt.Sprintf("%s: %v. Consider using the --write-sparse-files flag during restore to optimize disk usage. See https://velero.io/docs/main/restore-reference/#write-sparse-files for more details", errMsg, err)
+			err = errors.New(errMsg)
+		}
+		_, _ = c.errorOut(ctx, &pvr, err, errMsg, log)
 		return
 	}
 
@@ -289,7 +295,12 @@ func (c *PodVolumeRestoreReconcilerLegacy) OnDataPathCompleted(ctx context.Conte
 	// within the volume. The velero init container on the pod is waiting
 	// for this file to exist in each restored volume before completing.
 	if err := os.WriteFile(filepath.Join(volumePath, ".velero", string(restoreUID)), nil, 0644); err != nil { //nolint:gosec // Internal usage. No need to check.
-		_, _ = c.errorOut(ctx, &pvr, err, "error writing done file", log)
+		errMsg := "error writing done file"
+		if strings.Contains(err.Error(), "no space left on device") {
+			errMsg = fmt.Sprintf("%s: %v. Consider using the --write-sparse-files flag during restore to optimize disk usage. See https://velero.io/docs/main/restore-reference/#write-sparse-files for more details", errMsg, err)
+			err = errors.New(errMsg)
+		}
+		_, _ = c.errorOut(ctx, &pvr, err, errMsg, log)
 		return
 	}
 
