@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kopia/kopia/repo"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -116,7 +115,7 @@ func (urp *unifiedRepoProvider) InitRepo(ctx context.Context, param RepoParam) e
 		return errors.Wrap(err, "error to get repo options")
 	}
 
-	err = urp.repoService.Init(ctx, *repoOption, true)
+	err = urp.repoService.Create(ctx, *repoOption)
 	if err != nil {
 		return errors.Wrap(err, "error to init backup repo")
 	}
@@ -152,7 +151,7 @@ func (urp *unifiedRepoProvider) ConnectToRepo(ctx context.Context, param RepoPar
 		return errors.Wrap(err, "error to get repo options")
 	}
 
-	err = urp.repoService.Init(ctx, *repoOption, false)
+	err = urp.repoService.Connect(ctx, *repoOption)
 	if err != nil {
 		return errors.Wrap(err, "error to connect backup repo")
 	}
@@ -188,20 +187,18 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 		return errors.Wrap(err, "error to get repo options")
 	}
 
-	err = urp.repoService.Init(ctx, *repoOption, false)
-	if err == nil {
+	if created, err := urp.repoService.IsCreated(ctx, *repoOption); err != nil {
+		return errors.Wrap(err, "error to check backup repo")
+	} else if created {
 		log.Debug("Repo has already been initialized remotely")
 		return nil
-	}
-	if !errors.Is(err, repo.ErrRepositoryNotInitialized) {
-		return errors.Wrap(err, "error to connect to backup repo")
 	}
 
 	if param.BackupLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
 		return errors.Errorf("cannot create new backup repo for read-only backup storage location %s/%s", param.BackupLocation.Namespace, param.BackupLocation.Name)
 	}
 
-	err = urp.repoService.Init(ctx, *repoOption, true)
+	err = urp.repoService.Create(ctx, *repoOption)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup repo")
 	}
