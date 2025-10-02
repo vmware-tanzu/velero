@@ -30,7 +30,7 @@
 
     while keeping backup logs and backup associated data for inspection
 
-- Provide clear backup phase transitions (InProgress → Cancelling → Cancelled)
+- Provide clear backup phase transitions (WaitingForPluginOperations → FinalizingCancelled → Failed)
 
 ## Non Goals
 - Cancelling backups that have already completed or failed
@@ -41,9 +41,9 @@
 ## High-Level Design
 - The solution introduces a new `cancel` boolean field to the backup specification that users can set to `true` to request cancellation
 
-- Existing controllers `(backup_controller, backup_operations_controller, backup_finalizer_controller)` will check for this field, attempt to cancel async ops and then transition to the `Cancelling` phase
+- The `backup_operations_controller` will detect cancellation requests, cancel ongoing async operations, and transition to `BackupPhaseFinalizingCancelled`
 
-- A new dedicated backup cancellation controller will watch for backups in the `Cancelling` phase, trying to cleanup backup data
+- The existing `backup_finalizer_controller` will handle cancelled backups by cleaning up backup data while preserving logs, then transitioning to `BackupPhaseFailed`
 
 
 ## Detailed Design
@@ -56,39 +56,87 @@ type BackupSpec struct {
     
     // Cancel indicates whether the backup should be cancelled.
     // When set to true, Velero will attempt to cancel all ongoing operations
-    // and transition the backup to Cancelled phase.
+    // and transition the backup to a cancelled state.
     // +optional
-    Cancel *bool `json:"cancel,omitempty"`
+    Cancel bool `json:"cancel,omitempty"`
 }
 ```
 
-Add new backup phases to `BackupPhase`:
+Add new backup phase to `BackupPhase`:
 ```go
 const (
     // ... existing phases ...
-    BackupPhaseCancelling BackupPhase = "Cancelling" 
-    BackupPhaseCancelled  BackupPhase = "Cancelled"
+    BackupPhaseFinalizingCancelled BackupPhase = "FinalizingCancelled"
 )
 ```
 
 ### Controller Changes
 
 #### Existing Controllers
-`backup_controller`
 
-`backup_operations_controller`
+**backup_operations_controller**
 
-`backup_finalizer_controller`
+The backup operations controller will be modified to detect cancellation requests and cancel ongoing async operations:
 
+1. **Cancellation Detection**: In `getBackupItemOperationProgress()`, check `backup.Spec.Cancel` alongside existing timeout logic
+2. **Operation Cancellation**: When cancellation is requested, call `bia.Cancel(operationID, backup)` for all in-progress operations
+3. **Phase Transition**: When all operations complete (either successfully, failed, or cancelled), transition to appropriate finalizing phase:
+   - If `backup.Spec.Cancel == true` → `BackupPhaseFinalizingCancelled`
+   - Otherwise → `BackupPhaseFinalizing` or `BackupPhaseFinalizingPartiallyFailed`
 
-#### New Backup Cancellation Controller
+```go
+// In getBackupItemOperationProgress()
+if backup.Spec.Cancel {
+    _ = bia.Cancel(operation.Spec.OperationID, backup)
+    operation.Status.Phase = itemoperation.OperationPhaseFailed
+    operation.Status.Error = "Backup cancelled by user"
+    // ... mark as failed and continue
+}
 
+// In Reconcile() phase transition logic
+if !stillInProgress {
+    if backup.Spec.Cancel {
+        backup.Status.Phase = velerov1api.BackupPhaseFinalizingCancelled
+    } else if backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperations {
+        backup.Status.Phase = velerov1api.BackupPhaseFinalizing
+    } else {
+        backup.Status.Phase = velerov1api.BackupPhaseFinalizingPartiallyFailed
+    }
+}
 ```
 
-The controller will:
-1. Watch for backups in `BackupPhaseCancelling`
-2. Attempt to delete backup data
-3. Set phase to `BackupPhaseCancelled`
+**backup_finalizer_controller**
+
+The backup finalizer controller will handle cancelled backups differently from normal finalization:
+
+1. **Detect Cancelled Finalization**: Check for `BackupPhaseFinalizingCancelled` phase
+2. **Cleanup Backup Data**: Remove backup content, metadata, and snapshots from object storage
+3. **Preserve Logs**: Keep backup logs for debugging and inspection
+4. **Final Phase**: Transition to `BackupPhaseFailed` with appropriate failure reason
+
+```go
+switch backup.Status.Phase {
+case velerov1api.BackupPhaseFinalizing:
+    // Normal finalization - preserve everything
+    backup.Status.Phase = velerov1api.BackupPhaseCompleted
+    
+case velerov1api.BackupPhaseFinalizingPartiallyFailed:
+    // Partial failure finalization - preserve data
+    backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
+    
+case velerov1api.BackupPhaseFinalizingCancelled:
+    // Cancelled finalization - clean up data but preserve logs
+    if err := cleanupCancelledBackupData(backupStore, backup.Name); err != nil {
+        log.WithError(err).Error("Failed to cleanup cancelled backup data")
+    }
+    backup.Status.Phase = velerov1api.BackupPhaseFailed
+    backup.Status.FailureReason = "Backup cancelled by user"
+}
+```
+
+**backup_controller**
+
+No changes required for the first implementation. Cancellation during the initial backup phase (before async operations) is out of scope.
 
 ### Cancellation Flow
 
@@ -103,6 +151,8 @@ For operations with BackupItemAction v2 implementations (e.g., CSI PVC actions):
 BackupWithResolvers is atomic
 If cancellation happens before the call, nothing happens, ItemBlocks or PodVolumeBackups
 If after, PostHooks ensure that PodVolumeBackups are completed, so there is no cancellation here
+
+We focus on async ops for this first pass
 
 
 ## Alternatives Considered
