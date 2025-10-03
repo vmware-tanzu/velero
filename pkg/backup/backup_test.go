@@ -1428,8 +1428,8 @@ func TestBackupItemActionsForSkippedPV(t *testing.T) {
 					},
 					includedPVs: map[string]struct{}{},
 				},
-				BackedUpItems:    NewBackedUpItemsMap(),
-				WorkerPool:       itemBlockPool,
+				BackedUpItems: NewBackedUpItemsMap(),
+				WorkerPool:    itemBlockPool,
 			},
 			apiResources: []*test.APIResource{
 				test.PVCs(
