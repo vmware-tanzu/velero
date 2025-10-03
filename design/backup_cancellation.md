@@ -46,6 +46,23 @@
 - The existing `backup_finalizer_controller` will handle cancelled backups by cleaning up backup data while preserving logs, then transitioning to `BackupPhaseFailed`
 
 
+- Extend the backup request struct to include:
+    - `Cancel` (bool): reflects whether cancellation has been requested.
+    - `LastCancelCheck` (timestamp): records the last time cancellation status was checked.
+
+- Cancellation check logic:
+    1. If `LastCancelCheck` is zero, set it to the current time and continue as usual.
+    2. If more than a configured interval (e.g., 1–3 seconds) has passed since `LastCancelCheck`:
+        - Update `LastCancelCheck` to now.
+        - Retrieve the latest backup object from the API.
+        - Set `request.Cancel` to the current value of `backup.Spec.Cancel`.
+    3. Always use the current value of `request.Cancel` to determine if cancellation is requested.
+
+- If backup processing is concurrent (multi-threaded), protect access to `request.Cancel` and `LastCancelCheck` with read/write mutexes to avoid race conditions.
+    
+     
+
+
 ## Detailed Design
 
 ### API Changes
