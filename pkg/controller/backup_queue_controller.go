@@ -151,7 +151,6 @@ func (r *backupQueueReconciler) listQueuedBackups(ctx context.Context, ns string
 		if backup.Status.Phase == velerov1api.BackupPhaseQueued {
 			backups = append(backups, backup)
 		}
-
 	}
 	return backups, nil
 }
@@ -173,7 +172,7 @@ func (r *backupQueueReconciler) listEarlierBackups(ctx context.Context, ns strin
 		// InProgress and ReadyToStart backups count towards the concurrentBackups limit
 		if backup.Status.Phase == velerov1api.BackupPhaseInProgress ||
 			backup.Status.Phase == velerov1api.BackupPhaseReadyToStart {
-			runningCount += 1
+			runningCount++
 		}
 	}
 	return backups, runningCount, nil
@@ -188,11 +187,11 @@ func (r *backupQueueReconciler) detectNamespaceConflict(ctx context.Context, bac
 	for _, ns := range nsList.Items {
 		clusterNamespaces = append(clusterNamespaces, ns.Name)
 	}
-	foundConflict, conflictBackup := detectNSConflictsInternal(ctx, backup, earlierBackups, clusterNamespaces)
+	foundConflict, conflictBackup := detectNSConflictsInternal(backup, earlierBackups, clusterNamespaces)
 	return foundConflict, conflictBackup, clusterNamespaces, nil
 }
 
-func detectNSConflictsInternal(ctx context.Context, backup *velerov1api.Backup, earlierBackups []velerov1api.Backup, clusterNamespaces []string) (bool, string) {
+func detectNSConflictsInternal(backup *velerov1api.Backup, earlierBackups []velerov1api.Backup, clusterNamespaces []string) (bool, string) {
 	backupNamespaces := namespacesForBackup(backup, clusterNamespaces)
 	backupNSMap := make(map[string]struct{})
 	for _, ns := range backupNamespaces {
@@ -221,14 +220,14 @@ func detectNSConflictsInternal(ctx context.Context, backup *velerov1api.Backup, 
 // This could happen if velero just reconciled the one earlier in the queue and rejected it
 // due to too many running backups, but a backup completed in between that reconcile and this one
 // so exit, as the recent completion has triggered another reconcile of all queued backups
-func (r *backupQueueReconciler) checkForEarlierRunnableBackups(ctx context.Context, backup *velerov1api.Backup, earlierBackups []velerov1api.Backup, clusterNamespaces []string) (bool, string) {
+func (r *backupQueueReconciler) checkForEarlierRunnableBackups(backup *velerov1api.Backup, earlierBackups []velerov1api.Backup, clusterNamespaces []string) (bool, string) {
 	for _, earlierBackup := range earlierBackups {
 		// if this backup is queued and ahead of current backup, check for conflicts
 		if earlierBackup.Status.Phase != velerov1api.BackupPhaseQueued ||
 			earlierBackup.Status.QueuePosition >= backup.Status.QueuePosition {
 			continue
 		}
-		conflict, _ := detectNSConflictsInternal(ctx, &earlierBackup, earlierBackups, clusterNamespaces)
+		conflict, _ := detectNSConflictsInternal(&earlierBackup, earlierBackups, clusterNamespaces)
 		// !conflict means we've found an earlier backup that is currently runnable
 		// so current reconcile should exit to run this one
 		if !conflict {
@@ -299,7 +298,7 @@ func (r *backupQueueReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		maxQueuePosition, err := r.getMaxQueuePosition(ctx, backup.Namespace)
 		if err != nil {
 			// error is logged in getMaxQueuePosition func
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, nil //nolint:nilerr // We want to return nil to avoid requeue
 		}
 		original := backup.DeepCopy()
 		backup.Status.Phase = velerov1api.BackupPhaseQueued
@@ -329,7 +328,7 @@ func (r *backupQueueReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			log.Infof("Backup %v has namespace conflict with %v, leaving queued", backup.Name, conflictBackup)
 			return ctrl.Result{}, nil
 		}
-		foundEarlierRunnable, earlierRunnable := r.checkForEarlierRunnableBackups(ctx, backup, earlierBackups, clusterNamespaces)
+		foundEarlierRunnable, earlierRunnable := r.checkForEarlierRunnableBackups(backup, earlierBackups, clusterNamespaces)
 		if foundEarlierRunnable {
 			log.Infof("Earlier queued backup %v is runnable, leaving %v queued", earlierRunnable, backup.Name)
 			return ctrl.Result{}, nil
@@ -356,7 +355,7 @@ func (r *backupQueueReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 					log.WithError(errors.Wrapf(err, "error updating Backup %s queuePosition to %v", queuedBackup.Name, newQueuePos))
 					return ctrl.Result{}, nil
 				}
-				newQueuePos += 1
+				newQueuePos++
 			}
 		}
 		return ctrl.Result{}, nil
