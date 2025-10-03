@@ -23,10 +23,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+
 	//"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -60,7 +62,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			expectPhase: velerov1api.BackupPhaseInProgress,
 		},
 		{
-			name:         "Second New Backup gets queued with queuePosition 2",
+			name: "Second New Backup gets queued with queuePosition 2",
 			priorBackups: []*velerov1api.Backup{
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").Phase(velerov1api.BackupPhaseQueued).QueuePosition(1).Result(),
 			},
@@ -74,7 +76,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			expectPhase: velerov1api.BackupPhaseReadyToStart,
 		},
 		{
-			name:         "Queued Backup remains queued if no spaces available",
+			name: "Queued Backup remains queued if no spaces available",
 			priorBackups: []*velerov1api.Backup{
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").Phase(velerov1api.BackupPhaseInProgress).Result(),
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-12").Phase(velerov1api.BackupPhaseInProgress).Result(),
@@ -85,7 +87,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			expectQueuePosition: 1,
 		},
 		{
-			name:         "Queued Backup remains queued if no spaces available including ReadyToStart",
+			name: "Queued Backup remains queued if no spaces available including ReadyToStart",
 			priorBackups: []*velerov1api.Backup{
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").Phase(velerov1api.BackupPhaseInProgress).Result(),
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-12").Phase(velerov1api.BackupPhaseReadyToStart).Result(),
@@ -96,7 +98,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			expectQueuePosition: 1,
 		},
 		{
-			name:         "Queued Backup remains queued if earlier runnable backup is also queued",
+			name: "Queued Backup remains queued if earlier runnable backup is also queued",
 			priorBackups: []*velerov1api.Backup{
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").Phase(velerov1api.BackupPhaseInProgress).Result(),
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-12").Phase(velerov1api.BackupPhaseQueued).QueuePosition(1).Result(),
@@ -107,7 +109,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			expectQueuePosition: 2,
 		},
 		{
-			name:         "Queued Backup remains queued if in conflict with running backup",
+			name: "Queued Backup remains queued if in conflict with running backup",
 			priorBackups: []*velerov1api.Backup{
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").Phase(velerov1api.BackupPhaseInProgress).IncludedNamespaces("foo").Result(),
 			},
@@ -118,7 +120,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			expectQueuePosition: 1,
 		},
 		{
-			name:         "Queued Backup remains queued if in conflict with ReadyToStart backup",
+			name: "Queued Backup remains queued if in conflict with ReadyToStart backup",
 			priorBackups: []*velerov1api.Backup{
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").Phase(velerov1api.BackupPhaseReadyToStart).IncludedNamespaces("foo").Result(),
 			},
@@ -129,7 +131,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			expectQueuePosition: 1,
 		},
 		{
-			name:         "Queued Backup remains queued if in conflict with earlier queued backup",
+			name: "Queued Backup remains queued if in conflict with earlier queued backup",
 			priorBackups: []*velerov1api.Backup{
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").Phase(velerov1api.BackupPhaseQueued).QueuePosition(1).IncludedNamespaces("foo").Result(),
 			},
@@ -140,7 +142,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			expectQueuePosition: 2,
 		},
 		{
-			name:         "Queued Backup remains queued if earlier non-ns-conflict backup exists",
+			name: "Queued Backup remains queued if earlier non-ns-conflict backup exists",
 			priorBackups: []*velerov1api.Backup{
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").Phase(velerov1api.BackupPhaseInProgress).IncludedNamespaces("bar").Result(),
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-12").Phase(velerov1api.BackupPhaseQueued).QueuePosition(1).IncludedNamespaces("foo").Result(),
@@ -152,7 +154,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			expectQueuePosition: 2,
 		},
 		{
-			name:         "Running all-namespace backup conflicts with queued one-namespace backup ",
+			name: "Running all-namespace backup conflicts with queued one-namespace backup ",
 			priorBackups: []*velerov1api.Backup{
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").Phase(velerov1api.BackupPhaseInProgress).IncludedNamespaces("*").Result(),
 			},
@@ -163,7 +165,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			expectQueuePosition: 1,
 		},
 		{
-			name:         "Running one-namespace backup conflicts with queued all-namespace backup ",
+			name: "Running one-namespace backup conflicts with queued all-namespace backup ",
 			priorBackups: []*velerov1api.Backup{
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").Phase(velerov1api.BackupPhaseInProgress).IncludedNamespaces("bar").Result(),
 			},
@@ -174,24 +176,24 @@ func TestBackupQueueReconciler(t *testing.T) {
 			expectQueuePosition: 1,
 		},
 		{
-			name:         "Queued Backup moves to ReadyToStart if running count < concurrentBackups",
+			name: "Queued Backup moves to ReadyToStart if running count < concurrentBackups",
 			priorBackups: []*velerov1api.Backup{
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").Phase(velerov1api.BackupPhaseInProgress).Result(),
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-12").Phase(velerov1api.BackupPhaseInProgress).Result(),
 			},
-			concurrentBackups:   3,
-			backup:              builder.ForBackup(velerov1api.DefaultNamespace, "backup-20").Phase(velerov1api.BackupPhaseQueued).QueuePosition(1).Result(),
-			expectPhase:         velerov1api.BackupPhaseReadyToStart,
+			concurrentBackups: 3,
+			backup:            builder.ForBackup(velerov1api.DefaultNamespace, "backup-20").Phase(velerov1api.BackupPhaseQueued).QueuePosition(1).Result(),
+			expectPhase:       velerov1api.BackupPhaseReadyToStart,
 		},
 		{
-			name:         "Queued Backup moves to ReadyToStart if running count < concurrentBackups and no ns conflict found",
+			name: "Queued Backup moves to ReadyToStart if running count < concurrentBackups and no ns conflict found",
 			priorBackups: []*velerov1api.Backup{
 				builder.ForBackup(velerov1api.DefaultNamespace, "backup-11").Phase(velerov1api.BackupPhaseReadyToStart).IncludedNamespaces("foo").Result(),
 			},
-			namespaces:          []string{"foo", "bar"},
-			concurrentBackups:   3,
-			backup:              builder.ForBackup(velerov1api.DefaultNamespace, "backup-20").Phase(velerov1api.BackupPhaseQueued).QueuePosition(1).IncludedNamespaces("bar").Result(),
-			expectPhase:         velerov1api.BackupPhaseReadyToStart,
+			namespaces:        []string{"foo", "bar"},
+			concurrentBackups: 3,
+			backup:            builder.ForBackup(velerov1api.DefaultNamespace, "backup-20").Phase(velerov1api.BackupPhaseQueued).QueuePosition(1).IncludedNamespaces("bar").Result(),
+			expectPhase:       velerov1api.BackupPhaseReadyToStart,
 		},
 	}
 
@@ -214,7 +216,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			logger := logrus.New()
 			log := logger.WithField("controller", "backup-queue-test")
 			r := NewBackupQueueReconciler(fakeClient, scheme, log, test.concurrentBackups)
-			req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace,Name: test.backup.Name}}
+			req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}}
 			res, err := r.Reconcile(context.Background(), req)
 			gotErr := err != nil
 			require.NoError(t, err)
@@ -231,6 +233,5 @@ func TestBackupQueueReconciler(t *testing.T) {
 			assert.Equal(t, test.expectQueuePosition, backupAfter.Status.QueuePosition)
 		})
 	}
-
 
 }
