@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -217,7 +216,7 @@ func TestBackupQueueReconciler(t *testing.T) {
 			log := logger.WithField("controller", "backup-queue-test")
 			r := NewBackupQueueReconciler(fakeClient, scheme, log, test.concurrentBackups)
 			req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: test.backup.Namespace, Name: test.backup.Name}}
-			res, err := r.Reconcile(context.Background(), req)
+			res, err := r.Reconcile(t.Context(), req)
 			gotErr := err != nil
 			require.NoError(t, err)
 			assert.Equal(t, ctrl.Result{}, res)
@@ -233,5 +232,4 @@ func TestBackupQueueReconciler(t *testing.T) {
 			assert.Equal(t, test.expectQueuePosition, backupAfter.Status.QueuePosition)
 		})
 	}
-
 }
