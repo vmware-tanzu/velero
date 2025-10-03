@@ -117,7 +117,6 @@ type kubernetesBackupper struct {
 	podCommandExecutor        podexec.PodCommandExecutor
 	podVolumeBackupperFactory podvolume.BackupperFactory
 	podVolumeTimeout          time.Duration
-	podVolumeContext          context.Context
 	defaultVolumesToFsBackup  bool
 	clientPageSize            int
 	uploaderType              string
@@ -365,12 +364,12 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	}
 
 	var podVolumeCancelFunc context.CancelFunc
-	kb.podVolumeContext, podVolumeCancelFunc = context.WithTimeout(context.Background(), podVolumeTimeout)
+	podVolumeContext, podVolumeCancelFunc := context.WithTimeout(context.Background(), podVolumeTimeout)
 	defer podVolumeCancelFunc()
 
 	var podVolumeBackupper podvolume.Backupper
 	if kb.podVolumeBackupperFactory != nil {
-		podVolumeBackupper, err = kb.podVolumeBackupperFactory.NewBackupper(kb.podVolumeContext, log, backupRequest.Backup, kb.uploaderType)
+		podVolumeBackupper, err = kb.podVolumeBackupperFactory.NewBackupper(podVolumeContext, log, backupRequest.Backup, kb.uploaderType)
 		if err != nil {
 			log.WithError(errors.WithStack(err)).Debugf("Error from NewBackupper")
 			return errors.WithStack(err)
@@ -416,6 +415,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		kbClient:                 kb.kbClient,
 		discoveryHelper:          kb.discoveryHelper,
 		podVolumeBackupper:       podVolumeBackupper,
+		podVolumeContext:         podVolumeContext,
 		podVolumeSnapshotTracker: podvolume.NewTracker(),
 		volumeSnapshotterCache:   NewVolumeSnapshotterCache(volumeSnapshotterGetter),
 		itemHookHandler: &hook.DefaultItemHookHandler{
@@ -848,7 +848,7 @@ func (kb *kubernetesBackupper) handleItemBlockPostHooks(itemBlock *BackupItemBlo
 	log := itemBlock.Log
 
 	// the post hooks will not execute until all PVBs of the item block pods are processed
-	if err := kb.waitUntilPVBsProcessed(kb.podVolumeContext, log, itemBlock, hookPods); err != nil {
+	if err := kb.waitUntilPVBsProcessed(itemBlock.itemBackupper.podVolumeContext, log, itemBlock, hookPods); err != nil {
 		log.WithError(err).Error("failed to wait PVBs processed for the ItemBlock")
 		return
 	}
