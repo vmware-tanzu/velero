@@ -85,7 +85,7 @@ func queuePositionOrderFunc(objList client.ObjectList) client.ObjectList {
 
 // SetupWithManager adds the reconciler to the manager
 func (r *backupQueueReconciler) SetupWithManager(mgr ctrl.Manager) error {
-        // For periodic requeue, only consider Queued backups, order by QueuePosition
+	// For periodic requeue, only consider Queued backups, order by QueuePosition
 	gp := kube.NewGenericEventPredicate(func(object client.Object) bool {
 		backup := object.(*velerov1api.Backup)
 		return backup.Status.Phase == velerov1api.BackupPhaseQueued
@@ -93,7 +93,7 @@ func (r *backupQueueReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	s := kube.NewPeriodicalEnqueueSource(r.logger.WithField("controller", constant.ControllerBackupQueue), mgr.GetClient(), &velerov1api.BackupList{}, r.frequency, kube.PeriodicalEnqueueSourceOption{
 		Predicates: []predicate.Predicate{gp},
-		OrderFunc: queuePositionOrderFunc,
+		OrderFunc:  queuePositionOrderFunc,
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -123,7 +123,7 @@ func (r *backupQueueReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					return oldBackup.Status.Phase == velerov1api.BackupPhaseInProgress &&
 						newBackup.Status.Phase != velerov1api.BackupPhaseInProgress ||
 						oldBackup.Status.Phase != velerov1api.BackupPhaseQueued &&
-						newBackup.Status.Phase == velerov1api.BackupPhaseQueued
+							newBackup.Status.Phase == velerov1api.BackupPhaseQueued
 				},
 				CreateFunc: func(event.CreateEvent) bool {
 					return false
@@ -148,9 +148,9 @@ func (r *backupQueueReconciler) listQueuedBackups(ctx context.Context, ns string
 		return nil, err
 	}
 	for _, backup := range backupList.Items {
-                if backup.Status.Phase == velerov1api.BackupPhaseQueued {
+		if backup.Status.Phase == velerov1api.BackupPhaseQueued {
 			backups = append(backups, backup)
-                }
+		}
 
 	}
 	return backups, nil
@@ -164,17 +164,17 @@ func (r *backupQueueReconciler) listEarlierBackups(ctx context.Context, ns strin
 		return nil, 0, err
 	}
 	for _, backup := range backupList.Items {
-                if backup.Status.Phase == velerov1api.BackupPhaseInProgress ||
+		if backup.Status.Phase == velerov1api.BackupPhaseInProgress ||
 			backup.Status.Phase == velerov1api.BackupPhaseReadyToStart ||
 			(backup.Status.Phase == velerov1api.BackupPhaseQueued &&
-			backup.Status.QueuePosition < queuePos) {
+				backup.Status.QueuePosition < queuePos) {
 			backups = append(backups, backup)
-                }
+		}
 		// InProgress and ReadyToStart backups count towards the concurrentBackups limit
-                if backup.Status.Phase == velerov1api.BackupPhaseInProgress ||
+		if backup.Status.Phase == velerov1api.BackupPhaseInProgress ||
 			backup.Status.Phase == velerov1api.BackupPhaseReadyToStart {
 			runningCount += 1
-                }
+		}
 	}
 	return backups, runningCount, nil
 }
@@ -216,6 +216,7 @@ func detectNSConflictsInternal(ctx context.Context, backup *velerov1api.Backup, 
 	}
 	return false, ""
 }
+
 // Returns true if there are backups ahead of the current backup that are runnable
 // This could happen if velero just reconciled the one earlier in the queue and rejected it
 // due to too many running backups, but a backup completed in between that reconcile and this one
@@ -261,9 +262,9 @@ func (r *backupQueueReconciler) orderedQueuedBackups(ctx context.Context, backup
 	}
 	orderedBackupList := queuePositionOrderFunc(backupList).(*velerov1api.BackupList)
 	for _, item := range orderedBackupList.Items {
-                if item.Status.Phase == velerov1api.BackupPhaseQueued {
-                        returnList = append(returnList, item)
-                }
+		if item.Status.Phase == velerov1api.BackupPhaseQueued {
+			returnList = append(returnList, item)
+		}
 	}
 	return returnList, nil
 }
@@ -272,13 +273,13 @@ func (r *backupQueueReconciler) findQueuedBackupsToRequeue(ctx context.Context, 
 	requests := []reconcile.Request{}
 	backups, _ := r.orderedQueuedBackups(ctx, backup)
 	for _, item := range backups {
-                requests = append(requests, reconcile.Request{
-                        NamespacedName: types.NamespacedName{
-                                Namespace: item.GetNamespace(),
-                                Name:      item.GetName(),
-                        },
-                })
-        }
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: item.GetNamespace(),
+				Name:      item.GetName(),
+			},
+		})
+	}
 	return requests
 }
 
