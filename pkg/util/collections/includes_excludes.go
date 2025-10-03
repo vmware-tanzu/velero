@@ -333,8 +333,8 @@ func GetGlobalResourceIncludesExcludes(helper discovery.Helper, logger logrus.Fi
 }
 
 type ScopeIncludesExcludes struct {
-	namespaceScopedResourceFilter IncludesExcludes // namespace-scoped resource filter
-	clusterScopedResourceFilter   IncludesExcludes // cluster-scoped resource filter
+	namespaceScopedResourceFilter IncludesExcludes          // namespace-scoped resource filter
+	clusterScopedResourceFilter   IncludesExcludes          // cluster-scoped resource filter
 	namespaceFilter               NamespaceIncludesExcludes // namespace filter
 
 	helper discovery.Helper

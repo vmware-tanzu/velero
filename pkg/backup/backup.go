@@ -181,8 +181,8 @@ func getNamespaceIncludesExcludes(backup *velerov1api.Backup, kbClient kbclient.
 		activeNamespaces = append(activeNamespaces, ns.Name)
 		nsLabels := ns.GetLabels()
 		if len(nsLabels[ArgoCDManagedByNamespaceLabel]) > 0 && includesExcludes.ShouldInclude(ns.Name) {
-                        nsManagedByArgoCD = append(nsManagedByArgoCD, ns.Name)
-                }
+			nsManagedByArgoCD = append(nsManagedByArgoCD, ns.Name)
+		}
 
 	}
 	return includesExcludes.ActiveNamespaces(activeNamespaces), nsManagedByArgoCD, nil
