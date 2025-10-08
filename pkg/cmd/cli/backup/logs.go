@@ -17,11 +17,15 @@ limitations under the License.
 package backup
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -61,6 +65,51 @@ func (l *LogsOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&l.CaCertFile, "cacert", l.CaCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
 }
 
+func coloredLevel(level string) string {
+	switch level {
+	case "info":
+		return color.GreenString("info")
+	case "warning":
+		return color.YellowString("warning")
+	case "error":
+		return color.RedString("error")
+	case "debug":
+		return color.BlueString("debug")
+	default:
+		return level
+	}
+}
+
+
+// Process logs (by adding color) before printing them
+func processAndPrintLogs(r io.Reader, w io.Writer) {
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		// Read line
+		line := scanner.Text()
+
+		// Get level position
+		levelPrefixSize := len("level=")
+		levelStart := strings.Index(line, "level=")
+		levelSize := strings.Index(line[levelStart+levelPrefixSize:], " ")
+		if levelStart == -1 || levelSize == -1 {
+			// No space after level found, print as-is
+			fmt.Fprintln(w, line)
+			continue
+		}
+
+		// Get and color level
+		level := line[levelStart+levelPrefixSize : levelStart+levelPrefixSize+levelSize]
+		level = coloredLevel(level)
+
+		// Print line with colored level
+		fmt.Fprint(w, line[:levelStart+levelPrefixSize])
+		fmt.Fprint(w, level)
+		fmt.Fprint(w, line[levelStart+levelPrefixSize+levelSize:])
+		fmt.Fprintln(w)
+	}
+}
+
 func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
 	backup := new(velerov1api.Backup)
 	err := l.Client.Get(context.Background(), kbclient.ObjectKey{Namespace: f.Namespace(), Name: l.BackupName}, backup)
@@ -86,7 +135,10 @@ func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
 		bslCACert = ""
 	}
 
-	err = downloadrequest.StreamWithBSLCACert(context.Background(), l.Client, f.Namespace(), l.BackupName, velerov1api.DownloadTargetKindBackupLog, os.Stdout, l.Timeout, l.InsecureSkipTLSVerify, l.CaCertFile, bslCACert)
+	pr, pw := io.Pipe()
+	go processAndPrintLogs(pr, os.Stdout)
+
+	err = downloadrequest.StreamWithBSLCACert(context.Background(), l.Client, f.Namespace(), l.BackupName, velerov1api.DownloadTargetKindBackupLog, pw, l.Timeout, l.InsecureSkipTLSVerify, l.CaCertFile, bslCACert)
 	return err
 }
 
