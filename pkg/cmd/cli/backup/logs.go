@@ -81,7 +81,7 @@ func getLevelColor(level string) *color.Color {
 }
 
 // Process logs (by adding color) before printing them
-func processAndPrintLogs(r io.Reader, w io.Writer) {
+func processAndPrintLogs(r io.Reader, w io.Writer) error {
 	d := logfmt.NewDecoder(r)
 	for d.ScanRecord() { // get record (line)
 		// Scan fields and get color
@@ -113,6 +113,10 @@ func processAndPrintLogs(r io.Reader, w io.Writer) {
 		}
 		fmt.Fprintln(w)
 	}
+	if err := d.Err(); err != nil {
+		return fmt.Errorf("error processing logs: %v", err)
+	}
+	return nil
 }
 
 func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
@@ -153,7 +157,10 @@ func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
 		w = pw
 		go func(pr *io.PipeReader) {
 			defer wg.Done()
-			processAndPrintLogs(pr, os.Stdout)
+			err := processAndPrintLogs(pr, os.Stdout)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error processing logs: %v\n", err)
+			}
 		}(pr)
 	}
 
