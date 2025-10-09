@@ -19,23 +19,20 @@ package backup
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
-	"sync"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/go-logfmt/logfmt"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/cacert"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 )
 
 type LogsOptions struct {
@@ -65,60 +62,6 @@ func (l *LogsOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&l.CaCertFile, "cacert", l.CaCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
 }
 
-func getLevelColor(level string) *color.Color {
-	switch level {
-	case "info":
-		return color.New(color.FgGreen)
-	case "warning":
-		return color.New(color.FgYellow)
-	case "error":
-		return color.New(color.FgRed)
-	case "debug":
-		return color.New(color.FgBlue)
-	default:
-		return color.New()
-	}
-}
-
-// Process logs (by adding color) before printing them
-func processAndPrintLogs(r io.Reader, w io.Writer) error {
-	d := logfmt.NewDecoder(r)
-	for d.ScanRecord() { // get record (line)
-		// Scan fields and get color
-		var fields [][2][]byte
-		var lineColor *color.Color
-		for d.ScanKeyval() {
-			fields = append(fields, [2][]byte{d.Key(), d.Value()})
-			if string(d.Key()) == "level" {
-				lineColor = getLevelColor(string(d.Value()))
-			}
-		}
-
-		// Re-encode with color. We do not use logfmt Encoder because it does not support color
-		for _, field := range fields {
-			var key, value string
-			if lineColor == nil { // handle case where no color (log level) was found
-				key = string(field[0])
-				value = string(field[1])
-			} else {
-				key = lineColor.Sprintf("%s", field[0])
-				if string(field[0]) == "level" {
-					colorCopy := *lineColor
-					value = colorCopy.Add(color.Bold).Sprintf("%s", field[1])
-				} else {
-					value = string(field[1])
-				}
-			}
-			fmt.Fprintf(w, "%s=%s ", key, value)
-		}
-		fmt.Fprintln(w)
-	}
-	if err := d.Err(); err != nil {
-		return fmt.Errorf("error processing logs: %v", err)
-	}
-	return nil
-}
-
 func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
 	backup := new(velerov1api.Backup)
 	err := l.Client.Get(context.Background(), kbclient.ObjectKey{Namespace: f.Namespace(), Name: l.BackupName}, backup)
@@ -144,32 +87,9 @@ func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
 		bslCACert = ""
 	}
 
-	// Potentially add color to logs
-	var w io.Writer
-	var wg sync.WaitGroup
-	wg.Add(1)
-	// If NoColor, do not parse logs and directly fall back to stdout
-	if color.NoColor {
-		w = os.Stdout
-		wg.Done()
-	} else {
-		pr, pw := io.Pipe()
-		w = pw
-		go func(pr *io.PipeReader) {
-			defer wg.Done()
-			err := processAndPrintLogs(pr, os.Stdout)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error processing logs: %v\n", err)
-			}
-		}(pr)
-	}
-
+	w, wg := output.PrintLogsWithColor()
 	err = downloadrequest.StreamWithBSLCACert(context.Background(), l.Client, f.Namespace(), l.BackupName, velerov1api.DownloadTargetKindBackupLog, w, l.Timeout, l.InsecureSkipTLSVerify, l.CaCertFile, bslCACert)
-
-	// if pipe writer was used, close it to signal we're done writing
-	if pw, ok := w.(*io.PipeWriter); ok {
-		pw.Close()
-	}
+	w.Close() // signal we're done writing
 	wg.Wait() // wait for all logs to be processed and printed
 	return err
 }
