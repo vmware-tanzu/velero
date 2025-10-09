@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/fatih/color"
@@ -139,17 +140,30 @@ func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
 		bslCACert = ""
 	}
 
+	// Potentially add color to logs
 	var w io.Writer
-	// If NoColor, do not parse logs
+	var wg sync.WaitGroup
+	wg.Add(1)
+	// If NoColor, do not parse logs and directly fall back to stdout
 	if color.NoColor {
 		w = os.Stdout
+		wg.Done()
 	} else {
 		pr, pw := io.Pipe()
 		w = pw
-		go processAndPrintLogs(pr, os.Stdout)
+		go func(pr *io.PipeReader) {
+			defer wg.Done()
+			processAndPrintLogs(pr, os.Stdout)
+		}(pr)
 	}
 
 	err = downloadrequest.StreamWithBSLCACert(context.Background(), l.Client, f.Namespace(), l.BackupName, velerov1api.DownloadTargetKindBackupLog, w, l.Timeout, l.InsecureSkipTLSVerify, l.CaCertFile, bslCACert)
+
+	// if pipe writer was used, close it to signal we're done writing
+	if pw, ok := w.(*io.PipeWriter); ok {
+		pw.Close()
+	}
+	wg.Wait() // wait for all logs to be processed and printed
 	return err
 }
 
