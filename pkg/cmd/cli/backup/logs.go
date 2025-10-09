@@ -139,10 +139,17 @@ func (l *LogsOptions) Run(c *cobra.Command, f client.Factory) error {
 		bslCACert = ""
 	}
 
-	pr, pw := io.Pipe()
-	go processAndPrintLogs(pr, os.Stdout)
+	var w io.Writer
+	// If NoColor, do not parse logs
+	if color.NoColor {
+		w = os.Stdout
+	} else {
+		pr, pw := io.Pipe()
+		w = pw
+		go processAndPrintLogs(pr, os.Stdout)
+	}
 
-	err = downloadrequest.StreamWithBSLCACert(context.Background(), l.Client, f.Namespace(), l.BackupName, velerov1api.DownloadTargetKindBackupLog, pw, l.Timeout, l.InsecureSkipTLSVerify, l.CaCertFile, bslCACert)
+	err = downloadrequest.StreamWithBSLCACert(context.Background(), l.Client, f.Namespace(), l.BackupName, velerov1api.DownloadTargetKindBackupLog, w, l.Timeout, l.InsecureSkipTLSVerify, l.CaCertFile, bslCACert)
 	return err
 }
 
