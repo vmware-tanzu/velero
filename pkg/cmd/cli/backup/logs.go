@@ -95,11 +95,20 @@ func processAndPrintLogs(r io.Reader, w io.Writer) {
 
 		// Re-encode with color. We do not use logfmt Encoder because it does not support color
 		for _, field := range fields {
+			var key, value string
 			if lineColor == nil { // handle case where no color (log level) was found
-				fmt.Fprintf(w, "%s=%s ", field[0], field[1])
+				key = string(field[0])
+				value = string(field[1])
 			} else {
-				fmt.Fprintf(w, "%s=%s ", lineColor.Sprintf("%s", field[0]), field[1])
+				key = lineColor.Sprintf("%s", field[0])
+				if string(field[0]) == "level" {
+					colorCopy := *lineColor
+					value = colorCopy.Add(color.Bold).Sprintf("%s", field[1])
+				} else {
+					value = string(field[1])
+				}
 			}
+			fmt.Fprintf(w, "%s=%s ", key, value)
 		}
 		fmt.Fprintln(w)
 	}
