@@ -89,6 +89,15 @@ type Backupper interface {
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) error
 
+	// BackupWithResolvers performs the core Kubernetes backup operation, creating a gzipped tar archive
+	// of selected cluster resources with plugin transformations applied.
+	//
+	// It discovers resources based on the backup spec, applies BackupItemAction and ItemBlockAction
+	// plugins, handles volume snapshots, executes backup hooks, and writes everything to a compressed
+	// tar archive. Accepts pre-resolved plugin actions for efficiency.
+	//
+	// Returns an error only for complete backup failures. Individual resource failures are logged
+	// but don't stop the backup process.
 	BackupWithResolvers(
 		log logrus.FieldLogger,
 		backupRequest *Request,
@@ -98,6 +107,13 @@ type Backupper interface {
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) error
 
+	// FinalizeBackup completes the backup process by updating resources that were modified
+	// during async operations and creating the final backup archive.
+	//
+	// It reads the original backup archive, collects resources specified in PostOperationItems
+	// from completed async operations, re-backs up those resources with their updated state,
+	// and writes a new archive with the updated content. This ensures the backup contains
+	// the final state of resources after async operations (like volume snapshots) complete.
 	FinalizeBackup(
 		log logrus.FieldLogger,
 		backupRequest *Request,
@@ -127,6 +143,55 @@ type kubernetesBackupper struct {
 
 func (i *itemKey) String() string {
 	return fmt.Sprintf("resource=%s,namespace=%s,name=%s", i.resource, i.namespace, i.name)
+}
+
+// checkCancelRequest periodically checks if a backup has been cancelled by fetching
+// the latest backup object from the API and updating the request's Cancel field.
+// It uses rate limiting to avoid excessive API calls (checks at most every 3 seconds).
+// Returns true if the backup should be cancelled.
+func checkCancelRequest(ctx context.Context, kbClient kbclient.Client, request *Request, log logrus.FieldLogger) bool {
+	log.Info("Checking if backup should be cancelled")
+	const cancelCheckInterval = 3 * time.Second
+
+	now := time.Now()
+
+	// If lastCancelCheck is zero (first call), initialize it to now
+	if request.LastCancelCheck.IsZero() {
+		request.LastCancelCheck = now
+		return false
+	}
+
+	// Check if enough time has passed since the last check
+	if now.Sub(request.LastCancelCheck) < cancelCheckInterval {
+		// Not enough time has passed, return the current cancel state
+		log.Info("Not enough time has passed since the last check, returning the current cancel state")
+		return request.Cancel
+	}
+
+	// Fetch the latest backup object from the API
+	latestBackup := &velerov1api.Backup{}
+	err := kbClient.Get(ctx, kbclient.ObjectKey{
+		Namespace: request.Backup.Namespace,
+		Name:      request.Backup.Name,
+	}, latestBackup)
+
+	if err != nil {
+		log.WithError(err).Warn("Failed to fetch latest backup object for cancel check")
+		// On error, keep the current state and update the check time
+		request.LastCancelCheck = now
+		return request.Cancel
+	}
+
+	// Update the cancel state based on the latest backup spec
+	if latestBackup.Spec.Cancel != nil && *latestBackup.Spec.Cancel {
+		request.Cancel = true
+		log.Info("Backup cancellation detected")
+	}
+
+	// Update the last check time
+	request.LastCancelCheck = now
+
+	return request.Cancel
 }
 
 func cohabitatingResources() map[string]*cohabitatingResource {
@@ -344,6 +409,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		pageSize:              kb.clientPageSize,
 	}
 
+	// Items to backup
 	items := collector.getAllItems()
 	log.WithField("progress", "").Infof("Collected %d items matching the backup spec from the Kubernetes API (actual number of items backed up may be more or less depending on velero.io/exclude-from-backup annotation, plugins returning additional related items to back up, etc.)", len(items))
 
@@ -397,7 +463,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	// it's done sending progress updates
 	quit := make(chan struct{})
 
-	// This is the progress updater goroutine that receives
+	// GOROUTINE: This is the progress updater goroutine that receives
 	// progress updates on the 'update' channel. It patches
 	// the backup CR with progress updates at most every second,
 	// but it will not issue a patch if it hasn't received a new
@@ -458,12 +524,13 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	var itemBlock *BackupItemBlock
 	itemBlockReturn := make(chan ItemBlockReturn, 100)
 	wg := &sync.WaitGroup{}
-	// Handle returns from worker pool processing ItemBlocks
+	// GOROUTINE: Handle returns from worker pool processing ItemBlocks
 	go func() {
 		for {
 			select {
 			case response := <-itemBlockReturn: // process each BackupItemBlock response
 				func() {
+					// Concurrency down, the goroutine processing the ItemBlock is done
 					defer wg.Done()
 					if response.err != nil {
 						log.WithError(errors.WithStack((response.err))).Error("Got error in BackupItemBlock.")
@@ -500,6 +567,8 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		}
 	}()
 
+	// Boolean that indicates that this backup has been cancelled
+	var cancelled bool
 	for i := range items {
 		log.WithFields(map[string]any{
 			"progress":  "",
@@ -507,6 +576,15 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 			"namespace": items[i].namespace,
 			"name":      items[i].name,
 		}).Infof("Processing item")
+
+		// Cancellation is an early exit: if we see it's true, no more itemBlocks will be sent to the worker pool
+		// We should be able to safely exit here, as Wg is triggered only when an itemBlock is sent to the worker pool
+		// Processing item log
+		cancelled = checkCancelRequest(context.Background(), kb.kbClient, backupRequest, log)
+		if cancelled {
+			// Phase will be set to Cancelling in the backup controller
+			break
+		}
 
 		// Skip if this item has already been processed (in a block or previously excluded)
 		if items[i].inItemBlockOrExcluded {
@@ -542,25 +620,49 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		// 2) Both current and next item are ordered resources
 		// 3) Both current and next item are for the same GroupResource
 		addNextToBlock := i < len(items)-1 && items[i].orderedResource && items[i+1].orderedResource && items[i].groupResource == items[i+1].groupResource
+
+		// The backupItemBlock call is now made in the processItemBlockWorker goroutine, which is spawned from the StartItemBlockWorkerPool function
+		// StartItemBlockWorkerPool is called in the backupReconciler.prepareBackupRequest function in the backup controller
 		if itemBlock != nil && len(itemBlock.Items) > 0 && !addNextToBlock {
 			log.Infof("Backing Up Item Block including %s %s/%s (%v items in block)", items[i].groupResource.String(), items[i].namespace, items[i].name, len(itemBlock.Items))
 
+			// Concurrency up
 			wg.Add(1)
+			// Send the itemBlock to the worker pool
 			backupRequest.ItemBlockChannel <- ItemBlockInput{
 				itemBlock:  itemBlock,
 				returnChan: itemBlockReturn,
 			}
+			// Reset the itemBlock so we can create a new one for the next item
 			itemBlock = nil
+
 		}
 	}
 
+	// If canclled, can we call a version of this which cancels all the PVBs?
+	if cancelled {
+		// todo: Cancel all the PVBs
+		// 1.List PVBs owned by the backup: matching labels
+
+		// 2. Set spec cancel to true for each PVB
+
+		// The following line is called below: this will wait for all the PVBs to be processed, either by completion or cancellation
+		// And so we don't need to wait for all the PVBs here
+		// processedPVBs := itemBackupper.podVolumeBackupper.WaitAllPodVolumesProcessed(log)
+
+		// With this our work here is done: proceed from backup_controller
+
+	}
+
+	// GOROUTINE: Goroutine to wait for all the ItemBlocks to be processed
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		wg.Wait()
 	}()
 
-	// Wait for all the ItemBlocks to be processed
+	// Blocks here until either all the ItemBlocks are processed or the response context is done (cancellation)
+	// Done this way so we can handle other channels, e.g. cancellation channel
 	select {
 	case <-done:
 		log.Info("done processing ItemBlocks")
@@ -584,6 +686,7 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 		}
 	}
 
+	// We wait here for all the PVBs in the backup to complete
 	processedPVBs := itemBackupper.podVolumeBackupper.WaitAllPodVolumesProcessed(log)
 	backupRequest.PodVolumeBackups = append(backupRequest.PodVolumeBackups, processedPVBs...)
 

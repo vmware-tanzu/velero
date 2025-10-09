@@ -41,6 +41,10 @@ spec:
           spec:
             description: BackupSpec defines the specification for a Velero backup.
             properties:
+              cancel:
+                description: Cancel specifies whether to cancel the backup.
+                nullable: true
+                type: boolean
               csiSnapshotTimeout:
                 description: |-
                   CSISnapshotTimeout specifies the time used to wait for CSI VolumeSnapshot status turns to
@@ -604,6 +608,8 @@ spec:
                 - PartiallyFailed
                 - Failed
                 - Deleting
+                - Cancelling
+                - Cancelled
                 type: string
               progress:
                 description: |-

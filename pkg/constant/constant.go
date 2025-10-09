@@ -2,6 +2,7 @@ package constant
 
 const (
 	ControllerBackup                = "backup"
+	ControllerBackupCancellation    = "backup-cancellation"
 	ControllerBackupOperations      = "backup-operations"
 	ControllerBackupDeletion        = "backup-deletion"
 	ControllerBackupFinalizer       = "backup-finalizer"

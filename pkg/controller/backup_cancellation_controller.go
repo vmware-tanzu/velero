@@ -41,6 +41,7 @@ type backupCancellationReconciler struct {
 	newPluginManager  func(logger logrus.FieldLogger) clientmgmt.Manager
 	backupStoreGetter persistence.ObjectBackupStoreGetter
 	metrics           *metrics.ServerMetrics
+	backupTracker     BackupTracker
 }
 
 func NewBackupCancellationReconciler(
@@ -50,6 +51,7 @@ func NewBackupCancellationReconciler(
 	backupStoreGetter persistence.ObjectBackupStoreGetter,
 	metrics *metrics.ServerMetrics,
 	itemOperationsMap *itemoperationmap.BackupItemOperationsMap,
+	backupTracker BackupTracker,
 ) *backupCancellationReconciler {
 	return &backupCancellationReconciler{
 		Client:            client,
@@ -59,22 +61,22 @@ func NewBackupCancellationReconciler(
 		newPluginManager:  newPluginManager,
 		backupStoreGetter: backupStoreGetter,
 		metrics:           metrics,
+		backupTracker:     backupTracker,
 	}
 }
 
 func (r *backupCancellationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&velerov1api.Backup{}).
+		Named(constant.ControllerBackupCancellation).
 		Complete(r)
 }
 
 func (r *backupCancellationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.logger.WithFields(logrus.Fields{
-		"controller":    constant.ControllerBackup,
+		"controller":    constant.ControllerBackupCancellation,
 		"backuprequest": req.String(),
 	})
-
-	log.Debug("Getting backup")
 
 	original := &velerov1api.Backup{}
 	err := r.Client.Get(ctx, req.NamespacedName, original)
@@ -86,6 +88,21 @@ func (r *backupCancellationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		log.WithError(err).Error("error getting backup")
 		return ctrl.Result{}, err
 	}
+
+	switch original.Status.Phase {
+	case "", velerov1api.BackupPhaseCancelling:
+		// only process cancelling backups
+	default:
+		r.logger.WithFields(logrus.Fields{
+			"backup": kubeutil.NamespaceAndName(original),
+			"phase":  original.Status.Phase,
+		}).Debug("Backup is not handled")
+		return ctrl.Result{}, nil
+	}
+
+	log.Info("Reconciling backup cancellation")
+
+	log.Debug("Getting backup")
 
 	backup := original.DeepCopy()
 	log.Debugf("backup: %s", backup.Name)
@@ -118,6 +135,9 @@ func (r *backupCancellationReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// - Delete partial backup data from object storage?
 	// - Clean up in-progress volume snapshots?
 	// - Remove temporary files?
+
+	//todo: remove backup from backup tracker
+	r.backupTracker.Delete(backup.Namespace, backup.Name)
 
 	// Then set to cancelled
 	backup.Status.Phase = velerov1api.BackupPhaseCancelled

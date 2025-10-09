@@ -123,6 +123,8 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		"controller":          constant.ControllerBackupDeletion,
 		"deletebackuprequest": req.String(),
 	})
+
+	// Controller works on DeleteBackupRequest objects
 	log.Debug("Getting deletebackuprequest")
 	dbr := &velerov1api.DeleteBackupRequest{}
 	if err := r.Get(ctx, req.NamespacedName, dbr); err != nil {
@@ -156,6 +158,7 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
+	// BackupDeleteRequest has the backup name in the spec
 	log = log.WithField("backup", dbr.Spec.BackupName)
 
 	// Remove any existing deletion requests for this backup so we only have
@@ -165,6 +168,9 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// Don't allow deleting an in-progress backup
+	// todo: If cancellation is implented, we would set backup.Spec.Cancel to true
+	// how would we return here? as opposed to a user-canceled backup, where do do not delete everything
+	// another flag to send it back to deletion controller?
 	if r.backupTracker.Contains(dbr.Namespace, dbr.Spec.BackupName) {
 		err := r.patchDeleteBackupRequestWithError(ctx, dbr, errors.New("backup is still in progress"))
 		return ctrl.Result{}, err

@@ -203,7 +203,10 @@ func (c *backupOperationsReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// BackupPhaseWaitingForPluginOperationsPartiallyFailed and needs update
 	// If the only changes are incremental progress, then no write is necessary, progress can remain in memory
 	if !stillInProgress {
-		if backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperations {
+		if isBackupCancelled(backup) {
+			log.Infof("Marking backup %s Cancelled", backup.Name)
+			backup.Status.Phase = velerov1api.BackupPhaseCancelling
+		} else if backup.Status.Phase == velerov1api.BackupPhaseWaitingForPluginOperations {
 			log.Infof("Marking backup %s Finalizing", backup.Name)
 			backup.Status.Phase = velerov1api.BackupPhaseFinalizing
 		} else {
@@ -360,10 +363,14 @@ func getBackupItemOperationProgress(
 				continue
 			}
 			// cancel operation if past timeout period
-			if operation.Status.Created.Time.Add(backup.Spec.ItemOperationTimeout.Duration).Before(time.Now()) {
+			if operation.Status.Created.Time.Add(backup.Spec.ItemOperationTimeout.Duration).Before(time.Now()) || isBackupCancelled(backup) {
 				_ = bia.Cancel(operation.Spec.OperationID, backup)
 				operation.Status.Phase = itemoperation.OperationPhaseFailed
-				operation.Status.Error = "Asynchronous action timed out"
+				if isBackupCancelled(backup) {
+					operation.Status.Error = "Asynchronous action cancelled"
+				} else {
+					operation.Status.Error = "Asynchronous action timed out"
+				}
 				errs = append(errs, wrapErrMsg(operation.Status.Error, bia))
 				changes = true
 				failedCount++
@@ -395,4 +402,8 @@ func wrapErrMsg(errMsg string, bia v2.BackupItemAction) string {
 		errMsg += ", "
 	}
 	return fmt.Sprintf("%splugin: %s", errMsg, plugin)
+}
+
+func isBackupCancelled(backup *velerov1api.Backup) bool {
+	return backup.Spec.Cancel != nil && *backup.Spec.Cancel
 }
