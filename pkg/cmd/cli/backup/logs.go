@@ -17,12 +17,10 @@ limitations under the License.
 package backup
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -31,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/go-logfmt/logfmt"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
@@ -65,47 +64,43 @@ func (l *LogsOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&l.CaCertFile, "cacert", l.CaCertFile, "Path to a certificate bundle to use when verifying TLS connections.")
 }
 
-func coloredLevel(level string) string {
+func getLevelColor(level string) *color.Color {
 	switch level {
 	case "info":
-		return color.GreenString("info")
+		return color.New(color.FgGreen)
 	case "warning":
-		return color.YellowString("warning")
+		return color.New(color.FgYellow)
 	case "error":
-		return color.RedString("error")
+		return color.New(color.FgRed)
 	case "debug":
-		return color.BlueString("debug")
+		return color.New(color.FgBlue)
 	default:
-		return level
+		return color.New()
 	}
 }
 
-
 // Process logs (by adding color) before printing them
 func processAndPrintLogs(r io.Reader, w io.Writer) {
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		// Read line
-		line := scanner.Text()
-
-		// Get level position
-		levelPrefixSize := len("level=")
-		levelStart := strings.Index(line, "level=")
-		levelSize := strings.Index(line[levelStart+levelPrefixSize:], " ")
-		if levelStart == -1 || levelSize == -1 {
-			// No space after level found, print as-is
-			fmt.Fprintln(w, line)
-			continue
+	d := logfmt.NewDecoder(r)
+	for d.ScanRecord() { // get record (line)
+		// Scan fields and get color
+		var fields [][2][]byte
+		var lineColor *color.Color
+		for d.ScanKeyval() {
+			fields = append(fields, [2][]byte{d.Key(), d.Value()})
+			if string(d.Key()) == "level" {
+				lineColor = getLevelColor(string(d.Value()))
+			}
 		}
 
-		// Get and color level
-		level := line[levelStart+levelPrefixSize : levelStart+levelPrefixSize+levelSize]
-		level = coloredLevel(level)
-
-		// Print line with colored level
-		fmt.Fprint(w, line[:levelStart+levelPrefixSize])
-		fmt.Fprint(w, level)
-		fmt.Fprint(w, line[levelStart+levelPrefixSize+levelSize:])
+		// Re-encode with color. We do not use logfmt Encoder because it does not support color
+		for _, field := range fields {
+			if lineColor == nil { // handle case where no color (log level) was found
+				fmt.Fprintf(w, "%s=%s ", field[0], field[1])
+			} else {
+				fmt.Fprintf(w, "%s=%s ", lineColor.Sprintf("%s", field[0]), field[1])
+			}
+		}
 		fmt.Fprintln(w)
 	}
 }
