@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/fatih/color"
 	"github.com/go-logfmt/logfmt"
@@ -25,6 +27,11 @@ func getLevelColor(level string) *color.Color {
 	}
 }
 
+// https://github.com/go-logfmt/logfmt/blob/e5396c6ee35145aead27da56e7921a7656f69624/encode.go#L235
+func needsQuotedValueRune(r rune) bool {
+	return r <= ' ' || r == '=' || r == '"' || r == 0x7f || r == utf8.RuneError
+}
+
 // Process logs (by adding color) before printing them
 func processAndPrintLogs(r io.Reader, w io.Writer) error {
 	d := logfmt.NewDecoder(r)
@@ -41,18 +48,21 @@ func processAndPrintLogs(r io.Reader, w io.Writer) error {
 
 		// Re-encode with color. We do not use logfmt Encoder because it does not support color
 		for _, field := range fields {
-			var key, value string
-			if lineColor == nil { // handle case where no color (log level) was found
-				key = string(field[0])
-				value = string(field[1])
-			} else {
-				key = lineColor.Sprintf("%s", field[0])
-				if string(field[0]) == "level" {
+			key := string(field[0])
+			value := string(field[1])
+
+			// Quote if needed
+			if strings.IndexFunc(value, needsQuotedValueRune) != -1 {
+				value = fmt.Sprintf("%q", value)
+			}
+
+			// Add color
+			if lineColor != nil { // handle case where no color (log level) was found
+				if key == "level" {
 					colorCopy := *lineColor
-					value = colorCopy.Add(color.Bold).Sprintf("%s", field[1])
-				} else {
-					value = string(field[1])
+					value = colorCopy.Add(color.Bold).Sprintf("%s", value)
 				}
+				key = lineColor.Sprintf("%s", field[0])
 			}
 			fmt.Fprintf(w, "%s=%s ", key, value)
 		}
