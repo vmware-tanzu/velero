@@ -31,6 +31,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/cacert"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 )
 
 func NewLogsCommand(f client.Factory) *cobra.Command {
@@ -77,7 +78,10 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 				bslCACert = ""
 			}
 
-			err = downloadrequest.StreamWithBSLCACert(context.Background(), kbClient, f.Namespace(), restoreName, velerov1api.DownloadTargetKindRestoreLog, os.Stdout, timeout, insecureSkipTLSVerify, caCertFile, bslCACert)
+			w, wg := output.PrintLogsWithColor()
+			err = downloadrequest.StreamWithBSLCACert(context.Background(), kbClient, f.Namespace(), restoreName, velerov1api.DownloadTargetKindRestoreLog, w, timeout, insecureSkipTLSVerify, caCertFile, bslCACert)
+			w.Close() // signal we're done writing
+			wg.Wait() // wait for all logs to be processed and printed
 			cmd.CheckError(err)
 		},
 	}
