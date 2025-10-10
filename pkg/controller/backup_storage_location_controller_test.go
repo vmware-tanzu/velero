@@ -303,3 +303,81 @@ func TestBSLReconcile(t *testing.T) {
 		})
 	}
 }
+
+func TestSanitizeStorageError(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    error
+		expected string
+	}{
+		{
+			name:     "Nil error",
+			input:    nil,
+			expected: "",
+		},
+		{
+			name:     "Simple error without Azure formatting",
+			input:    errors.New("simple error message"),
+			expected: "simple error message",
+		},
+		{
+			name:     "AWS style error",
+			input:    errors.New("NoSuchBucket: The specified bucket does not exist"),
+			expected: "NoSuchBucket: The specified bucket does not exist",
+		},
+		{
+			name: "Azure container not found error with full HTTP response",
+			input: errors.New(`rpc error: code = Unknown desc = GET https://oadp100711zl59k.blob.core.windows.net/oadp100711zl59k1
+--------------------------------------------------------------------------------
+RESPONSE 404: 404 The specified container does not exist.
+ERROR CODE: ContainerNotFound
+--------------------------------------------------------------------------------
+<?xml version="1.0" encoding="utf-8"?><Error><Code>ContainerNotFound</Code><Message>The specified container does not exist.
+RequestId:63cf34d8-801e-0078-09b4-2e4682000000
+Time:2024-11-04T12:23:04.5623627Z</Message></Error>
+--------------------------------------------------------------------------------
+`),
+			expected: "rpc error: code = Unknown desc = ContainerNotFound: The specified container does not exist.",
+		},
+		{
+			name: "Azure blob not found error",
+			input: errors.New(`rpc error: code = Unknown desc = GET https://storage.blob.core.windows.net/container/blob
+--------------------------------------------------------------------------------
+RESPONSE 404: 404 The specified blob does not exist.
+ERROR CODE: BlobNotFound
+--------------------------------------------------------------------------------
+<?xml version="1.0" encoding="utf-8"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.
+RequestId:12345678-1234-1234-1234-123456789012
+Time:2024-11-04T12:23:04.5623627Z</Message></Error>
+--------------------------------------------------------------------------------
+`),
+			expected: "rpc error: code = Unknown desc = BlobNotFound: The specified blob does not exist.",
+		},
+		{
+			name: "Azure error with plain text response (no XML)",
+			input: errors.New(`rpc error: code = Unknown desc = GET https://storage.blob.core.windows.net/container
+--------------------------------------------------------------------------------
+RESPONSE 404: 404 The specified container does not exist.
+ERROR CODE: ContainerNotFound
+--------------------------------------------------------------------------------
+`),
+			expected: "rpc error: code = Unknown desc = ContainerNotFound: The specified container does not exist.",
+		},
+		{
+			name: "Azure error without XML message but with error code",
+			input: errors.New(`rpc error: code = Unknown desc = operation failed
+RESPONSE 403: 403 Forbidden
+ERROR CODE: AuthorizationFailure
+--------------------------------------------------------------------------------
+`),
+			expected: "rpc error: code = Unknown desc = AuthorizationFailure: Forbidden",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := sanitizeStorageError(test.input)
+			assert.Equal(t, test.expected, actual)
+		})
+	}
+}
