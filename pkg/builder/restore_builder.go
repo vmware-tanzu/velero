@@ -171,3 +171,9 @@ func (b *RestoreBuilder) ItemOperationTimeout(timeout time.Duration) *RestoreBui
 	b.object.Spec.ItemOperationTimeout.Duration = timeout
 	return b
 }
+
+// DisabledPVReprovisioningStorageClasses appends to the Restore's disabled PV re-rpovisioning StorageClasses.
+func (b *RestoreBuilder) DisabledPVReprovisioningStorageClasses(storageClasses ...string) *RestoreBuilder {
+	b.object.Spec.DisabledPVReprovisioningStorageClasses = append(b.object.Spec.DisabledPVReprovisioningStorageClasses, storageClasses...)
+	return b
+}

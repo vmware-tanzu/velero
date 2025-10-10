@@ -201,6 +201,27 @@ func TestRestorePVWithVolumeInfo(t *testing.T) {
 			},
 		},
 		{
+			name:    "Restore PV with ClaimPolicy as Delete and Disabled Re-provisioning",
+			restore: defaultRestore().DisabledPVReprovisioningStorageClasses("no-reprovisioning").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").StorageClass("no-reprovisioning").ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).Result(),
+				).Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+			},
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
+				"pv-1": {
+					PVName:  "pv-1",
+					Skipped: true,
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.PVs(): {"/pv-1"},
+			},
+		},
+		{
 			name:    "Restore PV with ClaimPolicy as Retain",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
@@ -2467,6 +2488,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 		wantError               bool
 		wantWarning             bool
 		csiFeatureVerifierErr   string
+		volumeInfoMap           map[string]volume.BackupVolumeInfo
 	}{
 		{
 			name:    "when a PV with a reclaim policy of delete has no snapshot and does not exist in-cluster, it does not get restored, and its PVC gets reset for dynamic provisioning",
@@ -3193,6 +3215,172 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			})).Result(),
 			want: []*test.APIResource{},
 		},
+		{
+			name:    "when a PV with a reclaim policy of delete has no snapshot does not exist in-cluster and has a StorageClass that disable re-provisioning, it gets restored, with its claim ref",
+			restore: defaultRestore().DisabledPVReprovisioningStorageClasses("no-reprovisioning").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").
+						StorageClass("no-reprovisioning").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).
+						ClaimRef("ns-1", "pvc-1").
+						Result(),
+				).
+				AddItems("persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").
+						VolumeName("pv-1").
+						ObjectMeta(
+							builder.WithAnnotations("pv.kubernetes.io/bind-completed", "true", "pv.kubernetes.io/bound-by-controller", "true", "foo", "bar"),
+						).
+						Result(),
+				).
+				Done(),
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
+				"pv-1": {
+					PVName:  "pv-1",
+					Skipped: true,
+				},
+			},
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						StorageClass("no-reprovisioning").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						ClaimRef("ns-1", "pvc-1").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").
+						VolumeName("pv-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+							builder.WithAnnotations("foo", "bar"),
+						).
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of retain has no snapshot does not exist in-cluster and has a StorageClass that disable re-provisioning, it gets restored, with its claim ref",
+			restore: defaultRestore().DisabledPVReprovisioningStorageClasses("no-reprovisioning").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").
+						StorageClass("no-reprovisioning").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						ClaimRef("ns-1", "pvc-1").
+						Result(),
+				).
+				AddItems("persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").
+						VolumeName("pv-1").
+						ObjectMeta(
+							builder.WithAnnotations("pv.kubernetes.io/bind-completed", "true", "pv.kubernetes.io/bound-by-controller", "true", "foo", "bar"),
+						).
+						Result(),
+				).
+				Done(),
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
+				"pv-1": {
+					PVName:  "pv-1",
+					Skipped: true,
+				},
+			},
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						StorageClass("no-reprovisioning").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						ClaimRef("ns-1", "pvc-1").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").
+						VolumeName("pv-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+							builder.WithAnnotations("foo", "bar"),
+						).
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of delete has a snapshot does not exist in-cluster and has a StorageClass that disable re-provisioning, the snapshot and PV are restored",
+			restore: defaultRestore().DisabledPVReprovisioningStorageClasses("no-reprovisioning").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: test.NewTarWriter(t).
+				AddItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").
+						StorageClass("no-reprovisioning").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				).
+				Done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
+			},
+			volumeSnapshotterGetter: map[string]vsv1.VolumeSnapshotter{
+				"provider-1": &volumeSnapshotter{
+					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
+				},
+			},
+			volumeInfoMap: map[string]volume.BackupVolumeInfo{
+				"pv-1": {
+					BackupMethod: volume.NativeSnapshot,
+					PVName:       "pv-1",
+					NativeSnapshotInfo: &volume.NativeSnapshotInfo{
+						SnapshotHandle: "testSnapshotHandle",
+					},
+				},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						StorageClass("no-reprovisioning").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).
+						AWSEBSVolumeID("new-volume").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						Result(),
+				),
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -3236,6 +3424,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				BackupReader:             tc.tarball,
 				CSIVolumeSnapshots:       tc.csiVolumeSnapshots,
 				RestoreVolumeInfoTracker: volume.NewRestoreVolInfoTracker(tc.restore, h.log, test.NewFakeControllerRuntimeClient(t)),
+				BackupVolumeInfoMap:      tc.volumeInfoMap,
 			}
 			warnings, errs := h.restorer.Restore(
 				data,

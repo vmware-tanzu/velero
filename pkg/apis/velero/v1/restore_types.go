@@ -129,6 +129,13 @@ type RestoreSpec struct {
 	// +optional
 	// +nullable
 	UploaderConfig *UploaderConfigForRestore `json:"uploaderConfig,omitempty"`
+
+	// DisabledPVReprovisioningStorageClasses is a slice of StorageClasses names.
+	// PV without snapshot and having one of these StorageClass will not be
+	// re-provisionned (even when ReclaimPolicy is Delete).
+	// +optional
+	// +nullable
+	DisabledPVReprovisioningStorageClasses []string `json:"disabledPVReprovisioningStorageClasses,omitempty"`
 }
 
 // UploaderConfigForRestore defines the configuration for the restore.
