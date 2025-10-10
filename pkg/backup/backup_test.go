@@ -4055,6 +4055,10 @@ func (b *fakePodVolumeBackupper) ListPodVolumeBackupsByPod(podNamespace, podName
 	return pvbs, nil
 }
 
+func (b *fakePodVolumeBackupper) CancelAllPodVolumeBackups() ([]*velerov1.PodVolumeBackup, error) {
+	return b.pvbs, nil
+}
+
 // TestBackupWithPodVolume runs backups of pods that are annotated for PodVolume backup,
 // and ensures that the pod volume backupper is called, that the returned PodVolumeBackups
 // are added to the Request object, and that when PVCs are backed up with PodVolume, the

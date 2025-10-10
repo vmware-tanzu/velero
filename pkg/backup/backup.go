@@ -164,7 +164,6 @@ func checkCancelRequest(ctx context.Context, kbClient kbclient.Client, request *
 	// Check if enough time has passed since the last check
 	if now.Sub(request.LastCancelCheck) < cancelCheckInterval {
 		// Not enough time has passed, return the current cancel state
-		log.Info("Not enough time has passed since the last check, returning the current cancel state")
 		return request.Cancel
 	}
 
@@ -642,15 +641,8 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	// If canclled, can we call a version of this which cancels all the PVBs?
 	if cancelled {
 		// todo: Cancel all the PVBs
-		// 1.List PVBs owned by the backup: matching labels
-
-		// 2. Set spec cancel to true for each PVB
-
-		// The following line is called below: this will wait for all the PVBs to be processed, either by completion or cancellation
-		// And so we don't need to wait for all the PVBs here
-		// processedPVBs := itemBackupper.podVolumeBackupper.WaitAllPodVolumesProcessed(log)
-
-		// With this our work here is done: proceed from backup_controller
+		// Best effort, if PVB controller cancels, great.
+		itemBackupper.podVolumeBackupper.CancelAllPodVolumeBackups()
 
 	}
 

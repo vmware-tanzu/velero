@@ -763,7 +763,7 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	// Any errors on operations at this point should be added to backup errors.
 	// If any operations are still not complete, then back will not be set to
 	// Completed yet.
-	inProgressOperations, _, opsCompleted, opsFailed, errs := getBackupItemOperationProgress(backup.Backup, pluginManager, *backup.GetItemOperationsList())
+	inProgressOperations, _, opsCompleted, opsFailed, errs := getBackupItemOperationProgress(backup.Backup, pluginManager, *backup.GetItemOperationsList(), backupLog)
 	if len(errs) > 0 {
 		for _, err := range errs {
 			backupLog.Error(err)
@@ -802,7 +802,6 @@ func (b *backupReconciler) runBackup(backup *pkgbackup.Request) error {
 	case backup.Cancel: // Check cancellation first
 		backupLog.Info("Marking backup as cancelling in runBackup")
 		backup.Status.Phase = velerov1api.BackupPhaseCancelling
-	// todo: New case if cancel is true
 	default:
 		if inProgressOperations {
 			backup.Status.Phase = velerov1api.BackupPhaseWaitingForPluginOperations
