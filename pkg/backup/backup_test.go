@@ -5577,7 +5577,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 				CompletionTimestamp(&now).
 				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{VolumeSnapshot: "vs-1"}).
 				SnapshotID("snapshot-id").
-				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000}).
+				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000, IncrementalBytes: 500}).
 				Phase(velerov2alpha1.DataUploadPhaseFailed).
 				SourceNamespace("ns-1").
 				SourcePVC("pvc-1").
@@ -5603,6 +5603,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 						RetainedSnapshot: "vs-1",
 						SnapshotHandle:   "snapshot-id",
 						Size:             1000,
+						IncrementalSize:  500,
 						Phase:            velerov2alpha1.DataUploadPhaseFailed,
 					},
 				},
@@ -5615,7 +5616,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 				CompletionTimestamp(&now).
 				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{VolumeSnapshot: "vs-1"}).
 				SnapshotID("snapshot-id").
-				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000}).
+				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000, IncrementalBytes: 500}).
 				Phase(velerov2alpha1.DataUploadPhaseCompleted).
 				SourceNamespace("ns-1").
 				SourcePVC("pvc-1").
@@ -5641,6 +5642,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 						RetainedSnapshot: "vs-1",
 						SnapshotHandle:   "snapshot-id",
 						Size:             1000,
+						IncrementalSize:  500,
 						Phase:            velerov2alpha1.DataUploadPhaseCompleted,
 					},
 				},
@@ -5654,7 +5656,7 @@ func TestUpdateVolumeInfos(t *testing.T) {
 				CompletionTimestamp(&now).
 				CSISnapshot(&velerov2alpha1.CSISnapshotSpec{VolumeSnapshot: "vs-1"}).
 				SnapshotID("snapshot-id").
-				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000}).
+				Progress(shared.DataMoveOperationProgress{TotalBytes: 1000, IncrementalBytes: 500}).
 				Phase(velerov2alpha1.DataUploadPhaseCompleted).
 				SourceNamespace("ns-1").
 				SourcePVC("pvc-1").

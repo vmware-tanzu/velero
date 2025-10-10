@@ -33,6 +33,11 @@ spec:
       jsonPath: .status.progress.totalBytes
       name: Total Bytes
       type: integer
+    - description: Incremental bytes
+      format: int64
+      jsonPath: .status.progress.incrementalBytes
+      name: Incremental Bytes
+      type: integer
     - description: Name of the Backup Storage Location where this backup should be
         stored
       jsonPath: .spec.backupStorageLocation
@@ -215,6 +220,9 @@ spec:
                   about the backup operation.
                 properties:
                   bytesDone:
+                    format: int64
+                    type: integer
+                  incrementalBytes:
                     format: int64
                     type: integer
                   totalBytes:

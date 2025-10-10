@@ -27,7 +27,6 @@ import (
 
 	"github.com/kopia/kopia/repo"
 	"github.com/kopia/kopia/repo/content"
-	"github.com/kopia/kopia/repo/content/index"
 	"github.com/kopia/kopia/repo/manifest"
 	"github.com/kopia/kopia/repo/object"
 )
@@ -69,9 +68,21 @@ func (sr *shimRepository) OpenObject(ctx context.Context, id object.ID) (object.
 	}, err
 }
 
-// VerifyObject not supported
+// VerifyObject verify specified object
 func (sr *shimRepository) VerifyObject(ctx context.Context, id object.ID) ([]content.ID, error) {
-	return nil, errors.New("VerifyObject is not supported")
+	contentIDs, err := sr.udmRepo.VerifyObject(ctx, udmrepo.ID(id.String()))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to verify object with id %v", id)
+	}
+	returnIDs := []content.ID{}
+	for _, contentID := range contentIDs {
+		returnID, err := content.ParseID(string(contentID))
+		if err != nil {
+			return returnIDs, errors.Wrapf(err, "invalid content ID %v returned for %v: %v", contentID, id, err)
+		}
+		returnIDs = append(returnIDs, returnID)
+	}
+	return returnIDs, nil
 }
 
 // Get one or more manifest data that match the specific manifest id
@@ -141,7 +152,15 @@ func (sr *shimRepository) Refresh(ctx context.Context) error {
 
 // ContentInfo not supported
 func (sr *shimRepository) ContentInfo(ctx context.Context, contentID content.ID) (content.Info, error) {
-	return index.Info{}, errors.New("ContentInfo is not supported")
+	info, err := sr.udmRepo.ContentInfo(ctx, udmrepo.ID(contentID.String()))
+	if err != nil {
+		return content.Info{}, errors.Wrapf(err, "failed to get content info for %v", contentID)
+	}
+	contentInfo, ok := info.(content.Info)
+	if !ok {
+		return content.Info{}, errors.New("failed to get content info, wrong type returned")
+	}
+	return contentInfo, nil
 }
 
 // PrefetchContents is not supported by unified repo

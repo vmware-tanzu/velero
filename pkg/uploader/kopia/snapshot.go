@@ -53,6 +53,7 @@ var loadSnapshotFunc = snapshot.LoadSnapshot
 var listSnapshotsFunc = snapshot.ListSnapshots
 var filesystemEntryFunc = snapshotfs.FilesystemEntryFromIDWithPath
 var restoreEntryFunc = restore.Entry
+var storageStatsFunc = snapshotfs.CalculateStorageStats
 
 const UploaderConfigMultipartKey = "uploader-multipart"
 const MaxErrorReported = 10
@@ -188,12 +189,12 @@ func Backup(ctx context.Context, fsUploader SnapshotUploader, repoWriter repo.Re
 
 	kopiaCtx := kopia.SetupKopiaLog(ctx, log)
 
-	snapID, snapshotSize, err := SnapshotSource(kopiaCtx, repoWriter, fsUploader, sourceInfo, sourceEntry, forceFull, parentSnapshot, tags, uploaderCfg, log, "Kopia Uploader")
+	snapID, snapshotSize, incrementalSize, err := SnapshotSource(kopiaCtx, repoWriter, fsUploader, sourceInfo, sourceEntry, forceFull, parentSnapshot, tags, uploaderCfg, log, "Kopia Uploader")
 	snapshotInfo := &uploader.SnapshotInfo{
-		ID:   snapID,
-		Size: snapshotSize,
+		ID:              snapID,
+		Size:            snapshotSize,
+		IncrementalSize: incrementalSize,
 	}
-
 	return snapshotInfo, false, err
 }
 
@@ -238,7 +239,7 @@ func SnapshotSource(
 	uploaderCfg map[string]string,
 	log logrus.FieldLogger,
 	description string,
-) (string, int64, error) {
+) (string, int64, int64, error) {
 	log.Info("Start to snapshot...")
 	snapshotStartTime := time.Now()
 
@@ -258,7 +259,7 @@ func SnapshotSource(
 
 			pre, err := findPreviousSnapshotManifest(ctx, rep, sourceInfo, snapshotTags, nil, log)
 			if err != nil {
-				return "", 0, errors.Wrapf(err, "Failed to find previous kopia snapshot manifests for si %v", sourceInfo)
+				return "", 0, 0, errors.Wrapf(err, "Failed to find previous kopia snapshot manifests for si %v", sourceInfo)
 			}
 
 			previous = pre
@@ -273,12 +274,12 @@ func SnapshotSource(
 
 	policyTree, err := setupPolicy(ctx, rep, sourceInfo, uploaderCfg)
 	if err != nil {
-		return "", 0, errors.Wrapf(err, "unable to set policy for si %v", sourceInfo)
+		return "", 0, 0, errors.Wrapf(err, "unable to set policy for si %v", sourceInfo)
 	}
 
 	manifest, err := u.Upload(ctx, rootDir, policyTree, sourceInfo, previous...)
 	if err != nil {
-		return "", 0, errors.Wrapf(err, "Failed to upload the kopia snapshot for si %v", sourceInfo)
+		return "", 0, 0, errors.Wrapf(err, "Failed to upload the kopia snapshot for si %v", sourceInfo)
 	}
 
 	manifest.Tags = snapshotTags
@@ -287,26 +288,37 @@ func SnapshotSource(
 	manifest.Pins = []string{"velero-pin"}
 
 	if _, err = saveSnapshotFunc(ctx, rep, manifest); err != nil {
-		return "", 0, errors.Wrapf(err, "Failed to save kopia manifest %v", manifest.ID)
+		return "", 0, 0, errors.Wrapf(err, "Failed to save kopia manifest %v", manifest.ID)
 	}
 
 	_, err = applyRetentionPolicyFunc(ctx, rep, sourceInfo, true)
 	if err != nil {
-		return "", 0, errors.Wrapf(err, "Failed to apply kopia retention policy for si %v", sourceInfo)
+		return "", 0, 0, errors.Wrapf(err, "Failed to apply kopia retention policy for si %v", sourceInfo)
 	}
 
 	if err = rep.Flush(ctx); err != nil {
-		return "", 0, errors.Wrapf(err, "Failed to flush kopia repository")
+		return "", 0, 0, errors.Wrapf(err, "Failed to flush kopia repository")
 	}
 	log.Infof("Created snapshot with root %v and ID %v in %v", manifest.RootObjectID(), manifest.ID, time.Since(snapshotStartTime).Truncate(time.Second))
-	return reportSnapshotStatus(manifest, policyTree)
+	return reportSnapshotStatus(ctx, rep, manifest, policyTree, sourceInfo, log)
 }
 
-func reportSnapshotStatus(manifest *snapshot.Manifest, policyTree *policy.Tree) (string, int64, error) {
+func reportSnapshotStatus(
+	ctx context.Context,
+	rep repo.RepositoryWriter,
+	manifest *snapshot.Manifest,
+	policyTree *policy.Tree,
+	sourceInfo snapshot.SourceInfo,
+	log logrus.FieldLogger,
+) (string, int64, int64, error) {
 	manifestID := manifest.ID
 	snapSize := manifest.Stats.TotalFileSize
-
 	var errs []string
+	incrementalSize, err := findIncrementalSize(ctx, rep, sourceInfo, manifestID, log)
+	if err != nil {
+		errs = append(errs, fmt.Sprintf("Error finding incremental size: %v", err.Error()))
+	}
+
 	if ds := manifest.RootEntry.DirSummary; ds != nil {
 		for _, ent := range ds.FailedEntries {
 			if len(errs) > MaxErrorReported {
@@ -321,10 +333,10 @@ func reportSnapshotStatus(manifest *snapshot.Manifest, policyTree *policy.Tree) 
 	}
 
 	if len(errs) != 0 {
-		return string(manifestID), snapSize, errors.New(strings.Join(errs, "\n"))
+		return string(manifestID), snapSize, incrementalSize, errors.New(strings.Join(errs, "\n"))
 	}
 
-	return string(manifestID), snapSize, nil
+	return string(manifestID), snapSize, incrementalSize, nil
 }
 
 // findPreviousSnapshotManifest returns the list of previous snapshots for a given source, including
@@ -373,6 +385,35 @@ func findPreviousSnapshotManifest(ctx context.Context, rep repo.Repository, sour
 	}
 
 	return result, nil
+}
+
+// findIncrementalSize returns incremental size info for a snapshotID
+func findIncrementalSize(
+	ctx context.Context,
+	rep repo.Repository,
+	sourceInfo snapshot.SourceInfo,
+	snapshotID manifest.ID,
+	log logrus.FieldLogger,
+) (int64, error) {
+	var incrementalSize int64
+	man, err := listSnapshotsFunc(ctx, rep, sourceInfo)
+	if err != nil || len(man) == 0 {
+		log.Debugf("No snapshots found or err %v", err)
+		return incrementalSize, err
+	}
+	man = snapshot.SortByTime(man, false)
+
+	err = storageStatsFunc(ctx, rep, man, func(m *snapshot.Manifest) error {
+		if m.ID == snapshotID {
+			if m.StorageStats != nil {
+				incrementalSize = m.StorageStats.NewData.PackedContentBytes
+			}
+			return errors.New("done")
+		}
+		return nil
+	})
+	log.Debugf("storageStatsFunc returned %v", err)
+	return incrementalSize, nil
 }
 
 // Restore restore specific sourcePath with given snapshotID and update progress

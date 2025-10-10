@@ -101,6 +101,10 @@ type BackupRepo interface {
 	// id: the object's unified identifier.
 	OpenObject(ctx context.Context, id ID) (ObjectReader, error)
 
+	// VerifyObject verifies an existing object
+	// id: the object's unified identifier.
+	VerifyObject(ctx context.Context, id ID) ([]ID, error)
+
 	// GetManifest gets a manifest data from the backup repository.
 	GetManifest(ctx context.Context, id ID, mani *RepoManifest) error
 
@@ -119,6 +123,10 @@ type BackupRepo interface {
 
 	// Flush flushes all the backup repository data
 	Flush(ctx context.Context) error
+
+	// ContentInfo gets info for specific content
+	// contentID: the content ID
+	ContentInfo(ctx context.Context, contentID ID) (any, error)
 
 	// GetAdvancedFeatures returns the support for advanced features
 	GetAdvancedFeatures() AdvancedFeatureInfo

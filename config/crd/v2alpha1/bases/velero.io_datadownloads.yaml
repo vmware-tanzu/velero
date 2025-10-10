@@ -188,6 +188,9 @@ spec:
                   bytesDone:
                     format: int64
                     type: integer
+                  incrementalBytes:
+                    format: int64
+                    type: integer
                   totalBytes:
                     format: int64
                     type: integer

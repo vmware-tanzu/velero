@@ -66,7 +66,17 @@ func injectSnapshotFuncs() *snapshotMockes {
 	treeForSourceFunc = s.policyMock.TreeForSource
 	loadSnapshotFunc = s.snapshotMock.LoadSnapshot
 	saveSnapshotFunc = s.snapshotMock.SaveSnapshot
+	storageStatsFunc = mockStorageStats
 	return s
+}
+
+func mockStorageStats(ctx context.Context, rep repo.Repository, manifests []*snapshot.Manifest, callback func(m *snapshot.Manifest) error) error {
+	for _, m := range manifests {
+		if err := callback(m); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func MockFuncs(s *snapshotMockes, args []mockArgs) {
@@ -199,8 +209,9 @@ func TestSnapshotSource(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			s := injectSnapshotFuncs()
+			s.repoWriterMock.On("FindManifests", mock.Anything, mock.Anything).Return(nil, nil)
 			MockFuncs(s, tc.args)
-			_, _, err = SnapshotSource(ctx, s.repoWriterMock, s.uploderMock, sourceInfo, rootDir, false, "/", nil, tc.uploaderCfg, log, "TestSnapshotSource")
+			_, _, _, err = SnapshotSource(ctx, s.repoWriterMock, s.uploderMock, sourceInfo, rootDir, false, "/", nil, tc.uploaderCfg, log, "TestSnapshotSource")
 			if tc.notError {
 				assert.NoError(t, err)
 			} else {
@@ -211,25 +222,36 @@ func TestSnapshotSource(t *testing.T) {
 }
 
 func TestReportSnapshotStatus(t *testing.T) {
+	log := logrus.New()
+	ctx := t.Context()
+	sourceInfo := snapshot.SourceInfo{
+		UserName: "testUserName",
+		Host:     "testHost",
+		Path:     "/var",
+	}
+	s := injectSnapshotFuncs()
 	testCases := []struct {
-		shouldError      bool
-		expectedResult   string
-		expectedSize     int64
-		directorySummary *fs.DirectorySummary
-		expectedErrors   []string
+		shouldError         bool
+		expectedResult      string
+		expectedSize        int64
+		expectedIncremental int64
+		directorySummary    *fs.DirectorySummary
+		expectedErrors      []string
 	}{
 		{
-			shouldError:    false,
-			expectedResult: "sample-manifest-id",
-			expectedSize:   1024,
+			shouldError:         false,
+			expectedResult:      "sample-manifest-id",
+			expectedSize:        1024,
+			expectedIncremental: 512,
 			directorySummary: &fs.DirectorySummary{
 				TotalFileSize: 1024,
 			},
 		},
 		{
-			shouldError:    true,
-			expectedResult: "sample-manifest-id",
-			expectedSize:   1024,
+			shouldError:         true,
+			expectedResult:      "sample-manifest-id",
+			expectedSize:        1024,
+			expectedIncremental: 512,
 			directorySummary: &fs.DirectorySummary{
 				FailedEntries: []*fs.EntryWithError{
 					{
@@ -243,17 +265,26 @@ func TestReportSnapshotStatus(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		manifest := &snapshot.Manifest{
+		man := &snapshot.Manifest{
 			ID: manifest.ID("sample-manifest-id"),
 			Stats: snapshot.Stats{
 				TotalFileSize: 1024,
+			},
+			StorageStats: &snapshot.StorageStats{
+				NewData: snapshot.StorageUsageDetails{
+					OriginalContentBytes: 256,
+					PackedContentBytes:   512,
+				},
 			},
 			RootEntry: &snapshot.DirEntry{
 				DirSummary: tc.directorySummary,
 			},
 		}
 
-		result, size, err := reportSnapshotStatus(manifest, policy.BuildTree(nil, getDefaultPolicy()))
+		listSnapshotsFunc = func(ctx context.Context, rep repo.Repository, si snapshot.SourceInfo) ([]*snapshot.Manifest, error) {
+			return []*snapshot.Manifest{man}, nil
+		}
+		result, size, incrementalSize, err := reportSnapshotStatus(ctx, s.repoWriterMock, man, policy.BuildTree(nil, getDefaultPolicy()), sourceInfo, log)
 
 		switch {
 		case tc.shouldError && err == nil:
@@ -273,6 +304,10 @@ func TestReportSnapshotStatus(t *testing.T) {
 
 		if size != tc.expectedSize {
 			t.Errorf("unexpected size: got %v, want %v", size, tc.expectedSize)
+		}
+
+		if incrementalSize != tc.expectedIncremental {
+			t.Errorf("unexpected incremental size: got %v, want %v", incrementalSize, tc.expectedIncremental)
 		}
 	}
 }

@@ -613,7 +613,7 @@ func (r *DataUploadReconciler) OnDataUploadProgress(ctx context.Context, namespa
 	log := r.logger.WithField("dataupload", duName)
 
 	if err := UpdateDataUploadWithRetry(ctx, r.client, types.NamespacedName{Namespace: namespace, Name: duName}, log, func(du *velerov2alpha1api.DataUpload) bool {
-		du.Status.Progress = shared.DataMoveOperationProgress{TotalBytes: progress.TotalBytes, BytesDone: progress.BytesDone}
+		du.Status.Progress = shared.DataMoveOperationProgress{TotalBytes: progress.TotalBytes, BytesDone: progress.BytesDone, IncrementalBytes: progress.IncrementalBytes}
 		return true
 	}); err != nil {
 		log.WithError(err).Error("Failed to update progress")

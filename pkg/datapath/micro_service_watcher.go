@@ -397,6 +397,7 @@ func getCompletionProgressFromResult(taskType string, result Result) *uploader.P
 	if taskType == TaskTypeBackup {
 		progress.BytesDone = result.Backup.TotalBytes
 		progress.TotalBytes = result.Backup.TotalBytes
+		progress.IncrementalBytes = result.Backup.IncrementalBytes
 	} else {
 		progress.BytesDone = result.Restore.TotalBytes
 		progress.TotalBytes = result.Restore.TotalBytes

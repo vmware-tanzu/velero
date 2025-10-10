@@ -41,10 +41,12 @@ func TestShimRepo(t *testing.T) {
 	shim := NewShimRepo(backupRepo)
 	// All below calls put together for the implementation are empty or just very simple, and just want to cover testing
 	// If wanting to write unit tests for some functions could remove it and with writing new function alone
+	backupRepo.On("VerifyObject", mock.Anything, mock.Anything).Return(nil, nil)
 	shim.VerifyObject(ctx, object.ID{})
 	shim.Time()
 	shim.ClientOptions()
 	shim.Refresh(ctx)
+	backupRepo.On("ContentInfo", mock.Anything, mock.Anything).Return(content.Info{}, nil)
 	shim.ContentInfo(ctx, content.ID{})
 	shim.PrefetchContents(ctx, []content.ID{}, "hint")
 	shim.PrefetchObjects(ctx, []object.ID{}, "hint")

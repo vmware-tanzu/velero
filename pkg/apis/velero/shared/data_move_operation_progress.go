@@ -25,5 +25,8 @@ type DataMoveOperationProgress struct {
 	TotalBytes int64 `json:"totalBytes,omitempty"`
 
 	// +optional
+	IncrementalBytes int64 `json:"incrementalBytes,omitempty"`
+
+	// +optional
 	BytesDone int64 `json:"bytesDone,omitempty"`
 }

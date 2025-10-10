@@ -25,6 +25,7 @@ import (
 
 	"github.com/kopia/kopia/repo"
 	"github.com/kopia/kopia/repo/compression"
+	"github.com/kopia/kopia/repo/content"
 	"github.com/kopia/kopia/repo/content/index"
 	"github.com/kopia/kopia/repo/maintenance"
 	"github.com/kopia/kopia/repo/manifest"
@@ -252,6 +253,45 @@ func (kr *kopiaRepository) OpenObject(ctx context.Context, id udmrepo.ID) (udmre
 	return &kopiaObjectReader{
 		rawReader: reader,
 	}, nil
+}
+
+func (kr *kopiaRepository) VerifyObject(ctx context.Context, id udmrepo.ID) ([]udmrepo.ID, error) {
+	if kr.rawRepo == nil {
+		return nil, errors.New("repo is closed or not open")
+	}
+
+	objID, err := object.ParseID(string(id))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing object ID from %v", id)
+	}
+
+	contentIDs, err := kr.rawRepo.VerifyObject(kopia.SetupKopiaLog(ctx, kr.logger), objID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error verifying object")
+	}
+
+	returnIDs := []udmrepo.ID{}
+	for _, id := range contentIDs {
+		returnIDs = append(returnIDs, udmrepo.ID(id.String()))
+	}
+	return returnIDs, nil
+}
+
+func (kr *kopiaRepository) ContentInfo(ctx context.Context, contentID udmrepo.ID) (any, error) {
+	if kr.rawRepo == nil {
+		return content.Info{}, errors.New("repo is closed or not open")
+	}
+
+	contID, err := content.ParseID(string(contentID))
+	if err != nil {
+		return content.Info{}, errors.Wrapf(err, "error parsing content ID from %v", contentID)
+	}
+
+	info, err := kr.rawRepo.ContentInfo(kopia.SetupKopiaLog(ctx, kr.logger), contID)
+	if err != nil {
+		return content.Info{}, errors.Wrap(err, "error getting content info")
+	}
+	return info, nil
 }
 
 func (kr *kopiaRepository) GetManifest(ctx context.Context, id udmrepo.ID, mani *udmrepo.RepoManifest) error {
