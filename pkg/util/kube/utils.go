@@ -371,15 +371,16 @@ func VerifyJSONConfigs(ctx context.Context, namespace string, crClient client.Cl
 		return errors.Errorf("data is not available in ConfigMap %s", configName)
 	}
 
+	// Verify all the keys in ConfigMap's data.
 	jsonString := ""
 	for _, v := range cm.Data {
 		jsonString = v
-	}
 
-	configs := configType
-	err = json.Unmarshal([]byte(jsonString), configs)
-	if err != nil {
-		return errors.Wrapf(err, "error to unmarshall data from ConfigMap %s", configName)
+		configs := configType
+		err = json.Unmarshal([]byte(jsonString), configs)
+		if err != nil {
+			return errors.Wrapf(err, "error to unmarshall data from ConfigMap %s", configName)
+		}
 	}
 
 	return nil

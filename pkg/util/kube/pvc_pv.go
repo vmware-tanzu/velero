@@ -463,8 +463,18 @@ func GetPVCForPodVolume(vol *corev1api.Volume, pod *corev1api.Pod, crClient crcl
 	return pvc, nil
 }
 
-func DiagnosePVC(pvc *corev1api.PersistentVolumeClaim) string {
-	return fmt.Sprintf("PVC %s/%s, phase %s, binding to %s\n", pvc.Namespace, pvc.Name, pvc.Status.Phase, pvc.Spec.VolumeName)
+func DiagnosePVC(pvc *corev1api.PersistentVolumeClaim, events *corev1api.EventList) string {
+	diag := fmt.Sprintf("PVC %s/%s, phase %s, binding to %s\n", pvc.Namespace, pvc.Name, pvc.Status.Phase, pvc.Spec.VolumeName)
+
+	if events != nil {
+		for _, e := range events.Items {
+			if e.InvolvedObject.UID == pvc.UID && e.Type == corev1api.EventTypeWarning {
+				diag += fmt.Sprintf("PVC event reason %s, message %s\n", e.Reason, e.Message)
+			}
+		}
+	}
+
+	return diag
 }
 
 func DiagnosePV(pv *corev1api.PersistentVolume) string {
@@ -553,4 +563,20 @@ func GetPVAttachedNode(ctx context.Context, pv string, storageClient storagev1.S
 	}
 
 	return "", nil
+}
+
+func GetPVAttachedNodes(ctx context.Context, pv string, storageClient storagev1.StorageV1Interface) ([]string, error) {
+	vaList, err := storageClient.VolumeAttachments().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error listing volumeattachment")
+	}
+
+	nodes := []string{}
+	for _, va := range vaList.Items {
+		if va.Spec.Source.PersistentVolumeName != nil && *va.Spec.Source.PersistentVolumeName == pv {
+			nodes = append(nodes, va.Spec.NodeName)
+		}
+	}
+
+	return nodes, nil
 }
