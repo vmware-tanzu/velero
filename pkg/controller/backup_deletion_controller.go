@@ -174,6 +174,10 @@ func (r *backupDeletionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if r.backupTracker.Contains(dbr.Namespace, dbr.Spec.BackupName) {
 		err := r.patchDeleteBackupRequestWithError(ctx, dbr, errors.New("backup is still in progress"))
 		return ctrl.Result{}, err
+
+		// Cancellation Scenario: 
+		// Set backup.Spec.Cancel to true
+		// exponential backoff; by the time it comes back, it will be removed from the backup tracker from backup_cancellation_controller
 	}
 
 	// Get the backup we're trying to delete
