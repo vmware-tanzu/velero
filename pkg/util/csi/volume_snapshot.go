@@ -689,7 +689,7 @@ func WaitUntilVSCHandleIsReady(
 	return vsc, nil
 }
 
-func DiagnoseVS(vs *snapshotv1api.VolumeSnapshot) string {
+func DiagnoseVS(vs *snapshotv1api.VolumeSnapshot, events *corev1api.EventList) string {
 	vscName := ""
 	readyToUse := false
 	errMessage := ""
@@ -709,6 +709,14 @@ func DiagnoseVS(vs *snapshotv1api.VolumeSnapshot) string {
 	}
 
 	diag := fmt.Sprintf("VS %s/%s, bind to %s, readyToUse %v, errMessage %s\n", vs.Namespace, vs.Name, vscName, readyToUse, errMessage)
+
+	if events != nil {
+		for _, e := range events.Items {
+			if e.InvolvedObject.UID == vs.UID && e.Type == corev1api.EventTypeWarning {
+				diag += fmt.Sprintf("VS event reason %s, message %s\n", e.Reason, e.Message)
+			}
+		}
+	}
 
 	return diag
 }
