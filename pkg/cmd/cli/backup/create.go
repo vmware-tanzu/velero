@@ -80,7 +80,7 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 
 type CreateOptions struct {
 	Name                            string
-	TTL                             time.Duration
+	TTL                             flag.Duration
 	SnapshotVolumes                 flag.OptionalBool
 	SnapshotMoveData                flag.OptionalBool
 	DataMover                       string
@@ -121,7 +121,7 @@ func NewCreateOptions() *CreateOptions {
 }
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.DurationVar(&o.TTL, "ttl", o.TTL, "How long before the backup can be garbage collected.")
+	flags.Var(&o.TTL, "ttl", "How long before the backup can be garbage collected.")
 	flags.Var(&o.IncludeNamespaces, "include-namespaces", "Namespaces to include in the backup (use '*' for all namespaces).")
 	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "Namespaces to exclude from the backup.")
 	flags.Var(&o.IncludeResources, "include-resources", "Resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources). Cannot work with include-cluster-scoped-resources, exclude-cluster-scoped-resources, include-namespace-scoped-resources and exclude-namespace-scoped-resources.")
@@ -388,7 +388,7 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			ExcludedNamespaceScopedResources(o.ExcludeNamespaceScopedResources...).
 			LabelSelector(o.Selector.LabelSelector).
 			OrLabelSelector(o.OrSelector.OrLabelSelectors).
-			TTL(o.TTL).
+			TTL(o.TTL.Duration).
 			StorageLocation(o.StorageLocation).
 			VolumeSnapshotLocations(o.SnapshotLocations...).
 			CSISnapshotTimeout(o.CSISnapshotTimeout).
