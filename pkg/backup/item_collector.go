@@ -35,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/pager"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
@@ -71,7 +73,7 @@ type itemCollector struct {
 type nsTracker struct {
 	singleLabelSelector labels.Selector
 	orLabelSelector     []labels.Selector
-	namespaceFilter     *collections.IncludesExcludes
+	namespaceFilter     *collections.NamespaceIncludesExcludes
 	logger              logrus.FieldLogger
 
 	namespaceMap map[string]bool
@@ -103,7 +105,7 @@ func (nt *nsTracker) init(
 	unstructuredNSs []unstructured.Unstructured,
 	singleLabelSelector labels.Selector,
 	orLabelSelector []labels.Selector,
-	namespaceFilter *collections.IncludesExcludes,
+	namespaceFilter *collections.NamespaceIncludesExcludes,
 	logger logrus.FieldLogger,
 ) {
 	if nt.namespaceMap == nil {
@@ -448,6 +450,33 @@ func (r *itemCollector) getResourceItems(
 		}
 	}
 
+	// Call ResolveNamespaceList to get the list of namespaces to backup
+	_, wildcardExpansion, err := r.backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList()
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Error("error resolving namespace list")
+		return nil, errors.WithStack(err)
+	}
+
+	if wildcardExpansion {
+		log.Info("Wildcard expansion occurred")
+
+		expandedIncludes := r.backupRequest.NamespaceIncludesExcludes.GetIncludes()
+		expandedExcludes := r.backupRequest.NamespaceIncludesExcludes.GetExcludes()
+
+		// Record the expanded wildcard includes/excludes in the request status
+		r.backupRequest.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
+			IncludeWildcardMatches: expandedIncludes,
+			ExcludeWildcardMatches: expandedExcludes,
+		}
+
+		r.log.WithFields(logrus.Fields{
+			"expandedIncludes": expandedIncludes,
+			"expandedExcludes": expandedExcludes,
+			"includedCount":    len(expandedIncludes),
+			"excludedCount":    len(expandedExcludes),
+		}).Info("Successfully expanded wildcard patterns")
+	}
+
 	// Handle namespace resource here.
 	// Namespace are filtered by namespace include/exclude filters,
 	// backup LabelSelectors and OrLabelSelectors are checked too.
@@ -635,7 +664,7 @@ func coreGroupResourcePriority(resource string) int {
 // getNamespacesToList examines ie and resolves the includes and excludes to a full list of
 // namespaces to list. If ie is nil or it includes *, the result is just "" (list across all
 // namespaces). Otherwise, the result is a list of every included namespace minus all excluded ones.
-func getNamespacesToList(ie *collections.IncludesExcludes) []string {
+func getNamespacesToList(ie *collections.NamespaceIncludesExcludes) []string {
 	if ie == nil {
 		return []string{""}
 	}
@@ -753,21 +782,29 @@ func (r *itemCollector) collectNamespaces(
 	}
 
 	unstructuredList, err := resourceClient.List(metav1.ListOptions{})
+
+	activeNamespacesHashSet := make(map[string]bool)
+	for _, namespace := range unstructuredList.Items {
+		activeNamespacesHashSet[namespace.GetName()] = true
+	}
+
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Error("error list namespaces")
 		return nil, errors.WithStack(err)
 	}
 
-	for _, includedNSName := range r.backupRequest.Backup.Spec.IncludedNamespaces {
+	// Change to look at the struct includes/excludes
+	// In case wildcards are expanded, we need to look at the struct includes/excludes
+	for _, includedNSName := range r.backupRequest.NamespaceIncludesExcludes.GetIncludes() {
+
 		nsExists := false
 		// Skip checking the namespace existing when it's "*".
 		if includedNSName == "*" {
 			continue
 		}
-		for _, unstructuredNS := range unstructuredList.Items {
-			if unstructuredNS.GetName() == includedNSName {
-				nsExists = true
-			}
+
+		if _, ok := activeNamespacesHashSet[includedNSName]; ok {
+			nsExists = true
 		}
 
 		if !nsExists {
