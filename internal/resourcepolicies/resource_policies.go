@@ -111,7 +111,7 @@ func unmarshalResourcePolicies(yamlData *string) (*ResourcePolicies, error) {
 	resPolicies := &ResourcePolicies{}
 	err := decodeStruct(strings.NewReader(*yamlData), resPolicies)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode yaml data into resource policies  %v", err)
+		return nil, fmt.Errorf("failed to decode yaml data into resource policies  %w", err)
 	}
 
 	for _, vp := range resPolicies.VolumePolicies {
