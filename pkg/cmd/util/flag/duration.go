@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"k8s.io/apimachinery/pkg/util/duration"
 )
@@ -37,12 +38,13 @@ func ParseDuration(s string) (Duration, error) {
 	n := len(s)
 
 	for i < n {
-		if s[i] < '0' || s[i] > '9' {
-			return Duration{}, fmt.Errorf("expected digit at pos %d", i)
-		}
+		// Get number
 		j := i
-		for j < n && s[j] >= '0' && s[j] <= '9' {
+		for j < n && unicode.IsDigit(rune(s[j])) {
 			j++
+		}
+		if j == i {
+			return Duration{}, fmt.Errorf("expected number at pos %d", i)
 		}
 		numStr := s[i:j]
 		num, err := strconv.ParseInt(numStr, 10, 64)
@@ -52,7 +54,7 @@ func ParseDuration(s string) (Duration, error) {
 
 		// Get unit
 		k := j
-		for k < n && ((s[k] >= 'a' && s[k] <= 'z') || (s[k] >= 'A' && s[k] <= 'Z')) {
+		for k < n && unicode.IsLetter(rune(s[k])) {
 			k++
 		}
 		if k == j {
