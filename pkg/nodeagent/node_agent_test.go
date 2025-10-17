@@ -249,6 +249,7 @@ func TestGetConfigs(t *testing.T) {
 	cmWithValidData := builder.ForConfigMap("fake-ns", "node-agent-config").Data("fake-key", "{\"loadConcurrency\":{\"globalConfig\": 5}}").Result()
 	cmWithPriorityClass := builder.ForConfigMap("fake-ns", "node-agent-config").Data("fake-key", "{\"priorityClassName\": \"high-priority\"}").Result()
 	cmWithPriorityClassAndOther := builder.ForConfigMap("fake-ns", "node-agent-config").Data("fake-key", "{\"priorityClassName\": \"low-priority\", \"loadConcurrency\":{\"globalConfig\": 3}}").Result()
+	cmWithMultipleKeysInData := builder.ForConfigMap("fake-ns", "node-agent-config").Data("fake-key-1", "{}", "fake-key-2", "{}").Result()
 
 	tests := []struct {
 		name          string
@@ -330,6 +331,14 @@ func TestGetConfigs(t *testing.T) {
 					GlobalConfig: 3,
 				},
 			},
+		},
+		{
+			name:      "ConfigMap's Data has more than one key",
+			namespace: "fake-ns",
+			kubeClientObj: []runtime.Object{
+				cmWithMultipleKeysInData,
+			},
+			expectErr: "more than one keys are found in ConfigMap node-agent-config's data. only expect one",
 		},
 	}
 
