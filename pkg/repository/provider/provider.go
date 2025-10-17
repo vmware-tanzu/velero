@@ -27,6 +27,7 @@ import (
 type RepoParam struct {
 	BackupLocation *velerov1api.BackupStorageLocation
 	BackupRepo     *velerov1api.BackupRepository
+	CacheDir       string
 }
 
 // Provider defines the methods to manipulate a backup repository

@@ -63,11 +63,12 @@ type RestoreMicroService struct {
 	pvrInformer cache.Informer
 	pvrHandler  cachetool.ResourceEventHandlerRegistration
 	nodeName    string
+	cacheDir    string
 }
 
 func NewRestoreMicroService(ctx context.Context, client client.Client, kubeClient kubernetes.Interface, pvrName string, namespace string, nodeName string,
 	sourceTargetPath datapath.AccessPoint, dataPathMgr *datapath.Manager, repoEnsurer *repository.Ensurer, cred *credentials.CredentialGetter,
-	pvrInformer cache.Informer, log logrus.FieldLogger) *RestoreMicroService {
+	pvrInformer cache.Informer, cacheDir string, log logrus.FieldLogger) *RestoreMicroService {
 	return &RestoreMicroService{
 		ctx:              ctx,
 		client:           client,
@@ -82,6 +83,7 @@ func NewRestoreMicroService(ctx context.Context, client client.Client, kubeClien
 		nodeName:         nodeName,
 		resultSignal:     make(chan dataPathResult),
 		pvrInformer:      pvrInformer,
+		cacheDir:         cacheDir,
 	}
 }
 
@@ -175,6 +177,7 @@ func (r *RestoreMicroService) RunCancelableDataPath(ctx context.Context) (string
 			RepoIdentifier:    "",
 			RepositoryEnsurer: r.repoEnsurer,
 			CredentialGetter:  r.credentialGetter,
+			CacheDir:          r.cacheDir,
 		}); err != nil {
 		return "", errors.Wrap(err, "error to initialize data path")
 	}
