@@ -86,7 +86,7 @@ When you create a backup, you can specify a TTL (time to live) by adding the fla
 * All PersistentVolume snapshots
 * All associated Restores
 
-The TTL flag allows the user to specify the backup retention period with the value specified in hours, minutes and seconds in the form `--ttl 24h0m0s`. If not specified, a default TTL value of 30 days will be applied.
+The TTL flag allows the user to specify the backup retention period with the value in the form `--ttl 1d0h0m0s`. If not specified, a default TTL value of 30 days will be applied.
 
 The effects of expiration are not applied immediately, they are applied when the gc-controller runs its reconciliation loop every hour by default. If needed, you can adjust the frequency of the reconciliation loop using the `--garbage-collection-frequency
 <DURATION>` flag.
