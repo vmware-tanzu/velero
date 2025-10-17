@@ -572,6 +572,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		constant.ControllerBackupDeletion:      {},
 		constant.ControllerBackupFinalizer:     {},
 		constant.ControllerBackupOperations:    {},
+		constant.ControllerBackupCancellation:  {},
 		constant.ControllerBackupRepo:          {},
 		constant.ControllerBackupSync:          {},
 		constant.ControllerDownloadRequest:     {},
@@ -590,6 +591,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			constant.ControllerBackupDeletion,
 			constant.ControllerBackupFinalizer,
 			constant.ControllerBackupOperations,
+			constant.ControllerBackupCancellation,
 			constant.ControllerGarbageCollection,
 			constant.ControllerSchedule,
 		)
@@ -704,6 +706,21 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		)
 		if err := r.SetupWithManager(s.mgr); err != nil {
 			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupOperations)
+		}
+	}
+
+	if _, ok := enabledRuntimeControllers[constant.ControllerBackupCancellation]; ok {
+		r := controller.NewBackupCancellationReconciler(
+			s.logger,
+			s.mgr.GetClient(),
+			newPluginManager,
+			backupStoreGetter,
+			s.metrics,
+			backupOpsMap,
+			backupTracker,
+		)
+		if err := r.SetupWithManager(s.mgr); err != nil {
+			s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerBackupCancellation)
 		}
 	}
 

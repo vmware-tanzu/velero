@@ -55,6 +55,7 @@ type Backupper interface {
 	WaitAllPodVolumesProcessed(log logrus.FieldLogger) []*velerov1api.PodVolumeBackup
 	GetPodVolumeBackupByPodAndVolume(podNamespace, podName, volume string) (*velerov1api.PodVolumeBackup, error)
 	ListPodVolumeBackupsByPod(podNamespace, podName string) ([]*velerov1api.PodVolumeBackup, error)
+	CancelAllPodVolumeBackups() ([]*velerov1api.PodVolumeBackup, error)
 }
 
 type backupper struct {
@@ -556,4 +557,28 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume c
 	}
 
 	return pvb
+}
+
+// CancelAllPodVolumeBackups cancels all the PVBs by setting spec.cancel to true
+func (b *backupper) CancelAllPodVolumeBackups() ([]*velerov1api.PodVolumeBackup, error) {
+	objs := b.pvbIndexer.List()
+
+	pvbs := make([]*velerov1api.PodVolumeBackup, len(objs))
+	for i, obj := range objs {
+		pvb, ok := obj.(*velerov1api.PodVolumeBackup)
+		if !ok {
+			return nil, errors.Errorf("expected PodVolumeBackup, but got %T", obj)
+		}
+		pvbs[i] = pvb
+	}
+	for _, pvb := range pvbs {
+		pvb.Spec.Cancel = true
+	}
+	for _, pvb := range pvbs {
+		pvb.Spec.Cancel = true
+		if err := b.crClient.Update(b.ctx, pvb); err != nil {
+			return nil, err
+		}
+	}
+	return pvbs, nil
 }
