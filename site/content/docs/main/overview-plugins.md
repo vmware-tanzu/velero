@@ -11,7 +11,19 @@ Any plugin can be added after Velero has been installed by using the command `ve
 
 Example with a dockerhub image: `velero plugin add velero/velero-plugin-for-aws:v1.0.0`.
 
-In the same way, any plugin can be removed by using the command `velero plugin remove <registry/image:version>`.
+In the same way, any plugin can be removed by using the command `velero plugin remove <registry/image:version>` or `velero plugin remove <plugin-name>`.
+
+You can also list installed plugins using `velero plugin get` to see which plugins are built-in (mandatory) and cannot be removed.
+
+## Built-in vs External Plugins
+
+Velero distinguishes between two types of plugins:
+
+- **Built-in plugins**: These are plugins that are part of the Velero server binary itself (e.g., `velero.io/aws`, `velero.io/pod`). These plugins are mandatory and cannot be removed as they are essential for core Velero functionality.
+
+- **External plugins**: These are plugins installed via init containers (e.g., `velero/velero-plugin-for-gcp:v1.0.0`). These can be added and removed as needed.
+
+Use `velero plugin get` to see which plugins are built-in (marked as `true` in the BuiltIn column) and which are external (marked as `false`).
 
 ## Creating a new plugin
 
