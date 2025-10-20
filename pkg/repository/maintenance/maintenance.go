@@ -32,11 +32,13 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerolabel "github.com/vmware-tanzu/velero/pkg/label"
 	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
 	"github.com/vmware-tanzu/velero/pkg/util"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -68,11 +70,22 @@ func GenerateJobName(repo string) string {
 }
 
 // DeleteOldJobs deletes old maintenance jobs and keeps the latest N jobs
-func DeleteOldJobs(cli client.Client, repo string, keep int, logger logrus.FieldLogger) error {
+func DeleteOldJobs(cli client.Client, repo velerov1api.BackupRepository, keep int, logger logrus.FieldLogger) error {
 	logger.Infof("Start to delete old maintenance jobs. %d jobs will be kept.", keep)
 	// Get the maintenance job list by label
 	jobList := &batchv1api.JobList{}
-	err := cli.List(context.TODO(), jobList, client.MatchingLabels(map[string]string{RepositoryNameLabel: repo}))
+	err := cli.List(
+		context.TODO(),
+		jobList,
+		&client.ListOptions{
+			Namespace: repo.Namespace,
+			LabelSelector: labels.SelectorFromSet(
+				map[string]string{
+					RepositoryNameLabel: velerolabel.GetValidName(repo.Name),
+				},
+			),
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -339,10 +352,17 @@ func WaitJobComplete(cli client.Client, ctx context.Context, jobName, ns string,
 // and then return the maintenance jobs' status in the range of limit
 func WaitAllJobsComplete(ctx context.Context, cli client.Client, repo *velerov1api.BackupRepository, limit int, log logrus.FieldLogger) ([]velerov1api.BackupRepositoryMaintenanceStatus, error) {
 	jobList := &batchv1api.JobList{}
-	err := cli.List(context.TODO(), jobList, &client.ListOptions{
-		Namespace: repo.Namespace,
-	},
-		client.MatchingLabels(map[string]string{RepositoryNameLabel: repo.Name}),
+	err := cli.List(
+		context.TODO(),
+		jobList,
+		&client.ListOptions{
+			Namespace: repo.Namespace,
+			LabelSelector: labels.SelectorFromSet(
+				map[string]string{
+					RepositoryNameLabel: velerolabel.GetValidName(repo.Name),
+				},
+			),
+		},
 	)
 
 	if err != nil {
@@ -558,7 +578,7 @@ func buildJob(
 	}
 
 	podLabels := map[string]string{
-		RepositoryNameLabel: repo.Name,
+		RepositoryNameLabel: velerolabel.GetValidName(repo.Name),
 	}
 
 	for _, k := range util.ThirdPartyLabels {
@@ -588,7 +608,7 @@ func buildJob(
 			Name:      GenerateJobName(repo.Name),
 			Namespace: repo.Namespace,
 			Labels: map[string]string{
-				RepositoryNameLabel: repo.Name,
+				RepositoryNameLabel: velerolabel.GetValidName(repo.Name),
 			},
 		},
 		Spec: batchv1api.JobSpec{
