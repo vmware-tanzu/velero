@@ -49,6 +49,18 @@ func GetValidName(label string) string {
 	return label[:charsFromLabel] + strSha[:6]
 }
 
+// ReturnNameOrHash returns the original name if it is within the DNS1035LabelMaxLength limit,
+// otherwise it returns the sha256 hash of the name truncated to DNS1035LabelMaxLength.
+func ReturnNameOrHash(name string) string {
+	if len(name) <= validation.DNS1035LabelMaxLength {
+		return name
+	}
+
+	hash := sha256.Sum256([]byte(name))
+	hashStr := hex.EncodeToString(hash[:])
+	return hashStr[:validation.DNS1035LabelMaxLength]
+}
+
 // NewSelectorForBackup returns a Selector based on the backup name.
 // This is useful for interacting with Listers that need a Selector.
 func NewSelectorForBackup(name string) labels.Selector {
