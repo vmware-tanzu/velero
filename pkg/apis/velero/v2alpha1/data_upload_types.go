@@ -172,6 +172,10 @@ type DataUploadStatus struct {
 	// +optional
 	// +nullable
 	AcceptedTimestamp *metav1.Time `json:"acceptedTimestamp,omitempty"`
+
+	// SnapshotSize is the logical size of the snapshot.
+	// +optional
+	SnapshotSize int64 `json:"snapshotSize,omitempty"`
 }
 
 // TODO(2.0) After converting all resources to use the runttime-controller client,
@@ -244,4 +248,8 @@ type DataUploadResult struct {
 	// NodeOS is OS of the node where the DataUpload is processed.
 	// +optional
 	NodeOS NodeOS `json:"nodeOS,omitempty"`
+
+	// SnapshotSize is the logical size of the snapshot.
+	// +optional
+	SnapshotSize int64 `json:"snapshotSize,omitempty"`
 }

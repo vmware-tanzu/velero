@@ -493,6 +493,7 @@ func (r *DataUploadReconciler) OnDataUploadCompleted(ctx context.Context, namesp
 		du.Status.Path = result.Backup.Source.ByPath
 		du.Status.Phase = velerov2alpha1api.DataUploadPhaseCompleted
 		du.Status.SnapshotID = result.Backup.SnapshotID
+		du.Status.SnapshotSize = result.Backup.TotalBytes
 		du.Status.CompletionTimestamp = &metav1.Time{Time: r.Clock.Now()}
 		if result.Backup.EmptySnapshot {
 			du.Status.Message = "volume was empty so no data was upload"
