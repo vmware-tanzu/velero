@@ -17,12 +17,16 @@ limitations under the License.
 package kopialib
 
 import (
+	"context"
 	"testing"
+
+	"github.com/kopia/kopia/repo/blob"
 
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
 	storagemocks "github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/mocks"
@@ -55,10 +59,6 @@ func TestCreateBackupRepo(t *testing.T) {
 		listBlobErr  error
 		expectedErr  string
 	}{
-		{
-			name:        "invalid config file",
-			expectedErr: "invalid config file path",
-		},
 		{
 			name: "storage setup fail, invalid type",
 			repoOptions: udmrepo.RepoOptions{
@@ -235,6 +235,106 @@ func TestConnectBackupRepo(t *testing.T) {
 			} else {
 				assert.EqualError(t, err, tc.expectedErr)
 			}
+		})
+	}
+}
+
+func TestIsBackupRepoCreated(t *testing.T) {
+	testCases := []struct {
+		name           string
+		backendStore   *storagemocks.Store
+		repoOptions    udmrepo.RepoOptions
+		connectErr     error
+		setupError     error
+		returnStore    *storagemocks.Storage
+		retFuncGetBlob func(context.Context, blob.ID, int64, int64, blob.OutputBuffer) error
+		expected       bool
+		expectedErr    string
+	}{
+		{
+			name: "storage setup fail, invalid type",
+			repoOptions: udmrepo.RepoOptions{
+				ConfigFilePath: "fake-file",
+			},
+			expectedErr: "error to setup backend storage: error to find storage type",
+		},
+		{
+			name: "storage setup fail, backend store steup fail",
+			repoOptions: udmrepo.RepoOptions{
+				ConfigFilePath: "fake-file",
+				StorageType:    udmrepo.StorageTypeAzure,
+			},
+			backendStore: new(storagemocks.Store),
+			setupError:   errors.New("fake-setup-error"),
+			expectedErr:  "error to setup backend storage: error to setup storage: fake-setup-error",
+		},
+		{
+			name: "storage connect fail",
+			repoOptions: udmrepo.RepoOptions{
+				ConfigFilePath: "fake-file",
+				StorageType:    udmrepo.StorageTypeAzure,
+			},
+			backendStore: new(storagemocks.Store),
+			connectErr:   errors.New("fake-connect-error"),
+			expectedErr:  "error to connect to storage: fake-connect-error",
+		},
+		{
+			name: "get blob error",
+			repoOptions: udmrepo.RepoOptions{
+				ConfigFilePath: "fake-file",
+				StorageType:    udmrepo.StorageTypeAzure,
+			},
+			backendStore: new(storagemocks.Store),
+			returnStore:  new(storagemocks.Storage),
+			retFuncGetBlob: func(context.Context, blob.ID, int64, int64, blob.OutputBuffer) error {
+				return errors.New("fake-get-blob-error")
+			},
+			expectedErr: "error to read format blob: fake-get-blob-error",
+		},
+		{
+			name: "wrong format",
+			repoOptions: udmrepo.RepoOptions{
+				ConfigFilePath: "fake-file",
+				StorageType:    udmrepo.StorageTypeAzure,
+			},
+			backendStore: new(storagemocks.Store),
+			returnStore:  new(storagemocks.Storage),
+			retFuncGetBlob: func(ctx context.Context, id blob.ID, offset int64, length int64, output blob.OutputBuffer) error {
+				output.Write([]byte("fake-buffer"))
+				return nil
+			},
+			expectedErr: "invalid format blob: invalid character 'k' in literal false (expecting 'l')",
+		},
+	}
+
+	logger := velerotest.NewLogger()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			backendStores = []kopiaBackendStore{
+				{udmrepo.StorageTypeAzure, "fake store", tc.backendStore},
+				{udmrepo.StorageTypeFs, "fake store", tc.backendStore},
+				{udmrepo.StorageTypeGcs, "fake store", tc.backendStore},
+				{udmrepo.StorageTypeS3, "fake store", tc.backendStore},
+			}
+
+			if tc.backendStore != nil {
+				tc.backendStore.On("Connect", mock.Anything, mock.Anything, mock.Anything).Return(tc.returnStore, tc.connectErr)
+				tc.backendStore.On("Setup", mock.Anything, mock.Anything, mock.Anything).Return(tc.setupError)
+			}
+
+			if tc.returnStore != nil {
+				tc.returnStore.On("GetBlob", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tc.retFuncGetBlob)
+			}
+
+			created, err := IsBackupRepoCreated(t.Context(), tc.repoOptions, logger)
+
+			if tc.expectedErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tc.expectedErr)
+			}
+
+			assert.Equal(t, tc.expected, created)
 		})
 	}
 }

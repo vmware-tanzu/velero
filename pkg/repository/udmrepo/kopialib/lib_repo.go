@@ -95,17 +95,26 @@ func NewKopiaRepoService(logger logrus.FieldLogger) udmrepo.BackupRepoService {
 	return ks
 }
 
-func (ks *kopiaRepoService) Init(ctx context.Context, repoOption udmrepo.RepoOptions, createNew bool) error {
+func (ks *kopiaRepoService) Create(ctx context.Context, repoOption udmrepo.RepoOptions) error {
 	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
 
-	if createNew {
-		if err := CreateBackupRepo(repoCtx, repoOption, ks.logger); err != nil {
-			return err
-		}
-
-		return writeInitParameters(repoCtx, repoOption, ks.logger)
+	if err := CreateBackupRepo(repoCtx, repoOption, ks.logger); err != nil {
+		return err
 	}
+
+	return writeInitParameters(repoCtx, repoOption, ks.logger)
+}
+
+func (ks *kopiaRepoService) Connect(ctx context.Context, repoOption udmrepo.RepoOptions) error {
+	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
+
 	return ConnectBackupRepo(repoCtx, repoOption, ks.logger)
+}
+
+func (ks *kopiaRepoService) IsCreated(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
+	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
+
+	return IsBackupRepoCreated(repoCtx, repoOption, ks.logger)
 }
 
 func (ks *kopiaRepoService) Open(ctx context.Context, repoOption udmrepo.RepoOptions) (udmrepo.BackupRepo, error) {
