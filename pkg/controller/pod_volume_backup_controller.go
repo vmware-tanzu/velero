@@ -526,6 +526,7 @@ func (r *PodVolumeBackupReconciler) OnDataPathCompleted(ctx context.Context, nam
 		pvb.Status.Phase = velerov1api.PodVolumeBackupPhaseCompleted
 		pvb.Status.SnapshotID = result.Backup.SnapshotID
 		pvb.Status.CompletionTimestamp = &completionTime
+		pvb.Status.IncrementalBytes = result.Backup.IncrementalBytes
 		if result.Backup.EmptySnapshot {
 			pvb.Status.Message = "volume was empty so no snapshot was taken"
 		}

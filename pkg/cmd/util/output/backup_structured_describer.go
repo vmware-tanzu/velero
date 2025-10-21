@@ -464,6 +464,10 @@ func describeDataMovementInSF(details bool, info *volume.BackupVolumeInfo, snaps
 
 		dataMovement["uploaderType"] = info.SnapshotDataMovementInfo.UploaderType
 		dataMovement["result"] = string(info.Result)
+		if info.SnapshotDataMovementInfo.Size > 0 || info.SnapshotDataMovementInfo.IncrementalSize > 0 {
+			dataMovement["size"] = info.SnapshotDataMovementInfo.Size
+			dataMovement["incrementalSize"] = info.SnapshotDataMovementInfo.IncrementalSize
+		}
 
 		snapshotDetail["dataMovement"] = dataMovement
 	} else {
@@ -534,7 +538,7 @@ func describePodVolumeBackupsInSF(backups []velerov1api.PodVolumeBackup, details
 		// group the backups in the current phase by pod (i.e. "ns/name")
 		backupsByPod := new(volumesByPod)
 		for _, backup := range backupsByPhase[phase] {
-			backupsByPod.Add(backup.Spec.Pod.Namespace, backup.Spec.Pod.Name, backup.Spec.Volume, phase, backup.Status.Progress)
+			backupsByPod.Add(backup.Spec.Pod.Namespace, backup.Spec.Pod.Name, backup.Spec.Volume, phase, backup.Status.Progress, backup.Status.IncrementalBytes)
 		}
 
 		backupsByPods := make([]map[string]string, 0)

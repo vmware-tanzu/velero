@@ -1198,6 +1198,7 @@ func updateVolumeInfos(
 				volumeInfos[index].SnapshotDataMovementInfo.SnapshotHandle = dataUpload.Status.SnapshotID
 				volumeInfos[index].SnapshotDataMovementInfo.RetainedSnapshot = dataUpload.Spec.CSISnapshot.VolumeSnapshot
 				volumeInfos[index].SnapshotDataMovementInfo.Size = dataUpload.Status.Progress.TotalBytes
+				volumeInfos[index].SnapshotDataMovementInfo.IncrementalSize = dataUpload.Status.IncrementalBytes
 				volumeInfos[index].SnapshotDataMovementInfo.Phase = dataUpload.Status.Phase
 
 				if dataUpload.Status.Phase == velerov2alpha1.DataUploadPhaseCompleted {
