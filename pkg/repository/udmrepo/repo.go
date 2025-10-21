@@ -93,6 +93,9 @@ type BackupRepoService interface {
 	// DefaultMaintenanceFrequency returns the defgault frequency of maintenance, callers refer this
 	// frequency to maintain the backup repository to get the best maintenance performance
 	DefaultMaintenanceFrequency() time.Duration
+
+	// ClientSideCacheLimit returns the max cache size required on client side
+	ClientSideCacheLimit(repoOption map[string]string) int64
 }
 
 // BackupRepo provides the access to the backup repository
