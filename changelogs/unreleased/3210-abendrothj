@@ -26,16 +26,17 @@ This change implements issue #3210 by adding built-in plugin detection and enhan
 # Show which plugins are built-in
 $ velero plugin get
 NAME                    KIND                BuiltIn
-velero.io/aws          ObjectStore         true
 velero.io/pod          BackupItemAction    true
+velero.io/pv            BackupItemAction    true
+velero.io/aws          ObjectStore         false
 velero.io/gcp          ObjectStore         false
 
 # Try to remove built-in plugin - refused
-$ velero plugin remove velero.io/aws
-An error occurred: plugin velero.io/aws is built-in and cannot be removed
+$ velero plugin remove velero.io/pod
+An error occurred: plugin velero.io/pod is built-in and cannot be removed
 
 # Remove external plugin by name - works
-$ velero plugin remove velero.io/gcp
+$ velero plugin remove velero.io/aws
 # (removes corresponding init container)
 ```
 
