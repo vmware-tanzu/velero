@@ -71,14 +71,14 @@ func TestGetInstalledPluginInfo(t *testing.T) {
 					{
 						Name:    "velero.io/aws",
 						Kind:    common.PluginKindObjectStore,
-						Command: "/usr/local/bin/velero", // Same as server binary
+						Command: "/plugins/aws-plugin", // External plugin binary
 					},
 				},
 			},
 			expectedBuiltIn: map[string]bool{
 				"velero.io/pod": true,
 				"velero.io/pv":  true,
-				"velero.io/aws": true,
+				"velero.io/aws": false,
 			},
 		},
 		{
@@ -96,18 +96,18 @@ func TestGetInstalledPluginInfo(t *testing.T) {
 					{
 						Name:    "velero.io/aws",
 						Kind:    common.PluginKindObjectStore,
-						Command: "/usr/local/bin/velero", // Same as server binary
+						Command: "/plugins/aws-plugin", // External plugin binary
 					},
 					{
 						Name:    "velero.io/gcp",
 						Kind:    common.PluginKindObjectStore,
-						Command: "/plugins/gcp-plugin", // Different from server binary
+						Command: "/plugins/gcp-plugin", // External plugin binary
 					},
 				},
 			},
 			expectedBuiltIn: map[string]bool{
 				"velero.io/pod": true,
-				"velero.io/aws": true,
+				"velero.io/aws": false,
 				"velero.io/gcp": false,
 			},
 		},

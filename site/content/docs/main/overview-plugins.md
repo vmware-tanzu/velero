@@ -19,9 +19,9 @@ You can also list installed plugins using `velero plugin get` to see which plugi
 
 Velero distinguishes between two types of plugins:
 
-- **Built-in plugins**: These are plugins that are part of the Velero server binary itself (e.g., `velero.io/aws`, `velero.io/pod`). These plugins are mandatory and cannot be removed as they are essential for core Velero functionality.
+- **Built-in plugins**: These are plugins that are part of the Velero server binary itself (e.g., `velero.io/pod`, `velero.io/pv`). These plugins are mandatory and cannot be removed as they are essential for core Velero functionality.
 
-- **External plugins**: These are plugins installed via init containers (e.g., `velero/velero-plugin-for-gcp:v1.0.0`). These can be added and removed as needed.
+- **External plugins**: These are plugins installed via init containers (e.g., `velero.io/aws`, `velero.io/gcp`). These can be added and removed as needed.
 
 Use `velero plugin get` to see which plugins are built-in (marked as `true` in the BuiltIn column) and which are external (marked as `false`).
 

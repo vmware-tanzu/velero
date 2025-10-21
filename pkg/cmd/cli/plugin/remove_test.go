@@ -132,17 +132,17 @@ func TestBuiltInPluginDetection(t *testing.T) {
 	}{
 		{
 			name:       "refuse removal of built-in plugin",
-			pluginName: "velero.io/aws",
+			pluginName: "velero.io/pod",
 			serverStatus: map[string]bool{
-				"velero.io/aws": true,
+				"velero.io/pod": true,
 			},
-			expectedError: "plugin velero.io/aws is built-in and cannot be removed",
+			expectedError: "plugin velero.io/pod is built-in and cannot be removed",
 		},
 		{
-			name:       "allow removal of non-built-in plugin",
-			pluginName: "velero.io/gcp",
+			name:       "allow removal of external plugin",
+			pluginName: "velero.io/aws",
 			serverStatus: map[string]bool{
-				"velero.io/gcp": false,
+				"velero.io/aws": false,
 			},
 			expectedError: "", // No error expected
 		},
