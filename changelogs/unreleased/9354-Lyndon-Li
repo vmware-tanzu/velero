@@ -1,1 +1,1 @@
-Add snapshotSize for DataUpload, DataDownload, PodVolumeBackup, PodVolumeRestore
+Add snapshotSize for DataDownload, PodVolumeRestore

@@ -123,10 +123,6 @@ type PodVolumeBackupStatus struct {
 	// +optional
 	// +nullable
 	AcceptedTimestamp *metav1.Time `json:"acceptedTimestamp,omitempty"`
-
-	// SnapshotSize is the logical size of the snapshot.
-	// +optional
-	SnapshotSize int64 `json:"snapshotSize,omitempty"`
 }
 
 // TODO(2.0) After converting all resources to use the runttime-controller client,

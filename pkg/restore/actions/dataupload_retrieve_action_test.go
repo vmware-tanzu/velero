@@ -58,7 +58,7 @@ func TestDataUploadRetrieveActionExectue(t *testing.T) {
 		},
 		{
 			name:          "DataUploadRetrieve Action test",
-			dataUpload:    builder.ForDataUpload("velero", "testDU").SourceNamespace("testNamespace").SourcePVC("testPVC").SnapshotID("fake-id").SnapshotSize(1000).Result(),
+			dataUpload:    builder.ForDataUpload("velero", "testDU").SourceNamespace("testNamespace").SourcePVC("testPVC").SnapshotID("fake-id").TotalBytes(1000).Result(),
 			restore:       builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("testingUID")).Backup("testBackup").Result(),
 			runtimeScheme: scheme,
 			veleroObjs: []runtime.Object{
@@ -75,16 +75,6 @@ func TestDataUploadRetrieveActionExectue(t *testing.T) {
 				builder.ForBackup("velero", "testBackup").StorageLocation("testLocation").Result(),
 			},
 			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "migre209d0da-49c7-45ba-8d5a-3e59fd591ec1.kibishii-data-ki152333", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"testLocation","sourceNamespace":"migre209d0da-49c7-45ba-8d5a-3e59fd591ec1"}`).Result(),
-		},
-		{
-			name:          "snapshotSize is zero",
-			dataUpload:    builder.ForDataUpload("velero", "testDU").SourceNamespace("testNamespace").SourcePVC("testPVC").TotalBytes(2000).Result(),
-			restore:       builder.ForRestore("velero", "testRestore").ObjectMeta(builder.WithUID("testingUID")).Backup("testBackup").Result(),
-			runtimeScheme: scheme,
-			veleroObjs: []runtime.Object{
-				builder.ForBackup("velero", "testBackup").StorageLocation("testLocation").Result(),
-			},
-			expectedDataUploadResult: builder.ForConfigMap("velero", "").ObjectMeta(builder.WithGenerateName("testDU-"), builder.WithLabels(velerov1.PVCNamespaceNameLabel, "testNamespace.testPVC", velerov1.RestoreUIDLabel, "testingUID", velerov1.ResourceUsageLabel, string(velerov1.VeleroResourceUsageDataUploadResult))).Data("testingUID", `{"backupStorageLocation":"testLocation","sourceNamespace":"testNamespace","snapshotSize":2000}`).Result(),
 		},
 	}
 

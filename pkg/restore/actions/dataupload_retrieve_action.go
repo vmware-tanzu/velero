@@ -72,16 +72,11 @@ func (d *DataUploadRetrieveAction) Execute(input *velero.RestoreItemActionExecut
 		return nil, errors.Wrapf(err, "error to get backup for restore %s", input.Restore.Name)
 	}
 
-	snapshotSize := dataUpload.Status.SnapshotSize
-	if snapshotSize == 0 {
-		snapshotSize = dataUpload.Status.Progress.TotalBytes
-	}
-
 	dataUploadResult := velerov2alpha1.DataUploadResult{
 		BackupStorageLocation: backup.Spec.StorageLocation,
 		DataMover:             dataUpload.Spec.DataMover,
 		SnapshotID:            dataUpload.Status.SnapshotID,
-		SnapshotSize:          snapshotSize,
+		SnapshotSize:          dataUpload.Status.Progress.TotalBytes,
 		SourceNamespace:       dataUpload.Spec.SourceNamespace,
 		DataMoverResult:       dataUpload.Status.DataMoverResult,
 		NodeOS:                dataUpload.Status.NodeOS,

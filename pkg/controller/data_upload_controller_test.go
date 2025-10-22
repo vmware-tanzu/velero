@@ -856,7 +856,6 @@ func TestOnDataUploadCompleted(t *testing.T) {
 			Source: datapath.AccessPoint{
 				ByPath: "fake-path",
 			},
-			TotalBytes: int64(1000),
 		},
 	})
 	updatedDu := &velerov2alpha1api.DataUpload{}
@@ -865,7 +864,6 @@ func TestOnDataUploadCompleted(t *testing.T) {
 	assert.False(t, updatedDu.Status.CompletionTimestamp.IsZero())
 	assert.Equal(t, "fake-id", updatedDu.Status.SnapshotID)
 	assert.Equal(t, "fake-path", updatedDu.Status.Path)
-	assert.Equal(t, int64(1000), updatedDu.Status.SnapshotSize)
 }
 
 func TestFindDataUploadForPod(t *testing.T) {

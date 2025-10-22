@@ -93,14 +93,9 @@ func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, 
 			continue
 		}
 
-		snapshotSize := pvb.Status.SnapshotSize
-		if snapshotSize == 0 {
-			snapshotSize = pvb.Status.Progress.TotalBytes
-		}
-
 		volumes[pvb.Spec.Volume] = volumeBackupInfo{
 			snapshotID:     pvb.Status.SnapshotID,
-			snapshotSize:   snapshotSize,
+			snapshotSize:   pvb.Status.Progress.TotalBytes,
 			uploaderType:   getUploaderTypeOrDefault(pvb.Spec.UploaderType),
 			repositoryType: getRepositoryType(pvb.Spec.UploaderType),
 		}

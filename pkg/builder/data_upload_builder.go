@@ -181,14 +181,8 @@ func (d *DataUploadBuilder) Message(msg string) *DataUploadBuilder {
 	return d
 }
 
-// SnapshotSize sets the DataUpload's SnapshotSize.
-func (d *DataUploadBuilder) SnapshotSize(size int64) *DataUploadBuilder {
-	d.object.Status.SnapshotSize = size
-	return d
-}
-
 // TotalBytes sets the DataUpload's TotalBytes.
 func (d *DataUploadBuilder) TotalBytes(size int64) *DataUploadBuilder {
-	d.object.Status.SnapshotSize = size
+	d.object.Status.Progress.TotalBytes = size
 	return d
 }

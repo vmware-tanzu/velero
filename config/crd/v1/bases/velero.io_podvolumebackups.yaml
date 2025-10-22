@@ -225,10 +225,6 @@ spec:
                 description: SnapshotID is the identifier for the snapshot of the
                   pod volume.
                 type: string
-              snapshotSize:
-                description: SnapshotSize is the logical size of the snapshot.
-                format: int64
-                type: integer
               startTimestamp:
                 description: |-
                   StartTimestamp records the time a backup was started.
