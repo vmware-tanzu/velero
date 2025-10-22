@@ -18,6 +18,7 @@ package backup
 
 import (
 	"sync"
+	"time"
 
 	"github.com/vmware-tanzu/velero/internal/hook"
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
@@ -70,6 +71,8 @@ type Request struct {
 	SkippedPVTracker          *skipPVTracker
 	VolumesInformation        volume.BackupVolumesInformation
 	ItemBlockChannel          chan ItemBlockInput
+	Cancel                    bool
+	LastCancelCheck           time.Time
 }
 
 // BackupVolumesInformation contains the information needs by generating
