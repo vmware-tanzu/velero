@@ -12,7 +12,7 @@ jobs:
   get-go-version:
     uses: ./.github/workflows/get-go-version.yaml
     with:
-      ref: ${{ github.ref }}
+      ref: ${{ github.ref_name }}
 
   build:
     name: Build
