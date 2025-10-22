@@ -973,6 +973,7 @@ func TestCreateRestorePod(t *testing.T) {
 				test.nodeOS,
 				test.affinity,
 				"", // priority class name
+				nil,
 			)
 
 			require.NoError(t, err)
