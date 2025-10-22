@@ -103,7 +103,7 @@ func (a *PVCAction) cleanupStaleVeleroLabels(pvc *corev1api.PersistentVolumeClai
 	// Clean stale Velero labels from main metadata
 	if pvc.Labels != nil {
 		for k, v := range pvc.Labels {
-			if strings.HasPrefix(k, "velero.io/") {
+			if strings.HasPrefix(k, "velero.io/") || strings.HasPrefix(k, "backup.velero.io/") {
 				// Only remove labels that are clearly stale from previous operations
 				shouldRemove := false
 
