@@ -10,6 +10,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	. "github.com/vmware-tanzu/velero/test"
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 	. "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -64,19 +65,36 @@ func (p *PVCSelectedNodeChanging) Init() error {
 
 func (p *PVCSelectedNodeChanging) CreateResources() error {
 	By(fmt.Sprintf("Create namespace %s", p.namespace), func() {
-		Expect(CreateNamespace(p.Ctx, p.Client, p.namespace)).To(Succeed(),
+		labels := make(map[string]string)
+		if p.VeleroCfg.WorkerOS == common.WorkerOSWindows {
+			labels = map[string]string{
+				"pod-security.kubernetes.io/enforce":         "privileged",
+				"pod-security.kubernetes.io/enforce-version": "latest",
+			}
+		}
+		Expect(CreateNamespaceWithLabel(p.Ctx, p.Client, p.namespace, labels)).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", p.namespace))
 	})
 
 	By(fmt.Sprintf("Create pod %s in namespace %s", p.podName, p.namespace), func() {
-		nodeNameList, err := GetWorkerNodes(p.Ctx)
+		nodeNameList, err := GetWorkerNodes(p.Ctx, p.VeleroCfg.WorkerOS)
 		Expect(err).To(Succeed())
 		for _, nodeName := range nodeNameList {
 			p.oldNodeName = nodeName
 			fmt.Printf("Create PVC on node %s\n", p.oldNodeName)
 			pvcAnn := map[string]string{p.ann: nodeName}
-			_, err := CreatePod(p.Client, p.namespace, p.podName, StorageClassName, p.pvcName, []string{p.volume},
-				pvcAnn, nil, p.VeleroCfg.ImageRegistryProxy)
+			_, err := CreatePod(
+				p.Client,
+				p.namespace,
+				p.podName,
+				StorageClassName,
+				p.pvcName,
+				[]string{p.volume},
+				pvcAnn,
+				nil,
+				p.VeleroCfg.ImageRegistryProxy,
+				p.VeleroCfg.WorkerOS,
+			)
 			Expect(err).To(Succeed())
 			err = WaitForPods(p.Ctx, p.Client, p.namespace, []string{p.podName})
 			Expect(err).To(Succeed())
@@ -85,8 +103,9 @@ func (p *PVCSelectedNodeChanging) CreateResources() error {
 	})
 
 	By("Prepare ConfigMap data", func() {
-		nodeNameList, err := GetWorkerNodes(p.Ctx)
+		nodeNameList, err := GetWorkerNodes(p.Ctx, p.VeleroCfg.WorkerOS)
 		Expect(err).To(Succeed())
+		// Expect Windows node or Linux node number are no less than 2.
 		Expect(len(nodeNameList)).To(BeNumerically(">=", 2))
 		for _, nodeName := range nodeNameList {
 			if nodeName != p.oldNodeName {

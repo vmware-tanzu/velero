@@ -44,6 +44,7 @@ type FSBRInitParam struct {
 	RepositoryEnsurer *repository.Ensurer
 	CredentialGetter  *credentials.CredentialGetter
 	Filesystem        filesystem.Interface
+	CacheDir          string
 }
 
 // FSBRStartParam define the input param for FSBR start
@@ -112,7 +113,7 @@ func (fs *fileSystemBR) Init(ctx context.Context, param any) error {
 		return errors.Wrapf(err, "error to ensure backup repository %s-%s-%s", initParam.BSLName, initParam.SourceNamespace, initParam.RepositoryType)
 	}
 
-	err = fs.boostRepoConnect(ctx, initParam.RepositoryType, initParam.CredentialGetter)
+	err = fs.boostRepoConnect(ctx, initParam.RepositoryType, initParam.CredentialGetter, initParam.CacheDir)
 	if err != nil {
 		return errors.Wrapf(err, "error to boost backup repository connection %s-%s-%s", initParam.BSLName, initParam.SourceNamespace, initParam.RepositoryType)
 	}
@@ -245,9 +246,9 @@ func (fs *fileSystemBR) Cancel() {
 	fs.log.WithField("user", fs.jobName).Info("FileSystemBR is canceled")
 }
 
-func (fs *fileSystemBR) boostRepoConnect(ctx context.Context, repositoryType string, credentialGetter *credentials.CredentialGetter) error {
+func (fs *fileSystemBR) boostRepoConnect(ctx context.Context, repositoryType string, credentialGetter *credentials.CredentialGetter, cacheDir string) error {
 	if repositoryType == velerov1api.BackupRepositoryTypeKopia {
-		if err := repoProvider.NewUnifiedRepoProvider(*credentialGetter, repositoryType, fs.log).BoostRepoConnect(ctx, repoProvider.RepoParam{BackupLocation: fs.backupLocation, BackupRepo: fs.backupRepo}); err != nil {
+		if err := repoProvider.NewUnifiedRepoProvider(*credentialGetter, repositoryType, fs.log).BoostRepoConnect(ctx, repoProvider.RepoParam{BackupLocation: fs.backupLocation, BackupRepo: fs.backupRepo, CacheDir: cacheDir}); err != nil {
 			return err
 		}
 	} else {

@@ -1047,7 +1047,7 @@ func TestRecallMaintenance(t *testing.T) {
 		{
 			name:          "wait completion error",
 			runtimeScheme: schemeFail,
-			expectedErr:   "error waiting incomplete repo maintenance job for repo repo: error listing maintenance job for repo repo: no kind is registered for the type v1.JobList in scheme \"pkg/runtime/scheme.go:100\"",
+			expectedErr:   "error waiting incomplete repo maintenance job for repo repo: error listing maintenance job for repo repo: no kind is registered for the type v1.JobList in scheme",
 		},
 		{
 			name:          "no consolidate result",
@@ -1105,7 +1105,7 @@ func TestRecallMaintenance(t *testing.T) {
 
 			err := r.recallMaintenance(t.Context(), backupRepo, velerotest.NewLogger())
 			if test.expectedErr != "" {
-				assert.EqualError(t, err, test.expectedErr)
+				assert.ErrorContains(t, err, test.expectedErr)
 			} else {
 				assert.NoError(t, err)
 

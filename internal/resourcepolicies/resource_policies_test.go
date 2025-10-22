@@ -227,9 +227,10 @@ func TestGetResourceMatchedAction(t *testing.T) {
 		},
 	}
 	testCases := []struct {
-		name           string
-		volume         *structuredVolume
-		expectedAction *Action
+		name             string
+		volume           *structuredVolume
+		expectedAction   *Action
+		resourcePolicies *ResourcePolicies
 	}{
 		{
 			name: "match policy",
@@ -299,12 +300,36 @@ func TestGetResourceMatchedAction(t *testing.T) {
 			},
 			expectedAction: nil,
 		},
+		{
+			name: "nil condition always match the action",
+			volume: &structuredVolume{
+				capacity:     *resource.NewQuantity(5<<30, resource.BinarySI),
+				storageClass: "some-class",
+				pvcLabels: map[string]string{
+					"environment": "staging",
+				},
+			},
+			resourcePolicies: &ResourcePolicies{
+				Version: "v1",
+				VolumePolicies: []VolumePolicy{
+					{
+						Action:     Action{Type: "skip"},
+						Conditions: map[string]any{},
+					},
+				},
+			},
+			expectedAction: &Action{Type: "skip"},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			policies := &Policies{}
-			err := policies.BuildPolicy(resPolicies)
+			currentResourcePolicy := resPolicies
+			if tc.resourcePolicies != nil {
+				currentResourcePolicy = tc.resourcePolicies
+			}
+			err := policies.BuildPolicy(currentResourcePolicy)
 			if err != nil {
 				t.Errorf("Failed to build policy with error %v", err)
 			}

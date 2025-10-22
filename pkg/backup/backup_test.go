@@ -3269,7 +3269,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			err := h.backupper.Backup(h.log, tc.req, backupFile, nil, nil, tc.snapshotterGetter)
 			require.NoError(t, err)
 
-			assert.Equal(t, tc.want, tc.req.VolumeSnapshots)
+			assert.Equal(t, tc.want, tc.req.VolumeSnapshots.Get())
 		})
 	}
 }
@@ -4213,7 +4213,7 @@ func TestBackupWithPodVolume(t *testing.T) {
 			assert.Equal(t, tc.want, req.PodVolumeBackups)
 
 			// this assumes that we don't have any test cases where some PVs should be snapshotted using a VolumeSnapshotter
-			assert.Nil(t, req.VolumeSnapshots)
+			assert.Nil(t, req.VolumeSnapshots.Get())
 		})
 	}
 }

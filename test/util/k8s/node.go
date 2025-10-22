@@ -11,8 +11,13 @@ import (
 	common "github.com/vmware-tanzu/velero/test/util/common"
 )
 
-func GetWorkerNodes(ctx context.Context) ([]string, error) {
-	getCMD := exec.CommandContext(ctx, "kubectl", "get", "node", "-o", "json")
+func GetWorkerNodes(ctx context.Context, workerOS string) ([]string, error) {
+	getCMD := exec.CommandContext(
+		ctx,
+		"kubectl", "get", "node", "-l",
+		fmt.Sprintf("kubernetes.io/os=%s", workerOS),
+		"-o", "json",
+	)
 
 	fmt.Printf("kubectl get node cmd =%v\n", getCMD)
 	jsonBuf, err := common.CMDExecWithOutput(getCMD)

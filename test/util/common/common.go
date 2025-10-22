@@ -72,10 +72,13 @@ func GetListByCmdPipes(ctx context.Context, cmdLines []*OsCommandLine) ([]string
 
 func GetResourceWithLabel(ctx context.Context, namespace, resourceName string, labels map[string]string) ([]string, error) {
 	labelStr := ""
+	parts := make([]string, 0, len(labels))
 
 	for key, value := range labels {
 		strings.Join([]string{labelStr, key + "=" + value}, ",")
+		parts = append(parts, key+"="+value)
 	}
+	labelStr = strings.Join(parts, ",")
 
 	cmds := []*OsCommandLine{}
 	cmd := &OsCommandLine{

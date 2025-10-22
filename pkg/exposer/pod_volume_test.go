@@ -190,6 +190,29 @@ func TestPodVolumeExpose(t *testing.T) {
 				return "/var/lib/kubelet/pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount", nil
 			},
 		},
+		{
+			name:        "succeed with privileged pod",
+			ownerBackup: backup,
+			exposeParam: PodVolumeExposeParam{
+				ClientNamespace: "fake-ns",
+				ClientPodName:   "fake-client-pod",
+				ClientPodVolume: "fake-client-volume",
+				Privileged:      true,
+			},
+			kubeClientObj: []runtime.Object{
+				podWithNode,
+				node,
+				daemonSet,
+			},
+			funcGetPodVolumeHostPath: func(context.Context, *corev1api.Pod, string, kubernetes.Interface, filesystem.Interface, logrus.FieldLogger) (datapath.AccessPoint, error) {
+				return datapath.AccessPoint{
+					ByPath: "/host_pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount",
+				}, nil
+			},
+			funcExtractPodVolumeHostPath: func(context.Context, string, kubernetes.Interface, string, string) (string, error) {
+				return "/var/lib/kubelet/pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount", nil
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -443,6 +466,7 @@ func TestPodVolumeDiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
+			UID:       "fake-pod-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: backup.APIVersion,
@@ -468,6 +492,7 @@ func TestPodVolumeDiagnoseExpose(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
 			Name:      "fake-backup",
+			UID:       "fake-pod-uid",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: backup.APIVersion,
@@ -564,6 +589,48 @@ end diagnose pod volume exposer`,
 			expected: `begin diagnose pod volume exposer
 Pod velero/fake-backup, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
+end diagnose pod volume exposer`,
+		},
+		{
+			name:        "with events",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				&backupPodWithNodeName,
+				&nodeAgentPod,
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: velerov1.DefaultNamespace, Name: "event-1"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-uid-1"},
+					Reason:         "reason-1",
+					Message:        "message-1",
+				},
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: velerov1.DefaultNamespace, Name: "event-2"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Reason:         "reason-2",
+					Message:        "message-2",
+				},
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: "other-namespace", Name: "event-3"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Reason:         "reason-3",
+					Message:        "message-3",
+				},
+				&corev1api.Event{
+					ObjectMeta:     metav1.ObjectMeta{Namespace: velerov1.DefaultNamespace, Name: "event-4"},
+					Type:           corev1api.EventTypeWarning,
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Reason:         "reason-4",
+					Message:        "message-4",
+				},
+			},
+			expected: `begin diagnose pod volume exposer
+Pod velero/fake-backup, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+Pod event reason reason-2, message message-2
+Pod event reason reason-4, message message-4
 end diagnose pod volume exposer`,
 		},
 	}

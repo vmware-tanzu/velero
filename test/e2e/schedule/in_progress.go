@@ -14,6 +14,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/test"
 	framework "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	k8sutil "github.com/vmware-tanzu/velero/test/util/k8s"
 	veleroutil "github.com/vmware-tanzu/velero/test/util/velero"
 )
@@ -64,11 +65,19 @@ func (s *InProgressCase) Init() error {
 
 func (s *InProgressCase) CreateResources() error {
 	By(fmt.Sprintf("Create namespace %s", s.namespace), func() {
+		labels := make(map[string]string)
+		if s.VeleroCfg.WorkerOS == common.WorkerOSWindows {
+			labels = map[string]string{
+				"pod-security.kubernetes.io/enforce":         "privileged",
+				"pod-security.kubernetes.io/enforce-version": "latest",
+			}
+		}
 		Expect(
-			k8sutil.CreateNamespace(
+			k8sutil.CreateNamespaceWithLabel(
 				s.Ctx,
 				s.Client,
 				s.namespace,
+				labels,
 			),
 		).To(Succeed(),
 			fmt.Sprintf("Failed to create namespace %s", s.namespace))
@@ -85,6 +94,7 @@ func (s *InProgressCase) CreateResources() error {
 			nil,
 			s.podAnn,
 			s.VeleroCfg.ImageRegistryProxy,
+			s.VeleroCfg.WorkerOS,
 		)
 		Expect(err).To(Succeed())
 

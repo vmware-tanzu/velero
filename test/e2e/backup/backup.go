@@ -109,7 +109,7 @@ func BackupRestoreTest(backupRestoreTestConfig BackupRestoreTestConfig) {
 				DeleteStorageClass(context.Background(), *veleroCfg.ClientToInstallVelero, KibishiiStorageClassName)
 			})
 			if InstallVelero {
-				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*5)
+				ctx, ctxCancel := context.WithTimeout(context.Background(), time.Minute*10)
 				defer ctxCancel()
 				err = VeleroUninstall(ctx, veleroCfg)
 				Expect(err).To(Succeed())

@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend/logging"
 )
 
 type FsBackend struct {
@@ -50,6 +51,8 @@ func (c *FsBackend) Setup(ctx context.Context, flags map[string]string, logger l
 	c.options.FileMode = defaultFileMode
 	c.options.DirectoryMode = defaultDirMode
 
+	ctx = logging.WithLogger(ctx, logger)
+
 	c.options.Limits = setupLimits(ctx, flags)
 
 	return nil
@@ -59,6 +62,7 @@ func (c *FsBackend) Connect(ctx context.Context, isCreate bool, logger logrus.Fi
 	if !filepath.IsAbs(c.options.Path) {
 		return nil, errors.Errorf("filesystem repository path is not absolute, path: %s", c.options.Path)
 	}
+	ctx = logging.WithLogger(ctx, logger)
 
 	return filesystem.New(ctx, &c.options, isCreate)
 }

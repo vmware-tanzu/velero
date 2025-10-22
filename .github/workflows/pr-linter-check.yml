@@ -7,16 +7,24 @@ on:
       - "design/**"
       - "**/*.md"
 jobs:
+  get-go-version:
+    uses: ./.github/workflows/get-go-version.yaml
+    with:
+      ref: ${{ github.event.pull_request.base.ref }}
+
   build:
     name: Run Linter Check
     runs-on: ubuntu-latest
+    needs: get-go-version
     steps:
       - name: Check out the code
         uses: actions/checkout@v5
-      - name: Set up Go
-        uses: actions/setup-go@v5
+
+      - name: Set up Go version
+        uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
+          go-version: ${{ needs.get-go-version.outputs.version }}
+
       - name: Linter check
         uses: golangci/golangci-lint-action@v8
         with:

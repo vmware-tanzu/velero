@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	common "github.com/vmware-tanzu/velero/test/util/common"
 )
 
 const (
@@ -37,7 +38,8 @@ const (
 	PollInterval         = 2 * time.Second
 	PollTimeout          = 15 * time.Minute
 	DefaultContainerName = "container-busybox"
-	TestImage            = "busybox:1.37.0"
+	LinuxTestImage       = "busybox:1.37.0"
+	WindowTestImage      = "mcr.microsoft.com/windows/nanoserver:ltsc2022"
 )
 
 // DeploymentBuilder builds Deployment objects.
@@ -50,30 +52,100 @@ func (d *DeploymentBuilder) Result() *appsv1api.Deployment {
 }
 
 // newDeployment returns a RollingUpdate Deployment with a fake container image
-func NewDeployment(name, ns string, replicas int32, labels map[string]string, imageRegistryProxy string) *DeploymentBuilder {
-	imageAddress := TestImage
-	if imageRegistryProxy != "" {
-		imageAddress = path.Join(imageRegistryProxy, TestImage)
+func NewDeployment(
+	name, ns string,
+	replicas int32,
+	labels map[string]string,
+	imageRegistryProxy string,
+	workerOS string,
+) *DeploymentBuilder {
+	// Default to Linux environment
+	imageAddress := LinuxTestImage
+	command := []string{"sleep", "infinity"}
+	args := make([]string, 0)
+	var affinity corev1api.Affinity
+	var tolerations []corev1api.Toleration
+
+	if workerOS == common.WorkerOSLinux && imageRegistryProxy != "" {
+		imageAddress = path.Join(imageRegistryProxy, LinuxTestImage)
+	}
+
+	containerSecurityContext := &corev1api.SecurityContext{
+		AllowPrivilegeEscalation: boolptr.False(),
+		Capabilities: &corev1api.Capabilities{
+			Drop: []corev1api.Capability{"ALL"},
+		},
+		RunAsNonRoot: boolptr.True(),
+		RunAsUser:    func(i int64) *int64 { return &i }(65534),
+		RunAsGroup:   func(i int64) *int64 { return &i }(65534),
+		SeccompProfile: &corev1api.SeccompProfile{
+			Type: corev1api.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+
+	podSecurityContext := &corev1api.PodSecurityContext{
+		FSGroup:             func(i int64) *int64 { return &i }(65534),
+		FSGroupChangePolicy: func(policy corev1api.PodFSGroupChangePolicy) *corev1api.PodFSGroupChangePolicy { return &policy }(corev1api.FSGroupChangeAlways),
+	}
+
+	// Settings for Windows
+	if workerOS == common.WorkerOSWindows {
+		imageAddress = WindowTestImage
+		command = []string{"cmd"}
+		args = []string{"/c", "ping -t localhost > NUL"}
+
+		affinity = corev1api.Affinity{
+			NodeAffinity: &corev1api.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &corev1api.NodeSelector{
+					NodeSelectorTerms: []corev1api.NodeSelectorTerm{
+						{
+							MatchExpressions: []corev1api.NodeSelectorRequirement{
+								{
+									Key:      "kubernetes.io/os",
+									Values:   []string{common.WorkerOSWindows},
+									Operator: corev1api.NodeSelectorOpIn,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		tolerations = []corev1api.Toleration{
+			{
+				Effect: corev1api.TaintEffectNoSchedule,
+				Key:    "os",
+				Value:  common.WorkerOSWindows,
+			},
+			{
+				Effect: corev1api.TaintEffectNoExecute,
+				Key:    "os",
+				Value:  common.WorkerOSWindows,
+			},
+		}
+
+		whetherToRunAsRoot := false
+		containerSecurityContext = &corev1api.SecurityContext{
+			RunAsNonRoot: &whetherToRunAsRoot,
+		}
+
+		containerUserName := "ContainerAdministrator"
+		podSecurityContext = &corev1api.PodSecurityContext{
+			WindowsOptions: &corev1api.WindowsSecurityContextOptions{
+				RunAsUserName: &containerUserName,
+			},
+		}
 	}
 
 	containers := []corev1api.Container{
 		{
 			Name:    DefaultContainerName,
 			Image:   imageAddress,
-			Command: []string{"sleep", "1000000"},
+			Command: command,
+			Args:    args,
 			// Make pod obeys the restricted pod security standards.
-			SecurityContext: &corev1api.SecurityContext{
-				AllowPrivilegeEscalation: boolptr.False(),
-				Capabilities: &corev1api.Capabilities{
-					Drop: []corev1api.Capability{"ALL"},
-				},
-				RunAsNonRoot: boolptr.True(),
-				RunAsUser:    func(i int64) *int64 { return &i }(65534),
-				RunAsGroup:   func(i int64) *int64 { return &i }(65534),
-				SeccompProfile: &corev1api.SeccompProfile{
-					Type: corev1api.SeccompProfileTypeRuntimeDefault,
-				},
-			},
+			SecurityContext: containerSecurityContext,
 		},
 	}
 
@@ -100,11 +172,10 @@ func NewDeployment(name, ns string, replicas int32, labels map[string]string, im
 						Labels: labels,
 					},
 					Spec: corev1api.PodSpec{
-						SecurityContext: &corev1api.PodSecurityContext{
-							FSGroup:             func(i int64) *int64 { return &i }(65534),
-							FSGroupChangePolicy: func(policy corev1api.PodFSGroupChangePolicy) *corev1api.PodFSGroupChangePolicy { return &policy }(corev1api.FSGroupChangeAlways),
-						},
-						Containers: containers,
+						SecurityContext: podSecurityContext,
+						Containers:      containers,
+						Affinity:        &affinity,
+						Tolerations:     tolerations,
 					},
 				},
 			},
@@ -127,10 +198,6 @@ func (d *DeploymentBuilder) WithVolume(volumes []*corev1api.Volume) *DeploymentB
 	return d
 }
 
-func CreateDeploy(c clientset.Interface, ns string, deployment *appsv1api.Deployment) error {
-	_, err := c.AppsV1().Deployments(ns).Create(context.TODO(), deployment, metav1.CreateOptions{})
-	return err
-}
 func CreateDeployment(c clientset.Interface, ns string, deployment *appsv1api.Deployment) (*appsv1api.Deployment, error) {
 	return c.AppsV1().Deployments(ns).Create(context.TODO(), deployment, metav1.CreateOptions{})
 }

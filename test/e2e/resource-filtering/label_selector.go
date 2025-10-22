@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -82,13 +83,26 @@ func (l *LabelSelector) CreateResources() error {
 				"resourcefiltering": "false",
 			}
 		}
+
+		if l.VeleroCfg.WorkerOS == common.WorkerOSWindows {
+			labels["pod-security.kubernetes.io/enforce"] = "privileged"
+			labels["pod-security.kubernetes.io/enforce-version"] = "latest"
+		}
+
 		if err := CreateNamespaceWithLabel(l.Ctx, l.Client, namespace, labels); err != nil {
 			return errors.Wrapf(err, "Failed to create namespace %s", namespace)
 		}
 		//Create deployment
 		fmt.Printf("Creating deployment in namespaces ...%s\n", namespace)
 
-		deployment := NewDeployment(l.CaseBaseName, namespace, l.replica, labels, l.VeleroCfg.ImageRegistryProxy).Result()
+		deployment := NewDeployment(
+			l.CaseBaseName,
+			namespace,
+			l.replica,
+			labels,
+			l.VeleroCfg.ImageRegistryProxy,
+			l.VeleroCfg.WorkerOS,
+		).Result()
 		deployment, err := CreateDeployment(l.Client.ClientGo, namespace, deployment)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to delete the namespace %q", namespace))

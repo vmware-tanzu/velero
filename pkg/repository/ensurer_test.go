@@ -81,7 +81,7 @@ func TestEnsureRepo(t *testing.T) {
 			namespace:      "fake-ns",
 			bsl:            "fake-bsl",
 			repositoryType: "fake-repo-type",
-			err:            "error getting backup repository list: no kind is registered for the type v1.BackupRepositoryList in scheme \"pkg/runtime/scheme.go:100\"",
+			err:            "error getting backup repository list: no kind is registered for the type v1.BackupRepositoryList in scheme",
 		},
 		{
 			name:           "success on existing repo",
@@ -128,7 +128,7 @@ func TestEnsureRepo(t *testing.T) {
 
 			repo, err := ensurer.EnsureRepo(t.Context(), velerov1.DefaultNamespace, test.namespace, test.bsl, test.repositoryType)
 			if err != nil {
-				require.EqualError(t, err, test.err)
+				require.ErrorContains(t, err, test.err)
 			} else {
 				require.NoError(t, err)
 			}
@@ -190,7 +190,7 @@ func TestCreateBackupRepositoryAndWait(t *testing.T) {
 			namespace:      "fake-ns",
 			bsl:            "fake-bsl",
 			repositoryType: "fake-repo-type",
-			err:            "unable to create backup repository resource: no kind is registered for the type v1.BackupRepository in scheme \"pkg/runtime/scheme.go:100\"",
+			err:            "unable to create backup repository resource: no kind is registered for the type v1.BackupRepository in scheme",
 		},
 		{
 			name:           "get repo fail",
@@ -252,7 +252,7 @@ func TestCreateBackupRepositoryAndWait(t *testing.T) {
 				RepositoryType:  test.repositoryType,
 			})
 			if err != nil {
-				require.EqualError(t, err, test.err)
+				require.ErrorContains(t, err, test.err)
 			} else {
 				require.NoError(t, err)
 			}

@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 
 	. "github.com/vmware-tanzu/velero/test/e2e/test"
+	"github.com/vmware-tanzu/velero/test/util/common"
 	. "github.com/vmware-tanzu/velero/test/util/k8s"
 )
 
@@ -105,8 +106,16 @@ func (r *ResourceModifiersCase) CreateResources() error {
 
 	for nsNum := 0; nsNum < r.NamespacesTotal; nsNum++ {
 		namespace := fmt.Sprintf("%s-%00000d", r.CaseBaseName, nsNum)
+		nsLabels := make(map[string]string)
+		if r.VeleroCfg.WorkerOS == common.WorkerOSWindows {
+			nsLabels = map[string]string{
+				"pod-security.kubernetes.io/enforce":         "privileged",
+				"pod-security.kubernetes.io/enforce-version": "latest",
+			}
+		}
+
 		By(fmt.Sprintf("Create namespaces %s for workload\n", namespace), func() {
-			Expect(CreateNamespace(r.Ctx, r.Client, namespace)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespace))
+			Expect(CreateNamespaceWithLabel(r.Ctx, r.Client, namespace, nsLabels)).To(Succeed(), fmt.Sprintf("Failed to create namespace %s", namespace))
 		})
 
 		By(fmt.Sprintf("Creating deployment in namespaces ...%s\n", namespace), func() {
@@ -145,7 +154,14 @@ func (r *ResourceModifiersCase) Clean() error {
 }
 
 func (r *ResourceModifiersCase) createDeployment(namespace string) error {
-	deployment := NewDeployment(r.CaseBaseName, namespace, 1, map[string]string{"app": "test"}, r.VeleroCfg.ImageRegistryProxy).Result()
+	deployment := NewDeployment(
+		r.CaseBaseName,
+		namespace,
+		1,
+		map[string]string{"app": "test"},
+		r.VeleroCfg.ImageRegistryProxy,
+		r.VeleroCfg.WorkerOS,
+	).Result()
 	deployment, err := CreateDeployment(r.Client.ClientGo, namespace, deployment)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to create deloyment %s the namespace %q", deployment.Name, namespace))

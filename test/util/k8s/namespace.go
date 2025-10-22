@@ -53,8 +53,12 @@ func CreateNamespaceWithLabel(ctx context.Context, client TestClient, namespace 
 	ns := builder.ForNamespace(namespace).Result()
 	ns.Labels = label
 	// Add label to avoid PSA check.
-	ns.Labels["pod-security.kubernetes.io/enforce"] = "baseline"
-	ns.Labels["pod-security.kubernetes.io/enforce-version"] = "latest"
+	if _, ok := ns.Labels["pod-security.kubernetes.io/enforce"]; !ok {
+		ns.Labels["pod-security.kubernetes.io/enforce"] = "baseline"
+	}
+	if _, ok := ns.Labels["pod-security.kubernetes.io/enforce-version"]; !ok {
+		ns.Labels["pod-security.kubernetes.io/enforce-version"] = "latest"
+	}
 	_, err := client.ClientGo.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		return nil

@@ -51,6 +51,7 @@ import (
 type podVolumeRestoreConfig struct {
 	volumePath      string
 	pvrName         string
+	cacheDir        string
 	resourceTimeout time.Duration
 }
 
@@ -86,6 +87,7 @@ func NewRestoreCommand(f client.Factory) *cobra.Command {
 	command.Flags().Var(formatFlag, "log-format", fmt.Sprintf("The format for log output. Valid values are %s.", strings.Join(formatFlag.AllowedValues(), ", ")))
 	command.Flags().StringVar(&config.volumePath, "volume-path", config.volumePath, "The full path of the volume to be restored")
 	command.Flags().StringVar(&config.pvrName, "pod-volume-restore", config.pvrName, "The PVR name")
+	command.Flags().StringVar(&config.cacheDir, "cache-volume-path", config.cacheDir, "The full path of the cache volume")
 	command.Flags().DurationVar(&config.resourceTimeout, "resource-timeout", config.resourceTimeout, "How long to wait for resource processes which are not covered by other specific timeout parameters.")
 
 	_ = command.MarkFlagRequired("volume-path")
@@ -294,5 +296,5 @@ func (s *podVolumeRestore) createDataPathService() (dataPathService, error) {
 	return podvolume.NewRestoreMicroService(s.ctx, s.client, s.kubeClient, s.config.pvrName, s.namespace, s.nodeName, datapath.AccessPoint{
 		ByPath:  s.config.volumePath,
 		VolMode: uploader.PersistentVolumeFilesystem,
-	}, s.dataPathMgr, repoEnsurer, credGetter, pvrInformer, s.logger), nil
+	}, s.dataPathMgr, repoEnsurer, credGetter, pvrInformer, s.config.cacheDir, s.logger), nil
 }

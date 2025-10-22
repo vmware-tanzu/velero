@@ -153,6 +153,7 @@ func TestCreateBackupPodWithPriorityClass(t *testing.T) {
 				false, // spcNoRelabeling
 				kube.NodeOSLinux,
 				tc.expectedPriorityClass,
+				nil,
 			)
 
 			require.NoError(t, err, tc.description)
@@ -237,6 +238,7 @@ func TestCreateBackupPodWithMissingConfigMap(t *testing.T) {
 		false, // spcNoRelabeling
 		kube.NodeOSLinux,
 		"", // empty priority class since config map is missing
+		nil,
 	)
 
 	// Should succeed even when config map is missing
