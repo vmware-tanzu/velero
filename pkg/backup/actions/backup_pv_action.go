@@ -112,6 +112,10 @@ func (a *PVCAction) cleanupStaleVeleroLabels(pvc *corev1api.PersistentVolumeClai
 					shouldRemove = true
 				}
 
+				if k == "backup.velero.io/must-include-additional-items" {
+					shouldRemove = true
+				}
+
 				// Remove backup-name labels that don't match current backup
 				if k == "velero.io/backup-name" && v != backup.Name {
 					shouldRemove = true
