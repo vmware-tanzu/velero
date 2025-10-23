@@ -58,7 +58,7 @@ For other scenarios, we can add them regarded to the future changes/requirements
 
 If available, one cache volume is dedicately assigned to one data mover pod. That is, the cached data is destroyed when the data mover pod completes. Then the backup repository instance also closes.    
 Cache data are fully managed by the specific backup repository. So the backup repository may also have its own way to GC the cache data.  
-That is to say, cache data GC may be launched by the backup repository instance during the running of the data mover pod; then the left data are automatically destroyed when the data mover pod and the cache PVC are destroyed. So no specially logics are needed for cache data GC.  
+That is to say, cache data GC may be launched by the backup repository instance during the running of the data mover pod; then the left data are automatically destroyed when the data mover pod and the cache PVC are destroyed (cache PVC's `reclaimPolicy` is always `Deleted`, so once the cache PVC is destroyed, the volume will also be destroyed). So no specially logics are needed for cache data GC.  
 
 ### Data Size
 
@@ -70,19 +70,22 @@ Cache volumes take storage space and cluster resources (PVC, PV), therefore, cac
 
 The cache volume size is calculated from below factors (for Restore scenarios):  
 - **Limit**: The limit of the cache data, that is represented by `cacheLimitMB`, the default value is 5GB
-- **backupSize**: The size of the backup as a reference to evaluate whether to create a cache volume. It doesn't mean the backup data really decides the cache data all the time, it is just a reference to evaluate the scale of the backup, small scale backups may need small cache data. Sometimes, backupSize is not applicable/available or is irrelevant to the size of cache data, in this case, Limit will be used directly.  
+- **backupSize**: The size of the backup as a reference to evaluate whether to create a cache volume. It doesn't mean the backup data really decides the cache data all the time, it is just a reference to evaluate the scale of the backup, small scale backups may need small cache data. Sometimes, backupSize is not irrelevant to the size of cache data, in this case, ResidentThreshold should not be set, Limit will be used directly. It is unlikely that backupSize is unavailable, but once that happens, ResidentThreshold is ignored, Limit will be used directly.  
 - **ResidentThreshold**: The minimum backup size that a cache volume is created
-- **InflationPercentage**: Considering the overhead of the file system and the possible delay of the cache cleanup, there should be an inflation for the final volume size vs. the logical size, otherwise, the cache volume may be overrun. This inflation percentage is hardcoded, e.g., 20%
+- **InflationPercentage**: Considering the overhead of the file system and the possible delay of the cache cleanup, there should be an inflation for the final volume size vs. the logical size, otherwise, the cache volume may be overrun. This inflation percentage is hardcoded, e.g., 20%. 
 
 A formula is as below:  
 ```
-cacheVolumeSize = (backupSize != 0 ? (backupSize > residentThreshold ? limit : 0) : limit) * inflationPercentage
+cacheVolumeSize = ((backupSize != 0 ? (backupSize > residentThreshold ? limit : 0) : limit) * (100 + inflationPercentage)) / 100
 ```
 Finally, the `cacheVolumeSize` will be rounded up to GiB considering the UX friendliness, storage friendliness and management friendliness.    
 
 ### PVC/PV
 
 The PVC for a cache volume is created in Velero namespace and a storage class is required for the cache PVC. The PVC's accessMode is `ReadWriteOnce` and volumeMode is `FileSystem`, so the storage class provided should support this specification. Otherwise, if the storageclass doesn't support either of the specifications, the data mover pod may be hang in `Pending` state until a timeout setting with the data movement (e.g. `prepareTimeout`) and the data movement will finally fail.  
+It is not expected that the cache volume is retained after data mover pod is deleted, so the `reclaimPolicy` for the storageclass must be `Delete`.  
+
+To detect the problems in the storageclass and fail earlier, a validation is applied to the storageclass and once the validation fails, the cache configuration will be ignored, so the data mover pod will be created without a cache volume.  
 
 ### Cache Volume Configurations
 
@@ -139,20 +142,7 @@ The cache volume configurations will be visited by node-agent server, so they al
 
 ### Backup and Restore
 
-The restore needs to know the backup size so as to calculate the cache volume size, some new fields are added to the DataUpload, DataDownload, PodVolumeBackup and PodVolumeRestore CRDs.  
-
-`snapshotSize` field is added to DataUpload and PodVolumeBackup's `status`:
-```yaml
-          status:
-              snapshotID:
-                description: SnapshotID is the identifier for the snapshot in the
-                  backup repository.
-                type: string
-              snapshotSize:
-                description: SnapshotSize is the logical size of the snapshot.
-                format: int64
-                type: integer
-```
+The restore needs to know the backup size so as to calculate the cache volume size, some new fields are added to the DataDownload and PodVolumeRestore CRDs.  
 
 `snapshotSize` field is also added to DataDownload and PodVolumeRestore's `spec`:
 ```yaml
@@ -167,9 +157,9 @@ The restore needs to know the backup size so as to calculate the cache volume si
                 type: integer
 ```
 
-`snapshotSize` represents the total size of the backup; during restore, the value is transferred from DataUpload/PodVolumeBackup to DataDownload/PodVolumeRestore.    
+`snapshotSize` represents the total size of the backup; during restore, the value is transferred from DataUpload/PodVolumeBackup's `Status.Progress.TotalBytes` to DataDownload/PodVolumeRestore.    
 
-When restoring from backups created by previous versions, `snapshotSize` is not available, according to the above formula, `residentThresholdMB` is ignored, cache volume size is calculated directly from cache limit for the corresponding backup repository.  
+It is unlikely that `Status.Progress.TotalBytes` from DataUpload/PodVolumeBackup is unavailable, but once it happens, according to the above formula, `residentThresholdMB` is ignored, cache volume size is calculated directly from cache limit for the corresponding backup repository.  
 
 ### Exposer
 
