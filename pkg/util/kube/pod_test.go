@@ -896,10 +896,11 @@ func TestDiagnosePod(t *testing.T) {
 	testCases := []struct {
 		name     string
 		pod      *corev1api.Pod
+		events   *corev1api.EventList
 		expected string
 	}{
 		{
-			name: "pod with all info",
+			name: "pod with all info but event",
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "fake-pod",
@@ -928,11 +929,111 @@ func TestDiagnosePod(t *testing.T) {
 			},
 			expected: "Pod fake-ns/fake-pod, phase Pending, node name fake-node\nPod condition Initialized, status True, reason fake-reason-1, message fake-message-1\nPod condition PodScheduled, status False, reason fake-reason-2, message fake-message-2\n",
 		},
+		{
+			name: "pod with all info and empty event list",
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-pod",
+					Namespace: "fake-ns",
+				},
+				Spec: corev1api.PodSpec{
+					NodeName: "fake-node",
+				},
+				Status: corev1api.PodStatus{
+					Phase: corev1api.PodPending,
+					Conditions: []corev1api.PodCondition{
+						{
+							Type:    corev1api.PodInitialized,
+							Status:  corev1api.ConditionTrue,
+							Reason:  "fake-reason-1",
+							Message: "fake-message-1",
+						},
+						{
+							Type:    corev1api.PodScheduled,
+							Status:  corev1api.ConditionFalse,
+							Reason:  "fake-reason-2",
+							Message: "fake-message-2",
+						},
+					},
+				},
+			},
+			events:   &corev1api.EventList{},
+			expected: "Pod fake-ns/fake-pod, phase Pending, node name fake-node\nPod condition Initialized, status True, reason fake-reason-1, message fake-message-1\nPod condition PodScheduled, status False, reason fake-reason-2, message fake-message-2\n",
+		},
+		{
+			name: "pod with all info and events",
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fake-pod",
+					Namespace: "fake-ns",
+					UID:       "fake-pod-uid",
+				},
+				Spec: corev1api.PodSpec{
+					NodeName: "fake-node",
+				},
+				Status: corev1api.PodStatus{
+					Phase: corev1api.PodPending,
+					Conditions: []corev1api.PodCondition{
+						{
+							Type:    corev1api.PodInitialized,
+							Status:  corev1api.ConditionTrue,
+							Reason:  "fake-reason-1",
+							Message: "fake-message-1",
+						},
+						{
+							Type:    corev1api.PodScheduled,
+							Status:  corev1api.ConditionFalse,
+							Reason:  "fake-reason-2",
+							Message: "fake-message-2",
+						},
+					},
+				},
+			},
+			events: &corev1api.EventList{Items: []corev1api.Event{
+				{
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-uid-1"},
+					Type:           corev1api.EventTypeWarning,
+					Reason:         "reason-1",
+					Message:        "message-1",
+				},
+				{
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-uid-2"},
+					Type:           corev1api.EventTypeWarning,
+					Reason:         "reason-2",
+					Message:        "message-2",
+				},
+				{
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Type:           corev1api.EventTypeWarning,
+					Reason:         "reason-3",
+					Message:        "message-3",
+				},
+				{
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Type:           corev1api.EventTypeNormal,
+					Reason:         "reason-4",
+					Message:        "message-4",
+				},
+				{
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Type:           corev1api.EventTypeNormal,
+					Reason:         "reason-5",
+					Message:        "message-5",
+				},
+				{
+					InvolvedObject: corev1api.ObjectReference{UID: "fake-pod-uid"},
+					Type:           corev1api.EventTypeWarning,
+					Reason:         "reason-6",
+					Message:        "message-6",
+				},
+			}},
+			expected: "Pod fake-ns/fake-pod, phase Pending, node name fake-node\nPod condition Initialized, status True, reason fake-reason-1, message fake-message-1\nPod condition PodScheduled, status False, reason fake-reason-2, message fake-message-2\nPod event reason reason-3, message message-3\nPod event reason reason-6, message message-6\n",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			diag := DiagnosePod(tc.pod)
+			diag := DiagnosePod(tc.pod, tc.events)
 			assert.Equal(t, tc.expected, diag)
 		})
 	}

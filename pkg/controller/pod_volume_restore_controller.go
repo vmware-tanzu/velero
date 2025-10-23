@@ -56,7 +56,7 @@ import (
 
 func NewPodVolumeRestoreReconciler(client client.Client, mgr manager.Manager, kubeClient kubernetes.Interface, dataPathMgr *datapath.Manager,
 	counter *exposer.VgdpCounter, nodeName string, preparingTimeout time.Duration, resourceTimeout time.Duration, podResources corev1api.ResourceRequirements,
-	logger logrus.FieldLogger, dataMovePriorityClass string) *PodVolumeRestoreReconciler {
+	logger logrus.FieldLogger, dataMovePriorityClass string, privileged bool) *PodVolumeRestoreReconciler {
 	return &PodVolumeRestoreReconciler{
 		client:                client,
 		mgr:                   mgr,
@@ -72,6 +72,7 @@ func NewPodVolumeRestoreReconciler(client client.Client, mgr manager.Manager, ku
 		exposer:               exposer.NewPodVolumeExposer(kubeClient, logger),
 		cancelledPVR:          make(map[string]time.Time),
 		dataMovePriorityClass: dataMovePriorityClass,
+		privileged:            privileged,
 	}
 }
 
@@ -90,6 +91,7 @@ type PodVolumeRestoreReconciler struct {
 	resourceTimeout       time.Duration
 	cancelledPVR          map[string]time.Time
 	dataMovePriorityClass string
+	privileged            bool
 }
 
 // +kubebuilder:rbac:groups=velero.io,resources=podvolumerestores,verbs=get;list;watch;create;update;patch;delete
@@ -896,6 +898,7 @@ func (r *PodVolumeRestoreReconciler) setupExposeParam(pvr *velerov1api.PodVolume
 		Resources:             r.podResources,
 		// Priority class name for the data mover pod, retrieved from node-agent-configmap
 		PriorityClassName: r.dataMovePriorityClass,
+		Privileged:        r.privileged,
 	}
 }
 

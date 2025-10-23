@@ -17,20 +17,15 @@ limitations under the License.
 package actions
 
 import (
-	"context"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework/common"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/util"
 )
@@ -91,46 +86,13 @@ func (p *PVCAction) Execute(input *velero.RestoreItemActionExecuteInput) (*veler
 		return nil, errors.WithStack(err)
 	}
 
-	if pvc.Annotations == nil {
-		pvc.Annotations = make(map[string]string)
-	}
-
 	log := p.logger.WithFields(map[string]any{
 		"kind":      pvc.Kind,
 		"namespace": pvc.Namespace,
 		"name":      pvc.Name,
 	})
 
-	// Handle selected node annotation
-	node, ok := pvc.Annotations[AnnSelectedNode]
-	if ok {
-		// fetch node mapping from configMap
-		newNode, err := getNewNodeFromConfigMap(p.configMapClient, node)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(newNode) != 0 {
-			// Check whether the mapped node exists first.
-			exists, err := isNodeExist(p.nodeClient, newNode)
-			if err != nil {
-				return nil, errors.Wrapf(err, "error checking %s's mapped node %s existence", node, newNode)
-			}
-			if !exists {
-				log.Warnf("Selected-node's mapped node doesn't exist: source: %s, dest: %s. Please check the ConfigMap with label velero.io/change-pvc-node-selector.", node, newNode)
-			}
-
-			// set node selector
-			// We assume that node exist for node-mapping
-			pvc.Annotations[AnnSelectedNode] = newNode
-			log.Infof("Updating selected-node to %s from %s", newNode, node)
-		} else {
-			log.Info("Clearing PVC selected-node annotation")
-			delete(pvc.Annotations, AnnSelectedNode)
-		}
-	}
-
-	// Remove other annotations
+	// Remove PVC annotations
 	removePVCAnnotations(
 		&pvc,
 		[]string{
@@ -138,6 +100,7 @@ func (p *PVCAction) Execute(input *velero.RestoreItemActionExecuteInput) (*veler
 			AnnBoundByController,
 			AnnStorageProvisioner,
 			AnnBetaStorageProvisioner,
+			AnnSelectedNode,
 			velerov1api.VolumeSnapshotLabel,
 			velerov1api.DataUploadNameAnnotation,
 		},
@@ -165,34 +128,6 @@ func (p *PVCAction) Execute(input *velero.RestoreItemActionExecuteInput) (*veler
 		}
 	}
 	return output, nil
-}
-
-func getNewNodeFromConfigMap(client corev1client.ConfigMapInterface, node string) (string, error) {
-	// fetch node mapping from configMap
-	config, err := common.GetPluginConfig(common.PluginKindRestoreItemAction, "velero.io/change-pvc-node-selector", client)
-	if err != nil {
-		return "", err
-	}
-
-	if config == nil {
-		// there is no node mapping defined for change-pvc-node
-		// so we will return empty new node
-		return "", nil
-	}
-
-	return config.Data[node], nil
-}
-
-// isNodeExist check if node resource exist or not
-func isNodeExist(nodeClient corev1client.NodeInterface, name string) (bool, error) {
-	_, err := nodeClient.Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
 }
 
 func removePVCAnnotations(pvc *corev1api.PersistentVolumeClaim, remove []string) {

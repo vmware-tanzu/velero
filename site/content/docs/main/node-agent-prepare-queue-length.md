@@ -27,19 +27,19 @@ To create the configMap, save something like the above sample to a json file and
 kubectl create cm node-agent-config -n velero --from-file=<json file name>
 ```
 
-To provide the configMap to node-agent, edit the node-agent daemonset and add the ```- --node-agent-config``` argument to the spec:
+To provide the configMap to node-agent, edit the node-agent daemonset and add the ```- --node-agent-configmap`` argument to the spec:
 1. Open the node-agent daemonset spec  
 ```
 kubectl edit ds node-agent -n velero
 ```
-2. Add ```- --node-agent-config``` to ```spec.template.spec.containers```  
+2. Add ```- --node-agent-configmap``` to ```spec.template.spec.containers```  
 ```
 spec:
   template:
     spec:
       containers:
       - args:
-        - --node-agent-config=<configMap name>
+        - --node-agent-configmap=<configMap name>
 ```
 
 [1]: csi-snapshot-data-movement.md

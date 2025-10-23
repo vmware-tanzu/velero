@@ -17,11 +17,9 @@ limitations under the License.
 package actions
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
@@ -42,105 +40,57 @@ import (
 // desired result.
 func TestPVCActionExecute(t *testing.T) {
 	tests := []struct {
-		name      string
-		pvc       *corev1api.PersistentVolumeClaim
-		configMap *corev1api.ConfigMap
-		node      *corev1api.Node
-		newNode   *corev1api.Node
-		want      *corev1api.PersistentVolumeClaim
-		wantErr   error
+		name    string
+		pvc     *corev1api.PersistentVolumeClaim
+		want    *corev1api.PersistentVolumeClaim
+		wantErr error
 	}{
 		{
-			name: "a valid mapping for a persistent volume claim is applied correctly",
-			pvc: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").
-				ObjectMeta(
-					builder.WithAnnotations("volume.kubernetes.io/selected-node", "source-node"),
-				).Result(),
-			configMap: builder.ForConfigMap("velero", "change-pvc-node").
-				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
-				Data("source-node", "dest-node").
-				Result(),
-			newNode: builder.ForNode("dest-node").Result(),
-			want: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").
-				ObjectMeta(
-					builder.WithAnnotations("volume.kubernetes.io/selected-node", "dest-node"),
-				).Result(),
-		},
-		{
-			name: "when no config map exists for the plugin, the item is returned without node selector",
-			pvc: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").
-				ObjectMeta(
-					builder.WithAnnotations("volume.kubernetes.io/selected-node", "source-node"),
-				).Result(),
-			configMap: builder.ForConfigMap("velero", "change-pvc-node").
-				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/some-other-plugin", "RestoreItemAction")).
-				Data("source-node", "dest-node").
-				Result(),
-			node: builder.ForNode("source-node").Result(),
-			want: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").Result(),
-		},
-		{
-			name: "when no node-mappings exist in the plugin config map, the item is returned without node selector",
-			pvc: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").
-				ObjectMeta(
-					builder.WithAnnotations("volume.kubernetes.io/selected-node", "source-node"),
-				).Result(),
-			configMap: builder.ForConfigMap("velero", "change-pvc-node").
-				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
-				Result(),
-			node: builder.ForNode("source-node").Result(),
-			want: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").Result(),
-		},
-		{
-			name: "when persistent volume claim has no node selector, the item is returned as-is",
+			name: "a persistent volume claim with no annotation",
 			pvc:  builder.ForPersistentVolumeClaim("source-ns", "pvc-1").Result(),
-			configMap: builder.ForConfigMap("velero", "change-pvc-node").
-				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
-				Data("source-node", "dest-node").
-				Result(),
 			want: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").Result(),
 		},
 		{
-			name: "when persistent volume claim's node-selector has no mapping in the config map, the item is returned without node selector",
+			name: "a persistent volume claim with selected-node annotation",
 			pvc: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").
 				ObjectMeta(
 					builder.WithAnnotations("volume.kubernetes.io/selected-node", "source-node"),
 				).Result(),
-			configMap: builder.ForConfigMap("velero", "change-pvc-node").
-				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "", "velero.io/change-pvc-node-selector", "RestoreItemAction")).
-				Data("source-node-1", "dest-node").
-				Result(),
-			node: builder.ForNode("source-node").Result(),
-			want: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").Result(),
+			want: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").ObjectMeta(builder.WithAnnotationsMap(map[string]string{})).Result(),
+		},
+		{
+			name: "a persistent volume claim with other annotation",
+			pvc: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").
+				ObjectMeta(
+					builder.WithAnnotations("other-anno-1", "other-value-1", "other-anno-2", "other-value-2"),
+				).Result(),
+			want: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").ObjectMeta(
+				builder.WithAnnotations("other-anno-1", "other-value-1", "other-anno-2", "other-value-2"),
+			).Result(),
+		},
+		{
+			name: "a persistent volume claim with other annotation and selected-node annotation",
+			pvc: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").
+				ObjectMeta(
+					builder.WithAnnotations("other-anno", "other-value", "volume.kubernetes.io/selected-node", "source-node"),
+				).Result(),
+			want: builder.ForPersistentVolumeClaim("source-ns", "pvc-1").ObjectMeta(
+				builder.WithAnnotations("other-anno", "other-value"),
+			).Result(),
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			clientset := fake.NewSimpleClientset()
-			logger := logrus.StandardLogger()
-			buf := bytes.Buffer{}
-			logrus.SetOutput(&buf)
+
 			a := NewPVCAction(
-				logger,
+				velerotest.NewLogger(),
 				clientset.CoreV1().ConfigMaps("velero"),
 				clientset.CoreV1().Nodes(),
 			)
 
 			// set up test data
-			if tc.configMap != nil {
-				_, err := clientset.CoreV1().ConfigMaps(tc.configMap.Namespace).Create(t.Context(), tc.configMap, metav1.CreateOptions{})
-				require.NoError(t, err)
-			}
-
-			if tc.node != nil {
-				_, err := clientset.CoreV1().Nodes().Create(t.Context(), tc.node, metav1.CreateOptions{})
-				require.NoError(t, err)
-			}
-			if tc.newNode != nil {
-				_, err := clientset.CoreV1().Nodes().Create(t.Context(), tc.newNode, metav1.CreateOptions{})
-				require.NoError(t, err)
-			}
 			unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pvc)
 			require.NoError(t, err)
 
@@ -155,10 +105,6 @@ func TestPVCActionExecute(t *testing.T) {
 
 			// execute method under test
 			res, err := a.Execute(input)
-
-			// Make sure mapped selected-node exists.
-			logOutput := buf.String()
-			assert.NotContains(t, logOutput, "Selected-node's mapped node doesn't exist")
 
 			// validate for both error and non-error cases
 			switch {
