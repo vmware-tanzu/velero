@@ -110,6 +110,7 @@ type BackupSpec struct {
 
 	// TTL is a time.Duration-compatible string describing how long
 	// the Backup should be retained for.
+	// Supports time.Duration units + day, week, month, and year.
 	// +optional
 	TTL metav1.Duration `json:"ttl,omitempty"`
 
