@@ -108,7 +108,7 @@ type BackupSpec struct {
 	// +nullable
 	SnapshotVolumes *bool `json:"snapshotVolumes,omitempty"`
 
-	// TTL is a string describing how long
+	// TTL is a time.Duration-compatible string describing how long
 	// the Backup should be retained for.
 	// +optional
 	TTL metav1.Duration `json:"ttl,omitempty"`
