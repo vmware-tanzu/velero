@@ -538,7 +538,7 @@ spec:
                     description: |-
                       TTL is a time.Duration-compatible string describing how long
                       the Backup should be retained for.
-                      Supports time.Duration units + day, week, month, and year.
+                      Supports time.Duration units + day (d), week (w), month (mo), and year (yr).
                     type: string
                   uploaderConfig:
                     description: UploaderConfig specifies the configuration for the
