@@ -279,19 +279,12 @@ func (e *podVolumeExposer) DiagnoseExpose(ctx context.Context, ownerObject corev
 		diag += fmt.Sprintf("error getting hosting pod %s, err: %v\n", hostingPodName, err)
 	}
 
-	var cachePVC *corev1api.PersistentVolumeClaim
-	if pod.Spec.Volumes != nil {
-		for _, v := range pod.Spec.Volumes {
-			if v.Name == cacheVolumeName {
-				cachePVC, err = e.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(ctx, getCachePVCName(ownerObject), metav1.GetOptions{})
-				if err != nil {
-					cachePVC = nil
-					diag += fmt.Sprintf("error getting cache pvc %s, err: %v\n", getCachePVCName(ownerObject), err)
-				}
+	cachePVC, err := e.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(ctx, getCachePVCName(ownerObject), metav1.GetOptions{})
+	if err != nil {
+		cachePVC = nil
 
-				break
-			}
-
+		if !apierrors.IsNotFound(err) {
+			diag += fmt.Sprintf("error getting cache pvc %s, err: %v\n", getCachePVCName(ownerObject), err)
 		}
 	}
 
