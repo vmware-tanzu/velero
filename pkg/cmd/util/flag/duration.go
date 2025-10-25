@@ -28,7 +28,7 @@ var unitMap = map[string]uint64{
 	"d":  uint64(24 * time.Hour),
 	"w":  uint64(7 * 24 * time.Hour),
 	"mo": uint64(30 * 24 * time.Hour),
-	"yr": uint64(365 * 24 * time.Hour),
+	"y":  uint64(365 * 24 * time.Hour),
 }
 
 // ParseDuration parses strings like "2d5h10.5m"

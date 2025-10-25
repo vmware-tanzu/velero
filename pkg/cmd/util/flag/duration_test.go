@@ -57,7 +57,7 @@ func TestParseDuration(t *testing.T) {
 		},
 		{
 			name:     "years only",
-			input:    "1yr",
+			input:    "1y",
 			expected: 365 * 24 * time.Hour,
 			wantErr:  false,
 		},
