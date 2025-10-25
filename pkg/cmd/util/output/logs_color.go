@@ -81,7 +81,7 @@ type nopCloser struct {
 func (nopCloser) Close() error { return nil }
 
 // Print logfmt-formatted logs to stdout with color based on log level
-// if color.NoColor is set, logs will be directly piped to w without processing
+// if color.NoColor is set, logs will be directly piped to stdout without processing
 // Returns the writer to write logs to, and a waitgroup to wait for processing to finish
 // Writer must be closed once all logs have been written
 func PrintLogsWithColor() (io.WriteCloser, *sync.WaitGroup) {
