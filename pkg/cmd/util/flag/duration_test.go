@@ -52,13 +52,13 @@ func TestParseDuration(t *testing.T) {
 		{
 			name:     "months only",
 			input:    "2mo",
-			expected: 2 * 30 * 24 * time.Hour,
+			expected: 2 * 31 * 24 * time.Hour,
 			wantErr:  false,
 		},
 		{
 			name:     "years only",
 			input:    "1y",
-			expected: 365 * 24 * time.Hour,
+			expected: 366 * 24 * time.Hour,
 			wantErr:  false,
 		},
 		{
@@ -126,7 +126,7 @@ func TestParseDuration(t *testing.T) {
 
 		// Error cases
 		{
-			name:     "invalid character at start",
+			name:     "invalid characters",
 			input:    "abc",
 			expected: 0,
 			wantErr:  true,

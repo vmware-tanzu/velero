@@ -27,12 +27,13 @@ var unitMap = map[string]uint64{
 	"h":  uint64(time.Hour),
 	"d":  uint64(24 * time.Hour),
 	"w":  uint64(7 * 24 * time.Hour),
-	"mo": uint64(30 * 24 * time.Hour),
-	"y":  uint64(365 * 24 * time.Hour),
+	"mo": uint64(31 * 24 * time.Hour),
+	"y":  uint64(366 * 24 * time.Hour),
 }
 
 // ParseDuration parses strings like "2d5h10.5m"
 // it does not support negative durations.
+// units are static and over-provisioned: 1d=24h, 1mo=31d, 1y=366d
 func ParseDuration(s string) (Duration, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
