@@ -25,6 +25,8 @@ ifneq (, $(shell which docker 2>/dev/null))
   DOCKER := docker
 else ifneq (, $(shell which podman 2>/dev/null))
   DOCKER := podman
+  # map host uid to container uid
+  export PODMAN_USERNS=keep-id
 else
   $(error Neither docker nor podman found)
 endif
@@ -214,6 +216,7 @@ shell: build-dirs build-env
 		-e GOPROXY \
 		-i $(TTY) \
 		--rm \
+		-u $$(id -u):$$(id -g) \
 		-v "$$(pwd):/github.com/vmware-tanzu/velero:delegated" \
 		-v "$$(pwd)/_output/bin:/output:delegated" \
 		-v "$$(pwd)/.go/pkg:/go/pkg:delegated" \
