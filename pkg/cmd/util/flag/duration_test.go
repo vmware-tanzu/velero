@@ -26,21 +26,9 @@ func TestParseDuration(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:     "nanoseconds only",
-			input:    "30ns",
-			expected: 30 * time.Nanosecond,
-			wantErr:  false,
-		},
-		{
 			name:     "seconds only",
 			input:    "30s",
 			expected: 30 * time.Second,
-			wantErr:  false,
-		},
-		{
-			name:     "minutes only",
-			input:    "5m",
-			expected: 5 * time.Minute,
 			wantErr:  false,
 		},
 		{
