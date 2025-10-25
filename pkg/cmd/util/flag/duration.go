@@ -31,28 +31,33 @@ var unitMap = map[string]uint64{
 	"yr": uint64(365 * 24 * time.Hour),
 }
 
-// ParseDuration parses strings like "2d5h10m"
+// ParseDuration parses strings like "2d5h10.5m"
+// it does not support negative durations.
 func ParseDuration(s string) (Duration, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return Duration{Duration: 0}, nil
 	}
 
-	var total uint64
+	var total float64
 	i := 0
 	n := len(s)
 
 	for i < n {
-		// Get number
+		// Get number (including decimal point)
 		j := i
-		for j < n && unicode.IsDigit(rune(s[j])) {
+		hasDot := false
+		for j < n && (unicode.IsDigit(rune(s[j])) || (s[j] == '.' && !hasDot)) {
+			if s[j] == '.' {
+				hasDot = true
+			}
 			j++
 		}
 		if j == i {
 			return Duration{}, fmt.Errorf("expected number at pos %d", i)
 		}
 		numStr := s[i:j]
-		num, err := strconv.ParseUint(numStr, 10, 64)
+		num, err := strconv.ParseFloat(numStr, 64)
 		if err != nil {
 			return Duration{}, err
 		}
@@ -73,7 +78,7 @@ func ParseDuration(s string) (Duration, error) {
 			return Duration{}, fmt.Errorf("unknown unit %q", unit)
 		}
 		// Add to total
-		total += num * val
+		total += num * float64(val)
 
 		i = k
 		for i < n && s[i] == ' ' {
@@ -81,7 +86,7 @@ func ParseDuration(s string) (Duration, error) {
 		}
 	}
 
-	// Convert integer seconds into time.Duration
+	// Convert to time.Duration (nanoseconds)
 	return Duration{Duration: time.Duration(total)}, nil
 }
 

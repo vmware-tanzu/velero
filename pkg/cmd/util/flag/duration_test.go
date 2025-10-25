@@ -104,6 +104,38 @@ func TestParseDuration(t *testing.T) {
 			wantErr:  false,
 		},
 
+		// Fractional values
+		{
+			name:     "basic fraction",
+			input:    "5.5s",
+			expected: time.Duration(5.5 * float64(time.Second)),
+			wantErr:  false,
+		},
+		{
+			name:     "fraction with no decimal part",
+			input:    "5.s",
+			expected: time.Duration(5 * float64(time.Second)),
+			wantErr:  false,
+		},
+		{
+			name:     "fractional with multiple decimals",
+			input:    "1.25h30.5m",
+			expected: time.Duration(1.25*float64(time.Hour) + 30.5*float64(time.Minute)),
+			wantErr:  false,
+		},
+		{
+			name:     "fractional zero",
+			input:    "0.0s",
+			expected: 0,
+			wantErr:  false,
+		},
+		{
+			name:     "mixed integer and fractional",
+			input:    "2h1.5m30s",
+			expected: 2*time.Hour + time.Duration(1.5*float64(time.Minute)) + 30*time.Second,
+			wantErr:  false,
+		},
+
 		// Error cases
 		{
 			name:     "invalid character at start",
@@ -142,8 +174,8 @@ func TestParseDuration(t *testing.T) {
 			wantErr:  true,
 		},
 		{
-			name:     "decimal number",
-			input:    "5.5s",
+			name:     "multiple decimal points",
+			input:    "5.5.5s",
 			expected: 0,
 			wantErr:  true,
 		},
