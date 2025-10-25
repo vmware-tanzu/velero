@@ -87,8 +87,8 @@ func TestParseDuration(t *testing.T) {
 		},
 		{
 			name:     "large numbers",
-			input:    "10000000s",
-			expected: 10000000 * time.Second,
+			input:    "99999999999ms",
+			expected: 99999999999 * time.Millisecond,
 			wantErr:  false,
 		},
 
