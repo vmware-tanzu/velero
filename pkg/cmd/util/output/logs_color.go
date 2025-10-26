@@ -63,7 +63,7 @@ func processAndPrintLogs(r io.Reader, w io.Writer) error {
 		}
 
 		// Re-encode with color. We do not use logfmt Encoder because it does not support color
-		for _, field := range fields {
+		for i, field := range fields {
 			key := string(field[0])
 			value := string(field[1])
 
@@ -80,7 +80,10 @@ func processAndPrintLogs(r io.Reader, w io.Writer) error {
 				}
 				key = lineColor.Sprintf("%s", field[0])
 			}
-			fmt.Fprintf(w, "%s=%s ", key, value)
+			if i != 0 {
+				fmt.Fprint(w, " ")
+			}
+			fmt.Fprintf(w, "%s=%s", key, value)
 		}
 		fmt.Fprintln(w)
 	}
