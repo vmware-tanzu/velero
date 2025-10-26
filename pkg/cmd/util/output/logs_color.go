@@ -103,12 +103,14 @@ func (nopCloser) Close() error { return nil }
 // if color.NoColor is set, logs will be directly piped to stdout without processing
 // Returns the writer to write logs to, and a waitgroup to wait for processing to finish
 // Writer must be closed once all logs have been written
+// Note: this function is a wrapper around processAndPrintLogs to avoid always creating a goroutine
 func PrintLogsWithColor() (io.WriteCloser, *sync.WaitGroup) {
 	// If NoColor, do not parse logs and directly fall back to stdout
 	var wg sync.WaitGroup
 	if color.NoColor {
 		return nopCloser{os.Stdout}, &wg
 	} else {
+		// Else, create a goroutine to process logs.
 		wg.Add(1)
 		pr, pw := io.Pipe()
 
