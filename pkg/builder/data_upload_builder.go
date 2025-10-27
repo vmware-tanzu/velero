@@ -180,3 +180,9 @@ func (d *DataUploadBuilder) Message(msg string) *DataUploadBuilder {
 	d.object.Status.Message = msg
 	return d
 }
+
+// TotalBytes sets the DataUpload's TotalBytes.
+func (d *DataUploadBuilder) TotalBytes(size int64) *DataUploadBuilder {
+	d.object.Status.Progress.TotalBytes = size
+	return d
+}

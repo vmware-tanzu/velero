@@ -39,6 +39,7 @@ const (
 // volumeBackupInfo describes the backup info of a volume backed up by PodVolumeBackups
 type volumeBackupInfo struct {
 	snapshotID     string
+	snapshotSize   int64
 	uploaderType   string
 	repositoryType string
 }
@@ -94,6 +95,7 @@ func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, 
 
 		volumes[pvb.Spec.Volume] = volumeBackupInfo{
 			snapshotID:     pvb.Status.SnapshotID,
+			snapshotSize:   pvb.Status.Progress.TotalBytes,
 			uploaderType:   getUploaderTypeOrDefault(pvb.Spec.UploaderType),
 			repositoryType: getRepositoryType(pvb.Spec.UploaderType),
 		}
@@ -109,7 +111,7 @@ func getVolumeBackupInfoForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, 
 	}
 
 	for k, v := range fromAnnntation {
-		volumes[k] = volumeBackupInfo{v, uploader.ResticType, velerov1api.BackupRepositoryTypeRestic}
+		volumes[k] = volumeBackupInfo{v, 0, uploader.ResticType, velerov1api.BackupRepositoryTypeRestic}
 	}
 
 	return volumes
