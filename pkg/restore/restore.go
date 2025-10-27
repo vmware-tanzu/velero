@@ -1699,21 +1699,21 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 	createdObj.SetManagedFields(obj.GetManagedFields())
 	patchBytes, err := generatePatch(withoutManagedFields, createdObj)
 	if err != nil {
-		restoreLogger.Errorf("error generating patch for managed fields %s: %s", kube.NamespaceAndName(obj), err.Error())
+		restoreLogger.Errorf("error generating patch for managed fields %s: %s", kube.NamespaceAndName(createdObj), err.Error())
 		errs.Add(namespace, err)
 		return warnings, errs, itemExists
 	}
 	if patchBytes != nil {
-		if _, err = resourceClient.Patch(obj.GetName(), patchBytes); err != nil {
+		if _, err = resourceClient.Patch(createdObj.GetName(), patchBytes); err != nil {
 			if !apierrors.IsNotFound(err) {
-				restoreLogger.Errorf("error patch for managed fields %s: %s", kube.NamespaceAndName(obj), err.Error())
+				restoreLogger.Errorf("error patch for managed fields %s: %s", kube.NamespaceAndName(createdObj), err.Error())
 				errs.Add(namespace, err)
 				return warnings, errs, itemExists
 			}
-			restoreLogger.Warnf("item not found when patching managed fields %s: %s", kube.NamespaceAndName(obj), err.Error())
+			restoreLogger.Warnf("item not found when patching managed fields %s: %s", kube.NamespaceAndName(createdObj), err.Error())
 			warnings.Add(namespace, err)
 		} else {
-			restoreLogger.Infof("the managed fields for %s is patched", kube.NamespaceAndName(obj))
+			restoreLogger.Infof("the managed fields for %s is patched", kube.NamespaceAndName(createdObj))
 		}
 	}
 
