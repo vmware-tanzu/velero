@@ -1514,7 +1514,11 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 		createdObj, restoreErr = resourceClient.Create(obj)
 		if restoreErr == nil {
 			itemExists = true
-			ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: itemExists}
+			ctx.restoredItems[itemKey] = restoredItemStatus{
+				action:      ItemRestoreResultCreated,
+				itemExists:  itemExists,
+				createdName: createdObj.GetName(),
+			}
 		}
 	}
 
