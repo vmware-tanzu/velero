@@ -741,7 +741,7 @@ func (ctx *restoreContext) processSelectedResource(
 						namespace: ns.Namespace,
 						name:      ns.Name,
 					}
-					ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: true}
+					ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: true, createdName: ns.Name}
 				}
 
 				// Keep track of namespaces that we know exist so we don't
@@ -1142,7 +1142,7 @@ func (ctx *restoreContext) restoreItem(obj *unstructured.Unstructured, groupReso
 				namespace: nsToEnsure.Namespace,
 				name:      nsToEnsure.Name,
 			}
-			ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: true}
+			ctx.restoredItems[itemKey] = restoredItemStatus{action: ItemRestoreResultCreated, itemExists: true, createdName: nsToEnsure.Name}
 		}
 	} else {
 		if boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
