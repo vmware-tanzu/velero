@@ -608,7 +608,7 @@ func getBackupRepositoryConfig(ctx context.Context, ctrlClient client.Client, co
 
 	jsonData, found := loc.Data[repoType]
 	if !found {
-		log.Info("No data for repo type %s in config map %s", repoType, configName)
+		log.Infof("No data for repo type %s in config map %s", repoType, configName)
 		return nil, nil
 	}
 

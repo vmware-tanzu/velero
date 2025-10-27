@@ -76,6 +76,7 @@ func (d *DataUploadRetrieveAction) Execute(input *velero.RestoreItemActionExecut
 		BackupStorageLocation: backup.Spec.StorageLocation,
 		DataMover:             dataUpload.Spec.DataMover,
 		SnapshotID:            dataUpload.Status.SnapshotID,
+		SnapshotSize:          dataUpload.Status.Progress.TotalBytes,
 		SourceNamespace:       dataUpload.Spec.SourceNamespace,
 		DataMoverResult:       dataUpload.Status.DataMoverResult,
 		NodeOS:                dataUpload.Status.NodeOS,
