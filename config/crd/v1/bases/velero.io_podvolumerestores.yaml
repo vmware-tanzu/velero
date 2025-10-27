@@ -134,7 +134,7 @@ spec:
                 description: SnapshotID is the ID of the volume snapshot to be restored.
                 type: string
               snapshotSize:
-                description: SnapshotSize is the logical size of the snapshot.
+                description: SnapshotSize is the logical size in Bytes of the snapshot.
                 format: int64
                 type: integer
               sourceNamespace:

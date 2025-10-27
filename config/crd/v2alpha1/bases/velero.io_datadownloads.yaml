@@ -109,7 +109,7 @@ spec:
                   be restored from.
                 type: string
               snapshotSize:
-                description: SnapshotSize is the logical size of the snapshot.
+                description: SnapshotSize is the logical size in Bytes of the snapshot.
                 format: int64
                 type: integer
               sourceNamespace:

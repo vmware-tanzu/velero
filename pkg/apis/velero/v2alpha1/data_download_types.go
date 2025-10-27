@@ -59,7 +59,7 @@ type DataDownloadSpec struct {
 	// +optional
 	NodeOS NodeOS `json:"nodeOS,omitempty"`
 
-	// SnapshotSize is the logical size of the snapshot.
+	// SnapshotSize is the logical size in Bytes of the snapshot.
 	// +optional
 	SnapshotSize int64 `json:"snapshotSize,omitempty"`
 }

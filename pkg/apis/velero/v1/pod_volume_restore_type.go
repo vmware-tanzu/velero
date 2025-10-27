@@ -59,7 +59,7 @@ type PodVolumeRestoreSpec struct {
 	// when the PodVolumeRestore is in InProgress phase
 	Cancel bool `json:"cancel,omitempty"`
 
-	// SnapshotSize is the logical size of the snapshot.
+	// SnapshotSize is the logical size in Bytes of the snapshot.
 	// +optional
 	SnapshotSize int64 `json:"snapshotSize,omitempty"`
 }
