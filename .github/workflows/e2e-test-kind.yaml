@@ -185,7 +185,7 @@ jobs:
         timeout-minutes: 30
       - name: Upload debug bundle
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: DebugBundle
           path: /home/runner/work/velero/velero/test/e2e/debug-bundle*
