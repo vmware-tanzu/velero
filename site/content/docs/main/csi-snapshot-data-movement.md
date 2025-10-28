@@ -116,10 +116,15 @@ velero backup create NAME --snapshot-move-data --data-mover DATA-MOVER-NAME OPTI
 When the backup starts, you will see the `VolumeSnapshot` and `VolumeSnapshotContent` objects created, but after the backup finishes, the objects will disappear.  
 After snapshots are created, you will see one or more `DataUpload` CRs created.  
 You may also see some intermediate objects (i.e., pods, PVCs, PVs) created in Velero namespace or the cluster scope, they are to help data movers to move data. And they will be removed after the backup completes.  
-The phase of a `DataUpload` CR changes several times during the backup process and finally goes to one of the terminal status, `Completed`, `Failed` or `Cancelled`. You can see the phase changes as well as the data upload progress by watching the `DataUpload` CRs:  
+The phase of a `DataUpload` CR changes several times during the backup process and finally goes to one of the terminal status, `Completed`, `Failed` or `Cancelled`. You can see the phase changes as well as the data upload progress by watching the `DataUpload` CRs. While the `DataUpload` is being processed, progress is shown with `BYTES DONE` representing the amount of volume data that has been processed so far and `TOTAL BYTES` representing the estimated total volume data. Upon completion, these two numbers will be the same. In addition, once the `DataUpload` is done, `INCREMENTAL BYTES` will be filled in with the amount of data which is new or changed since the last backup of this volume. Note that the actual uploaded content may be smaller than `INCREMENTAL BYTES` due to kopia deduplication, compression, etc.  
 
 ```bash
 kubectl -n velero get datauploads -l velero.io/backup-name=YOUR_BACKUP_NAME -w
+```
+
+By default, `INCREMENTAL BYTES` is not displayed in the `kubectl get` output. To see this extended field, the `-o wide` arg is needed:
+```bash
+kubectl -n velero get datauploads -o wide -l velero.io/backup-name=YOUR_BACKUP_NAME -w
 ```
 
 When the backup completes, you can view information about the backups:
