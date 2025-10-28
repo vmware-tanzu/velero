@@ -84,6 +84,7 @@ type nodeAgentServerConfig struct {
 	resourceTimeout         time.Duration
 	dataMoverPrepareTimeout time.Duration
 	nodeAgentConfig         string
+	backupRepoConfig        string
 }
 
 func NewServerCommand(f client.Factory) *cobra.Command {
@@ -121,6 +122,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.dataMoverPrepareTimeout, "data-mover-prepare-timeout", config.dataMoverPrepareTimeout, "How long to wait for preparing a DataUpload/DataDownload. Default is 30 minutes.")
 	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "The address to expose prometheus metrics")
 	command.Flags().StringVar(&config.nodeAgentConfig, "node-agent-configmap", config.nodeAgentConfig, "The name of ConfigMap containing node-agent configurations.")
+	command.Flags().StringVar(&config.backupRepoConfig, "backup-repository-configmap", config.backupRepoConfig, "The name of ConfigMap containing backup repository configurations.")
 
 	return command
 }
@@ -140,6 +142,7 @@ type nodeAgentServer struct {
 	csiSnapshotClient *snapshotv1client.Clientset
 	dataPathMgr       *datapath.Manager
 	dataPathConfigs   *velerotypes.NodeAgentConfigs
+	backupRepoConfigs map[string]string
 	vgdpCounter       *exposer.VgdpCounter
 }
 
@@ -254,6 +257,11 @@ func newNodeAgentServer(logger logrus.FieldLogger, factory client.Factory, confi
 	if err := s.getDataPathConfigs(); err != nil {
 		return nil, err
 	}
+
+	if err := s.getBackupRepoConfigs(); err != nil {
+		return nil, err
+	}
+
 	s.dataPathMgr = datapath.NewManager(s.getDataPathConcurrentNum(defaultDataPathConcurrentNum))
 
 	return s, nil
@@ -326,6 +334,14 @@ func (s *nodeAgentServer) run() {
 		} else {
 			s.vgdpCounter = counter
 			s.logger.Infof("VGDP loads are constrained with %d", s.dataPathConfigs.LoadConcurrency.PrepareQueueLength)
+		}
+	}
+
+	if s.dataPathConfigs != nil && s.dataPathConfigs.CachePVCConfig != nil {
+		if err := s.validateCachePVCConfig(*s.dataPathConfigs.CachePVCConfig); err != nil {
+			s.logger.WithError(err).Warnf("Ignore cache config %v", s.dataPathConfigs.CachePVCConfig)
+		} else {
+			s.logger.Infof("Using cache volume configs %v", s.dataPathConfigs.CachePVCConfig)
 		}
 	}
 
@@ -557,11 +573,29 @@ func (s *nodeAgentServer) getDataPathConfigs() error {
 
 	configs, err := getConfigsFunc(s.ctx, s.namespace, s.kubeClient, s.config.nodeAgentConfig)
 	if err != nil {
-		s.logger.WithError(err).Errorf("Failed to get node agent configs from configMap %s, ignore it", s.config.nodeAgentConfig)
-		return err
+		return errors.Wrapf(err, "error getting node agent configs from configMap %s", s.config.nodeAgentConfig)
 	}
 
 	s.dataPathConfigs = configs
+	return nil
+}
+
+func (s *nodeAgentServer) getBackupRepoConfigs() error {
+	if s.config.backupRepoConfig == "" {
+		s.logger.Info("No backup repo configMap is specified")
+		return nil
+	}
+
+	cm, err := s.kubeClient.CoreV1().ConfigMaps(s.namespace).Get(s.ctx, s.config.backupRepoConfig, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "error getting backup repo configs from configMap %s", s.config.backupRepoConfig)
+	}
+
+	if cm.Data == nil {
+		return errors.Errorf("no data is in the backup repo configMap %s", s.config.backupRepoConfig)
+	}
+
+	s.backupRepoConfigs = cm.Data
 	return nil
 }
 
@@ -619,4 +653,21 @@ func (s *nodeAgentServer) getDataPathConcurrentNum(defaultNum int) int {
 	}
 
 	return concurrentNum
+}
+
+func (s *nodeAgentServer) validateCachePVCConfig(config velerotypes.CachePVC) error {
+	if config.StorageClass == "" {
+		return errors.New("storage class is absent")
+	}
+
+	sc, err := s.kubeClient.StorageV1().StorageClasses().Get(s.ctx, config.StorageClass, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "error getting storage class %s", config.StorageClass)
+	}
+
+	if sc.ReclaimPolicy != nil && *sc.ReclaimPolicy != corev1api.PersistentVolumeReclaimDelete {
+		return errors.Errorf("unexpected storage class reclaim policy %v", *sc.ReclaimPolicy)
+	}
+
+	return nil
 }

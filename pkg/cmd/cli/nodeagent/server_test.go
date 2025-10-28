@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +35,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/nodeagent"
 	testutil "github.com/vmware-tanzu/velero/pkg/test"
 	velerotypes "github.com/vmware-tanzu/velero/pkg/types"
+
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 func Test_validatePodVolumesHostPath(t *testing.T) {
@@ -142,11 +145,10 @@ func Test_getDataPathConfigs(t *testing.T) {
 		getFunc       func(context.Context, string, kubernetes.Interface, string) (*velerotypes.NodeAgentConfigs, error)
 		configMapName string
 		expectConfigs *velerotypes.NodeAgentConfigs
-		expectLog     string
+		expectedErr   string
 	}{
 		{
-			name:      "no config specified",
-			expectLog: "No node-agent configMap is specified",
+			name: "no config specified",
 		},
 		{
 			name:          "failed to get configs",
@@ -154,7 +156,7 @@ func Test_getDataPathConfigs(t *testing.T) {
 			getFunc: func(context.Context, string, kubernetes.Interface, string) (*velerotypes.NodeAgentConfigs, error) {
 				return nil, errors.New("fake-get-error")
 			},
-			expectLog: "Failed to get node agent configs from configMap node-agent-config, ignore it",
+			expectedErr: "error getting node agent configs from configMap node-agent-config: fake-get-error",
 		},
 		{
 			name:          "configs cm not found",
@@ -162,7 +164,7 @@ func Test_getDataPathConfigs(t *testing.T) {
 			getFunc: func(context.Context, string, kubernetes.Interface, string) (*velerotypes.NodeAgentConfigs, error) {
 				return nil, errors.New("fake-not-found-error")
 			},
-			expectLog: "Failed to get node agent configs from configMap node-agent-config, ignore it",
+			expectedErr: "error getting node agent configs from configMap node-agent-config: fake-not-found-error",
 		},
 
 		{
@@ -177,23 +179,21 @@ func Test_getDataPathConfigs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logBuffer := ""
-
 			s := &nodeAgentServer{
 				config: nodeAgentServerConfig{
 					nodeAgentConfig: test.configMapName,
 				},
-				logger: testutil.NewSingleLogger(&logBuffer),
+				logger: testutil.NewLogger(),
 			}
 
 			getConfigsFunc = test.getFunc
 
-			s.getDataPathConfigs()
-			assert.Equal(t, test.expectConfigs, s.dataPathConfigs)
-			if test.expectLog == "" {
-				assert.Empty(t, logBuffer)
+			err := s.getDataPathConfigs()
+			if test.expectedErr == "" {
+				require.NoError(t, err)
+				assert.Equal(t, test.expectConfigs, s.dataPathConfigs)
 			} else {
-				assert.Contains(t, logBuffer, test.expectLog)
+				require.EqualError(t, err, test.expectedErr)
 			}
 		})
 	}
@@ -412,6 +412,120 @@ func Test_getDataPathConcurrentNum(t *testing.T) {
 				assert.Empty(t, logBuffer)
 			} else {
 				assert.Contains(t, logBuffer, test.expectLog)
+			}
+		})
+	}
+}
+
+func TestGetBackupRepoConfigs(t *testing.T) {
+	cmNoData := builder.ForConfigMap(velerov1api.DefaultNamespace, "backup-repo-config").Result()
+	cmWithData := builder.ForConfigMap(velerov1api.DefaultNamespace, "backup-repo-config").Data("cacheLimit", "100").Result()
+
+	tests := []struct {
+		name          string
+		configMapName string
+		kubeClientObj []runtime.Object
+		expectConfigs map[string]string
+		expectedErr   string
+	}{
+		{
+			name: "no config specified",
+		},
+		{
+			name:          "failed to get configs",
+			configMapName: "backup-repo-config",
+			expectedErr:   "error getting backup repo configs from configMap backup-repo-config: configmaps \"backup-repo-config\" not found",
+		},
+		{
+			name:          "configs data not found",
+			kubeClientObj: []runtime.Object{cmNoData},
+			configMapName: "backup-repo-config",
+			expectedErr:   "no data is in the backup repo configMap backup-repo-config",
+		},
+		{
+			name:          "succeed",
+			configMapName: "backup-repo-config",
+			kubeClientObj: []runtime.Object{cmWithData},
+			expectConfigs: map[string]string{"cacheLimit": "100"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			s := &nodeAgentServer{
+				namespace:  velerov1api.DefaultNamespace,
+				kubeClient: fakeKubeClient,
+				config: nodeAgentServerConfig{
+					backupRepoConfig: test.configMapName,
+				},
+				logger: testutil.NewLogger(),
+			}
+
+			err := s.getBackupRepoConfigs()
+			if test.expectedErr == "" {
+				require.NoError(t, err)
+				require.Equal(t, test.expectConfigs, s.backupRepoConfigs)
+			} else {
+				require.EqualError(t, err, test.expectedErr)
+			}
+		})
+	}
+}
+
+func TestValidateCachePVCConfig(t *testing.T) {
+	scWithRetainPolicy := builder.ForStorageClass("fake-storage-class").ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).Result()
+	scWithDeletePolicy := builder.ForStorageClass("fake-storage-class").ReclaimPolicy(corev1api.PersistentVolumeReclaimDelete).Result()
+	scWithNoPolicy := builder.ForStorageClass("fake-storage-class").Result()
+
+	tests := []struct {
+		name          string
+		config        velerotypes.CachePVC
+		kubeClientObj []runtime.Object
+		expectedErr   string
+	}{
+		{
+			name:        "no storage class",
+			expectedErr: "storage class is absent",
+		},
+		{
+			name:        "failed to get storage class",
+			config:      velerotypes.CachePVC{StorageClass: "fake-storage-class"},
+			expectedErr: "error getting storage class fake-storage-class: storageclasses.storage.k8s.io \"fake-storage-class\" not found",
+		},
+		{
+			name:          "storage class reclaim policy is not expected",
+			config:        velerotypes.CachePVC{StorageClass: "fake-storage-class"},
+			kubeClientObj: []runtime.Object{scWithRetainPolicy},
+			expectedErr:   "unexpected storage class reclaim policy Retain",
+		},
+		{
+			name:          "storage class reclaim policy is delete",
+			config:        velerotypes.CachePVC{StorageClass: "fake-storage-class"},
+			kubeClientObj: []runtime.Object{scWithDeletePolicy},
+		},
+		{
+			name:          "storage class with no reclaim policy",
+			config:        velerotypes.CachePVC{StorageClass: "fake-storage-class"},
+			kubeClientObj: []runtime.Object{scWithNoPolicy},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			s := &nodeAgentServer{
+				kubeClient: fakeKubeClient,
+			}
+
+			err := s.validateCachePVCConfig(test.config)
+
+			if test.expectedErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, test.expectedErr)
 			}
 		})
 	}
