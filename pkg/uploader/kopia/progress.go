@@ -177,3 +177,7 @@ func (p *Progress) EstimationParameters() upload.EstimationParameters {
 func (p *Progress) Enabled() bool {
 	return true
 }
+
+func (p *Progress) GetIncrementalSize() int64 {
+	return p.estimatedTotalBytes - p.cachedBytes
+}

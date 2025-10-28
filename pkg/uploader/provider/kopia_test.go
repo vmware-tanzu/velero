@@ -106,7 +106,7 @@ func TestRunBackup(t *testing.T) {
 				tc.volMode = uploader.PersistentVolumeFilesystem
 			}
 			BackupFunc = tc.hookBackupFunc
-			_, _, _, err := kp.RunBackup(t.Context(), "var", "", nil, false, "", tc.volMode, map[string]string{}, &updater)
+			_, _, _, _, err := kp.RunBackup(t.Context(), "var", "", nil, false, "", tc.volMode, map[string]string{}, &updater)
 			if tc.notError {
 				assert.NoError(t, err)
 			} else {
