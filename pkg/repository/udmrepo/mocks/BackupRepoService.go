@@ -16,6 +16,24 @@ type BackupRepoService struct {
 	mock.Mock
 }
 
+// ClientSideCacheLimit provides a mock function with given fields: repoOption
+func (_m *BackupRepoService) ClientSideCacheLimit(repoOption map[string]string) int64 {
+	ret := _m.Called(repoOption)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ClientSideCacheLimit")
+	}
+
+	var r0 int64
+	if rf, ok := ret.Get(0).(func(map[string]string) int64); ok {
+		r0 = rf(repoOption)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	return r0
+}
+
 // Connect provides a mock function with given fields: ctx, repoOption
 func (_m *BackupRepoService) Connect(ctx context.Context, repoOption udmrepo.RepoOptions) error {
 	ret := _m.Called(ctx, repoOption)

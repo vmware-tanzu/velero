@@ -74,7 +74,7 @@ func NewKopiaUploaderProvider(
 		return nil, errors.Wrapf(err, "error to get repo options")
 	}
 
-	repoSvc := BackupRepoServiceCreateFunc(log)
+	repoSvc := BackupRepoServiceCreateFunc(backupRepo.Spec.RepositoryType, log)
 	log.WithField("repoUID", repoUID).Info("Opening backup repo")
 
 	kp.bkRepo, err = repoSvc.Open(ctx, *repoOpt)

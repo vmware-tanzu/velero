@@ -1345,3 +1345,63 @@ func TestMaintainProgress(t *testing.T) {
 		})
 	}
 }
+
+func TestClientSideCacheLimit(t *testing.T) {
+	testCases := []struct {
+		name       string
+		repoOption map[string]string
+		expected   int64
+	}{
+		{
+			name:     "nil option",
+			expected: 5000 << 20,
+		},
+		{
+			name: "no option",
+			repoOption: map[string]string{
+				"other-repo": "\"enableCompression\": true",
+			},
+			expected: 5000 << 20,
+		},
+		{
+			name: "unmarshall fails",
+			repoOption: map[string]string{
+				"kopia": "wrong-json",
+			},
+			expected: 5000 << 20,
+		},
+		{
+			name: "no cache limit",
+			repoOption: map[string]string{
+				"kopia": "{\"enableCompression\": true}",
+			},
+			expected: 5000 << 20,
+		},
+		{
+			name: "wrong cache value type",
+			repoOption: map[string]string{
+				"kopia": "{\"cacheLimitMB\": \"abcd\",\"enableCompression\": true}",
+			},
+			expected: 5000 << 20,
+		},
+		{
+			name: "succeed",
+			repoOption: map[string]string{
+				"kopia": "{\"cacheLimitMB\": 1,\"enableCompression\": true}",
+			},
+			expected: 1048576,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ks := &kopiaRepoService{
+				logger: velerotest.NewLogger(),
+			}
+
+			limit := ks.ClientSideCacheLimit(tc.repoOption)
+
+			assert.Equal(t, tc.expected, limit)
+		})
+	}
+}
