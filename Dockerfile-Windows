@@ -15,7 +15,7 @@
 ARG OS_VERSION=1809
 
 # Velero binary build section
-FROM --platform=$BUILDPLATFORM golang:1.24.6-bookworm AS velero-builder
+FROM --platform=$BUILDPLATFORM golang:1.24.9-bookworm AS velero-builder
 
 ARG GOPROXY
 ARG BIN
