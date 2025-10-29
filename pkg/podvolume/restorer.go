@@ -92,9 +92,15 @@ func newRestorer(
 
 	_, _ = pvrInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: func(_, obj any) {
-				pvr := obj.(*velerov1api.PodVolumeRestore)
+			UpdateFunc: func(oldObj, newObj any) {
+				pvr := newObj.(*velerov1api.PodVolumeRestore)
+				pvrOld := oldObj.(*velerov1api.PodVolumeRestore)
+
 				if pvr.GetLabels()[velerov1api.RestoreUIDLabel] != string(restore.UID) {
+					return
+				}
+
+				if pvr.Status.Phase == pvrOld.Status.Phase {
 					return
 				}
 
