@@ -222,6 +222,36 @@ Follow the below troubleshooting steps to confirm that Velero is using the corre
    Ensure that the key exists within the secret's data by checking the output from `kubectl -n velero describe secret $BSL_SECRET` or `kubectl -n velero describe secret $VSL_SECRET`.
    If it does not exist, follow the instructions for [editing a Kubernetes secret][12] to add the base64 encoded credentials data.
 
+## Repository credentials secret errors in restricted environments
+
+If you're running Velero in a restricted environment where secret creation or access is not permitted, you may encounter errors related to the `velero-repo-credentials` secret during server startup or filesystem backup operations.
+
+### Common error messages
+
+You might see errors like:
+- `"error creating uploader: repository credentials secret missing or invalid"`
+- `"Could not fetch repository credentials secret; filesystem-level backups will not work"`
+- `"error to get password"`
+
+### Solution for restricted environments
+
+If you only need Velero for Kubernetes manifest backups and volume snapshots (without filesystem-level backups), you can disable the repository credentials secret requirement:
+
+#### Option 1: Use command line flag
+Add the `--disable-repo-credentials-secret` flag to your Velero server deployment.
+
+#### Option 2: Use environment variable
+Set the `DISABLE_REPO_CREDENTIALS_SECRET` environment variable to `true`.
+
+See the [customize installation guide](customize-installation.md#run-in-restricted-environments) for detailed configuration examples.
+
+### Important considerations
+
+- When repository credentials are disabled, **filesystem-level backups will not work**
+- Volume snapshots and Kubernetes manifest backups will continue to function normally
+- The warning messages about missing credentials are expected and can be safely ignored in this configuration
+- This configuration is specifically designed for environments with strict security policies that prevent secret creation/access
+
 ## Kopia repository files' ownership mismatch
 
 Velero sets the files' ownership created in the Kopia repository to `default@default`.
