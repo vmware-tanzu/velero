@@ -11,10 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1api "k8s.io/api/apps/v1"
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	clientTesting "k8s.io/client-go/testing"
 	clientFake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -72,6 +74,9 @@ func TestPodVolumeExpose(t *testing.T) {
 		exposeParam                  PodVolumeExposeParam
 		funcGetPodVolumeHostPath     func(context.Context, *corev1api.Pod, string, kubernetes.Interface, filesystem.Interface, logrus.FieldLogger) (datapath.AccessPoint, error)
 		funcExtractPodVolumeHostPath func(context.Context, string, kubernetes.Interface, string, string) (string, error)
+		kubeReactors                 []reactor
+		expectBackupPod              bool
+		expectCachePVC               bool
 		err                          string
 	}{
 		{
@@ -189,6 +194,7 @@ func TestPodVolumeExpose(t *testing.T) {
 			funcExtractPodVolumeHostPath: func(context.Context, string, kubernetes.Interface, string, string) (string, error) {
 				return "/var/lib/kubelet/pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount", nil
 			},
+			expectBackupPod: true,
 		},
 		{
 			name:        "succeed with privileged pod",
@@ -212,12 +218,99 @@ func TestPodVolumeExpose(t *testing.T) {
 			funcExtractPodVolumeHostPath: func(context.Context, string, kubernetes.Interface, string, string) (string, error) {
 				return "/var/lib/kubelet/pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount", nil
 			},
+			expectBackupPod: true,
+		},
+		{
+			name:        "succeed, cache config, no cache volume",
+			ownerBackup: backup,
+			exposeParam: PodVolumeExposeParam{
+				ClientNamespace: "fake-ns",
+				ClientPodName:   "fake-client-pod",
+				ClientPodVolume: "fake-client-volume",
+				CacheVolume:     &CacheConfigs{},
+			},
+			kubeClientObj: []runtime.Object{
+				podWithNode,
+				node,
+				daemonSet,
+			},
+			funcGetPodVolumeHostPath: func(context.Context, *corev1api.Pod, string, kubernetes.Interface, filesystem.Interface, logrus.FieldLogger) (datapath.AccessPoint, error) {
+				return datapath.AccessPoint{
+					ByPath: "/host_pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount",
+				}, nil
+			},
+			funcExtractPodVolumeHostPath: func(context.Context, string, kubernetes.Interface, string, string) (string, error) {
+				return "/var/lib/kubelet/pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount", nil
+			},
+			expectBackupPod: true,
+		},
+		{
+			name:        "create cache volume fail",
+			ownerBackup: backup,
+			exposeParam: PodVolumeExposeParam{
+				ClientNamespace: "fake-ns",
+				ClientPodName:   "fake-client-pod",
+				ClientPodVolume: "fake-client-volume",
+				CacheVolume:     &CacheConfigs{Limit: 1024},
+			},
+			kubeClientObj: []runtime.Object{
+				podWithNode,
+				node,
+				daemonSet,
+			},
+			funcGetPodVolumeHostPath: func(context.Context, *corev1api.Pod, string, kubernetes.Interface, filesystem.Interface, logrus.FieldLogger) (datapath.AccessPoint, error) {
+				return datapath.AccessPoint{
+					ByPath: "/host_pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount",
+				}, nil
+			},
+			funcExtractPodVolumeHostPath: func(context.Context, string, kubernetes.Interface, string, string) (string, error) {
+				return "/var/lib/kubelet/pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount", nil
+			},
+			kubeReactors: []reactor{
+				{
+					verb:     "create",
+					resource: "persistentvolumeclaims",
+					reactorFunc: func(action clientTesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("fake-create-error")
+					},
+				},
+			},
+			err: "error to create cache pvc: fake-create-error",
+		},
+		{
+			name:        "succeed with cache volume",
+			ownerBackup: backup,
+			exposeParam: PodVolumeExposeParam{
+				ClientNamespace: "fake-ns",
+				ClientPodName:   "fake-client-pod",
+				ClientPodVolume: "fake-client-volume",
+				CacheVolume:     &CacheConfigs{Limit: 1024},
+			},
+			kubeClientObj: []runtime.Object{
+				podWithNode,
+				node,
+				daemonSet,
+			},
+			funcGetPodVolumeHostPath: func(context.Context, *corev1api.Pod, string, kubernetes.Interface, filesystem.Interface, logrus.FieldLogger) (datapath.AccessPoint, error) {
+				return datapath.AccessPoint{
+					ByPath: "/host_pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount",
+				}, nil
+			},
+			funcExtractPodVolumeHostPath: func(context.Context, string, kubernetes.Interface, string, string) (string, error) {
+				return "/var/lib/kubelet/pods/pod-id-xxx/volumes/kubernetes.io~csi/pvc-id-xxx/mount", nil
+			},
+			expectBackupPod: true,
+			expectCachePVC:  true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeKubeClient := fake.NewSimpleClientset(test.kubeClientObj...)
+
+			for _, reactor := range test.kubeReactors {
+				fakeKubeClient.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactorFunc)
+			}
 
 			exposer := podVolumeExposer{
 				kubeClient: fakeKubeClient,
@@ -248,9 +341,23 @@ func TestPodVolumeExpose(t *testing.T) {
 				require.NoError(t, err)
 
 				_, err = exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(t.Context(), ownerObject.Name, metav1.GetOptions{})
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, test.err)
+				require.EqualError(t, err, test.err)
+			}
+
+			_, err = exposer.kubeClient.CoreV1().Pods(ownerObject.Namespace).Get(t.Context(), ownerObject.Name, metav1.GetOptions{})
+			if test.expectBackupPod {
+				require.NoError(t, err)
+			} else {
+				require.True(t, apierrors.IsNotFound(err))
+			}
+
+			_, err = exposer.kubeClient.CoreV1().PersistentVolumeClaims(ownerObject.Namespace).Get(t.Context(), getCachePVCName(ownerObject), metav1.GetOptions{})
+			if test.expectCachePVC {
+				require.NoError(t, err)
+			} else {
+				require.True(t, apierrors.IsNotFound(err))
 			}
 		})
 	}
@@ -517,6 +624,38 @@ func TestPodVolumeDiagnoseExpose(t *testing.T) {
 		},
 	}
 
+	cachePVCWithVolumeName := corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: velerov1.DefaultNamespace,
+			Name:      "fake-backup-cache",
+			UID:       "fake-cache-pvc-uid",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: backup.APIVersion,
+					Kind:       backup.Kind,
+					Name:       backup.Name,
+					UID:        backup.UID,
+				},
+			},
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeName: "fake-pv-cache",
+		},
+		Status: corev1api.PersistentVolumeClaimStatus{
+			Phase: corev1api.ClaimPending,
+		},
+	}
+
+	cachePV := corev1api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-pv-cache",
+		},
+		Status: corev1api.PersistentVolumeStatus{
+			Phase:   corev1api.VolumePending,
+			Message: "fake-pv-message",
+		},
+	}
+
 	nodeAgentPod := corev1api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: velerov1.DefaultNamespace,
@@ -589,6 +728,37 @@ end diagnose pod volume exposer`,
 			expected: `begin diagnose pod volume exposer
 Pod velero/fake-backup, phase Pending, node name fake-node
 Pod condition Initialized, status True, reason , message fake-pod-message
+end diagnose pod volume exposer`,
+		},
+		{
+			name:        "cache pvc with volume name, no pv",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				&backupPodWithNodeName,
+				&cachePVCWithVolumeName,
+				&nodeAgentPod,
+			},
+			expected: `begin diagnose pod volume exposer
+Pod velero/fake-backup, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+PVC velero/fake-backup-cache, phase Pending, binding to fake-pv-cache
+error getting cache pv fake-pv-cache, err: persistentvolumes "fake-pv-cache" not found
+end diagnose pod volume exposer`,
+		},
+		{
+			name:        "cache pvc with volume name, pv exists",
+			ownerBackup: backup,
+			kubeClientObj: []runtime.Object{
+				&backupPodWithNodeName,
+				&cachePVCWithVolumeName,
+				&cachePV,
+				&nodeAgentPod,
+			},
+			expected: `begin diagnose pod volume exposer
+Pod velero/fake-backup, phase Pending, node name fake-node
+Pod condition Initialized, status True, reason , message fake-pod-message
+PVC velero/fake-backup-cache, phase Pending, binding to fake-pv-cache
+PV fake-pv-cache, phase Pending, reason , message fake-pv-message
 end diagnose pod volume exposer`,
 		},
 		{
