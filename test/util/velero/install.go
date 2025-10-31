@@ -312,9 +312,9 @@ func installVeleroServer(
 
 	// TODO: need to consider align options.UseNodeAgentWindows usage
 	// with options.UseNodeAgent
-	// Only version after v1.16.0 support windows node agent.
+	// Only version after v1.16.0 or release-1.16-dev support windows node agent.
 	if options.WorkerOS == common.WorkerOSWindows &&
-		(semver.Compare(version, "v1.16") >= 0 || version == "main") {
+		(semver.Compare(version, "v1.16") >= 0 || version == "main" || strings.Compare(version, "release-1.16-dev") >= 0) {
 		fmt.Println("Install node-agent-windows. The Velero version is ", version)
 		args = append(args, "--use-node-agent-windows")
 	}
