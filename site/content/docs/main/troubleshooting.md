@@ -237,6 +237,22 @@ To resolve it, please use Kopia maintenance CLI to set the ownership correctly, 
 
 Please refer to [Issue 9007](https://github.com/vmware-tanzu/velero/issues/9007) for more information.
 
+## Disk space issues during restore
+
+If you encounter issues restoring volumes that appear to be 100% full or when restoring to volumes with limited disk space, you can use the `--write-sparse-files` flag during restore. This feature is available for File System Backup (FSB) restores and CSI snapshot data movements.
+
+Example error message:
+```
+Velero: pod volume restore failed: error restoring volume: error creating .velero directory for done file: mkdir /host_pods/60880bf2-9d1c-47cf-ba8f-5f8db43b385b/volumes/kubernetes.io~csi/pvc-ee79e0f0-ed62-44f7-987e-16efca1d1cd5/mount/.velero: no space left on device. Consider using the --write-sparse-files flag during restore to optimize disk usage. See https://velero.io/docs/main/restore-reference/#write-sparse-files for more details
+```
+
+To resolve this issue, create a restore with the `--write-sparse-files` flag:
+```bash
+velero restore create <RESTORE_NAME> --from-backup <BACKUP_NAME> --write-sparse-files
+```
+
+See [Write Sparse files](restore-reference.md#write-sparse-files) for more details on using this option.
+
 [1]: debugging-restores.md
 [2]: debugging-install.md
 [3]: file-system-backup.md
