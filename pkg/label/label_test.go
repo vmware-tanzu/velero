@@ -48,6 +48,32 @@ func TestGetValidLabelName(t *testing.T) {
 	}
 }
 
+func TestReturnNameOrHash(t *testing.T) {
+	tests := []struct {
+		name          string
+		label         string
+		expectedLabel string
+	}{
+		{
+			name:          "valid label name should not be modified",
+			label:         "short label value",
+			expectedLabel: "short label value",
+		},
+		{
+			name:          "label with more than 63 characters should be modified",
+			label:         "this_is_a_very_long_label_value_that_will_be_rejected_by_Kubernetes",
+			expectedLabel: "1a7399f2d00e268fc12daf431d6667319d1461e2609981070bb7e85c",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			labelVal := ReturnNameOrHash(test.label)
+			assert.Equal(t, test.expectedLabel, labelVal)
+		})
+	}
+}
+
 func TestNewSelectorForBackup(t *testing.T) {
 	selector := NewSelectorForBackup("my-backup")
 	assert.Equal(t, "velero.io/backup-name=my-backup", selector.String())
