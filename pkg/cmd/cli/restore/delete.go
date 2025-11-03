@@ -31,6 +31,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/confirm"
 )
 
@@ -41,26 +42,30 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s [NAMES]", use),
 		Short: "Delete restores",
-		Example: `  # Delete a restore named "restore-1".
-  velero restore delete restore-1
-
-  # Delete a restore named "restore-1" without prompting for confirmation.
-  velero restore delete restore-1 --confirm
-
-  # Delete restores named "restore-1" and "restore-2".
-  velero restore delete restore-1 restore-2
-
-  # Delete all restores labeled with "foo=bar".
-  velero restore delete --selector foo=bar
-	
-  # Delete all restores.
-  velero restore delete --all`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(f, args))
 			cmd.CheckError(o.Validate(c, f, args))
 			cmd.CheckError(Run(o))
 		},
 	}
+
+	// Set examples using the dynamic program name
+	progName := util.GetProgramName(c)
+	c.Example = fmt.Sprintf(`  # Delete a restore named "restore-1".
+  %s restore delete restore-1
+
+  # Delete a restore named "restore-1" without prompting for confirmation.
+  %s restore delete restore-1 --confirm
+
+  # Delete restores named "restore-1" and "restore-2".
+  %s restore delete restore-1 restore-2
+
+  # Delete all restores labeled with "foo=bar".
+  %s restore delete --selector foo=bar
+
+  # Delete all restores.
+  %s restore delete --all`, progName, progName, progName, progName, progName)
+
 	o.BindFlags(c.Flags())
 	return c
 }

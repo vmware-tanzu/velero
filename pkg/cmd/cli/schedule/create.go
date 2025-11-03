@@ -31,6 +31,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backup"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 )
 
@@ -53,18 +54,6 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 The schedule can also be expressed using "@every <duration>" syntax. The duration
 can be specified using a combination of seconds (s), minutes (m), and hours (h), for
 example: "@every 2h30m".`,
-
-		Example: `  # Create a backup every 6 hours.
-  velero create schedule NAME --schedule="0 */6 * * *"
-
-  # Create a backup every 6 hours with the @every notation.
-  velero create schedule NAME --schedule="@every 6h"
-
-  # Create a daily backup of the web namespace.
-  velero create schedule NAME --schedule="@every 24h" --include-namespaces web
-
-  # Create a weekly backup, each living for 90 days (2160 hours).
-  velero create schedule NAME --schedule="@every 168h" --ttl 2160h0m0s`,
 		Args: cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args, f))
@@ -72,6 +61,20 @@ example: "@every 2h30m".`,
 			cmd.CheckError(o.Run(c, f))
 		},
 	}
+
+	// Set examples using the dynamic program name
+	progName := util.GetProgramName(c)
+	c.Example = fmt.Sprintf(`  # Create a backup every 6 hours.
+  %s create schedule NAME --schedule="0 */6 * * *"
+
+  # Create a backup every 6 hours with the @every notation.
+  %s create schedule NAME --schedule="@every 6h"
+
+  # Create a daily backup of the web namespace.
+  %s create schedule NAME --schedule="@every 24h" --include-namespaces web
+
+  # Create a weekly backup, each living for 90 days (2160 hours).
+  %s create schedule NAME --schedule="@every 168h" --ttl 2160h0m0s`, progName, progName, progName, progName)
 
 	o.BindFlags(c.Flags())
 	output.BindFlags(c.Flags())

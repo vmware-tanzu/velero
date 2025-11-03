@@ -45,6 +45,7 @@ import (
 	velerov2alpha1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v2alpha1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/confirm"
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	"github.com/vmware-tanzu/velero/pkg/install"
@@ -79,7 +80,6 @@ func NewCommand(f client.Factory) *cobra.Command {
 The '--namespace' flag can be used to specify the namespace where velero is installed (default: velero).
 Use '--force' to skip the prompt confirming if you want to uninstall Velero.
 		`,
-		Example: ` # velero uninstall --namespace staging`,
 		Run: func(c *cobra.Command, args []string) {
 			if o.wait {
 				fmt.Println("Warning: the \"--wait\" option is deprecated and will be removed in a future release. The uninstall command always waits for the uninstall to complete.")
@@ -99,6 +99,10 @@ Use '--force' to skip the prompt confirming if you want to uninstall Velero.
 			cmd.CheckError(Run(context.Background(), kbClient, f.Namespace()))
 		},
 	}
+
+	// Set examples using the dynamic program name
+	progName := util.GetProgramName(c)
+	c.Example = fmt.Sprintf(` # %s uninstall --namespace staging`, progName)
 
 	o.BindFlags(c.Flags())
 	return c
