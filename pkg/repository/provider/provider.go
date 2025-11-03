@@ -32,6 +32,8 @@ type RepoParam struct {
 
 // Provider defines the methods to manipulate a backup repository
 type Provider interface {
+	ConfigProvider
+
 	// InitRepo is to initialize a repository from a new storage place
 	InitRepo(ctx context.Context, param RepoParam) error
 
@@ -60,7 +62,13 @@ type Provider interface {
 
 	// BatchForget is to delete a list of snapshots from the repository
 	BatchForget(ctx context.Context, snapshotIDs []string, param RepoParam) []error
+}
 
+// ConfigProvider defines the methods to get configurations of a backup repository
+type ConfigProvider interface {
 	// DefaultMaintenanceFrequency returns the default frequency to run maintenance
-	DefaultMaintenanceFrequency(ctx context.Context, param RepoParam) time.Duration
+	DefaultMaintenanceFrequency() time.Duration
+
+	// ClientSideCacheLimit returns the max cache size required on client side
+	ClientSideCacheLimit(repoOption map[string]string) int64
 }
