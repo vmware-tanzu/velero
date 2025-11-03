@@ -149,9 +149,9 @@ func TestResticRunBackup(t *testing.T) {
 			}
 			if !tc.nilUpdater {
 				updater := FakeBackupProgressUpdater{PodVolumeBackup: &velerov1api.PodVolumeBackup{}, Log: tc.rp.log, Ctx: t.Context(), Cli: fake.NewClientBuilder().WithScheme(util.VeleroScheme).Build()}
-				_, _, _, err = tc.rp.RunBackup(t.Context(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, map[string]string{}, &updater)
+				_, _, _, _, err = tc.rp.RunBackup(t.Context(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, map[string]string{}, &updater)
 			} else {
-				_, _, _, err = tc.rp.RunBackup(t.Context(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, map[string]string{}, nil)
+				_, _, _, _, err = tc.rp.RunBackup(t.Context(), "var", "", map[string]string{}, false, parentSnapshot, tc.volMode, map[string]string{}, nil)
 			}
 
 			tc.rp.log.Infof("test name %v error %v", tc.name, err)

@@ -24,6 +24,6 @@ import (
 )
 
 // Create creates an instance of BackupRepoService
-func Create(logger logrus.FieldLogger) udmrepo.BackupRepoService {
+func Create(repoBackend string, logger logrus.FieldLogger) udmrepo.BackupRepoService {
 	return kopialib.NewKopiaRepoService(logger)
 }

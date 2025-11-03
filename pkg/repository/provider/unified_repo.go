@@ -20,13 +20,13 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"maps"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/kopia/kopia/repo"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -81,9 +81,14 @@ func NewUnifiedRepoProvider(
 		log:              log,
 	}
 
-	repo.repoService = createRepoService(log)
+	repo.repoService = createRepoService(repoBackend, log)
 
 	return &repo
+}
+
+func GetUnifiedRepoClientSideCacheLimit(repoOption map[string]string, repoBackend string, log logrus.FieldLogger) int64 {
+	repoService := createRepoService(repoBackend, log)
+	return repoService.ClientSideCacheLimit(repoOption)
 }
 
 func (urp *unifiedRepoProvider) InitRepo(ctx context.Context, param RepoParam) error {
@@ -116,7 +121,7 @@ func (urp *unifiedRepoProvider) InitRepo(ctx context.Context, param RepoParam) e
 		return errors.Wrap(err, "error to get repo options")
 	}
 
-	err = urp.repoService.Init(ctx, *repoOption, true)
+	err = urp.repoService.Create(ctx, *repoOption)
 	if err != nil {
 		return errors.Wrap(err, "error to init backup repo")
 	}
@@ -152,7 +157,7 @@ func (urp *unifiedRepoProvider) ConnectToRepo(ctx context.Context, param RepoPar
 		return errors.Wrap(err, "error to get repo options")
 	}
 
-	err = urp.repoService.Init(ctx, *repoOption, false)
+	err = urp.repoService.Connect(ctx, *repoOption)
 	if err != nil {
 		return errors.Wrap(err, "error to connect backup repo")
 	}
@@ -188,20 +193,18 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 		return errors.Wrap(err, "error to get repo options")
 	}
 
-	err = urp.repoService.Init(ctx, *repoOption, false)
-	if err == nil {
+	if created, err := urp.repoService.IsCreated(ctx, *repoOption); err != nil {
+		return errors.Wrap(err, "error to check backup repo")
+	} else if created {
 		log.Debug("Repo has already been initialized remotely")
 		return nil
-	}
-	if !errors.Is(err, repo.ErrRepositoryNotInitialized) {
-		return errors.Wrap(err, "error to connect to backup repo")
 	}
 
 	if param.BackupLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
 		return errors.Errorf("cannot create new backup repo for read-only backup storage location %s/%s", param.BackupLocation.Namespace, param.BackupLocation.Name)
 	}
 
-	err = urp.repoService.Init(ctx, *repoOption, true)
+	err = urp.repoService.Create(ctx, *repoOption)
 	if err != nil {
 		return errors.Wrap(err, "error to create backup repo")
 	}
@@ -416,12 +419,11 @@ func (urp *unifiedRepoProvider) GetStoreOptions(param any) (map[string]string, e
 	}
 
 	storeOptions := make(map[string]string)
-	for k, v := range storeVar {
-		storeOptions[k] = v
-	}
+	maps.Copy(storeOptions, storeVar)
+	maps.Copy(storeOptions, storeCred)
 
-	for k, v := range storeCred {
-		storeOptions[k] = v
+	if repoParam.CacheDir != "" {
+		storeOptions[udmrepo.StoreOptionCacheDir] = repoParam.CacheDir
 	}
 
 	return storeOptions, nil
@@ -597,6 +599,6 @@ func getStorageVariables(backupLocation *velerov1api.BackupStorageLocation, repo
 	return result, nil
 }
 
-func createRepoService(log logrus.FieldLogger) udmrepo.BackupRepoService {
-	return reposervice.Create(log)
+func createRepoService(repoBackend string, log logrus.FieldLogger) udmrepo.BackupRepoService {
+	return reposervice.Create(repoBackend, log)
 }

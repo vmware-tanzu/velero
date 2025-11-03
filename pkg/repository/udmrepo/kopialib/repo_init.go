@@ -24,6 +24,7 @@ import (
 
 	"github.com/kopia/kopia/repo"
 	"github.com/kopia/kopia/repo/blob"
+	"github.com/kopia/kopia/repo/format"
 	"github.com/pkg/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
@@ -47,10 +48,6 @@ var backendStores = []kopiaBackendStore{
 // CreateBackupRepo creates a Kopia repository and then connect to it.
 // The storage must be empty, otherwise, it will fail
 func CreateBackupRepo(ctx context.Context, repoOption udmrepo.RepoOptions, logger logrus.FieldLogger) error {
-	if repoOption.ConfigFilePath == "" {
-		return errors.New("invalid config file path")
-	}
-
 	backendStore, err := setupBackendStore(ctx, repoOption.StorageType, repoOption.StorageOptions, logger)
 	if err != nil {
 		return errors.Wrap(err, "error to setup backend storage")
@@ -64,11 +61,6 @@ func CreateBackupRepo(ctx context.Context, repoOption udmrepo.RepoOptions, logge
 	err = createWithStorage(ctx, st, repoOption)
 	if err != nil {
 		return errors.Wrap(err, "error to create repo with storage")
-	}
-
-	err = connectWithStorage(ctx, st, repoOption)
-	if err != nil {
-		return errors.Wrap(err, "error to connect repo with storage")
 	}
 
 	return nil
@@ -97,6 +89,34 @@ func ConnectBackupRepo(ctx context.Context, repoOption udmrepo.RepoOptions, logg
 	}
 
 	return nil
+}
+
+func IsBackupRepoCreated(ctx context.Context, repoOption udmrepo.RepoOptions, logger logrus.FieldLogger) (bool, error) {
+	backendStore, err := setupBackendStore(ctx, repoOption.StorageType, repoOption.StorageOptions, logger)
+	if err != nil {
+		return false, errors.Wrap(err, "error to setup backend storage")
+	}
+
+	st, err := backendStore.store.Connect(ctx, false, logger)
+	if err != nil {
+		return false, errors.Wrap(err, "error to connect to storage")
+	}
+
+	var formatBytes byteBuffer
+	if err := st.GetBlob(ctx, format.KopiaRepositoryBlobID, 0, -1, &formatBytes); err != nil {
+		if errors.Is(err, blob.ErrBlobNotFound) {
+			return false, nil
+		}
+
+		return false, errors.Wrap(err, "error to read format blob")
+	}
+
+	_, err = format.ParseKopiaRepositoryJSON(formatBytes.buffer)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 func findBackendStore(storage string) *kopiaBackendStore {
@@ -159,4 +179,21 @@ func ensureEmpty(ctx context.Context, s blob.Storage) error {
 	}
 
 	return errors.Wrap(err, "error to list blobs")
+}
+
+type byteBuffer struct {
+	buffer []byte
+}
+
+func (b *byteBuffer) Write(p []byte) (n int, err error) {
+	b.buffer = append(b.buffer, p...)
+	return len(p), nil
+}
+
+func (b *byteBuffer) Reset() {
+	b.buffer = nil
+}
+
+func (b *byteBuffer) Length() int {
+	return len(b.buffer)
 }

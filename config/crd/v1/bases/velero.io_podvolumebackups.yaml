@@ -33,6 +33,12 @@ spec:
       jsonPath: .status.progress.totalBytes
       name: Total Bytes
       type: integer
+    - description: Incremental bytes
+      format: int64
+      jsonPath: .status.incrementalBytes
+      name: Incremental Bytes
+      priority: 10
+      type: integer
     - description: Name of the Backup Storage Location where this backup should be
         stored
       jsonPath: .spec.backupStorageLocation
@@ -189,6 +195,11 @@ spec:
                 format: date-time
                 nullable: true
                 type: string
+              incrementalBytes:
+                description: IncrementalBytes holds the number of bytes new or changed
+                  since the last backup
+                format: int64
+                type: integer
               message:
                 description: Message is a message about the pod volume backup's status.
                 type: string

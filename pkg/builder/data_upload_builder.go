@@ -145,6 +145,12 @@ func (d *DataUploadBuilder) Progress(progress shared.DataMoveOperationProgress) 
 	return d
 }
 
+// IncrementalBytes sets the DataUpload's IncrementalBytes.
+func (d *DataUploadBuilder) IncrementalBytes(incrementalBytes int64) *DataUploadBuilder {
+	d.object.Status.IncrementalBytes = incrementalBytes
+	return d
+}
+
 // Node sets the DataUpload's Node.
 func (d *DataUploadBuilder) Node(node string) *DataUploadBuilder {
 	d.object.Status.Node = node
@@ -178,5 +184,11 @@ func (d *DataUploadBuilder) Finalizers(finalizers []string) *DataUploadBuilder {
 // Message sets the DataUpload's Message.
 func (d *DataUploadBuilder) Message(msg string) *DataUploadBuilder {
 	d.object.Status.Message = msg
+	return d
+}
+
+// TotalBytes sets the DataUpload's TotalBytes.
+func (d *DataUploadBuilder) TotalBytes(size int64) *DataUploadBuilder {
+	d.object.Status.Progress.TotalBytes = size
 	return d
 }

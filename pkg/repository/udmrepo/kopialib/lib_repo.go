@@ -18,6 +18,7 @@ package kopialib
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -35,6 +36,7 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/kopia"
 	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo"
+	"github.com/vmware-tanzu/velero/pkg/repository/udmrepo/kopialib/backend"
 )
 
 type kopiaRepoService struct {
@@ -79,6 +81,7 @@ const (
 	defaultMaintainCheckPeriod     = time.Hour
 	overwriteFullMaintainInterval  = time.Duration(0)
 	overwriteQuickMaintainInterval = time.Duration(0)
+	repoBackend                    = "kopia"
 )
 
 var kopiaRepoOpen = repo.Open
@@ -92,17 +95,26 @@ func NewKopiaRepoService(logger logrus.FieldLogger) udmrepo.BackupRepoService {
 	return ks
 }
 
-func (ks *kopiaRepoService) Init(ctx context.Context, repoOption udmrepo.RepoOptions, createNew bool) error {
+func (ks *kopiaRepoService) Create(ctx context.Context, repoOption udmrepo.RepoOptions) error {
 	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
 
-	if createNew {
-		if err := CreateBackupRepo(repoCtx, repoOption, ks.logger); err != nil {
-			return err
-		}
-
-		return writeInitParameters(repoCtx, repoOption, ks.logger)
+	if err := CreateBackupRepo(repoCtx, repoOption, ks.logger); err != nil {
+		return err
 	}
+
+	return writeInitParameters(repoCtx, repoOption, ks.logger)
+}
+
+func (ks *kopiaRepoService) Connect(ctx context.Context, repoOption udmrepo.RepoOptions) error {
+	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
+
 	return ConnectBackupRepo(repoCtx, repoOption, ks.logger)
+}
+
+func (ks *kopiaRepoService) IsCreated(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
+	repoCtx := kopia.SetupKopiaLog(ctx, ks.logger)
+
+	return IsBackupRepoCreated(repoCtx, repoOption, ks.logger)
 }
 
 func (ks *kopiaRepoService) Open(ctx context.Context, repoOption udmrepo.RepoOptions) (udmrepo.BackupRepo, error) {
@@ -209,6 +221,34 @@ func (ks *kopiaRepoService) Maintain(ctx context.Context, repoOption udmrepo.Rep
 
 func (ks *kopiaRepoService) DefaultMaintenanceFrequency() time.Duration {
 	return defaultMaintainCheckPeriod
+}
+
+func (ks *kopiaRepoService) ClientSideCacheLimit(repoOption map[string]string) int64 {
+	defaultLimit := int64(backend.DefaultCacheLimitMB << 20)
+	if repoOption == nil {
+		return defaultLimit
+	}
+
+	if v, found := repoOption[repoBackend]; found {
+		var configs map[string]any
+		if err := json.Unmarshal([]byte(v), &configs); err != nil {
+			ks.logger.WithError(err).Warnf("error unmarshalling config data from data %v", v)
+			return defaultLimit
+		}
+
+		limit := defaultLimit
+		if v, found := configs[udmrepo.StoreOptionCacheLimit]; found {
+			if iv, ok := v.(float64); ok {
+				limit = int64(iv) << 20
+			} else {
+				ks.logger.Warnf("ignore cache limit from data %v", v)
+			}
+		}
+
+		return limit
+	}
+
+	return defaultLimit
 }
 
 func (km *kopiaMaintenance) runMaintenance(ctx context.Context, rep repo.DirectRepositoryWriter) error {
