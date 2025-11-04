@@ -1,3 +1,33 @@
+## v1.17.1
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.17.1
+
+### Container Image
+`velero/velero:v1.17.1`
+
+### Documentation
+https://velero.io/docs/v1.17/
+
+### Upgrading
+https://velero.io/docs/v1.17/upgrade-to-1.17/
+
+### All Changes
+  * Fix issue #9365, prevent fake completion notification due to multiple update of single PVR (#9376, @Lyndon-Li)
+  * Fix issue #9332, add bytesDone for cache files (#9341, @Lyndon-Li)
+  * VerifyJSONConfigs verify every elements in Data. (#9303, @blackpiglet)
+  * Add option for privileged fs-backup pod (#9300, @sseago)
+  * Fix repository maintenance jobs to inherit allowlisted tolerations from Velero deployment (#9299, @shubham-pampattiwar)
+  * Fix issue #9229, don't attach backupPVC to the source node (#9297, @Lyndon-Li)
+  * Protect VolumeSnapshot field from race condition during multi-thread backup (#9292, @0xLeo258)
+  * Implement concurrency control for cache of native VolumeSnapshotter plugin. (#9290, @0xLeo258)
+  * Backport to 1.17 (PR#9244 Update AzureAD Microsoft Authentication Library to v1.5.0) (#9285, @priyansh17)
+  * Fix schedule controller to prevent backup queue accumulation during extended blocking scenarios by properly handling empty backup phases (#9277, @shubham-pampattiwar)
+  * Get pod list once per namespace in pvc IBA (#9266, @sseago)
+  * Update AzureAD Microsoft Authentication Library to v1.5.0 (#9244, @priyansh17)
+  * feat: Permit specifying annotations for the BackupPVC (#9173, @clementnuss)
+
+
 ## v1.17
 
 ### Download
