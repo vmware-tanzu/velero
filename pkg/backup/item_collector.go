@@ -796,7 +796,6 @@ func (r *itemCollector) collectNamespaces(
 	// Change to look at the struct includes/excludes
 	// In case wildcards are expanded, we need to look at the struct includes/excludes
 	for _, includedNSName := range r.backupRequest.NamespaceIncludesExcludes.GetIncludes() {
-
 		nsExists := false
 		// Skip checking the namespace existing when it's "*".
 		if includedNSName == "*" {

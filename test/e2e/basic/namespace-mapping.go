@@ -44,13 +44,15 @@ func (n *NamespaceMapping) Init() error {
 	var mappedNS string
 	var mappedNSList []string
 	n.NSIncluded = &[]string{}
+	var mappedNSSb47 strings.Builder
 	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
 		createNSName := fmt.Sprintf("%s-%00000d", n.CaseBaseName, nsNum)
 		*n.NSIncluded = append(*n.NSIncluded, createNSName)
 		mappedNS = mappedNS + createNSName + ":" + createNSName + "-mapped"
 		mappedNSList = append(mappedNSList, createNSName+"-mapped")
-		mappedNS = mappedNS + ","
+		mappedNSSb47.WriteString(",")
 	}
+	mappedNS += mappedNSSb47.String()
 	mappedNS = strings.TrimRightFunc(mappedNS, func(r rune) bool {
 		return r == ','
 	})

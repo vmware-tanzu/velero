@@ -10,7 +10,6 @@ import (
 )
 
 func ShouldExpandWildcards(includes []string, excludes []string) bool {
-
 	wildcardFound := false
 	for _, include := range includes {
 		// Special case: "*" alone means "match all" - don't expand
@@ -109,7 +108,6 @@ func validateBracePatterns(pattern string) error {
 }
 
 func ExpandWildcards(activeNamespaces []string, includes []string, excludes []string) ([]string, []string, error) {
-
 	expandedIncludes, err := expandWildcards(includes, activeNamespaces)
 	if err != nil {
 		return nil, nil, err
@@ -137,7 +135,6 @@ func expandWildcards(patterns []string, activeNamespaces []string) ([]string, er
 	matchedSet := make(map[string]struct{})
 
 	for _, pattern := range patterns {
-
 		// If the pattern is a non-wildcard pattern, we can just add it to the result
 		if !containsWildcardPattern(pattern) {
 			matchedSet[pattern] = struct{}{}

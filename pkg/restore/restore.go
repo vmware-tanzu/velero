@@ -2411,7 +2411,7 @@ func (ctx *restoreContext) expandNamespaceWildcards(backupResources map[string]*
 		return nil
 	}
 
-	// If `*` is mentioned in restore exludes, something is wrong
+	// If `*` is mentioned in restore excludes, something is wrong
 	if slices.Contains(ctx.restore.Spec.ExcludedNamespaces, "*") {
 		return errors.New("wildcard '*' is not allowed in restore excludes")
 	}

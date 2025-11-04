@@ -465,7 +465,7 @@ func TestExpandWildcardsPrivate(t *testing.T) {
 func TestExpandWildcardsEdgeCases(t *testing.T) {
 	t.Run("nil inputs", func(t *testing.T) {
 		includes, excludes, err := ExpandWildcards(nil, nil, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, includes)
 		assert.Nil(t, excludes)
 	})
@@ -473,42 +473,42 @@ func TestExpandWildcardsEdgeCases(t *testing.T) {
 	t.Run("empty string patterns", func(t *testing.T) {
 		activeNamespaces := []string{"ns1", "ns2"}
 		result, err := expandWildcards([]string{""}, activeNamespaces)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.ElementsMatch(t, []string{""}, result) // empty string is treated as literal
 	})
 
 	t.Run("whitespace patterns", func(t *testing.T) {
 		activeNamespaces := []string{"ns1", " ", "ns2"}
 		result, err := expandWildcards([]string{" "}, activeNamespaces)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.ElementsMatch(t, []string{" "}, result)
 	})
 
 	t.Run("special characters in namespace names", func(t *testing.T) {
 		activeNamespaces := []string{"ns-1", "ns_2", "ns.3", "ns@4"}
 		result, err := expandWildcards([]string{"ns*"}, activeNamespaces)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.ElementsMatch(t, []string{"ns-1", "ns_2", "ns.3", "ns@4"}, result)
 	})
 
 	t.Run("complex glob combinations", func(t *testing.T) {
 		activeNamespaces := []string{"app1-prod", "app2-prod", "app1-test", "db-prod", "service"}
 		result, err := expandWildcards([]string{"app?-{prod,test}"}, activeNamespaces)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.ElementsMatch(t, []string{"app1-prod", "app2-prod", "app1-test"}, result)
 	})
 
 	t.Run("escaped characters", func(t *testing.T) {
 		activeNamespaces := []string{"app*", "app-prod", "app?test", "app-test"}
 		result, err := expandWildcards([]string{"app\\*"}, activeNamespaces)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.ElementsMatch(t, []string{"app*"}, result)
 	})
 
 	t.Run("mixed literal and wildcard patterns", func(t *testing.T) {
 		activeNamespaces := []string{"app.prod", "app-prod", "app_prod", "test.ns"}
 		result, err := expandWildcards([]string{"app.prod", "app?prod"}, activeNamespaces)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.ElementsMatch(t, []string{"app.prod", "app-prod", "app_prod"}, result)
 	})
 
