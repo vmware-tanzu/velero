@@ -388,12 +388,12 @@ func GetVolumeSnapshotClassFromPVCAnnotationsForDriver(
 
 func GetVolumeSnapshotClassFromStorageClassAnnotationsForDriver(storageClass *storagev1api.StorageClass, snapshotClasses *snapshotv1api.VolumeSnapshotClassList) (*snapshotv1api.VolumeSnapshotClass, error) {
 	annotationKey := velerov1api.VolumeSnapshotClassDriverStorageClassAnnotation
-	snapshotClassName, ok := storageClass.ObjectMeta.Annotations[annotationKey]
+	snapshotClassNameFromStorageClassAnnotation, ok := storageClass.ObjectMeta.Annotations[annotationKey]
 	if !ok {
 		return nil, nil
 	}
 	for _, sc := range snapshotClasses.Items {
-		if strings.EqualFold(snapshotClassName, sc.ObjectMeta.Name) {
+		if strings.EqualFold(snapshotClassNameFromStorageClassAnnotation, sc.ObjectMeta.Name) {
 			if !strings.EqualFold(sc.Driver, storageClass.Provisioner) {
 				return nil, errors.Errorf("Incorrect volumesnapshotclass, snapshot class %s is not for driver %s", sc.ObjectMeta.Name, storageClass.Provisioner)
 			}
