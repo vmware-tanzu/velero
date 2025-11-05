@@ -1440,11 +1440,6 @@ func (in *RestoreStatus) DeepCopyInto(out *RestoreStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.WildcardNamespaces != nil {
-		in, out := &in.WildcardNamespaces, &out.WildcardNamespaces
-		*out = new(WildcardNamespaceStatus)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.StartTimestamp != nil {
 		in, out := &in.StartTimestamp, &out.StartTimestamp
 		*out = (*in).DeepCopy()

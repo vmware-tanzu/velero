@@ -524,3 +524,21 @@ type BackupList struct {
 
 	Items []Backup `json:"items"`
 }
+
+// WildcardNamespaceStatus contains information about wildcard namespace matching results
+type WildcardNamespaceStatus struct {
+	// IncludeWildcardMatches records the namespaces that matched include wildcard patterns
+	// +optional
+	// +nullable
+	IncludeWildcardMatches []string `json:"includeWildcardMatches,omitempty"`
+
+	// ExcludeWildcardMatches records the namespaces that matched exclude wildcard patterns
+	// +optional
+	// +nullable
+	ExcludeWildcardMatches []string `json:"excludeWildcardMatches,omitempty"`
+
+	// WildcardResult records the final namespaces after applying wildcard include/exclude logic
+	// +optional
+	// +nullable
+	WildcardResult []string `json:"wildcardResult,omitempty"`
+}

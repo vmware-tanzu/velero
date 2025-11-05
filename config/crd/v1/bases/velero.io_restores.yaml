@@ -556,33 +556,6 @@ spec:
                   Warnings is a count of all warning messages that were generated during
                   execution of the restore. The actual warnings are stored in object storage.
                 type: integer
-              wildcardNamespaces:
-                description: WildcardNamespaces contains information about wildcard
-                  namespace processing
-                nullable: true
-                properties:
-                  excludeWildcardMatches:
-                    description: ExcludeWildcardMatches records the namespaces that
-                      matched exclude wildcard patterns
-                    items:
-                      type: string
-                    nullable: true
-                    type: array
-                  includeWildcardMatches:
-                    description: IncludeWildcardMatches records the namespaces that
-                      matched include wildcard patterns
-                    items:
-                      type: string
-                    nullable: true
-                    type: array
-                  wildcardResult:
-                    description: WildcardResult records the final namespaces after
-                      applying wildcard include/exclude logic
-                    items:
-                      type: string
-                    nullable: true
-                    type: array
-                type: object
             type: object
         type: object
     served: true
