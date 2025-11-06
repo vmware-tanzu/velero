@@ -41,21 +41,23 @@ func (n *NamespaceMapping) Init() error {
 	if n.UseVolumeSnapshots {
 		backupType = "snapshot"
 	}
-	var mappedNS string
+	var mappedNSSb strings.Builder
 	var mappedNSList []string
 	n.NSIncluded = &[]string{}
-	var mappedNSSb47 strings.Builder
+
 	for nsNum := 0; nsNum < n.NamespacesTotal; nsNum++ {
+		if nsNum > 0 {
+			mappedNSSb.WriteString(",")
+		}
 		createNSName := fmt.Sprintf("%s-%00000d", n.CaseBaseName, nsNum)
 		*n.NSIncluded = append(*n.NSIncluded, createNSName)
-		mappedNS = mappedNS + createNSName + ":" + createNSName + "-mapped"
+		mappedNSSb.WriteString(createNSName)
+		mappedNSSb.WriteString(":")
+		mappedNSSb.WriteString(createNSName)
+		mappedNSSb.WriteString("-mapped")
 		mappedNSList = append(mappedNSList, createNSName+"-mapped")
-		mappedNSSb47.WriteString(",")
 	}
-	mappedNS += mappedNSSb47.String()
-	mappedNS = strings.TrimRightFunc(mappedNS, func(r rune) bool {
-		return r == ','
-	})
+	mappedNS := mappedNSSb.String()
 
 	n.TestMsg = &TestMSG{
 		Desc:      fmt.Sprintf("Restore namespace %s with namespace mapping by %s test", *n.NSIncluded, backupType),
