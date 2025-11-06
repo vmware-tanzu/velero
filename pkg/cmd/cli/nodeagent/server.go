@@ -348,6 +348,16 @@ func (s *nodeAgentServer) run() {
 		}
 	}
 
+	var cachePVCConfig *velerotypes.CachePVC
+	if s.dataPathConfigs != nil && s.dataPathConfigs.CachePVCConfig != nil {
+		cachePVCConfig = s.dataPathConfigs.CachePVCConfig
+		s.logger.Infof("Using customized cachePVC config %v", cachePVCConfig)
+	}
+
+	if s.backupRepoConfigs != nil {
+		s.logger.Infof("Using backup repo config %v", s.backupRepoConfigs)
+	}
+
 	pvbReconciler := controller.NewPodVolumeBackupReconciler(s.mgr.GetClient(), s.mgr, s.kubeClient, s.dataPathMgr, s.vgdpCounter, s.nodeName, s.config.dataMoverPrepareTimeout, s.config.resourceTimeout, podResources, s.metrics, s.logger, dataMovePriorityClass, privilegedFsBackup)
 	if err := pvbReconciler.SetupWithManager(s.mgr); err != nil {
 		s.logger.Fatal(err, "unable to create controller", "controller", constant.ControllerPodVolumeBackup)
@@ -387,12 +397,6 @@ func (s *nodeAgentServer) run() {
 	if s.dataPathConfigs != nil && s.dataPathConfigs.RestorePVCConfig != nil {
 		restorePVCConfig = *s.dataPathConfigs.RestorePVCConfig
 		s.logger.Infof("Using customized restorePVC config %v", restorePVCConfig)
-	}
-
-	var cachePVCConfig *velerotypes.CachePVC
-	if s.dataPathConfigs != nil && s.dataPathConfigs.CachePVCConfig != nil {
-		cachePVCConfig = s.dataPathConfigs.CachePVCConfig
-		s.logger.Infof("Using customized cachePVC config %v", cachePVCConfig)
 	}
 
 	dataDownloadReconciler := controller.NewDataDownloadReconciler(
