@@ -47,3 +47,20 @@ func TestGetRepositoryProvider(t *testing.T) {
 	_, err = mgr.getRepositoryProvider(repo)
 	require.Error(t, err)
 }
+
+func TestGetRepositoryConfigProvider(t *testing.T) {
+	mgr := NewConfigManager(nil).(*configManager)
+
+	// empty repository type
+	_, err := mgr.getRepositoryProvider("")
+	require.Error(t, err)
+
+	// valid repository type
+	provider, err := mgr.getRepositoryProvider(velerov1.BackupRepositoryTypeKopia)
+	require.NoError(t, err)
+	assert.NotNil(t, provider)
+
+	// invalid repository type
+	_, err = mgr.getRepositoryProvider(velerov1.BackupRepositoryTypeRestic)
+	require.Error(t, err)
+}
