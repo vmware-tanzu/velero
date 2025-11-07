@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -986,6 +987,382 @@ func TestShouldExcluded(t *testing.T) {
 				ie = GetScopeResourceIncludesExcludes(setupDiscoveryClientWithResources(tc.apiResources), logger, []string{}, []string{}, tc.clusterIncludes, tc.clusterExcludes, *NewNamespaceIncludesExcludes())
 			}
 			assert.Equal(t, tc.resourceIsExcluded, ie.ShouldExclude(tc.resourceName))
+		})
+	}
+}
+
+func TestExpandIncludesExcludes(t *testing.T) {
+	tests := []struct {
+		name                    string
+		includes                []string
+		excludes                []string
+		activeNamespaces        []string
+		expectedIncludes        []string
+		expectedExcludes        []string
+		expectedWildcardExpanded bool
+		expectError             bool
+	}{
+		{
+			name:                    "no wildcards - should not expand",
+			includes:                []string{"default", "kube-system"},
+			excludes:                []string{"kube-public"},
+			activeNamespaces:        []string{"default", "kube-system", "kube-public", "test"},
+			expectedIncludes:        []string{"default", "kube-system"},
+			expectedExcludes:        []string{"kube-public"},
+			expectedWildcardExpanded: false,
+			expectError:             false,
+		},
+		{
+			name:                    "asterisk alone - should not expand",
+			includes:                []string{"*"},
+			excludes:                []string{},
+			activeNamespaces:        []string{"default", "kube-system", "test"},
+			expectedIncludes:        []string{"*"},
+			expectedExcludes:        []string{},
+			expectedWildcardExpanded: false,
+			expectError:             false,
+		},
+		{
+			name:                    "wildcard in includes - should expand",
+			includes:                []string{"kube-*"},
+			excludes:                []string{},
+			activeNamespaces:        []string{"default", "kube-system", "kube-public", "test"},
+			expectedIncludes:        []string{"kube-system", "kube-public"},
+			expectedExcludes:        []string{},
+			expectedWildcardExpanded: true,
+			expectError:             false,
+		},
+		{
+			name:                    "wildcard in excludes - should expand",
+			includes:                []string{"default"},
+			excludes:                []string{"*-test"},
+			activeNamespaces:        []string{"default", "kube-test", "app-test", "prod"},
+			expectedIncludes:        []string{"default"},
+			expectedExcludes:        []string{"kube-test", "app-test"},
+			expectedWildcardExpanded: true,
+			expectError:             false,
+		},
+		{
+			name:                    "wildcards in both includes and excludes",
+			includes:                []string{"kube-*", "app-*"},
+			excludes:                []string{"*-test"},
+			activeNamespaces:        []string{"kube-system", "kube-test", "app-prod", "app-test", "default"},
+			expectedIncludes:        []string{"kube-system", "kube-test", "app-prod", "app-test"},
+			expectedExcludes:        []string{"kube-test", "app-test"},
+			expectedWildcardExpanded: true,
+			expectError:             false,
+		},
+		{
+			name:                    "wildcard pattern matches nothing",
+			includes:                []string{"nonexistent-*"},
+			excludes:                []string{},
+			activeNamespaces:        []string{"default", "kube-system"},
+			expectedIncludes:        []string{},
+			expectedExcludes:        []string{},
+			expectedWildcardExpanded: true,
+			expectError:             false,
+		},
+		{
+			name:                    "mix of wildcards and non-wildcards in includes",
+			includes:                []string{"default", "kube-*"},
+			excludes:                []string{},
+			activeNamespaces:        []string{"default", "kube-system", "kube-public", "test"},
+			expectedIncludes:        []string{"default", "kube-system", "kube-public"},
+			expectedExcludes:        []string{},
+			expectedWildcardExpanded: true,
+			expectError:             false,
+		},
+		{
+			name:                    "question mark wildcard",
+			includes:                []string{"test-?"},
+			excludes:                []string{},
+			activeNamespaces:        []string{"test-1", "test-2", "test-10", "default"},
+			expectedIncludes:        []string{"test-1", "test-2"},
+			expectedExcludes:        []string{},
+			expectedWildcardExpanded: true,
+			expectError:             false,
+		},
+		{
+			name:                    "brace wildcard pattern",
+			includes:                []string{"app-{prod,dev}"},
+			excludes:                []string{},
+			activeNamespaces:        []string{"app-prod", "app-dev", "app-test", "default"},
+			expectedIncludes:        []string{"app-prod", "app-dev"},
+			expectedExcludes:        []string{},
+			expectedWildcardExpanded: true,
+			expectError:             false,
+		},
+		{
+			name:                    "empty activeNamespaces with wildcards",
+			includes:                []string{"kube-*"},
+			excludes:                []string{},
+			activeNamespaces:        []string{},
+			expectedIncludes:        []string{},
+			expectedExcludes:        []string{},
+			expectedWildcardExpanded: true,
+			expectError:             false,
+		},
+		{
+			name:                    "invalid wildcard pattern - consecutive asterisks",
+			includes:                []string{"kube-**"},
+			excludes:                []string{},
+			activeNamespaces:        []string{"default"},
+			expectedIncludes:        []string{"kube-**"},
+			expectedExcludes:        []string{},
+			expectedWildcardExpanded: false,
+			expectError:             true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			nie := NewNamespaceIncludesExcludes().
+				ActiveNamespaces(tc.activeNamespaces).
+				Includes(tc.includes...).
+				Excludes(tc.excludes...)
+
+			err := nie.ExpandIncludesExcludes()
+
+			if tc.expectError {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedWildcardExpanded, nie.IsWildcardExpanded())
+
+			// Check includes - convert to sets for order-independent comparison
+			actualIncludes := sets.NewString(nie.GetIncludes()...)
+			expectedIncludes := sets.NewString(tc.expectedIncludes...)
+			assert.True(t, actualIncludes.Equal(expectedIncludes),
+				"includes mismatch: expected %v, got %v", tc.expectedIncludes, nie.GetIncludes())
+
+			// Check excludes
+			actualExcludes := sets.NewString(nie.GetExcludes()...)
+			expectedExcludes := sets.NewString(tc.expectedExcludes...)
+			assert.True(t, actualExcludes.Equal(expectedExcludes),
+				"excludes mismatch: expected %v, got %v", tc.expectedExcludes, nie.GetExcludes())
+		})
+	}
+}
+
+func TestResolveNamespaceList(t *testing.T) {
+	tests := []struct {
+		name                 string
+		includes             []string
+		excludes             []string
+		activeNamespaces     []string
+		expectedNamespaces   []string
+		preExpandWildcards   bool
+	}{
+		{
+			name:               "no includes/excludes - all active namespaces",
+			includes:           []string{},
+			excludes:           []string{},
+			activeNamespaces:   []string{"default", "kube-system", "test"},
+			expectedNamespaces: []string{"default", "kube-system", "test"},
+		},
+		{
+			name:               "asterisk includes - all active namespaces",
+			includes:           []string{"*"},
+			excludes:           []string{},
+			activeNamespaces:   []string{"default", "kube-system", "test"},
+			expectedNamespaces: []string{"default", "kube-system", "test"},
+		},
+		{
+			name:               "specific includes - only those namespaces",
+			includes:           []string{"default", "test"},
+			excludes:           []string{},
+			activeNamespaces:   []string{"default", "kube-system", "test"},
+			expectedNamespaces: []string{"default", "test"},
+		},
+		{
+			name:               "includes with excludes",
+			includes:           []string{"*"},
+			excludes:           []string{"kube-system"},
+			activeNamespaces:   []string{"default", "kube-system", "test"},
+			expectedNamespaces: []string{"default", "test"},
+		},
+		{
+			name:               "wildcard includes - expands and filters",
+			includes:           []string{"kube-*"},
+			excludes:           []string{},
+			activeNamespaces:   []string{"default", "kube-system", "kube-public", "test"},
+			expectedNamespaces: []string{"kube-system", "kube-public"},
+		},
+		{
+			name:               "wildcard includes with wildcard excludes",
+			includes:           []string{"app-*"},
+			excludes:           []string{"*-test"},
+			activeNamespaces:   []string{"app-prod", "app-dev", "app-test", "default"},
+			expectedNamespaces: []string{"app-prod", "app-dev"},
+		},
+		{
+			name:               "wildcard matches nothing - empty result",
+			includes:           []string{"nonexistent-*"},
+			excludes:           []string{},
+			activeNamespaces:   []string{"default", "kube-system"},
+			expectedNamespaces: []string{},
+		},
+		{
+			name:               "empty active namespaces",
+			includes:           []string{"*"},
+			excludes:           []string{},
+			activeNamespaces:   []string{},
+			expectedNamespaces: []string{},
+		},
+		{
+			name:               "includes namespace not in active namespaces",
+			includes:           []string{"default", "nonexistent"},
+			excludes:           []string{},
+			activeNamespaces:   []string{"default", "test"},
+			expectedNamespaces: []string{"default"},
+		},
+		{
+			name:               "excludes all namespaces from includes",
+			includes:           []string{"default", "test"},
+			excludes:           []string{"default", "test"},
+			activeNamespaces:   []string{"default", "test", "prod"},
+			expectedNamespaces: []string{},
+		},
+		{
+			name:               "pre-expanded wildcards - should not expand again",
+			includes:           []string{"kube-*"},
+			excludes:           []string{},
+			activeNamespaces:   []string{"default", "kube-system", "kube-public"},
+			expectedNamespaces: []string{"kube-system", "kube-public"},
+			preExpandWildcards: true,
+		},
+		{
+			name:               "complex wildcard pattern",
+			includes:           []string{"app-{prod,dev}", "kube-*"},
+			excludes:           []string{"*-test"},
+			activeNamespaces:   []string{"app-prod", "app-dev", "app-test", "kube-system", "kube-test", "default"},
+			expectedNamespaces: []string{"app-prod", "app-dev", "kube-system"},
+		},
+		{
+			name:               "question mark wildcard pattern",
+			includes:           []string{"ns-?"},
+			excludes:           []string{},
+			activeNamespaces:   []string{"ns-1", "ns-2", "ns-10", "default"},
+			expectedNamespaces: []string{"ns-1", "ns-2"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			nie := NewNamespaceIncludesExcludes().
+				ActiveNamespaces(tc.activeNamespaces).
+				Includes(tc.includes...).
+				Excludes(tc.excludes...)
+
+			// Pre-expand wildcards if requested
+			if tc.preExpandWildcards {
+				err := nie.ExpandIncludesExcludes()
+				require.NoError(t, err)
+			}
+
+			namespaces, err := nie.ResolveNamespaceList()
+			require.NoError(t, err)
+
+			// Convert to sets for order-independent comparison
+			actualNs := sets.NewString(namespaces...)
+			expectedNs := sets.NewString(tc.expectedNamespaces...)
+			assert.True(t, actualNs.Equal(expectedNs),
+				"namespaces mismatch: expected %v, got %v", tc.expectedNamespaces, namespaces)
+		})
+	}
+}
+
+func TestResolveNamespaceListError(t *testing.T) {
+	tests := []struct {
+		name             string
+		includes         []string
+		excludes         []string
+		activeNamespaces []string
+	}{
+		{
+			name:             "invalid wildcard pattern in includes",
+			includes:         []string{"kube-**"},
+			excludes:         []string{},
+			activeNamespaces: []string{"default"},
+		},
+		{
+			name:             "invalid wildcard pattern in excludes",
+			includes:         []string{"default"},
+			excludes:         []string{"test-**"},
+			activeNamespaces: []string{"default"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			nie := NewNamespaceIncludesExcludes().
+				ActiveNamespaces(tc.activeNamespaces).
+				Includes(tc.includes...).
+				Excludes(tc.excludes...)
+
+			_, err := nie.ResolveNamespaceList()
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestNamespaceIncludesExcludesShouldIncludeAfterWildcardExpansion(t *testing.T) {
+	tests := []struct {
+		name             string
+		includes         []string
+		excludes         []string
+		activeNamespaces []string
+		testNamespace    string
+		expectedResult   bool
+	}{
+		{
+			name:             "wildcard expanded to empty includes - should not include anything",
+			includes:         []string{"nonexistent-*"},
+			excludes:         []string{},
+			activeNamespaces: []string{"default", "kube-system"},
+			testNamespace:    "default",
+			expectedResult:   false,
+		},
+		{
+			name:             "wildcard expanded with matches - should include matched namespace",
+			includes:         []string{"kube-*"},
+			excludes:         []string{},
+			activeNamespaces: []string{"default", "kube-system", "kube-public"},
+			testNamespace:    "kube-system",
+			expectedResult:   true,
+		},
+		{
+			name:             "wildcard expanded with matches - should not include unmatched namespace",
+			includes:         []string{"kube-*"},
+			excludes:         []string{},
+			activeNamespaces: []string{"default", "kube-system", "kube-public"},
+			testNamespace:    "default",
+			expectedResult:   false,
+		},
+		{
+			name:             "no wildcard expansion - empty includes means include all",
+			includes:         []string{},
+			excludes:         []string{},
+			activeNamespaces: []string{"default", "kube-system"},
+			testNamespace:    "default",
+			expectedResult:   true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			nie := NewNamespaceIncludesExcludes().
+				ActiveNamespaces(tc.activeNamespaces).
+				Includes(tc.includes...).
+				Excludes(tc.excludes...)
+
+			err := nie.ExpandIncludesExcludes()
+			require.NoError(t, err)
+
+			result := nie.ShouldInclude(tc.testNamespace)
+			assert.Equal(t, tc.expectedResult, result)
 		})
 	}
 }
