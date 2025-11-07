@@ -65,6 +65,7 @@ func (gss globStringSet) match(match string) bool {
 type NamespaceIncludesExcludes struct {
 	activeNamespaces []string
 	includesExcludes *IncludesExcludes
+	wildcardExpanded bool
 }
 
 func NewNamespaceIncludesExcludes() *NamespaceIncludesExcludes {
@@ -134,6 +135,12 @@ func (nie *NamespaceIncludesExcludes) ExcludesString() string {
 // included or not. Everything in the includes list except those
 // items in the excludes list should be included.
 func (nie *NamespaceIncludesExcludes) ShouldInclude(s string) bool {
+	// Special case: if wildcard expansion occurred and resulted in an empty includes list,
+	// it means the wildcard pattern matched nothing, so we should include nothing.
+	// This differs from the default behavior where an empty includes list means "include everything".
+	if nie.wildcardExpanded && nie.includesExcludes.includes.Len() == 0 {
+		return false
+	}
 	return nie.includesExcludes.ShouldInclude(s)
 }
 
@@ -159,12 +166,15 @@ func (nie *NamespaceIncludesExcludes) ResolveNamespaceList() ([]string, bool, er
 
 		nie.SetIncludes(expandedIncludes)
 		nie.SetExcludes(expandedExcludes)
+		nie.wildcardExpanded = true
 
 		return nie.resolveNamespaceListTraditional(), true, nil
 	}
 
 	// Use traditional resolution when no wildcard expansion is needed
-	return nie.resolveNamespaceListTraditional(), false, nil
+	// Note: Don't reset wildcardExpanded to false here, as it may have been set to true
+	// by a previous call, and we want to preserve that state across multiple calls
+	return nie.resolveNamespaceListTraditional(), nie.wildcardExpanded, nil
 }
 
 // resolveNamespaceListTraditional is a helper method to resolve namespaces using the old glob-based logic.

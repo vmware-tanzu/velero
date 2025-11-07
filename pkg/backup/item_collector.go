@@ -458,8 +458,6 @@ func (r *itemCollector) getResourceItems(
 	}
 
 	if wildcardExpansion {
-		log.Info("Wildcard expansion occurred")
-
 		expandedIncludes := r.backupRequest.NamespaceIncludesExcludes.GetIncludes()
 		expandedExcludes := r.backupRequest.NamespaceIncludesExcludes.GetExcludes()
 
@@ -469,7 +467,7 @@ func (r *itemCollector) getResourceItems(
 			ExcludeWildcardMatches: expandedExcludes,
 		}
 
-		r.log.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"expandedIncludes": expandedIncludes,
 			"expandedExcludes": expandedExcludes,
 			"includedCount":    len(expandedIncludes),
@@ -845,17 +843,18 @@ func (r *itemCollector) collectNamespaces(
 	var items []*kubernetesResource
 
 	for index := range unstructuredList.Items {
+		nsName := unstructuredList.Items[index].GetName()
+
 		path, err := r.writeToFile(&unstructuredList.Items[index])
 		if err != nil {
-			log.WithError(err).Errorf("Error writing item %s to file",
-				unstructuredList.Items[index].GetName())
+			log.WithError(err).Errorf("Error writing item %s to file", nsName)
 			continue
 		}
 
 		items = append(items, &kubernetesResource{
 			groupResource: gr,
 			preferredGVR:  preferredGVR,
-			name:          unstructuredList.Items[index].GetName(),
+			name:          nsName,
 			path:          path,
 			kind:          resource.Kind,
 		})
