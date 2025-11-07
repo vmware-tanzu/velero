@@ -1,0 +1,1 @@
+Fix BackupRepository PrepareRepo to ensure local config file exists when repo exists remotely, using Open() fallback to Connect() pattern. This fixes failures in multi-pod environments and after pod restarts where config files are missing or invalid.

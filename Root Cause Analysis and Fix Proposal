@@ -1,0 +1,94 @@
+Root Cause Analysis and Fix Proposal
+I've completed the investigation into the HCP test BackupRepository Kopia initialization failure. Here are my findings:
+Root Cause
+The error occurs in Velero's PrepareRepo function at pkg/repository/provider/unified_repo.go:170-215:
+func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam) error {
+    // ... setup code ...
+    
+    repoOption, err := udmrepo.NewRepoOptions(
+        udmrepo.WithPassword(urp, param),
+        udmrepo.WithConfigFile(urp.workPath, string(param.BackupRepo.UID)),
+        // ... other options ...
+    )
+    
+    // Check if repo exists in backend storage
+    if created, err := urp.repoService.IsCreated(ctx, *repoOption); err != nil {
+        return errors.Wrap(err, "error to check backup repo")
+    } else if created {
+        log.Debug("Repo has already been initialized remotely")
+        return nil  // ❌ BUG: Returns without creating local config file!
+    }
+    
+    // Only reached if repo doesn't exist in backend
+    err = urp.repoService.Create(ctx, *repoOption)
+    // ...
+}
+The Problem:
+Kopia Architecture: Kopia repositories have two components:
+Backend storage (S3/Azure/GCS) containing repository metadata
+Local config file (/home/velero/udmrepo/repo-<uid>.conf) containing connection info
+Current Flow:
+repo.Initialize(): Creates backend storage metadata AND creates initial local config file
+repo.Connect(): Connects to existing backend AND creates/updates local config file
+repo.Open(): Opens repo using EXISTING local config file
+The Bug:
+When PrepareRepo finds the repository already exists in backend storage (via IsCreated()), it returns immediately without calling Connect()
+This means the local config file is never created/recreated
+Since the config file is stored in ephemeral pod storage (/home/velero), it's lost when:
+  - A different node-agent pod tries to use the repository
+  - The pod restarts
+  - The creating pod is deleted
+Later, when DataUpload tries to open the repository via repoService.Open(), it fails because the config file doesn't exist
+When This Occurs
+This bug manifests in these scenarios:
+Multi-pod environments: One node-agent pod creates the BackupRepository, another pod tries to use it
+Pod restarts: After the creating pod restarts, it loses the local config file (ephemeral storage)
+HCP tests: Multiple backups in sequence where different resources trigger repository initialization
+The Fix
+The fix is to ensure PrepareRepo always calls Connect() when the repository exists remotely:
+func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam) error {
+    // ... setup code ...
+    
+    repoOption, err := udmrepo.NewRepoOptions(/* ... */)
+    if err != nil {
+        return errors.Wrap(err, "error to get repo options")
+    }
+
+    if created, err := urp.repoService.IsCreated(ctx, *repoOption); err != nil {
+        return errors.Wrap(err, "error to check backup repo")
+    } else if created {
+        log.Debug("Repo has already been initialized remotely, connecting to it")
+        // ✅ FIX: Call Connect to create local config file
+        return urp.repoService.Connect(ctx, *repoOption)
+    }
+
+    // Repository doesn't exist, create it
+    if param.BackupLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
+        return errors.Errorf("cannot create new backup repo for read-only backup storage location %s/%s", 
+            param.BackupLocation.Namespace, param.BackupLocation.Name)
+    }
+
+    err = urp.repoService.Create(ctx, *repoOption)
+    if err != nil {
+        return errors.Wrap(err, "error to create backup repo")
+    }
+
+    log.Debug("Prepare repo complete")
+    return nil
+}
+File to Fix
+Location: /Users/tkaovila/git/velero/pkg/repository/provider/unified_repo.go
+Lines: 211-216 (specifically line 215)
+Change: Replace `return nil` with `return urp.repoService.Connect(ctx, *repoOption)`
+Additional Context
+From lib_repo.go:98-106, Create() calls writeInitParameters() which opens the repo. This means:
+The initial repo.Initialize() does create a local config file
+However, this config file is stored in ephemeral pod storage (/home/velero/udmrepo/)
+The issue is that subsequent PrepareRepo() calls don't recreate the config file when it's missing
+
+This explains the failure pattern:
+The first DataUpload might succeed (if it runs on the same pod that created the repo)
+Subsequent DataUploads fail when:
+  - Running on different node-agent pods (don't have the config file)
+  - Running after pod restart (config file lost from ephemeral storage)
+All HCP resources fail with the same error because they're processed by pods without the config file

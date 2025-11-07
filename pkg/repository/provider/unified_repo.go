@@ -211,8 +211,20 @@ func (urp *unifiedRepoProvider) PrepareRepo(ctx context.Context, param RepoParam
 	if created, err := urp.repoService.IsCreated(ctx, *repoOption); err != nil {
 		return errors.Wrap(err, "error to check backup repo")
 	} else if created {
-		log.Debug("Repo has already been initialized remotely")
-		return nil
+		// Repo exists remotely. Try to open with existing config file.
+		bkRepo, err := urp.repoService.Open(ctx, *repoOption)
+		if err == nil {
+			// Config file exists and is valid
+			if c := bkRepo.Close(ctx); c != nil {
+				log.WithError(c).Error("Failed to close repo")
+			}
+			log.Debug("Repo has already been initialized remotely and config file is valid")
+			return nil
+		}
+
+		// Config file missing or invalid, recreate it
+		log.WithError(err).Debug("Repo exists remotely but config file issue detected, connecting to it")
+		return urp.repoService.Connect(ctx, *repoOption)
 	}
 
 	if param.BackupLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {

@@ -612,8 +612,11 @@ func TestPrepareRepo(t *testing.T) {
 		funcTable       localFuncTable
 		getter          *credmock.SecretStore
 		repoService     *reposervicenmocks.BackupRepoService
+		backupRepo      *reposervicenmocks.BackupRepo
 		retFuncCreate   func(context.Context, udmrepo.RepoOptions) error
 		retFuncCheck    func(context.Context, udmrepo.RepoOptions) (bool, error)
+		retFuncConnect  func(context.Context, udmrepo.RepoOptions) error
+		retFuncOpen     []any
 		credStoreReturn string
 		credStoreError  error
 		readOnlyBSL     bool
@@ -662,7 +665,7 @@ func TestPrepareRepo(t *testing.T) {
 			expectedErr: "error to check backup repo: fake-error",
 		},
 		{
-			name:            "already initialized",
+			name:            "already initialized with valid config",
 			getter:          new(credmock.SecretStore),
 			credStoreReturn: "fake-password",
 			funcTable: localFuncTable{
@@ -674,12 +677,65 @@ func TestPrepareRepo(t *testing.T) {
 				},
 			},
 			repoService: new(reposervicenmocks.BackupRepoService),
+			backupRepo:  new(reposervicenmocks.BackupRepo),
 			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
 				return true, nil
 			},
+			retFuncOpen: []any{nil}, // Open succeeds - config file exists and is valid
 			retFuncCreate: func(ctx context.Context, repoOption udmrepo.RepoOptions) error {
-				return errors.New("fake-error")
+				return errors.New("fake-error-should-not-be-called")
 			},
+		},
+		{
+			name:            "already initialized but config missing and connect succeeds",
+			getter:          new(credmock.SecretStore),
+			credStoreReturn: "fake-password",
+			funcTable: localFuncTable{
+				getStorageVariables: func(*velerov1api.BackupStorageLocation, string, string, map[string]string) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+				getStorageCredentials: func(*velerov1api.BackupStorageLocation, velerocredentials.FileStore) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+			},
+			repoService: new(reposervicenmocks.BackupRepoService),
+			backupRepo:  new(reposervicenmocks.BackupRepo),
+			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
+				return true, nil
+			},
+			retFuncOpen: []any{errors.New("fake-open-error")}, // Open fails - config file missing/invalid
+			retFuncConnect: func(ctx context.Context, repoOption udmrepo.RepoOptions) error {
+				return nil // Connect succeeds - recreates config file
+			},
+			retFuncCreate: func(ctx context.Context, repoOption udmrepo.RepoOptions) error {
+				return errors.New("fake-error-should-not-be-called")
+			},
+		},
+		{
+			name:            "already initialized but config missing and connect fails",
+			getter:          new(credmock.SecretStore),
+			credStoreReturn: "fake-password",
+			funcTable: localFuncTable{
+				getStorageVariables: func(*velerov1api.BackupStorageLocation, string, string, map[string]string) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+				getStorageCredentials: func(*velerov1api.BackupStorageLocation, velerocredentials.FileStore) (map[string]string, error) {
+					return map[string]string{}, nil
+				},
+			},
+			repoService: new(reposervicenmocks.BackupRepoService),
+			backupRepo:  new(reposervicenmocks.BackupRepo),
+			retFuncCheck: func(ctx context.Context, repoOption udmrepo.RepoOptions) (bool, error) {
+				return true, nil
+			},
+			retFuncOpen: []any{errors.New("fake-open-error")}, // Open fails - config file missing/invalid
+			retFuncConnect: func(ctx context.Context, repoOption udmrepo.RepoOptions) error {
+				return errors.New("fake-connect-error") // Connect also fails
+			},
+			retFuncCreate: func(ctx context.Context, repoOption udmrepo.RepoOptions) error {
+				return errors.New("fake-error-should-not-be-called")
+			},
+			expectedErr: "fake-connect-error",
 		},
 		{
 			name:            "bsl is readonly",
@@ -766,6 +822,21 @@ func TestPrepareRepo(t *testing.T) {
 
 			tc.repoService.On("IsCreated", mock.Anything, mock.Anything).Return(tc.retFuncCheck)
 			tc.repoService.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(tc.retFuncCreate)
+			tc.repoService.On("Connect", mock.Anything, mock.Anything).Return(tc.retFuncConnect)
+
+			// Mock Open() - returns BackupRepo if successful, error if not
+			if tc.retFuncOpen != nil {
+				if tc.retFuncOpen[0] == nil {
+					// Open succeeds - return the mock BackupRepo
+					if tc.backupRepo != nil {
+						tc.backupRepo.On("Close", mock.Anything).Return(nil)
+					}
+					tc.repoService.On("Open", mock.Anything, mock.Anything).Return(tc.backupRepo, nil)
+				} else {
+					// Open fails - return error
+					tc.repoService.On("Open", mock.Anything, mock.Anything).Return(nil, tc.retFuncOpen[0])
+				}
+			}
 
 			if tc.readOnlyBSL {
 				bsl.Spec.AccessMode = velerov1api.BackupStorageLocationAccessModeReadOnly
