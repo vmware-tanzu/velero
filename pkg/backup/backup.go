@@ -172,6 +172,11 @@ func NewKubernetesBackupper(
 // include and exclude from the backup.
 func getNamespaceIncludesExcludes(backup *velerov1api.Backup, kbClient kbclient.Client) (*collections.NamespaceIncludesExcludes, []string, error) {
 	includesExcludes := collections.NewNamespaceIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...)
+	err := includesExcludes.ExpandIncludesExcludes()
+	if err != nil {
+		return nil, []string{}, err
+	}
+
 	nsList := corev1api.NamespaceList{}
 	activeNamespaces := []string{}
 	nsManagedByArgoCD := []string{}
@@ -262,6 +267,25 @@ func (kb *kubernetesBackupper) BackupWithResolvers(
 	var err error
 	var nsManagedByArgoCD []string
 	backupRequest.NamespaceIncludesExcludes, nsManagedByArgoCD, err = getNamespaceIncludesExcludes(backupRequest.Backup, kb.kbClient)
+
+	if backupRequest.NamespaceIncludesExcludes.IsWildcardExpanded() {
+		expandedIncludes := backupRequest.NamespaceIncludesExcludes.GetIncludes()
+		expandedExcludes := backupRequest.NamespaceIncludesExcludes.GetExcludes()
+
+		// Record the expanded wildcard includes/excludes in the request status
+		backupRequest.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
+			IncludeWildcardMatches: expandedIncludes,
+			ExcludeWildcardMatches: expandedExcludes,
+		}
+
+		log.WithFields(logrus.Fields{
+			"expandedIncludes": expandedIncludes,
+			"expandedExcludes": expandedExcludes,
+			"includedCount":    len(expandedIncludes),
+			"excludedCount":    len(expandedExcludes),
+		}).Info("Successfully expanded wildcard patterns")
+	}
+
 	if err != nil {
 		log.WithError(err).Errorf("error listing namespaces")
 		return err

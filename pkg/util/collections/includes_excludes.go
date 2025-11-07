@@ -17,7 +17,6 @@ limitations under the License.
 package collections
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/vmware-tanzu/velero/internal/resourcepolicies"
@@ -75,11 +74,13 @@ func NewNamespaceIncludesExcludes() *NamespaceIncludesExcludes {
 	}
 }
 
-// ActiveNamespaces adds a list of namespaces. This should represent the full
-// list of active namespaces in the cluster.
-func (nie *NamespaceIncludesExcludes) ActiveNamespaces(nsList []string) *NamespaceIncludesExcludes {
-	nie.activeNamespaces = nsList
+func (nie *NamespaceIncludesExcludes) ActiveNamespaces(activeNamespaces []string) *NamespaceIncludesExcludes {
+	nie.activeNamespaces = activeNamespaces
 	return nie
+}
+
+func (nie *NamespaceIncludesExcludes) IsWildcardExpanded() bool {
+	return nie.wildcardExpanded
 }
 
 // Includes adds items to the includes list. '*' is a wildcard
@@ -150,42 +151,45 @@ func (nie *NamespaceIncludesExcludes) IncludeEverything() bool {
 	return nie.includesExcludes.IncludeEverything()
 }
 
-// ResolveNamespaceList returns a list of all namespaces which will be backed up.
-// The second return value indicates whether wildcard expansion was performed.
-func (nie *NamespaceIncludesExcludes) ResolveNamespaceList() ([]string, bool, error) {
+// Attempts to expand wildcard patterns, if any, in the includes and excludes lists.
+func (nie *NamespaceIncludesExcludes) ExpandIncludesExcludes() error {
 	includes := nie.GetIncludes()
 	excludes := nie.GetExcludes()
 
-	// Check if we should use wildcard expansion
 	if wildcard.ShouldExpandWildcards(includes, excludes) {
 		expandedIncludes, expandedExcludes, err := wildcard.ExpandWildcards(
 			nie.activeNamespaces, includes, excludes)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to expand wildcard patterns in namespace includes/excludes: %w", err)
+			return err
 		}
 
 		nie.SetIncludes(expandedIncludes)
 		nie.SetExcludes(expandedExcludes)
 		nie.wildcardExpanded = true
-
-		return nie.resolveNamespaceListTraditional(), true, nil
 	}
 
-	// Use traditional resolution when no wildcard expansion is needed
-	// Note: Don't reset wildcardExpanded to false here, as it may have been set to true
-	// by a previous call, and we want to preserve that state across multiple calls
-	return nie.resolveNamespaceListTraditional(), nie.wildcardExpanded, nil
+	return nil
 }
 
-// resolveNamespaceListTraditional is a helper method to resolve namespaces using the old glob-based logic.
-func (nie *NamespaceIncludesExcludes) resolveNamespaceListTraditional() []string {
+// ResolveNamespaceList returns a list of all namespaces which will be backed up.
+// The second return value indicates whether wildcard expansion was performed.
+func (nie *NamespaceIncludesExcludes) ResolveNamespaceList() ([]string, error) {
+
+	// Check if this is being called by non-backup processing e.g. backup queue controller
+	if !nie.wildcardExpanded {
+		err := nie.ExpandIncludesExcludes()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	outNamespaces := []string{}
 	for _, ns := range nie.activeNamespaces {
 		if nie.ShouldInclude(ns) {
 			outNamespaces = append(outNamespaces, ns)
 		}
 	}
-	return outNamespaces
+	return outNamespaces, nil
 }
 
 // IncludesExcludes is a type that manages lists of included

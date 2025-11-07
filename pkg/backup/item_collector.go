@@ -35,8 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/pager"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
@@ -448,31 +446,6 @@ func (r *itemCollector) getResourceItems(
 			}
 			cohabitator.seen = true
 		}
-	}
-
-	// Call ResolveNamespaceList to get the list of namespaces to backup
-	_, wildcardExpansion, err := r.backupRequest.NamespaceIncludesExcludes.ResolveNamespaceList()
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("error resolving namespace list")
-		return nil, errors.WithStack(err)
-	}
-
-	if wildcardExpansion {
-		expandedIncludes := r.backupRequest.NamespaceIncludesExcludes.GetIncludes()
-		expandedExcludes := r.backupRequest.NamespaceIncludesExcludes.GetExcludes()
-
-		// Record the expanded wildcard includes/excludes in the request status
-		r.backupRequest.Status.WildcardNamespaces = &velerov1api.WildcardNamespaceStatus{
-			IncludeWildcardMatches: expandedIncludes,
-			ExcludeWildcardMatches: expandedExcludes,
-		}
-
-		log.WithFields(logrus.Fields{
-			"expandedIncludes": expandedIncludes,
-			"expandedExcludes": expandedExcludes,
-			"includedCount":    len(expandedIncludes),
-			"excludedCount":    len(expandedExcludes),
-		}).Info("Successfully expanded wildcard patterns")
 	}
 
 	// Handle namespace resource here.
